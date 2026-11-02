@@ -40,8 +40,8 @@ struct EventCollection {
 impl Default for EventCollection {
     fn default() -> Self {
         Self {
-            finalizers: Default::default(),
-            events: Default::default(),
+            finalizers: EventFinalizers::default(),
+            events: Vec::default(),
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),
         }

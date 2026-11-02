@@ -1,5 +1,4 @@
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_body_util::{BodyExt, Collected};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -9,12 +8,13 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
+use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
     config::AcknowledgementsConfig,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
@@ -44,6 +44,7 @@ pub struct HecClientAcknowledgementsConfig {
     /// Once reached, the sink begins applying backpressure.
     pub max_pending_acks: NonZeroU64,
 
+    // Flattened fields receive map entries, never a standalone boolean shorthand.
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -60,7 +61,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
-            inner: Default::default(),
+            inner: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -154,7 +155,7 @@ impl HecAckClient {
                         }
                     }
                 }
-            };
+            }
         }
     }
 
@@ -229,15 +230,14 @@ impl HecAckClient {
             .build_request(
                 payload,
                 "/services/collector/ack",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
             .client
-            .send(request.map(Body::from))
+            .send(request.map(full_body))
             .await
             .map_err(|_| HecAckApiError::ServerSendQuery)?;
 
@@ -265,9 +265,9 @@ pub async fn run_acknowledgements(
     http_request_builder: Arc<HttpRequestBuilder>,
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
 ) {
-    let mut interval = tokio::time::interval(Duration::from_secs(
-        indexer_acknowledgements.query_interval.get() as u64,
-    ));
+    let mut interval = tokio::time::interval(Duration::from_secs(u64::from(
+        indexer_acknowledgements.query_interval.get(),
+    )));
     let mut ack_client = HecAckClient::new(
         indexer_acknowledgements.retry_limit.get(),
         client,
@@ -300,23 +300,47 @@ mod tests {
     use tokio::sync::oneshot::{self, Receiver};
     use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
-    use super::HecAckClient;
-    use crate::{
-        http::HttpClient,
-        sinks::{
-            splunk_hec::common::{
-                EndpointTarget, acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
-            },
-            util::Compression,
+    use super::{HecAckClient, HecClientAcknowledgementsConfig};
+
+    use crate::sinks::{
+        splunk_hec::common::{
+            EndpointTarget, acknowledgements::HecAckStatusRequest, create_client,
+            service::HttpRequestBuilder,
         },
+        util::Compression,
     };
 
+    #[test]
+    fn flattened_acknowledgements_remain_object_only() {
+        for enabled in [false, true] {
+            let input = serde_json::json!({"enabled": enabled});
+            let config: HecClientAcknowledgementsConfig = serde_json::from_value(input).unwrap();
+            assert_eq!(config.inner.enabled(), enabled);
+            assert_eq!(serde_json::to_value(config).unwrap()["enabled"], enabled);
+            assert!(
+                serde_json::from_value::<HecClientAcknowledgementsConfig>(serde_json::json!(
+                    enabled
+                ))
+                .is_err()
+            );
+        }
+        let schema =
+            serde_json::to_value(
+                vector_lib::configurable::schema::generate_root_schema::<
+                    HecClientAcknowledgementsConfig,
+                >()
+                .unwrap(),
+            )
+            .unwrap();
+        assert!(schema.get("oneOf").is_none(), "{schema}");
+    }
+
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = HttpRequestBuilder::new(
-            String::from(""),
+            String::new(),
             EndpointTarget::default(),
-            String::from(""),
+            String::new(),
             Compression::default(),
         );
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
@@ -360,7 +384,7 @@ mod tests {
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
         let ack_request_body = ack_client.get_ack_query_body();
-        assert!(ack_request_body.acks.is_empty())
+        assert!(ack_request_body.acks.is_empty());
     }
 
     #[tokio::test]

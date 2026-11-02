@@ -25,7 +25,7 @@ fn pulsar_get_headers() {
         .as_mut_log()
         .insert(properties_key.path.as_ref().unwrap(), property_values);
 
-    let properties = super::util::get_properties(&event, &Some(properties_key)).unwrap();
+    let properties = super::util::get_properties(&event, Some(&properties_key)).unwrap();
     assert_eq!(properties.get("a-key").unwrap(), "a-value".as_bytes());
     assert_eq!(properties.get("b-key").unwrap(), "b-value".as_bytes());
 }

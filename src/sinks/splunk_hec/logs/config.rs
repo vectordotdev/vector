@@ -9,16 +9,16 @@ use vector_lib::{
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         prelude::*,
         splunk_hec::common::{
             EndpointTarget, SplunkHecDefaultBatchSettings,
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, create_client,
+            build_healthcheck, build_http_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::{HttpEndpoint, http::HttpRetryLogic},
+        util::{HttpEndpoint, http::RetryStrategy, http_v1::http_response_retry_logic},
     },
     template::ConfinementConfig,
 };
@@ -170,7 +170,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
@@ -286,6 +286,10 @@ impl ValidatedSink for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
+    /// Builds the sink processor.
+    ///
+    /// # Errors
+    /// Returns an error if the encoding configuration is invalid.
     pub fn build_processor(
         &self,
         client: HttpClient,
@@ -318,8 +322,11 @@ impl HecLogsSinkConfig {
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
-            .settings(request_settings, HttpRetryLogic::default())
-            .service(build_http_batch_service(
+            .settings(
+                request_settings,
+                http_response_retry_logic(RetryStrategy::Default),
+            )
+            .service(build_http_service(
                 client,
                 Arc::clone(&http_request_builder),
                 self.endpoint_target,
@@ -386,15 +393,15 @@ mod tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");

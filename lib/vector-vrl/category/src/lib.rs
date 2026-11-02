@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use strum::AsRefStr;
 
 /// Category classification for Vector-specific VRL functions.

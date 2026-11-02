@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     collections::HashMap,
     pin::Pin,

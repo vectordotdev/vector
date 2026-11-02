@@ -532,7 +532,7 @@ impl observability::Service for ObservabilityService {
                 component_type: ComponentType::Source as i32,
                 on_type,
                 outputs: ports_to_proto_outputs(ports, &key_str, &sent_events_by_output),
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 
@@ -556,7 +556,7 @@ impl observability::Service for ObservabilityService {
                 component_type: component_type as i32,
                 on_type,
                 outputs,
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 

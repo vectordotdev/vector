@@ -154,14 +154,14 @@ fn default_name() -> String {
 impl GenerateConfig for NatsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             auth: None,
             connection_name: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
             subject: Template::try_from("from.vector").unwrap(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
-            request: Default::default(),
+            request: TowerRequestConfig::default(),
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
@@ -307,7 +307,7 @@ async fn healthcheck(
     config
         .connect(options, server_addresses)
         .map_ok(|_| ())
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
         .await
 }
 
@@ -333,7 +333,7 @@ impl NatsPublisher {
                     })?;
                 client
                     .flush()
-                    .map_ok(|_| ())
+                    .map_ok(|()| ())
                     .map_err(|e| NatsError::PublishError {
                         source: Box::new(e),
                     })

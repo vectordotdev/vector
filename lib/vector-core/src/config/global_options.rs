@@ -8,7 +8,6 @@ use super::{
     super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
     metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
 };
-use crate::serde::bool_or_struct;
 
 #[expect(
     clippy::ref_option,
@@ -124,7 +123,7 @@ pub struct GlobalOptions {
     /// [e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
-        deserialize_with = "bool_or_struct",
+        deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
     #[configurable(metadata(docs::required = false))]

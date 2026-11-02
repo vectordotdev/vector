@@ -1,10 +1,9 @@
 use std::{borrow::Cow, sync::Arc};
 
 use bytes::Bytes;
-use futures_util::future::BoxFuture;
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use http_1::{Request, StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
+use vector_http::empty_body;
 use vector_lib::{
     config::proxy::ProxyConfig,
     event::EventRef,
@@ -13,15 +12,18 @@ use vector_lib::{
 
 use super::{
     EndpointTarget,
-    request::HecRequest,
     service::{HttpRequestBuilder, MetadataFields},
 };
 use crate::{
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
-        self, UriParseSnafu,
-        util::{SinkBatchSettings, http::HttpBatchService},
+        self,
+        util::{
+            SinkBatchSettings,
+            http::HttpRequest,
+            http_v1::{HttpService, HttpServiceRequestBuilder},
+        },
     },
     template::ConfinedTemplate,
     tls::{TlsConfig, TlsSettings},
@@ -44,58 +46,84 @@ pub enum HealthcheckError {
     QueuesFull,
 }
 
+/// Error returned when a HEC URI cannot be parsed.
+#[derive(Debug, Snafu)]
+#[snafu(display("URI parse error: {source}"))]
+pub struct UriParseError {
+    source: http_1::uri::InvalidUri,
+}
+
+/// Builds the HTTP client.
+///
+/// # Errors
+/// Returns an error if the TLS or proxy configuration is invalid.
 pub fn create_client(
     tls: Option<&TlsConfig>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
-    Ok(HttpClient::new(tls_settings, proxy_config)?)
+    HttpClient::new(tls_settings.into(), proxy_config)
 }
 
-// TODO: `HttpBatchService` has been deprecated for direct use in sinks.
-//       This sink should undergo a refactor to utilize the `HttpService`
-//       instead, which extracts much of the boilerplate code for `Service`.
-pub fn build_http_batch_service(
+/// Builds native HEC event or raw endpoint requests for [`HttpService`].
+#[derive(Clone)]
+pub struct HecEventRequestBuilder {
+    http_request_builder: Arc<HttpRequestBuilder>,
+    path: &'static str,
+    auto_extract_timestamp: bool,
+}
+
+impl HttpServiceRequestBuilder<MetadataFields> for HecEventRequestBuilder {
+    fn build(&self, mut request: HttpRequest<MetadataFields>) -> crate::Result<Request<Bytes>> {
+        self.http_request_builder.build_request(
+            request.take_payload(),
+            self.path,
+            request.get_additional_metadata(),
+            self.auto_extract_timestamp,
+        )
+    }
+}
+
+/// Builds the native HEC event service, decoding compressed responses.
+#[must_use]
+pub fn build_http_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     endpoint_target: EndpointTarget,
     auto_extract_timestamp: bool,
-) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
-    HttpBatchService::new(client, move |req: HecRequest| {
-        let request_builder = Arc::clone(&http_request_builder);
-        let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-            Box::pin(async move {
-                request_builder.build_request(
-                    req.body,
-                    match endpoint_target {
-                        EndpointTarget::Event => "/services/collector/event",
-                        EndpointTarget::Raw => "/services/collector/raw",
-                    },
-                    req.passthrough_token,
-                    MetadataFields {
-                        source: req.source,
-                        sourcetype: req.sourcetype,
-                        index: req.index,
-                        host: req.host,
-                    },
-                    auto_extract_timestamp,
-                )
-            });
-        future
-    })
+) -> HttpService<HecEventRequestBuilder, MetadataFields> {
+    let path = match endpoint_target {
+        EndpointTarget::Event => "/services/collector/event",
+        EndpointTarget::Raw => "/services/collector/raw",
+    };
+    HttpService::new(
+        client,
+        HecEventRequestBuilder {
+            http_request_builder,
+            path,
+            auto_extract_timestamp,
+        },
+    )
+    .with_response_decompression()
 }
 
+/// Checks the HEC endpoint.
+///
+/// # Errors
+/// Returns an error if the URI is invalid, the request fails, or Splunk reports an unhealthy status.
+///
+/// # Panics
+/// Panics if the token cannot be used in an HTTP authorization header.
 pub async fn build_healthcheck(
     endpoint: String,
     token: String,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)
-        .context(UriParseSnafu)?;
+    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {token}"))
-        .body(Body::empty())
+        .body(empty_body())
         .unwrap();
 
     let response = client.send(request).await?;
@@ -103,20 +131,24 @@ pub async fn build_healthcheck(
         StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(sinks::HealthcheckError::unexpected_status(other).into()),
     }
 }
 
-pub fn build_uri(
+/// Builds a HEC URI with percent-encoded query parameters.
+///
+/// # Errors
+/// Returns an error if the resulting URI is invalid.
+pub fn build_uri<'a>(
     host: &str,
     path: &str,
-    query: impl IntoIterator<Item = (&'static str, String)>,
-) -> Result<Uri, http::uri::InvalidUri> {
+    query: impl IntoIterator<Item = (&'static str, &'a str)>,
+) -> Result<Uri, UriParseError> {
     let mut uri = format!("{}{path}", host.trim_end_matches('/'));
 
     let mut first = true;
 
-    for (key, value) in query.into_iter() {
+    for (key, value) in query {
         if first {
             uri.push('?');
             first = false;
@@ -129,20 +161,22 @@ pub fn build_uri(
         )));
         uri.push('=');
         uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
-            &value,
+            value,
             percent_encoding::NON_ALPHANUMERIC,
         )));
     }
 
-    uri.parse::<Uri>()
+    uri.parse::<Uri>().context(UriParseSnafu)
 }
 
+#[must_use]
 pub fn config_host_key() -> OptionalValuePath {
     OptionalValuePath {
         path: crate::config::log_schema().host_key().cloned(),
     }
 }
 
+#[must_use]
 pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
     OptionalTargetPath {
         path: crate::config::log_schema()
@@ -171,7 +205,7 @@ pub fn render_template_string<'a>(
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use http::{HeaderValue, Uri};
+    use http_1::{HeaderValue, Uri};
     use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
@@ -200,7 +234,7 @@ mod tests {
         let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
-        assert!(healthcheck.await.is_ok())
+        assert!(healthcheck.await.is_ok());
     }
 
     #[tokio::test]
@@ -280,8 +314,7 @@ mod tests {
             .build_request(
                 events.clone(),
                 "/services/collector/event",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .unwrap();
@@ -303,7 +336,7 @@ mod tests {
 
         assert_eq!(request.headers().get("Content-Encoding"), None);
 
-        assert_eq!(request.body(), &events)
+        assert_eq!(request.body(), &events);
     }
 
     #[tokio::test]
@@ -323,8 +356,7 @@ mod tests {
             .build_request(
                 events.clone(),
                 "/services/collector/event",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .unwrap();
@@ -349,40 +381,12 @@ mod tests {
             Some(&HeaderValue::from_static("gzip"))
         );
 
-        assert_eq!(request.body(), &events)
-    }
-
-    #[tokio::test]
-    async fn test_build_request_uri_invalid_uri_returns_error() {
-        let endpoint = "invalid";
-        let token = "token";
-        let compression = Compression::gzip_default();
-        let events = Bytes::from("events");
-        let http_request_builder = HttpRequestBuilder::new(
-            String::from(endpoint),
-            EndpointTarget::default(),
-            String::from(token),
-            compression,
-        );
-
-        let err = http_request_builder
-            .build_request(
-                events,
-                "/services/collector/event",
-                None,
-                MetadataFields::default(),
-                false,
-            )
-            .unwrap_err();
-        assert_eq!(err.to_string(), "URI parse error: invalid format")
+        assert_eq!(request.body(), &events);
     }
 
     #[test]
     fn test_build_uri() {
-        let query = [
-            (HOST_FIELD, "zork flork".to_string()),
-            (SOURCE_FIELD, "zam".to_string()),
-        ];
+        let query = [(HOST_FIELD, "zork flork"), (SOURCE_FIELD, "zam")];
         let uri = build_uri("http://sproink.com", "/thing/thang", query).unwrap();
 
         assert_eq!(
@@ -470,14 +474,21 @@ pub mod integration_test_helpers {
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
 
+    #[must_use]
     pub fn splunk_hec_address() -> String {
         std::env::var("SPLUNK_HEC_ADDRESS").unwrap_or_else(|_| "http://localhost:8088".into())
     }
 
+    #[must_use]
     pub fn splunk_api_address() -> String {
         std::env::var("SPLUNK_API_ADDRESS").unwrap_or_else(|_| "https://localhost:8089".into())
     }
 
+    /// Fetches the configured HEC token.
+    ///
+    /// # Panics
+    /// Panics if the client cannot be built, Splunk returns an unexpected response,
+    /// or no HTTP Event Collector input is configured.
     pub async fn get_token() -> String {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -495,16 +506,17 @@ pub mod integration_test_helpers {
                     .send()
             },
             Duration::from_millis(500),
-            Duration::from_secs(60),
+            Duration::from_mins(1),
         )
         .await;
 
         let json: JsonValue = res.json().await.unwrap();
         let entries = json["entry"].as_array().unwrap().clone();
 
-        if entries.is_empty() {
-            panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
-        }
+        assert!(
+            !entries.is_empty(),
+            "You don't have any HTTP Event Collector inputs set up in Splunk"
+        );
 
         entries[0]["content"]["token"].as_str().unwrap().to_owned()
     }

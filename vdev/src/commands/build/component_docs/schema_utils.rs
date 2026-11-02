@@ -446,13 +446,6 @@ impl SchemaContext {
                 Value::String(condition.clone()),
             );
         }
-
-        if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
-            resolved_schema
-                .as_object_mut()
-                .unwrap()
-                .insert("minimal".to_string(), minimal.clone());
-        }
     }
 
     pub fn sort_hash_nested(

@@ -10,7 +10,7 @@ generated: components: sinks: nats: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Configuration of the authentication strategy when interacting with NATS."
@@ -65,25 +65,28 @@ generated: components: sinks: nats: configuration: {
 			[jetstream]: https://docs.nats.io/nats-concepts/jetstream
 			"""
 		required: false
-		type: object: options: {
-			enabled: {
-				description: "Whether to enable Jetstream."
-				required:    false
-				type: bool: default: false
-			}
-			headers: {
-				description: "A map of NATS headers to be included in each message."
-				required:    false
-				type: object: options: message_id: {
-					description: """
-						A unique identifier for the message. Useful for deduplication.
+		type: {
+			bool: {}
+			object: options: {
+				enabled: {
+					description: "Whether to enable Jetstream."
+					required:    false
+					type: bool: default: false
+				}
+				headers: {
+					description: "A map of NATS headers to be included in each message."
+					required:    false
+					type: object: options: message_id: {
+						description: """
+																A unique identifier for the message. Useful for deduplication.
 
-						Can be a template that references fields in the event, e.g., `{{ event_id }}`.
-						"""
-					required: false
-					type: string: {
-						examples: ["event-{{ event_id }}"]
-						syntax: "template"
+																Can be a template that references fields in the event, e.g., `{{ event_id }}`.
+																"""
+						required: false
+						type: string: {
+							examples: ["event-{{ event_id }}"]
+							syntax: "template"
+						}
 					}
 				}
 			}

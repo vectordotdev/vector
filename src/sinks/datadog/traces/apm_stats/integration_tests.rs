@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use http_body::Body as _;
+use http_body_util::BodyExt as _;
 
 use axum::{
     Router,
@@ -83,10 +83,8 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     info!("HTTP server for `{name}` listening on {addr}");
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
 // Needed for the sink healthcheck
@@ -144,6 +142,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
 }
 
 #[derive(Serialize)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::struct_field_names, reason = "Match the Datadog span schema.")]
 struct Span {
     duration: i64,
     error: i32,
@@ -194,7 +194,7 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
         for url in urls {
             let res = client
                 .post(url)
-                .header(CONTENT_TYPE, "application/json")
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .json(&traces_payload)
                 .send()
                 .await
@@ -210,16 +210,18 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
     }
 
     // send first set of trace data
-    if !send_trace(urls, start, duration, span_id).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 
     sleep(Duration::from_millis(100)).await;
 
     // send second set of trace data
-    if !send_trace(urls, start, duration, span_id + 1).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id + 1).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 }
 
 /// Receives the stats payloads from the Receiver channels from both of the server instances.
@@ -256,7 +258,7 @@ async fn receive_the_stats(
                     break;
                 }
             },
-            _ = &mut timeout => break,
+            () = &mut timeout => break,
         }
     }
 

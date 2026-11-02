@@ -241,7 +241,7 @@ pub struct NetworkConnector {
 }
 
 impl NetworkConnector {
-    fn on_connected(&self, metadata: ConnectionMetadata) {
+    fn on_connected(metadata: ConnectionMetadata) {
         match metadata {
             ConnectionMetadata::Tcp { peer_addr } => {
                 emit!(TcpSocketConnectionEstablished {
@@ -255,7 +255,7 @@ impl NetworkConnector {
         }
     }
 
-    fn on_connection_error<E: std::error::Error>(&self, error: E) {
+    fn on_connection_error<E: std::error::Error>(error: E) {
         emit!(SocketOutgoingConnectionError { error });
     }
 
@@ -294,13 +294,13 @@ impl NetworkConnector {
             match self.connect().await {
                 Ok((connection, maybe_metadata)) => {
                     if let Some(metadata) = maybe_metadata {
-                        self.on_connected(metadata);
+                        Self::on_connected(metadata);
                     }
 
                     return connection;
                 }
                 Err(error) => {
-                    self.on_connection_error(error);
+                    Self::on_connection_error(error);
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -308,12 +308,14 @@ impl NetworkConnector {
     }
 
     /// Gets a `Healthcheck` based on the configured destination of this connector.
+    #[must_use]
     pub fn healthcheck(&self) -> Healthcheck {
         let connector = self.clone();
         Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })
     }
 
     /// Gets a `Service` suitable for sending data to the configured destination of this connector.
+    #[must_use]
     pub fn service(&self) -> NetworkService {
         NetworkService::new(self.clone())
     }
@@ -374,10 +376,10 @@ impl Service<Vec<u8>> for NetworkService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut socket = match std::mem::replace(&mut self.state, NetworkServiceState::Sending(rx))
-        {
-            NetworkServiceState::Connected(socket) => socket,
-            _ => panic!("poll_ready must be called first"),
+        let NetworkServiceState::Connected(mut socket) =
+            std::mem::replace(&mut self.state, NetworkServiceState::Sending(rx))
+        else {
+            panic!("poll_ready must be called first");
         };
 
         Box::pin(async move {

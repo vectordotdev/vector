@@ -14,10 +14,21 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            features: ""
+            suffix: ""
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            features: ""
+            suffix: ""
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            features: ""
+            suffix: ""
+          # Keep publishing commands out of ordinary developer binaries.
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            features: package-repositories
+            suffix: -package-repositories
 
     steps:
       - name: Checkout Vector
@@ -30,13 +41,13 @@ jobs:
 
       - name: Build
         working-directory: vdev
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --locked --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
 
       - name: Package
         shell: bash
         run: |
           VERSION=${GITHUB_REF_NAME#vdev-v}
-          OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
+          OUTDIR="vdev${{ matrix.suffix }}-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
 
           BIN_ROOT="${CARGO_TARGET_DIR:-target}"
@@ -52,9 +63,9 @@ jobs:
           echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
 
       - name: Stage asset for release
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: vdev-${{ matrix.target }}
+          name: vdev${{ matrix.suffix }}-${{ matrix.target }}
           path: ${{ env.ASSET }}
           if-no-files-found: error
 
@@ -66,7 +77,7 @@ jobs:
       id-token: write # Required to publish artifacts with AWS OIDC
     steps:
       - name: Download staged assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: vdev-*
           path: assets

@@ -6,17 +6,17 @@ use std::{collections::HashMap, io};
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::{
+use http_1::{
     Request, StatusCode, Uri,
     header::{self, HeaderName, HeaderValue},
 };
-use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_http::{HttpError, empty_body, full_body};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{AcknowledgementsConfig, Input, telemetry},
@@ -32,7 +32,7 @@ use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     schema,
     sinks::{
         Healthcheck,
@@ -42,7 +42,7 @@ use crate::{
             sink::ChronicleSink,
         },
         gcs_common::{
-            config::{GcsRetryLogic, healthcheck_response},
+            config::{GcsRetryLogic, healthcheck_status},
             service::GcsResponse,
         },
         util::{
@@ -82,7 +82,7 @@ pub enum Region {
     /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
 
-    /// SãoPaulo Region
+    /// São Paulo Region
     SãoPaulo,
 
     /// Canada Region
@@ -112,7 +112,7 @@ pub enum Region {
     /// Sydney Region
     Sydney,
 
-    /// TelAviv Region
+    /// Tel Aviv Region
     TelAviv,
 
     /// Tokyo Region
@@ -131,7 +131,9 @@ impl Region {
         match self {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
-            Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Asia | Region::Singapore => {
+                "https://asia-southeast1-malachiteingestion-pa.googleapis.com"
+            }
             Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
             Region::Canada => {
                 "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
@@ -142,7 +144,6 @@ impl Region {
             Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
             Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
             Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
-            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
             Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
@@ -256,7 +257,7 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             credentials_path: /path/to/credentials.json
             customer_id: customer_id
             namespace: namespace
@@ -266,11 +267,15 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             fallback_log_type: VECTOR_DEV
             encoding:
               codec: text
-        "#})
+        "})
         .unwrap()
     }
 }
 
+/// Builds a Chronicle endpoint healthcheck.
+///
+/// # Errors
+/// Returns an error if the endpoint is not a valid HTTP URI.
 pub fn build_healthcheck(
     client: HttpClient,
     base_url: &str,
@@ -279,11 +284,11 @@ pub fn build_healthcheck(
     let uri = base_url.parse::<Uri>()?;
 
     let healthcheck = async move {
-        let mut request = http::Request::get(&uri).body(Body::empty())?;
-        auth.apply(&mut request);
+        let mut request = Request::get(&uri).body(empty_body())?;
+        auth.apply_v1(&mut request);
 
         let response = client.send(request).await?;
-        healthcheck_response(response, GcsHealthcheckError::NotFound.into())
+        healthcheck_status(response.status(), GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -348,7 +353,7 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
 
         let healthcheck = build_healthcheck(client.clone(), healthcheck_endpoint, creds.clone())?;
         creds.spawn_regenerate_token();
@@ -377,7 +382,7 @@ impl ChronicleUnstructuredConfig {
 
         let request = self.request.into_settings();
 
-        let partitioner = self.partitioner()?;
+        let partitioner = self.partitioner();
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
@@ -395,12 +400,12 @@ impl ChronicleUnstructuredConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
-        Ok(ChroniclePartitioner::new(
+    fn partitioner(&self) -> ChroniclePartitioner {
+        ChroniclePartitioner::new(
             self.log_type.clone(),
             self.fallback_log_type.clone(),
             self.namespace.clone(),
-        ))
+        )
     }
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
@@ -475,7 +480,7 @@ impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
                     .as_log()
                     .get_timestamp()
                     .and_then(|ts| ts.as_timestamp())
-                    .cloned();
+                    .copied();
                 let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
 
@@ -625,8 +630,8 @@ impl ChronicleRequestBuilder {
             labels: config.labels.as_ref().map(|labs| {
                 labs.iter()
                     .map(|(k, v)| Label {
-                        key: k.to_string(),
-                        value: v.to_string(),
+                        key: k.clone(),
+                        value: v.clone(),
                     })
                     .collect::<Vec<_>>()
             }),
@@ -662,7 +667,7 @@ pub enum ChronicleResponseError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
+    HttpError { error: HttpError },
 }
 
 impl Service<ChronicleRequest> for ChronicleService {
@@ -683,12 +688,13 @@ impl Service<ChronicleRequest> for ChronicleService {
             headers.insert(name, value);
         }
 
-        let mut http_request = builder.body(Body::from(request.body)).unwrap();
-        self.creds.apply(&mut http_request);
+        let mut http_request = builder.body(request.body).unwrap();
+        self.creds.apply_v1(&mut http_request);
+        let http_request = http_request.map(full_body);
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
         Box::pin(async move {
-            match client.call(http_request).await {
+            match client.send(http_request).await {
                 Ok(response) => {
                     let status = response.status();
                     if status.is_success() {

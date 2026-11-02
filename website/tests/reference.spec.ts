@@ -24,6 +24,18 @@ test("generated VRL function and component references render", async ({ page }) 
   await expect.poll(code).toBe(consoleExample("advanced"));
 });
 
+test("map-typed config fields render their examples", async ({ page }) => {
+  await page.goto("/docs/reference/configuration/sources/kafka/");
+  const field = page.locator('[id="librdkafka_options"]').locator("xpath=ancestor::div[contains(@class, 'p-4')][1]");
+  await expect(field.getByRole("heading", { name: "librdkafka_options", exact: true })).toBeVisible();
+
+  const examples = field.locator("div[x-data]").filter({ hasText: "Examples" });
+  await expect(examples).toHaveCount(1);
+  const code = async () => (await examples.locator("pre:visible").innerText()).trimEnd();
+  await examples.locator("a").click();
+  await expect.poll(code).toContain('"client.id": "${ENV_VAR}"');
+});
+
 test("VRL TOC highlight follows scrolling between functions and their examples", async ({ page }) => {
   await page.goto(functions);
   const toc = page.locator("#toc");

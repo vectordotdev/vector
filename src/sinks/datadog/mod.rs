@@ -1,7 +1,10 @@
+//! Shared configuration, native HTTP healthchecks, and API errors for Datadog sinks.
+
 use futures_util::FutureExt;
-use http::{Request, StatusCode, Uri};
-use hyper::{body::Body, client::connect::Connect};
+use http_1::{Request, Response, StatusCode, Uri};
+use hyper_1::body::Incoming;
 use snafu::Snafu;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
     sensitive_string::SensitiveString, tls::TlsEnableableConfig,
@@ -10,7 +13,7 @@ use vector_lib::{
 use super::Healthcheck;
 use crate::{
     common::datadog,
-    http::{HttpClient, HttpError},
+    http::client_v1::HttpClient,
     sinks::{HealthcheckError, util::HttpEndpoint},
 };
 
@@ -87,6 +90,7 @@ pub struct LocalDatadogCommonConfig {
 }
 
 impl LocalDatadogCommonConfig {
+    #[must_use]
     pub fn new(
         endpoint: Option<String>,
         site: Option<String>,
@@ -100,6 +104,11 @@ impl LocalDatadogCommonConfig {
         }
     }
 
+    /// Combines local options with the global Datadog configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if neither configuration supplies an API key.
     pub fn with_globals(
         &self,
         config: datadog::Options,
@@ -134,10 +143,11 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    pub fn build_healthcheck<C>(&self, client: HttpClient<Body, C>) -> crate::Result<Healthcheck>
-    where
-        C: Connect + Clone + Send + Sync + 'static,
-    {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the validation endpoint cannot be parsed.
+    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint = self.get_api_endpoint("/api/v1/validate")?;
 
         let api_key: String = self.default_api_key.clone().into();
@@ -153,29 +163,26 @@ impl DatadogCommonConfig {
     fn get_api_endpoint(&self, path: &str) -> crate::Result<Uri> {
         let base = datadog::get_api_base_endpoint(self.endpoint.as_deref(), self.site.as_str());
         let endpoint = HttpEndpoint::parse(&base)?.append_path(path)?;
-        Ok(endpoint.into_uri())
+        Ok(endpoint.into_v1())
     }
 }
 
 /// Makes a GET HTTP request to `<site>/api/v1/validate` using the provided client and API key.
-async fn build_healthcheck_future<C>(
-    client: HttpClient<Body, C>,
+async fn build_healthcheck_future(
+    client: HttpClient,
     validate_endpoint: Uri,
     api_key: String,
-) -> crate::Result<()>
-where
-    C: Connect + Clone + Send + Sync + 'static,
-{
+) -> crate::Result<()> {
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
-        .body(hyper::Body::empty())
+        .body(empty_body())
         .map_err(|e| format!("Failed to make HTTP(S) request: {e:?}"))?;
 
     let response = client.send(request).await?;
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(HealthcheckError::unexpected_status(other).into()),
     }
 }
 
@@ -202,11 +209,14 @@ pub enum DatadogApiError {
 }
 
 impl DatadogApiError {
-    /// Common DatadogApiError handling for HTTP Responses.
-    /// Returns Ok(response) if the response was Ok/Accepted.
+    /// Converts a native HTTP 1 Datadog response into an API result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a failed request or a non-success HTTP status.
     pub fn from_result(
-        result: Result<http::Response<Body>, HttpError>,
-    ) -> Result<http::Response<Body>, DatadogApiError> {
+        result: Result<Response<Incoming>, HttpError>,
+    ) -> Result<Response<Incoming>, DatadogApiError> {
         match result {
             Ok(response) => {
                 match response.status() {
@@ -242,6 +252,7 @@ impl DatadogApiError {
         }
     }
 
+    #[must_use]
     pub const fn is_retriable(&self) -> bool {
         match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
@@ -324,7 +335,7 @@ mod tests {
             endpoint: Some("localhost:8080".to_string()),
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             config
@@ -338,7 +349,7 @@ mod tests {
             endpoint: None,
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             default

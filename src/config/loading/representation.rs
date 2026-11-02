@@ -166,14 +166,20 @@ fn validate_json(value: &Value) -> Result<(), Vec<String>> {
 }
 
 pub(super) fn merge_into_map(map: &mut ConfigMap, other: ConfigMap) -> Result<(), Vec<String>> {
-    merge_into_map_at_path(map, other, "$").map_err(|error| vec![error])
+    merge_into_map_at_path(map, other, &mut Vec::new()).map_err(|error| vec![error])
 }
 
-fn merge_into_map_at_path(map: &mut ConfigMap, other: ConfigMap, path: &str) -> Result<(), String> {
+fn merge_into_map_at_path(
+    map: &mut ConfigMap,
+    other: ConfigMap,
+    path: &mut Vec<String>,
+) -> Result<(), String> {
     for (name, value) in other {
         if let Some(existing) = map.remove(&name) {
-            let inner_path = format!("{path}.{name}");
-            map.insert(name, merge_values_at_path(existing, value, &inner_path)?);
+            path.push(name.clone());
+            let merged = merge_values_at_path(existing, value, path);
+            path.pop();
+            map.insert(name, merged?);
         } else {
             map.insert(name, value);
         }
@@ -183,10 +189,14 @@ fn merge_into_map_at_path(map: &mut ConfigMap, other: ConfigMap, path: &str) -> 
 }
 
 pub(super) fn merge_values(value: Value, other: Value) -> Result<Value, Vec<String>> {
-    merge_values_at_path(value, other, "$").map_err(|error| vec![error])
+    merge_values_at_path(value, other, &mut Vec::new()).map_err(|error| vec![error])
 }
 
-fn merge_values_at_path(value: Value, other: Value, path: &str) -> Result<Value, String> {
+fn merge_values_at_path(
+    value: Value,
+    other: Value,
+    path: &mut Vec<String>,
+) -> Result<Value, String> {
     match (value, other) {
         (Value::Null, Value::Null) => Ok(Value::Null),
         (Value::Bool(_), Value::Bool(other)) => Ok(Value::Bool(other)),
@@ -204,11 +214,18 @@ fn merge_values_at_path(value: Value, other: Value, path: &str) -> Result<Value,
             merge_into_map_at_path(&mut value, other, path)?;
             Ok(Value::Object(value))
         }
-        (value, other) => Err(format!(
-            "Incompatible types at path \"{path}\", expected \"{}\" received \"{}\".",
-            value_type(&value),
-            value_type(&other)
-        )),
+        (value, other) => {
+            let display_path = if path.is_empty() {
+                "$".to_owned()
+            } else {
+                format!("$.{}", path.join("."))
+            };
+            Err(format!(
+                "Incompatible types at path \"{display_path}\", expected \"{}\" received \"{}\".",
+                value_type(&value),
+                value_type(&other)
+            ))
+        }
     }
 }
 
@@ -574,8 +591,8 @@ mod tests {
     #[test]
     fn merge_reports_nested_type_conflicts() {
         let error = merge_values(
-            json!({ "nested": { "value": "string" } }),
-            json!({ "nested": { "value": 1 } }),
+            json!({ "first": { "value": 1 }, "nested": { "value": "string" } }),
+            json!({ "first": { "value": 2 }, "nested": { "value": 1 } }),
         )
         .unwrap_err();
 

@@ -1,0 +1,64 @@
+api:
+  enabled: true
+
+sources:
+  source_0:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "a", "property": "foo" }'
+      - '{ "key": "b", "property": "bar" }'
+    interval: 0.1
+
+  source_1:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "c", "property": "some" }'
+      - '{ "key": "d", "property": "another" }'
+    interval: 0.1
+
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 5
+
+transforms:
+  transform_0:
+    type: remap
+    inputs:
+      - source_*
+    source: |
+      . = parse_json!(.message)
+      if .key == "a" {
+        .group = 0
+      } else {
+        .group = 1
+      }
+
+sinks:
+  sink_0:
+    type: http
+    inputs:
+      - transform_0
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
+    encoding:
+      codec: json
+    compression: zlib
+    batch:
+      timeout_secs: 1
+      max_events: 4
+
+  sink_1:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json
+
+  sink_2:
+    type: datadog_metrics
+    inputs:
+      - internal_metrics
+    default_api_key: "${DATADOG_API_KEY}"

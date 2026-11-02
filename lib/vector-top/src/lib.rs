@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Top subcommand
 pub mod dashboard;
 pub mod events;

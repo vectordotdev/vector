@@ -24,8 +24,8 @@ use windows::Win32::System::Threading::{
 use windows::core::HSTRING;
 
 use super::{
-    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
-    metadata, sid_resolver::SidResolver, xml_parser,
+    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig,
+    error::WindowsEventLogError, metadata, sid_resolver::SidResolver, xml_parser,
 };
 
 use crate::internal_events::WindowsEventLogBookmarkError;
@@ -43,13 +43,13 @@ use crate::internal_events::WindowsEventLogBookmarkError;
 static DRAIN_STEP_HOOK: std::sync::Mutex<Option<std::sync::Arc<dyn Fn(HANDLE) + Send + Sync>>> =
     std::sync::Mutex::new(None);
 
-/// Maximum number of entries in the EvtFormatMessage result cache.
+/// Maximum number of entries in the `EvtFormatMessage` result cache.
 pub const FORMAT_CACHE_CAPACITY: usize = 10_000;
 /// Maximum number of cached publisher metadata handles.
 const PUBLISHER_CACHE_CAPACITY: usize = 256;
 
-/// RAII wrapper for EvtOpenPublisherMetadata handles.
-/// Calls EvtClose on drop to prevent handle leaks when evicted from LRU cache.
+/// RAII wrapper for `EvtOpenPublisherMetadata` handles.
+/// Calls `EvtClose` on drop to prevent handle leaks when evicted from LRU cache.
 pub struct PublisherHandle(pub isize);
 
 impl Drop for PublisherHandle {
@@ -80,19 +80,19 @@ const ERROR_INVALID_OPERATION: u32 = 4317; // 0x10DD
 /// Returned by `EvtNext` on every pull once the Windows Event Log service (wevtsvc) has been
 /// restarted: all subscription handles of the old service instance are dead for good. Bookmark
 /// handles survive the restart, so rebuilding the subscription from the bookmark resumes without
-/// gap or duplicate (verified on Windows 11 by restarting the EventLog service between EvtNext
+/// gap or duplicate (verified on Windows 11 by restarting the `EventLog` service between `EvtNext`
 /// calls). Before this was handled, a source went silent until Vector itself was restarted.
 const ERROR_INVALID_HANDLE: u32 = 6;
-const ERROR_EVT_INVALID_QUERY: u32 = 15001; // 0x3A99
-const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15007; // 0x3A9F
+const ERROR_EVT_INVALID_QUERY: u32 = 15_001; // 0x3A99
+const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15_007; // 0x3A9F
 // Returned by `EvtSubscribe` for direct (analytic/debug) channels, which cannot be
 // subscribed to. Named explicitly because 15009 used to be held by the misnamed
 // `ERROR_EVT_CHANNEL_NOT_FOUND`, so such a channel was skipped by accident. Correcting
 // that constant without this one would turn a skipped channel into a hard startup
 // failure for every config that lists one alongside valid channels.
-const ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL: u32 = 15009; // 0x3AA1
-const ERROR_EVT_QUERY_RESULT_STALE: u32 = 15011; // 0x3AA3
-const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15012; // 0x3AA4
+const ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL: u32 = 15_009; // 0x3AA1
+const ERROR_EVT_QUERY_RESULT_STALE: u32 = 15_011; // 0x3AA3
+const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15_012; // 0x3AA4
 
 /// Backoff for rebuilding a subscription whose handle keeps reporting itself unusable
 /// while the channel delivers nothing (5 s, doubling, capped at 10 min).
@@ -220,7 +220,7 @@ pub enum WaitResult {
     Shutdown,
 }
 
-/// Pull-model Windows Event Log subscription using EvtSubscribe + signal event + EvtNext.
+/// Pull-model Windows Event Log subscription using `EvtSubscribe` + signal event + `EvtNext`.
 ///
 /// Instead of a callback (push model), we use:
 /// 1. `CreateEventW` to create a manual-reset signal per channel
@@ -237,10 +237,10 @@ pub struct EventLogSubscription {
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     shutdown_event: HANDLE,
     render_buffer: Vec<u8>,
-    /// Cached EvtOpenPublisherMetadata handles keyed by provider name.
+    /// Cached `EvtOpenPublisherMetadata` handles keyed by provider name.
     /// Bounded LRU; evicted handles are closed via `PublisherHandle::drop`.
     publisher_cache: LruCache<String, PublisherHandle>,
-    /// Cached EvtFormatMessage results. Outer key is provider name (looked up
+    /// Cached `EvtFormatMessage` results. Outer key is provider name (looked up
     /// via `&str` — zero allocation on the hot path), inner LRU is bounded per provider.
     format_cache: HashMap<String, LruCache<(u32, u64), Option<String>>>,
     /// Pre-registered counter for metadata cache hits.
@@ -252,7 +252,7 @@ pub struct EventLogSubscription {
     /// Reusable UTF-16 decode buffer to avoid per-event allocations.
     decode_buffer: Vec<u16>,
     /// Round-robin index for fair channel scheduling. Rotates the starting
-    /// channel each pull_events call to prevent a single busy channel
+    /// channel each `pull_events` call to prevent a single busy channel
     /// (e.g., Security on a domain controller) from starving others.
     round_robin_index: usize,
 }
@@ -267,8 +267,12 @@ unsafe impl Sync for EventLogSubscription {}
 impl EventLogSubscription {
     /// Create a new pull-model subscription for all configured channels.
     ///
-    /// Each channel gets its own signal event and EvtSubscribe handle.
+    /// Each channel gets its own signal event and `EvtSubscribe` handle.
     /// A shutdown event is created for clean termination of blocking waits.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn new(
         config: &WindowsEventLogConfig,
         checkpointer: Arc<Checkpointer>,
@@ -473,7 +477,7 @@ impl EventLogSubscription {
                     });
                 }
                 Err(e) => {
-                    let error_code = (e.code().0 as u32) & 0xFFFF;
+                    let error_code = e.code().0.cast_unsigned() & 0xFFFF;
                     if error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
                         || error_code == ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL
@@ -496,20 +500,18 @@ impl EventLogSubscription {
                             let _ = CloseHandle(signal_event);
                         }
                         continue;
-                    } else {
-                        // Clean up already-created subscriptions on failure
-                        for sub in channel_subscriptions {
-                            unsafe {
-                                let _ = EvtClose(sub.subscription_handle);
-                                let _ = CloseHandle(sub.signal_event);
-                            }
-                        }
-                        unsafe {
-                            let _ =
-                                CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
-                        }
-                        return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
                     }
+                    // Clean up already-created subscriptions on failure
+                    for sub in channel_subscriptions {
+                        unsafe {
+                            let _ = EvtClose(sub.subscription_handle);
+                            let _ = CloseHandle(sub.signal_event);
+                        }
+                    }
+                    unsafe {
+                        let _ = CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
+                    }
+                    return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
                 }
             }
         }
@@ -536,7 +538,7 @@ impl EventLogSubscription {
             checkpointer,
             rate_limiter,
             shutdown_event,
-            render_buffer: vec![0u8; 16384],
+            render_buffer: vec![0u8; 16_384],
             publisher_cache: LruCache::new(NonZeroUsize::new(PUBLISHER_CACHE_CAPACITY).unwrap()),
             format_cache: HashMap::new(),
             cache_hits_counter: counter!("windows_event_log_cache_hits_total"),
@@ -552,6 +554,10 @@ impl EventLogSubscription {
     /// Uses `WaitForMultipleObjects` via `spawn_blocking` to avoid blocking the
     /// Tokio runtime. The wait array puts shutdown first so a stop request wins
     /// over any channel that is already signaled.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
         // Build wait handle array: [shutdown_event, channel0_signal, channel1_signal, ...]
         let mut handles = Vec::with_capacity(self.channels.len() + 1);
@@ -585,7 +591,7 @@ impl EventLogSubscription {
     /// Each channel gets a per-channel budget of `max_events / num_channels`
     /// to prevent a single busy channel (e.g., Security) from starving others.
     /// The starting channel rotates each call via round-robin. Channels that
-    /// don't use their budget simply leave slots unused — the next pull_events
+    /// don't use their budget simply leave slots unused — the next `pull_events`
     /// call reclaims them naturally since the signal stays set.
     ///
     /// # At-least-once delivery semantics
@@ -616,6 +622,14 @@ impl EventLogSubscription {
         self.pull_events_inner(max_events, false)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn pull_events_inner(
         &mut self,
         max_events: usize,
@@ -698,7 +712,7 @@ impl EventLogSubscription {
                 }
 
                 if let Err(err) = result {
-                    let code = (err.code().0 as u32) & 0xFFFF;
+                    let code = err.code().0.cast_unsigned() & 0xFFFF;
                     if code == ERROR_NO_MORE_ITEMS {
                         channel_drained = true;
                         break;
@@ -891,7 +905,9 @@ impl EventLogSubscription {
                     channel_sub.subscription_active_gauge.set(1.0);
                 }
 
-                channel_sub.events_read_counter.increment(returned as u64);
+                channel_sub
+                    .events_read_counter
+                    .increment(u64::from(returned));
                 channel_sub
                     .last_event_timestamp_gauge
                     .set(chrono::Utc::now().timestamp() as f64);
@@ -942,12 +958,14 @@ impl EventLogSubscription {
                                 system_fields.channel.clone()
                             };
                             let provider_name = system_fields.provider_name.clone();
-                            let task_val = system_fields.task as u64;
-                            let opcode_val = system_fields.opcode as u64;
+                            let task_val = u64::from(system_fields.task);
+                            let opcode_val = u64::from(system_fields.opcode);
                             let keywords_val = system_fields.keywords;
 
                             let (task_name, opcode_name, keyword_names) =
-                                if !provider_name.is_empty() {
+                                if provider_name.is_empty() {
+                                    (None, None, Vec::new())
+                                } else {
                                     metadata::resolve_event_metadata(
                                         &mut self.publisher_cache,
                                         &mut self.format_cache,
@@ -959,8 +977,6 @@ impl EventLogSubscription {
                                         opcode_val,
                                         keywords_val,
                                     )
-                                } else {
-                                    (None, None, Vec::new())
                                 };
 
                             let rendered_message =
@@ -1190,7 +1206,7 @@ impl EventLogSubscription {
         self.rate_limiter.as_ref()
     }
 
-    /// Returns (total_channels, active_channels) for health reporting.
+    /// Returns (`total_channels`, `active_channels`) for health reporting.
     pub fn channel_health_summary(&self) -> (usize, usize) {
         let total = self.channels.len();
         // Read the tracked state, not the handle. A failed re-subscription deliberately
@@ -1271,7 +1287,7 @@ impl EventLogSubscription {
                     }
                 }
                 Err(e) => {
-                    let error_code = (e.code().0 as u32) & 0xFFFF;
+                    let error_code = e.code().0.cast_unsigned() & 0xFFFF;
                     if error_code == ERROR_FILE_NOT_FOUND
                         || error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
@@ -1289,12 +1305,11 @@ impl EventLogSubscription {
                             channel = %channel
                         );
                         continue;
-                    } else {
-                        return Err(WindowsEventLogError::OpenChannelError {
-                            channel: channel.clone(),
-                            source: e,
-                        });
                     }
+                    return Err(WindowsEventLogError::OpenChannelError {
+                        channel: channel.clone(),
+                        source: e,
+                    });
                 }
             }
         }
@@ -1303,11 +1318,11 @@ impl EventLogSubscription {
     }
 }
 
-/// Maximum XPath query length supported by Windows Event Log API.
+/// Maximum `XPath` query length supported by Windows Event Log API.
 /// Queries exceeding this limit fall back to `"*"` (all events).
 const XPATH_MAX_LENGTH: usize = 4096;
 
-/// Build an XPath query from config, incorporating `only_event_ids` when no
+/// Build an `XPath` query from config, incorporating `only_event_ids` when no
 /// explicit `event_query` is set.
 ///
 /// When `only_event_ids` is configured and no custom `event_query` is provided,
@@ -1317,6 +1332,10 @@ const XPATH_MAX_LENGTH: usize = 4096;
 ///
 /// If the generated query exceeds [`XPATH_MAX_LENGTH`] (4096 chars), falls back
 /// to `"*"` and lets the downstream filter in `build_event()` handle it.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn build_xpath_query(
     config: &WindowsEventLogConfig,
 ) -> Result<String, WindowsEventLogError> {
@@ -1516,7 +1535,7 @@ mod tests {
         );
     }
 
-    /// Test that wait_for_events_blocking returns timeout or events available
+    /// Test that `wait_for_events_blocking` returns timeout or events available
     #[tokio::test]
     async fn test_wait_for_events_timeout() {
         let mut config = WindowsEventLogConfig::default();
@@ -1549,7 +1568,7 @@ mod tests {
         drop(subscription);
     }
 
-    /// Test that signal_shutdown wakes a waiting thread
+    /// Test that `signal_shutdown` wakes a waiting thread
     #[tokio::test]
     async fn test_shutdown_signal_wakes_wait() {
         let mut config = WindowsEventLogConfig::default();
@@ -1573,7 +1592,7 @@ mod tests {
         let shutdown_event_raw = subscription.shutdown_event_raw() as isize;
 
         let wait_handle = tokio::task::spawn_blocking(move || {
-            let r = subscription.wait_for_events_blocking(30000);
+            let r = subscription.wait_for_events_blocking(30_000);
             (subscription, r)
         });
 
@@ -1586,10 +1605,8 @@ mod tests {
 
         let (subscription, result) = wait_handle.await.unwrap();
         match result {
-            WaitResult::Shutdown => {} // Expected
-            WaitResult::EventsAvailable => {
-                // Acceptable - there may have been real events
-            }
+            // Shutdown is expected; actual events are also acceptable.
+            WaitResult::Shutdown | WaitResult::EventsAvailable => {}
             WaitResult::Timeout => {
                 panic!("Should not timeout - shutdown should have woken the wait");
             }
@@ -1623,7 +1640,7 @@ mod tests {
         );
     }
 
-    /// Test pull_events with read_existing_events=true
+    /// Test `pull_events` with `read_existing_events=true`
     #[tokio::test]
     async fn test_pull_events_returns_events() {
         let mut config = WindowsEventLogConfig::default();
@@ -1844,7 +1861,7 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let checkpointer = Arc::new(Checkpointer::new(temp_dir.path()).await.unwrap());
 
-        let fake_bookmark = r#"<BookmarkList><Bookmark Channel='Application' RecordId='999999999' IsCurrent='true'/></BookmarkList>"#;
+        let fake_bookmark = r"<BookmarkList><Bookmark Channel='Application' RecordId='999999999' IsCurrent='true'/></BookmarkList>";
 
         checkpointer
             .set("Application".to_string(), fake_bookmark.to_string())
@@ -1986,6 +2003,10 @@ mod tests {
     /// `Timeout` — which is exactly what #25194 reports.
     #[tokio::test]
     #[serial]
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn test_pull_events_preserves_setevent_during_drain() {
         use std::sync::Arc as StdArc;
 

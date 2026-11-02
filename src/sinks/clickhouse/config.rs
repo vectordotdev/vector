@@ -2,8 +2,9 @@
 
 use std::fmt;
 
-use http::{StatusCode, Uri};
-use http_1::Request;
+use http::Uri;
+use http_1::{Request, StatusCode};
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -20,10 +21,7 @@ use super::{
 };
 use crate::{
     config::{SinkContext, ValidatedSink},
-    http::{
-        Auth, MaybeAuth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, MaybeAuth, client_v1::HttpClient},
     sinks::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
@@ -476,11 +474,9 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    match status {
+    match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 

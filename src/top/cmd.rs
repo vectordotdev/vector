@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use chrono::Local;
 use futures_util::future::join_all;
-use http::Uri;
+use http_1::Uri;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
@@ -33,7 +33,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     };
     let mut client = Client::new(uri.clone());
 
-    if client.connect().await.is_err() || client.health().await.is_err() {
+    // `connect` opens no connection, so the health RPC is what detects an unreachable API.
+    if client.connect().is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
@@ -84,7 +85,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
     )
     .await
     {
-        Ok(_) => {
+        Ok(()) => {
             connection.abort();
             exitcode::OK
         }
@@ -108,15 +109,20 @@ async fn subscription(
     shutdown_tx: oneshot::Sender<()>,
 ) {
     loop {
+        // Each attempt gets a new client, so a reconnect opens a new connection. `connect` opens
+        // no connection: the RPCs of `init_components` do, and fail while the API is unreachable.
+        let mut client = Client::new(uri.clone());
+        if client.connect().is_err() {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
+        }
+
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(uri.clone(), &opts.components).await {
-            Ok(state) => state,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        let Ok(state) = metrics::init_components(&mut client, &opts.components).await else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
         let initial_components = state
             .components
@@ -125,22 +131,15 @@ async fn subscription(
             .collect();
         _ = tx.send(EventType::InitializeState(state)).await;
 
-        // Subscribe to updated metrics via gRPC streaming
-        let handles = match metrics::subscribe(
-            uri.clone(),
+        // Subscribe to updated metrics via gRPC streaming, over the connection that
+        // `init_components` opened.
+        let handles = metrics::subscribe(
+            client,
             tx.clone(),
-            opts.interval as i64,
+            i64::from(opts.interval),
             opts.components.clone(),
             initial_components,
-        )
-        .await
-        {
-            Ok(handles) => handles,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
-        };
+        );
 
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(

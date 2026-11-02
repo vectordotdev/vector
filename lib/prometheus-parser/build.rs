@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 fn main() {
     println!("cargo:rerun-if-changed=proto/prometheus-remote.proto");
     println!("cargo:rerun-if-changed=proto/prometheus-types.proto");

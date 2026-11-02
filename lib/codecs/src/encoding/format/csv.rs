@@ -53,11 +53,10 @@ impl CsvSerializerConfig {
     }
 
     /// Build the `CsvSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no CSV fields are configured.
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
@@ -317,6 +316,44 @@ mod tests {
     use vector_core::event::{LogEvent, ObjectMap, Value};
 
     use super::*;
+
+    #[test]
+    fn ascii_field_schemas_match_their_serialized_values_and_defaults() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CsvSerializerOptions>().unwrap(),
+        )
+        .unwrap();
+        for (field, default) in [("delimiter", ","), ("escape", "\""), ("quote", "\"")] {
+            let property = &schema["properties"][field];
+            let resolved = property
+                .get("$ref")
+                .and_then(serde_json::Value::as_str)
+                .map_or(property, |reference| {
+                    schema
+                        .pointer(reference.strip_prefix('#').unwrap())
+                        .unwrap()
+                });
+            assert_eq!(resolved["type"], "string", "{field}: {schema}");
+            assert_eq!(property["default"], default, "{field}");
+        }
+
+        for field in ["delimiter", "escape", "quote"] {
+            let mut input = serde_json::json!({"fields": ["message"]});
+            input[field] = serde_json::json!("1");
+            let options: CsvSerializerOptions = serde_json::from_value(input.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_value(options).unwrap()[field],
+                "1",
+                "{field}"
+            );
+
+            input[field] = serde_json::json!(1);
+            assert!(
+                serde_json::from_value::<CsvSerializerOptions>(input).is_err(),
+                "{field}"
+            );
+        }
+    }
 
     fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();

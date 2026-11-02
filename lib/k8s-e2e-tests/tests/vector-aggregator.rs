@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(clippy::await_holding_lock)]
 
 use k8s_e2e_tests::*;

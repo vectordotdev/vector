@@ -27,11 +27,11 @@ pub mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct AmqpEventError {
-        pub error: lapin::Error,
+    pub struct AmqpEventError<'a> {
+        pub error: &'a lapin::Error,
     }
 
-    impl InternalEvent for AmqpEventError {
+    impl InternalEvent for AmqpEventError<'_> {
         fn emit(self) {
             error!(message = "Failed to read message.",
                    error = ?self.error,

@@ -4,62 +4,65 @@ generated: components: sources: splunk_hec: configuration: {
 	acknowledgements: {
 		description: "Acknowledgement configuration for the `splunk_hec` source."
 		required:    false
-		type: object: options: {
-			ack_idle_cleanup: {
-				description: """
-					Whether or not to remove channels after idling for `max_idle_time` seconds.
+		type: {
+			bool: {}
+			object: options: {
+				ack_idle_cleanup: {
+					description: """
+						Whether or not to remove channels after idling for `max_idle_time` seconds.
 
-					A channel is idling if it is not used for sending data or querying acknowledgement statuses.
-					"""
-				required: false
-				type: bool: default: false
-			}
-			enabled: {
-				description: "Enables end-to-end acknowledgements."
-				required:    false
-				type: bool: {}
-			}
-			max_idle_time: {
-				description: """
-					The amount of time, in seconds, a channel is allowed to idle before removal.
+						A channel is idling if it is not used for sending data or querying acknowledgement statuses.
+						"""
+					required: false
+					type: bool: default: false
+				}
+				enabled: {
+					description: "Enables end-to-end acknowledgements."
+					required:    false
+					type: bool: {}
+				}
+				max_idle_time: {
+					description: """
+						The amount of time, in seconds, a channel is allowed to idle before removal.
 
-					Channels can potentially idle for longer than this setting but clients should not rely on such behavior.
+						Channels can potentially idle for longer than this setting but clients should not rely on such behavior.
 
-					Minimum of `1`.
-					"""
-				required: false
-				type: uint: default: 300
-			}
-			max_number_of_ack_channels: {
-				description: """
-					The maximum number of Splunk HEC channels clients can use with this source.
+						Minimum of `1`.
+						"""
+					required: false
+					type: uint: default: 300
+				}
+				max_number_of_ack_channels: {
+					description: """
+						The maximum number of Splunk HEC channels clients can use with this source.
 
-					Minimum of `1`.
-					"""
-				required: false
-				type: uint: default: 1000000
-			}
-			max_pending_acks: {
-				description: """
-					The maximum number of acknowledgement statuses pending query across all channels.
+						Minimum of `1`.
+						"""
+					required: false
+					type: uint: default: 1000000
+				}
+				max_pending_acks: {
+					description: """
+						The maximum number of acknowledgement statuses pending query across all channels.
 
-					Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
+						Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
 
-					Minimum of `1`.
-					"""
-				required: false
-				type: uint: default: 10000000
-			}
-			max_pending_acks_per_channel: {
-				description: """
-					The maximum number of acknowledgement statuses pending query for a single channel.
+						Minimum of `1`.
+						"""
+					required: false
+					type: uint: default: 10000000
+				}
+				max_pending_acks_per_channel: {
+					description: """
+						The maximum number of acknowledgement statuses pending query for a single channel.
 
-					Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
+						Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
 
-					Minimum of `1`.
-					"""
-				required: false
-				type: uint: default: 1000000
+						Minimum of `1`.
+						"""
+					required: false
+					type: uint: default: 1000000
+				}
 			}
 		}
 	}

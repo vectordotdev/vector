@@ -1,21 +1,33 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt, io, mem,
+    time::Duration,
+};
 
 use bytes::{Bytes, BytesMut};
-use futures::SinkExt;
-use http::{Request, Uri};
+use futures::{StreamExt, future, stream::BoxStream};
+use http_1::Uri;
 use indoc::indoc;
+use tower::{Service, ServiceBuilder};
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::log_schema,
     configurable::configurable_component,
+    finalization::{EventFinalizers, EventStatus},
+    internal_event::CountByteSize,
+    json_size::JsonSize,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
+    request_metadata::{GroupedCountByteSize, RequestMetadata},
     schema,
     sensitive_string::SensitiveString,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse, batcher::BatchConfig as StreamBatchConfig},
 };
 use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    Field, InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, InfluxDbVersion,
-    ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
+    Field, InfluxDbSettings, InfluxDbWriteRequest, ProtocolVersion, encode_timestamp, healthcheck,
+    influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -23,14 +35,20 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
-    http::HttpClient,
-    internal_events::InfluxdbEncodingError,
+    http::client_v1::HttpClient,
+    internal_events::{InfluxdbEncodingError, LargeEventDroppedError, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings,
+            BatchConfig, Compression, HttpEndpoint, RequestBuilder, SinkBatchSettings,
             TowerRequestConfig,
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            builder::SinkBuilderExt,
+            encoding::{Encoder as SinkEncoder, write_all},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            metadata::RequestMetadataBuilder,
+            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
+            service::ServiceBuilderExt,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -48,7 +66,6 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 /// Configuration for the `influxdb_logs` sink.
 #[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
@@ -70,79 +87,8 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<KeyString>,
 
-    /// The InfluxDB API version to use.
-    ///
-    /// Omitting this option is deprecated and it will be required in a future release. When
-    /// unset, the version is temporarily inferred from the configured settings.
-    #[configurable(metadata(docs::examples = "2"))]
-    #[configurable(metadata(docs::examples = "1"))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub version: Option<InfluxDbVersion>,
-
-    /// The name of the database to write into.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "vector-database"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    #[configurable(metadata(docs::required_when = "version = \"1\""))]
-    pub database: Option<String>,
-
-    /// The consistency level to use for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "any"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub consistency: Option<String>,
-
-    /// The target retention policy for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "autogen"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub retention_policy_name: Option<String>,
-
-    /// The username to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "todd"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub username: Option<String>,
-
-    /// The password to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub password: Option<SensitiveString>,
-
-    /// The name of the organization to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    #[configurable(metadata(docs::examples = "my-org"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub org: Option<String>,
-
-    /// The name of the bucket to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    #[configurable(metadata(docs::examples = "vector-bucket"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub bucket: Option<String>,
-
-    /// The [token][token_docs] to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    ///
-    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
-    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub token: Option<SensitiveString>,
+    #[serde(flatten)]
+    pub settings: InfluxDbSettings,
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
@@ -178,24 +124,11 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "text"))]
     pub message_key: Option<OptionalValuePath>,
 
-    /// Use this option to customize the key containing the source_type.
+    /// Use this option to customize the key containing the `source_type`.
     ///
     /// The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
     #[configurable(metadata(docs::examples = "source"))]
     pub source_type_key: Option<OptionalValuePath>,
-}
-
-#[derive(Debug)]
-struct InfluxDbLogsSink {
-    uri: Uri,
-    token: String,
-    protocol_version: ProtocolVersion,
-    measurement: String,
-    tags: HashSet<KeyString>,
-    transformer: Transformer,
-    host_key: OwnedValuePath,
-    message_key: OwnedValuePath,
-    source_type_key: OwnedValuePath,
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {
@@ -234,7 +167,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 pub struct ValidatedInfluxDbLogs {
     measurement: String,
     tags: HashSet<KeyString>,
-    batch: BatchSettings<Buffer>,
+    batch: BatcherSettings,
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
     #[debug(skip)]
     uri: Uri,
@@ -253,9 +186,9 @@ impl ValidatedSink for InfluxDbLogsConfig {
         let measurement = self.get_measurement()?;
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
-        let batch = self.batch.into_batch_settings()?;
+        let batch = self.batch.into_batcher_settings()?;
 
-        let settings = influxdb_settings(self.settings()?);
+        let settings = influxdb_settings(self.settings.clone());
 
         let uri = settings.write_uri(self.endpoint.clone())?;
 
@@ -301,7 +234,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let request = self.request.into_settings();
@@ -321,9 +254,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
             .or_else(|| log_schema().source_type_key().cloned())
             .expect("global log_schema.source_type_key to be valid path");
 
-        let sink = InfluxDbLogsSink {
-            uri: uri.clone(),
-            token: token.inner().to_owned(),
+        let encoder = InfluxDbLogsEncoder {
             protocol_version: *protocol_version,
             measurement: measurement.clone(),
             tags: tags.clone(),
@@ -333,17 +264,19 @@ impl ValidatedSink for InfluxDbLogsConfig {
             source_type_key,
         };
 
-        let sink = BatchedHttpSink::new(
-            sink,
-            Buffer::new(batch.size, Compression::None),
-            request,
-            batch.timeout,
-            client,
-        )
-        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error, internal_log_rate_limit = false));
+        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token))
+            .with_response_decompression();
+        let service = ServiceBuilder::new()
+            .settings(request, http_response_retry_logic(RetryStrategy::Default))
+            .service(service);
 
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(sink), healthcheck))
+        let sink = InfluxDbLogsSink {
+            service,
+            batch_settings: *batch,
+            encoder,
+        };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -357,7 +290,7 @@ struct InfluxDbLogsEncoder {
     source_type_key: OwnedValuePath,
 }
 
-impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
+impl InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
         let mut log = event.into_log();
         // If the event isn't an object (`. = "foo"`), inserting or renaming will result in losing
@@ -419,121 +352,260 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
                 count: 1
             });
             return None;
-        };
+        }
 
         Some(output)
     }
 }
 
-impl HttpSink for InfluxDbLogsSink {
-    type Input = BytesMut;
-    type Output = BytesMut;
-    type Encoder = InfluxDbLogsEncoder;
+impl HttpServiceRequestBuilder<()> for InfluxDbWriteRequest {
+    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http_1::Request<Bytes>> {
+        self.request(request.take_payload())
+    }
+}
 
-    fn build_encoder(&self) -> Self::Encoder {
-        InfluxDbLogsEncoder {
-            protocol_version: self.protocol_version,
-            measurement: self.measurement.clone(),
-            tags: self.tags.clone(),
-            transformer: self.transformer.clone(),
-            host_key: self.host_key.clone(),
-            message_key: self.message_key.clone(),
-            source_type_key: self.source_type_key.clone(),
+/// An event encoded as one line of the line protocol, with the accounting of the original event.
+struct EncodedLine {
+    line: BytesMut,
+    finalizers: EventFinalizers,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+/// The lines of one write request.
+///
+/// The finalizers and the event accounting also cover events dropped for exceeding `max_bytes`.
+/// They are completed and reported with the request of the batch they were dropped from, even if
+/// that request has no lines.
+#[derive(Default)]
+struct LogBatch {
+    lines: Vec<BytesMut>,
+    finalizers: EventFinalizers,
+    count: usize,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+/// Batches lines by their encoded size.
+///
+/// A line longer than `max_bytes` is dropped if it would start a batch, and does not count towards
+/// `max_events`.
+struct LogBatchConfig {
+    batch: LogBatch,
+    batch_bytes: usize,
+    is_full: bool,
+    settings: BatcherSettings,
+}
+
+impl LogBatchConfig {
+    fn new(settings: BatcherSettings) -> Self {
+        Self {
+            batch: LogBatch::default(),
+            batch_bytes: 0,
+            is_full: false,
+            settings,
+        }
+    }
+}
+
+impl StreamBatchConfig<EncodedLine> for LogBatchConfig {
+    type ItemMetadata = ();
+    type Batch = LogBatch;
+
+    fn len(&self) -> usize {
+        self.batch.count
+    }
+
+    fn take_batch(&mut self) -> LogBatch {
+        self.batch_bytes = 0;
+        self.is_full = false;
+        mem::take(&mut self.batch)
+    }
+
+    fn push(&mut self, item: EncodedLine, (): ()) {
+        let EncodedLine {
+            line,
+            finalizers,
+            byte_size,
+            json_size,
+        } = item;
+        self.batch.finalizers.merge(finalizers);
+        self.batch.count += 1;
+        self.batch.byte_size += byte_size;
+        self.batch.json_size += json_size;
+
+        let max_bytes = self.settings.size_limit;
+        if self.batch.lines.is_empty() && line.len() > max_bytes {
+            emit!(LargeEventDroppedError {
+                length: line.len(),
+                max_length: max_bytes,
+            });
+        } else {
+            self.batch_bytes += line.len();
+            self.batch.lines.push(line);
+            self.is_full =
+                self.batch.lines.len() >= self.settings.item_limit || self.batch_bytes >= max_bytes;
         }
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
-        Request::post(&self.uri)
-            .header("Content-Type", "text/plain")
-            .header("Authorization", format!("Token {}", &self.token))
-            .body(events.freeze())
-            .map_err(Into::into)
+    fn is_batch_full(&self) -> bool {
+        self.is_full
+    }
+
+    fn item_fits_in_batch(&self, item: &EncodedLine) -> (bool, ()) {
+        let fits = self.batch.lines.is_empty()
+            || (self.batch.lines.len() < self.settings.item_limit
+                && self.batch_bytes + item.line.len() <= self.settings.size_limit);
+        (fits, ())
+    }
+
+    fn timeout(&self) -> Duration {
+        self.settings.timeout
+    }
+}
+
+/// The lines of a batch and the accounting of their original events.
+struct LogLines {
+    lines: Vec<BytesMut>,
+    json_size: GroupedCountByteSize,
+}
+
+struct LogLinesEncoder;
+
+impl SinkEncoder<LogLines> for LogLinesEncoder {
+    fn encode_input(
+        &self,
+        input: LogLines,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        let LogLines { lines, json_size } = input;
+        let mut written = 0;
+        for line in &lines {
+            write_all(writer, lines.len(), line)?;
+            written += line.len();
+        }
+        Ok((written, json_size))
+    }
+}
+
+struct InfluxDbLogsRequestBuilder {
+    encoder: LogLinesEncoder,
+}
+
+impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
+    type Metadata = EventFinalizers;
+    type Events = LogLines;
+    type Encoder = LogLinesEncoder;
+    type Payload = Bytes;
+    type Request = HttpRequest<()>;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        batch: LogBatch,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let LogBatch {
+            lines,
+            finalizers,
+            count,
+            byte_size,
+            json_size,
+        } = batch;
+        // Events are reported untagged, with the estimated JSON size of the original events.
+        let json_size = GroupedCountByteSize::from(CountByteSize(count, json_size));
+        let builder = RequestMetadataBuilder::new(count, byte_size, json_size.clone());
+        (finalizers, builder, LogLines { lines, json_size })
+    }
+
+    fn build_request(
+        &self,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        HttpRequest::new(payload.into_payload(), finalizers, metadata, ())
+    }
+}
+
+struct InfluxDbLogsSink<S> {
+    service: S,
+    batch_settings: BatcherSettings,
+    encoder: InfluxDbLogsEncoder,
+}
+
+impl<S> InfluxDbLogsSink<S>
+where
+    S: Service<HttpRequest<()>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let Self {
+            service,
+            batch_settings,
+            mut encoder,
+        } = *self;
+
+        input
+            .filter_map(move |mut event| {
+                let byte_size = event.size_of();
+                let json_size = event.estimated_json_encoded_size_of();
+                let finalizers = event.metadata_mut().take_finalizers();
+                // Events that fail to encode are dropped along with their finalizers.
+                future::ready(encoder.encode_event(event).map(|line| EncodedLine {
+                    line,
+                    finalizers,
+                    byte_size,
+                    json_size,
+                }))
+            })
+            .batched(LogBatchConfig::new(batch_settings))
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                InfluxDbLogsRequestBuilder {
+                    encoder: LogLinesEncoder,
+                },
+            )
+            .filter_map(|request| async move {
+                match request {
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                    Ok(request) => Some(request),
+                }
+            })
+            .into_driver(service)
+            // Requests that still fail after retries leave their events errored, as before.
+            .with_request_error_status(EventStatus::Errored)
+            .run()
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl<S> StreamSink<Event> for InfluxDbLogsSink<S>
+where
+    S: Service<HttpRequest<()>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
 impl InfluxDbLogsConfig {
-    fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        let version = match self.version {
-            Some(version) => {
-                self.validate_version(version)?;
-                version
-            }
-            None => {
-                warn!(
-                    "The `version` option is currently optional but will be required in a future release. \
-                     Please set it to `1` or `2` to match your InfluxDB settings."
-                );
-                self.infer_version()?
-            }
-        };
-        match version {
-            InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
-                database: self
-                    .database
-                    .clone()
-                    .ok_or("the `database` option is required when using InfluxDB v1")?,
-                consistency: self.consistency.clone(),
-                retention_policy_name: self.retention_policy_name.clone(),
-                username: self.username.clone(),
-                password: self.password.clone(),
-            })),
-            InfluxDbVersion::V2 => Ok(InfluxDbSettings::V2(InfluxDb2Settings {
-                org: self
-                    .org
-                    .clone()
-                    .ok_or("the `org` option is required when using InfluxDB v2")?,
-                bucket: self
-                    .bucket
-                    .clone()
-                    .ok_or("the `bucket` option is required when using InfluxDB v2")?,
-                token: self
-                    .token
-                    .clone()
-                    .ok_or("the `token` option is required when using InfluxDB v2")?,
-            })),
-        }
-    }
-
-    const fn settings_present(&self) -> (bool, bool) {
-        let has_v1 = self.database.is_some()
-            || self.consistency.is_some()
-            || self.retention_policy_name.is_some()
-            || self.username.is_some()
-            || self.password.is_some();
-        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
-        (has_v1, has_v2)
-    }
-
-    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
-        let (has_v1, has_v2) = self.settings_present();
-        match (has_v1, has_v2) {
-            (true, true) => Err(
-                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
-                    .into(),
-            ),
-            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
-            (true, false) => Ok(InfluxDbVersion::V1),
-            (false, true) => Ok(InfluxDbVersion::V2),
-        }
-    }
-
-    /// Rejects settings that belong to the version that was not selected, so that
-    /// an explicit `version` cannot silently ignore stale settings for the other version.
-    fn validate_version(&self, version: InfluxDbVersion) -> crate::Result<()> {
-        let (has_v1, has_v2) = self.settings_present();
-        match version {
-            InfluxDbVersion::V1 if has_v2 => Err(
-                "InfluxDB v1 settings are configured, but v2 settings were also provided; configure only one version."
-                    .into(),
-            ),
-            InfluxDbVersion::V2 if has_v1 => Err(
-                "InfluxDB v2 settings are configured, but v1 settings were also provided; configure only one version."
-                    .into(),
-            ),
-            _ => Ok(()),
-        }
-    }
-
     fn get_measurement(&self) -> Result<String, &'static str> {
         self.measurement
             .clone()
@@ -543,7 +615,7 @@ impl InfluxDbLogsConfig {
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
-        let healthcheck = healthcheck(config.endpoint.clone(), config.settings()?, client)?;
+        let healthcheck = healthcheck(config.endpoint, config.settings, client)?;
 
         Ok(healthcheck)
     }
@@ -560,12 +632,15 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use chrono::{Utc, offset::TimeZone};
     use futures::{StreamExt, channel::mpsc, stream};
     use http::{StatusCode, request::Parts};
     use indoc::indoc;
     use vector_lib::{
         event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        finalization::{BatchStatusReceiver, EventFinalizer, EventStatus},
         lookup::owned_value_path,
     };
 
@@ -573,7 +648,10 @@ mod tests {
     use crate::{
         config::ValidatedSink,
         sinks::{
-            influxdb::test_util::{assert_fields, split_line_protocol, ts},
+            influxdb::{
+                InfluxDb2Settings,
+                test_util::{assert_fields, split_line_protocol, ts},
+            },
             util::test::{build_test_server_status, load_sink},
         },
         test_util::{
@@ -624,25 +702,195 @@ mod tests {
     }
 
     #[test]
+    fn test_config_version_selects_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V1(_)));
+
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
+    }
+
+    #[test]
+    fn test_config_v1_settings_in_write_uri() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+            consistency: "quorum"
+            retention_policy_name: "autogen"
+            username: "my-user"
+            password: "my-password"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert_eq!(
+            config.validate().unwrap().uri.to_string(),
+            "http://localhost:8086/write?consistency=quorum&db=my-database&rp=autogen&p=my-password&u=my-user&precision=ns"
+        );
+    }
+
+    #[test]
+    fn test_config_version_required() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+        assert!(
+            error.to_string().contains("missing field `version`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_config_version_rejects_invalid_values() {
+        // Use the regular config loading path: it parses into an intermediate value, which is
+        // where an unquoted integer could otherwise be read as a variant index.
+        for (version, expected) in [
+            ("0", "invalid type: integer"),
+            ("1", "invalid type: integer"),
+            ("2", "invalid type: integer"),
+            ("3", "invalid type: integer"),
+            ("\"x\"", "unknown variant `x`"),
+        ] {
+            let config = format!(
+                "measurement: vector-logs\nendpoint: http://localhost:9999\nversion: {version}\norg: my-org\nbucket: my-bucket\ntoken: my-token\n"
+            );
+            let errors = crate::config::loading::load::<_, InfluxDbLogsConfig>(
+                config.as_bytes(),
+                crate::config::Format::Yaml,
+            )
+            .unwrap_err();
+            let error = errors.join("\n");
+            assert!(error.contains(expected), "version {version}: {error}");
+        }
+    }
+
+    #[test]
+    fn test_config_version_requires_settings() {
+        for (config, field) in [
+            (
+                indoc! {r#"
+                    measurement: "vector-logs"
+                    endpoint: "http://localhost:8086"
+                    version: "1"
+                "#},
+                "database",
+            ),
+            (
+                indoc! {r#"
+                    measurement: "vector-logs"
+                    endpoint: "http://localhost:9999"
+                    version: "2"
+                    bucket: "my-bucket"
+                    token: "my-token"
+                "#},
+                "org",
+            ),
+        ] {
+            let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("missing field `{field}`")),
+                "{field}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_config_rejects_unknown_fields() {
+        let v2 = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        for (extra, field) in [
+            ("database: my-database", "database"),
+            ("database: null", "database"),
+            ("database:", "database"),
+            ("bukcet: my-bucket", "bukcet"),
+            ("bukcet: null", "bukcet"),
+            ("endpont: http://localhost:9999", "endpont"),
+        ] {
+            let config = format!("{v2}{extra}\n");
+            let error = serde_yaml::from_str::<InfluxDbLogsConfig>(&config).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("unknown field `{field}`")),
+                "{field}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_config_accepts_null_optional_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+            password: null
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V1(_)));
+    }
+
+    #[test]
+    fn test_config_rejects_null_required_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: null
+        "#};
+        let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+        assert!(error.to_string().contains("invalid type: null"), "{error}");
+    }
+
+    fn v2_settings() -> InfluxDbSettings {
+        InfluxDbSettings::V2(InfluxDb2Settings {
+            org: "my-org".to_string(),
+            bucket: "my-bucket".to_string(),
+            token: "my-token".to_string().into(),
+        })
+    }
+
+    #[test]
     fn prepares_valid_config() {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
-            org: Some("my-org".to_string()),
-            bucket: Some("my-bucket".to_string()),
-            token: Some("my-token".to_string().into()),
+            settings: v2_settings(),
             tags: vec![],
-            version: Some(InfluxDbVersion::V2),
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,
@@ -662,22 +910,14 @@ mod tests {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
-            org: Some("my-org".to_string()),
-            bucket: Some("my-bucket".to_string()),
-            token: Some("my-token".to_string().into()),
+            settings: v2_settings(),
             host_key: Some(OptionalValuePath::new("custom_host")),
             tags: vec![],
-            version: Some(InfluxDbVersion::V2),
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             message_key: None,
             source_type_key: None,
         };
@@ -700,17 +940,15 @@ mod tests {
             .insert(event_path!("host"), "aws.cloud.eur");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let mut sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V1,
             "vector",
             ["metric_type", "host"].to_vec(),
         );
-        sink.transformer
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["host".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -718,13 +956,18 @@ mod tests {
         let line_protocol = split_line_protocol(string);
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
-        sink.transformer
+        let mut encoder = create_encoder(
+            ProtocolVersion::V1,
+            "vector",
+            ["metric_type", "host"].to_vec(),
+        );
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["metric_type".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
         let line_protocol = split_line_protocol(string);
@@ -732,7 +975,7 @@ mod tests {
             "host=aws.cloud.eur", line_protocol.1,
             "metric_type tag should be excluded"
         );
-        assert_fields(line_protocol.2, ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
     }
 
     #[test]
@@ -753,14 +996,11 @@ mod tests {
             .insert(event_path!("string"), "thisisastring");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V1,
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -772,7 +1012,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 "int=4i",
                 "float=5.5",
@@ -804,14 +1044,11 @@ mod tests {
             .insert(event_path!("string"), "thisisastring");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V2,
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -823,7 +1060,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 "int=4i",
                 "float=5.5",
@@ -844,18 +1081,12 @@ mod tests {
         event.as_mut_log().insert(event_path!("value"), 100);
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let mut sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
-            ProtocolVersion::V2,
-            "vector",
-            [].to_vec(),
-        );
+        let mut encoder = create_encoder(ProtocolVersion::V2, "vector", [].to_vec());
         // exclude default metric_type tag so to emit empty tags
-        sink.transformer
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["metric_type".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let line = std::str::from_utf8(&bytes).unwrap();
@@ -868,7 +1099,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("", line_protocol.1, "tags should be empty");
         assert_fields(
-            line_protocol.2,
+            &line_protocol.2,
             ["value=100i", "message=\"hello\""].to_vec(),
         );
 
@@ -886,14 +1117,7 @@ mod tests {
         event.insert(event_path!("nested", "array", 2isize), "another-value");
         event.insert(event_path!("nested", "array", 3isize), 15);
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
-            ProtocolVersion::V2,
-            "vector",
-            ["metric_type"].to_vec(),
-        );
-        let mut encoder = sink.build_encoder();
+        let mut encoder = create_encoder(ProtocolVersion::V2, "vector", ["metric_type"].to_vec());
 
         let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -902,7 +1126,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
-            line_protocol.2,
+            &line_protocol.2,
             [
                 "a=1i",
                 "nested.array[0]=\"example-value\"",
@@ -926,14 +1150,11 @@ mod tests {
         event.as_mut_log().insert(event_path!("as_a_tag"), 10);
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V2,
             "vector",
             ["as_a_tag", "not_exists_field", "source_type", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -944,7 +1165,7 @@ mod tests {
             "as_a_tag=10,metric_type=logs,source_type=file",
             line_protocol.1
         );
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
 
         assert_eq!("1542182950000000011\n", line_protocol.3);
     }
@@ -1046,7 +1267,7 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
         let lines = std::iter::repeat(())
-            .map(move |_| "message_value")
+            .map(move |()| "message_value")
             .take(5)
             .collect::<Vec<_>>();
         let mut events = Vec::new();
@@ -1057,7 +1278,14 @@ mod tests {
             event.insert(event_path!(format!("key{i}").as_str()), format!("value{i}"));
 
             let timestamp = Utc
-                .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
+                .with_ymd_and_hms(
+                    1970,
+                    1,
+                    1,
+                    0,
+                    0,
+                    u32::try_from(i).expect("test index fits in u32") + 1,
+                )
                 .single()
                 .expect("invalid timestamp");
             event.insert(event_path!("timestamp"), timestamp);
@@ -1099,7 +1327,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs,source_type=file", line_protocol.1);
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 &*format!("key{i}=\"value{i}\""),
                 "message=\"message_value\"",
@@ -1107,31 +1335,130 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
+        assert_eq!(((i + 1) * 1_000_000_000).to_string(), line_protocol.3);
     }
 
-    fn create_sink(
-        uri: &str,
-        token: &str,
+    fn create_encoder(
         protocol_version: ProtocolVersion,
         measurement: &str,
         tags: Vec<&str>,
-    ) -> InfluxDbLogsSink {
-        let uri = uri.parse::<Uri>().unwrap();
-        let token = token.to_string();
-        let measurement = measurement.to_string();
-        let tags: HashSet<_> = tags.into_iter().map(|tag| tag.into()).collect();
-        InfluxDbLogsSink {
-            uri,
-            token,
+    ) -> InfluxDbLogsEncoder {
+        InfluxDbLogsEncoder {
             protocol_version,
-            measurement,
-            tags,
-            transformer: Default::default(),
+            measurement: measurement.to_string(),
+            tags: tags.into_iter().map(Into::into).collect(),
+            transformer: Transformer::default(),
             host_key: owned_value_path!("host"),
             message_key: owned_value_path!("message"),
             source_type_key: owned_value_path!("source_type"),
         }
+    }
+
+    fn encoded_line(line: &str) -> (EncodedLine, BatchStatusReceiver) {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let item = EncodedLine {
+            line: BytesMut::from(line),
+            finalizers: EventFinalizers::new(EventFinalizer::new(batch)),
+            byte_size: 1,
+            json_size: JsonSize::new(10),
+        };
+        (item, receiver)
+    }
+
+    async fn batch_lines(
+        lines: &[&str],
+        max_bytes: usize,
+        max_events: usize,
+    ) -> (Vec<LogBatch>, Vec<BatchStatusReceiver>) {
+        let (items, receivers): (Vec<_>, Vec<_>) =
+            lines.iter().map(|line| encoded_line(line)).unzip();
+        let settings = BatcherSettings::new(
+            Duration::from_secs(1),
+            NonZeroUsize::new(max_bytes).unwrap(),
+            NonZeroUsize::new(max_events).unwrap(),
+        );
+        let batches = stream::iter(items)
+            .batched(LogBatchConfig::new(settings))
+            .collect()
+            .await;
+        (batches, receivers)
+    }
+
+    fn lines_of(batches: &[LogBatch]) -> Vec<Vec<String>> {
+        batches
+            .iter()
+            .map(|batch| {
+                batch
+                    .lines
+                    .iter()
+                    .map(|line| String::from_utf8_lossy(line).into_owned())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn batches_lines_by_encoded_bytes() {
+        let (batches, _) = batch_lines(
+            &["aaaa\n", "bbbbbb\n", "cc\n", "dd\n", "eeeeee\n", "f\n"],
+            10,
+            100,
+        )
+        .await;
+
+        assert_eq!(
+            lines_of(&batches),
+            vec![
+                vec!["aaaa\n"],
+                vec!["bbbbbb\n", "cc\n"],
+                vec!["dd\n", "eeeeee\n"],
+                vec!["f\n"],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_line_is_finalized_and_counted_with_its_batch() {
+        let (batches, receivers) =
+            batch_lines(&["this line is too long\n", "a\n", "b\n", "c\n"], 10, 2).await;
+
+        assert_eq!(lines_of(&batches), vec![vec!["a\n", "b\n"], vec!["c\n"]]);
+        assert_eq!(
+            batches.iter().map(|batch| batch.count).collect::<Vec<_>>(),
+            [3, 1]
+        );
+        assert_eq!(batches[0].json_size, JsonSize::new(30));
+
+        batches[0].finalizers.update_status(EventStatus::Rejected);
+        batches[1].finalizers.update_status(EventStatus::Delivered);
+        drop(batches);
+
+        let statuses = receivers
+            .into_iter()
+            .map(|mut receiver| receiver.try_recv().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statuses,
+            [
+                BatchStatus::Rejected,
+                BatchStatus::Rejected,
+                BatchStatus::Rejected,
+                BatchStatus::Delivered,
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_line_alone_yields_a_batch_without_lines() {
+        let (batches, mut receivers) =
+            batch_lines(&["a\n", "this line is too long\n"], 10, 100).await;
+
+        assert_eq!(lines_of(&batches), vec![vec!["a\n"], vec![]]);
+        assert_eq!(batches[1].count, 1);
+
+        batches[1].finalizers.update_status(EventStatus::Rejected);
+        drop(batches);
+        assert_eq!(receivers[1].try_recv(), Ok(BatchStatus::Rejected));
     }
 }
 
@@ -1154,7 +1481,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            InfluxDbVersion,
+            InfluxDb2Settings,
             logs::InfluxDbLogsConfig,
             test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
@@ -1162,6 +1489,11 @@ mod integration_tests {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the end-to-end log fixture together."
+    )]
     async fn influxdb2_logs_put_data() {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
@@ -1177,21 +1509,17 @@ mod integration_tests {
         let config = InfluxDbLogsConfig {
             measurement: Some(measure.clone()),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
-            tags: Default::default(),
-            version: Some(InfluxDbVersion::V2),
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
-            org: Some(ORG.to_string()),
-            bucket: Some(BUCKET.to_string()),
-            token: Some(TOKEN.to_string().into()),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            tags: Vec::default(),
+            settings: InfluxDbSettings::V2(InfluxDb2Settings {
+                org: ORG.to_string(),
+                bucket: BUCKET.to_string(),
+                token: TOKEN.to_string().into(),
+            }),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,
@@ -1236,13 +1564,13 @@ mod integration_tests {
 
         drop(batch);
 
-        let events = vec![
+        let input_logs = vec![
             Event::Log(event1),
             Event::Log(event2),
             Event::Log(namespaced_log),
         ];
 
-        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(input_logs), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

@@ -16,6 +16,10 @@ use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
 
 #[cfg(target_os = "linux")]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the conversion of Linux vmstat counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn record_vmstat_metrics(stats: &HashMap<String, i64>, output: &mut super::MetricsBuffer) {
     output.name = "memory";
 
@@ -29,6 +33,10 @@ fn record_vmstat_metrics(stats: &HashMap<String, i64>, output: &mut super::Metri
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn memory_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "memory";
         match heim::memory::memory().await {
@@ -100,6 +108,10 @@ impl HostMetrics {
         }
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn swap_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "memory";
         match heim::memory::swap().await {
@@ -122,13 +134,13 @@ impl HostMetrics {
                 #[cfg(not(windows))]
                 output.counter(
                     CounterName::MemorySwappedInBytesTotal,
-                    swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
+                    swap.sin().map_or(0, |swap| swap.get::<byte>()) as f64,
                     MetricTags::default(),
                 );
                 #[cfg(not(windows))]
                 output.counter(
                     CounterName::MemorySwappedOutBytesTotal,
-                    swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
+                    swap.sout().map_or(0, |swap| swap.get::<byte>()) as f64,
                     MetricTags::default(),
                 );
             }

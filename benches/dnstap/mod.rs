@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::Bytes;
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};

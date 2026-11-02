@@ -17,6 +17,10 @@ use super::{addr::next_addr, wait_for_tcp};
 ///
 /// A random local address is chosen for the HTTP server to listen on, and the function does not return until the server
 /// is up and ready for requests. The returned `Uri` is configured for the appropriate address.
+///
+/// # Panics
+///
+/// Panics if the listener address cannot be queried or used to construct a URI.
 pub async fn spawn_blackhole_http_server<H, F>(handler: H) -> Uri
 where
     H: Fn(Request<Body>) -> F + Clone + Send + 'static,
@@ -75,11 +79,16 @@ pub struct AuthenticatedHttpProxy {
 
 impl AuthenticatedHttpProxy {
     /// Returns the proxy URL, including its test credentials.
+    #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
 
     /// Waits for the next request received by the proxy.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no request arrives within five seconds or the observation channel closes.
     pub async fn next_request(&mut self) -> ProxyRequestObservation {
         timeout(std::time::Duration::from_secs(5), self.observations.recv())
             .await
@@ -95,6 +104,11 @@ impl Drop for AuthenticatedHttpProxy {
 }
 
 /// Spawns an HTTP proxy requiring the `proxy-user`/`proxy-pass` credentials.
+#[must_use]
+///
+/// # Panics
+///
+/// Panics if binding or inspecting the listener fails. Spawned tasks panic on invalid HTTP responses.
 pub fn spawn_authenticated_http_proxy() -> AuthenticatedHttpProxy {
     let address = SocketAddr::from(([127, 0, 0, 1], 0));
     let server = Server::bind(&address);

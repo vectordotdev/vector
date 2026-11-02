@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{fs::File, io::Write, path::PathBuf};
 use vector_common::Result;
 

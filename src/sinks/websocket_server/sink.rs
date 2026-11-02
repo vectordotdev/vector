@@ -49,7 +49,7 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
     },
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
@@ -66,7 +66,7 @@ pub struct WebSocketListenerSink {
 
 impl WebSocketListenerSink {
     #[cfg(test)]
-    pub fn new(config: WebSocketListenerSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
         let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         Self::from_validated(config, &validated, tls, cx)
@@ -79,7 +79,7 @@ impl WebSocketListenerSink {
         config: WebSocketListenerSinkConfig,
         validated: &ValidatedWebSocketListenerSink,
         tls: MaybeTlsSettings,
-        cx: SinkContext,
+        cx: &SinkContext,
     ) -> crate::Result<Self> {
         let auth = config
             .auth
@@ -159,6 +159,11 @@ impl WebSocketListenerSink {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the connection lifecycle together."
+    )]
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
@@ -202,7 +207,7 @@ impl WebSocketListenerSink {
                         .lock()
                         .expect("mutex poisoned")
                         .get(&key)
-                        .cloned()
+                        .copied()
                 }),
             );
             let Some(auth) = auth else {
@@ -268,7 +273,7 @@ impl WebSocketListenerSink {
                 emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
-                })
+                });
             })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
@@ -337,7 +342,7 @@ impl WebSocketListenerSink {
         {
             emit!(WebSocketListenerSendError {
                 error: Box::new(error)
-            })
+            });
         }
 
         {
@@ -355,8 +360,8 @@ impl WebSocketListenerSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for WebSocketListenerSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<Event, SinkError> for WebSocketListenerSink {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -364,7 +369,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
-        let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
+        let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
 
         let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
@@ -432,7 +437,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     // Error is handled by `Encoder`.
                     finalizers.update_status(EventStatus::Errored);
                 }
-            };
+            }
         }
 
         Ok(())
@@ -675,12 +680,12 @@ mod tests {
                 address,
                 ..Default::default()
             },
-            SinkContext::default(),
+            &SinkContext::default(),
         )
         .unwrap();
 
         run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             stream::once(ready(event)),
             &SINK_TAGS,
         )
@@ -831,10 +836,10 @@ mod tests {
     where
         S: Stream<Item = Event> + Send + 'static,
     {
-        let sink = WebSocketListenerSink::new(config, SinkContext::default()).unwrap();
+        let sink = WebSocketListenerSink::new(config, &SinkContext::default()).unwrap();
 
         let compliance_assertion = tokio::spawn(run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             events,
             &SINK_TAGS,
         ));
@@ -886,7 +891,7 @@ mod tests {
                 .collect()
                 .await;
 
-            pairs.iter().for_each(|(msg, expected)| {
+            for (msg, expected) in &pairs {
                 let mut base_msg = serde_json::from_str::<Value>(
                     &msg.as_ref().unwrap().clone().into_text().unwrap(),
                 )
@@ -896,7 +901,7 @@ mod tests {
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);
-            });
+            }
 
             if ack {
                 for (msg, _) in pairs {
@@ -927,9 +932,10 @@ mod tests {
                 found_metrics = true;
             }
         }
-        if !found_metrics {
-            panic!("Websocket server didn't emit any of the metrics that use extra tags!");
-        }
+        assert!(
+            found_metrics,
+            "Websocket server didn't emit any of the metrics that use extra tags!"
+        );
     }
 
     fn build_test_event_channel() -> (UnboundedSender<Event>, UnboundedReceiver<Event>) {

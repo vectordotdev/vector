@@ -31,6 +31,14 @@ use crate::{
     },
 };
 
+///
+/// # Errors
+///
+/// The returned source reports an error if processing the socket stream fails.
+///
+/// # Panics
+///
+/// The returned source panics if binding the listener or setting its permissions fails.
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
@@ -82,7 +90,7 @@ where
                 .peer_addr()
                 .ok()
                 .and_then(|addr| {
-                    addr.as_pathname().map(|e| e.to_owned()).map({
+                    addr.as_pathname().map(ToOwned::to_owned).map({
                         |path| {
                             span.record("peer_path", field::debug(&path));
                             path.to_string_lossy().into_owned()
