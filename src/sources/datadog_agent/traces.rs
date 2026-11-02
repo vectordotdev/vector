@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::future;
-use http::StatusCode;
+use http_0::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
 use vector_lib::{

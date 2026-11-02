@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
 use headers::{Authorization, authorization::Credentials};
-use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use http_0::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use serde::{
     Deserialize,
     de::{Error, MapAccess, Visitor},

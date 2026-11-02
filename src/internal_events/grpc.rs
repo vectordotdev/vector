@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use http_1::response::Response;
+use http::response::Response;
 use tonic::Code;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,

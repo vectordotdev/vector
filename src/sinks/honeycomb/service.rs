@@ -1,6 +1,6 @@
 //! Service implementation for the `honeycomb` sink.
 use bytes::Bytes;
-use http_1::{HeaderValue, Request};
+use http::{HeaderValue, Request};
 use snafu::ResultExt;
 
 use super::config::HTTP_HEADER_HONEYCOMB;
@@ -23,7 +23,7 @@ pub(super) struct HoneycombSvcRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let mut builder = Request::post(self.uri.clone().into_v1())
+        let mut builder = Request::post(self.uri.as_uri().clone())
             .header(HTTP_HEADER_HONEYCOMB, self.api_key.clone());
 
         if let Some(ce) = self.compression.content_encoding() {
