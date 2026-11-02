@@ -19,13 +19,6 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> &GroupedCountByteSize;
 
-    /// Number of events discarded by a terminal `Errored` response, when known.
-    /// Excludes confirmed deliveries from earlier attempts of the same request.
-    /// Defaults to the original request's count; other statuses do not use this override.
-    fn events_dropped(&self) -> Option<usize> {
-        None
-    }
-
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
@@ -256,12 +249,7 @@ where
                     EventStatus::Rejected | EventStatus::Errored
                 ) {
                     // The retry service has finished; either outcome abandons these events.
-                    let count = if response.event_status() == EventStatus::Errored {
-                        response.events_dropped().unwrap_or(event_count)
-                    } else {
-                        event_count
-                    };
-                    Self::emit_call_error(None, request_id, count);
+                    Self::emit_call_error(None, request_id, event_count);
                 }
             }
         }
@@ -456,7 +444,7 @@ mod tests {
         }
     }
 
-    struct StatusResponse(EventStatus, GroupedCountByteSize, Option<usize>);
+    struct StatusResponse(EventStatus, GroupedCountByteSize);
 
     impl DriverResponse for StatusResponse {
         fn event_status(&self) -> EventStatus {
@@ -465,10 +453,6 @@ mod tests {
 
         fn events_sent(&self) -> &GroupedCountByteSize {
             &self.1
-        }
-
-        fn events_dropped(&self) -> Option<usize> {
-            self.2
         }
     }
 
@@ -483,15 +467,11 @@ mod tests {
 
         metrics::init_test();
         let controller = Controller::get().unwrap();
-        for (status, dropped, expected_batch_status, expected_discarded) in [
-            (Some(Delivered), None, BatchStatus::Delivered, 0.0),
-            (Some(Delivered), Some(1), BatchStatus::Delivered, 0.0),
-            (Some(Rejected), None, BatchStatus::Rejected, 3.0),
-            (Some(Errored), None, BatchStatus::Errored, 3.0),
-            (Some(Rejected), Some(1), BatchStatus::Rejected, 3.0),
-            (Some(Errored), Some(1), BatchStatus::Errored, 1.0),
-            (Some(Errored), Some(0), BatchStatus::Errored, 0.0),
-            (None, None, BatchStatus::Rejected, 3.0),
+        for (status, expected_batch_status, expected_discarded) in [
+            (Some(Delivered), BatchStatus::Delivered, 0.0),
+            (Some(Rejected), BatchStatus::Rejected, 3.0),
+            (Some(Errored), BatchStatus::Errored, 3.0),
+            (None, BatchStatus::Rejected, 3.0),
         ] {
             controller.reset();
             let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -510,7 +490,6 @@ mod tests {
                         } else {
                             GroupedCountByteSize::default()
                         },
-                        dropped,
                     )),
                     None => Err("request failed"),
                 })

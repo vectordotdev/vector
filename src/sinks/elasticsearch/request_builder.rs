@@ -81,7 +81,6 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             metadata,
             original_events: es_metadata.original_events,
             elasticsearch_request_builder: self.clone(),
-            unconfirmed_events: es_metadata.batch_size,
         }
     }
 }
