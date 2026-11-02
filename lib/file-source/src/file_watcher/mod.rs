@@ -13,7 +13,7 @@ use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
     time::Instant,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
@@ -113,6 +113,15 @@ pub struct RawLineResult {
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
+/// Outcome of `FileWatcher::update_path`.
+#[derive(Debug)]
+pub struct PathUpdate {
+    /// Metrics of the previous file, when the inode changed.
+    pub unwatch_info: Option<FileUnwatchInfo>,
+    /// The watcher restarted the replacement file from the beginning.
+    pub reset: bool,
+}
+
 /// Information about a file when it is unwatched.
 /// Used for metric emission when Vector stops watching a file for any reason:
 /// - File deleted
@@ -152,6 +161,7 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
+    generation: u64,
 }
 
 impl FileWatcher {
@@ -199,51 +209,69 @@ impl FileWatcher {
         // Determine the actual position at which we should start reading.
         // For non-gzipped files, we use FileReader::Plain which allows metadata access.
         // For gzipped files, position tracking is not meaningful.
-        let (reader, file_position): (FileReader, FilePosition) =
-            match (gzipped, too_old, read_from) {
-                (true, true, _) => {
-                    debug!(
-                        message = "Not reading gzipped file older than `ignore_older`.",
-                        ?path,
-                    );
-                    (FileReader::Null(io::Cursor::new(Vec::new())), 0)
-                }
-                (true, _, ReadFrom::Checkpoint(file_position)) => {
-                    debug!(
-                        message = "Not re-reading gzipped file with existing stored offset.",
-                        ?path,
-                        %file_position
-                    );
-                    (FileReader::Null(io::Cursor::new(Vec::new())), file_position)
-                }
-                // TODO: This may become the default, leading us to stop reading gzipped files that
-                // we were reading before. Should we merge this and the next branch to read
-                // compressed file from the beginning even when `read_from = "end"` (implicitly via
-                // default or explicitly via config)?
-                (true, _, ReadFrom::End) => {
-                    debug!(
-                        message = "Can't read from the end of already-compressed file.",
-                        ?path,
-                    );
-                    (FileReader::Null(io::Cursor::new(Vec::new())), 0)
-                }
-                (true, false, ReadFrom::Beginning) => (
-                    FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
-                    0,
-                ),
-                (false, false, ReadFrom::Checkpoint(file_position)) => {
-                    let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-                (false, false, ReadFrom::Beginning) => {
-                    let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-                (false, true, _) | (false, false, ReadFrom::End) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-            };
+        let (reader, file_position): (FileReader, FilePosition) = match (
+            gzipped, too_old, read_from,
+        ) {
+            (true, true, _) => {
+                debug!(
+                    message = "Not reading gzipped file older than `ignore_older`.",
+                    ?path,
+                );
+                (FileReader::Null(io::Cursor::new(Vec::new())), 0)
+            }
+            (true, _, ReadFrom::Checkpoint(file_position)) => {
+                debug!(
+                    message = "Not re-reading gzipped file with existing stored offset.",
+                    ?path,
+                    %file_position
+                );
+                (FileReader::Null(io::Cursor::new(Vec::new())), file_position)
+            }
+            // TODO: This may become the default, leading us to stop reading gzipped files that
+            // we were reading before. Should we merge this and the next branch to read
+            // compressed file from the beginning even when `read_from = "end"` (implicitly via
+            // default or explicitly via config)?
+            (true, _, ReadFrom::End) => {
+                debug!(
+                    message = "Can't read from the end of already-compressed file.",
+                    ?path,
+                );
+                (FileReader::Null(io::Cursor::new(Vec::new())), 0)
+            }
+            (true, false, ReadFrom::Beginning) => (
+                FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
+                0,
+            ),
+            (false, false, ReadFrom::Checkpoint(file_position))
+                if file_position > metadata.len() =>
+            {
+                // The checkpoint lies beyond the end of the file: either the file
+                // was truncated, or the checkpoint was recorded against a different
+                // file whose fingerprint this one now matches (e.g. a recycled
+                // inode). Seeking to it would silently discard everything written
+                // until the file grows past the stale offset.
+                warn!(
+                    message = "Checkpoint position is beyond the end of the file; starting from the beginning. Was the file truncated, or its fingerprint reused?",
+                    ?path,
+                    checkpoint = file_position,
+                    file_size = metadata.len(),
+                );
+                let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
+                (FileReader::Plain(reader), pos)
+            }
+            (false, false, ReadFrom::Checkpoint(file_position)) => {
+                let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
+                (FileReader::Plain(reader), pos)
+            }
+            (false, false, ReadFrom::Beginning) => {
+                let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
+                (FileReader::Plain(reader), pos)
+            }
+            (false, true, _) | (false, false, ReadFrom::End) => {
+                let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
+                (FileReader::Plain(reader), pos)
+            }
+        };
 
         let ts = metadata
             .modified()
@@ -268,53 +296,93 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
+            generation: 0,
         })
+    }
+
+    /// The watcher generation under which this watcher records checkpoint
+    /// progress; set by the file server when the watcher takes ownership of a
+    /// fingerprint.
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn set_generation(&mut self, generation: u64) {
+        self.generation = generation;
     }
 
     /// Update the path being watched.
     ///
     /// If the file at the new path has a different inode, this indicates the file
-    /// was replaced (not just renamed). In this case, returns `FileUnwatchInfo`
-    /// containing metrics about the old file so the caller can emit appropriate events.
+    /// was replaced (not just renamed). In this case, the returned `PathUpdate`
+    /// carries `FileUnwatchInfo` with metrics about the old file so the caller can
+    /// emit appropriate events.
+    ///
+    /// `PathUpdate::reset` is `true` when the watcher had to abandon its current
+    /// position and start the replacement file from the beginning; the caller
+    /// should then treat the replacement as a new file (new generation, refreshed
+    /// checkpoint) so in-flight reads from the previous file cannot be recorded
+    /// as the replacement's progress.
     ///
     /// # Errors
     /// Returns an error if opening the replacement file, reading its metadata
     /// or compression header, or restoring the file position fails.
-    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
+    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<PathUpdate> {
+        let mut reset = false;
         let new_file = File::open(&path).await?;
 
         let file_info = new_file.file_info().await?;
-        let unwatch_info =
-            if (file_info.portable_dev(), file_info.portable_ino()) == (self.devno, self.inode) {
-                None
-            } else {
-                // Capture metrics from the old file before switching
-                let old_info = self.get_unwatch_info().await;
+        let unwatch_info = if (file_info.portable_dev(), file_info.portable_ino())
+            == (self.devno, self.inode)
+        {
+            None
+        } else {
+            // Capture metrics from the old file before switching
+            let old_info = self.get_unwatch_info().await;
 
-                let mut reader = BufReader::new(new_file);
-                let gzipped = is_gzipped(&mut reader).await?;
-                let new_reader = if gzipped {
-                    if self.file_position != 0 {
-                        FileReader::Null(io::Cursor::new(Vec::new()))
-                    } else {
-                        FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
-                    }
+            let len = new_file.metadata().await?.len();
+            let mut reader = BufReader::new(new_file);
+            let gzipped = is_gzipped(&mut reader).await?;
+            let new_reader = if gzipped {
+                if self.file_position != 0 {
+                    FileReader::Null(io::Cursor::new(Vec::new()))
                 } else {
-                    reader.seek(io::SeekFrom::Start(self.file_position)).await?;
-                    FileReader::Plain(reader)
-                };
-                self.reader = new_reader;
-
-                self.devno = file_info.portable_dev();
-                self.inode = file_info.portable_ino();
-
-                Some(old_info)
+                    FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
+                }
+            } else {
+                if self.file_position > len {
+                    // Same protection as in `new`: rebinding to a file shorter
+                    // than the current position would silently skip its head.
+                    warn!(
+                        message = "Position is beyond the end of the replacement file; reading it from the beginning.",
+                        ?path,
+                        position = self.file_position,
+                        file_size = len,
+                    );
+                    self.file_position = 0;
+                    // A partial line buffered from the previous file must not
+                    // be glued onto the replacement's first line.
+                    self.buf.clear();
+                    reset = true;
+                }
+                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
+                FileReader::Plain(reader)
             };
+            self.reader = new_reader;
+
+            self.devno = file_info.portable_dev();
+            self.inode = file_info.portable_ino();
+
+            Some(old_info)
+        };
 
         self.reached_eof = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.path = path;
-        Ok(unwatch_info)
+        Ok(PathUpdate {
+            unwatch_info,
+            reset,
+        })
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
