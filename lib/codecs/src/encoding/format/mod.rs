@@ -28,7 +28,8 @@ use std::fmt::Debug;
 
 #[cfg(feature = "parquet")]
 pub use self::parquet::{
-    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+    ParquetCompression, ParquetFileWriter, ParquetSchemaMode, ParquetSerializer,
+    ParquetSerializerConfig, ParquetWriteError,
 };
 #[cfg(feature = "arrow")]
 pub use arrow::{

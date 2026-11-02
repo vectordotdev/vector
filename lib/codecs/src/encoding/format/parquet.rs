@@ -11,7 +11,6 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
 use arrow::json::reader::infer_json_schema_from_iterator;
-use arrow::record_batch::RecordBatch;
 use bytes::{BufMut, BytesMut};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::ZstdLevel;
@@ -119,6 +118,23 @@ pub struct ParquetSerializerConfig {
     /// Controls how events with fields not present in the schema are handled.
     #[serde(default)]
     pub schema_mode: ParquetSchemaMode,
+
+    /// The maximum number of rows in a row group.
+    ///
+    /// Defaults to the Parquet writer default of 1048576 rows.
+    #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "events"))]
+    pub max_row_group_rows: Option<usize>,
+
+    /// The maximum estimated encoded size of a row group.
+    ///
+    /// A row group is written out once its encoded size reaches this limit, so lower
+    /// values bound the memory held by an open file at the cost of more, smaller row
+    /// groups, which are less efficient to query. Unset by default, in which case
+    /// row groups are limited only by `max_row_group_rows`.
+    #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_row_group_bytes: Option<usize>,
 }
 
 impl ParquetSerializerConfig {
@@ -232,7 +248,7 @@ pub struct ParquetSerializer {
     writer_props: Arc<WriterProperties>,
     schema_mode: ParquetSchemaMode,
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
-    schema_field_names: HashSet<String>,
+    schema_field_names: Arc<HashSet<String>>,
 
     #[debug(skip)]
     events_dropped_handle: Registered<EventsDroppedError>,
@@ -259,17 +275,29 @@ impl ParquetSerializer {
         reject_unsupported_arrow_types(&schema)?;
         let schema_ref = SchemaRef::new(schema);
 
-        let schema_field_names = schema_ref
-            .fields()
-            .iter()
-            .map(|f| f.name().clone())
-            .collect::<HashSet<_>>();
-
-        let writer_props = Arc::new(
-            WriterProperties::builder()
-                .set_compression(config.compression.try_into()?)
-                .build(),
+        let schema_field_names = Arc::new(
+            schema_ref
+                .fields()
+                .iter()
+                .map(|f| f.name().clone())
+                .collect::<HashSet<_>>(),
         );
+
+        if config.max_row_group_rows == Some(0) {
+            return Err("max_row_group_rows must be greater than 0".into());
+        }
+        if config.max_row_group_bytes == Some(0) {
+            return Err("max_row_group_bytes must be greater than 0".into());
+        }
+
+        let mut props = WriterProperties::builder().set_compression(config.compression.try_into()?);
+        if let Some(rows) = config.max_row_group_rows {
+            props = props.set_max_row_group_row_count(Some(rows));
+        }
+        if let Some(bytes) = config.max_row_group_bytes {
+            props = props.set_max_row_group_bytes(Some(bytes));
+        }
+        let writer_props = Arc::new(props.build());
 
         Ok(Self {
             schema: schema_ref,
@@ -288,34 +316,241 @@ impl ParquetSerializer {
         "application/vnd.apache.parquet"
     }
 
-    /// Writes `record_batch` into `buffer` as a complete Parquet file.
+    /// Opens a new Parquet file that is encoded incrementally.
     ///
-    /// On failure, emits an [`ArrowWriterError`] internal event (which
-    /// increments `component_errors_total`) before returning the error.
-    /// The caller is responsible for emitting `events_dropped`.
-    fn write_record_batch(
-        record_batch: &RecordBatch,
-        buffer: &mut BytesMut,
-        writer_props: &WriterProperties,
-    ) -> Result<(), parquet::errors::ParquetError> {
-        let mut writer = ArrowWriter::try_new(
-            buffer.writer(),
-            Arc::clone(record_batch.schema_ref()),
-            Some(writer_props.clone()),
+    /// `first_chunk` is used to infer the file schema when `schema_mode` is
+    /// `auto_infer`; every later chunk written to the returned
+    /// [`ParquetFileWriter`] must fit that schema. With a configured schema the
+    /// chunk is only inspected for the usual `strict`/`relaxed` handling when it
+    /// is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the schema cannot be inferred from `first_chunk` or
+    /// the underlying Parquet writer cannot be created.
+    pub fn open_file(&self, first_chunk: &[Event]) -> Result<ParquetFileWriter, Error> {
+        self.open_file_with_capacity(first_chunk, 0)
+    }
+
+    /// Like [`open_file`](Self::open_file), but reserves `capacity` bytes for the
+    /// output up front.
+    ///
+    /// Pass the expected final size when it is known (for example the size limit at
+    /// which the file is completed) so the buffer does not have to grow, and copy
+    /// its contents, as row groups are flushed into it.
+    ///
+    /// # Errors
+    ///
+    /// See [`open_file`](Self::open_file).
+    pub fn open_file_with_capacity(
+        &self,
+        first_chunk: &[Event],
+        capacity: usize,
+    ) -> Result<ParquetFileWriter, Error> {
+        let schema = if self.schema_mode == ParquetSchemaMode::AutoInfer {
+            let json_values = vector_log_events_to_json_values(first_chunk).map_err(|e| {
+                emit(JsonSerializationError { error: &e });
+                Error::new(ErrorKind::InvalidData, e)
+            })?;
+            Self::infer_file_schema(first_chunk, &json_values)?
+        } else {
+            Arc::clone(&self.schema)
+        };
+        self.open_file_with_schema(schema, capacity)
+    }
+
+    fn infer_file_schema(
+        events: &[Event],
+        json_values: &[serde_json::Value],
+    ) -> Result<SchemaRef, Error> {
+        if json_values.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Cannot infer a Parquet schema without any log events",
+            ));
+        }
+        let schema = ParquetSchemaGenerator::infer_schema(json_values)?;
+        Ok(Arc::new(ParquetSchemaGenerator::try_normalize_schema(
+            events, schema,
+        )))
+    }
+
+    fn open_file_with_schema(
+        &self,
+        schema: SchemaRef,
+        capacity: usize,
+    ) -> Result<ParquetFileWriter, Error> {
+        let writer = ArrowWriter::try_new(
+            BytesMut::with_capacity(capacity).writer(),
+            Arc::clone(&schema),
+            Some((*self.writer_props).clone()),
         )
-        .inspect_err(|e| {
-            emit(ArrowWriterError { error: e });
+        .map_err(|e| {
+            emit(ArrowWriterError { error: &e });
+            Error::other(e)
         })?;
 
-        writer.write(record_batch).inspect_err(|e| {
-            emit(ArrowWriterError { error: e });
+        Ok(ParquetFileWriter {
+            writer,
+            schema,
+            schema_mode: self.schema_mode,
+            schema_field_names: Arc::clone(&self.schema_field_names),
+            events_dropped_handle: self.events_dropped_handle.clone(),
+            rows: 0,
+        })
+    }
+}
+
+/// Error returned by [`ParquetFileWriter::write`].
+#[derive(Debug)]
+pub enum ParquetWriteError {
+    /// The chunk could not be turned into a record batch, for example because
+    /// of a schema violation. The file is unaffected and accepts further chunks;
+    /// only the events of this chunk are lost.
+    Chunk(vector_common::Error),
+    /// The Parquet writer itself failed. The file can no longer be completed
+    /// and must be discarded along with everything written to it.
+    File(parquet::errors::ParquetError),
+}
+
+impl std::fmt::Display for ParquetWriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Chunk(error) => write!(f, "Failed to encode events as Parquet: {error}"),
+            Self::File(error) => write!(f, "Parquet writer failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ParquetWriteError {}
+
+/// A Parquet file that is encoded one chunk of events at a time.
+///
+/// Each [`write`](Self::write) converts its chunk into an Arrow record batch and
+/// hands it to the Parquet writer, which encodes and compresses the pages right
+/// away and flushes completed row groups into the output buffer. Memory usage
+/// therefore tracks the compressed output plus a single chunk, rather than the
+/// uncompressed contents of the whole file as with [`ParquetSerializer::encode`].
+///
+/// Call [`encoded_size`](Self::encoded_size) after each write to decide when the
+/// file is large enough, then [`finish`](Self::finish) to obtain the bytes.
+#[derive(derive_more::Debug)]
+pub struct ParquetFileWriter {
+    #[debug(skip)]
+    writer: ArrowWriter<bytes::buf::Writer<BytesMut>>,
+    schema: SchemaRef,
+    schema_mode: ParquetSchemaMode,
+    schema_field_names: Arc<HashSet<String>>,
+    #[debug(skip)]
+    events_dropped_handle: Registered<EventsDroppedError>,
+    rows: usize,
+}
+
+impl ParquetFileWriter {
+    /// Encodes a chunk of events into the file.
+    ///
+    /// Returns the number of rows written. Non-log events are dropped and
+    /// reported, as in [`ParquetSerializer::encode`].
+    ///
+    /// # Errors
+    ///
+    /// See [`ParquetWriteError`] for which errors leave the file usable.
+    pub fn write(&mut self, events: &[Event]) -> Result<usize, ParquetWriteError> {
+        let json_values = vector_log_events_to_json_values(events).map_err(|e| {
+            emit(JsonSerializationError { error: &e });
+            ParquetWriteError::Chunk(Box::new(e))
+        })?;
+        self.write_json_values(events, &json_values)
+    }
+
+    fn write_json_values(
+        &mut self,
+        events: &[Event],
+        json_values: &[serde_json::Value],
+    ) -> Result<usize, ParquetWriteError> {
+        let non_log_count = events.len() - json_values.len();
+        if non_log_count > 0 {
+            warn!(
+                message = "Non-log events dropped by Parquet encoder ",
+                %non_log_count,
+                internal_log_rate_secs = 10,
+            );
+            self.events_dropped_handle.emit(Count(non_log_count));
+        }
+
+        if json_values.is_empty() {
+            return Ok(0);
+        }
+
+        if self.schema_mode == ParquetSchemaMode::Strict {
+            self.check_strict_fields(events)?;
+        }
+
+        let record_batch = build_record_batch(Arc::clone(&self.schema), json_values)
+            .map_err(|e| ParquetWriteError::Chunk(Box::new(e)))?;
+
+        self.writer.write(&record_batch).map_err(|e| {
+            emit(ArrowWriterError { error: &e });
+            ParquetWriteError::File(e)
         })?;
 
-        writer.close().inspect_err(|e| {
-            emit(ArrowWriterError { error: e });
-        })?;
+        let rows = record_batch.num_rows();
+        self.rows += rows;
+        Ok(rows)
+    }
 
+    /// In strict mode, reject events with top-level fields not in the schema.
+    fn check_strict_fields(&self, events: &[Event]) -> Result<(), ParquetWriteError> {
+        for event in events {
+            if let Some(log) = event.maybe_as_log()
+                && let Some(object_map) = log.as_map()
+            {
+                for top_level in object_map.keys() {
+                    if !self.schema_field_names.contains(top_level.as_str()) {
+                        return Err(ParquetWriteError::Chunk(Box::new(
+                            ArrowEncodingError::SchemaFetchError {
+                                message: format!(
+                                    "Strict schema mode: event contains field '{top_level}' not in schema",
+                                ),
+                            },
+                        )));
+                    }
+                }
+            }
+        }
         Ok(())
+    }
+
+    /// The Arrow schema of this file.
+    #[must_use]
+    pub fn schema(&self) -> &SchemaRef {
+        &self.schema
+    }
+
+    /// Number of rows written so far.
+    #[must_use]
+    pub const fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Estimated size of the finished file so far: bytes already flushed to the
+    /// output buffer plus the estimated encoded size of the in-progress row group.
+    #[must_use]
+    pub fn encoded_size(&self) -> usize {
+        self.writer.bytes_written() + self.writer.in_progress_size()
+    }
+
+    /// Writes the footer and returns the complete Parquet file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Parquet writer fails to finalize the file.
+    pub fn finish(self) -> Result<BytesMut, parquet::errors::ParquetError> {
+        let writer = self
+            .writer
+            .into_inner()
+            .inspect_err(|e| emit(ArrowWriterError { error: e }))?;
+        Ok(writer.into_inner())
     }
 }
 
@@ -335,53 +570,27 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             }
         };
 
-        let non_log_count = events.len() - json_values.len();
+        let schema = if self.schema_mode == ParquetSchemaMode::AutoInfer {
+            if json_values.is_empty() {
+                // Only non-log events: report them as dropped and emit nothing.
+                self.events_dropped_handle.emit(Count(events.len()));
+                return Ok(());
+            }
+            let schema = Self::infer_file_schema(&events, &json_values)?;
+            self.schema = Arc::clone(&schema);
+            schema
+        } else {
+            Arc::clone(&self.schema)
+        };
 
-        if non_log_count > 0 {
-            warn!(
-                message = "Non-log events dropped by Parquet encoder ",
-                %non_log_count,
-                internal_log_rate_secs = 10,
-            );
-            self.events_dropped_handle.emit(Count(non_log_count));
-        }
-
-        if json_values.is_empty() {
+        let mut file = self.open_file_with_schema(schema, 0)?;
+        let rows = file.write_json_values(&events, &json_values)?;
+        if rows == 0 {
             return Ok(());
         }
 
-        match self.schema_mode {
-            // In strict mode, check for extra top-level fields not in the schema.
-            ParquetSchemaMode::Strict => {
-                for event in &events {
-                    if let Some(log) = event.maybe_as_log()
-                        && let Some(object_map) = log.as_map()
-                    {
-                        for top_level in object_map.keys() {
-                            if !self.schema_field_names.contains(top_level.as_str()) {
-                                return Err(Box::new(ArrowEncodingError::SchemaFetchError {
-                                    message: format!(
-                                        "Strict schema mode: event contains field '{top_level}' not in schema",
-                                    ),
-                                }));
-                            }
-                        }
-                    }
-                }
-            }
-            ParquetSchemaMode::AutoInfer => {
-                let schema = ParquetSchemaGenerator::infer_schema(&json_values)?;
-                self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
-                    &events, schema,
-                ));
-            }
-            ParquetSchemaMode::Relaxed => {}
-        }
-
-        let record_batch =
-            build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
-
-        Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
+        let output = file.finish().map_err(Box::new)?;
+        buffer.unsplit(output);
 
         Ok(())
     }
@@ -962,5 +1171,205 @@ mod tests {
             result.unwrap_err().to_string().contains("raw_data"),
             "Error should name the offending field"
         );
+    }
+
+    #[test]
+    fn row_group_limits_are_applied() {
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            max_row_group_rows: Some(2),
+            ..Default::default()
+        })
+        .unwrap();
+        let events = sample_events();
+        let mut file = serializer.open_file(&events).unwrap();
+        file.write(&events).unwrap();
+        let output = file.finish().unwrap();
+        let reader = SerializedFileReader::new(Bytes::from(output)).unwrap();
+        assert_eq!(
+            reader.metadata().num_row_groups(),
+            3,
+            "5 rows in groups of 2"
+        );
+
+        for config in [
+            ParquetSerializerConfig {
+                schema_mode: ParquetSchemaMode::AutoInfer,
+                max_row_group_rows: Some(0),
+                ..Default::default()
+            },
+            ParquetSerializerConfig {
+                schema_mode: ParquetSchemaMode::AutoInfer,
+                max_row_group_bytes: Some(0),
+                ..Default::default()
+            },
+        ] {
+            assert!(ParquetSerializer::new(config).is_err());
+        }
+    }
+
+    // ── Incremental file writer ──────────────────────────────────────────────
+
+    #[test]
+    fn file_writer_accumulates_chunks_into_one_file() {
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            compression: ParquetCompression::Zstd { level: 3 },
+            ..Default::default()
+        })
+        .expect("Failed to create serializer");
+
+        // Distinct payloads per chunk so the encoded size visibly grows.
+        let chunks: Vec<Vec<Event>> = (0..3)
+            .map(|chunk| {
+                (0..200)
+                    .map(|i| {
+                        create_event(vec![
+                            (
+                                "message",
+                                format!("chunk {chunk} event {i} {}", "x".repeat(i)),
+                            ),
+                            ("host", format!("host-{i}")),
+                        ])
+                    })
+                    .collect()
+            })
+            .collect();
+        let chunk_len = chunks[0].len();
+
+        let mut file = serializer
+            .open_file(&chunks[0])
+            .expect("open_file should succeed");
+        assert_eq!(file.rows(), 0);
+
+        let mut last_size = file.encoded_size();
+        for chunk in &chunks {
+            let rows = file.write(chunk).expect("write should succeed");
+            assert_eq!(rows, chunk_len);
+            let size = file.encoded_size();
+            assert!(size > last_size, "encoded_size should grow with each chunk");
+            last_size = size;
+        }
+        assert_eq!(file.rows(), chunk_len * 3);
+
+        let output = file.finish().expect("finish should succeed");
+        assert_parquet_magic(&output);
+        assert_eq!(parquet_row_count(&output), chunk_len * 3);
+        assert!(
+            parquet_column_names(&output).contains(&"message".to_string()),
+            "columns should come from the inferred schema"
+        );
+    }
+
+    #[test]
+    fn file_writer_matches_single_shot_encode() {
+        let config = ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            ..Default::default()
+        };
+        let events = sample_events();
+
+        let mut serializer = ParquetSerializer::new(config.clone()).unwrap();
+        let mut buffer = BytesMut::new();
+        serializer.encode(events.clone(), &mut buffer).unwrap();
+
+        let serializer = ParquetSerializer::new(config).unwrap();
+        let mut file = serializer.open_file(&events).unwrap();
+        file.write(&events).unwrap();
+        let output = file.finish().unwrap();
+
+        assert_eq!(parquet_row_count(&buffer), parquet_row_count(&output));
+        assert_eq!(parquet_column_names(&buffer), parquet_column_names(&output));
+    }
+
+    #[test]
+    fn file_writer_auto_infer_requires_log_events() {
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            ..Default::default()
+        })
+        .unwrap();
+
+        let metric = Event::Metric(vector_core::event::Metric::new(
+            "cpu",
+            vector_core::event::MetricKind::Absolute,
+            vector_core::event::MetricValue::Gauge { value: 1.0 },
+        ));
+        assert!(serializer.open_file(&[metric]).is_err());
+        assert!(serializer.open_file(&[]).is_err());
+    }
+
+    #[test]
+    fn file_writer_relaxed_schema_file_fills_missing_fields() {
+        let schema_path = write_temp_schema(
+            "file_writer_relaxed",
+            "message logs {\n  required binary name (STRING);\n  optional int64 age;\n}",
+        );
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_file: Some(schema_path),
+            schema_mode: ParquetSchemaMode::Relaxed,
+            ..Default::default()
+        })
+        .unwrap();
+
+        // With a schema file the first chunk is not needed for inference.
+        let mut file = serializer.open_file(&[]).unwrap();
+        file.write(&[create_event(vec![("name", "alice"), ("city", "paris")])])
+            .unwrap();
+        file.write(&[create_event(vec![("name", "bob")])]).unwrap();
+        assert_eq!(file.rows(), 2);
+
+        let output = file.finish().unwrap();
+        assert_eq!(parquet_row_count(&output), 2);
+        assert_eq!(parquet_column_names(&output), vec!["name", "age"]);
+    }
+
+    #[test]
+    fn file_writer_strict_rejects_chunk_but_keeps_file_usable() {
+        let schema_path = write_temp_schema(
+            "file_writer_strict",
+            "message logs {\n  required binary name (STRING);\n}",
+        );
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_file: Some(schema_path),
+            schema_mode: ParquetSchemaMode::Strict,
+            ..Default::default()
+        })
+        .unwrap();
+
+        let mut file = serializer.open_file(&[]).unwrap();
+        file.write(&[create_event(vec![("name", "alice")])])
+            .unwrap();
+
+        let err = file
+            .write(&[create_event(vec![("name", "eve"), ("city", "paris")])])
+            .expect_err("strict mode should reject extra fields");
+        assert!(matches!(err, ParquetWriteError::Chunk(_)), "{err}");
+        assert!(err.to_string().contains("city"));
+
+        file.write(&[create_event(vec![("name", "bob")])]).unwrap();
+        assert_eq!(file.rows(), 2);
+        assert_eq!(parquet_row_count(&file.finish().unwrap()), 2);
+    }
+
+    #[test]
+    fn file_writer_type_mismatch_is_chunk_error() {
+        let schema_path = write_temp_schema(
+            "file_writer_mismatch",
+            "message logs {\n  required int64 count;\n}",
+        );
+        let serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_file: Some(schema_path),
+            ..Default::default()
+        })
+        .unwrap();
+
+        let mut file = serializer.open_file(&[]).unwrap();
+        file.write(&[create_event(vec![("count", 1_i64)])]).unwrap();
+        let err = file
+            .write(&[create_event(vec![("count", "not a number")])])
+            .expect_err("type mismatch should fail");
+        assert!(matches!(err, ParquetWriteError::Chunk(_)), "{err}");
+        assert_eq!(parquet_row_count(&file.finish().unwrap()), 1);
     }
 }

@@ -31,7 +31,8 @@ pub use format::{
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
 pub use format::{
-    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+    ParquetCompression, ParquetFileWriter, ParquetSchemaMode, ParquetSerializer,
+    ParquetSerializerConfig, ParquetWriteError,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
