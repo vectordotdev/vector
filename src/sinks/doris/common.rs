@@ -9,7 +9,7 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use http::Uri;
+use http_1::Uri;
 use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]
@@ -30,7 +30,8 @@ impl DorisCommon {
 
         // basic auth must be some for now
         let auth = config.auth.choose_one(&endpoint.auth)?;
-        let base_url = endpoint.uri.clone();
+        // Convert the validated endpoint to the native URI once, at the client boundary.
+        let base_url = endpoint.uri_v1()?;
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
 
         // Build encoder from the encoding configuration
@@ -52,7 +53,7 @@ impl DorisCommon {
     }
     pub fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
-        for endpoint in config.endpoints.iter() {
+        for endpoint in &config.endpoints {
             commons.push(Self::parse_config(config, endpoint)?);
         }
         Ok(commons)

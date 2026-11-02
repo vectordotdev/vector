@@ -11,8 +11,8 @@ use std::{
 };
 
 use futures::{FutureExt, StreamExt, future::BoxFuture};
-use http::{HeaderMap, Request, Response};
-use hyper::{Body, body::HttpBody};
+use http_1::{Request, Response};
+use http_body_1::{Body, Frame, SizeHint};
 use pin_project::pin_project;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
@@ -22,10 +22,11 @@ use tokio::{
 use tonic::{
     body::BoxBody,
     server::NamedService,
-    transport::server::{Connected, Routes, Server},
+    service::Routes,
+    transport::server::{Connected, Server},
 };
 use tower::{Layer, Service};
-use tower_http::{
+use tower_http_1::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
@@ -293,43 +294,36 @@ impl<B> MaxConnectionAgeBody<B> {
     }
 }
 
-impl<B> HttpBody for MaxConnectionAgeBody<B>
+impl<B> Body for MaxConnectionAgeBody<B>
 where
-    B: HttpBody,
+    B: Body,
 {
     type Data = B::Data;
     type Error = B::Error;
 
-    fn poll_data(
+    fn poll_frame(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
-        self.project().inner.poll_data(cx)
-    }
-
-    fn poll_trailers(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
-        self.project().inner.poll_trailers(cx)
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        self.project().inner.poll_frame(cx)
     }
 
     fn is_end_stream(&self) -> bool {
         self.inner.is_end_stream()
     }
 
-    fn size_hint(&self) -> hyper::body::SizeHint {
+    fn size_hint(&self) -> SizeHint {
         self.inner.size_hint()
     }
 }
 
-impl<S, B> Service<Request<Body>> for MaxConnectionAgeService<S>
+impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for MaxConnectionAgeService<S>
 where
-    S: Service<Request<Body>, Response = Response<B>> + Clone + Send + 'static,
+    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    B: HttpBody + Send + 'static,
+    ResBody: Body + Send + 'static,
 {
-    type Response = Response<MaxConnectionAgeBody<B>>;
+    type Response = Response<MaxConnectionAgeBody<ResBody>>;
     type Error = S::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -337,7 +331,7 @@ where
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         let guard = req
             .extensions()
             .get::<MaxConnectionAgeConnectInfo>()
@@ -353,6 +347,14 @@ where
     }
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -362,7 +364,7 @@ pub async fn run_grpc_server<S>(
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
         + NamedService
         + Clone
         + Send
@@ -380,6 +382,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
+        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
@@ -403,14 +406,30 @@ where
 
 // This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
-pub async fn run_grpc_server_with_routes(
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
+pub async fn run_grpc_server_with_routes<L>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     tls_reloader: Option<TlsAcceptorReloader>,
     routes: Routes,
     keepalive: GrpcKeepaliveConfig,
     shutdown: ShutdownSignal,
-) -> crate::Result<()> {
+    request_layer: L,
+) -> crate::Result<()>
+where
+    L: Layer<DecompressionAndMetrics<Routes>> + Clone + Send + 'static,
+    L::Service: Service<Request<BoxBody>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    <L::Service as Service<Request<BoxBody>>>::Future: Send + 'static,
+    <L::Service as Service<Request<BoxBody>>>::Error:
+        Into<tower::BoxError> + std::fmt::Display + Send + 'static,
+{
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
@@ -422,8 +441,11 @@ pub async fn run_grpc_server_with_routes(
     info!(%address, "Building gRPC server.");
 
     Server::builder()
+        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
+        // Request admission must see each HTTP/2 stream before its body is decompressed.
+        .layer(request_layer)
         .layer(DecompressionAndMetricsLayer)
         .add_routes(routes)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
@@ -434,22 +456,23 @@ pub async fn run_grpc_server_with_routes(
     Ok(())
 }
 
-/// Builds a [TraceLayer] configured for a gRPC server.
+/// Builds a [`TraceLayer`] configured for a gRPC server.
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
+#[must_use]
 pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<
     SharedClassifier<GrpcErrorsAsFailures>,
-    impl Fn(&Request<Body>) -> Span + Clone,
-    impl Fn(&Request<Body>, &Span) + Clone,
+    impl Fn(&Request<BoxBody>) -> Span + Clone,
+    impl Fn(&Request<BoxBody>, &Span) + Clone,
     impl Fn(&Response<BoxBody>, Duration, &Span) + Clone,
     (),
     (),
     (),
 > {
     TraceLayer::new_for_grpc()
-        .make_span_with(move |request: &Request<Body>| {
+        .make_span_with(move |request: &Request<BoxBody>| {
             // The path is defined as “/” {service name} “/” {method name}.
             let mut path = request.uri().path().split('/');
             let service = path.nth(1).unwrap_or("_unknown");
@@ -463,7 +486,7 @@ pub fn build_grpc_trace_layer(
                grpc_method = method,
             )
         })
-        .on_request(Box::new(|_request: &Request<Body>, _span: &Span| {
+        .on_request(Box::new(|_request: &Request<BoxBody>, _span: &Span| {
             emit!(GrpcServerRequestReceived);
         }))
         .on_response(
@@ -480,13 +503,15 @@ pub fn build_grpc_trace_layer(
 mod tests {
     use std::future::{Ready, ready};
 
+    use tonic::body::empty_body;
+
     use super::*;
 
     #[derive(Clone)]
     struct EmptyBodyService;
 
-    impl Service<Request<Body>> for EmptyBodyService {
-        type Response = Response<Body>;
+    impl Service<Request<BoxBody>> for EmptyBodyService {
+        type Response = Response<BoxBody>;
         type Error = Infallible;
         type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -494,8 +519,8 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: Request<Body>) -> Self::Future {
-            ready(Ok(Response::new(Body::empty())))
+        fn call(&mut self, _req: Request<BoxBody>) -> Self::Future {
+            ready(Ok(Response::new(empty_body())))
         }
     }
 
@@ -505,7 +530,7 @@ mod tests {
         let mut service = MaxConnectionAgeService {
             service: EmptyBodyService,
         };
-        let mut request = Request::new(Body::empty());
+        let mut request = Request::new(empty_body());
         request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
@@ -533,13 +558,13 @@ mod tests {
         let mut service = MaxConnectionAgeService {
             service: EmptyBodyService,
         };
-        let mut first_request = Request::new(Body::empty());
+        let mut first_request = Request::new(empty_body());
         first_request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
                 active_requests: Arc::clone(&first_connection_active_requests),
             });
-        let mut second_request = Request::new(Body::empty());
+        let mut second_request = Request::new(empty_body());
         second_request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {

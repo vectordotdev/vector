@@ -24,6 +24,12 @@ input validation, or otherwise restrict previously-allowed behavior in order to 
 bug, as well as removals introduced without a prior deprecation announcement. Such changes will be noted in the release
 notes and we will do our best to provide an upgrade guide, but may not necessarily follow the standard migration window.
 
+### End-of-life versions
+
+Support for platform, runtime, dependency, or external service versions that have reached end of life (EOL) may be
+dropped without prior announcement or the normal migration window. These versions no longer receive upstream
+maintenance, including security fixes.
+
 ### Examples
 
 Examples of possible deprecations in Vector:
@@ -78,8 +84,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  Use the fragment body for the full migration guide (rationale, before/after examples, links). Then run
-  `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and commit both files.
+  Use the fragment body for the full migration guide (rationale, before/after examples, links).
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
   change, so it does not belong in `changelog.d/`). The fragment is rendered on the release page in the
@@ -99,9 +104,10 @@ normally have been announced in an earlier release via a `deprecation.d/` fragme
 to land the announcement first, then come back to ship the removal after the migration window has passed (see the
 [Policy](#policy) section for the minimum window).
 
-The exception is the one described in [Security changes and critical bugs](#security-changes-and-critical-bugs): a
-security issue or critical bug may justify shipping a breaking change without a prior announcement. Call that out
-explicitly in the PR description so reviewers can apply the exception consciously rather than by oversight.
+Breaking changes that address a [security issue or critical bug](#security-changes-and-critical-bugs) or drop
+support for an [end-of-life version](#end-of-life-versions) may be released without a prior deprecation
+announcement. Include the appropriate changelog fragment in the pull request so the change is documented in
+the release notes.
 
 When removing a deprecation in a subsequent release, the pull request should:
 
@@ -111,5 +117,6 @@ When removing a deprecation in a subsequent release, the pull request should:
   change (the feature stops working), so it belongs in the release notes' Breaking changes section alongside other
   breaking changes. The Past Deprecations section is the lifecycle view, answering a different question for a
   different reader.
-- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This records the
-  removal in `website/data/deprecations.json` and deletes the original fragment in one step.
+- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This moves the
+  fragment to [`website/content/en/deprecations/enacted/`](../website/content/en/deprecations/enacted/) and records
+  `removed_in` in its frontmatter.

@@ -38,14 +38,14 @@ impl SidResolver {
     }
 }
 
-/// Convert a SID string to a PSID via ConvertStringSidToSidW, then call
-/// LookupAccountSidW to get the account name.
+/// Convert a SID string to a PSID via `ConvertStringSidToSidW`, then call
+/// `LookupAccountSidW` to get the account name.
 fn lookup_sid(sid_string: &str) -> Option<String> {
-    let sid_hstring = HSTRING::from(sid_string);
+    let encoded_identifier = HSTRING::from(sid_string);
 
     // Convert string SID to binary PSID
     let mut psid = PSID::default();
-    let convert_result = unsafe { ConvertStringSidToSidW(&sid_hstring, &mut psid) };
+    let convert_result = unsafe { ConvertStringSidToSidW(&encoded_identifier, &mut psid) };
     if convert_result.is_err() {
         return None;
     }

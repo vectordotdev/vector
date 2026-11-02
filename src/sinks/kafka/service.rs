@@ -68,7 +68,7 @@ impl MetaDescriptive for KafkaRequest {
     }
 }
 
-/// BlockedRecordState manages state for a record blocked from being enqueued on the producer.
+/// `BlockedRecordState` manages state for a record blocked from being enqueued on the producer.
 struct BlockedRecordState {
     records_blocked: Arc<AtomicUsize>,
 }
@@ -123,7 +123,7 @@ impl Service<KafkaRequest> for KafkaService {
 
         Box::pin(async move {
             let raw_byte_size =
-                request.body.len() + request.metadata.key.as_ref().map_or(0, |x| x.len());
+                request.body.len() + request.metadata.key.as_ref().map_or(0, bytes::Bytes::len);
             let event_byte_size = request
                 .request_metadata
                 .into_events_estimated_json_encoded_byte_size();
@@ -198,7 +198,7 @@ impl Service<KafkaRequest> for KafkaService {
                             event_status: EventStatus::Errored,
                         });
                     }
-                };
+                }
             }
         })
     }

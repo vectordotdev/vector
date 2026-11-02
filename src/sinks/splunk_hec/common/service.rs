@@ -6,26 +6,24 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
-use http::Request;
+use http_1::Request;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
+use vector_lib::{event::EventStatus, request_metadata::RequestMetadata};
 
 use super::{
     EndpointTarget,
     acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
-        UriParseSnafu,
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{Compression, sink::Response},
+        util::{Compression, http::HttpRequest, http_v1::HttpResponse, sink::Response},
     },
 };
 
@@ -44,7 +42,7 @@ struct HecAckResponseBody {
 
 impl<S> HecService<S>
 where
-    S: Service<HecRequest> + Send + 'static,
+    S: Service<HttpRequest<MetadataFields>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: Response + ResponseExt + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -61,7 +59,7 @@ where
             crate::spawn_in_current_span(run_acknowledgements(
                 rx,
                 ack_client,
-                Arc::clone(&http_request_builder),
+                http_request_builder,
                 indexer_acknowledgements,
             ));
             Some(tx)
@@ -69,6 +67,11 @@ where
             None
         };
 
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve the existing limit conversion."
+        )]
         let ack_slots = PollSemaphore::new(Arc::new(Semaphore::new(max_pending_acks as usize)));
         Self {
             inner,
@@ -81,7 +84,7 @@ where
 
 impl<S> Service<HecRequest> for HecService<S>
 where
-    S: Service<HecRequest> + Send + 'static,
+    S: Service<HttpRequest<MetadataFields>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: Response + ResponseExt + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -108,14 +111,34 @@ where
         }
     }
 
-    fn call(&mut self, mut req: HecRequest) -> Self::Future {
+    fn call(&mut self, req: HecRequest) -> Self::Future {
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let metadata = std::mem::take(req.metadata_mut());
+        let HecRequest {
+            body,
+            metadata,
+            finalizers,
+            passthrough_token,
+            index,
+            source,
+            sourcetype,
+            host,
+        } = req;
         let events_count = metadata.event_count();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
-        let response = self.inner.call(req);
+        let response = self.inner.call(HttpRequest::new(
+            body,
+            finalizers,
+            RequestMetadata::default(),
+            MetadataFields {
+                passthrough_token,
+                source,
+                sourcetype,
+                index,
+                host,
+            },
+        ));
 
         Box::pin(async move {
             let response = response.await.map_err(Into::into)?;
@@ -128,7 +151,7 @@ where
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
-                                    Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
+                                    Ok(()) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
                                         emit!(SplunkIndexerAcknowledgementUnavailableError {
@@ -171,9 +194,9 @@ pub trait ResponseExt {
     fn body(&self) -> &Bytes;
 }
 
-impl ResponseExt for http::Response<Bytes> {
+impl ResponseExt for HttpResponse {
     fn body(&self) -> &Bytes {
-        self.body()
+        self.response.body()
     }
 }
 
@@ -188,15 +211,18 @@ pub struct HttpRequestBuilder {
     pub channel: String,
 }
 
-#[derive(Default)]
-pub(super) struct MetadataFields {
-    pub(super) source: Option<String>,
-    pub(super) sourcetype: Option<String>,
-    pub(super) index: Option<String>,
-    pub(super) host: Option<String>,
+/// Per-request HEC fields used to select the token and the raw endpoint query metadata.
+#[derive(Clone, Debug, Default)]
+pub struct MetadataFields {
+    pub passthrough_token: Option<Arc<str>>,
+    pub source: Option<String>,
+    pub sourcetype: Option<String>,
+    pub index: Option<String>,
+    pub host: Option<String>,
 }
 
 impl HttpRequestBuilder {
+    #[must_use]
     pub fn new(
         endpoint: String,
         endpoint_target: EndpointTarget,
@@ -205,8 +231,8 @@ impl HttpRequestBuilder {
     ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
-            endpoint,
             endpoint_target,
+            endpoint,
             default_token,
             compression,
             channel,
@@ -217,8 +243,7 @@ impl HttpRequestBuilder {
         &self,
         body: Bytes,
         path: &str,
-        passthrough_token: Option<Arc<str>>,
-        metadata_fields: MetadataFields,
+        metadata_fields: &MetadataFields,
         auto_extract_timestamp: bool,
     ) -> Result<Request<Bytes>, crate::Error> {
         let uri = match self.endpoint_target {
@@ -226,25 +251,23 @@ impl HttpRequestBuilder {
                 // `auto_extract_timestamp` doesn't apply to the raw endpoint since the raw endpoint
                 // always does this anyway.
                 let metadata = [
-                    (super::SOURCE_FIELD, metadata_fields.source),
-                    (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
-                    (super::INDEX_FIELD, metadata_fields.index),
-                    (super::HOST_FIELD, metadata_fields.host),
+                    (super::SOURCE_FIELD, metadata_fields.source.as_deref()),
+                    (
+                        super::SOURCETYPE_FIELD,
+                        metadata_fields.sourcetype.as_deref(),
+                    ),
+                    (super::INDEX_FIELD, metadata_fields.index.as_deref()),
+                    (super::HOST_FIELD, metadata_fields.host.as_deref()),
                 ]
                 .into_iter()
                 .filter_map(|(key, value)| value.map(|value| (key, value)));
-                build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
+                build_uri(self.endpoint.as_str(), path, metadata)?
             }
             EndpointTarget::Event => build_uri(
                 self.endpoint.as_str(),
                 path,
-                if auto_extract_timestamp {
-                    Some((super::AUTO_EXTRACT_TIMESTAMP_FIELD, "true".to_string()))
-                } else {
-                    None
-                },
-            )
-            .context(UriParseSnafu)?,
+                auto_extract_timestamp.then_some((super::AUTO_EXTRACT_TIMESTAMP_FIELD, "true")),
+            )?,
         };
 
         let mut builder = Request::post(uri)
@@ -253,7 +276,10 @@ impl HttpRequestBuilder {
                 "Authorization",
                 format!(
                     "Splunk {}",
-                    passthrough_token.unwrap_or_else(|| self.default_token.as_str().into())
+                    metadata_fields
+                        .passthrough_token
+                        .as_deref()
+                        .unwrap_or(self.default_token.as_str())
                 ),
             )
             .header("X-Splunk-Request-Channel", self.channel.as_str());
@@ -280,7 +306,7 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{StreamExt, future::BoxFuture, poll, stream::FuturesUnordered};
+    use futures_util::{StreamExt, poll, stream::FuturesUnordered};
     use tower::{Service, ServiceExt};
     use vector_lib::{
         config::proxy::ProxyConfig,
@@ -292,20 +318,17 @@ mod tests {
         matchers::{header, header_exists, method, path},
     };
 
-    use crate::{
-        http::HttpClient,
-        sinks::{
-            splunk_hec::common::{
-                EndpointTarget,
-                acknowledgements::{
-                    HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
-                },
-                build_http_batch_service,
-                request::HecRequest,
-                service::{HecAckResponseBody, HecService, HttpRequestBuilder},
+    use crate::sinks::{
+        splunk_hec::common::{
+            EndpointTarget, HecEventRequestBuilder,
+            acknowledgements::{
+                HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
             },
-            util::{Compression, http::HttpBatchService, metadata::RequestMetadataBuilder},
+            build_http_service, create_client,
+            request::HecRequest,
+            service::{HecAckResponseBody, HecService, HttpRequestBuilder, MetadataFields},
         },
+        util::{Compression, http_v1::HttpService, metadata::RequestMetadataBuilder},
     };
 
     const TOKEN: &str = "token";
@@ -314,20 +337,15 @@ mod tests {
     fn get_hec_service(
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
-    ) -> HecService<
-        HttpBatchService<
-            BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
-            HecRequest,
-        >,
-    > {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+    ) -> HecService<HttpService<HecEventRequestBuilder, MetadataFields>> {
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
             EndpointTarget::default(),
             String::from(TOKEN),
             Compression::default(),
         ));
-        let http_service = build_http_batch_service(
+        let http_service = build_http_service(
             client.clone(),
             Arc::clone(&http_request_builder),
             EndpointTarget::Event,
@@ -430,7 +448,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -448,7 +466,7 @@ mod tests {
         responses.push(service.ready().await.unwrap().call(get_hec_request()));
         responses.push(service.ready().await.unwrap().call(get_hec_request()));
         while let Some(response) = responses.next().await {
-            assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
+            assert_eq!(EventStatus::Delivered, response.unwrap().event_status);
         }
     }
 
@@ -465,7 +483,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -481,7 +499,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Rejected, response.event_status)
+        assert_eq!(EventStatus::Rejected, response.event_status);
     }
 
     #[tokio::test]
@@ -501,7 +519,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -518,7 +536,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Errored, response.event_status)
+        assert_eq!(EventStatus::Errored, response.event_status);
     }
 
     #[tokio::test]
@@ -544,13 +562,16 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
     async fn service_poll_ready_multiple_times() {
         let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
-        let mut service = get_hec_service(mock_server.uri(), Default::default());
+        let mut service = get_hec_service(
+            mock_server.uri(),
+            HecClientAcknowledgementsConfig::default(),
+        );
 
         assert!(service.ready().await.is_ok());
         // Consecutive poll_ready returns OK since an ack slot has been granted
@@ -559,10 +580,13 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "poll_ready not called before invoking call")]
     async fn service_call_without_poll_ready() {
         let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
-        let mut service = get_hec_service(mock_server.uri(), Default::default());
+        let mut service = get_hec_service(
+            mock_server.uri(),
+            HecClientAcknowledgementsConfig::default(),
+        );
 
         _ = service.call(get_hec_request()).await;
     }
@@ -593,7 +617,7 @@ mod tests {
         // The service should now be ready for additional requests
         assert!(matches!(
             poll!(poll_fn(|cx| service.poll_ready(cx))),
-            Poll::Ready(Ok(_))
+            Poll::Ready(Ok(()))
         ));
     }
 }

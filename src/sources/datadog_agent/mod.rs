@@ -8,20 +8,13 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-pub(crate) mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
-#[allow(warnings)]
-pub(crate) mod ddtrace_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
-
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
+pub(crate) use datadog_proto::agentpayload as ddmetric_proto;
+pub(crate) use datadog_proto::metrics_v3 as ddmetric_v3_proto;
+pub(crate) use datadog_proto::trace as ddtrace_proto;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
@@ -61,7 +54,7 @@ use crate::{
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{
@@ -77,6 +70,10 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Configuration for the `datadog_agent` source.
 #[configurable_component(source(
     "datadog_agent",
@@ -148,7 +145,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -262,14 +259,16 @@ impl SourceConfig for DatadogAgentConfig {
                 .serve(make_svc)
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
@@ -373,25 +372,26 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             if !self.disable_logs {
-                output.push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS))
+                output
+                    .push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS));
             }
             if !self.disable_metrics {
-                output.push(SourceOutput::new_metrics().with_port(METRICS))
+                output.push(SourceOutput::new_metrics().with_port(METRICS));
             }
             if !self.disable_traces {
-                output.push(SourceOutput::new_traces().with_port(TRACES))
+                output.push(SourceOutput::new_traces().with_port(TRACES));
             }
             if !self.disable_llmobs {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
-                )
+                );
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
                 DataType::all_bits(),
                 definition,
-            ))
+            ));
         }
         output
     }
@@ -443,6 +443,7 @@ pub struct ApiKeyExtractor {
 }
 
 impl ApiKeyExtractor {
+    #[must_use]
     pub fn extract(
         &self,
         path: &str,
@@ -520,7 +521,7 @@ impl DatadogAgentSource {
         }
 
         if !config.disable_llmobs {
-            let llmobs_filter = llmobs::build_warp_filter(handler.clone(), self.clone());
+            let llmobs_filter = llmobs::build_warp_filter(handler, self.clone());
             filters = filters
                 .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
                 .or(Some(llmobs_filter));
@@ -529,6 +530,10 @@ impl DatadogAgentSource {
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())
     }
 
+    #[allow(
+        clippy::ref_option,
+        reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(crate) fn decode(
         &self,
         header: &Option<String>,

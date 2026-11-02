@@ -23,7 +23,6 @@ pub struct LuaMetricTags {
 }
 
 impl IntoLua for MetricKind {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
@@ -84,12 +83,18 @@ impl FromLua for TagValueSet {
                 for value in table.sequence_values() {
                     match value {
                         Ok(value) => string_values.push(value),
-                        Err(_) => unimplemented!(),
+                        Err(err) => {
+                            return Err(LuaError::FromLuaConversionError {
+                                from: "metric tag value",
+                                to: String::from("string"),
+                                message: Some(err.to_string()),
+                            });
+                        }
                     }
                 }
                 Ok(Self::from(string_values))
             }
-            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().clone()])),
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy()])),
             _ => Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: String::from("metric tag value"),
@@ -126,7 +131,6 @@ impl IntoLua for LuaMetricTags {
 }
 
 impl IntoLua for LuaMetric {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
@@ -187,6 +191,8 @@ impl IntoLua for LuaMetric {
                 aggregated_histogram.raw_set("buckets", buckets)?;
                 aggregated_histogram.raw_set("counts", counts)?;
                 aggregated_histogram.raw_set("count", count)?;
+                // An unreported sum leaves the key unset, so a script sees `nil` rather than a
+                // zero it cannot distinguish from a real measurement.
                 aggregated_histogram.raw_set("sum", sum)?;
                 tbl.raw_set("aggregated_histogram", aggregated_histogram)?;
             }
@@ -360,8 +366,7 @@ mod test {
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
@@ -450,6 +455,22 @@ mod test {
                 "metric.tags['example tag'][2] == 'b'",
             ],
         );
+    }
+
+    #[test]
+    fn from_lua_tag_value_set_rejects_non_string_element() {
+        let lua = Lua::new();
+
+        let table = lua.create_table().unwrap();
+        table.push("example value").unwrap();
+        table.push(true).unwrap();
+
+        let result = TagValueSet::from_lua(LuaValue::Table(table), &lua);
+
+        assert!(matches!(
+            result,
+            Err(LuaError::FromLuaConversionError { .. })
+        ));
     }
 
     #[test]
@@ -547,7 +568,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_metric(
@@ -565,6 +586,53 @@ mod test {
                 "metric.aggregated_histogram.sum == 975.2",
             ],
         );
+    }
+
+    /// A histogram that reports no sum leaves the key unset, so a script sees `nil` and can tell
+    /// "not reported" apart from a measured zero. Note that a script doing arithmetic on `sum`
+    /// without checking will now fail for these histograms.
+    #[test]
+    fn into_lua_aggregated_histogram_without_sum() {
+        let metric = Metric::new(
+            "example histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_metric(
+            metric,
+            MetricTagMode::Single,
+            vec![
+                "type(metric.aggregated_histogram) == 'table'",
+                "metric.aggregated_histogram.count == 30",
+                "metric.aggregated_histogram.sum == nil",
+            ],
+        );
+    }
+
+    #[test]
+    fn from_lua_aggregated_histogram_without_sum() {
+        let value = r#"{
+            name = "example histogram",
+            kind = "absolute",
+            aggregated_histogram = {
+                buckets = {1.0, 2.0},
+                counts = {20, 10}
+            }
+        }"#;
+        let expected = Metric::new(
+            "example histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -765,7 +833,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

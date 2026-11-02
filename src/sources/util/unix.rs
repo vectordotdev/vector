@@ -4,10 +4,14 @@ use crate::internal_events::UnixSocketFileDeleteError;
 
 pub const UNNAMED_SOCKET_HOST: &str = "(unnamed)";
 
+///
+/// # Errors
+///
+/// Returns an error if the socket permissions cannot be changed.
 pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Result<()> {
     if let Some(mode) = perms {
         match fs::set_permissions(path, fs::Permissions::from_mode(mode)) {
-            Ok(_) => debug!(message = "Socket permissions updated.", permission = mode),
+            Ok(()) => debug!(message = "Socket permissions updated.", permission = mode),
             Err(e) => {
                 if let Err(error) = remove_file(path) {
                     emit!(UnixSocketFileDeleteError { path, error });

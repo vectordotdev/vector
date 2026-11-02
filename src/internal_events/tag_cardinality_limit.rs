@@ -33,7 +33,7 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Tag value limit exceeded."
-        })
+        });
     }
 }
 
@@ -99,6 +99,8 @@ pub struct TagCardinalityTrackedKeys {
 }
 
 impl InternalEvent for TagCardinalityTrackedKeys {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         gauge!(GaugeName::TagCardinalityTrackedKeys).set(self.count as f64);
     }

@@ -121,7 +121,9 @@ impl Histogram {
         MetricValue::AggregatedHistogram {
             buckets: self.buckets(),
             count: self.count(),
-            sum: self.sum(),
+            // Vector's own histograms accumulate their sum as observations arrive, so it is always
+            // known.
+            sum: Some(self.sum()),
         }
     }
 }
@@ -177,15 +179,13 @@ mod test {
                 let index = Histogram::bucket_index(value);
                 assert!(
                     value <= sut.buckets[index].0,
-                    "Value {} is not less than the upper limit {}.",
-                    value,
+                    "Value {value} is not less than the upper limit {}.",
                     sut.buckets[index].0
                 );
                 if index > 0 {
                     assert!(
                         value > sut.buckets[index - 1].0,
-                        "Value {} is not greater than the previous upper limit {}.",
-                        value,
+                        "Value {value} is not greater than the previous upper limit {}.",
                         sut.buckets[index - 1].0
                     );
                 }

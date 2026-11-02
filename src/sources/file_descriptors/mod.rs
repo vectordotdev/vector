@@ -38,6 +38,10 @@ pub trait FileDescriptorConfig: NamedComponent {
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured decoder cannot be built.
     fn source<R>(
         &self,
         reader: R,
@@ -70,11 +74,11 @@ pub trait FileDescriptorConfig: NamedComponent {
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
         std::thread::spawn(move || {
-            info!("Capturing {}.", description);
+            info!("Capturing {description}.");
             read_from_fd(reader, sender);
         });
 
-        Ok(Box::pin(process_stream(
+        Ok(crate::sources::source_with_error(process_stream(
             receiver,
             decoder,
             out,
@@ -122,7 +126,7 @@ async fn process_stream(
     source_type: &'static str,
     hostname: Option<String>,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let events_received = register!(EventsReceived);
     let stream = receiver.inspect(|result| {
@@ -190,19 +194,19 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(_) => {
+        Err(error) => {
             let (count, _) = stream.size_hint();
             emit!(StreamClosedError { count });
-            Err(())
+            Err(error)
         }
     }
 }
 
 /// Builds the `vector_lib::config::Outputs` for stdin and
-/// file_descriptor sources.
+/// `file_descriptor` sources.
 fn outputs(
     log_namespace: LogNamespace,
-    host_key: &Option<OptionalValuePath>,
+    host_key: Option<&OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<SourceOutput> {
@@ -211,7 +215,7 @@ fn outputs(
         .with_source_metadata(
             source_name,
             host_key
-                .clone()
+                .cloned()
                 .map_or(log_schema().host_key().cloned(), |key| key.path)
                 .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),

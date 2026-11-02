@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::sync::Arc;
 
-use derivative::Derivative;
-use http::{Uri, header::HeaderValue};
+use http_1::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -16,7 +10,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{prelude::*, util::HttpEndpoint, util::service::TowerRequestSettings},
 };
 
@@ -117,12 +111,11 @@ pub struct NewRelicConfig {
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
-    pub fn build_healthcheck(
-        &self,
+    fn build_healthcheck(
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
-    ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck::healthcheck(client, credentials).boxed())
+    ) -> super::Healthcheck {
+        healthcheck::healthcheck(client, credentials).boxed()
     }
 }
 
@@ -138,14 +131,13 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
     // The credentials contain the license key and account ID, so they are
     // intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     credentials: Arc<NewRelicCredentials>,
 }
 
@@ -182,9 +174,9 @@ impl ValidatedSink for NewRelicConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
-        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(credentials))?;
+        let healthcheck = Self::build_healthcheck(client.clone(), Arc::clone(credentials));
 
         let service = ServiceBuilder::new()
             .settings(request_limits.clone(), NewRelicApiRetry)
@@ -215,13 +207,19 @@ pub struct NewRelicCredentials {
 }
 
 impl NewRelicCredentials {
+    /// Returns the sink endpoint.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the credentials produce an invalid URI.
+    #[must_use]
     pub fn get_uri(&self) -> Uri {
         self.try_get_uri().expect("URI should be valid")
     }
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return Ok(override_uri.as_uri().clone());
+            return Ok(override_uri.clone().into_v1());
         }
 
         match self.api {
@@ -331,7 +329,7 @@ mod tests {
         config.account_id = SensitiveString::from("super-secret-account-id".to_string());
 
         let validated = config.validate().expect("validation should succeed");
-        let debug = format!("{:?}", validated);
+        let debug = format!("{validated:?}");
 
         assert!(!debug.contains("super-secret-license-key"));
         assert!(!debug.contains("super-secret-account-id"));

@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package datadog.trace.idx;
+
+option go_package="github.com/DataDog/datadog-agent/pkg/proto/pbgo/trace/idx";
+
+// AnyValue is a union of possible value types.
+message AnyValue {
+	oneof value {
+		// stringValueRef specifies the string table ref of a string value.
+		uint32 stringValueRef = 1;
+		// boolValue specifies a bool value.
+		bool boolValue = 2;
+		// doubleValue specifies a double value.
+		double doubleValue = 3;
+		// intValue specifies an int value.
+		int64 intValue = 4;
+		// bytesValue specifies a bytes value.
+		bytes bytesValue = 5;
+		// arrayValue specifies an array value.
+		ArrayValue arrayValue = 6;
+		// keyValueList specifies a list of key-value pairs.
+		KeyValueList keyValueList = 7;
+	}
+}
+
+// KeyValue is a key-value pair where key is a string table ref and value is an AnyValue.
+message KeyValue {
+	// key specifies the string table ref of a key.
+	uint32 key = 1;
+	// value specifies a value.
+	AnyValue value = 2;
+}
+
+// ArrayValue is a repeated list of AnyValue that is needed since `oneof` in AnyValue
+// cannot be `repeated`
+message ArrayValue {
+	// values specifies a repeated list of AnyValue.
+	repeated AnyValue values = 1;
+}
+
+// KeyValueList is a repeated list of KeyValue messages that is needed since `oneof`
+// in AnyValue cannot be `repeated` or `map`
+message KeyValueList {
+	// keyValues specifies a repeated list of KeyValue.
+	repeated KeyValue keyValues = 1;
+}
+
+message SpanLink {
+   // traceID specifies the ID of the trace to which this span link belongs.
+   bytes traceID = 1;
+   // spanID specifies the ID of this span.
+   fixed64 spanID = 2;
+   // attributes specifies a map of attribute key string ref to any value.
+   map<uint32, AnyValue> attributes = 3;
+   // tracestateRef specifies the string table ref of the W3C tracestate.
+   uint32 tracestateRef = 4;
+   // flags specifies the W3C trace flags. Optional. If set, the high bit (bit 31) must be set.
+   uint32 flags = 5;
+}
+
+message SpanEvent {
+  // time is the number of nanoseconds between the Unix epoch and this event.
+  fixed64 time = 1;
+  // nameRef specifies the string table ref of this event's name.
+  uint32 nameRef = 2;
+  // attributes is a mapping from attribute key string ref to any value.
+  map<uint32, AnyValue> attributes = 3;
+}
+
+message Span {
+    // serviceRef specifies the string table ref of this span's service name.
+    uint32 serviceRef = 1;
+    // nameRef specifies the string table ref of this span's operation name.
+    uint32 nameRef = 2;
+    // resourceRef specifies the string table ref of this span's resource name.
+    uint32 resourceRef = 3;
+    // spanID is the ID of this span.
+    fixed64 spanID = 4;
+    // parentID is the ID of this span's parent, or zero if this span has no parent.
+    uint64 parentID = 5;
+    // start is the number of nanoseconds between the Unix epoch and the beginning of this span.
+    fixed64 start = 6;
+    // duration is the time length of this span in nanoseconds.
+    uint64 duration = 7;
+    // error specifies if there is an error associated with this span.
+    bool error = 8;
+    // attributes is a mapping from attribute key string ref to any value.
+    map<uint32, AnyValue> attributes = 9;
+    // typeRef is the string table ref of the type of the service with which this span is associated.  Example values: web, db, lambda.
+    uint32 typeRef = 10;
+    // span_links represents a collection of links, where each link defines a causal relationship between two spans.
+    repeated SpanLink links = 11;
+    // spanEvents represent an event at an instant in time related to this span, but not necessarily during the span.
+    repeated SpanEvent events = 12;
+    // envRef is the string table ref of the optional string environment of this span.
+    uint32 envRef = 13;
+    // versionRef is the string table ref of the optional string version of this span.
+    uint32 versionRef = 14;
+    // componentRef is the string table ref of the string component name of this span.
+    uint32 componentRef = 15;
+    // kind is the SpanKind of this span as defined in the OTEL Specification.
+    SpanKind kind = 16;
+}
+
+// SpanKind is the type of span. Can be used to specify additional relationships between spans
+// in addition to a parent/child relationship.
+enum SpanKind {
+  // Unspecified. Do NOT use as default.
+  // Implementations MAY assume SpanKind to be INTERNAL when receiving UNSPECIFIED.
+  SPAN_KIND_UNSPECIFIED = 0;
+
+  // Indicates that the span represents an internal operation within an application,
+  // as opposed to an operations happening at the boundaries. Default value.
+  SPAN_KIND_INTERNAL = 1;
+
+  // Indicates that the span covers server-side handling of an RPC or other
+  // remote network request.
+  SPAN_KIND_SERVER = 2;
+
+  // Indicates that the span describes a request to some remote service.
+  SPAN_KIND_CLIENT = 3;
+
+  // Indicates that the span describes a producer sending a message to a broker.
+  // Unlike CLIENT and SERVER, there is often no direct critical path latency relationship
+  // between producer and consumer spans. A PRODUCER span ends when the message was accepted
+  // by the broker while the logical processing of the message might span a much longer time.
+  SPAN_KIND_PRODUCER = 4;
+
+  // Indicates that the span describes consumer receiving a message from a broker.
+  // Like the PRODUCER kind, there is often no direct critical path latency relationship
+  // between producer and consumer spans.
+  SPAN_KIND_CONSUMER = 5;
+}

@@ -18,6 +18,7 @@ pub struct ErrorMessage {
 impl ErrorMessage {
     /// Create a new `ErrorMessage` from HTTP status code and a message
     #[allow(unused)] // triggered by check-component-features
+    #[must_use]
     pub fn new(code: http::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
@@ -27,6 +28,7 @@ impl ErrorMessage {
 
     /// Returns the HTTP status code
     #[allow(unused)] // triggered by check-component-features
+    #[must_use]
     pub fn status_code(&self) -> http::StatusCode {
         http::StatusCode::from_u16(self.code).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -35,11 +37,13 @@ impl ErrorMessage {
 #[cfg(feature = "sources-utils-http-prelude")]
 impl ErrorMessage {
     /// Returns the raw HTTP status code
+    #[must_use]
     pub const fn code(&self) -> u16 {
         self.code
     }
 
     /// Returns the error message
+    #[must_use]
     pub const fn message(&self) -> &str {
         self.message.as_str()
     }

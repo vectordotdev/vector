@@ -1,27 +1,42 @@
 use std::{
     convert::Infallible,
+    fmt::Display,
+    future::Future,
     net::SocketAddr,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
 use async_trait::async_trait;
-use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header};
-use hyper::{Body, body::HttpBody as _, client::conn, server::conn::http1, service::service_fn};
-use rstest::rstest;
-use tokio::{io::copy_bidirectional, net::TcpStream, task::JoinHandle, time::timeout};
-
-use super::{
-    HttpClient as LegacyHttpClient,
-    client_v1::{HttpClient, empty_body},
+use bytes::Bytes;
+use http_1::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
+use http_body_util::{BodyExt as _, Full};
+use hyper::body::HttpBody as _;
+use hyper_1::{body::Incoming, client::conn, service::service_fn};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
 };
+use rstest::rstest;
+use tokio::{
+    io::{AsyncReadExt as _, AsyncWriteExt as _, copy_bidirectional},
+    net::TcpStream,
+    task::{JoinHandle, JoinSet},
+    time::timeout,
+};
+use vector_http::{ConnectionOptions, RequestBody, empty_body};
+
+use super::{HttpClient as LegacyHttpClient, client_v1::HttpClient};
 use crate::{
     config::ProxyConfig,
     tls::{
-        MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH,
-        TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsConfig, TlsEnableableConfig, TlsSettings,
+        MaybeTlsIncomingStream, MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
+        TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsConfig,
+        TlsEnableableConfig, TlsSettings,
     },
 };
+
+mod http2;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const INVALID_CA_PATH: &str = "tests/integration/http-client/data/certs/invalid-ca-cert.pem";
@@ -33,7 +48,12 @@ const PROXY_AUTHORIZATION: &str = "Basic cHJveHktdXNlcjpwcm94eS1wYXNz";
 struct RequestObservation {
     method: Method,
     uri: Uri,
+    version: Version,
     headers: HeaderMap,
+    /// The ALPN protocol negotiated on the request's TLS connection, if any.
+    alpn: Option<Vec<u8>>,
+    /// Identifies the connection that carried the request, in accept order.
+    connection: usize,
 }
 
 struct TestServer {
@@ -120,8 +140,8 @@ impl TestClient for LegacyHttpClient {
         uri: &str,
         headers: &[(&str, &str)],
     ) -> Result<TestResponse, String> {
-        let mut request = Request::get(uri)
-            .body(Body::empty())
+        let mut request = http::Request::get(uri)
+            .body(hyper::Body::empty())
             .map_err(|error| error.to_string())?;
         for &(name, value) in headers {
             request.headers_mut().insert(
@@ -160,42 +180,56 @@ impl TestClient for HttpClient {
         uri: &str,
         headers: &[(&str, &str)],
     ) -> Result<TestResponse, String> {
-        let mut request = http_1::Request::get(uri)
-            .body(empty_body())
-            .map_err(|error| error.to_string())?;
-        for &(name, value) in headers {
-            request.headers_mut().insert(
-                http_1::header::HeaderName::from_bytes(name.as_bytes())
-                    .map_err(|error| error.to_string())?,
-                value
-                    .parse()
-                    .map_err(|error: http_1::header::InvalidHeaderValue| error.to_string())?,
-            );
-        }
-        let response = timeout(REQUEST_TIMEOUT, self.send(request))
-            .await
-            .map_err(|_| "request timed out".to_owned())?
-            .map_err(|error| error.to_string())?;
-        let status = response.status().as_u16();
-        let body = timeout(
-            REQUEST_TIMEOUT,
-            http_body_util::BodyExt::collect(response.into_body()),
-        )
+        native_get(uri, headers, |request| self.send(request)).await
+    }
+}
+
+/// Sends a `GET` request with `headers` through a native HTTP 1 client and collects the response.
+async fn native_get<F, E>(
+    uri: &str,
+    headers: &[(&str, &str)],
+    send: impl FnOnce(Request<RequestBody>) -> F,
+) -> Result<TestResponse, String>
+where
+    F: Future<Output = Result<Response<Incoming>, E>>,
+    E: Display,
+{
+    let mut request = Request::get(uri)
+        .body(empty_body())
+        .map_err(|error| error.to_string())?;
+    for &(name, value) in headers {
+        request.headers_mut().insert(
+            header::HeaderName::from_bytes(name.as_bytes()).map_err(|error| error.to_string())?,
+            value
+                .parse()
+                .map_err(|error: header::InvalidHeaderValue| error.to_string())?,
+        );
+    }
+    let response = timeout(REQUEST_TIMEOUT, send(request))
+        .await
+        .map_err(|_| "request timed out".to_owned())?
+        .map_err(|error| error.to_string())?;
+    let status = response.status().as_u16();
+    let body = timeout(REQUEST_TIMEOUT, response.into_body().collect())
         .await
         .map_err(|_| "response body timed out".to_owned())?
         .map_err(|error| error.to_string())?
         .to_bytes();
-        Ok(TestResponse {
-            status,
-            body: body.to_vec(),
-        })
-    }
+    Ok(TestResponse {
+        status,
+        body: body.to_vec(),
+    })
 }
 
 fn no_tls() -> MaybeTlsSettings {
     MaybeTlsSettings::from_config(None, false).unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn client_tls(config: TlsConfig) -> MaybeTlsSettings {
     TlsSettings::from_options(Some(&config)).unwrap().into()
 }
@@ -232,7 +266,15 @@ fn server_tls_with_alpn(
     .unwrap()
 }
 
-async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
+type ServerResponse = Response<Full<Bytes>>;
+
+/// Spawns a server that accepts HTTP/1.1, with upgrades, and HTTP/2 with prior knowledge on each
+/// connection. It records every request before it hands the request to `handler`.
+async fn spawn_server<H, F>(tls: MaybeTlsSettings, handler: H) -> TestServer
+where
+    H: Fn(Request<Incoming>) -> F + Clone + Send + Sync + 'static,
+    F: Future<Output = ServerResponse> + Send + 'static,
+{
     let addr = "127.0.0.1:0".parse().unwrap();
     let mut listener = tls.bind(&addr).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -240,25 +282,39 @@ async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
     let server_observations = Arc::clone(&observations);
 
     let task = tokio::spawn(async move {
+        let mut connections = JoinSet::new();
+        let mut next_connection = 0;
         loop {
-            let Ok(stream) = listener.accept().await else {
+            let Ok(mut stream) = listener.accept().await else {
                 continue;
             };
+            while connections.try_join_next().is_some() {}
+            let connection = next_connection;
+            next_connection += 1;
             let observations = Arc::clone(&server_observations);
-            tokio::spawn(async move {
-                let service = service_fn(move |request: Request<Body>| {
+            let handler = handler.clone();
+            connections.spawn(async move {
+                if stream.handshake().await.is_err() {
+                    return;
+                }
+                let alpn = negotiated_alpn(&stream);
+                let service = service_fn(move |request: Request<Incoming>| {
                     observations.lock().unwrap().push(RequestObservation {
                         method: request.method().clone(),
                         uri: request.uri().clone(),
+                        version: request.version(),
                         headers: request.headers().clone(),
+                        alpn: alpn.clone(),
+                        connection,
                     });
-                    async move { Ok::<_, Infallible>(Response::new(Body::from("origin response"))) }
+                    let response = handler(request);
+                    async move { Ok::<_, Infallible>(response.await) }
                 });
-                if let Err(error) = http1::Builder::new()
-                    .serve_connection(stream, service)
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection_with_upgrades(TokioIo::new(stream), service)
                     .await
                 {
-                    tracing::debug!(message = "Origin connection closed.", %error);
+                    tracing::debug!(message = "Test server connection closed.", %error);
                 }
             });
         }
@@ -269,103 +325,68 @@ async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
         observations,
         task,
     }
+}
+
+fn negotiated_alpn(stream: &MaybeTlsIncomingStream<TcpStream>) -> Option<Vec<u8>> {
+    stream
+        .ssl_stream()
+        .and_then(|stream| stream.ssl().selected_alpn_protocol())
+        .map(<[u8]>::to_vec)
+}
+
+async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
+    spawn_server(tls, |_| async {
+        Response::new(Full::new(Bytes::from_static(b"origin response")))
+    })
+    .await
 }
 
 async fn spawn_proxy(tls: MaybeTlsSettings, require_authentication: bool) -> TestServer {
     spawn_proxy_with_connect_status(tls, require_authentication, StatusCode::OK).await
 }
 
+/// Spawns a proxy that tunnels `CONNECT` requests and forwards absolute-form requests to their
+/// authority over the HTTP version of the request.
 async fn spawn_proxy_with_connect_status(
     tls: MaybeTlsSettings,
     require_authentication: bool,
     connect_status: StatusCode,
 ) -> TestServer {
-    let addr = "127.0.0.1:0".parse().unwrap();
-    let mut listener = tls.bind(&addr).await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let observations = Arc::new(Mutex::new(Vec::new()));
-    let server_observations = Arc::clone(&observations);
-
-    let task = tokio::spawn(async move {
-        loop {
-            let Ok(stream) = listener.accept().await else {
-                continue;
-            };
-            let observations = Arc::clone(&server_observations);
-            tokio::spawn(async move {
-                let service = service_fn(move |request: Request<Body>| {
-                    let observations = Arc::clone(&observations);
-                    async move {
-                        Ok::<_, Infallible>(
-                            proxy_request(
-                                request,
-                                observations,
-                                require_authentication,
-                                connect_status,
-                            )
-                            .await,
-                        )
-                    }
-                });
-                if let Err(error) = http1::Builder::new()
-                    .serve_connection(stream, service)
-                    .with_upgrades()
-                    .await
-                {
-                    tracing::debug!(message = "Proxy connection closed.", %error);
-                }
-            });
-        }
-    });
-
-    TestServer {
-        addr,
-        observations,
-        task,
-    }
+    spawn_server(tls, move |request| {
+        proxy_request(request, require_authentication, connect_status)
+    })
+    .await
 }
 
 async fn proxy_request(
-    mut request: Request<Body>,
-    observations: Arc<Mutex<Vec<RequestObservation>>>,
+    mut request: Request<Incoming>,
     require_authentication: bool,
     connect_status: StatusCode,
-) -> Response<Body> {
-    observations.lock().unwrap().push(RequestObservation {
-        method: request.method().clone(),
-        uri: request.uri().clone(),
-        headers: request.headers().clone(),
-    });
-
+) -> ServerResponse {
     if require_authentication && !has_proxy_authorization(request.headers()) {
-        return Response::builder()
-            .status(StatusCode::PROXY_AUTHENTICATION_REQUIRED)
-            .body(Body::empty())
-            .unwrap();
+        return empty_response(StatusCode::PROXY_AUTHENTICATION_REQUIRED);
     }
 
     if request.method() == Method::CONNECT {
         let Some(authority) = request.uri().authority().cloned() else {
-            return bad_gateway();
+            return empty_response(StatusCode::BAD_GATEWAY);
         };
         tokio::spawn(async move {
-            let Ok(mut upgraded) = hyper::upgrade::on(&mut request).await else {
+            let Ok(upgraded) = hyper_1::upgrade::on(&mut request).await else {
                 return;
             };
             let Ok(mut upstream) = TcpStream::connect(authority.as_str()).await else {
                 return;
             };
-            if let Err(error) = copy_bidirectional(&mut upgraded, &mut upstream).await {
+            if let Err(error) = copy_bidirectional(&mut TokioIo::new(upgraded), &mut upstream).await
+            {
                 tracing::debug!(message = "Proxy tunnel closed.", %error);
             }
         });
-        return Response::builder()
-            .status(connect_status)
-            .body(Body::empty())
-            .unwrap();
+        return empty_response(connect_status);
     }
 
-    forward_http(request).await
+    forward(request).await
 }
 
 fn has_proxy_authorization(headers: &HeaderMap) -> bool {
@@ -374,41 +395,62 @@ fn has_proxy_authorization(headers: &HeaderMap) -> bool {
         .is_some_and(|value| value.as_bytes() == PROXY_AUTHORIZATION.as_bytes())
 }
 
-async fn forward_http(mut request: Request<Body>) -> Response<Body> {
+async fn forward(mut request: Request<Incoming>) -> ServerResponse {
     let Some(authority) = request.uri().authority().cloned() else {
-        return bad_gateway();
+        return empty_response(StatusCode::BAD_GATEWAY);
     };
     let Ok(stream) = TcpStream::connect(authority.as_str()).await else {
-        return bad_gateway();
+        return empty_response(StatusCode::BAD_GATEWAY);
     };
-    let Ok((mut sender, connection)) = conn::http1::handshake(stream).await else {
-        return bad_gateway();
-    };
-    tokio::spawn(async move {
-        if let Err(error) = connection.await {
-            tracing::debug!(message = "Proxy upstream connection closed.", %error);
-        }
-    });
-
-    let path = request
-        .uri()
-        .path_and_query()
-        .map_or("/", |path| path.as_str())
-        .parse()
-        .unwrap();
-    *request.uri_mut() = path;
+    let stream = TokioIo::new(stream);
     request.headers_mut().remove(header::PROXY_AUTHORIZATION);
 
-    sender
-        .send_request(request)
-        .await
-        .unwrap_or_else(|_| bad_gateway())
+    let response = if request.version() == Version::HTTP_2 {
+        // HTTP/2 carries the destination in `:scheme` and `:authority`, so the absolute URI stays.
+        let Ok((mut sender, connection)) =
+            conn::http2::handshake(TokioExecutor::new(), stream).await
+        else {
+            return empty_response(StatusCode::BAD_GATEWAY);
+        };
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                tracing::debug!(message = "Proxy upstream connection closed.", %error);
+            }
+        });
+        sender.send_request(request).await
+    } else {
+        let Ok((mut sender, connection)) = conn::http1::handshake(stream).await else {
+            return empty_response(StatusCode::BAD_GATEWAY);
+        };
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                tracing::debug!(message = "Proxy upstream connection closed.", %error);
+            }
+        });
+        let path = request
+            .uri()
+            .path_and_query()
+            .map_or("/", |path| path.as_str())
+            .parse()
+            .unwrap();
+        *request.uri_mut() = path;
+        sender.send_request(request).await
+    };
+
+    let Ok(response) = response else {
+        return empty_response(StatusCode::BAD_GATEWAY);
+    };
+    let (parts, body) = response.into_parts();
+    match body.collect().await {
+        Ok(body) => Response::from_parts(parts, Full::new(body.to_bytes())),
+        Err(_) => empty_response(StatusCode::BAD_GATEWAY),
+    }
 }
 
-fn bad_gateway() -> Response<Body> {
+fn empty_response(status: StatusCode) -> ServerResponse {
     Response::builder()
-        .status(StatusCode::BAD_GATEWAY)
-        .body(Body::empty())
+        .status(status)
+        .body(Full::default())
         .unwrap()
 }
 
@@ -427,6 +469,11 @@ fn proxy_config(proxy: &TestServer, tls: bool, auth: bool) -> ProxyConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn assert_success(response: TestResponse) {
     assert_eq!(response.status, StatusCode::OK.as_u16());
     assert_eq!(response.body, b"origin response");
@@ -534,6 +581,131 @@ async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
         )
         .unwrap();
     assert_success(with_identity.get(&origin.https_uri()).await.unwrap());
+}
+
+fn mtls_client_tls() -> MaybeTlsSettings {
+    client_tls(TlsConfig {
+        ca_file: Some(TEST_PEM_CA_PATH.into()),
+        crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+        key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+        ..Default::default()
+    })
+}
+
+#[tokio::test]
+async fn v1_reload_tls_applies_to_clones() {
+    let origin = spawn_origin(server_tls(true)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("the server requires a client certificate");
+
+    let handle = client.clone().tls_reload_handle();
+    assert!(handle.reload(mtls_client_tls()).unwrap());
+
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+}
+
+#[tokio::test]
+async fn v1_tls_reload_handle_does_not_keep_client_alive() {
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    let handle = client.tls_reload_handle();
+    let clone = client.clone();
+    drop(client);
+    assert!(!handle.is_closed());
+
+    drop(clone);
+    assert!(handle.is_closed());
+    assert!(!handle.reload(mtls_client_tls()).unwrap());
+}
+
+#[tokio::test]
+async fn v1_reload_tls_does_not_reuse_pooled_connections() {
+    let origin = spawn_origin(server_tls(false)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+
+    let reloaded = client
+        .tls_reload_handle()
+        .reload(client_tls(TlsConfig {
+            ca_file: Some(INVALID_CA_PATH.into()),
+            ..Default::default()
+        }))
+        .unwrap();
+    assert!(reloaded);
+
+    // The pooled connection was verified against the trusted CA, so only a new connection made
+    // with the reloaded settings rejects the server.
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("requests after a reload must use the new TLS settings");
+}
+
+#[rstest]
+#[case::without_max_age(None, 1)]
+#[case::with_max_age(Some(Duration::from_millis(500)), 2)]
+#[tokio::test]
+async fn v1_max_connection_age_recycles_connections(
+    #[case] max_connection_age: Option<Duration>,
+    #[case] expected_connections: usize,
+) {
+    let origin = spawn_origin(no_tls()).await;
+    let options = ConnectionOptions::default().max_connection_age(max_connection_age);
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
+
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+
+    let mut connections: Vec<_> = origin
+        .observations()
+        .iter()
+        .map(|observation| observation.connection)
+        .collect();
+    connections.dedup();
+    assert_eq!(connections.len(), expected_connections);
+}
+
+#[tokio::test]
+async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
+    // A close-delimited response (no `Content-Length` or `Transfer-Encoding`) whose body is
+    // still streaming when the connection reaches its maximum age.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0u8; 1024];
+        let _ = stream.read(&mut request).await.unwrap();
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\npartial ")
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // The client may already have dropped the connection.
+        stream.write_all(b"rest of the body").await.ok();
+    });
+
+    let options = ConnectionOptions::default().max_connection_age(Some(Duration::from_millis(300)));
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
+
+    let response = client
+        .send(
+            Request::get(format!("http://{addr}/"))
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = timeout(REQUEST_TIMEOUT, response.into_body().collect())
+        .await
+        .expect("response body timed out");
+    assert!(
+        body.is_err(),
+        "a body cut off by the maximum age must fail, not complete truncated"
+    );
+    server.abort();
 }
 
 #[rstest]
@@ -667,6 +839,10 @@ async fn v1_tls_proxy_uses_http1_alpn() {
         .unwrap();
 
     assert_success(client.get(&origin.https_uri()).await.unwrap());
+    assert_eq!(
+        proxy.observations()[0].alpn.as_deref(),
+        Some(b"http/1.1".as_slice())
+    );
 }
 
 #[rstest]

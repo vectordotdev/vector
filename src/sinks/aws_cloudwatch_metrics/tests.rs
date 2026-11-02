@@ -64,7 +64,7 @@ async fn encode_events_basic_counter() {
         .with_timestamp(Some(
             Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
                 .single()
-                .and_then(|t| t.with_nanosecond(123456789))
+                .and_then(|t| t.with_nanosecond(123_456_789))
                 .expect("invalid timestamp"),
         )),
         Metric::new(
@@ -76,7 +76,7 @@ async fn encode_events_basic_counter() {
         .with_timestamp(Some(
             Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
                 .single()
-                .and_then(|t| t.with_nanosecond(123456789))
+                .and_then(|t| t.with_nanosecond(123_456_789))
                 .expect("invalid timestamp"),
         )),
     ];

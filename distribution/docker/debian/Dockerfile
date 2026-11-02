@@ -1,4 +1,4 @@
-FROM docker.io/debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258 AS builder
+FROM docker.io/debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS builder
 
 WORKDIR /vector
 
@@ -7,7 +7,7 @@ RUN dpkg -i vector_*_"$(dpkg --print-architecture)".deb
 
 RUN mkdir -p /var/lib/vector
 
-FROM docker.io/debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258
+FROM docker.io/debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.url="https://vector.dev"

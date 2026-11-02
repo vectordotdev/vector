@@ -1,23 +1,22 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use http::{HeaderValue, Uri, header::AUTHORIZATION};
+use http_1::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
+use vector_http::full_body;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
 use super::{
-    service::{RemoteWriteService, build_request},
+    service::{CustomHeaders, RemoteWriteService, build_request},
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
-            HttpEndpoint,
-            auth::Auth,
-            http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
+            HttpEndpoint, auth::Auth, http::RetryStrategy, http_v1::http_response_retry_logic,
             service::TowerRequestConfig,
         },
     },
@@ -161,19 +160,29 @@ fn remote_write_headers_examples() -> BTreeMap<String, String> {
     ])
 }
 
+/// Validates the custom headers and converts them to `http 1` types, keeping the sorted order
+/// of the shared `validate_headers`.
 fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
-    let headers = crate::sinks::util::http::validate_headers(headers)?;
-
-    for name in headers.keys() {
-        if configures_auth && name.inner() == AUTHORIZATION {
-            return Err("Authorization header can not be used with defined auth options".into());
-        }
-    }
-
-    Ok(headers)
+) -> crate::Result<CustomHeaders> {
+    crate::sinks::util::http::validate_headers(headers)?
+        .into_iter()
+        .map(
+            |(name, value)| -> crate::Result<(HeaderName, HeaderValue)> {
+                let name = HeaderName::from_bytes(name.inner().as_str().as_bytes())
+                    .map_err(|e| format!("Invalid header name '{}': {e}", name.inner()))?;
+                if configures_auth && name == AUTHORIZATION {
+                    return Err(
+                        "Authorization header can not be used with defined auth options".into(),
+                    );
+                }
+                let value = HeaderValue::from_bytes(value.as_bytes())
+                    .map_err(|e| format!("Invalid header value: {e}"))?;
+                Ok((name, value))
+            },
+        )
+        .collect()
 }
 
 /// Validates that `aws.region` is set when AWS authentication is selected.
@@ -181,11 +190,13 @@ fn validate_headers(
 /// Mirrors the check in `build`.
 #[cfg(feature = "aws-core")]
 fn validate_aws_region(
-    auth: &Option<PrometheusRemoteWriteAuth>,
-    aws: &Option<crate::aws::RegionOrEndpoint>,
+    auth: Option<&PrometheusRemoteWriteAuth>,
+    aws: Option<&crate::aws::RegionOrEndpoint>,
 ) -> crate::Result<()> {
     if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
-        && aws.as_ref().and_then(|config| config.region()).is_none()
+        && aws
+            .and_then(crate::aws::region::RegionOrEndpoint::region)
+            .is_none()
     {
         return Err(Errors::AwsRegionRequired.into());
     }
@@ -211,7 +222,7 @@ impl SinkConfig for RemoteWriteConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
-    validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    validated_headers: CustomHeaders,
     batch_settings: BatcherSettings,
 }
 
@@ -228,10 +239,7 @@ impl ValidatedSink for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let validated_headers = Arc::new(validate_headers(
-            &self.request.headers,
-            self.auth.is_some(),
-        )?);
+        let validated_headers = validate_headers(&self.request.headers, self.auth.is_some())?;
         let batch_settings = self
             .batch
             .batch_settings
@@ -239,7 +247,7 @@ impl ValidatedSink for RemoteWriteConfig {
             .into_batcher_settings()?;
 
         #[cfg(feature = "aws-core")]
-        validate_aws_region(&self.auth, &self.aws)?;
+        validate_aws_region(self.auth.as_ref(), self.aws.as_ref())?;
 
         Ok(ValidatedRemoteWrite {
             tenant_id,
@@ -265,7 +273,7 @@ impl ValidatedSink for RemoteWriteConfig {
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
 
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let auth = match &self.auth {
             Some(PrometheusRemoteWriteAuth::Basic { user, password }) => {
@@ -281,11 +289,12 @@ impl ValidatedSink for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = match self.aws.as_ref().and_then(|config| config.region()) {
-                    Some(region) => region,
-                    None => {
-                        unreachable!("aws.region validated by validate() when AWS auth is selected")
-                    }
+                let Some(region) = self
+                    .aws
+                    .as_ref()
+                    .and_then(crate::aws::region::RegionOrEndpoint::region)
+                else {
+                    unreachable!("aws.region validated by validate() when AWS auth is selected")
                 };
                 Some(Auth::Aws {
                     credentials_provider: aws_auth
@@ -297,9 +306,10 @@ impl ValidatedSink for RemoteWriteConfig {
             None => None,
         };
 
+        let endpoint = self.endpoint.clone().into_v1();
         let healthcheck_endpoint = match cx.healthcheck.uri {
-            Some(uri) => uri.uri,
-            None => self.endpoint.as_uri().clone(),
+            Some(uri) => uri.uri_v1()?,
+            None => endpoint.clone(),
         };
 
         let healthcheck = healthcheck(
@@ -312,7 +322,7 @@ impl ValidatedSink for RemoteWriteConfig {
         .boxed();
 
         let service = RemoteWriteService {
-            endpoint: self.endpoint.clone(),
+            endpoint,
             client,
             auth,
             compression: self.compression,
@@ -345,24 +355,23 @@ async fn healthcheck(
     endpoint: Uri,
     compression: Compression,
     auth: Option<Auth>,
-    headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    headers: CustomHeaders,
 ) -> crate::Result<()> {
-    let body = bytes::Bytes::new();
     let request = build_request(
-        http::Method::GET,
+        Method::GET,
         &endpoint,
         compression,
-        body,
+        bytes::Bytes::new(),
         None,
-        auth,
-        headers,
+        auth.as_ref(),
+        &headers,
     )
     .await?;
-    let response = client.send(request).await?;
+    let response = client.send(request.map(full_body)).await?;
 
     match response.status() {
-        http::StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+        StatusCode::OK => Ok(()),
+        other => Err(HealthcheckError::unexpected_status(other).into()),
     }
 }
 

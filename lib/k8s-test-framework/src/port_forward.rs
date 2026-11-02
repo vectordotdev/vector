@@ -62,6 +62,10 @@ pub struct PortForwarder {
 impl PortForwarder {
     /// Waits for port forward process to start listening on IPv4 and IPv6 local
     /// sockets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the port-forward process output fails.
     pub async fn wait_until_ready(&mut self) -> Result<()> {
         let ready_string_ipv4 = format!(
             "Forwarding from 127.0.0.1:{} -> {}",
@@ -96,34 +100,46 @@ impl PortForwarder {
     }
 
     /// Returns the local port that port forward was requested to listen on.
+    #[must_use]
     pub fn local_port(&self) -> u16 {
         self.local_port
     }
 
     /// Returns the resource port that port forward was requested to forward to.
+    #[must_use]
     pub fn resource_port(&self) -> u16 {
         self.resource_port
     }
 
     /// Returns the local address (in the "host:port" form) to connect to
     /// in order to reach the cluster resource port, at the IPv4 address family.
+    #[must_use]
     pub fn local_addr_ipv4(&self) -> String {
         format!("127.0.0.1:{}", self.local_port)
     }
 
     /// Returns the local address (in the "host:port" form) to connect to
     /// in order to reach the cluster resource port, at the IPv6 address family.
+    #[must_use]
     pub fn local_addr_ipv6(&self) -> String {
         format!("[::1]:{}", self.local_port)
     }
 
     /// Wait for the `kubectl port-forward` process to exit and return the exit
     /// code.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if waiting for the child process fails.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
         self.child.wait().await
     }
 
     /// Send a termination signal to the `kubectl port-forward` process.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if terminating or waiting for the child process fails.
     pub async fn kill(&mut self) -> std::io::Result<()> {
         self.child.kill().await
     }

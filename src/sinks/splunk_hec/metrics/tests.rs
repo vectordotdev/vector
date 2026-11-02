@@ -15,10 +15,12 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::config_host_key,
+            common::{acknowledgements::HecClientAcknowledgementsConfig, config_host_key},
             metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
         },
-        util::{Compression, HttpEndpoint, test::build_test_server},
+        util::{
+            BatchConfig, Compression, HttpEndpoint, TowerRequestConfig, test::build_test_server,
+        },
     },
     template::{ConfinementConfig, Template},
     test_util::addr::next_addr,
@@ -94,9 +96,9 @@ fn get_processed_event(
 }
 
 fn make_encoder(
-    sourcetype: &Option<Template>,
-    source: &Option<Template>,
-    index: &Option<Template>,
+    sourcetype: Option<&Template>,
+    source: Option<&Template>,
+    index: Option<&Template>,
 ) -> HecMetricsEncoder {
     use super::config::compute_templated_field_keys;
     HecMetricsEncoder {
@@ -127,12 +129,12 @@ fn validate_rejects_unconfined_template() {
         sourcetype: None,
         source: None,
         compression: Compression::None,
-        batch: Default::default(),
-        request: Default::default(),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
         default_namespace: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let result = config.validate();
@@ -140,6 +142,7 @@ fn validate_rejects_unconfined_template() {
 }
 
 #[test]
+#[expect(clippy::float_cmp, reason = "Verify the exact value.")]
 fn test_process_metric() {
     let sourcetype = Template::try_from("{{ tags.template_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ tags.template_source }}".to_string()).ok();
@@ -202,7 +205,7 @@ fn test_encode_event_templated_counter_returns_expected_json() {
     );
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "host": "host_value",
         "index": "index_value",
         "source": "source_value",
@@ -218,7 +221,7 @@ fn test_encode_event_templated_counter_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&sourcetype, &source, &index)
+        &make_encoder(sourcetype.as_ref(), source.as_ref(), index.as_ref())
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -243,7 +246,7 @@ fn test_encode_event_static_counter_returns_expected_json() {
     );
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "host": "host_value",
         "index": "index_value",
         "source": "source_value",
@@ -262,7 +265,7 @@ fn test_encode_event_static_counter_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&sourcetype, &source, &index)
+        &make_encoder(sourcetype.as_ref(), source.as_ref(), index.as_ref())
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -278,7 +281,7 @@ fn test_encode_event_gauge_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "example-gauge",
             "_value": 26.8,
@@ -287,7 +290,7 @@ fn test_encode_event_gauge_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&None, &None, &None)
+        &make_encoder(None, None, None)
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -303,7 +306,7 @@ fn test_encode_event_gauge_with_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "namespace.example-gauge",
             "_value": 26.8,
@@ -312,7 +315,7 @@ fn test_encode_event_gauge_with_namespace_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&None, &None, &None)
+        &make_encoder(None, None, None)
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -328,7 +331,7 @@ fn test_encode_event_gauge_default_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "default.example-gauge",
             "_value": 26.8,
@@ -337,7 +340,7 @@ fn test_encode_event_gauge_default_namespace_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&None, &None, &None)
+        &make_encoder(None, None, None)
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -353,7 +356,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "this_namespace_will_override_the_default.example-gauge",
             "_value": 26.8,
@@ -362,7 +365,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
     });
 
     let actual = serde_json::from_slice::<JsonValue>(
-        &make_encoder(&None, &None, &None)
+        &make_encoder(None, None, None)
             .encode_event(processed_event)
             .unwrap()[..],
     )
@@ -382,12 +385,12 @@ async fn splunk_passthrough_token() {
         sourcetype: None,
         source: None,
         compression: Compression::None,
-        batch: Default::default(),
-        request: Default::default(),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
         default_namespace: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
     let cx = SinkContext::default();
 
@@ -418,5 +421,5 @@ async fn splunk_passthrough_token() {
             "Splunk passthrough-token-2",
             "Splunk token"
         ]
-    )
+    );
 }

@@ -66,7 +66,7 @@ async fn test_greptimedb_sink() {
             .expect("Error getting greptimedb response array")
             .len(),
         10
-    )
+    );
 }
 
 #[tokio::test]
@@ -125,7 +125,7 @@ new_naming = true
             .expect("Error getting greptimedb response array")
             .len(),
         10
-    )
+    );
 }
 
 fn query_client() -> reqwest::Client {
@@ -137,13 +137,15 @@ fn create_event(name: &str, i: i32, base_time: DateTime<Utc>) -> Event {
         Metric::new(
             name.to_owned(),
             MetricKind::Incremental,
-            MetricValue::Counter { value: i as f64 },
+            MetricValue::Counter {
+                value: f64::from(i),
+            },
         )
         .with_namespace(Some("ns"))
         .with_tags(Some(metric_tags!(
             "region" => "us-west-1",
             "production" => "true",
         )))
-        .with_timestamp(Some(base_time + Duration::seconds(i as i64))),
+        .with_timestamp(Some(base_time + Duration::seconds(i64::from(i)))),
     )
 }

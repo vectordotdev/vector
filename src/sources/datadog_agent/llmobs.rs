@@ -147,6 +147,14 @@ struct LLMObsSpan {
     collection_errors: Option<Value>,
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_llmobs_body(
     body: Bytes,
     api_key: Option<Arc<str>>,

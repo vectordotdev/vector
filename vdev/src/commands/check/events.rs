@@ -375,12 +375,21 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw
-/// source slice of an impl block (which preserves comments and original
-/// formatting that `to_token_stream` strips).
+/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
+/// block (which preserves comments and original formatting that `to_token_stream` strips).
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
 });
+
+fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
+    let mut receiver = call.receiver.as_ref();
+    while let syn::Expr::Paren(paren) = receiver {
+        receiver = &paren.expr;
+    }
+    call.method == "emit_with_group"
+        && matches!(receiver, syn::Expr::Struct(event)
+            if event.path.segments.last().is_some_and(|segment| segment.ident == "ComponentEventsDropped"))
+}
 
 /// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
 /// applied to the raw file text so it sees calls nested inside other macros
@@ -748,6 +757,18 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         visit::visit_item_impl(self, node);
     }
 
+    fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
+        if is_grouped_drop_call(node)
+            && let Some(ctx) = self.impl_stack.last()
+        {
+            self.events
+                .entry(ctx.event_name.clone())
+                .or_default()
+                .emits_component_events_dropped = true;
+        }
+        visit::visit_expr_method_call(self, node);
+    }
+
     fn visit_macro(&mut self, node: &'ast syn::Macro) {
         let name = node
             .path
@@ -756,8 +777,8 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        // Use-counting, ComponentEventsDropped detection, and the
-        // log-message format check all run via a separate raw-source pass
+        // Use-counting, emit!/register! ComponentEventsDropped detection, and
+        // the log-message format check run via a separate raw-source pass
         // because `syn` does not descend into the bodies of arbitrary
         // `tokio::select!` / `cfg_if!` / etc. macro invocations.
 
@@ -767,12 +788,12 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             match name.as_str() {
                 "trace" | "debug" | "info" | "warn" | "error" => {
                     let parsed = parse_log_args(&node.tokens.to_string());
-                    let event = self.events.entry(ctx.event_name.clone()).or_default();
+                    let event = self.events.entry(ctx.event_name).or_default();
                     event.add_log(&name, &parsed.message, parsed.parameters);
                 }
                 "counter" | "gauge" | "histogram" => {
                     if let Some(metric) = parse_metric_args(&name, &node.tokens) {
-                        let event = self.events.entry(ctx.event_name.clone()).or_default();
+                        let event = self.events.entry(ctx.event_name).or_default();
                         event.add_metric(&metric.ty, &metric.name, metric.tags);
                     }
                 }
@@ -880,6 +901,9 @@ impl Scanner<'_> {
             // Component-events-dropped emission.
             if expr.contains("emit ! (ComponentEventsDropped")
                 || expr.contains("register ! (ComponentEventsDropped")
+                || syn::parse_str::<syn::Expr>(expr).is_ok_and(|expr| {
+                    matches!(expr, syn::Expr::MethodCall(call) if is_grouped_drop_call(&call))
+                })
             {
                 event.emits_component_events_dropped = true;
             }
@@ -1136,7 +1160,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
 
     let mut scanner = Scanner {
         events,
-        path_str: path_str.clone(),
+        path_str,
         in_internal_events_dir: in_internal_events,
         skip_dropped_for_file: skip_dropped,
         text: &text,
@@ -1257,6 +1281,60 @@ mod tests {
         // comma must not be split at the comma inside `<...>`.
         let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
         assert_eq!(split_comma_args(input), vec![input.to_string()]);
+    }
+
+    fn scan_dropped_event(body: &str) -> Event {
+        let source = format!(
+            "struct TestEventsDropped; impl InternalEvent for TestEventsDropped {{ fn emit(self) {{ {body} }} }}"
+        );
+        let file = syn::parse_file(&source).expect("parse event");
+        let mut events = HashMap::new();
+        Scanner {
+            events: &mut events,
+            path_str: "src/internal_events/test.rs".into(),
+            in_internal_events_dir: true,
+            skip_dropped_for_file: false,
+            text: &source,
+            impl_stack: Vec::new(),
+        }
+        .visit_file(&file);
+        let mut event = events.remove("TestEventsDropped").expect("scanned event");
+        event.uses = 1;
+        event
+    }
+
+    #[test]
+    fn recognizes_component_events_dropped_emit_with_group() {
+        for body in [
+            r#"ComponentEventsDropped::<INTENTIONAL> { count: 1, reason: "discarded" }
+                .emit_with_group(group);"#,
+            r#"(vector_lib::internal_event::ComponentEventsDropped::<INTENTIONAL> {
+                count: 1, reason: "discarded",
+            }).emit_with_group(group);"#,
+        ] {
+            let event = scan_dropped_event(body);
+            assert!(event.emits_component_events_dropped, "{body}");
+            assert!(run("TestEventsDropped", event).is_empty());
+        }
+    }
+
+    #[test]
+    fn unrelated_group_calls_do_not_bypass_dropped_event_validation() {
+        for body in [
+            "// ComponentEventsDropped\nother.emit_with_group(group);",
+            "let _: Option<ComponentEventsDropped> = None; other.emit_with_group(group);",
+            r#"let _ = "ComponentEventsDropped { count: 1 }.emit_with_group(group)";
+                other.emit_with_group(group);"#,
+            "let _ = ComponentEventsDropped { count: 1 }; other.emit_with_group(group);",
+        ] {
+            let event = scan_dropped_event(body);
+            assert!(!event.emits_component_events_dropped, "{body}");
+            let reports = run("TestEventsDropped", event);
+            assert!(reports.iter().any(|report| report.contains("MUST log")));
+            assert!(reports.iter().any(|report| report.contains(&format!(
+                "This event MUST increment counter \"{METRIC_NAME_EVENTS_DROPPED}\"."
+            ))));
+        }
     }
 
     #[test]

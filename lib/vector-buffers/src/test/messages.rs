@@ -174,8 +174,7 @@ impl FixedEncodable for SizedRecord {
         let minimum_len = self.encoded_len();
         if buffer.remaining_mut() < minimum_len {
             return Err(io::Error::other(format!(
-                "not enough capacity to encode record: need {}, only have {}",
-                minimum_len,
+                "not enough capacity to encode record: need {minimum_len}, only have {}",
                 buffer.remaining_mut()
             )));
         }

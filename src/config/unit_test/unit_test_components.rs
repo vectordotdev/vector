@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::sync::Arc;
 
 use futures::{Sink, Stream, stream};
@@ -44,7 +41,7 @@ impl SourceConfig for UnitTestSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_batch(events).await.map_err(|_| ())?;
+            out.send_batch(events).await?;
             Ok(())
         }))
     }
@@ -101,7 +98,7 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_event_stream(stream).await.map_err(|_| ())?;
+            out.send_event_stream(stream).await?;
             Ok(())
         }))
     }
@@ -142,8 +139,7 @@ pub struct UnitTestSinkResult {
 
 /// Configuration for the `unit_test` sink.
 #[configurable_component(sink("unit_test", "Unit test."))]
-#[derive(Clone, Default, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Default, derive_more::Debug)]
 pub struct UnitTestSinkConfig {
     /// Name of the test that this sink is being used for.
     pub test_name: String,
@@ -157,7 +153,7 @@ pub struct UnitTestSinkConfig {
 
     /// Predicate applied to each event that reaches the sink.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub check: UnitTestSinkCheck,
 }
 
@@ -231,9 +227,7 @@ impl StreamSink<Event> for UnitTestSink {
                     let actual = output_events.len();
                     if actual != expected {
                         result.test_errors.push(format!(
-                            "expected {} events from transforms {:?}, but received {}",
-                            expected, self.transform_ids, actual
-                        ));
+                            "expected {expected} events from transforms {:?}, but received {actual}", self.transform_ids));
                     }
                 }
 
@@ -246,9 +240,9 @@ impl StreamSink<Event> for UnitTestSink {
                         let mut check_errors = Vec::new();
                         for (j, condition) in check.iter().enumerate() {
                             let mut condition_errors = Vec::new();
-                            for event in output_events.iter() {
+                            for event in &output_events {
                                 match condition.check_with_context(event.clone()).0 {
-                                    Ok(_) => {
+                                    Ok(()) => {
                                         condition_errors.clear();
                                         break;
                                     }
@@ -264,8 +258,8 @@ impl StreamSink<Event> for UnitTestSink {
                             check_errors.insert(
                                 0,
                                 format!(
-                                    "check[{}] for transforms {:?} failed conditions:",
-                                    i, self.transform_ids
+                                    "check[{i}] for transforms {:?} failed conditions:",
+                                    self.transform_ids
                                 ),
                             );
                         }

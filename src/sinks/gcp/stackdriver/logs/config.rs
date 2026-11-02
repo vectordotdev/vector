@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use http::{Request, Uri};
-use hyper::Body;
+use http_1::Request;
 use snafu::Snafu;
+use vector_http::full_body;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
@@ -20,14 +20,15 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     schema,
     sinks::{
-        gcs_common::config::healthcheck_response,
+        gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, RetryStrategy, http_response_retry_logic},
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -176,7 +177,7 @@ pub(super) enum StackdriverLogName {
 #[derive(Clone, Debug, Default)]
 pub(super) struct StackdriverLabelConfig {
     /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
-    /// and extract their values to set as LogEntry labels.
+    /// and extract their values to set as `LogEntry` labels.
     #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
     #[serde(default = "default_labels_key")]
     pub(super) labels_key: Option<String>,
@@ -200,6 +201,11 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde requires the optional field type."
+)]
 pub(super) fn default_labels_key() -> Option<String> {
     Some("logging.googleapis.com/labels".to_string())
 }
@@ -324,10 +330,10 @@ impl ValidatedSink for StackdriverConfig {
         let request_limits = self.request.into_settings();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-            uri: self.endpoint.as_uri().clone(),
+            endpoint: self.endpoint.clone(),
             auth: auth.clone(),
         };
 
@@ -342,7 +348,7 @@ impl ValidatedSink for StackdriverConfig {
 
         let sink = StackdriverLogsSink::new(service, *batch_settings, request_builder);
 
-        let healthcheck = healthcheck(client, auth.clone(), self.endpoint.as_uri().clone()).boxed();
+        let healthcheck = healthcheck(client, auth.clone(), self.endpoint.clone()).boxed();
 
         auth.spawn_regenerate_token();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -355,24 +361,26 @@ pub struct ValidatedStackdriverLogs {
     batch_settings: BatcherSettings,
 }
 
-async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> crate::Result<()> {
+async fn healthcheck(
+    client: HttpClient,
+    auth: GcpAuthenticator,
+    endpoint: HttpEndpoint,
+) -> crate::Result<()> {
     let entries: Vec<BoxedRawValue> = Vec::new();
     let events = serde_json::json!({ "entries": entries });
 
     let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
-
-    let mut request = Request::post(uri)
+    let mut request = Request::post(endpoint.into_v1())
         .header("Content-Type", "application/json")
         .body(body)
         .unwrap();
 
-    auth.apply(&mut request);
-
-    let request = request.map(Body::from);
+    auth.apply_v1(&mut request);
+    let request = request.map(full_body);
 
     let response = client.send(request).await?;
 
-    healthcheck_response(response, HealthcheckError::NotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::NotFound.into())
 }
 
 #[cfg(test)]

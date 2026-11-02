@@ -21,7 +21,7 @@ use crate::{
     config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
-    serde::{bool_or_struct, default_decoding},
+    serde::default_decoding,
     sources::util::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
@@ -121,7 +121,7 @@ pub struct SimpleHttpConfig {
 
     decoding: Option<DeserializerConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -188,18 +188,18 @@ impl SimpleHttpConfig {
         schema_definition
     }
 
-    fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
+    fn get_decoding_config(&self) -> DecodingConfig {
         let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
         let framing = self
             .framing
             .clone()
             .unwrap_or_else(|| decoding.default_stream_framing());
 
-        Ok(DecodingConfig::new(
+        DecodingConfig::new(
             framing,
             decoding,
             self.log_namespace.unwrap_or(false).into(),
-        ))
+        )
     }
 }
 
@@ -256,8 +256,7 @@ pub fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> 
     for (idx, name) in list.iter().enumerate() {
         if idx < list.len() - 1 && list[idx] == list[idx + 1] {
             warn!(
-                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
-                list_name, name
+                "`{list_name}` configuration contains duplicate entry for `{name}`. Removing duplicate."
             );
             dedup = true;
         }
@@ -280,11 +279,18 @@ pub enum HttpConfigParamKind {
     Exact(String),
 }
 
+///
+/// # Errors
+///
+/// Returns an error if a wildcard parameter is not a valid glob pattern.
 pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParamKind>> {
     list.iter()
-        .map(|s| match s.contains('*') {
-            true => Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?)),
-            false => Ok(HttpConfigParamKind::Exact(s.to_string())),
+        .map(|s| {
+            if s.contains('*') {
+                Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?))
+            } else {
+                Ok(HttpConfigParamKind::Exact(s.clone()))
+            }
         })
         .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
@@ -295,7 +301,7 @@ impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self
-            .get_decoding_config()?
+            .get_decoding_config()
             .build()?
             .with_log_namespace(log_namespace);
 
@@ -334,8 +340,7 @@ impl SourceConfig for SimpleHttpConfig {
         vec![SourceOutput::new_maybe_logs(
             self.decoding
                 .as_ref()
-                .map(|d| d.output_type())
-                .unwrap_or(DataType::Log),
+                .map_or(DataType::Log, DeserializerConfig::output_type),
             schema_definition,
         )]
     }
@@ -380,35 +385,30 @@ impl HttpSource for SimpleHttpSource {
     ) {
         let now = Utc::now();
         for event in events.iter_mut() {
-            match event {
-                Event::Log(log) => {
-                    // add request_path to each event
+            if let Event::Log(log) = event {
+                // add request_path to each event
+                self.log_namespace.insert_source_metadata(
+                    SimpleHttpConfig::NAME,
+                    log,
+                    self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
+                    path!("path"),
+                    request_path.to_owned(),
+                );
+
+                self.log_namespace.insert_standard_vector_source_metadata(
+                    log,
+                    SimpleHttpConfig::NAME,
+                    now,
+                );
+
+                if let Some(addr) = source_ip {
                     self.log_namespace.insert_source_metadata(
                         SimpleHttpConfig::NAME,
                         log,
-                        self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-                        path!("path"),
-                        request_path.to_owned(),
+                        self.host_key.path.as_ref().map(LegacyKey::Overwrite),
+                        path!("host"),
+                        socket_addr_to_ip_string(addr),
                     );
-
-                    self.log_namespace.insert_standard_vector_source_metadata(
-                        log,
-                        SimpleHttpConfig::NAME,
-                        now,
-                    );
-
-                    if let Some(addr) = source_ip {
-                        self.log_namespace.insert_source_metadata(
-                            SimpleHttpConfig::NAME,
-                            log,
-                            self.host_key.path.as_ref().map(LegacyKey::Overwrite),
-                            path!("host"),
-                            socket_addr_to_ip_string(addr),
-                        );
-                    }
-                }
-                _ => {
-                    continue;
                 }
             }
         }
@@ -469,6 +469,7 @@ impl HttpSource for SimpleHttpSource {
 
 #[cfg(test)]
 mod tests {
+    use crate::http::KeepaliveConfig;
     use std::{io::Write, net::SocketAddr, str::FromStr};
 
     use flate2::{
@@ -541,7 +542,6 @@ mod tests {
         let context = SourceContext::new_test(sender, None);
         let method = match Method::from_str(method).unwrap() {
             Method::GET => HttpMethod::Get,
-            Method::POST => HttpMethod::Post,
             _ => HttpMethod::Post,
         };
 
@@ -562,7 +562,7 @@ mod tests {
                 decoding,
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
             }
             .build(context)
             .await
@@ -687,13 +687,13 @@ mod tests {
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -728,13 +728,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -770,7 +770,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -849,13 +849,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -954,35 +954,35 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
-    async fn assert_event_metadata(log: &LogEvent) {
+    fn assert_event_metadata(log: &LogEvent) {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
             .get((PathPrefix::Event, log_schema().source_type_key().unwrap()))
             .unwrap()
-            .as_str()
+            .to_str_lossy()
             .unwrap();
         assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
@@ -1035,7 +1035,7 @@ mod tests {
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["\"x-test-header\""], "true".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1080,7 +1080,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1124,7 +1124,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1168,7 +1168,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1213,7 +1213,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1594,6 +1594,91 @@ mod tests {
         assert_eq!(200, send_with_headers(addr, "", headers).await);
     }
 
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_missing() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "GET",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(401, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_wrong() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("wrong-token").unwrap().0.encode(),
+        );
+        assert_eq!(401, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn http_post_with_correct_bearer_auth() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("my-token").unwrap().0.encode(),
+        );
+        assert_eq!(200, send_with_headers(addr, "", headers).await);
+    }
+
     #[test]
     fn output_schema_definition_vector_namespace() {
         let config = SimpleHttpConfig {
@@ -1640,7 +1725,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1671,7 +1756,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1878,7 +1963,7 @@ mod tests {
     impl ValidatableComponent for SimpleHttpConfig {
         fn validation_configuration() -> ValidationConfiguration {
             let config = Self {
-                decoding: Some(DeserializerConfig::Json(Default::default())),
+                decoding: Some(DeserializerConfig::Json(JsonDeserializerConfig::default())),
                 ..Default::default()
             };
 
@@ -1890,9 +1975,7 @@ mod tests {
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
                 HttpResourceConfig::from_parts(uri, Some(config.method.into())),
-                config
-                    .get_decoding_config()
-                    .expect("should not fail to get decoding config"),
+                config.get_decoding_config(),
             );
 
             ValidationConfiguration::from_source(

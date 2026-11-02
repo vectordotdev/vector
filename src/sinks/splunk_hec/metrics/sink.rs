@@ -63,7 +63,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build HEC Metrics request: {:?}.", e);
+                        error!("Failed to build HEC Metrics request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),
@@ -128,8 +128,7 @@ impl HecMetricsProcessedEventMetadata {
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
-            MetricValue::Counter { value } => Some(value),
-            MetricValue::Gauge { value } => Some(value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
                 emit!(SplunkInvalidMetricReceivedError {
                     value: metric.value(),

@@ -1,11 +1,11 @@
 //! Common logic for sources that are HTTP clients.
 //!
 //! Specific HTTP client sources will:
-//!   - Call build_url() to build the URL(s) to call.
+//!   - Call `build_url()` to build the URL(s) to call.
 //!   - Implement a specific context struct which:
-//!       - Contains the data that source needs in order to process the HTTP responses into internal_events
-//!       - Implements the HttpClient trait
-//!   - Call call() supplying the generic inputs for calling and the source-specific
+//!       - Contains the data that source needs in order to process the HTTP responses into `internal_events`
+//!       - Implements the `HttpClient` trait
+//!   - Call `call()` supplying the generic inputs for calling and the source-specific
 //!     context.
 
 // Okta source only imports defaults but doesn't use the rest of the client
@@ -15,8 +15,13 @@ use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::{Uri, response::Parts};
+use http::{
+    HeaderMap, Uri,
+    header::{HeaderName, HeaderValue},
+    response::Parts,
+};
 use hyper::{Body, Request};
+use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
@@ -43,13 +48,51 @@ pub(crate) struct GenericHttpClientInputs {
     /// Timeout for the HTTP request.
     pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
-    pub headers: HashMap<String, Vec<String>>,
+    pub headers: HeaderMap<HeaderValue>,
     /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
     pub tls: TlsSettings,
     pub proxy: ProxyConfig,
     pub shutdown: ShutdownSignal,
+}
+
+#[derive(Debug, Snafu)]
+pub(crate) enum HeaderError {
+    #[snafu(display("Invalid HTTP header name {name:?}: {source}"))]
+    InvalidName {
+        name: String,
+        source: http::header::InvalidHeaderName,
+    },
+    #[snafu(display("Invalid value for HTTP header {name:?}: {source}"))]
+    InvalidValue {
+        name: String,
+        source: http::header::InvalidHeaderValue,
+    },
+}
+
+pub(crate) fn build_headers(
+    headers: &HashMap<String, Vec<String>>,
+) -> Result<HeaderMap<HeaderValue>, HeaderError> {
+    let mut parsed = HeaderMap::new();
+
+    for (name, values) in headers {
+        let header_name =
+            HeaderName::from_bytes(name.as_bytes()).with_context(|_| InvalidNameSnafu {
+                name: name.to_owned(),
+            })?;
+
+        for value in values {
+            let mut header_value =
+                HeaderValue::from_bytes(value.as_bytes()).with_context(|_| InvalidValueSnafu {
+                    name: name.to_owned(),
+                })?;
+            header_value.set_sensitive(true);
+            parsed.append(header_name.clone(), header_value);
+        }
+    }
+
+    Ok(parsed)
 }
 
 /// The default interval to call the HTTP endpoint if none is configured.
@@ -103,7 +146,7 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
-    };
+    }
     for (k, query_value) in query {
         match query_value {
             QueryParameterValue::SingleParam(param) => {
@@ -114,17 +157,17 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
                     serializer.append_pair(k, v.value());
                 }
             }
-        };
+        }
     }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {
         builder = builder.scheme(scheme.clone());
-    };
+    }
     if let Some(authority) = uri.authority() {
         builder = builder.authority(authority.clone());
-    };
+    }
     builder = builder.path_and_query(match serializer.finish() {
-        query if !query.is_empty() => format!("{}?{}", uri.path(), query),
+        query if !query.is_empty() => format!("{}?{query}", uri.path()),
         _ => uri.path().to_string(),
     });
     builder
@@ -143,6 +186,10 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
@@ -155,7 +202,7 @@ pub(crate) async fn call<
     context_builder: B,
     mut out: SourceSender,
     http_method: HttpMethod,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     // Building the HttpClient should not fail as it is just setting up the client with the
     // proxy and tls settings.
     let client =
@@ -185,10 +232,8 @@ pub(crate) async fn call<
             };
 
             // add user specified headers
-            for (header, values) in &inputs.headers {
-                for value in values {
-                    builder = builder.header(header, value);
-                }
+            for (header, value) in &inputs.headers {
+                builder = builder.header(header, value);
             }
 
             // set ACCEPT header if not user specified
@@ -300,10 +345,53 @@ pub(crate) async fn call<
             debug!("Finished sending.");
             Ok(())
         }
-        Err(_) => {
+        Err(error) => {
             let (count, _) = stream.size_hint();
             emit!(StreamClosedError { count });
-            Err(())
+            Err(error)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn headers_are_normalized_and_sensitive() {
+        let headers = build_headers(&HashMap::from([(
+            "X-Private-Token".to_string(),
+            vec!["secret".to_string(), "another-secret".to_string()],
+        )]))
+        .unwrap();
+
+        let values = headers
+            .get_all("x-private-token")
+            .iter()
+            .collect::<Vec<_>>();
+        assert_eq!(values.len(), 2);
+        assert!(values.iter().all(|value| value.is_sensitive()));
+    }
+
+    #[test]
+    fn invalid_header_name_is_rejected() {
+        let error = build_headers(&HashMap::from([(
+            "invalid header".to_string(),
+            vec!["value".to_string()],
+        )]))
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid HTTP header name"));
+    }
+
+    #[test]
+    fn invalid_header_value_is_rejected() {
+        let error = build_headers(&HashMap::from([(
+            "x-header".to_string(),
+            vec!["invalid\nvalue".to_string()],
+        )]))
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid value for HTTP header"));
     }
 }

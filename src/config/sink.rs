@@ -1,9 +1,6 @@
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use derivative::Derivative;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -59,9 +56,7 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 
 /// Fully resolved sink component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "sink"))]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
@@ -98,7 +93,7 @@ where
     /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
     /// sinks can carry it without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
@@ -111,6 +106,16 @@ where
     /// Every sink participates in the validated lifecycle, so the validated state is
     /// always present (filled in during config compilation) and the sink is built
     /// through the `DynValidatedSink` boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sink or its healthcheck cannot be built, for example when an
+    /// HTTP client, credentials, or other environment-dependent resources cannot be set up.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the validated state is missing because the sink was not validated during
+    /// config compilation, or if its type does not match the sink's expected validated state type.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let validated = self
             .validated
@@ -126,12 +131,12 @@ where
     {
         SinkOuter {
             inputs: Inputs::from_iter(inputs),
-            buffer: Default::default(),
+            buffer: BufferConfig::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
             inner: inner.into(),
-            proxy: Default::default(),
-            graph: Default::default(),
+            proxy: ProxyConfig::default(),
+            graph: GraphConfig::default(),
             validated: None,
         }
     }
@@ -151,11 +156,11 @@ where
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
             warn!(
                 "Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`."
-            )
+            );
         } else if self.healthcheck_uri.is_some() {
             warn!(
                 "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
-            )
+            );
         }
         SinkHealthcheckOptions {
             uri: self
@@ -330,17 +335,22 @@ pub struct SinkContext {
 }
 
 impl Default for SinkContext {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     fn default() -> Self {
         Self {
-            healthcheck: Default::default(),
-            globals: Default::default(),
+            healthcheck: SinkHealthcheckOptions::default(),
+            globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
-            metrics_storage: Default::default(),
-            proxy: Default::default(),
+            metrics_storage: MetricsStorage::default(),
+            proxy: ProxyConfig::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
-            extra_context: Default::default(),
+            extra_context: ExtraContext::default(),
         }
     }
 }

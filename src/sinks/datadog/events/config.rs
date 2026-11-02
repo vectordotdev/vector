@@ -1,25 +1,23 @@
-use http::Uri;
+use http_1::Uri;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
-use super::{
-    service::{DatadogEventsResponse, DatadogEventsService},
-    sink::DatadogEventsSink,
-};
+use super::{service::DatadogEventsServiceRequestBuilder, sink::DatadogEventsSink};
 use crate::{
     common::datadog,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
             HttpEndpoint, ServiceBuilderExt, TowerRequestConfig, TowerRequestSettings,
-            http::{HttpStatusRetryLogic, RetryStrategy},
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,
@@ -45,9 +43,9 @@ pub struct DatadogEventsConfig {
 
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -58,7 +56,7 @@ impl DatadogEventsConfig {
         let base = datadog::get_api_base_endpoint(endpoint, site);
         Ok(HttpEndpoint::parse(&base)?
             .append_path("/api/v1/events")?
-            .into_uri())
+            .into_v1())
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -73,15 +71,15 @@ impl DatadogEventsConfig {
         client: HttpClient,
         validated: &ValidatedEvents,
         endpoint: Uri,
-    ) -> crate::Result<VectorSink> {
-        let service =
-            DatadogEventsService::new(endpoint, dd_common.default_api_key.clone(), client);
+    ) -> VectorSink {
+        let request_builder = DatadogEventsServiceRequestBuilder {
+            endpoint,
+            default_api_key: dd_common.default_api_key.clone(),
+        };
+        let service = HttpService::new(client, request_builder).with_response_decompression();
 
         let request_settings = validated.request_settings.clone();
-        let retry_logic = HttpStatusRetryLogic::new(
-            |req: &DatadogEventsResponse| req.http_status,
-            self.retry_strategy.clone(),
-        );
+        let retry_logic = http_response_retry_logic(self.retry_strategy.clone());
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)
@@ -89,7 +87,7 @@ impl DatadogEventsConfig {
 
         let sink = DatadogEventsSink { service };
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        VectorSink::from_event_streamsink(sink)
     }
 }
 
@@ -143,7 +141,7 @@ impl ValidatedSink for DatadogEventsConfig {
         let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let endpoint = Self::events_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)?;
-        let sink = self.build_sink(&dd_common, client, validated, endpoint)?;
+        let sink = self.build_sink(&dd_common, client, validated, endpoint);
 
         Ok((sink, healthcheck))
     }

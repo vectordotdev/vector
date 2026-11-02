@@ -10,7 +10,7 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Azure service principal authentication."
@@ -65,27 +65,7 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 			"""
 		required: false
-		type: object: options: {
-			status_codes: {
-				description:   "Retry on these specific HTTP status codes"
-				relevant_when: "type = \"custom\""
-				required:      true
-				type: array: items: type: uint: {}
-			}
-			type: {
-				description: "The retry strategy enum."
-				required:    false
-				type: string: {
-					default: "default"
-					enum: {
-						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
-						custom:  "Custom retry strategy"
-						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
-						none:    "Don't retry any errors, including request timeouts."
-					}
-				}
-			}
-		}
+		type:     _schemaDefinitions["derived::vector::sinks::util::http::RetryStrategy::64fe77681a1c274eed24cca6"]
 	}
 	stream_name: {
 		description: """

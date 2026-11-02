@@ -154,14 +154,14 @@ fn default_name() -> String {
 impl GenerateConfig for NatsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             auth: None,
             connection_name: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
             subject: Template::try_from("from.vector").unwrap(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
-            request: Default::default(),
+            request: TowerRequestConfig::default(),
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
@@ -206,6 +206,7 @@ impl ValidatedSink for NatsSinkConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "subject")?;
         let server_addresses = self.parse_server_addresses()?;
+        self.encoding.validate()?;
 
         if let Some(tls) = &self.tls {
             validate_tls_cert_key_pair(tls).context(ConfigSnafu)?;
@@ -236,7 +237,11 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
     }
 }
 
@@ -302,7 +307,7 @@ async fn healthcheck(
     config
         .connect(options, server_addresses)
         .map_ok(|_| ())
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
         .await
 }
 
@@ -328,7 +333,7 @@ impl NatsPublisher {
                     })?;
                 client
                     .flush()
-                    .map_ok(|_| ())
+                    .map_ok(|()| ())
                     .map_err(|e| NatsError::PublishError {
                         source: Box::new(e),
                     })

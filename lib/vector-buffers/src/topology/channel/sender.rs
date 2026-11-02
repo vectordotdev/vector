@@ -1,10 +1,6 @@
-// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
-use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
@@ -14,7 +10,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
+    variants::disk_v2::{self, DiskBufferUsageSnapshot, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -163,6 +159,16 @@ where
             Self::DiskV2(_) => None,
         }
     }
+
+    fn usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
+        match self {
+            Self::InMemory(_) => Some(DiskBufferUsageSnapshot {
+                event_count: 0,
+                byte_size: 0,
+            }),
+            Self::DiskV2(writer) => writer.try_lock().ok().map(|writer| writer.usage_snapshot()),
+        }
+    }
 }
 
 enum UsageAccounting {
@@ -220,16 +226,19 @@ impl UsageAccounting {
 /// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
 /// `SenderAdapter` instances instead... which would let us get rid of the boxing and
 /// `#[async_recursion]` stuff.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
+    // `overflow` is self-referential, so formatting it via a plain placeholder would make
+    // derive_more infer `Option<Box<BufferSender<T>>>: Debug`, overflowing (E0275). A method-call
+    // expression skips bound inference while formatting the same value.
+    #[debug("{:?}", overflow.as_ref())]
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<UsageInstrumentation>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     send_duration: Option<Registered<BufferSendDuration>>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     custom_instrumentation: Option<Arc<dyn BufferInstrumentation<T>>>,
 }
 
@@ -289,6 +298,19 @@ impl<T: Bufferable> BufferSender<T> {
     /// Configures this sender to invoke a custom instrumentation hook.
     pub fn with_custom_instrumentation(&mut self, instrumentation: impl BufferInstrumentation<T>) {
         self.custom_instrumentation = Some(Arc::new(instrumentation));
+    }
+
+    /// Returns the aggregate approximate usage of all disk stages in this buffer topology.
+    ///
+    /// Returns `None` rather than waiting if any disk writer is currently busy.
+    pub fn disk_usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
+        let mut usage = self.base.usage_snapshot()?;
+        if let Some(overflow) = self.overflow.as_ref() {
+            let overflow_usage = overflow.disk_usage_snapshot()?;
+            usage.event_count = usage.event_count.saturating_add(overflow_usage.event_count);
+            usage.byte_size = usage.byte_size.saturating_add(overflow_usage.byte_size);
+        }
+        Some(usage)
     }
 }
 
@@ -397,5 +419,47 @@ impl<T: Bufferable> BufferSender<T> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    use tempfile::tempdir;
+    use tracing::Span;
+
+    use super::SenderAdapter;
+    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
+        let config = BufferConfig::Chained(vec![
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()),
+                when_full: WhenFull::Overflow,
+            },
+            BufferType::DiskV2 {
+                max_size: NonZeroU64::new(268_435_488).unwrap(),
+                when_full: WhenFull::Block,
+            },
+        ]);
+        let data_dir = tempdir().unwrap();
+        let (sender, _receiver) = config
+            .build::<SizedRecord>(
+                Some(data_dir.path().to_path_buf()),
+                "busy".into(),
+                Span::none(),
+            )
+            .await
+            .unwrap();
+        let overflow = sender.overflow.as_ref().unwrap();
+        let writer = match &overflow.base {
+            SenderAdapter::DiskV2(writer) => writer,
+            SenderAdapter::InMemory(_) => unreachable!(),
+        };
+        let _guard = writer.lock().await;
+
+        assert_eq!(sender.disk_usage_snapshot(), None);
     }
 }

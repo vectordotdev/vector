@@ -80,6 +80,10 @@ pub struct DnstapConfig {
     pub log_namespace: Option<bool>,
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_max_frame_length() -> usize {
     bytesize::kib(100u64) as usize
 }
@@ -100,6 +104,7 @@ pub enum Mode {
 }
 
 impl DnstapConfig {
+    #[must_use]
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
             mode: Mode::Unix(unix::UnixConfig::new(socket_path)),
@@ -115,6 +120,7 @@ impl DnstapConfig {
         self.raw_data_only.unwrap_or(false)
     }
 
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> vector_lib::schema::Definition {
         let event_schema = DnstapEventSchema;
 
@@ -195,8 +201,7 @@ impl SourceConfig for DnstapConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let frame_handler =
-                    unix::DnstapFrameHandler::new(config.clone(), common_frame_handler);
+                let frame_handler = unix::DnstapFrameHandler::new(config, common_frame_handler);
                 build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
             }
         }
@@ -270,7 +275,7 @@ impl FrameHandler for CommonFrameHandler {
 
     fn handle_event(
         &self,
-        received_from: Option<vrl::prelude::Bytes>,
+        received_from: Option<String>,
         frame: vrl::prelude::Bytes,
     ) -> Option<vector_lib::event::Event> {
         self.bytes_received.emit(ByteSize(frame.len()));
@@ -411,7 +416,7 @@ mod tests {
 
         definition
             .schema_definition(schema)
-            .assert_valid_for_event(&event)
+            .assert_valid_for_event(&event);
     }
 }
 
@@ -451,14 +456,14 @@ mod integration_tests {
                     mode: Mode::Unix(UnixConfig {
                         socket_path: socket,
                         socket_file_mode: Some(511),
-                        socket_receive_buffer_size: Some(10485760),
-                        socket_send_buffer_size: Some(10485760),
+                        socket_receive_buffer_size: Some(10_485_760),
+                        socket_send_buffer_size: Some(10_485_760),
                     }),
-                    max_frame_length: 102400,
+                    max_frame_length: 102_400,
                     host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
-                    max_frame_handling_tasks: Some(100000),
+                    max_frame_handling_tasks: Some(100_000),
                     lowercase_hostnames: false,
                     log_namespace: None,
                 }
@@ -466,7 +471,7 @@ mod integration_tests {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
             });
 
             send_query(raw_data, query_type);
@@ -669,7 +674,7 @@ mod integration_tests {
             "dnstap",
             "-reopen",
         ])
-        .await
+        .await;
     }
 
     async fn nslookup(port: &str) {
@@ -680,11 +685,11 @@ mod integration_tests {
             "h1.example.com",
             "localhost",
         ])
-        .await
+        .await;
     }
 
     async fn nsupdate() {
-        dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await
+        dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await;
     }
 
     #[tokio::test]

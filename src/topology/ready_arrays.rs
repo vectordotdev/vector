@@ -90,11 +90,10 @@ where
                     // When the inner stream signals pending flush everything
                     // we've got enqueued here. Next time we're polled we'll
                     // signal pending.
-                    if !self.enqueued.is_empty() {
-                        return Poll::Ready(Some(self.flush()));
-                    } else {
+                    if self.enqueued.is_empty() {
                         return Poll::Pending;
                     }
+                    return Poll::Ready(Some(self.flush()));
                 }
             }
         }

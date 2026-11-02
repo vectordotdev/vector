@@ -5,13 +5,13 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{
+use http_1::{
     Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
-use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_http::{HttpError, full_body};
 use vector_lib::{
     event::{EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -19,8 +19,8 @@ use vector_lib::{
 };
 
 use crate::{
-    http::{BuildRequestSnafu, HttpClient},
-    sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
+    http::client_v1::HttpClient,
+    sinks::{HTTPV1RequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -50,13 +50,13 @@ pub struct DatadogMetricsRequest {
 }
 
 impl DatadogMetricsRequest {
-    /// Converts this request to a `hyper`-compatible request.
+    /// Converts this request to a native `http 1` request with a `Bytes` body.
     ///
     /// # Errors
     ///
     /// If any of the header names or values are invalid, or if the URI is invalid, an error variant
     /// will be returned.
-    pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Body>> {
+    pub fn into_http_request(self, api_key: HeaderValue) -> http_1::Result<Request<Bytes>> {
         // use the API key from the incoming event if it is provided
         let api_key = self.api_key.map_or_else(
             || api_key,
@@ -80,7 +80,7 @@ impl DatadogMetricsRequest {
             .header(CONTENT_TYPE, self.content_type)
             .header(CONTENT_ENCODING, self.content_encoding);
 
-        request.body(Body::from(self.payload))
+        request.body(self.payload)
     }
 }
 
@@ -100,7 +100,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
     }
 }
 
-// Generalized wrapper around the raw response from Hyper.
+// Generalized wrapper around the raw response from the client.
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
@@ -151,10 +151,8 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of Error internal event is handled upstream by the caller
-    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.client
-            .poll_ready(cx)
-            .map_err(|error| DatadogApiError::HttpError { error })
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     // Emission of Error internal event is handled upstream by the caller
@@ -167,10 +165,12 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
             let request = request
                 .into_http_request(api_key)
-                .context(BuildRequestSnafu)
-                .map_err(|error| DatadogApiError::HttpError { error })?;
+                .context(HTTPV1RequestBuilderSnafu)
+                .map_err(|error| DatadogApiError::HttpError {
+                    error: HttpError::from(crate::Error::from(error)),
+                })?;
 
-            let result = client.send(request).await;
+            let result = client.send(request.map(full_body)).await;
             let result = DatadogApiError::from_result(result)?;
 
             Ok(DatadogMetricsResponse {

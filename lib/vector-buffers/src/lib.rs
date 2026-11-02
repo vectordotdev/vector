@@ -5,7 +5,6 @@
 
 #![deny(warnings)]
 #![deny(clippy::all)]
-#![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 #![allow(clippy::must_use_candidate)]
@@ -31,6 +30,7 @@ pub mod test;
 pub mod topology;
 
 pub(crate) mod variants;
+pub use variants::disk_v2::DiskBufferUsageSnapshot;
 
 /// `disk_v2`'s write-buffer size, re-exported under `test` so the harness can
 /// size payloads against the real value instead of hardcoding it.

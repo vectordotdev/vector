@@ -56,7 +56,11 @@ pub(super) struct Context {
     pub(super) common_attributes: Vec<HttpConfigParamKind>,
 }
 
-/// Publishes decoded events from the FirehoseRequest to the pipeline
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+/// Publishes decoded events from the `FirehoseRequest` to the pipeline
 pub(super) async fn firehose(
     request_id: String,
     source_arn: String,
@@ -105,7 +109,7 @@ pub(super) async fn firehose(
                                 log,
                                 log_schema().source_type_key(),
                                 path!("source_type"),
-                                Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
+                                Value::from_static_str(AwsKinesisFirehoseConfig::NAME),
                             );
                             // This handles the transition from the original timestamp logic. Originally the
                             // `timestamp_key` was always populated by the `request.timestamp` time.
@@ -125,21 +129,21 @@ pub(super) async fn firehose(
                                         );
                                     }
                                 }
-                            };
+                            }
 
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("request_id"))),
                                 path!("request_id"),
-                                request_id.to_owned(),
+                                request_id.clone(),
                             );
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
                                 path!("source_arn"),
-                                source_arn.to_owned(),
+                                source_arn.clone(),
                             );
 
                             if !common_attributes_map.is_empty() {
@@ -237,9 +241,9 @@ fn decode_record(
 
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
-        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
-            compression: compression.to_owned(),
-        }),
+        Compression::Gzip => {
+            decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu { compression })
+        }
         Compression::Auto => {
             if is_gzip(&buf) {
                 decode_gzip(&buf[..]).or_else(|error| {
