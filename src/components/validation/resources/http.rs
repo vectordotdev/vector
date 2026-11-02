@@ -13,10 +13,10 @@ use axum::{
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
 };
-use bytes::{BufMut as _, BytesMut};
+use bytes::{BufMut as _, Bytes, BytesMut};
 use http::{Method, Uri};
-use http_body_util::{BodyExt as _, Collected};
-use hyper::Client;
+use http_body_util::{BodyExt as _, Collected, Full};
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use tokio::{
     net::TcpListener,
     select,
@@ -253,7 +253,7 @@ fn spawn_input_http_client(
         started.mark_as_done();
         info!("HTTP client external input resource started.");
 
-        let client = Client::builder().build_http::<hyper::Body>();
+        let client = Client::builder(TokioExecutor::new()).build_http::<Full<Bytes>>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
         let headers = config.headers.unwrap_or_default();
@@ -297,7 +297,7 @@ fn spawn_input_http_client(
             }
 
             let request = request_builder
-                .body(buffer.freeze().into())
+                .body(Full::new(buffer.freeze()))
                 .expect("should not fail to build request");
 
             match client.request(request).await {
@@ -531,11 +531,8 @@ where
         // Every time a request is processed, we notify the core logic loop so it can continue
         // checking to see if it's time to fully close once all input events have been consumed and
         // the input receiver is closed.
-        let method_filter = MethodFilter::try_from(
-            axum::http::Method::from_bytes(request_method.as_str().as_bytes())
-                .expect("configured HTTP method should be a valid method token"),
-        )
-        .expect("should not fail to convert method to method filter");
+        let method_filter = MethodFilter::try_from(request_method)
+            .expect("should not fail to convert method to method filter");
         let method_router = MethodRouter::new()
             .fallback(|req: Request| async move {
                 error!(

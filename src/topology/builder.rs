@@ -1257,7 +1257,7 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,

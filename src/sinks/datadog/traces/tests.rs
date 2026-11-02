@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;

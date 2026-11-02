@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use snafu::ResultExt;
 use vector_http::empty_body;
@@ -405,7 +405,7 @@ pub(in crate::sinks) fn encode_uri(
     } else {
         format!("{path}?{query}")
     };
-    Ok(endpoint.append_path(&path_and_query)?.into_v1())
+    Ok(endpoint.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]
@@ -487,24 +487,26 @@ pub mod test_util {
         (measurement, tags, fields.to_string(), ts)
     }
 
-    fn client() -> reqwest::Client {
+    fn client() -> reqwest_13::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
 
-        reqwest::Client::builder()
+        reqwest_13::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .unwrap()
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest_13::Response {
         client()
-            .get(format!("{endpoint}/query"))
-            .query(&[("q", query)])
+            .get(
+                reqwest_13::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                    .unwrap(),
+            )
             .send()
             .await
             .unwrap()
@@ -558,7 +560,7 @@ pub mod test_util {
         body.insert("bucket", BUCKET);
         body.insert("token", TOKEN);
 
-        let client = reqwest::Client::builder()
+        let client = reqwest_13::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use http::{Uri, response::Parts};
+use http_0::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
@@ -226,8 +226,8 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
                 "{}:{}",
                 url.host().unwrap_or_default(),
                 url.port_u16().unwrap_or_else(|| match url.scheme() {
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+                    Some(scheme) if scheme == &http_0::uri::Scheme::HTTP => 80,
+                    Some(scheme) if scheme == &http_0::uri::Scheme::HTTPS => 443,
                     _ => 0,
                 })
             );
@@ -334,7 +334,7 @@ impl HttpClientContext for PrometheusScrapeContext {
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
     use crate::config::AcknowledgementsConfig;
-    use http_body::Body as _;
+    use http_body_0::Body as _;
     use hyper::{
         Body, Client, Response, Server,
         service::{make_service_fn, service_fn},
