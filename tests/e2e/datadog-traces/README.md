@@ -89,9 +89,6 @@ by the Agent. The workload stays small and deterministic because:
 - Edge cases are better as fixtures: `meta_struct`, NaN values, keys in both `meta` and
   `metrics`, invalid IDs. An app can't produce these reliably.
 
-A larger realistic app, such as [Storedog](https://github.com/DataDog/storedog), could join
-the same harness later.
-
 ## Running
 
 ```shell
