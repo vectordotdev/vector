@@ -9,14 +9,35 @@ OTLP.
 
 ## Input and destination
 
-```text
-client → frontend (Python) ─┬→ pricing (Node)
-                            └→ inventory (Go)
-            │ all three tracers
-            ▼
-     Datadog Agent 7.84.6
-       ├─ apm_dd_url ───────────→ fakeintake-agent    (input capture)
-       └─ additional_endpoints ─→ Vector ─→ fakeintake-vector  (output capture)
+```mermaid
+flowchart TB
+    app["Checkout app<br/><br/>3 services, 3 native tracers<br/>Python, Node, Go<br/>6 checkouts, ~114 spans / run<br/>errors, links, events"] --> agent["Datadog Agent<br/>7.84.6"]
+    agent -->|"apm_dd_url"| input
+    agent -->|"additional_endpoints"| vector
+    subgraph vector["Vector"]
+        source["datadog_agent source"] -->|"No transforms"| sink["datadog_traces sink"]
+    end
+    vector --> output
+    subgraph validation["Rust validation · after the run"]
+        input["fakeintake-agent<br/>input payloads"]
+        output["fakeintake-vector<br/>output payloads"]
+        coverage["Input must be rich enough<br/><br/>Every tracer, service and trace shape<br/>the test requires must appear"]
+        preservation["Every span must come out<br/>unchanged, exactly once<br/><br/>Only Agent payload, tracer payload<br/>and chunk grouping may differ"]
+    end
+    input --> coverage
+    input --> preservation
+    output --> preservation
+
+    classDef app fill:#ffdfb8,stroke:#c76b15,color:#482909
+    classDef agentNode fill:#d5eaff,stroke:#3377b5,color:#173956
+    classDef vectorNode fill:#e9dcff,stroke:#8050c2,color:#402466
+    classDef capture fill:#d6f3f2,stroke:#248c91,color:#164e52
+    classDef check fill:#dff2db,stroke:#4d9251,color:#234b27
+    class app app
+    class agent agentNode
+    class source,sink vectorNode
+    class input,output capture
+    class coverage,preservation check
 ```
 
 - [Workload](workload): three small services instrumented with pinned native tracers
