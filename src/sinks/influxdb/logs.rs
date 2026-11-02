@@ -1,21 +1,33 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt, io, mem,
+    time::Duration,
+};
 
 use bytes::{Bytes, BytesMut};
-use futures::SinkExt;
-use http::{Request, Uri};
+use futures::{StreamExt, future, stream::BoxStream};
+use http_1::Uri;
 use indoc::indoc;
+use tower::{Service, ServiceBuilder};
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::log_schema,
     configurable::configurable_component,
+    finalization::{EventFinalizers, EventStatus},
+    internal_event::CountByteSize,
+    json_size::JsonSize,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
+    request_metadata::{GroupedCountByteSize, RequestMetadata},
     schema,
     sensitive_string::SensitiveString,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse, batcher::BatchConfig as StreamBatchConfig},
 };
 use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol,
-    influxdb_settings,
+    Field, InfluxDbSettings, InfluxDbWriteRequest, ProtocolVersion, encode_timestamp, healthcheck,
+    influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -23,14 +35,20 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
-    http::HttpClient,
-    internal_events::InfluxdbEncodingError,
+    http::client_v1::HttpClient,
+    internal_events::{InfluxdbEncodingError, LargeEventDroppedError, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings,
+            BatchConfig, Compression, HttpEndpoint, RequestBuilder, SinkBatchSettings,
             TowerRequestConfig,
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            builder::SinkBuilderExt,
+            encoding::{Encoder as SinkEncoder, write_all},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            metadata::RequestMetadataBuilder,
+            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
+            service::ServiceBuilderExt,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -113,19 +131,6 @@ pub struct InfluxDbLogsConfig {
     pub source_type_key: Option<OptionalValuePath>,
 }
 
-#[derive(Debug)]
-struct InfluxDbLogsSink {
-    uri: Uri,
-    token: String,
-    protocol_version: ProtocolVersion,
-    measurement: String,
-    tags: HashSet<KeyString>,
-    transformer: Transformer,
-    host_key: OwnedValuePath,
-    message_key: OwnedValuePath,
-    source_type_key: OwnedValuePath,
-}
-
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc! {r#"
@@ -162,7 +167,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 pub struct ValidatedInfluxDbLogs {
     measurement: String,
     tags: HashSet<KeyString>,
-    batch: BatchSettings<Buffer>,
+    batch: BatcherSettings,
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
     #[debug(skip)]
     uri: Uri,
@@ -181,7 +186,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
         let measurement = self.get_measurement()?;
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
-        let batch = self.batch.into_batch_settings()?;
+        let batch = self.batch.into_batcher_settings()?;
 
         let settings = influxdb_settings(self.settings.clone());
 
@@ -229,7 +234,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let request = self.request.into_settings();
@@ -249,9 +254,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
             .or_else(|| log_schema().source_type_key().cloned())
             .expect("global log_schema.source_type_key to be valid path");
 
-        let sink = InfluxDbLogsSink {
-            uri: uri.clone(),
-            token: token.inner().to_owned(),
+        let encoder = InfluxDbLogsEncoder {
             protocol_version: *protocol_version,
             measurement: measurement.clone(),
             tags: tags.clone(),
@@ -261,17 +264,19 @@ impl ValidatedSink for InfluxDbLogsConfig {
             source_type_key,
         };
 
-        let sink = BatchedHttpSink::new(
-            sink,
-            Buffer::new(batch.size, Compression::None),
-            &request,
-            batch.timeout,
-            client,
-        )
-        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error, internal_log_rate_limit = false));
+        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token))
+            .with_response_decompression();
+        let service = ServiceBuilder::new()
+            .settings(request, http_response_retry_logic(RetryStrategy::Default))
+            .service(service);
 
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(sink), healthcheck))
+        let sink = InfluxDbLogsSink {
+            service,
+            batch_settings: *batch,
+            encoder,
+        };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -285,7 +290,7 @@ struct InfluxDbLogsEncoder {
     source_type_key: OwnedValuePath,
 }
 
-impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
+impl InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
         let mut log = event.into_log();
         // If the event isn't an object (`. = "foo"`), inserting or renaming will result in losing
@@ -353,29 +358,250 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     }
 }
 
-impl HttpSink for InfluxDbLogsSink {
-    type Input = BytesMut;
-    type Output = BytesMut;
-    type Encoder = InfluxDbLogsEncoder;
+impl HttpServiceRequestBuilder<()> for InfluxDbWriteRequest {
+    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http_1::Request<Bytes>> {
+        self.request(request.take_payload())
+    }
+}
 
-    fn build_encoder(&self) -> Self::Encoder {
-        InfluxDbLogsEncoder {
-            protocol_version: self.protocol_version,
-            measurement: self.measurement.clone(),
-            tags: self.tags.clone(),
-            transformer: self.transformer.clone(),
-            host_key: self.host_key.clone(),
-            message_key: self.message_key.clone(),
-            source_type_key: self.source_type_key.clone(),
+/// An event encoded as one line of the line protocol, with the accounting of the original event.
+struct EncodedLine {
+    line: BytesMut,
+    finalizers: EventFinalizers,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+/// The lines of one write request.
+///
+/// The finalizers and the event accounting also cover events dropped for exceeding `max_bytes`.
+/// They are completed and reported with the request of the batch they were dropped from, even if
+/// that request has no lines.
+#[derive(Default)]
+struct LogBatch {
+    lines: Vec<BytesMut>,
+    finalizers: EventFinalizers,
+    count: usize,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+/// Batches lines by their encoded size.
+///
+/// A line longer than `max_bytes` is dropped if it would start a batch, and does not count towards
+/// `max_events`.
+struct LogBatchConfig {
+    batch: LogBatch,
+    batch_bytes: usize,
+    is_full: bool,
+    settings: BatcherSettings,
+}
+
+impl LogBatchConfig {
+    fn new(settings: BatcherSettings) -> Self {
+        Self {
+            batch: LogBatch::default(),
+            batch_bytes: 0,
+            is_full: false,
+            settings,
+        }
+    }
+}
+
+impl StreamBatchConfig<EncodedLine> for LogBatchConfig {
+    type ItemMetadata = ();
+    type Batch = LogBatch;
+
+    fn len(&self) -> usize {
+        self.batch.count
+    }
+
+    fn take_batch(&mut self) -> LogBatch {
+        self.batch_bytes = 0;
+        self.is_full = false;
+        mem::take(&mut self.batch)
+    }
+
+    fn push(&mut self, item: EncodedLine, (): ()) {
+        let EncodedLine {
+            line,
+            finalizers,
+            byte_size,
+            json_size,
+        } = item;
+        self.batch.finalizers.merge(finalizers);
+        self.batch.count += 1;
+        self.batch.byte_size += byte_size;
+        self.batch.json_size += json_size;
+
+        let max_bytes = self.settings.size_limit;
+        if self.batch.lines.is_empty() && line.len() > max_bytes {
+            emit!(LargeEventDroppedError {
+                length: line.len(),
+                max_length: max_bytes,
+            });
+        } else {
+            self.batch_bytes += line.len();
+            self.batch.lines.push(line);
+            self.is_full =
+                self.batch.lines.len() >= self.settings.item_limit || self.batch_bytes >= max_bytes;
         }
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
-        Request::post(&self.uri)
-            .header("Content-Type", "text/plain")
-            .header("Authorization", format!("Token {}", &self.token))
-            .body(events.freeze())
-            .map_err(Into::into)
+    fn is_batch_full(&self) -> bool {
+        self.is_full
+    }
+
+    fn item_fits_in_batch(&self, item: &EncodedLine) -> (bool, ()) {
+        let fits = self.batch.lines.is_empty()
+            || (self.batch.lines.len() < self.settings.item_limit
+                && self.batch_bytes + item.line.len() <= self.settings.size_limit);
+        (fits, ())
+    }
+
+    fn timeout(&self) -> Duration {
+        self.settings.timeout
+    }
+}
+
+/// The lines of a batch and the accounting of their original events.
+struct LogLines {
+    lines: Vec<BytesMut>,
+    json_size: GroupedCountByteSize,
+}
+
+struct LogLinesEncoder;
+
+impl SinkEncoder<LogLines> for LogLinesEncoder {
+    fn encode_input(
+        &self,
+        input: LogLines,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        let LogLines { lines, json_size } = input;
+        let mut written = 0;
+        for line in &lines {
+            write_all(writer, lines.len(), line)?;
+            written += line.len();
+        }
+        Ok((written, json_size))
+    }
+}
+
+struct InfluxDbLogsRequestBuilder {
+    encoder: LogLinesEncoder,
+}
+
+impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
+    type Metadata = EventFinalizers;
+    type Events = LogLines;
+    type Encoder = LogLinesEncoder;
+    type Payload = Bytes;
+    type Request = HttpRequest<()>;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        batch: LogBatch,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let LogBatch {
+            lines,
+            finalizers,
+            count,
+            byte_size,
+            json_size,
+        } = batch;
+        // Events are reported untagged, with the estimated JSON size of the original events.
+        let json_size = GroupedCountByteSize::from(CountByteSize(count, json_size));
+        let builder = RequestMetadataBuilder::new(count, byte_size, json_size.clone());
+        (finalizers, builder, LogLines { lines, json_size })
+    }
+
+    fn build_request(
+        &self,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        HttpRequest::new(payload.into_payload(), finalizers, metadata, ())
+    }
+}
+
+struct InfluxDbLogsSink<S> {
+    service: S,
+    batch_settings: BatcherSettings,
+    encoder: InfluxDbLogsEncoder,
+}
+
+impl<S> InfluxDbLogsSink<S>
+where
+    S: Service<HttpRequest<()>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let Self {
+            service,
+            batch_settings,
+            mut encoder,
+        } = *self;
+
+        input
+            .filter_map(move |mut event| {
+                let byte_size = event.size_of();
+                let json_size = event.estimated_json_encoded_size_of();
+                let finalizers = event.metadata_mut().take_finalizers();
+                // Events that fail to encode are dropped along with their finalizers.
+                future::ready(encoder.encode_event(event).map(|line| EncodedLine {
+                    line,
+                    finalizers,
+                    byte_size,
+                    json_size,
+                }))
+            })
+            .batched(LogBatchConfig::new(batch_settings))
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                InfluxDbLogsRequestBuilder {
+                    encoder: LogLinesEncoder,
+                },
+            )
+            .filter_map(|request| async move {
+                match request {
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                    Ok(request) => Some(request),
+                }
+            })
+            .into_driver(service)
+            // Requests that still fail after retries leave their events errored, as before.
+            .with_request_error_status(EventStatus::Errored)
+            .run()
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl<S> StreamSink<Event> for InfluxDbLogsSink<S>
+where
+    S: Service<HttpRequest<()>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
@@ -406,12 +632,15 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use chrono::{Utc, offset::TimeZone};
     use futures::{StreamExt, channel::mpsc, stream};
     use http::{StatusCode, request::Parts};
     use indoc::indoc;
     use vector_lib::{
         event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        finalization::{BatchStatusReceiver, EventFinalizer, EventStatus},
         lookup::owned_value_path,
     };
 
@@ -711,17 +940,15 @@ mod tests {
             .insert(event_path!("host"), "aws.cloud.eur");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let mut sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V1,
             "vector",
             ["metric_type", "host"].to_vec(),
         );
-        sink.transformer
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["host".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -732,10 +959,15 @@ mod tests {
         assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
-        sink.transformer
+        let mut encoder = create_encoder(
+            ProtocolVersion::V1,
+            "vector",
+            ["metric_type", "host"].to_vec(),
+        );
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["metric_type".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
         let line_protocol = split_line_protocol(string);
@@ -764,14 +996,11 @@ mod tests {
             .insert(event_path!("string"), "thisisastring");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V1,
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -815,14 +1044,11 @@ mod tests {
             .insert(event_path!("string"), "thisisastring");
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V2,
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -855,18 +1081,12 @@ mod tests {
         event.as_mut_log().insert(event_path!("value"), 100);
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let mut sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
-            ProtocolVersion::V2,
-            "vector",
-            [].to_vec(),
-        );
+        let mut encoder = create_encoder(ProtocolVersion::V2, "vector", [].to_vec());
         // exclude default metric_type tag so to emit empty tags
-        sink.transformer
+        encoder
+            .transformer
             .set_except_fields(Some(vec!["metric_type".into()]))
             .unwrap();
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let line = std::str::from_utf8(&bytes).unwrap();
@@ -897,14 +1117,7 @@ mod tests {
         event.insert(event_path!("nested", "array", 2isize), "another-value");
         event.insert(event_path!("nested", "array", 3isize), 15);
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
-            ProtocolVersion::V2,
-            "vector",
-            ["metric_type"].to_vec(),
-        );
-        let mut encoder = sink.build_encoder();
+        let mut encoder = create_encoder(ProtocolVersion::V2, "vector", ["metric_type"].to_vec());
 
         let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -937,14 +1150,11 @@ mod tests {
         event.as_mut_log().insert(event_path!("as_a_tag"), 10);
         event.as_mut_log().insert(event_path!("timestamp"), ts());
 
-        let sink = create_sink(
-            "http://localhost:9999",
-            "my-token",
+        let mut encoder = create_encoder(
             ProtocolVersion::V2,
             "vector",
             ["as_a_tag", "not_exists_field", "source_type", "metric_type"].to_vec(),
         );
-        let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -1128,28 +1338,127 @@ mod tests {
         assert_eq!(((i + 1) * 1_000_000_000).to_string(), line_protocol.3);
     }
 
-    fn create_sink(
-        uri: &str,
-        token: &str,
+    fn create_encoder(
         protocol_version: ProtocolVersion,
         measurement: &str,
         tags: Vec<&str>,
-    ) -> InfluxDbLogsSink {
-        let uri = uri.parse::<Uri>().unwrap();
-        let token = token.to_string();
-        let measurement = measurement.to_string();
-        let tags: HashSet<_> = tags.into_iter().map(Into::into).collect();
-        InfluxDbLogsSink {
-            uri,
-            token,
+    ) -> InfluxDbLogsEncoder {
+        InfluxDbLogsEncoder {
             protocol_version,
-            measurement,
-            tags,
+            measurement: measurement.to_string(),
+            tags: tags.into_iter().map(Into::into).collect(),
             transformer: Transformer::default(),
             host_key: owned_value_path!("host"),
             message_key: owned_value_path!("message"),
             source_type_key: owned_value_path!("source_type"),
         }
+    }
+
+    fn encoded_line(line: &str) -> (EncodedLine, BatchStatusReceiver) {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let item = EncodedLine {
+            line: BytesMut::from(line),
+            finalizers: EventFinalizers::new(EventFinalizer::new(batch)),
+            byte_size: 1,
+            json_size: JsonSize::new(10),
+        };
+        (item, receiver)
+    }
+
+    async fn batch_lines(
+        lines: &[&str],
+        max_bytes: usize,
+        max_events: usize,
+    ) -> (Vec<LogBatch>, Vec<BatchStatusReceiver>) {
+        let (items, receivers): (Vec<_>, Vec<_>) =
+            lines.iter().map(|line| encoded_line(line)).unzip();
+        let settings = BatcherSettings::new(
+            Duration::from_secs(1),
+            NonZeroUsize::new(max_bytes).unwrap(),
+            NonZeroUsize::new(max_events).unwrap(),
+        );
+        let batches = stream::iter(items)
+            .batched(LogBatchConfig::new(settings))
+            .collect()
+            .await;
+        (batches, receivers)
+    }
+
+    fn lines_of(batches: &[LogBatch]) -> Vec<Vec<String>> {
+        batches
+            .iter()
+            .map(|batch| {
+                batch
+                    .lines
+                    .iter()
+                    .map(|line| String::from_utf8_lossy(line).into_owned())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn batches_lines_by_encoded_bytes() {
+        let (batches, _) = batch_lines(
+            &["aaaa\n", "bbbbbb\n", "cc\n", "dd\n", "eeeeee\n", "f\n"],
+            10,
+            100,
+        )
+        .await;
+
+        assert_eq!(
+            lines_of(&batches),
+            vec![
+                vec!["aaaa\n"],
+                vec!["bbbbbb\n", "cc\n"],
+                vec!["dd\n", "eeeeee\n"],
+                vec!["f\n"],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_line_is_finalized_and_counted_with_its_batch() {
+        let (batches, receivers) =
+            batch_lines(&["this line is too long\n", "a\n", "b\n", "c\n"], 10, 2).await;
+
+        assert_eq!(lines_of(&batches), vec![vec!["a\n", "b\n"], vec!["c\n"]]);
+        assert_eq!(
+            batches.iter().map(|batch| batch.count).collect::<Vec<_>>(),
+            [3, 1]
+        );
+        assert_eq!(batches[0].json_size, JsonSize::new(30));
+
+        batches[0].finalizers.update_status(EventStatus::Rejected);
+        batches[1].finalizers.update_status(EventStatus::Delivered);
+        drop(batches);
+
+        let statuses = receivers
+            .into_iter()
+            .map(|mut receiver| receiver.try_recv().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statuses,
+            [
+                BatchStatus::Rejected,
+                BatchStatus::Rejected,
+                BatchStatus::Rejected,
+                BatchStatus::Delivered,
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_line_alone_yields_a_batch_without_lines() {
+        let (batches, mut receivers) =
+            batch_lines(&["a\n", "this line is too long\n"], 10, 100).await;
+
+        assert_eq!(lines_of(&batches), vec![vec!["a\n"], vec![]]);
+        assert_eq!(batches[1].count, 1);
+
+        batches[1].finalizers.update_status(EventStatus::Rejected);
+        drop(batches);
+        assert_eq!(receivers[1].try_recv(), Ok(BatchStatus::Rejected));
     }
 }
 

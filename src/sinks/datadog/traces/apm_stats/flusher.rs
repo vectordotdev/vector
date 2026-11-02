@@ -6,6 +6,7 @@ use std::{
 use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
+use vector_http::full_body;
 use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
@@ -14,7 +15,7 @@ use super::{
     build_request,
 };
 use crate::{
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
     sinks::{
         HTTPV1RequestBuilderSnafu,

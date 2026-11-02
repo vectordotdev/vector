@@ -91,6 +91,10 @@
 .prose code {
   color: var(--color-primary-dark);
 }
+.prose pre code,
+.dark .prose pre code {
+  color: var(--color-white);
+}
 .prose code:not([class^="language-"]) {
   color: var(--color-dark);
   background-color: var(--color-gray-100);
@@ -155,24 +159,12 @@
   margin: 0;
 }
 
-/* VRL release entries end with a paragraph linking both the author and PR. */
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
+/* The opening Markdown bullet is the card body, not an extra visible list. */
+.vrl-changelog-entry > .prose > ul:first-child {
+  @apply m-0 list-none p-0;
 }
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])) > li,
-.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) > li {
-  @apply m-0;
-}
-.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
-}
-.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.dark .vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]),
-.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.dark .vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply border-gray-700 bg-gray-800/40;
+.vrl-changelog-entry > .prose > ul:first-child > li {
+  @apply m-0 p-0;
 }
 
 /* Dark mode prose overrides */
@@ -249,37 +241,91 @@
   --aa-input-border-color-alpha: 0.25;
 }
 
+/* Neutral surfaces make long release notes easier to scan in dark mode.
+   Keep this palette local to release pages, including their navigation. */
+.dark .release-page {
+  --color-dark: var(--color-neutral-900);
+  --color-gray-100: var(--color-neutral-100);
+  --color-gray-200: var(--color-neutral-200);
+  --color-gray-300: var(--color-neutral-300);
+  --color-gray-400: var(--color-neutral-400);
+  --color-gray-500: var(--color-neutral-500);
+  --color-gray-600: var(--color-neutral-600);
+  --color-gray-700: var(--color-neutral-700);
+  --color-gray-800: var(--color-neutral-800);
+  --color-gray-900: var(--color-neutral-900);
+}
+
+.dark .release-page .changelog-card {
+  background-color: var(--color-neutral-800);
+}
+
+.dark .release-page .prose code:not([class^="language-"]) {
+  background-color: color-mix(in oklab, var(--color-neutral-700) 50%, var(--color-neutral-800));
+}
+
+.dark .release-page .prose pre,
+.dark .release-page .prose .chroma,
+.dark .release-page .has-copy-button {
+  background-color: var(--color-neutral-900);
+}
+
+.dark .release-page #toc {
+  border-color: var(--color-neutral-700);
+}
+
 @layer components {
   .code-sample-filename {
     @apply font-semibold font-mono tracking-wide text-gray-200 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm;
   }
 }
 
-/* Copy buttons added by below.js: code on the left, button in its own column on the right.
-   In the prose layer so these override Tailwind Typography's pre margins while the
-   .no-prose spacing rules above still apply. */
+/* Code controls added by below.js. Long snippets get a header, while short
+   snippets keep the copy button alongside the code. */
 @layer prose {
 
-.has-copy-button {
+.has-code-controls {
   @apply flex items-start rounded-md bg-black;
 }
 
 /* Move Tailwind Typography's pre margin to the container (:where keeps .no-prose rules winning) */
-.prose .has-copy-button:where(:has(> pre)) {
+.prose .has-code-controls:where(:has(> pre)) {
   margin-top: 1.5em;
   margin-bottom: 1.5em;
 }
 
-/* The code: a pre, or a div.chroma wrapping a table when line numbers are in a table */
-.has-copy-button > :first-child {
+/* A pre, or a div.chroma wrapping a table when line numbers are in a table. */
+.code-block-content {
   @apply m-0 min-w-0 flex-1 overflow-x-auto;
 }
 
-.code-copy-button {
-  @apply mt-2.5 mr-2.5 flex-none rounded p-1.5 font-sans text-xs font-medium text-gray-400 cursor-pointer;
+.code-block-controls {
+  @apply m-2.5 flex flex-none items-center gap-2;
 }
 
-.code-copy-button:hover {
+.has-code-controls.is-collapsible {
+  @apply flex-col items-stretch;
+}
+
+.is-collapsible .code-block-controls {
+  @apply m-0 border-b border-gray-800 px-3 py-2;
+}
+
+.is-collapsible:has([aria-expanded="false"]) .code-block-controls {
+  @apply border-b-0;
+}
+
+.code-line-count {
+  @apply mr-auto font-sans text-xs text-gray-400;
+}
+
+.code-copy-button,
+.code-toggle-button {
+  @apply flex-none rounded p-1.5 font-sans text-xs font-medium text-gray-200 cursor-pointer;
+}
+
+.code-copy-button:hover,
+.code-toggle-button:hover {
   @apply bg-gray-800 text-white;
 }
 
@@ -289,13 +335,13 @@
 
 }
 
-/* Focus outlines for copy buttons and code blocks (Hugo makes each pre focusable for keyboard
-   scrolling). Unlayered and more specific than toc.sass's `.prose *:focus { outline: none }`. */
-.prose .code-copy-button:focus-visible {
+/* Unlayered so these override toc.sass's `.prose *:focus { outline: none }`. */
+.prose .code-copy-button:focus-visible,
+.prose .code-toggle-button:focus-visible {
   @apply outline-2 outline-offset-2 outline-secondary text-white;
 }
 
-.prose .has-copy-button pre:focus-visible {
+.prose .has-code-controls pre:focus-visible {
   @apply outline-2 -outline-offset-2 outline-secondary;
 }
 

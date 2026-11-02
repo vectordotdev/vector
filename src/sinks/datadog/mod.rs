@@ -4,6 +4,7 @@ use futures_util::FutureExt;
 use http_1::{Request, Response, StatusCode, Uri};
 use hyper_1::body::Incoming;
 use snafu::Snafu;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
     sensitive_string::SensitiveString, tls::TlsEnableableConfig,
@@ -12,7 +13,7 @@ use vector_lib::{
 use super::Healthcheck;
 use crate::{
     common::datadog,
-    http::client_v1::{HttpClient, HttpError, empty_body},
+    http::client_v1::HttpClient,
     sinks::{HealthcheckError, util::HttpEndpoint},
 };
 

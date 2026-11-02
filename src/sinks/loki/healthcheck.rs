@@ -1,12 +1,10 @@
 use http_1::{Request, StatusCode};
+use vector_http::empty_body;
 
 use super::append_loki_path;
 
 use crate::{
-    http::{
-        Auth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, client_v1::HttpClient},
     sinks::util::{HttpEndpoint, UriSerde},
 };
 

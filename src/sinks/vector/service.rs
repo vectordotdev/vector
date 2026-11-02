@@ -2,10 +2,10 @@ use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper_1::body::Incoming;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
+use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
@@ -15,7 +15,6 @@ use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::{Http2Client, HttpError},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
@@ -23,7 +22,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport>,
+    pub client: proto_vector::Client<GrpcTransport<BoxBody>>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -146,25 +145,5 @@ impl Service<VectorRequest> for VectorService {
         };
 
         Box::pin(future)
-    }
-}
-
-/// Sends tonic's gRPC requests over the native HTTP/2 client.
-#[derive(Clone, Debug)]
-pub struct GrpcTransport(Http2Client<BoxBody>);
-
-impl Service<http_1::Request<BoxBody>> for GrpcTransport {
-    type Response = http_1::Response<Incoming>;
-    type Error = HttpError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: http_1::Request<BoxBody>) -> Self::Future {
-        Box::pin(self.0.request(request))
     }
 }

@@ -69,6 +69,14 @@ pub struct DatadogTracesConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// Do not compute APM stats from the received traces.
+    ///
+    /// Enable this when APM stats are forwarded separately, for example stats computed by the
+    /// Datadog Agent, to avoid counting them twice.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub disable_apm_stats: bool,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -158,6 +166,7 @@ impl DatadogTracesConfig {
             compression,
             PAYLOAD_LIMIT,
             Arc::clone(&apm_stats_aggregator),
+            self.disable_apm_stats,
         );
 
         // shutdown= Sender that the sink signals when input stream is exhausted.
