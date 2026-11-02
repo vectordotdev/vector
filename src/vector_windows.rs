@@ -273,7 +273,9 @@ pub mod service_control {
 
         let service_status = service.query_status().context(ServiceSnafu)?;
         if service_status.current_state != ServiceState::Stopped {
-            service.stop().context(ServiceSnafu)?;
+            if service_status.current_state != ServiceState::StopPending {
+                service.stop().context(ServiceSnafu)?;
+            }
             emit(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
