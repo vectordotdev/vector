@@ -101,9 +101,11 @@ pub(crate) const RESERVED_ANCHORS: &[&str] = &[
 
 /// Slug rule shared by the CI checker and the release generator: lowercase ASCII alnum
 /// with `-` separators, non-empty, no leading/trailing hyphen, not a reserved name.
+/// The renderer owns `upgrade-guide-*` for migration subheadings.
 pub(crate) fn is_valid_anchor(anchor: &str) -> bool {
     !anchor.is_empty()
         && !RESERVED_ANCHORS.contains(&anchor)
+        && !anchor.starts_with("upgrade-guide-")
         && !anchor.starts_with('-')
         && !anchor.ends_with('-')
         && anchor

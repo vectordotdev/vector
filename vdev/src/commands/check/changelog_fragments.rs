@@ -419,6 +419,7 @@ mod tests {
             "vrl-changelog",
             "vector-changelog",
             "bug-fixes",
+            "upgrade-guide-bug-fixes",
         ] {
             let raw = wrap(&format!("# x {{#{anchor}}}"), "y", "N/A");
             let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
