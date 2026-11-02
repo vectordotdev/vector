@@ -227,7 +227,10 @@ impl HttpClient {
     ) -> Result<PooledClient, BoxError> {
         let connector = HttpProxyConnector::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?
             .with_options(options);
-        Ok(Client::builder(TokioExecutor::new()).build(connector))
+        // The pool timer closes idle connections in the background, as the Hyper 0.14 client did.
+        Ok(Client::builder(TokioExecutor::new())
+            .pool_timer(TokioTimer::new())
+            .build(connector))
     }
 
     /// Inserts the forward proxy credentials that the route of `request` needs, unless it

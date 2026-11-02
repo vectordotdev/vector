@@ -686,13 +686,17 @@ mod tests {
     };
 
     use http::Request;
+    use http_body_util::BodyExt as _;
     use hyper_util::rt::TokioIo;
     use tokio::{
         io::{AsyncReadExt as _, AsyncWriteExt as _, duplex},
         net::TcpListener,
         time::Instant,
     };
-    use vector_core::{config::proxy::ProxyConfig, tls::MaybeTlsSettings};
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        tls::{MaybeTls, MaybeTlsSettings},
+    };
 
     use super::{MaxAgeIo, connect_authority, tls_host};
     use crate::{ConnectionOptions, HttpClient, empty_body};
@@ -779,5 +783,53 @@ mod tests {
 
         // The TCP connection was established, so the timeout hit during the TLS handshake.
         let _stream = accepted.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn idle_pooled_connections_are_closed_in_the_background() {
+        // Answer one keep-alive request, then report what the next read of the idle connection
+        // returns: `0` once the client closes it.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buffer = [0u8; 4096];
+            let mut request = Vec::new();
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = stream.read(&mut buffer).await.unwrap();
+                assert_ne!(
+                    read, 0,
+                    "the client closed the connection before the request"
+                );
+                request.extend_from_slice(&buffer[..read]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+                .await
+                .unwrap();
+            stream.read(&mut buffer).await.unwrap()
+        });
+
+        let client = HttpClient::new(MaybeTls::Raw(()), &ProxyConfig::default()).unwrap();
+        let request = Request::get(format!("http://127.0.0.1:{port}/"))
+            .body(empty_body())
+            .unwrap();
+        let response = client.send(request).await.unwrap();
+        response.into_body().collect().await.unwrap();
+        // Let the connection return to the pool before the clock is paused.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // The pool's default idle timeout is 90 seconds. The background check runs once per
+        // timeout, and evicts connections idle for longer than it, so the second check does.
+        tokio::time::pause();
+        tokio::time::advance(Duration::from_secs(181)).await;
+        tokio::time::resume();
+
+        let read = tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("the idle connection should be closed without another request")
+            .unwrap();
+        assert_eq!(read, 0);
+        drop(client);
     }
 }
