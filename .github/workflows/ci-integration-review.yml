@@ -297,6 +297,8 @@ jobs:
           commit_sha: ${{ github.event.review.commit_id }}
 
       - name: Multiservice OpenTelemetry trace validation
+        # Shorter than the job timeout so the evidence and report steps still run.
+        timeout-minutes: 50
         run: |
           mkdir -p target/otel-traces-multiservice-evidence
           set -o pipefail

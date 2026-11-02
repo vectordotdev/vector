@@ -87,6 +87,34 @@ async function hideOlderReports({ github, owner, repo, issueNumber, marker, curr
   }
 }
 
+// Edits the comment from the start step, or posts a new one if there is none or it was deleted.
+async function publishComment({ github, core, owner, repo, issueNumber, marker, body, testName }) {
+  const commentId = parseInt(process.env.COMMENT_ID, 10);
+  if (!Number.isNaN(commentId)) {
+    try {
+      await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+      return commentId;
+    } catch (error) {
+      if (error.status !== 404) {
+        throw error;
+      }
+      core.info(`Comment ${commentId} no longer exists, posting a new one`);
+    }
+  }
+  const { data: comment } = await github.rest.issues.createComment({
+    owner,
+    repo,
+    issue_number: issueNumber,
+    body
+  });
+  try {
+    await hideOlderReports({ github, owner, repo, issueNumber, marker, current: comment });
+  } catch (error) {
+    core.warning(`Could not hide older ${testName} reports: ${error.message}`);
+  }
+  return comment.id;
+}
+
 module.exports = async ({ github, context, core }) => {
   if (context.eventName !== "pull_request_review") {
     core.info(`Skipping PR report for ${context.eventName} event`);
@@ -121,32 +149,28 @@ module.exports = async ({ github, context, core }) => {
   }
   const body = lines.join("\n");
 
-  let commentId = parseInt(env.COMMENT_ID, 10);
-  if (Number.isNaN(commentId)) {
-    const { data: comment } = await github.rest.issues.createComment({
+  // The comment and the status are independent so one failing doesn't block the other.
+  const errors = [];
+  try {
+    const commentId = await publishComment({ github, core, owner, repo, issueNumber, marker, body, testName });
+    core.setOutput("comment-id", String(commentId));
+  } catch (error) {
+    errors.push(`comment: ${error.message}`);
+  }
+  try {
+    await github.rest.repos.createCommitStatus({
       owner,
       repo,
-      issue_number: issueNumber,
-      body
+      sha,
+      state: statusState,
+      context: `e2e/${testName}`,
+      description: statusDescription,
+      target_url: runUrl
     });
-    commentId = comment.id;
-    try {
-      await hideOlderReports({ github, owner, repo, issueNumber, marker, current: comment });
-    } catch (error) {
-      core.warning(`Could not hide older ${testName} reports: ${error.message}`);
-    }
-  } else {
-    await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+  } catch (error) {
+    errors.push(`status: ${error.message}`);
   }
-  core.setOutput("comment-id", String(commentId));
-
-  await github.rest.repos.createCommitStatus({
-    owner,
-    repo,
-    sha,
-    state: statusState,
-    context: `e2e/${testName}`,
-    description: statusDescription,
-    target_url: runUrl
-  });
+  if (errors.length > 0) {
+    core.setFailed(`Could not publish the ${testName} report (${errors.join("; ")})`);
+  }
 };
