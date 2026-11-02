@@ -13,6 +13,7 @@ use std::{
 use jsonschema::Validator;
 use serde_json::{Map, Value};
 use vector_config::{
+    component::{SinkDescription, SourceDescription, TransformDescription},
     constants::{METADATA, SERDE_ALIASES, SERDE_VARIANT_ALIASES},
     schema::generate_root_schema,
 };
@@ -44,15 +45,41 @@ static VALIDATOR: LazyLock<Option<Validator>> = LazyLock::new(|| {
 });
 
 pub(super) fn find(map: &Map<String, Value>, hint: Option<ComponentHint>) -> Vec<String> {
-    let Some(validator) = VALIDATOR.as_ref() else {
-        return Vec::new();
-    };
     let value = match hint {
         Some(ComponentHint::Test) => serde_json::json!({"tests": map.values().collect::<Vec<_>>()}),
         Some(hint) => serde_json::json!({hint.as_component_field(): map}),
         None => Value::Object(map.clone()),
     };
+    // The schema only describes registered component types, so a configuration using any other
+    // type can never match it. Checking first avoids building the validator, which is expensive.
+    if let Some(component_type) = unregistered_component_type(&value) {
+        debug!(
+            component_type,
+            "Skipped ignored-field diagnostics because the configuration uses a component type without a schema."
+        );
+        return Vec::new();
+    }
+    let Some(validator) = VALIDATOR.as_ref() else {
+        return Vec::new();
+    };
     ignored_paths(validator, &value)
+}
+
+/// Returns the first source, transform, or sink type that has no registered schema.
+pub(super) fn unregistered_component_type(value: &Value) -> Option<&str> {
+    let kinds: [(&str, fn() -> Vec<&'static str>); 3] = [
+        ("sources", SourceDescription::types),
+        ("transforms", TransformDescription::types),
+        ("sinks", SinkDescription::types),
+    ];
+    kinds.into_iter().find_map(|(field, registered_types)| {
+        let components = value.get(field)?.as_object()?;
+        let registered = registered_types();
+        components
+            .values()
+            .filter_map(|component| component.get("type")?.as_str())
+            .find(|component_type| registered.binary_search(component_type).is_err())
+    })
 }
 
 pub(super) fn warnings(paths: &[String]) -> Vec<String> {

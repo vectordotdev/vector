@@ -174,3 +174,21 @@ fn invalid_configurations_keep_their_error_without_deprecation_warnings() {
     );
     assert!(!logs.contains("DEPRECATED:"), "{logs}");
 }
+
+#[test]
+fn unregistered_component_types_skip_diagnostics() {
+    let mut value: Value = serde_yaml::from_str(CONFIG).unwrap();
+    assert_eq!(ignored_fields::unregistered_component_type(&value), None);
+
+    value["transforms"] = serde_json::json!({
+        "custom": {"type": "unregistered_transform", "inputs": ["files"], "unknown_option": 42}
+    });
+    assert_eq!(
+        ignored_fields::unregistered_component_type(&value),
+        Some("unregistered_transform")
+    );
+    assert_eq!(
+        ignored_fields::find(value.as_object().unwrap(), None),
+        Vec::<String>::new()
+    );
+}
