@@ -267,43 +267,6 @@ fn release_preparation_requires_a_guide_when_the_base_has_breaking_changes() {
 }
 
 #[test]
-fn release_preparation_requires_inline_guide_for_vrl_migrations() {
-    let (temp, base) = preparation();
-    let repo = temp.path();
-    write(
-        repo,
-        "website/cue/reference/releases/0.59.0.cue",
-        "vrl_changelog: \"See the [migration instructions](/releases/0.59.0/#vrl-pr-1).\"\n",
-    );
-    let page = "website/content/en/releases/0.59.0.md";
-    write(
-        repo,
-        page,
-        "---\ninline_upgrade_guide: true\n---\n## VRL migration {#vrl-pr-1}\n\nUse the replacement.\n",
-    );
-    commit(repo);
-    check(repo, &base, true);
-
-    // A standalone guide cannot satisfy links targeting the release page itself.
-    write(
-        repo,
-        "website/content/en/highlights/2026-09-16-0-59-0-upgrade-guide.md",
-        "Migration instructions\n",
-    );
-    for contents in [
-        "---\ninline_upgrade_guide: true\n---\n",
-        "---\n---\n## VRL migration {#vrl-pr-1}\n\nUse the replacement.\n",
-    ] {
-        write(repo, page, contents);
-        commit(repo);
-        assert!(
-            check(repo, &base, false)
-                .contains("breaking releases require a generated upgrade guide")
-        );
-    }
-}
-
-#[test]
 fn release_preparation_rejects_unrelated_kubectl_changes() {
     let (temp, base) = preparation();
     let repo = temp.path();
@@ -641,7 +604,7 @@ mod prepare {
             repo,
             "gh",
             r#"printf '%s\n' "$@" >> .git/gh-calls
-printf '## [0.28.0 (2026-10-30)](https://github.com/vectordotdev/vrl/releases/tag/v0.28.0)\n### Fixes\n- Release fixture\n'"#,
+printf '## 0.28.0\n- Release fixture\n'"#,
         );
         stub(repo, "cue", "exit 0");
     }

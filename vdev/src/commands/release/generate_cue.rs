@@ -11,7 +11,6 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
-use super::vrl_changelog;
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
@@ -37,23 +36,11 @@ pub struct Cli {
     /// The version being released (e.g. `0.58.0`).
     #[arg(long)]
     version: Version,
-    /// Include this VRL release's changelog and migration instructions.
-    #[arg(long)]
-    vrl_version: Option<Version>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let vrl_notes = self
-            .vrl_version
-            .as_ref()
-            .map(vrl_changelog::fetch)
-            .transpose()?;
-        run(
-            &self.version,
-            PullRequestMetadata::Optional,
-            vrl_notes.as_deref(),
-        )?;
+        run(&self.version, PullRequestMetadata::Optional)?;
         Ok(())
     }
 }
@@ -65,7 +52,6 @@ impl Cli {
 pub(super) fn run(
     new_version: &Version,
     pull_request_metadata: PullRequestMetadata,
-    vrl_notes: Option<&str>,
 ) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -105,19 +91,11 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
-    let vrl = vrl_notes.map(|notes| vrl_changelog::extract(notes, &new_version));
-    let cue_text = render_release_cue(
-        &new_version,
-        &changelog_entries,
-        vrl.as_ref().map(|vrl| vrl.notes.as_str()),
-    );
-    let mut breaking: Vec<&BreakingDetails> = changelog_entries
+    let cue_text = render_release_cue(&new_version, &changelog_entries);
+    let breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
         .collect();
-    if let Some(vrl) = &vrl {
-        breaking.extend(&vrl.migrations);
-    }
     let upgrade_guide = if breaking.is_empty() {
         String::new()
     } else {
@@ -320,14 +298,14 @@ struct ChangelogEntry {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct BreakingDetails {
-    pub(super) title: String,
-    pub(super) anchor: String,
+struct BreakingDetails {
+    title: String,
+    anchor: String,
     /// Content of the fragment's `## Summary` section — reused in the guide so each
     /// breaking change stands on its own without the reader hunting for the release notes.
-    pub(super) summary: String,
+    summary: String,
     /// Content of the fragment's `## Migration` section (headers, code fences, etc.).
-    pub(super) migration: String,
+    migration: String,
 }
 
 fn read_changelog_fragments(
@@ -654,16 +632,9 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
 
 // ---------- CUE rendering ----------
 
-fn render_release_cue(
-    version: &Version,
-    changelog: &[ChangelogEntry],
-    vrl_notes: Option<&str>,
-) -> String {
+fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
-    let vrl_block = vrl_notes
-        .map(|notes| format!("\n{}\n", vrl_changelog::cue_block(notes)))
-        .unwrap_or_default();
 
     indoc::formatdoc! {"
         package metadata
@@ -674,7 +645,7 @@ fn render_release_cue(
         \tchangelog: [
         {changelog_block}
         \t]
-        {vrl_block}}}
+        }}
     "}
 }
 
@@ -1083,7 +1054,7 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries, None);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));

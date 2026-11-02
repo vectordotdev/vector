@@ -13379,7 +13379,6 @@ dependencies = [
  "owo-colors",
  "pastey",
  "proc-macro2 1.0.107",
- "pulldown-cmark",
  "quote 1.0.47",
  "regex",
  "reqwest 0.11.26",

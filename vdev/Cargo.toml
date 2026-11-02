@@ -61,7 +61,6 @@ log = "0.4.29"
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 pastey.workspace = true
-pulldown-cmark = { version = "0.13", default-features = false }
 regex.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["preserve_order"] }

@@ -119,9 +119,8 @@ Finally, a good fragment is concise and avoids implementation details.
 
 Breaking fragments (`*.breaking.md`) generate an upgrade guide below the VRL changelog.
 Use the [scaffolder](#quick-start) or follow the [example](#breaking).
-VRL migration instructions are imported automatically.
 
-Preview with `cargo vdev release generate-cue --version <vector-version> --vrl-version <vrl-version>`.
+Preview with `cargo vdev release generate-cue --version <vector-version>`.
 This keeps source fragments and refuses to overwrite release files.
 
 ## Authors

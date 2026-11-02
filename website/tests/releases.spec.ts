@@ -3,19 +3,20 @@ import { test, expect } from "./fixtures";
 for (const width of [1280, 390]) {
   test(`multiline VRL entries stay inside their cards at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/releases/0.59.0/");
+    await page.goto("/releases/0.61.0/#vrl-fixes");
     const changelog = page.locator(".vrl-changelog");
     const entry = changelog.locator(".vrl-changelog-entry").filter({
-      has: page.locator('a[href="https://github.com/vectordotdev/vrl/pull/1861"]')
+      has: page.locator('a[href="https://github.com/vectordotdev/vrl/pull/2001"]')
     });
 
-    await expect(changelog.locator(".vrl-changelog-entry")).toHaveCount(8);
-    await expect(entry).toContainText("hard compile error instead of a runtime failure");
+    await expect(changelog.locator(".vrl-changelog-entry")).toHaveCount(6);
+    await expect(entry).toContainText("they no longer compile until the error is handled");
     await expect(entry.locator("pre")).toHaveText([
-      'join!(["sources", "transforms", "sinks"], separator: ", ")',
-      'join(["sources", "transforms", "sinks"], separator: ", ")'
+      'to_unix_timestamp(ts, unit: "nanoseconds")',
+      'to_unix_timestamp!(ts, unit: "nanoseconds")',
+      'to_unix_timestamp(ts, unit: "nanoseconds") ?? 0'
     ]);
-    await expect(entry.getByRole("link", { name: "pront", exact: true })).toBeVisible();
+    await expect(entry.getByRole("link", { name: "suryakant-source", exact: true })).toBeVisible();
 
     const card = (await entry.boundingBox())!;
     expect(card.x).toBeGreaterThanOrEqual(0);
