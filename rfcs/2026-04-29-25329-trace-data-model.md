@@ -397,8 +397,8 @@ smallest-item disposition above.
 A `TraceEvent` whose `spans` vector becomes empty retains its top-level `trace_id` and
 passes through unchanged. Sinks emit the corresponding empty wire shape, fire
 finalizers on successful delivery, and report the condition. OTLP and Datadog ingress
-produce no event from an empty wire grouping because neither format supplies an ID for
-it. The internal proto and typed JSON retain the ID on empty events.
+produce no event from an empty wire grouping: OTLP and standard Datadog payloads supply
+no ID for it, and an empty indexed Datadog chunk has no span or service to partition. The internal proto and typed JSON retain the ID on empty events.
 
 #### Status, kind, and sampling priority
 
