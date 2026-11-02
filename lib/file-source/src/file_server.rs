@@ -303,7 +303,7 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(RawLineResult {
-                    raw_line: Some(line),
+                    raw_line,
                     discarded_for_size_and_truncated,
                 }) = watcher.read_line().await
                 {
@@ -314,6 +314,11 @@ where
                             buf.len(),
                         );
                     }
+
+                    // A read that reaches EOF has no line, but it can still report discarded data.
+                    let Some(line) = raw_line else {
+                        break;
+                    };
 
                     let sz = line.bytes.len();
                     trace!(
@@ -629,4 +634,161 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::File,
+        io::{Error, Write},
+        path::Path,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+
+    use bytes::BytesMut;
+    use file_source_common::FingerprintStrategy;
+    use futures::sink;
+    use tokio::sync::oneshot;
+
+    use super::*;
+
+    const WAIT_LIMIT: Duration = Duration::from_secs(10);
+
+    #[derive(Clone, Default)]
+    struct DiscardCounter(Arc<AtomicUsize>);
+
+    impl FileSourceInternalEvents for DiscardCounter {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {}
+
+        fn emit_file_checkpoint_write_error(&self, _: Error) {}
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    struct SinglePath(PathBuf);
+
+    impl PathsProvider for SinglePath {
+        type IntoIter = Vec<PathBuf>;
+
+        fn paths(&self) -> Self::IntoIter {
+            vec![self.0.clone()]
+        }
+    }
+
+    async fn wait_for(description: &str, condition: impl Fn() -> bool) {
+        let start = time::Instant::now();
+        while !condition() {
+            assert!(start.elapsed() < WAIT_LIMIT, "timed out: {description}");
+            sleep(Duration::from_millis(20)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn discarded_line_is_reported_at_eof() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        writeln!(file, "short").unwrap();
+
+        let emitter = DiscardCounter::default();
+        let discarded = Arc::clone(&emitter.0);
+        let server = FileServer {
+            paths_provider: SinglePath(path),
+            max_read_bytes: 2048,
+            ignore_checkpoints: true,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 10,
+            line_delimiter: Bytes::from("\n"),
+            data_dir: dir.path().to_path_buf(),
+            glob_minimum_cooldown: Duration::from_millis(10),
+            fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 10, false),
+            oldest_first: false,
+            remove_after: None,
+            emitter,
+            rotate_wait: Duration::from_hours(1),
+        };
+
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let chans = Box::pin(sink::unfold(
+            Arc::clone(&received),
+            |received, batch: Vec<Line>| async move {
+                received
+                    .lock()
+                    .unwrap()
+                    .extend(batch.into_iter().map(|line| line.text));
+                Ok::<_, std::io::Error>(received)
+            },
+        ));
+
+        let (stop_data, shutdown_data) = oneshot::channel::<()>();
+        let (stop_checkpointer, shutdown_checkpointer) = oneshot::channel::<()>();
+        let checkpointer = Checkpointer::new(dir.path());
+
+        let driver = async {
+            wait_for("first line", || received.lock().unwrap().len() == 1).await;
+
+            // A complete oversized line with nothing after it is reported without a later line.
+            writeln!(file, "this is too long").unwrap();
+            wait_for("complete oversized line", || {
+                discarded.load(Ordering::SeqCst) == 1
+            })
+            .await;
+
+            // An oversized line that has no delimiter yet is reported once, however often it is
+            // polled.
+            write!(file, "this one is unterminated").unwrap();
+            wait_for("unterminated oversized line", || {
+                discarded.load(Ordering::SeqCst) == 2
+            })
+            .await;
+            sleep(Duration::from_secs(1)).await;
+            writeln!(file, " until now").unwrap();
+            writeln!(file, "last short").unwrap();
+            wait_for("line after the discarded lines", || {
+                received.lock().unwrap().len() == 2
+            })
+            .await;
+            assert_eq!(discarded.load(Ordering::SeqCst), 2);
+
+            stop_data.send(()).unwrap();
+            stop_checkpointer.send(()).unwrap();
+        };
+
+        let (result, ()) = tokio::join!(
+            server.run(chans, shutdown_data, shutdown_checkpointer, checkpointer),
+            driver
+        );
+        result.unwrap();
+
+        assert_eq!(
+            *received.lock().unwrap(),
+            vec![Bytes::from("short"), Bytes::from("last short")]
+        );
+    }
 }

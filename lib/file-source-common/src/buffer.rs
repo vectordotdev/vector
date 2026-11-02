@@ -46,7 +46,9 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     max_size: usize,
 ) -> io::Result<ReadResult> {
     let mut total_read = 0;
-    let mut discarding = false;
+    // `buf` only stays over the limit when an earlier call reached EOF inside a line it already
+    // reported, so keep discarding that line rather than reporting it again.
+    let mut discarding = buf.len() > max_size;
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     let mut discarded_for_size_and_truncated = Vec::new();
@@ -447,6 +449,49 @@ mod test {
                 "Should find delimiter for line {i}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_oversized_line_spanning_eof_is_reported_once() {
+        async fn read(
+            data: &[u8],
+            position: &mut u64,
+            buffer: &mut BytesMut,
+            max_size: usize,
+        ) -> ReadResult {
+            let mut reader = BufReader::new(Cursor::new(data.to_vec()));
+            read_until_with_max_size(&mut reader, position, b"\n", buffer, max_size)
+                .await
+                .unwrap()
+        }
+
+        let max_size = 5;
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        // The first read reaches EOF inside a line that is already over the limit.
+        let result = read(b"0123456789", &mut position, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, None);
+        assert_eq!(result.discarded_for_size_and_truncated.len(), 1);
+        let buffered = buffer.len();
+
+        // Polling at EOF does not report it again.
+        let result = read(b"", &mut position, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, None);
+        assert!(result.discarded_for_size_and_truncated.is_empty());
+
+        // More of the same line is neither reported nor buffered.
+        let result = read(b"abcdef", &mut position, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, None);
+        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(buffer.len(), buffered);
+
+        // The delimiter ends the discarded line, and the next line is read normally.
+        let result = read(b"gh\nnext\n", &mut position, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, Some(8));
+        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(buffer.as_ref(), b"next");
+        assert_eq!(position, 24);
     }
 
     #[tokio::test]
