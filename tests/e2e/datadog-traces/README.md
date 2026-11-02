@@ -77,6 +77,10 @@ the same harness later.
 cargo vdev e2e run datadog-traces
 ```
 
+In CI, a Vector-team member can submit a PR review starting with
+`/ci-run-e2e-datadog-traces` to run it against the reviewed commit. Automatic PR CI does
+not run it.
+
 ## Known gaps
 
 - Span-level only: Agent envelope, tracer payload and chunk fields are not compared yet.
