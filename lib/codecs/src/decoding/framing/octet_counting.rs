@@ -49,6 +49,10 @@ pub struct OctetCountingDecoder {
     /// Whether the newline-delimited fallback is currently discarding the
     /// remainder of an oversized, non-terminated frame.
     newline_discarding: bool,
+    /// How far into the buffer the newline-delimited fallback has already
+    /// scanned for a delimiter, so partially delivered frames are not
+    /// rescanned from the start on every call.
+    newline_scan_pos: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,6 +70,7 @@ impl OctetCountingDecoder {
             other: CharacterDelimitedDecoder::new(b'\n'),
             octet_decoding: None,
             newline_discarding: false,
+            newline_scan_pos: 0,
         }
     }
 
@@ -76,6 +81,7 @@ impl OctetCountingDecoder {
             other: CharacterDelimitedDecoder::new_with_max_length(b'\n', max_length),
             octet_decoding: None,
             newline_discarding: false,
+            newline_scan_pos: 0,
         }
     }
 
@@ -262,17 +268,37 @@ impl OctetCountingDecoder {
                 }
                 None => src.advance(src.len()),
             }
-        } else if src.len() > self.other.max_length() && memchr(b'\n', src).is_none() {
-            // Over the limit and no delimiter in sight: drop what has been
-            // buffered so far and discard the rest of this frame as it
-            // arrives.
-            emit(DecoderFrameTooLongError {
-                length: src.len(),
-                max_length: self.other.max_length(),
-            });
-            src.advance(src.len());
-            self.newline_discarding = true;
-            return Ok(None);
+            self.newline_scan_pos = 0;
+        } else {
+            // The buffer may have shrunk (e.g. a final frame consumed by
+            // `decode_eof`), so clamp the scan cursor before slicing.
+            self.newline_scan_pos = self.newline_scan_pos.min(src.len());
+            if memchr(b'\n', &src[self.newline_scan_pos..]).is_some() {
+                // A complete line is available; frame it. The delimiter is
+                // rescanned once from the start of the line by the
+                // underlying decoder, which is linear in the frame length
+                // and matches the framing cost itself.
+                self.newline_scan_pos = 0;
+            } else {
+                // Still accumulating a partial line: remember how far we
+                // have scanned so the next call only scans newly arrived
+                // bytes (mirrors the `next_index` cursor of the previous
+                // `LinesCodec`-based fallback).
+                self.newline_scan_pos = src.len();
+                if src.len() > self.other.max_length() {
+                    // Over the limit and no delimiter in sight: drop what
+                    // has been buffered so far and discard the rest of this
+                    // frame as it arrives.
+                    emit(DecoderFrameTooLongError {
+                        length: src.len(),
+                        max_length: self.other.max_length(),
+                    });
+                    src.advance(src.len());
+                    self.newline_discarding = true;
+                    self.newline_scan_pos = 0;
+                }
+                return Ok(None);
+            }
         }
         self.other.decode(src)
     }
@@ -475,6 +501,47 @@ mod tests {
             Ok(Some("<57>ok".into())),
             decoder.decode(&mut buffer).map_err(|_| false)
         );
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+    }
+
+    #[test]
+    fn non_octet_decode_keeps_scan_cursor_across_partial_reads() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(1024);
+        let mut buffer = BytesMut::with_capacity(64);
+
+        // A line delivered across several reads must not be rescanned from
+        // the start on every call (mirrors the `next_index` cursor of the
+        // old `LinesCodec` fallback).
+        buffer.put(&b"<57>partial"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert_eq!(decoder.newline_scan_pos, buffer.len());
+
+        buffer.put(&b" without newline"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert_eq!(decoder.newline_scan_pos, buffer.len());
+
+        buffer.put(&b"\n"[..]);
+        let frame = decoder.decode(&mut buffer).unwrap().unwrap();
+        assert_eq!(b"<57>partial without newline"[..], frame[..]);
+        assert_eq!(decoder.newline_scan_pos, 0);
+    }
+
+    #[test]
+    fn non_octet_decode_eof_after_partial_frame() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+        let mut buffer = BytesMut::with_capacity(64);
+
+        buffer.put(&b"<57>unterminated tail"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+
+        // EOF with a partial frame: the remainder is emitted as the final
+        // frame, and further `decode_eof`/`decode` calls must not panic
+        // with a scan cursor left beyond the (now empty) buffer.
+        assert_eq!(
+            Ok(Some("<57>unterminated tail".into())),
+            decoder.decode_eof(&mut buffer).map_err(|_| false)
+        );
+        assert_eq!(Ok(None), decoder.decode_eof(&mut buffer).map_err(|_| false));
         assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
     }
 
