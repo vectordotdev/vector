@@ -46,6 +46,8 @@ pub use event_data_eq::EventDataEq;
 #[cfg(any(test, feature = "test"))]
 pub mod event_test_util;
 
+pub mod extra_context;
+
 pub mod finalization;
 pub mod finalizer;
 pub use finalizer::EmptyStream;

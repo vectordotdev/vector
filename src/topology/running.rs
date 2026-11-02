@@ -15,6 +15,7 @@ use tokio::{
 use tracing::Instrument;
 use vector_lib::{
     buffers::{BufferConfig, topology::channel::BufferSender},
+    extra_context::ExtraContext,
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
@@ -37,7 +38,6 @@ use crate::{
         enrichment_table_sinks,
     },
     event::EventArray,
-    extra_context::ExtraContext,
     internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
@@ -1598,11 +1598,10 @@ fn enrichment_table_sink_buffer(
 mod tests {
     use std::collections::HashSet;
 
-    use vector_lib::config::ComponentKey;
+    use vector_lib::{config::ComponentKey, extra_context::ExtraContext};
 
     use crate::{
         config::Config,
-        extra_context::ExtraContext,
         test_util::{
             mock::{basic_sink, basic_source, basic_transform},
             start_topology, trace_init,

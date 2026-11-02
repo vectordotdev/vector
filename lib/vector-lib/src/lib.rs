@@ -11,8 +11,8 @@ pub use vector_buffers as buffers;
 pub use vector_common::event_test_util;
 pub use vector_common::{
     Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
-    byte_size_of, byte_size_of::ByteSizeOf, conversion, counter, encode_logfmt, finalization,
-    finalizer, gauge, histogram, id, impl_event_data_eq, internal_event, json_size,
+    byte_size_of, byte_size_of::ByteSizeOf, conversion, counter, encode_logfmt, extra_context,
+    finalization, finalizer, gauge, histogram, id, impl_event_data_eq, internal_event, json_size,
     registered_event, request_metadata, sampling, sensitive_string, shutdown,
     spawn_in_current_span, stats, trigger,
 };

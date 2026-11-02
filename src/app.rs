@@ -18,6 +18,7 @@ use tokio::{
     sync::{MutexGuard, broadcast::error::RecvError},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(feature = "api")]
 use crate::api;
@@ -26,7 +27,6 @@ use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, Component, ComponentConfig, ComponentKind, Config, ConfigPath},
-    extra_context::ExtraContext,
     heartbeat,
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
