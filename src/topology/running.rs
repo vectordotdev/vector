@@ -19,6 +19,7 @@ use vector_lib::{
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
+    spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
 };
@@ -41,7 +42,6 @@ use crate::{
     internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
-    spawn_named,
     utilization::UtilizationRegistry,
 };
 
