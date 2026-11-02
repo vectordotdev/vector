@@ -77,14 +77,20 @@ fn convert_idx_chunk(
     );
     trace_event.insert(event_path!("dropped"), chunk.dropped_trace);
     trace_event.insert(event_path!("tags"), Value::from(tags));
+    let root_span_id = chunk
+        .spans
+        .iter()
+        .find(|span| span.parent_id == 0)
+        .map(|span| span.span_id);
     trace_event.insert(
         event_path!("spans"),
         chunk
             .spans
             .into_iter()
-            .enumerate()
-            .map(|(index, span)| {
-                let trace_id_high_tag = trace_id_high_tag.as_deref().filter(|_| index == 0);
+            .map(|span| {
+                let trace_id_high_tag = trace_id_high_tag
+                    .as_deref()
+                    .filter(|_| root_span_id == Some(span.span_id));
                 convert_idx_span(strings, span, trace_id_low, trace_id_high_tag).map(Value::from)
             })
             .collect::<Result<Vec<_>, _>>()?,
@@ -768,19 +774,23 @@ mod tests {
     }
 
     #[test]
-    fn trace_id_high_is_written_to_the_first_span_only() {
+    fn trace_id_high_is_written_to_the_logical_root_only() {
         let strings = Strings::new();
-        let first = base_span(&strings);
-        let second = base_span(&strings);
-        let events = convert(strings.into_payload(vec![chunk(0xab, 123, vec![first, second])]));
-        let first_meta = object(span_at(&events[0], 0).get("meta").unwrap());
-        let second_meta = object(span_at(&events[0], 1).get("meta").unwrap());
+        let mut child = base_span(&strings);
+        child.span_id = 2;
+        child.parent_id = 1;
+        let mut root = base_span(&strings);
+        root.span_id = 1;
+        root.parent_id = 0;
+        let events = convert(strings.into_payload(vec![chunk(0xab, 123, vec![child, root])]));
+        let child_meta = object(span_at(&events[0], 0).get("meta").unwrap());
+        let root_meta = object(span_at(&events[0], 1).get("meta").unwrap());
 
         assert_eq!(
-            first_meta.get("_dd.p.tid").unwrap(),
+            root_meta.get("_dd.p.tid").unwrap(),
             &Value::from("00000000000000ab")
         );
-        assert!(!second_meta.contains_key("_dd.p.tid"));
+        assert!(!child_meta.contains_key("_dd.p.tid"));
         assert_eq!(
             span_at(&events[0], 0).get("trace_id").unwrap(),
             &Value::from(123)
