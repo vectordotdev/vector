@@ -370,6 +370,14 @@ impl AcknowledgementsConfig {
     pub const DEFAULT: Self = Self { enabled: None };
 
     #[must_use]
+    pub fn merge(&self, other: &Self) -> Self {
+        let enabled = self
+            .enabled
+            .map_or(other.enabled, |enabled| Some(enabled | other.enabled()));
+        Self { enabled }
+    }
+
+    #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);
         Self { enabled }
@@ -575,6 +583,36 @@ mod test {
 
     use super::*;
     use crate::event::LogEvent;
+
+    #[test]
+    fn merge() {
+        let test_data: [(
+            AcknowledgementsConfig,
+            AcknowledgementsConfig,
+            AcknowledgementsConfig,
+        ); 9] = [
+            (None.into(), None.into(), None.into()),
+            (None.into(), Some(false).into(), Some(false).into()),
+            (None.into(), Some(true).into(), Some(true).into()),
+            (Some(false).into(), None.into(), Some(false).into()),
+            (Some(false).into(), Some(false).into(), Some(false).into()),
+            (Some(false).into(), Some(true).into(), Some(true).into()),
+            (Some(true).into(), None.into(), Some(true).into()),
+            (Some(true).into(), Some(false).into(), Some(true).into()),
+            (Some(true).into(), Some(true).into(), Some(true).into()),
+        ];
+
+        for test_data_set in test_data {
+            assert_eq!(
+                test_data_set.0.merge(&test_data_set.1),
+                test_data_set.2,
+                "{:?}.merge({:?}) should result in {:?}",
+                test_data_set.0,
+                test_data_set.1,
+                test_data_set.2
+            )
+        }
+    }
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {
