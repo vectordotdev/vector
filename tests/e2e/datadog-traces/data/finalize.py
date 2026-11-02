@@ -40,18 +40,22 @@ def docker_request(method, path, timeout=40):
 
 def stop_containers(network, label, timeout=30):
     filters = json.dumps({"network": [network], "label": [label]})
-    containers = json.loads(docker_request("GET", "/containers/json?" + urlencode({"filters": filters})))
+    # Include exited containers, so one that crashed earlier still fails the exit check.
+    query = urlencode({"all": 1, "filters": filters})
+    containers = json.loads(docker_request("GET", "/containers/json?" + query))
     if not containers:
-        raise RuntimeError(f"No running containers matching {label}")
+        raise RuntimeError(f"No containers matching {label}")
+    running = [container for container in containers if container["State"] == "running"]
 
     # Allow the API request to outlast Docker's grace period.
-    with ThreadPoolExecutor(max_workers=len(containers)) as executor:
-        list(executor.map(
-            lambda container: docker_request(
-                "POST", f"/containers/{container['Id']}/stop?t={timeout}", timeout=timeout + 10,
-            ),
-            containers,
-        ))
+    if running:
+        with ThreadPoolExecutor(max_workers=len(running)) as executor:
+            list(executor.map(
+                lambda container: docker_request(
+                    "POST", f"/containers/{container['Id']}/stop?t={timeout}", timeout=timeout + 10,
+                ),
+                running,
+            ))
 
     for container in containers:
         state = json.loads(docker_request("GET", f"/containers/{container['Id']}/json"))["State"]
