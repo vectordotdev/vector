@@ -335,10 +335,12 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             // Octet counting isn't used so fallback to newline codec.
             match self.newline_decode(buf)? {
                 Some(bytes) => Ok(Some(strip_trailing_carriage_return(bytes))),
-                None => self
-                    .other
-                    .decode_eof(buf)
-                    .map(|line| line.map(strip_trailing_carriage_return)),
+                None => self.other.decode_eof(buf).map(|line| {
+                    line.map(strip_trailing_carriage_return)
+                        // A final remainder of exactly "\r" strips down to an
+                        // empty frame; `LinesCodec` returned `None` for it.
+                        .filter(|frame| !frame.is_empty())
+                }),
             }
         }
     }
@@ -543,6 +545,25 @@ mod tests {
         );
         assert_eq!(Ok(None), decoder.decode_eof(&mut buffer).map_err(|_| false));
         assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+    }
+
+    #[test]
+    fn non_octet_decode_eof_carriage_return_parity() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+
+        // An unterminated remainder ending in a bare `\r` has the `\r`
+        // stripped, matching `LinesCodec::decode_eof`, which applies
+        // `without_carriage_return` to the final remainder as well.
+        let mut buffer = BytesMut::from(&b"<57>tail\r"[..]);
+        assert_eq!(
+            Ok(Some("<57>tail".into())),
+            decoder.decode_eof(&mut buffer).map_err(|_| false)
+        );
+
+        // A remainder that is exactly "\r" yields no frame at all, also
+        // matching `LinesCodec::decode_eof`.
+        let mut buffer = BytesMut::from(&b"\r"[..]);
+        assert_eq!(Ok(None), decoder.decode_eof(&mut buffer).map_err(|_| false));
     }
 
     #[test]
