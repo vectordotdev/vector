@@ -78,8 +78,10 @@ cargo vdev e2e run datadog-traces
 ```
 
 In CI, a Vector-team member can submit a PR review starting with
-`/ci-run-e2e-datadog-traces` to run it against the reviewed commit. Automatic PR CI does
-not run it.
+`/ci-run-e2e-datadog-traces` to run it against the reviewed commit, or
+`/ci-run-e2e-trace-model` to also run the
+[multiservice OpenTelemetry test](../opentelemetry-traces-multiservice/README.md).
+Automatic PR CI does not run it.
 
 ## Known gaps
 

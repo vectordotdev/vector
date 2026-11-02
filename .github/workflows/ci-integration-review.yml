@@ -19,7 +19,11 @@
 #
 #     /ci-run-integration-all
 #
-# 4. Run all CI (including all integration tests)
+# 4. Run the trace model E2E tests (datadog-traces and opentelemetry-traces-multiservice)
+#
+#     /ci-run-e2e-trace-model
+#
+# 5. Run all CI (including all integration tests)
 #
 #     /ci-run-all
 #
@@ -218,7 +222,8 @@ jobs:
           REVIEW_BODY: ${{ github.event.review.body }}
           SERVICE: ${{ matrix.service }}
         run: |
-          if [[ "$REVIEW_BODY" == /ci-run-e2e-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-e2e-${SERVICE}"* ]]; then
+          if [[ "$REVIEW_BODY" == /ci-run-e2e-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-e2e-${SERVICE}"* ]] || \
+             { [[ "$REVIEW_BODY" == /ci-run-e2e-trace-model* ]] && [[ "$SERVICE" == datadog-traces ]]; }; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -256,7 +261,7 @@ jobs:
 
   otel-traces-multiservice:
     name: Multiservice OpenTelemetry trace validation
-    if: github.repository == 'vectordotdev/vector' && startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: github.repository == 'vectordotdev/vector' && (startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice') || startsWith(github.event.review.body, '/ci-run-e2e-trace-model'))
     needs:
       - prep-pr
       - build-test-runner
