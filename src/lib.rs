@@ -10,8 +10,6 @@
 #![allow(async_fn_in_trait)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::match_wild_err_arm)]
-#![allow(clippy::new_ret_no_self)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten

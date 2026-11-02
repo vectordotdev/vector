@@ -6,7 +6,7 @@ use std::{collections::HashMap, io};
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http_1::{
+use http::{
     Request, StatusCode, Uri,
     header::{self, HeaderName, HeaderValue},
 };
@@ -285,7 +285,7 @@ pub fn build_healthcheck(
 
     let healthcheck = async move {
         let mut request = Request::get(&uri).body(empty_body())?;
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
 
         let response = client.send(request).await?;
         healthcheck_status(response.status(), GcsHealthcheckError::NotFound.into())
@@ -689,7 +689,7 @@ impl Service<ChronicleRequest> for ChronicleService {
         }
 
         let mut http_request = builder.body(request.body).unwrap();
-        self.creds.apply_v1(&mut http_request);
+        self.creds.apply(&mut http_request);
         let http_request = http_request.map(full_body);
 
         let client = self.client.clone();

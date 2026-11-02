@@ -11,8 +11,8 @@ use std::{
 };
 
 use futures::{FutureExt, StreamExt, future::BoxFuture};
-use http_1::{Request, Response};
-use http_body_1::{Body, Frame, SizeHint};
+use http::{Request, Response};
+use http_body::{Body, Frame, SizeHint};
 use pin_project::pin_project;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},

@@ -1,18 +1,18 @@
 {{/* Renders the "Deprecation Announcements" section for a specific release.
-     Each entry whose `deprecated_since` matches the page version is listed.
-     Enactments (removals) are not duplicated here — they are surfaced via
-     the changelog's Breaking changes section and on /deprecations/.
+     Each entry whose `deprecated_since` matches the page version is listed:
+     active notices first, then notices that have since been enacted, dimmed
+     and crediting the release that removed them. The release that removes a
+     notice surfaces the removal in its Breaking changes section instead.
      Params: version (string, e.g. "0.56" or "0.56.0") */}}
-{{- $pending := (partialCached "deprecations/entries.html" .).active -}}
+{{- $entries := partialCached "deprecations/entries.html" . -}}
 {{- /* Entries carry X.Y.Z versions (see deprecations/entries.html), so normalize
        a "0.56" shorthand param the same way and match exactly: "0.56" fragments
        belong to the 0.56.0 page only, never to 0.56.1. */ -}}
-{{- $version := .version -}}
-{{- if eq (len (split $version ".")) 2 }}{{ $version = printf "%s.0" $version }}{{ end -}}
+{{- $version := (partial "deprecations/version.html" .version).version -}}
 
-{{- $announced := where $pending "deprecated_since" $version -}}
+{{- $announced := (where $entries.active "deprecated_since" $version) | append (where $entries.enacted "deprecated_since" $version) -}}
 
-{{ if gt (len $announced) 0 }}
+{{ with $announced }}
 <div class="mt-8">
   <div class="prose dark:prose-invert max-w-none">
     {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
@@ -21,10 +21,22 @@
     </p>
   </div>
   <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
-    {{ range $announced }}
+    {{ range . }}
+    {{ $footer := "" }}
+    {{ $class := "" }}
+    {{ with .removed_in }}
+    {{ $removed := printf "v%s" . }}
+    {{ with site.GetPage (printf "/releases/%s" .) }}
+    {{ $removed = printf `<a href="%s" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary">%s</a>` .RelPermalink $removed }}
+    {{ end }}
+    {{ $footer = printf "Removed in %s" $removed }}
+    {{ $class = "opacity-75" }}
+    {{ end }}
     {{ partial "releases/changelog-card.html" (dict
       "title" .what
       "body" .content
+      "footer" $footer
+      "class" $class
     ) }}
     {{ end }}
   </ul>

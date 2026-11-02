@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
-use http_1::Request;
+use http::Request;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
