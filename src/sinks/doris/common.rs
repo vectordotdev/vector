@@ -9,7 +9,7 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use http_1::Uri;
+use http::Uri;
 use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]
@@ -30,8 +30,7 @@ impl DorisCommon {
 
         // basic auth must be some for now
         let auth = config.auth.choose_one(&endpoint.auth)?;
-        // Convert the validated endpoint to the native URI once, at the client boundary.
-        let base_url = endpoint.uri_v1()?;
+        let base_url = endpoint.uri.clone();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
 
         // Build encoder from the encoding configuration

@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use bytes::Bytes;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use vector_http::empty_body;
 use vector_lib::{
@@ -50,7 +50,7 @@ pub enum HealthcheckError {
 #[derive(Debug, Snafu)]
 #[snafu(display("URI parse error: {source}"))]
 pub struct UriParseError {
-    source: http_1::uri::InvalidUri,
+    source: http::uri::InvalidUri,
 }
 
 /// Builds the HTTP client.
@@ -205,7 +205,7 @@ pub fn render_template_string<'a>(
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use http_1::{HeaderValue, Uri};
+    use http::{HeaderValue, Uri};
     use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
@@ -400,20 +400,20 @@ mod tests {
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
-    use std::net::SocketAddr;
-
-    use http::StatusCode;
+    use bytes::Bytes;
+    use http::{Response, StatusCode};
+    use http_body_util::Full;
     use tokio::time::Duration;
     use vector_lib::config::proxy::ProxyConfig;
-    use warp::Filter;
 
     use super::{
         build_healthcheck, create_client,
         integration_test_helpers::{get_token, splunk_hec_address},
     };
     use crate::{
-        assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError,
-        test_util::retry_until,
+        assert_downcast_matches,
+        sinks::splunk_hec::common::HealthcheckError,
+        test_util::{http::spawn_blackhole_http_server, retry_until},
     };
 
     #[tokio::test]
@@ -445,16 +445,14 @@ mod integration_tests {
     #[tokio::test]
     async fn splunk_healthcheck_server_unavailable() {
         let client = create_client(None, &ProxyConfig::default()).unwrap();
-        let healthcheck = build_healthcheck(
-            "http://localhost:5503/".to_string(),
-            get_token().await,
-            client,
-        );
-
-        let unhealthy = warp::any()
-            .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
-        let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-        tokio::spawn(server);
+        let address = spawn_blackhole_http_server(|_| async {
+            Ok(Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Full::new(Bytes::from_static(b"i'm sad")))
+                .unwrap())
+        })
+        .await;
+        let healthcheck = build_healthcheck(address.to_string(), get_token().await, client);
 
         assert_downcast_matches!(
             healthcheck.await.unwrap_err(),

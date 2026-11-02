@@ -2,7 +2,7 @@ use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::uri::Scheme;
+use http_0::uri::Scheme;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -76,7 +76,7 @@ impl SourceConfig for ApacheMetricsConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|endpoint| endpoint.parse::<http::Uri>())
+            .map(|endpoint| endpoint.parse::<http_0::Uri>())
             .collect::<Result<Vec<_>, _>>()
             .context(super::UriParseSnafu)?;
 
@@ -107,7 +107,7 @@ trait UriExt {
     fn sanitized_authority(&self) -> String;
 }
 
-impl UriExt for http::Uri {
+impl UriExt for http_0::Uri {
     fn to_sanitized_string(&self) -> String {
         let mut s = String::new();
 
@@ -148,7 +148,7 @@ impl UriExt for http::Uri {
     reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
 )]
 fn apache_metrics(
-    urls: Vec<http::Uri>,
+    urls: Vec<http_0::Uri>,
     interval: Duration,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
@@ -179,7 +179,7 @@ fn apache_metrics(
                     .map_err(crate::Error::from)
                     .and_then(|response| async {
                         let (header, body) = response.into_parts();
-                        let body = http_body::Body::collect(body).await?.to_bytes();
+                        let body = http_body_0::Body::collect(body).await?.to_bytes();
                         Ok((header, body))
                     })
                     .into_stream()

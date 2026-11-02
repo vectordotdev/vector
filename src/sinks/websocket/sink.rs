@@ -407,7 +407,7 @@ mod tests {
                                                 if format!("Bearer {}", token.inner()) != h.to_str().unwrap() =>
                                             {
                                                 return Err(
-                                                    http::Response::<Option<String>>::new(None),
+                                                    http_0::Response::<Option<String>>::new(None),
                                                 );
                                             }
                                             Auth::Bearer { .. } => {}

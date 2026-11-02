@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use http_1::{Request, Response, StatusCode, Uri};
+use http::{Request, Response, StatusCode, Uri};
 use http_body_util::BodyExt;
 use hyper_1::body::Incoming;
 use serde::Deserialize;
