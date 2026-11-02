@@ -10,6 +10,14 @@ pub struct ReadResult {
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
+/// Returns the length of the longest proper prefix of `delim` that `data` ends with.
+fn partial_delim_len(data: &[u8], delim: &[u8]) -> usize {
+    (1..delim.len())
+        .rev()
+        .find(|&prefix_len| data.ends_with(&delim[..prefix_len]))
+        .unwrap_or(0)
+}
+
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
 /// The function reads up to `max_size` bytes from `reader`, splitting the input
@@ -23,7 +31,9 @@ pub struct ReadResult {
 /// hit the end of the buffer but did not find a `delim` yet, indicating that
 /// we've sheered a write or that there were no bytes available in the `reader`
 /// and the `reader` was very sure about it. If the inner value is Some the
-/// interior `usize` is the number of bytes written into `buf`.
+/// interior `usize` is the number of bytes written into `buf`. When retrying,
+/// pass the same `buf` back in, because a `delim` split across the two calls is
+/// only recognised from the part of it that was left at the end of `buf`.
 ///
 /// Tweak of
 /// <https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471>.
@@ -46,7 +56,6 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     max_size: usize,
 ) -> io::Result<ReadResult> {
     let mut total_read = 0;
-    let mut discarding = false;
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     let mut discarded_for_size_and_truncated = Vec::new();
@@ -57,42 +66,48 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     // Any potential partial delimiter that was found in the "old" buffer is stored in this variable.
     let mut partial_delim: BytesMut = BytesMut::with_capacity(delim_len);
 
+    // An earlier call may have reached EOF with part of a delimiter at the end of `buf`. It belongs
+    // to neither the line nor its length until the data after it shows what it is.
+    let line_len = buf.len() - partial_delim_len(buf, delim);
+    partial_delim.extend_from_slice(&buf[line_len..]);
+    buf.truncate(line_len);
+
+    let mut discarding = false;
+
     loop {
         // Read the next chunk of data
         let available: &[u8] = match reader.fill_buf().await {
             Ok(n) => n,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
+            Err(e) => {
+                buf.extend_from_slice(&partial_delim);
+                return Err(e);
+            }
         };
 
         // First, check if we have a partial delimiter from the previous iteration/buffer
+        let mut delim_suffix_len = None;
         if !partial_delim.is_empty() {
             let expected_suffix = &delim[partial_delim.len()..];
-            let expected_suffix_len = expected_suffix.len();
 
             // We already know that we have a partial delimiter match from the previous buffer.
             // Here we check what part of the delimiter is missing and whether the new buffer
             // contains the remaining part.
-            if available.len() >= expected_suffix_len
-                && &available[..expected_suffix_len] == expected_suffix
-            {
-                // Complete delimiter found! Consume the remainder of the delimiter so we can start
-                // processing data after the delimiter.
-                reader.consume(expected_suffix_len);
-                *position += expected_suffix_len as u64;
-                total_read += expected_suffix_len;
-                partial_delim.clear();
-
-                // Found a complete delimiter, return the current buffer so we can proceed with the
-                // next record after this delimiter in the next call.
+            if available.starts_with(expected_suffix) {
+                // Complete delimiter found! Consuming the remainder of the delimiter and deciding
+                // what to do with the line it ends is the same as for a delimiter found whole.
+                delim_suffix_len = Some(expected_suffix.len());
+            } else if available.is_empty() {
+                // We've hit EOF, so we can't tell yet. Leave the partial delimiter at the end of
+                // `buf` for the next call to pick up.
+                buf.extend_from_slice(&partial_delim);
                 return Ok(ReadResult {
-                    successfully_read: Some(total_read),
+                    successfully_read: None,
                     discarded_for_size_and_truncated,
                 });
-            }
-            // Not a complete delimiter after all.
-            // Add partial_delim to output buffer as it is actual data.
-            if !discarding {
+            } else if !discarding {
+                // Not a complete delimiter after all.
+                // Add partial_delim to output buffer as it is actual data.
                 buf.extend_from_slice(&partial_delim);
             }
             partial_delim.clear();
@@ -100,7 +115,9 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
         }
 
         let (done, used) = {
-            if let Some(i) = delim_finder.find(available) {
+            if let Some(suffix_len) = delim_suffix_len {
+                (true, suffix_len)
+            } else if let Some(i) = delim_finder.find(available) {
                 if !discarding {
                     buf.extend_from_slice(&available[..i]);
                 }
@@ -119,7 +136,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                     // Check if the end of the current buffer matches a prefix of the delimiter
                     // by testing from longest to shortest possible prefix.
                     //
-                    // This loop runs at most (delim_len - 1) iterations:
+                    // `partial_delim_len` runs at most (delim_len - 1) iterations:
                     //   - 2-byte delimiter (\r\n): 1 iteration max
                     //   - 5-byte delimiter: 4 iterations max
                     //
@@ -144,14 +161,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                     //     `delim_finder.find` earlier)
                     //   Iteration 2: It checks if the current buffer ends with "ABC"
                     //   Iterations 3-4: Same for "AB" and "A"
-                    for prefix_len in (1..delim_len).rev() {
-                        if available.len() >= prefix_len
-                            && available.ends_with(&delim[..prefix_len])
-                        {
-                            partial_match_len = prefix_len;
-                            break;
-                        }
-                    }
+                    partial_match_len = partial_delim_len(available, delim);
                 }
 
                 let bytes_to_copy = available.len() - partial_match_len;
@@ -213,11 +223,17 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
 
 #[cfg(test)]
 mod test {
-    use std::{io::Cursor, num::NonZeroU8, ops::Range};
+    use std::{
+        io::{self, Cursor},
+        num::NonZeroU8,
+        ops::Range,
+        pin::Pin,
+        task::{Context, Poll},
+    };
 
     use bytes::{BufMut, BytesMut};
     use quickcheck::{QuickCheck, TestResult};
-    use tokio::io::BufReader;
+    use tokio::io::{AsyncRead, AsyncReadExt, BufReader, ReadBuf};
 
     use super::read_until_with_max_size;
     use crate::buffer::ReadResult;
@@ -447,6 +463,249 @@ mod test {
                 "Should find delimiter for line {i}"
             );
         }
+    }
+
+    /// Reads from `data` once, as a reader that hits EOF right after `data` would.
+    async fn read_chunk(
+        data: &[u8],
+        position: &mut u64,
+        delimiter: &[u8],
+        buffer: &mut BytesMut,
+        max_size: usize,
+    ) -> ReadResult {
+        let mut reader = BufReader::new(Cursor::new(data.to_vec()));
+        read_until_with_max_size(&mut reader, position, delimiter, buffer, max_size)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_delimiter_split_by_eof() {
+        // With the first limit the merged line used to be dropped, with the second it used to be
+        // emitted as one event.
+        for max_size in [5, 1024] {
+            let delimiter = b"\r\n";
+            let mut position = 0;
+            let mut buffer = BytesMut::new();
+
+            let result =
+                read_chunk(b"123\r", &mut position, delimiter, &mut buffer, max_size).await;
+            assert_eq!(result.successfully_read, None);
+            assert!(result.discarded_for_size_and_truncated.is_empty());
+
+            // Polling at EOF changes nothing.
+            let result = read_chunk(b"", &mut position, delimiter, &mut buffer, max_size).await;
+            assert_eq!(result.successfully_read, None);
+            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(buffer.as_ref(), b"123\r");
+
+            let mut reader = BufReader::new(Cursor::new(b"\nnext\r\n".to_vec()));
+            let result = read_until_with_max_size(
+                &mut reader,
+                &mut position,
+                delimiter,
+                &mut buffer,
+                max_size,
+            )
+            .await
+            .unwrap();
+            assert_eq!(result.successfully_read, Some(1));
+            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(buffer.as_ref(), b"123");
+            assert_eq!(position, 5);
+
+            buffer.clear();
+            let result = read_until_with_max_size(
+                &mut reader,
+                &mut position,
+                delimiter,
+                &mut buffer,
+                max_size,
+            )
+            .await
+            .unwrap();
+            assert_eq!(result.successfully_read, Some(6));
+            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(buffer.as_ref(), b"next");
+            assert_eq!(position, 11);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delimiter_split_by_eof_at_every_position() {
+        async fn lines_from_chunks(chunks: [&[u8]; 3], delimiter: &[u8]) -> Vec<BytesMut> {
+            let mut lines = Vec::new();
+            let mut position = 0;
+            let mut buffer = BytesMut::new();
+            for chunk in chunks {
+                let mut reader = BufReader::new(Cursor::new(chunk.to_vec()));
+                while read_until_with_max_size(
+                    &mut reader,
+                    &mut position,
+                    delimiter,
+                    &mut buffer,
+                    1024,
+                )
+                .await
+                .unwrap()
+                .successfully_read
+                .is_some()
+                {
+                    lines.push(buffer.split());
+                }
+            }
+            lines
+        }
+
+        async fn check(delimiter: &[u8], data: &[u8], expected: &[&[u8]]) {
+            for first in 0..=data.len() {
+                for second in first..=data.len() {
+                    let chunks = [&data[..first], &data[first..second], &data[second..]];
+                    assert_eq!(
+                        lines_from_chunks(chunks, delimiter).await,
+                        expected,
+                        "chunks: {chunks:?}"
+                    );
+                }
+            }
+        }
+
+        check(
+            b"\r\n",
+            b"a\r\nb\r\r\nc\rd\r\n\r\n",
+            &[b"a", b"b\r", b"c\rd", b""],
+        )
+        .await;
+        check(b"ABC", b"xABCyAABCzABABCABC", &[b"x", b"yA", b"zAB", b""]).await;
+    }
+
+    #[tokio::test]
+    async fn test_long_delimiter_split_by_eof_twice() {
+        let delimiter = b"ABC";
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        for chunk in [b"xA".as_slice(), b"B"] {
+            let result = read_chunk(chunk, &mut position, delimiter, &mut buffer, 1024).await;
+            assert_eq!(result.successfully_read, None);
+        }
+
+        let result = read_chunk(b"C", &mut position, delimiter, &mut buffer, 1024).await;
+        assert_eq!(result.successfully_read, Some(1));
+        assert_eq!(buffer.as_ref(), b"x");
+    }
+
+    #[tokio::test]
+    async fn test_partial_delimiter_at_eof_can_turn_out_to_be_data() {
+        let delimiter = b"\r\n";
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        let result = read_chunk(b"12\r", &mut position, delimiter, &mut buffer, 1024).await;
+        assert_eq!(result.successfully_read, None);
+
+        let result = read_chunk(b"x\r\n", &mut position, delimiter, &mut buffer, 1024).await;
+        assert_eq!(result.successfully_read, Some(3));
+        assert_eq!(buffer.as_ref(), b"12\rx");
+    }
+
+    #[tokio::test]
+    async fn test_partial_delimiter_at_eof_does_not_count_towards_the_limit() {
+        let delimiter = b"\r\n";
+        let max_size = 5;
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        // The line is exactly at the limit, only its partial delimiter would take it over.
+        let result = read_chunk(b"12345\r", &mut position, delimiter, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, None);
+        assert!(result.discarded_for_size_and_truncated.is_empty());
+
+        let result = read_chunk(b"\n", &mut position, delimiter, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, Some(1));
+        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(buffer.as_ref(), b"12345");
+    }
+
+    #[tokio::test]
+    async fn test_oversized_line_with_delimiter_split_by_eof() {
+        let delimiter = b"\r\n";
+        let max_size = 5;
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        let result = read_chunk(b"123456\r", &mut position, delimiter, &mut buffer, max_size).await;
+        assert_eq!(result.successfully_read, None);
+        assert_eq!(result.discarded_for_size_and_truncated.len(), 1);
+
+        // The oversized line ends here and is not emitted, and the next line survives.
+        let result = read_chunk(
+            b"\nnext\r\n",
+            &mut position,
+            delimiter,
+            &mut buffer,
+            max_size,
+        )
+        .await;
+        assert_eq!(result.successfully_read, Some(7));
+        assert_eq!(buffer.as_ref(), b"next");
+        assert_eq!(position, 14);
+    }
+
+    #[tokio::test]
+    async fn test_oversized_line_with_delimiter_split_by_buffer_boundary() {
+        let delimiter = b"\r\n";
+        let max_size = 5;
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+        // The first fill of the buffer ends between the `\r` and the `\n`.
+        let mut reader = BufReader::with_capacity(7, Cursor::new(b"123456\r\nnext\r\n".to_vec()));
+
+        let result =
+            read_until_with_max_size(&mut reader, &mut position, delimiter, &mut buffer, max_size)
+                .await
+                .unwrap();
+
+        assert_eq!(result.successfully_read, Some(14));
+        assert_eq!(result.discarded_for_size_and_truncated.len(), 1);
+        assert_eq!(buffer.as_ref(), b"next");
+    }
+
+    #[tokio::test]
+    async fn test_read_error_keeps_partial_delimiter() {
+        struct FailingReader;
+
+        impl AsyncRead for FailingReader {
+            fn poll_read(
+                self: Pin<&mut Self>,
+                _: &mut Context<'_>,
+                _: &mut ReadBuf<'_>,
+            ) -> Poll<io::Result<()>> {
+                Poll::Ready(Err(io::Error::other("read failed")))
+            }
+        }
+
+        let delimiter = b"\r\n";
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+
+        // The error comes after the partial delimiter has been read in the same call.
+        let mut reader = BufReader::new(Cursor::new(b"12\r".to_vec()).chain(FailingReader));
+        let result =
+            read_until_with_max_size(&mut reader, &mut position, delimiter, &mut buffer, 1024)
+                .await;
+        assert!(result.is_err());
+
+        // The error comes when an earlier call already left the partial delimiter in `buffer`.
+        let mut reader = BufReader::new(FailingReader);
+        let result =
+            read_until_with_max_size(&mut reader, &mut position, delimiter, &mut buffer, 1024)
+                .await;
+        assert!(result.is_err());
+
+        let result = read_chunk(b"\n", &mut position, delimiter, &mut buffer, 1024).await;
+        assert_eq!(result.successfully_read, Some(1));
+        assert_eq!(buffer.as_ref(), b"12");
     }
 
     #[tokio::test]
