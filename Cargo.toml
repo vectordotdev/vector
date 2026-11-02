@@ -683,7 +683,7 @@ typed-trace = ["vector-lib/typed-trace"]
 
 aws-core = [
   "aws-runtime",
-  "aws-config",
+  "dep:aws-config",
   "dep:aws-credential-types",
   "dep:aws-sigv4",
   "dep:aws-types",
