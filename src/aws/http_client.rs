@@ -261,6 +261,14 @@ fn classify(error: &HttpError) -> fn(BoxError) -> ConnectorError {
         if hyper_error.is_incomplete_message() {
             return |error| ConnectorError::other(error, Some(ErrorKind::TransientError));
         }
+        // The server is shutting the HTTP/2 connection down or refused the stream before
+        // processing it, so the request can be sent again on a new connection.
+        if let Some(h2_error) = find_source::<h2::Error>(hyper_error)
+            && (h2_error.is_go_away()
+                || (h2_error.is_reset() && h2_error.reason() == Some(h2::Reason::REFUSED_STREAM)))
+        {
+            return ConnectorError::io;
+        }
         return |error| ConnectorError::other(error, None);
     }
 

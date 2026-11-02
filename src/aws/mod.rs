@@ -727,6 +727,65 @@ mod tests {
         assert!(error.is_timeout(), "expected a timeout error: {error:?}");
     }
 
+    /// A stream the server refuses over HTTP/2 was not processed, so the SDK connector reports
+    /// it as an I/O error that the SDK treats as transient.
+    #[tokio::test]
+    async fn connector_reports_refused_http2_stream_as_io_error() {
+        use crate::tls::{
+            TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsEnableableConfig,
+        };
+
+        let server_tls = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    alpn_protocols: Some(vec!["h2".to_owned()]),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .expect("server TLS settings");
+        let mut listener = server_tls
+            .bind(&"127.0.0.1:0".parse().expect("address"))
+            .await
+            .expect("bind");
+        let port = listener.local_addr().expect("local address").port();
+        tokio::spawn(async move {
+            let mut stream = listener.accept().await.expect("accept");
+            stream.handshake().await.expect("TLS handshake");
+            let mut connection = h2::server::handshake(stream).await.expect("h2 handshake");
+            while let Some(Ok((_request, mut respond))) = connection.accept().await {
+                respond.send_reset(h2::Reason::REFUSED_STREAM);
+            }
+        });
+
+        let client_tls = TlsConfig {
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
+            alpn_protocols: Some(vec!["h2".to_owned()]),
+            ..Default::default()
+        };
+        let http_connector = connector(&ProxyConfig::default(), Some(&client_tls))
+            .expect("connector builds")
+            .http_connector(
+                &HttpConnectorSettings::default(),
+                &http_client::test_runtime_components(),
+            );
+        let request = http::Request::get(format!("https://localhost:{port}/"))
+            .body(SdkBody::empty())
+            .expect("valid request");
+        let request = HttpRequest::try_from(request).expect("valid SDK request");
+
+        let error = tokio::time::timeout(Duration::from_secs(5), http_connector.call(request))
+            .await
+            .expect("the server answers")
+            .expect_err("the server refuses the stream");
+
+        assert!(error.is_io(), "expected an I/O error: {error:?}");
+    }
+
     /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
     /// credentials, region, and service, and leave the URI unchanged.
     #[tokio::test]
