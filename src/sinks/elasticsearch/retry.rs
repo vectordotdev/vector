@@ -1,11 +1,11 @@
 use http::StatusCode;
 use serde::Deserialize;
+use vector_http::HttpError;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
 use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 
 use crate::{
     event::Finalizable,
-    http::HttpError,
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent,

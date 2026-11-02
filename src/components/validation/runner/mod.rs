@@ -208,10 +208,22 @@ impl Runner {
         }
     }
 
+    /// Runs every test case for the configured component and collects the validator results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the test case file cannot be opened or deserialized, if a test case
+    /// names a component configuration that does not exist, or if a sink's external resource
+    /// fails to spawn (for example, because its decoder cannot be built).
+    ///
+    /// # Panics
+    ///
+    /// Panics if a source or sink has no external resource, if the input or output driver task
+    /// panics, or if the generated topology configuration fails to build. Spawning external
+    /// resources and drivers can also panic on unsupported codecs, framings, or resource
+    /// directions, and on invalid resource URIs.
     #[allow(clippy::print_stdout)]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.

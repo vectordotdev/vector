@@ -10,7 +10,9 @@ use glob::glob;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use super::generate_cue::{HIGHLIGHTS_DIR, RELEASES_DIR, find_existing_upgrade_guide};
+use super::generate_cue::{
+    HIGHLIGHTS_DIR, RELEASES_DIR, find_existing_upgrade_guide, has_inline_upgrade_guide,
+};
 use crate::{
     app::CommandExt as _,
     utils::{cargo, paths},
@@ -126,8 +128,13 @@ fn release_notes(
                 .ok_or_else(|| anyhow!("Bad upgrade guide filename: {}", path.display()))
         })
         .transpose()?;
+    let upgrade_guide_url = if has_inline_upgrade_guide(repo_root, version)? {
+        Some(format!("{WEBSITE_URL}/releases/{version}/#upgrade-guide"))
+    } else {
+        upgrade_guide_slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"))
+    };
     let template = load_template(repo_root, template_path)?;
-    render_notes(version, &changelog, upgrade_guide_slug, &template)
+    render_notes(version, &changelog, upgrade_guide_url.as_deref(), &template)
 }
 
 /// Read the release notes template, defaulting to [`RELEASE_NOTES_TEMPLATE_PATH`] under the
@@ -194,12 +201,11 @@ struct Section {
 fn render_notes(
     version: &Version,
     changelog: &[ChangelogEntry],
-    upgrade_guide_slug: Option<&str>,
+    upgrade_guide_url: Option<&str>,
     template: &str,
 ) -> Result<String> {
     let release_url = format!("{WEBSITE_URL}/releases/{version}/");
-    let upgrade_guide_url =
-        upgrade_guide_slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"));
+    let upgrade_guide_url = upgrade_guide_url.map(str::to_owned);
 
     let changes = changelog.len();
     let contributors = match changelog
@@ -289,7 +295,8 @@ mod tests {
     );
 
     fn render(version: &Version, changelog: &[ChangelogEntry], slug: Option<&str>) -> String {
-        render_notes(version, changelog, slug, FIXTURE).unwrap()
+        let url = slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"));
+        render_notes(version, changelog, url.as_deref(), FIXTURE).unwrap()
     }
 
     #[test]
@@ -390,7 +397,7 @@ mod tests {
         let notes = render_notes(
             &Version::new(0, 59, 0),
             &changelog,
-            Some("2026-10-05-0-59-0-upgrade-guide"),
+            Some("https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/"),
             &template,
         )?;
 

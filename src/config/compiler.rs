@@ -61,6 +61,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         secret,
         graceful_shutdown_duration,
         allow_empty: _,
+        loading_warnings: mut warnings,
     } = builder;
     let graph = match Graph::new(nodes, global.wildcard_matching.unwrap_or_default()) {
         Ok(graph) => graph,
@@ -140,7 +141,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
         config.propagate_acknowledgements()?;
 
-        let warnings = validation::warnings(&config);
+        warnings.extend(validation::warnings(&config));
 
         Ok((config, warnings))
     } else {

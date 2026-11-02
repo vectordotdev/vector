@@ -1,5 +1,4 @@
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_body_util::{BodyExt, Collected};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -9,12 +8,13 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
+use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
     config::AcknowledgementsConfig,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
@@ -230,15 +230,14 @@ impl HecAckClient {
             .build_request(
                 payload,
                 "/services/collector/ack",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
             .client
-            .send(request.map(Body::from))
+            .send(request.map(full_body))
             .await
             .map_err(|_| HecAckApiError::ServerSendQuery)?;
 
@@ -303,14 +302,12 @@ mod tests {
 
     use super::{HecAckClient, HecClientAcknowledgementsConfig};
 
-    use crate::{
-        http::HttpClient,
-        sinks::{
-            splunk_hec::common::{
-                EndpointTarget, acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
-            },
-            util::Compression,
+    use crate::sinks::{
+        splunk_hec::common::{
+            EndpointTarget, acknowledgements::HecAckStatusRequest, create_client,
+            service::HttpRequestBuilder,
         },
+        util::Compression,
     };
 
     #[test]
@@ -339,7 +336,7 @@ mod tests {
     }
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = HttpRequestBuilder::new(
             String::new(),
             EndpointTarget::default(),
