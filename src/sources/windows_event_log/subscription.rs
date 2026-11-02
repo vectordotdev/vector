@@ -849,7 +849,7 @@ impl EventLogSubscription {
                                 idle_resubscribes = channel_sub.idle_resubscribes
                             );
                         }
-                        match Self::resubscribe_channel(channel_sub, &self.config) {
+                        match Self::resubscribe_channel(channel_sub, &self.config, loud) {
                             Ok(()) => {
                                 if loud {
                                     info!(
@@ -1101,9 +1101,15 @@ impl EventLogSubscription {
     /// invalidated query position, e.g. after an admin cleared the event log; a restarted Event
     /// Log service; or a channel that was unregistered and registered again). Creates a new
     /// handle from the current bookmark and only then closes the old one.
+    ///
+    /// `loud` is the caller's log sampling (first attempt and powers of two): a rebuild that keeps
+    /// failing, e.g. while the Event Log service is down, is retried every few seconds, so the
+    /// warning about the strict bookmark failure follows the same sampling instead of firing on
+    /// every retry.
     fn resubscribe_channel(
         channel_sub: &mut ChannelSubscription,
         config: &WindowsEventLogConfig,
+        loud: bool,
     ) -> Result<(), WindowsEventLogError> {
         // The old handle is deliberately kept open until the replacement exists.
         //
@@ -1157,12 +1163,21 @@ impl EventLogSubscription {
                     // channel came back between the two calls.
                     Err(e) if is_channel_not_found(&e) => Err(e),
                     Err(e) => {
-                        warn!(
-                            message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
-                            channel = %channel_sub.channel,
-                            error = %e,
-                            fallback_flags = format!("{fallback_flags:#x}")
-                        );
+                        if loud {
+                            warn!(
+                                message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                                channel = %channel_sub.channel,
+                                error = %e,
+                                fallback_flags = format!("{fallback_flags:#x}")
+                            );
+                        } else {
+                            debug!(
+                                message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                                channel = %channel_sub.channel,
+                                error = %e,
+                                fallback_flags = format!("{fallback_flags:#x}")
+                            );
+                        }
                         EvtSubscribe(
                             None,
                             channel_sub.signal_event,
