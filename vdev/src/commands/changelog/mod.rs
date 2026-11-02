@@ -72,6 +72,7 @@ const MIGRATION_MARKER: &str = "\n## Migration\n";
 /// Anchors that would collide with fixed headings emitted by the upgrade-guide renderer.
 /// Fragments may not choose these as their `{#anchor}` override, or produce them via slugify.
 pub(crate) const RESERVED_ANCHORS: &[&str] = &[
+    "breaking-changes",
     "vector-breaking-changes",
     "vector-upgrade-guide",
     "upgrade-guide",

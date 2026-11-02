@@ -3,6 +3,7 @@
 use std::{collections::HashMap, ops::Range, process::Command, sync::LazyLock};
 
 use anyhow::{Context, Result, bail};
+use pulldown_cmark::{Event, Parser, Tag};
 use regex::Regex;
 use semver::Version;
 
@@ -11,6 +12,10 @@ use super::generate_cue::BreakingDetails;
 static PULL_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"https://github\.com/vectordotdev/vrl/pull/([0-9]+)")
         .expect("valid VRL pull-request regex")
+});
+
+static STRUCTURED_TITLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"^<a id="([^"]+)"></a> \*\*(.+)\*\*$"#).expect("valid structured VRL title regex")
 });
 
 pub(super) struct Changelog {
@@ -41,9 +46,8 @@ pub(super) fn fetch(version: &Version) -> Result<String> {
 fn release_section(changelog: &str, version: &Version) -> Result<String> {
     let prefix = format!("## [{version} ");
     let mut section = Vec::new();
-    let mut fence = None;
-    for line in changelog.lines() {
-        if !in_fence(line, &mut fence) && line.starts_with("## ") {
+    for (line, code) in markdown_lines(changelog) {
+        if !code && line.starts_with("## ") {
             if !section.is_empty() {
                 break;
             }
@@ -51,7 +55,7 @@ fn release_section(changelog: &str, version: &Version) -> Result<String> {
                 continue;
             }
         }
-        if !section.is_empty() || line.starts_with(&prefix) {
+        if !section.is_empty() || (!code && line.starts_with(&prefix)) {
             section.push(line);
         }
     }
@@ -68,12 +72,23 @@ pub(super) fn extract(notes: &str, vector_version: &Version) -> Changelog {
     let mut ranges = Vec::new();
     let mut current = None;
     let mut breaking = false;
-    let mut fence = None;
-    for (index, line) in lines.iter().enumerate() {
-        if in_fence(line, &mut fence) {
+    let anchor_prefix = notes.lines().find_map(|line| {
+        let version = line.strip_prefix("## [")?.split_once(' ')?.0;
+        version
+            .parse::<Version>()
+            .ok()
+            .map(|version| format!("v{version}-"))
+    });
+    for (index, (line, code)) in markdown_lines(notes).enumerate() {
+        if code {
             continue;
         }
-        if line.starts_with("- ") || line.starts_with("## ") || line.starts_with("### ") {
+        let migration_heading =
+            current.is_some() && line.starts_with("### ") && is_migration_heading(line);
+        if line.starts_with("- ")
+            || line.starts_with("## ")
+            || (line.starts_with("### ") && !migration_heading)
+        {
             if let Some((start, is_breaking)) = current.take() {
                 ranges.push((start..index, is_breaking));
             }
@@ -96,7 +111,9 @@ pub(super) fn extract(notes: &str, vector_version: &Version) -> Changelog {
     let mut output = Vec::new();
     let mut cursor = 0;
     for (range, breaking) in ranges {
-        if let Some((mut migration, credit)) = migration(&lines, &range, breaking) {
+        if let Some((mut migration, credit)) =
+            migration(&lines, &range, breaking, anchor_prefix.as_deref())
+        {
             let count = anchors.entry(migration.anchor.clone()).or_insert(0);
             *count += 1;
             if *count > 1 {
@@ -107,11 +124,7 @@ pub(super) fn extract(notes: &str, vector_version: &Version) -> Changelog {
                     .iter()
                     .map(|line| (*line).to_owned()),
             );
-            let summary = migration
-                .summary
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ");
+            let summary = migration.summary.replace('\n', "\n  ");
             output.push(format!("- {summary}\n"));
             output.push(format!(
                 "  See the [migration instructions](/releases/{vector_version}/#{}).\n",
@@ -145,6 +158,7 @@ fn migration(
     lines: &[&str],
     range: &Range<usize>,
     breaking: bool,
+    anchor_prefix: Option<&str>,
 ) -> Option<(BreakingDetails, Option<String>)> {
     let mut body = Vec::new();
     for (offset, line) in lines[range.clone()].iter().enumerate() {
@@ -167,7 +181,11 @@ fn migration(
         body.pop();
     }
     let body = body.join("\n");
-    let body = body.trim();
+    let body = body.trim_matches('\n');
+    if STRUCTURED_TITLE.is_match(body.lines().next().unwrap_or("")) {
+        return structured_migration(body, anchor_prefix)
+            .map(|details| (details, credit.map(str::to_owned)));
+    }
     if body.is_empty() || (!breaking && !has_migration_notes(body)) {
         return None;
     }
@@ -182,18 +200,49 @@ fn migration(
             title,
             anchor,
             summary: summary.to_owned(),
-            migration: migration_markdown(migration.trim()),
+            migration: migration_markdown(migration.trim_matches('\n')),
         },
         credit.map(str::to_owned),
     ))
 }
 
+/// Current VRL releases declare these fields explicitly; older notes use the legacy path.
+fn structured_migration(body: &str, anchor_prefix: Option<&str>) -> Option<BreakingDetails> {
+    let title = STRUCTURED_TITLE.captures(body.lines().next()?)?;
+    let mut summary_start = None;
+    for (event, range) in Parser::new(body).into_offset_iter() {
+        if !matches!(event, Event::Start(Tag::Paragraph))
+            || (range.start > 0 && body.as_bytes()[range.start - 1] != b'\n')
+        {
+            continue;
+        }
+        match body.get(range.clone())?.trim_end_matches('\n') {
+            "**Summary**" if summary_start.is_none() => summary_start = Some(range.end),
+            "**Migration**" if summary_start.is_some() => {
+                let id = &title[1];
+                let anchor = anchor_prefix
+                    .and_then(|prefix| id.strip_prefix(prefix))
+                    .unwrap_or(id);
+                return Some(BreakingDetails {
+                    title: format!("VRL: {}", &title[2]),
+                    anchor: format!("vrl-{}", crate::commands::changelog::slugify(anchor)),
+                    summary: body
+                        .get(summary_start?..range.start)?
+                        .trim_matches('\n')
+                        .to_owned(),
+                    migration: body.get(range.end..)?.trim_matches('\n').to_owned(),
+                });
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 fn migration_markdown(markdown: &str) -> String {
-    let mut fence = None;
-    markdown
-        .lines()
-        .map(|line| {
-            if !in_fence(line, &mut fence)
+    markdown_lines(markdown)
+        .map(|(line, code)| {
+            if !code
                 && let Some(label) = ["**", "__"].into_iter().find_map(|marker| {
                     line.strip_prefix(marker)
                         .and_then(|line| line.strip_suffix(marker))
@@ -220,26 +269,20 @@ fn first_sentence(summary: &str) -> String {
 
 fn is_credit(line: &str) -> bool {
     let line = line.trim();
-    (line.starts_with("*Thanks to ")
-        || line.starts_with("Thanks to ")
-        || line.starts_with("[PR #")
-        || line.starts_with("~~[PR #"))
-        && PULL_REQUEST.is_match(line)
+    ((line.starts_with("*Thanks to ") || line.starts_with("Thanks to "))
+        && line.contains("](https://github.com/"))
+        || ((line.starts_with("[PR #") || line.starts_with("~~[PR #"))
+            && PULL_REQUEST.is_match(line))
 }
 
 fn has_migration_notes(body: &str) -> bool {
     let mut before = false;
     let mut after = false;
-    let mut fence = None;
-    for line in body.lines() {
-        if in_fence(line, &mut fence) || line.starts_with("    ") || line.starts_with('\t') {
+    for (line, code) in markdown_lines(body) {
+        if code || line.starts_with("    ") || line.starts_with('\t') {
             continue;
         }
-        let label = line.trim().trim_start_matches('#').trim();
-        let label = label
-            .replace("**", "")
-            .replace("__", "")
-            .to_ascii_lowercase();
+        let label = migration_label(line);
         let matches = |name: &str| label == name || label.starts_with(&format!("{name}:"));
         if matches("migration") || matches("upgrade guide") {
             return true;
@@ -250,43 +293,52 @@ fn has_migration_notes(body: &str) -> bool {
     before && after
 }
 
-/// True for every line inside a fence, including its opening and closing markers.
-/// Shared by section/entry detection and migration-label detection.
-fn in_fence(line: &str, fence: &mut Option<(u8, usize)>) -> bool {
-    let line = line.trim_start();
-    let marker = line
-        .as_bytes()
-        .first()
-        .copied()
-        .filter(|byte| matches!(byte, b'`' | b'~'));
-    if let Some(marker) = marker {
-        let length = line.bytes().take_while(|byte| *byte == marker).count();
-        if length >= 3 {
-            match *fence {
-                Some((open_marker, open_length))
-                    if marker == open_marker
-                        && length >= open_length
-                        && line
-                            .get(length..)
-                            .is_some_and(|tail| tail.trim().is_empty()) =>
-                {
-                    *fence = None;
-                }
-                None => *fence = Some((marker, length)),
-                _ => {}
-            }
-            return true;
+fn migration_label(line: &str) -> String {
+    line.trim()
+        .trim_start_matches('#')
+        .trim()
+        .replace("**", "")
+        .replace("__", "")
+        .to_ascii_lowercase()
+}
+
+fn is_migration_heading(line: &str) -> bool {
+    let label = migration_label(line);
+    [
+        "migration",
+        "upgrade guide",
+        "before",
+        "after",
+        "old",
+        "new",
+    ]
+    .iter()
+    .any(|name| label == *name || label.starts_with(&format!("{name}:")))
+}
+
+/// Preserve source lines while identifying code with the Markdown parser.
+fn markdown_lines(markdown: &str) -> impl Iterator<Item = (&str, bool)> {
+    let mut blocks = Parser::new(markdown)
+        .into_offset_iter()
+        .filter_map(|(event, range)| {
+            matches!(event, Event::Start(Tag::CodeBlock(_))).then_some(range)
+        })
+        .peekable();
+    let mut offset = 0;
+    markdown.split_inclusive('\n').map(move |raw| {
+        while blocks.peek().is_some_and(|range| range.end <= offset) {
+            blocks.next();
         }
-    }
-    fence.is_some()
+        let code = blocks.peek().is_some_and(|range| range.start <= offset);
+        offset += raw.len();
+        let line = raw.strip_suffix('\n').unwrap_or(raw);
+        (line.strip_suffix('\r').unwrap_or(line), code)
+    })
 }
 
 pub(super) fn cue_block(notes: &str) -> String {
-    let mut fence = None;
-    let body = notes
-        .lines()
-        .map(|line| {
-            let code = in_fence(line, &mut fence);
+    let body = markdown_lines(notes)
+        .map(|(line, code)| {
             let shift = if !code && line.starts_with('#') {
                 "#"
             } else {
@@ -297,4 +349,76 @@ pub(super) fn cue_block(notes: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n");
     format!("\tvrl_changelog: #\"\"\"\n{body}\n\t\t\"\"\"#")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imports_declared_fields_and_keeps_legacy_migrations() {
+        let notes = indoc::indoc! {r#"
+            ## [0.39.0 (2026-11-02)](https://github.com/vectordotdev/vrl/releases/tag/v0.39.0)
+            ### Breaking Changes & Upgrade Guide
+            - <a id="v0.39.0-explicit-anchor"></a> **Rename `foo`**
+
+              **Summary**
+
+              The full summary is preserved.
+              Including its second line.
+
+              ```text
+              **Migration**
+              ## [0.38.0 (example)]
+              ```
+
+              **Migration**
+
+                  # Keep this as code
+                  .foo = .bar
+
+              *Thanks to [alice](https://github.com/alice) for contributing this change!*
+            ### Fixes
+            - A legacy change.
+
+            ### Migration
+
+            Use the replacement.
+
+              *Thanks to [bob](https://github.com/bob) for contributing PR [#2](https://github.com/vectordotdev/vrl/pull/2)!*
+            - An ordinary fix.
+        "#};
+        for notes in [notes.to_string(), notes.replace('\n', "\r\n")] {
+            let changelog = format!("{notes}\n## [0.38.0 (2026-10-28)]\n- Earlier release.\n");
+            let release = release_section(&changelog, &Version::new(0, 39, 0)).unwrap();
+            let imported = extract(&release, &Version::new(0, 62, 0));
+            assert_eq!(imported.migrations.len(), 2);
+            let current = &imported.migrations[0];
+            assert_eq!(current.title, "VRL: Rename `foo`");
+            assert_eq!(current.anchor, "vrl-explicit-anchor");
+            assert!(current.summary.contains("Including its second line."));
+            assert!(
+                current
+                    .summary
+                    .contains("**Migration**\n## [0.38.0 (example)]")
+            );
+            assert_eq!(
+                current.migration,
+                "    # Keep this as code\n    .foo = .bar"
+            );
+            assert_eq!(imported.migrations[1].anchor, "vrl-pr-2");
+            assert!(
+                imported.migrations[1]
+                    .migration
+                    .contains("Use the replacement.")
+            );
+            assert!(imported.notes.contains("#vrl-explicit-anchor"));
+            assert!(imported.notes.contains("[alice](https://github.com/alice)"));
+            assert!(imported.notes.contains("- An ordinary fix."));
+            assert!(!imported.notes.contains("Earlier release."));
+        }
+        assert!(!crate::commands::changelog::is_valid_anchor(
+            "breaking-changes"
+        ));
+    }
 }

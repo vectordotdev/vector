@@ -9,9 +9,10 @@
 {{- range split . "\n" -}}
   {{- $line := . -}}
   {{- $credit := and (eq $fence "")
-    (findRE `^[ \t]*(\*?Thanks to |(~~)?\[PR #)` $line)
     (findRE `\]\(https://github\.com/[^/()]+\)` $line)
-    (findRE `\]\(https://github\.com/vectordotdev/vrl/pull/[0-9]+\)` $line) -}}
+    (or (findRE `^[ \t]*\*?Thanks to ` $line)
+      (and (findRE `^[ \t]*(~~)?\[PR #` $line)
+        (findRE `\]\(https://github\.com/vectordotdev/vrl/pull/[0-9]+\)` $line))) -}}
   {{- if and (eq $fence "") (hasPrefix $line "- ") -}}
     {{- $prefix = printf "%s%s" $prefix $entry -}}
     {{- $entry = printf "%s\n" $line -}}

@@ -123,12 +123,11 @@ guide from them. See [Examples](#examples) below for the exact shape — or just
 scaffolder from [Quick start](#quick-start). The generated guide lives in the release
 page's Markdown and is rendered below the VRL changelog.
 
-Release preparation also imports the selected VRL release's changelog. Entries in its
-**Breaking Changes** section, or entries with explicit **Migration** / **Upgrade Guide**
-notes or paired **Before/After** / **Old/New** examples, are included in the same upgrade
-guide. The VRL changelog keeps each entry's full opening paragraph (up to the first blank
-line), contributor credit, and a link to its migration instructions. Ordinary entries stay
-in the VRL changelog.
+Release preparation also imports the selected VRL release's changelog. Current breaking
+entries supply their title, anchor, Summary, and Migration directly. Older entries under
+**Breaking Changes**, or with explicit migration notes or Before/After examples, remain
+supported. The VRL changelog retains the summary, contributor credit, and a link to the
+inline migration instructions.
 
 To preview both Vector and VRL release notes without preparing a release, run
 `cargo vdev release generate-cue --version <vector-version> --vrl-version <vrl-version>`.
