@@ -109,7 +109,7 @@ const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15_012; // 0x3AA4
 /// The backoff is skipped as soon as Windows signals the channel, so a real event is never
 /// held back by it.
 const RESUBSCRIBE_BACKOFF_BASE: std::time::Duration = std::time::Duration::from_secs(5);
-const RESUBSCRIBE_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_secs(600);
+const RESUBSCRIBE_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_mins(10);
 
 /// Wait before rebuild number `attempt` (1-based) of an idle channel.
 fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
@@ -155,7 +155,7 @@ const fn handle_is_dead(code: u32) -> bool {
 }
 
 /// Whether a failed `EvtSubscribe` reports that the channel is not registered.
-fn is_channel_not_found(error: &windows::core::Error) -> bool {
+const fn is_channel_not_found(error: &windows::core::Error) -> bool {
     error.code().0.cast_unsigned() & 0xFFFF == ERROR_EVT_CHANNEL_NOT_FOUND
 }
 

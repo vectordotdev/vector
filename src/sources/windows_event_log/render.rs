@@ -154,23 +154,25 @@ pub(super) fn channel_record_count(channel: &str) -> Option<u64> {
 ///
 /// A disabled channel can still be subscribed to, but never delivers anything.
 pub(super) fn channel_enabled(channel: &str) -> Option<bool> {
+    // EVT_VARIANT is 16 bytes: 8 bytes value + 4 bytes count + 4 bytes type
+    const EVT_VARIANT_SIZE: u32 = 16;
+
     let channel_hstring = HSTRING::from(channel);
     // SAFETY: `channel_hstring` is a valid, NUL-terminated wide string that outlives the call;
     // the returned handle is closed below.
     let config_handle = unsafe { EvtOpenChannelConfig(None, &channel_hstring, 0) }.ok()?;
 
-    // EVT_VARIANT is 16 bytes: 8 bytes value + 4 bytes count + 4 bytes type
-    let mut buffer = [0u8; 16];
+    let mut buffer = [0u8; EVT_VARIANT_SIZE as usize];
     let mut buffer_used = 0u32;
 
     // SAFETY: `config_handle` is a valid channel configuration handle, `buffer` is writable for
-    // `buffer.len()` bytes and `buffer_used` is a valid `u32` for the duration of the call.
+    // `EVT_VARIANT_SIZE` bytes and `buffer_used` is a valid `u32` for the duration of the call.
     let result = unsafe {
         EvtGetChannelConfigProperty(
             config_handle,
             EVT_CHANNEL_CONFIG_PROPERTY_ID(EvtChannelConfigEnabled.0),
             0,
-            buffer.len() as u32,
+            EVT_VARIANT_SIZE,
             Some(buffer.as_mut_ptr().cast()),
             &raw mut buffer_used,
         )

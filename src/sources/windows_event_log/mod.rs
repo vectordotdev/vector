@@ -404,7 +404,7 @@ impl WindowsEventLogSource {
         // because the wait can be shortened to a pending re-subscription deadline, so the
         // number of timeouts no longer measures elapsed time.
         let mut last_health = std::time::Instant::now();
-        const HEALTH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+        let health_interval = std::time::Duration::from_secs(30);
 
         loop {
             // Move subscription into blocking thread for WaitForMultipleObjects.
@@ -494,7 +494,7 @@ impl WindowsEventLogSource {
                     }
 
                     // Health heartbeat on a separate ~30s cadence
-                    if last_health.elapsed() >= HEALTH_INTERVAL {
+                    if last_health.elapsed() >= health_interval {
                         last_health = std::time::Instant::now();
                         let (total, active) = subscription.channel_health_summary();
                         if active < total {
