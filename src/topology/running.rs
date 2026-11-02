@@ -356,6 +356,11 @@ impl RunningTopology {
                     .scan(&new_config, previous_disk_buffer_paths);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
+                let metrics = crate::metrics::Controller::get()
+                    .expect("Metrics must be initialized before reloading the topology");
+                for (key, kind) in diff.removed_components() {
+                    metrics.remove_component_metrics(key.id(), kind);
+                }
 
                 info!("New configuration loaded successfully.");
 

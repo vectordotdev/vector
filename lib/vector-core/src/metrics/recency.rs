@@ -48,7 +48,7 @@
 //! not, and thus whether it should actually be deleted.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -303,6 +303,14 @@ where
             global_idle_timeout,
             per_set_timeouts: Mutex::new(PerSetTimeout::new(per_set_timeouts)),
         }
+    }
+
+    pub(super) fn remove_keys(&self, keys: &HashSet<K>) {
+        self.inner.lock().1.retain(|key, _| !keys.contains(key));
+        self.per_set_timeouts
+            .lock()
+            .per_key_timeouts
+            .retain(|key, _| !keys.contains(key));
     }
 
     /// Checks if the given counter should be stored, based on its known recency.
