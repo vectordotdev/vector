@@ -12,4 +12,7 @@ Migrate any dashboards or alerts that reference:
 
 to:
 
-- `component_errors_total`
+- `component_errors_total{component_type="aws_ec2_metadata", error_type="request_failed", stage="processing"}`
+
+Keep these selectors, and any existing `component_id` selector, so that the query does not count errors
+from unrelated components.
