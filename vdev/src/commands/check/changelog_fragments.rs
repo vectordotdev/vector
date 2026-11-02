@@ -414,9 +414,16 @@ mod tests {
 
     #[test]
     fn bad_anchor() {
-        let raw = wrap("# x {#Not Valid!}", "y", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        for anchor in [
+            "Not Valid!",
+            "vrl-changelog",
+            "vector-changelog",
+            "bug-fixes",
+        ] {
+            let raw = wrap(&format!("# x {{#{anchor}}}"), "y", "N/A");
+            let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
+            assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        }
     }
 
     #[test]

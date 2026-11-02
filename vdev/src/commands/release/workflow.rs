@@ -641,9 +641,16 @@ fn validate_upgrade_guide(base: &str, files: &[ChangedFile], version: &Version) 
         "--",
         "changelog.d/",
     ])?;
-    if base_fragments
-        .split_terminator('\0')
-        .any(|file| file.ends_with(".breaking.md"))
+    let release_path = Path::new(super::generate_cue::RELEASES_DIR).join(format!("{version}.cue"));
+    // The VRL importer links to the release page, so a standalone guide cannot satisfy it.
+    let vrl_requires_inline = release_path.is_file()
+        && fs::read_to_string(&release_path)?.contains(&format!(
+            "[migration instructions](/releases/{version}/#vrl-"
+        ));
+    if vrl_requires_inline
+        || base_fragments
+            .split_terminator('\0')
+            .any(|file| file.ends_with(".breaking.md"))
     {
         let inline = files.iter().any(|file| {
             file.kind == ChangeKind::Added
@@ -651,11 +658,12 @@ fn validate_upgrade_guide(base: &str, files: &[ChangedFile], version: &Version) 
         }) && super::generate_cue::has_inline_upgrade_guide(Path::new("."), version)?;
         ensure!(
             inline
-                || files.iter().any(|file| {
-                    file.kind == ChangeKind::Added
-                        && release_highlight(&file.path, version)
-                        && Path::new(&file.path).is_file()
-                }),
+                || (!vrl_requires_inline
+                    && files.iter().any(|file| {
+                        file.kind == ChangeKind::Added
+                            && release_highlight(&file.path, version)
+                            && Path::new(&file.path).is_file()
+                    })),
             "breaking releases require a generated upgrade guide for {version}"
         );
     }
