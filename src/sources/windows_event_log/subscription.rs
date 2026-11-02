@@ -237,6 +237,21 @@ struct ChannelSubscription {
 unsafe impl Send for ChannelSubscription {}
 unsafe impl Sync for ChannelSubscription {}
 
+impl ChannelSubscription {
+    /// Report the subscription as active again once its handle has evidently answered a pull.
+    ///
+    /// A failed rebuild keeps the old handle and reports the channel inactive. That handle may
+    /// still work: delivering events, answering `ERROR_NO_MORE_ITEMS`, returning an empty batch,
+    /// or `ERROR_INVALID_OPERATION` on a disabled or empty channel all show it does. Restoring the
+    /// state only on delivery would leave an idle channel reported as down indefinitely.
+    fn report_active(&mut self) {
+        if !self.subscription_active {
+            self.subscription_active = true;
+            self.subscription_active_gauge.set(1.0);
+        }
+    }
+}
+
 /// Result of waiting for events across all channels.
 pub enum WaitResult {
     /// At least one channel has events available.
@@ -741,6 +756,7 @@ impl EventLogSubscription {
                 if let Err(err) = result {
                     let code = err.code().0.cast_unsigned() & 0xFFFF;
                     if code == ERROR_NO_MORE_ITEMS {
+                        channel_sub.report_active();
                         channel_drained = true;
                         break;
                     }
@@ -812,6 +828,9 @@ impl EventLogSubscription {
                                 None
                             };
                             if let Some(reason) = idle_reason {
+                                // Treated as idle, not broken (see `handle_is_dead`), so it counts
+                                // as active like any other idle channel.
+                                channel_sub.report_active();
                                 if channel_sub.idle_resubscribes == 1 {
                                     info!(
                                         message = "Channel has nothing to read, keeping the subscription instead of rebuilding it.",
@@ -915,6 +934,7 @@ impl EventLogSubscription {
                 }
 
                 if returned == 0 {
+                    channel_sub.report_active();
                     channel_drained = true;
                     break;
                 }
@@ -924,10 +944,7 @@ impl EventLogSubscription {
                 channel_sub.next_resubscribe_at = None;
                 // A handle retained after a failed rebuild (or reported inactive while backed
                 // off) is evidently working: report it active again.
-                if !channel_sub.subscription_active {
-                    channel_sub.subscription_active = true;
-                    channel_sub.subscription_active_gauge.set(1.0);
-                }
+                channel_sub.report_active();
 
                 channel_sub
                     .events_read_counter
@@ -1610,6 +1627,68 @@ mod tests {
             sub.channels.len(),
             1,
             "Should have one channel subscription"
+        );
+    }
+
+    /// A handle retained after a failed rebuild is reported inactive; once it answers a pull
+    /// without delivering anything (`ERROR_NO_MORE_ITEMS` or an empty batch), it is evidently
+    /// usable and must be reported active again instead of staying down on an idle channel.
+    #[tokio::test]
+    async fn test_empty_pull_reports_retained_handle_active() {
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true;
+        config.event_timeout_ms = 100;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Drain the channel so the next pull answers `ERROR_NO_MORE_ITEMS` instead of
+        // delivering (delivery would restore the state on its own).
+        let mut drained = false;
+        for _ in 0..500 {
+            match subscription.pull_events(1000) {
+                Ok(events) if events.is_empty() => {
+                    drained = true;
+                    break;
+                }
+                Ok(_) => {}
+                Err(e) => panic!("pull failed while draining: {e}"),
+            }
+        }
+        assert!(drained, "Application channel did not drain");
+
+        // Simulate the state left by a failed rebuild that kept the old handle, then pull once.
+        // Only an empty pull exercises the path under test: a delivered event restores the
+        // state on its own. Application is a live log, so another process may write between
+        // the drain and the pull; in that case clear the state again and retry.
+        let mut checked = false;
+        for _ in 0..20 {
+            for channel in &mut subscription.channels {
+                channel.subscription_active = false;
+            }
+            let events = subscription
+                .pull_events(100)
+                .expect("pull on a drained channel should succeed");
+            if !events.is_empty() {
+                continue;
+            }
+
+            let (total, active) = subscription.channel_health_summary();
+            assert_eq!(total, 1);
+            assert_eq!(
+                active, 1,
+                "an answering handle must be reported active again"
+            );
+            checked = true;
+            break;
+        }
+        assert!(
+            checked,
+            "no empty pull observed; the channel kept delivering"
         );
     }
 
