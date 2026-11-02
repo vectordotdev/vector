@@ -50,9 +50,10 @@ pub(super) fn find(map: &Map<String, Value>, hint: Option<ComponentHint>) -> Vec
         Some(hint) => serde_json::json!({hint.as_component_field(): map}),
         None => Value::Object(map.clone()),
     };
-    // The schema only describes registered component types, so a configuration using any other
-    // type can never match it. Checking first avoids building the validator, which is expensive.
-    if let Some(component_type) = unregistered_component_type(&value) {
+    // The schema only describes component types registered with a schema, so a configuration
+    // using any other type can never match it. Checking first avoids building the validator,
+    // which is expensive.
+    if let Some(component_type) = component_type_without_schema(&value) {
         debug!(
             component_type,
             "Skipped ignored-field diagnostics because the configuration uses a component type without a schema."
@@ -65,20 +66,21 @@ pub(super) fn find(map: &Map<String, Value>, hint: Option<ComponentHint>) -> Vec
     ignored_paths(validator, &value)
 }
 
-/// Returns the first source, transform, or sink type that has no registered schema.
-pub(super) fn unregistered_component_type(value: &Value) -> Option<&str> {
+/// Returns the first source, transform, or sink type that has no schema, either because it does not
+/// exist or because it is only registered for deserialization.
+pub(super) fn component_type_without_schema(value: &Value) -> Option<&str> {
     let kinds: [(&str, fn() -> Vec<&'static str>); 3] = [
         ("sources", SourceDescription::types),
         ("transforms", TransformDescription::types),
         ("sinks", SinkDescription::types),
     ];
-    kinds.into_iter().find_map(|(field, registered_types)| {
+    kinds.into_iter().find_map(|(field, types_with_schema)| {
         let components = value.get(field)?.as_object()?;
-        let registered = registered_types();
+        let with_schema = types_with_schema();
         components
             .values()
             .filter_map(|component| component.get("type")?.as_str())
-            .find(|component_type| registered.binary_search(component_type).is_err())
+            .find(|component_type| with_schema.binary_search(component_type).is_err())
     })
 }
 
