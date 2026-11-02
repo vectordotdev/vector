@@ -37,6 +37,15 @@ generated: components: sinks: vector: configuration: {
 		required_one_of_group: "address_or_routing"
 		type: string: examples: ["http://127.0.0.1:6000", "https://somehost:6000"]
 	}
+	auth: {
+		description: """
+			Authentication sent with every request to the downstream Vector instance.
+
+			Use TLS to keep the credentials from being sent in plaintext.
+			"""
+		required: false
+		type:     _schemaDefinitions["core::option::Option<vector::http::VectorAuthConfig>"]
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false
