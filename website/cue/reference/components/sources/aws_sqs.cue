@@ -99,5 +99,18 @@ components: sources: aws_sqs: components._aws & {
 				`acknowledgements` setting.
 				"""
 		}
+		auto_concurrency: {
+			title: "Automatic Concurrency Management"
+			body: """
+				The `aws_sqs` source automatically manages the number of concurrent polling tasks by
+				monitoring the number of messages returned in each poll response.
+				Vector starts with a single polling task and scales up to `max_concurrency` tasks
+				when active pollers receive batches of 5 or more messages.
+				When a polling task waits for `poll_secs` and receives an empty response, excess
+				polling tasks shut down until a single active polling task remains.
+				This allows the source to respond dynamically to high queue volume while minimizing
+				unnecessary `ReceiveMessage` API requests when the queue is idle.
+				"""
+		}
 	}
 }
