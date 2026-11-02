@@ -69,15 +69,43 @@ pub(crate) struct BreakingSections {
 const SUMMARY_MARKER: &str = "\n## Summary\n";
 const MIGRATION_MARKER: &str = "\n## Migration\n";
 
-/// Anchors that would collide with fixed headings emitted by the upgrade-guide renderer.
+/// Fixed release-page headings and structural IDs that migration anchors must not shadow.
 /// Fragments may not choose these as their `{#anchor}` override, or produce them via slugify.
-pub(crate) const RESERVED_ANCHORS: &[&str] = &["vector-breaking-changes", "vector-upgrade-guide"];
+pub(crate) const RESERVED_ANCHORS: &[&str] = &[
+    "breaking-changes",
+    "bug-fixes",
+    "changelog",
+    "chore",
+    "deprecation-announcements",
+    "deprecations",
+    "enhancements",
+    "footer-heading",
+    "known-issues",
+    "new-features",
+    "page-content",
+    "security-changes",
+    "toc",
+    "upgrade-guide",
+    "vector-breaking-changes",
+    "vector-changelog",
+    "vector-upgrade-guide",
+    "vrl-breaking-changes",
+    "vrl-breaking-changes--upgrade-guide",
+    "vrl-changelog",
+    "vrl-enhancements",
+    "vrl-fixes",
+    "vrl-new-features",
+    "vrl-security",
+    "whats-next",
+];
 
 /// Slug rule shared by the CI checker and the release generator: lowercase ASCII alnum
 /// with `-` separators, non-empty, no leading/trailing hyphen, not a reserved name.
+/// The renderer owns `upgrade-guide-*` for migration subheadings.
 pub(crate) fn is_valid_anchor(anchor: &str) -> bool {
     !anchor.is_empty()
         && !RESERVED_ANCHORS.contains(&anchor)
+        && !anchor.starts_with("upgrade-guide-")
         && !anchor.starts_with('-')
         && !anchor.ends_with('-')
         && anchor
