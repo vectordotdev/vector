@@ -41,6 +41,19 @@ Trace Context, and other informational entries are defined in the
     -- the per-span shape (`service`, `name`, `resource`, `traceID`, `spanID`,
     `parentID`, `start`, `duration`, `error`, `meta`, `metrics`, `type`, `meta_struct`,
     `spanLinks`, `spanEvents`).
+- **Datadog indexed (`idx`) trace format**: the string-indexed form of the same
+  agent-to-backend payload, carried in `AgentPayload.idxTracerPayloads = 11`. Each
+  `idx.TracerPayload` holds one string table that its chunks, spans, events, and links
+  reference by index. Attributes are typed `AnyValue`s (string reference, bool, int,
+  double, bytes, array, key-value list), the 128-bit trace ID is a chunk-level field,
+  and the span kind and sampling mechanism are dedicated fields. The Datadog Agent
+  sends this form by default from 7.84.0 onward
+  ([7.84.0 release notes](https://github.com/DataDog/datadog-agent/releases/tag/7.84.0)).
+  The schema lives in
+  [`idx/tracer_payload.proto`](https://github.com/DataDog/datadog-agent/blob/7.84.0/pkg/proto/datadog/trace/idx/tracer_payload.proto)
+  and [`idx/span.proto`](https://github.com/DataDog/datadog-agent/blob/7.84.0/pkg/proto/datadog/trace/idx/span.proto).
+  This sub-RFC calls the `tracerPayloads` form "standard" where the distinction
+  matters; "legacy" continues to mean Vector's pre-typed `LegacyTraceEvent` layout.
 - **Datadog Agent OTLP ingest**: the OTLP-to-Datadog conversion implemented by the
   Datadog Agent in
   [`pkg/trace/api/otlp.go`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go)
@@ -81,7 +94,10 @@ Trace Context, and other informational entries are defined in the
 - The agent-payload envelope and tracer-payload tags in
   `TraceEvent.datadog.{agent,tracer}`.
 - The chunk-scoped typed state in `TraceEvent.datadog.chunk = Some(...)`
-  (`priority`, `origin`, `dropped`, `tags`).
+  (`priority`, `origin`, `dropped`, `sampling_mechanism`, `tags`).
+- Ingress of both the standard `tracerPayloads` form and the indexed
+  `idxTracerPayloads` form into the same typed layout, so that a trace's typed
+  representation does not depend on which form the Datadog Agent sent.
 - The stable partition of each chunk by its wire spans' reconstructed trace ID and
   `Span.service` on ingress, storing the ID in `TraceEvent.trace_id`, and the
   corresponding re-coalescence by trace ID on egress.
@@ -99,10 +115,9 @@ Trace Context, and other informational entries are defined in the
   Out of scope.
 - `TracerPayload.containerDebug` (Datadog-internal container-tag-resolution diagnostic);
   dropped on ingest, not synthesized on egress.
-- Typed decoding of `AgentPayload.idxTracerPayloads = 11` (the indexed/deduplicated
-  tracer-payload form). Until support lands, standard `tracerPayloads` entries are
-  processed while indexed entries are discarded; see "Ingress and egress
-  mapping."
+- Datadog egress in the indexed form. The `datadog_traces` sink emits standard
+  `tracerPayloads` only; see "Zero-loss round-trip exclusions" for the
+  indexed-sourced shapes this leaves outside the round-trip guarantee.
 - Typed decoding of the pre-`tracerPayloads` `/api/v0.2/traces` shape
   (`traces` / `transactions` with empty `tracerPayloads`). The typed mapping discards
   those spans and reports the drop. Removing that decode path may land independently
@@ -133,6 +148,16 @@ Rationale section below.
 - **Unknown `AttributeAnyValue` or array-element type discriminators** drop the
   containing span-event attribute and saturating-increment
   `SpanEvent.dropped_attributes_count`.
+- **`_dd.p.dm` on a subset of spans, or with differing values across a chunk**,
+  ingests as one chunk-level `sampling_mechanism` and egresses on every span of the
+  chunk; see "Sampling mechanism."
+- **Indexed-sourced values with no standard wire form**: array and key-value-list
+  values in span, chunk, tracer, and link attributes egress as `dd_value_to_string`
+  strings, and span-event attribute values without an `AttributeAnyValue` form
+  (bytes, key-value lists, nested arrays) are stringified. When the Datadog backend
+  reads the indexed form directly, it flattens attribute arrays and maps into dotted
+  keys, keeps span-event arrays and maps nested, and renders span-event bytes as
+  base64; see the stringification paragraph under Rationale.
 The Datadog-side consequences of the parent RFC's malformed-input rule, zero-ID
 rejection, and wire-domain normalization also apply.
 
@@ -167,14 +192,13 @@ wire format.
 
 #### Ingress and egress mapping
 
-Until indexed decoding is implemented, the source discards every non-empty
-`idxTracerPayloads` entry. Standard `tracerPayloads` in the same `AgentPayload` continue
-through the mapping below. An indexed-only payload consequently produces zero events and
-is nonetheless acknowledged, avoiding retries that cannot succeed on the same Vector
-version.
+Standard `tracerPayloads` entries follow the mapping below. Indexed
+`idxTracerPayloads` entries follow "Indexed (`idx`) ingress," which resolves the string
+table and then applies the same grouping and typed placement. An `AgentPayload` may
+carry both; each entry is mapped independently.
 
-After indexed entries are handled as above, a modern `AgentPayload` whose
-`tracerPayloads` repeated field is empty and whose historical `traces` and
+A modern `AgentPayload` whose `tracerPayloads` and `idxTracerPayloads` repeated fields
+are both empty and whose historical `traces` and
 `transactions` fields are also empty, or a `TracerPayload` whose `chunks` repeated
 field is empty, produces zero `TraceEvent`s: there is no
 `TraceChunk` from which to populate `TraceEvent.datadog.chunk` and no event grouping is
@@ -216,7 +240,8 @@ The grouping rules are:
   event-scoped state" below).
 - `TraceChunk.{priority, origin, droppedTrace, tags}` populate
   `TraceEvent.datadog.chunk = Some(DatadogChunkContext { ... })`, including when every
-  field is default.
+  field is default. `_dd.p.dm` populates `sampling_mechanism` (see "Sampling
+  mechanism").
   Every decoded `priority` value is present internally: `0` maps to
   `Some(SamplingPriority::AutoReject)` and every other `i32` maps through the parent
   RFC's canonical constructor.
@@ -249,6 +274,8 @@ merges or omits waits until the source emits typed events.
 | `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `TraceEvent.trace_id.high_u64`                        |
 | `Span.spanID`, `Span.parentID`                                | `Span.span_id`, `Span.parent_span_id`                 |
 | `Span.name`                                                   | `Span.name`                                           |
+| `Span.meta["span.kind"]` (known values, see below)            | `Span.kind`                                           |
+| `_dd.p.dm` in `TraceChunk.tags` or `Span.meta` (see below)    | `TraceEvent.datadog.chunk.sampling_mechanism`         |
 | `Span.resource`                                               | `Span.datadog.resource_name`                          |
 | `Span.type`                                                   | `Span.datadog.span_type`                              |
 | `Span.start`, `Span.duration`                                 | `Span.start_time`, `Span.duration` (ns-exact)         |
@@ -271,6 +298,85 @@ The cross-format derivation rules later in this section (`datadog.span_type` fro
 `Resource.attributes` into per-span `meta`) are projections of the Datadog Agent OTLP
 ingest reference in the Glossary. The precise key sets and lookup orders track current
 upstream behavior without requiring a specification amendment.
+
+#### Indexed (`idx`) ingress
+
+An `idx.TracerPayload` maps to the same typed layout as the standard `TracerPayload`
+it replaces, so a trace occupies the same typed fields whichever form the Agent sent.
+The rules below state only where the indexed form differs from the standard mapping
+above.
+
+**String table.**
+
+- Every `*Ref` field and attribute key is an index into the enclosing
+  `idx.TracerPayload.strings`. Index `0` is the empty string by producer convention
+  and maps like an empty standard string (see "Empty Datadog string fields").
+- A reference that does not index the table is malformed. The parent RFC's
+  smallest-item disposition applies: an invalid attribute key or value drops that
+  attribute; an invalid required span field (`serviceRef`, `nameRef`, `resourceRef`,
+  `typeRef`) drops the span; an invalid `TracerPayload` or `TraceChunk` scalar drops
+  that grouping.
+- Resolving references must not allocate without bound. The decoder bounds the total
+  bytes materialized from string references per request and rejects the request when
+  the bound is exceeded, because a small payload can reference one large string many
+  times. The bound is an implementation choice. The rejection uses a non-retryable
+  `4xx` status and is reported, because the Datadog Agent retries `408`, `429`, and
+  `5xx` responses and a resend of the same payload cannot succeed.
+
+**Identifiers and grouping.**
+
+- `TraceChunk.traceID` must be exactly 16 bytes, big-endian. It populates
+  `TraceEvent.trace_id` for every span in the chunk; any other length, or an all-zero
+  ID, drops the chunk and reports it. Indexed spans carry no per-span trace ID, so the
+  `_dd.p.tid` reconstruction rule does not apply. A `_dd.p.tid` span attribute is
+  consumed and does not override the chunk ID; a differing value is reported.
+- `SpanLink.traceID` must be 8 or 16 bytes, big-endian; an 8-byte ID has a zero high
+  half. Any other length drops the link.
+- `Span.spanID` and `Span.parentID` follow the standard rules (`parentID = 0` is `None`).
+- Chunks are partitioned by resolved `Span.service` exactly like standard chunks. Because
+  the trace ID is chunk-level, no trace-ID partitioning is needed.
+
+**Typed placement.**
+
+| Indexed                                               | Internal                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------- |
+| `TracerPayload` `*Ref` scalars                        | Same slots as the standard `TracerPayload` scalars            |
+| `TracerPayload.attributes`                            | `TraceEvent.datadog.tracer.tags` (typed `AttrValue`)          |
+| `TraceChunk.{priority, droppedTrace}`, `originRef`    | `DatadogChunkContext.{priority, dropped, origin}`             |
+| `TraceChunk.samplingMechanism`                        | `DatadogChunkContext.sampling_mechanism` (always `Some`)      |
+| `TraceChunk.attributes`                               | `DatadogChunkContext.tags` (typed `AttrValue`)                |
+| `Span.{serviceRef, nameRef, resourceRef, typeRef}`    | Same slots as standard `Span.{service, name, resource, type}` |
+| `Span.start`, `Span.duration` (unsigned)              | `Span.start_time`, `Span.duration`                            |
+| `Span.error` (bool)                                   | `Span.status` per the `error != 0` rule                       |
+| `Span.kind`                                           | `Span.kind` (see "`Span.kind`")                               |
+| `Span.{envRef, versionRef, componentRef}` (non-empty) | `Span.attributes.{env, version, component}`                   |
+| `Span.attributes` string, bool, int, double           | `Span.attributes` `String`, `Bool`, `Int`, `Double`           |
+| `Span.attributes` bytes                               | `Span.datadog.meta_struct`                                    |
+| `Span.attributes` array, key-value list               | `Span.attributes` `Array`, `Map`                              |
+| `SpanEvent`, `SpanLink` fields and typed attributes   | `SpanEvent`, `SpanLink` with per-variant `AttrValue`          |
+
+**Placement notes.**
+
+- Promoted span fields stay attributes. The standard form carries `env`, `version`, and
+  `component` as `meta` entries and the typed model has no span-level slots for them,
+  so the indexed fields are lifted back into those keys. When the key is already
+  present with a different value, `componentRef` wins and the `env` / `version`
+  attributes win, matching the Datadog backend's indexed reader; the conflict is
+  reported.
+- Top-level span `bytes` attributes are `meta_struct` payloads. The Agent's indexed
+  converter encodes standard `meta_struct` entries this way, and the Datadog backend
+  decodes them as `meta_struct`.
+- Key-value lists become `AttrValue::Map`. Keys that resolve to the same string use
+  wire-order last-wins; each overwritten value saturating-increments the enclosing
+  item's dropped-attribute count where the model carries one.
+- An unset `AnyValue` is `AttrValue::Null`.
+- `TracerPayload.containerDebug` is dropped, as for the standard form.
+
+Value types on Datadog-sourced attributes therefore depend on the Agent's wire form:
+standard input produces only `String` and `Double` values in `Span.attributes`, while
+indexed input may also produce `Int`, `Bool`, `Array`, and `Map`, and typed values in
+chunk, tracer, and link attributes. Typed consumers must not assume a key's variant
+from its source being Datadog.
 
 #### `TracerPayload` semantic-convention key mapping
 
@@ -335,6 +441,50 @@ The tag is sink-owned: Datadog egress derives it exclusively from
 `meta["_dd.p.tid"]` as a zero-padded 16-character lowercase hex string; if zero, the
 tag is omitted. A transform-authored `attributes["_dd.p.tid"]` does not win. Removing
 such an entry is reported; Datadog has no wire dropped-attribute count to update.
+
+#### `Span.kind`
+
+The span kind has one typed home in both Datadog forms. Indexed ingress maps
+`idx.Span.kind` to `Span.kind` through the parent RFC's canonical constructor,
+including `Unspecified` and unknown values as `Other(n)`. Standard ingress lifts
+`meta["span.kind"]` into `Span.kind` when the value is exactly `internal`, `server`,
+`client`, `producer`, or `consumer`, and consumes the entry. Any other value stays in
+`Span.attributes` and leaves `Span.kind` as `Unspecified`, so the original string
+round-trips. When an indexed span's `kind` is `Unspecified`, a `span.kind` attribute
+follows the standard lifting rule. Otherwise the field wins: the attribute is
+consumed, and a disagreeing value is reported.
+
+On Datadog egress, a `Span.kind` of `Internal`, `Server`, `Client`, `Producer`, or
+`Consumer` writes `meta["span.kind"]` with the matching lowercase name and replaces any
+attribute at that key. `Unspecified` and `Other(_)` write nothing, and an attribute at
+that key is emitted as an ordinary attribute.
+
+#### Sampling mechanism
+
+The sampling mechanism identifies the sampler that made the chunk's decision. It is
+chunk-scoped like `priority` and is stored as
+`DatadogChunkContext.sampling_mechanism: Option<u32>`.
+
+- Indexed ingress maps every decoded `TraceChunk.samplingMechanism`, including `0`,
+  to `Some(n)`, as for `priority`. Proto3 cannot distinguish an absent value from
+  mechanism `0`, and the Datadog backend renders both as `_dd.p.dm = "-0"` on every
+  span, so `Some(0)` reproduces the backend's view. `None` means no source value,
+  such as standard input without `_dd.p.dm` or an OTLP-sourced event.
+- Standard ingress reads `_dd.p.dm` from `TraceChunk.tags`, else from the first span in
+  wire order that carries it in `meta`. The value is `-<n>` or `<n>` for an unsigned
+  32-bit `n`. A parseable value populates the field, and every parseable `_dd.p.dm`
+  entry in the chunk's tags and spans is consumed. A differing value on a later span
+  is reported. An unparseable value is not consumed and stays an ordinary attribute.
+- The `_dd.p.dm` key is sink-owned on Datadog egress, like `_dd.p.tid`. When the field
+  is `Some(n)`, egress writes `_dd.p.dm = "-<n>"` into `TraceChunk.tags` and into the
+  `meta` of every span in the chunk, replacing any attribute at that key. When it is
+  `None`, egress writes no `_dd.p.dm`.
+
+The Datadog backend reads the mechanism from both the chunk tag and each span's
+`meta`, and its indexed reader writes the chunk value onto every span. Writing it on
+every span therefore matches how the backend sees the same trace when the Agent sends
+the indexed form. For standard input that tagged only some spans, this is the declared
+normalization listed under exclusions.
 
 #### `SpanLink.traceID_high`
 
@@ -462,9 +612,9 @@ always present because protobuf cannot distinguish an omitted map from an empty 
 
 #### Datadog chunk context
 
-Datadog `TraceChunk.priority`, `origin`, `droppedTrace`, and `tags` apply uniformly to
-every span in the chunk. Every Datadog-sourced `TraceEvent` corresponds to exactly one
-chunk by construction and therefore carries `TraceEvent.datadog.chunk = Some(...)`, including
+Datadog `TraceChunk.priority`, `origin`, `droppedTrace`, sampling mechanism, and `tags`
+apply uniformly to every span in the chunk. Every Datadog-sourced `TraceEvent`
+corresponds to exactly one chunk by construction and therefore carries `TraceEvent.datadog.chunk = Some(...)`, including
 for an explicitly all-default chunk. An OTLP-sourced event with no recovered Datadog
 chunk state carries `None`.
 
@@ -486,9 +636,9 @@ logic. Per the deferral above, the individual kind-to-type cases track that upst
 reference and are not fixed by this document.
 
 If `Span.datadog.span_type` is `Some(v)`, the value is emitted as-is (Datadog-sourced spans
-carry it directly). Because Datadog has no span-kind wire field, `Span.kind` is always
-`Unspecified` for Datadog-sourced events on ingress; the `SpanKind2Type` derivation
-therefore never fires on a pure `Datadog -> Vector -> Datadog` round trip.
+carry it directly). Datadog-sourced spans always carry `span_type`, so the
+`SpanKind2Type` derivation never fires on a pure `Datadog -> Vector -> Datadog` round
+trip even though `Span.kind` may be set (see "`Span.kind`").
 
 When `Span.datadog.resource_name` is `None` on Datadog egress (the normal case for OTLP-sourced
 spans), the sink derives the wire `Span.resource` from `Span.attributes` following the
@@ -524,6 +674,9 @@ On Datadog egress, the sink:
 - Emits `TraceEvent.trace_id.low_u64()` as every contained wire `Span.traceID`; writes
   `meta["_dd.p.tid"]` from `TraceEvent.trace_id.high_u64()` if non-zero, omits it if zero
   (see "`_dd.p.tid`" above).
+- Writes `meta["span.kind"]` from `Span.kind` and `_dd.p.dm` from
+  `DatadogChunkContext.sampling_mechanism` (see "`Span.kind`" and "Sampling
+  mechanism" above).
 - Resolves the typed slot/attribute-map pair `Span.status` versus
   `Span.attributes."error.message"`:
   - When `Span.status` is `Error(message)` or `Other(_, message)` and `message` is
@@ -678,9 +831,10 @@ the Glossary, is the reference for these derivations:
 The rest follows this RFC's explicit typed mapping. In particular, Vector emits
 `SpanEvent` and `SpanLink` through their native Datadog protobuf fields and preserves a
 128-bit trace ID through `_dd.p.tid`; it does not reproduce the Agent converter's legacy
-`meta["events"]`, `meta["_dd.span_links"]`, `meta["otel.trace_id"]`, or
-`meta["span.kind"]` encodings unless a separate mapping rule above requires the same
-field. Those wire-shape differences are permitted only where the Datadog backend
+`meta["events"]`, `meta["_dd.span_links"]`, or `meta["otel.trace_id"]` encodings unless
+a separate mapping rule above requires the same field. `meta["span.kind"]` is written
+from `Span.kind` under the "`Span.kind`" rule, which matches the Agent converter for
+known kinds. Those wire-shape differences are permitted only where the Datadog backend
 observes equivalent trace data.
 
 `datadog_agent -> Vector -> OTLP` is the inverse of the forward mapping for fields the
@@ -759,12 +913,30 @@ not authoritative.
   single-service chunks pass through unchanged; for a non-conforming multi-trace chunk,
   egress emits one chunk per `trace_id`. Both shapes are effectively equivalent at the
   Datadog backend, since chunk grouping is an ingestion-time transport detail rather
-  than a semantic primitive. All four `DatadogChunkContext` fields contribute to the
+  than a semantic primitive. All five `DatadogChunkContext` fields contribute to the
   grouping key; `dropped` (`droppedTrace` on the wire) is chunk-scoped sampler state,
   not a per-group attribute: two chunks that share the same
-  `(priority, origin, tags, TraceEvent.trace_id)` but differ on `droppedTrace` must
-  remain distinct egress chunks, otherwise the relay re-emits the second chunk's spans
-  with the wrong dropped flag.
+  `(priority, origin, sampling_mechanism, tags, TraceEvent.trace_id)` but differ on
+  `droppedTrace` must remain distinct egress chunks, otherwise the relay re-emits the
+  second chunk's spans with the wrong dropped flag.
+- The indexed form is covered in this sub-RFC, not deferred, because deferring it would
+  fix a typed layout that indexed ingress later contradicts. Indexed payloads carry
+  the span kind and sampling mechanism as dedicated fields and may omit the standard
+  `span.kind` tag. If standard ingress kept them as attributes, the same trace would land
+  in different typed fields depending on the Agent version, and reconciling the two
+  later would move data that typed consumers already read. Lifting both into typed
+  slots for both forms keeps one layout.
+- The sampling mechanism is a typed `DatadogChunkContext` field rather than a
+  `_dd.p.dm` chunk-tag convention for the same reason `priority` is typed: it is
+  chunk-scoped sampler state that egress must reproduce on every span, not an opaque
+  tag. The indexed wire field is already an integer. The tag stays sink-owned on
+  egress, following the `_dd.p.tid` precedent.
+- Standard egress stringifies array and key-value-list attribute values through
+  `dd_value_to_string` rather than flattening them into dotted keys. The sink has no
+  provenance to tell indexed-sourced values from OTLP-sourced ones, and flattening
+  would diverge from the Datadog Agent's OTLP converter, which stringifies them. The
+  resulting indexed-sourced difference is declared under exclusions; indexed egress
+  or a flattening rule (see Future Improvements) would remove it.
 - Attribute iteration order within `SpanEvent.attributes` is not preserved by the
   parent RFC's key-sorted `Attributes` carrier. Although the upstream Datadog
   `Span.proto` notes that this order "should be preserved," the comment is not honored
@@ -869,7 +1041,10 @@ coexistence integration. This sub-RFC supplies the following Datadog-specific wo
 1. Implement the Datadog converter and unique detection of historical pre-hint layouts.
    The converter must split each chunk by reconstructed trace ID and `Span.service` in
    stable first-seen pair order and apply the parent RFC's metadata and acknowledgement
-   contract to the resulting sequence.
+   contract to the resulting sequence. The same converter covers legacy layouts
+   produced from indexed payloads, which carry the span kind in `meta["span.kind"]`,
+   the sampling mechanism in the `_dd.p.dm` chunk tag, and indexed bytes attributes
+   in `meta_struct`.
 2. Implement `TraceEvent -> Datadog` encoding satisfying the mapping and egress contracts
    above.
 3. During the parent RFC's sink-local stage, migrate the `datadog_traces` sink and APM
@@ -888,13 +1063,13 @@ coexistence integration. This sub-RFC supplies the following Datadog-specific wo
 
 ## Future Improvements
 
-- Datadog `AgentPayload.idxTracerPayloads = 11` (indexed / deduplicated tracer-payload form): map
-  the indexed shape through the same typed model. Until that support is added, indexed
-  entries are discarded while standard entries continue. A stricter mode may instead
-  reject any payload containing indexed entries when operators prefer all-or-nothing
-  acceptance. The indexed shape has been reviewed against the typed slots and fits
-  field-for-field with no structural changes required; remaining work is string-table
-  codec at the wire boundary.
+- Datadog egress in the indexed form. The typed model already holds every indexed
+  field, so the remaining work is a string-table encoder and egress rules for typed
+  attribute values. Indexed egress would remove the indexed-sourced exclusions above.
+- Standard-form egress of array and key-value-list span attributes as dotted keys with typed
+  leaves (`k.0`, `k.sub`), matching how the Datadog backend reads them from indexed
+  payloads. This changes only the sink's wire output, not the typed layout, but it
+  diverges from the Agent's OTLP converter for OTLP-sourced arrays.
 - VRL helper for decoding raw Datadog `Span` protobuf into the typed surface
   (`decode_datadog_span`), parallel to the OTLP mapping sub-RFC's `decode_otlp_span`
   helper.
