@@ -10,7 +10,6 @@
 #![allow(async_fn_in_trait)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::type_complexity)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
@@ -42,7 +41,6 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
         tikv_jemallocator::Jemalloc,
     );
 
-#[allow(unreachable_pub)]
 pub mod internal_telemetry;
 
 #[macro_use]
@@ -64,11 +62,10 @@ pub mod internal_events;
 #[cfg(feature = "lapin")]
 pub mod amqp;
 #[cfg(feature = "api")]
-#[allow(unreachable_pub)]
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 pub mod aws;
 pub mod common;
 pub mod completion;
@@ -112,7 +109,6 @@ pub mod template;
 pub mod test_util;
 #[cfg(feature = "top")]
 pub mod top;
-#[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]

@@ -64,6 +64,13 @@ use crate::event::EventStatus;
 
 // === BatchSink ===
 
+/// The [`PartitionBatchSink`] used by [`BatchSink`], with a single unit partition.
+type UnpartitionedBatchSink<S, B> = PartitionBatchSink<
+    Map<S, PartitionInnerBuffer<<B as Batch>::Output, ()>, <B as Batch>::Output>,
+    PartitionBuffer<B, ()>,
+    (),
+>;
+
 /// A `Sink` interface that wraps a `Service` and a
 /// `Batch`.
 ///
@@ -88,11 +95,7 @@ where
     B: Batch,
 {
     #[pin]
-    inner: PartitionBatchSink<
-        Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
-        PartitionBuffer<B, ()>,
-        (),
-    >,
+    inner: UnpartitionedBatchSink<S, B>,
 }
 
 impl<S, B> BatchSink<S, B>
