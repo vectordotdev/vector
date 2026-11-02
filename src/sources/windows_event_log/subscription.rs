@@ -84,6 +84,11 @@ const ERROR_INVALID_OPERATION: u32 = 4317; // 0x10DD
 /// calls). Before this was handled, a source went silent until Vector itself was restarted.
 const ERROR_INVALID_HANDLE: u32 = 6;
 const ERROR_EVT_INVALID_QUERY: u32 = 15_001; // 0x3A99
+/// Returned by `EvtSubscribe` for a channel that does not exist, and by `EvtNext` once a channel
+/// that existed at subscription time has been unregistered. The latter happens for a few seconds
+/// during every Microsoft Defender platform update, which unregisters and re-registers
+/// `Microsoft-Windows-Windows Defender/Operational`. The old handle never recovers, so it is
+/// rebuilt from the bookmark once the channel is back (vectordotdev/vector#26888).
 const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15_007; // 0x3A9F
 // Returned by `EvtSubscribe` for direct (analytic/debug) channels, which cannot be
 // subscribed to. Named explicitly because 15009 used to be held by the misnamed
@@ -146,14 +151,36 @@ const fn handle_is_dead(code: u32) -> bool {
     code == ERROR_EVT_QUERY_RESULT_STALE
         || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
         || code == ERROR_INVALID_HANDLE
+        || code == ERROR_EVT_CHANNEL_NOT_FOUND
+}
+
+/// Whether a failed `EvtSubscribe` reports that the channel is not registered.
+fn is_channel_not_found(error: &windows::core::Error) -> bool {
+    error.code().0.cast_unsigned() & 0xFFFF == ERROR_EVT_CHANNEL_NOT_FOUND
+}
+
+/// Whether `EvtNext` returning `code` routes into the re-subscription branch of the pull loop.
+///
+/// `ERROR_INVALID_OPERATION` is included but handled specially there: on a disabled or empty
+/// channel it only means there is nothing to read.
+const fn triggers_resubscribe(code: u32) -> bool {
+    handle_is_dead(code) || code == ERROR_INVALID_OPERATION
+}
+
+/// Whether the handle stopped working because of something outside the channel's data
+/// (the Event Log service restarted, or the channel was unregistered), so a rebuild must
+/// not wait for an idle-channel backoff set earlier.
+const fn handle_lost_externally(code: u32) -> bool {
+    code == ERROR_INVALID_HANDLE || code == ERROR_EVT_CHANNEL_NOT_FOUND
 }
 
 /// Cap a pending re-subscription deadline at the base interval from `now`.
 ///
-/// Used for `ERROR_INVALID_HANDLE`: the handle's service instance is gone and it can never
-/// signal, so an idle-channel deadline set before the service stopped must not hold back
-/// its replacement. Without a deadline, the rebuild happens right away.
-fn cap_deadline_for_invalid_handle(
+/// Used for `ERROR_INVALID_HANDLE` and `ERROR_EVT_CHANNEL_NOT_FOUND`: the handle's service
+/// instance or channel registration is gone and it can never signal, so an idle-channel
+/// deadline set before must not hold back its replacement. Without a deadline, the rebuild
+/// happens right away.
+fn cap_deadline_for_lost_handle(
     deadline: Option<std::time::Instant>,
     now: std::time::Instant,
 ) -> Option<std::time::Instant> {
@@ -726,21 +753,18 @@ impl EventLogSubscription {
                     // repeatedly on a perfectly healthy channel. Previously it was mistaken
                     // for a stale result (the constant held 4317) and swallowed at debug
                     // level, so the source went silent for good while still looking healthy.
-                    if code == ERROR_EVT_QUERY_RESULT_STALE
-                        || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
-                        || code == ERROR_INVALID_OPERATION
-                        || code == ERROR_INVALID_HANDLE
-                    {
+                    if triggers_resubscribe(code) {
                         let now = std::time::Instant::now();
                         // An invalid handle belongs to an Event Log service instance that is
                         // gone; it can never signal again. An idle-channel deadline inherited
                         // from before the service stopped (up to RESUBSCRIBE_BACKOFF_MAX) must
-                        // not delay its replacement, so cap it at the base interval.
-                        if code == ERROR_INVALID_HANDLE {
-                            channel_sub.next_resubscribe_at = cap_deadline_for_invalid_handle(
-                                channel_sub.next_resubscribe_at,
-                                now,
-                            );
+                        // not delay its replacement, so cap it at the base interval. The same
+                        // holds for a channel that was unregistered (Defender platform update):
+                        // it is usually back within seconds. While it is still missing, the
+                        // rebuild fails and is retried on the base interval below.
+                        if handle_lost_externally(code) {
+                            channel_sub.next_resubscribe_at =
+                                cap_deadline_for_lost_handle(channel_sub.next_resubscribe_at, now);
                         }
                         let backed_off = channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
                         if !signalled && backed_off {
@@ -812,7 +836,7 @@ impl EventLogSubscription {
                         let loud = channel_sub.idle_resubscribes.is_power_of_two();
                         if loud {
                             warn!(
-                                message = "Subscription handle no longer usable (stale result, invalidated position, invalid operation, or invalid handle), attempting re-subscription.",
+                                message = "Subscription handle no longer usable (stale result, invalidated position, invalid operation, invalid handle, or channel not found), attempting re-subscription.",
                                 error_code = code,
                                 channel = %channel_sub.channel,
                                 idle_resubscribes = channel_sub.idle_resubscribes
@@ -1073,9 +1097,10 @@ impl EventLogSubscription {
         Ok(all_events)
     }
 
-    /// Re-subscribe a channel after its query position becomes invalid
-    /// (e.g., an admin cleared the event log). Closes the old subscription
-    /// handle and creates a new one using the current bookmark.
+    /// Re-subscribe a channel whose subscription handle can no longer serve results (stale or
+    /// invalidated query position, e.g. after an admin cleared the event log; a restarted Event
+    /// Log service; or a channel that was unregistered and registered again). Creates a new
+    /// handle from the current bookmark and only then closes the old one.
     fn resubscribe_channel(
         channel_sub: &mut ChannelSubscription,
         config: &WindowsEventLogConfig,
@@ -1126,6 +1151,11 @@ impl EventLogSubscription {
                 );
                 match strict_result {
                     Ok(handle) => Ok(handle),
+                    // The channel is not registered (yet). That says nothing about the bookmark,
+                    // so keep it and let the caller retry, rather than falling back to a
+                    // subscription without it, which would replay or skip records if the
+                    // channel came back between the two calls.
+                    Err(e) if is_channel_not_found(&e) => Err(e),
                     Err(e) => {
                         warn!(
                             message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
@@ -1422,13 +1452,13 @@ mod tests {
         // Event Log service stopped: the dead handle must be rebuilt within the base interval.
         let inherited = Some(now + Duration::from_secs(600));
         assert_eq!(
-            cap_deadline_for_invalid_handle(inherited, now),
+            cap_deadline_for_lost_handle(inherited, now),
             Some(now + Duration::from_secs(5))
         );
         // A shorter deadline is kept, and no deadline means rebuild immediately.
         let short = Some(now + Duration::from_secs(2));
-        assert_eq!(cap_deadline_for_invalid_handle(short, now), short);
-        assert_eq!(cap_deadline_for_invalid_handle(None, now), None);
+        assert_eq!(cap_deadline_for_lost_handle(short, now), short);
+        assert_eq!(cap_deadline_for_lost_handle(None, now), None);
     }
 
     #[test]
@@ -1473,9 +1503,42 @@ mod tests {
         assert!(handle_is_dead(ERROR_INVALID_HANDLE));
         assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_STALE));
         assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_INVALID_POSITION));
+        // Channel unregistered while subscribed (Defender platform update, #26888).
+        assert!(handle_is_dead(ERROR_EVT_CHANNEL_NOT_FOUND));
         // Also returned by a healthy but idle channel, so it must not flip the active state.
         assert!(!handle_is_dead(ERROR_INVALID_OPERATION));
         assert!(!handle_is_dead(ERROR_NO_MORE_ITEMS));
+    }
+
+    #[test]
+    fn test_externally_lost_handles_skip_idle_backoff() {
+        // Service restart and unregistered channel: an idle-channel deadline must not delay
+        // the rebuild.
+        assert!(handle_lost_externally(ERROR_INVALID_HANDLE));
+        assert!(handle_lost_externally(ERROR_EVT_CHANNEL_NOT_FOUND));
+        // Stale results and idle channels keep their backoff.
+        assert!(!handle_lost_externally(ERROR_EVT_QUERY_RESULT_STALE));
+        assert!(!handle_lost_externally(
+            ERROR_EVT_QUERY_RESULT_INVALID_POSITION
+        ));
+        assert!(!handle_lost_externally(ERROR_INVALID_OPERATION));
+        // Every one of these is handled by the pull loop's re-subscription branch.
+        for code in [
+            ERROR_EVT_QUERY_RESULT_STALE,
+            ERROR_EVT_QUERY_RESULT_INVALID_POSITION,
+            ERROR_INVALID_OPERATION,
+            ERROR_INVALID_HANDLE,
+            ERROR_EVT_CHANNEL_NOT_FOUND,
+        ] {
+            assert!(
+                triggers_resubscribe(code),
+                "{code} must trigger a re-subscription"
+            );
+        }
+        assert!(!triggers_resubscribe(ERROR_NO_MORE_ITEMS));
+        assert!(!triggers_resubscribe(ERROR_ACCESS_DENIED));
+        // 0x80073A9F as reported in #26888, reduced the same way as in `pull_events_inner`.
+        assert_eq!(0x8007_3A9F_u32 & 0xFFFF, ERROR_EVT_CHANNEL_NOT_FOUND);
     }
 
     #[test]
