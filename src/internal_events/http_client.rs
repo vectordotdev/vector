@@ -260,9 +260,11 @@ fn convert_legacy_headers(headers: &http_0::HeaderMap) -> HeaderMap<HeaderValue>
         |mut converted, (name, value)| {
             let name = HeaderName::from_bytes(name.as_str().as_bytes())
                 .expect("http 0.2 header names are valid http 1 header names");
-            let value = HeaderValue::from_bytes(value.as_bytes())
+            let mut converted_value = HeaderValue::from_bytes(value.as_bytes())
                 .expect("http 0.2 header values are valid http 1 header values");
-            converted.append(name, value);
+            // Callers mark their own credential headers sensitive; keep that for redaction.
+            converted_value.set_sensitive(value.is_sensitive());
+            converted.append(name, converted_value);
             converted
         },
     )
@@ -436,6 +438,20 @@ mod tests {
             HttpRequestTelemetry::version(&request),
             Some(Version::HTTP_11)
         );
+    }
+
+    #[test]
+    fn legacy_request_keeps_caller_marked_sensitive_headers() {
+        let mut token = http_0::HeaderValue::from_static("secret");
+        token.set_sensitive(true);
+        let request = http_0::Request::builder()
+            .header("x-custom-token", token)
+            .body(hyper::Body::empty())
+            .unwrap();
+
+        let headers = HttpRequestTelemetry::sanitized_headers(&request);
+        let x_custom_token = HeaderName::from_static("x-custom-token");
+        assert_eq!(is_sensitive(&headers, &x_custom_token), [true]);
     }
 
     #[test]
