@@ -73,7 +73,7 @@ impl MetaDescriptive for ElasticsearchRequest {
 ///
 /// Bulk requests may need asynchronous AWS signing with a service-specific payload hash, so
 /// this service builds requests itself instead of using the generic `http_v1::HttpService`.
-/// Like the legacy HTTP batch service, it requests and decodes compressed responses.
+/// It requests and decodes compressed responses.
 #[derive(Clone)]
 pub struct ElasticsearchService {
     client: HttpClient,
