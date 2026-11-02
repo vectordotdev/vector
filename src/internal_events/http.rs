@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use http::Response;
+use http_0::Response;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},

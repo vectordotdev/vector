@@ -13,7 +13,7 @@ use std::{
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
-use http_1::uri::{InvalidUri, Uri};
+use http::uri::{InvalidUri, Uri};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -270,7 +270,7 @@ impl SourceConfig for PubsubConfig {
         let auth = self.auth.build(Scope::PubSub).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
-        auth.apply_uri_v1(&mut uri);
+        auth.apply_uri(&mut uri);
 
         let protocol = uri
             .scheme()
@@ -928,7 +928,7 @@ mod tests {
                         tokio::spawn(async move {
                             let mut requests = request.into_body();
                             requests.data().await.unwrap().unwrap();
-                            let response = http_1::Response::builder()
+                            let response = http::Response::builder()
                                 .header("content-type", "application/grpc")
                                 .body(())
                                 .unwrap();
@@ -1104,7 +1104,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();
@@ -1165,7 +1165,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();
@@ -1230,7 +1230,7 @@ mod integration_tests {
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
-    use http::method::Method;
+    use http_0::method::Method;
     use hyper::{Request, StatusCode};
     use serde_json::{Value, json};
     use tokio::time::{Duration, Instant};
@@ -1518,7 +1518,7 @@ mod integration_tests {
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = http_body::Body::collect(response.into_body())
+            let body = http_body_0::Body::collect(response.into_body())
                 .await
                 .unwrap()
                 .to_bytes();
