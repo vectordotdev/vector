@@ -1,11 +1,11 @@
 use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
-use tokio_util::codec::{LinesCodec, LinesCodecError};
+use tokio_util::codec::LinesCodecError;
 use tracing::trace;
 use vector_config::configurable_component;
 
-use super::BoxedFramingError;
+use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
 /// Config used to build a `OctetCountingDecoder`.
 #[configurable_component]
@@ -41,7 +41,7 @@ pub struct OctetCountingDecoderOptions {
 /// <https://tools.ietf.org/html/rfc6587#section-3.4.1>.
 #[derive(Clone, Debug)]
 pub struct OctetCountingDecoder {
-    other: LinesCodec,
+    other: CharacterDelimitedDecoder,
     octet_decoding: Option<State>,
 }
 
@@ -57,7 +57,7 @@ impl OctetCountingDecoder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            other: LinesCodec::new(),
+            other: CharacterDelimitedDecoder::new(b'\n'),
             octet_decoding: None,
         }
     }
@@ -66,7 +66,7 @@ impl OctetCountingDecoder {
     #[must_use]
     pub fn new_with_max_length(max_length: usize) -> Self {
         Self {
-            other: LinesCodec::new_with_max_length(max_length),
+            other: CharacterDelimitedDecoder::new_with_max_length(b'\n', max_length),
             octet_decoding: None,
         }
     }
@@ -168,22 +168,12 @@ impl OctetCountingDecoder {
 
                     Ok(None)
                 } else if let Some(msg) = src.get(from..to) {
-                    let bytes = if std::str::from_utf8(msg).is_ok() {
-                        Bytes::copy_from_slice(msg)
-                    } else {
-                        // The data was not valid UTF8 :-(.
-                        //
-                        // Advance the buffer past the erroneous bytes to
-                        // prevent us getting stuck in an infinite loop.
-                        src.advance(to);
-                        self.octet_decoding = None;
-                        return Err(LinesCodecError::Io(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to decode message as UTF8",
-                        )));
-                    };
-
-                    // We have managed to read the entire message as valid UTF8!
+                    // The message bytes are passed through as-is: the framer is
+                    // byte-oriented, and UTF-8 handling (strict or lossy) is the
+                    // responsibility of the deserializer, which applies
+                    // `String::from_utf8_lossy` when `lossy` is enabled (the
+                    // default for the syslog deserializer).
+                    let bytes = Bytes::copy_from_slice(msg);
                     src.advance(to);
                     self.octet_decoding = None;
                     Ok(Some(bytes))
@@ -257,23 +247,36 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(src) {
-            ret
+            ret.map_err(Into::into)
         } else {
-            // Octet counting isn't used so fallback to newline codec.
-            self.other.decode(src).map(|line| line.map(Into::into))
+            // Octet counting isn't used so fallback to newline-delimited
+            // decoding. Frames are passed through as raw bytes; UTF-8
+            // handling is left to the deserializer. A trailing `\r` is
+            // stripped to preserve the behavior of the previous
+            // `LinesCodec`-based fallback.
+            self.other
+                .decode(src)
+                .map(|line| line.map(strip_trailing_carriage_return))
         }
-        .map_err(Into::into)
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(buf) {
-            ret
+            ret.map_err(Into::into)
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other.decode_eof(buf).map(|line| line.map(Into::into))
+            self.other
+                .decode_eof(buf)
+                .map(|line| line.map(strip_trailing_carriage_return))
         }
-        .map_err(Into::into)
     }
+}
+
+fn strip_trailing_carriage_return(mut bytes: Bytes) -> Bytes {
+    if bytes.last() == Some(&b'\r') {
+        bytes.truncate(bytes.len() - 1);
+    }
+    bytes
 }
 
 #[cfg(test)]
@@ -335,16 +338,54 @@ mod tests {
     }
 
     #[test]
-    fn octet_decode_moves_past_invalid_utf8() {
+    fn octet_decode_passes_through_invalid_utf8() {
         let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(16);
 
-        // An invalid syslog message containing invalid utf8 bytes.
+        // An invalid syslog message containing invalid utf8 bytes: the framer
+        // must pass the raw bytes through instead of dropping the frame.
         buffer.put(&[b'4', b' ', 0xf0, 0x28, 0x8c, 0xbc][..]);
         let result = decoder.decode(&mut buffer);
 
-        assert!(result.is_err());
+        assert_eq!(
+            Ok(Some(Bytes::from_static(&[0xf0, 0x28, 0x8c, 0xbc]))),
+            result.map_err(|_| false)
+        );
         assert_eq!(b""[..], buffer);
+    }
+
+    #[test]
+    fn non_octet_decode_passes_through_invalid_utf8() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(128);
+        let mut buffer = BytesMut::with_capacity(16);
+
+        // Non-octet-counting (newline-delimited) message with invalid UTF-8:
+        // must be returned as raw bytes, not dropped with an error.
+        buffer.put(&b"<57>Mar 25 21:47:46 host app: dump "[..]);
+        buffer.put(&[0x96, 0xa9, 0xea, 0xe8, 0x80, 0xff][..]);
+        buffer.put(&b"\n<57>next\n"[..]);
+        let result = decoder.decode(&mut buffer);
+        let frame = result.unwrap().unwrap();
+        assert_eq!(
+            b"<57>Mar 25 21:47:46 host app: dump \x96\xa9\xea\xe8\x80\xff"[..],
+            frame[..]
+        );
+        let next = decoder.decode(&mut buffer);
+        assert_eq!(Ok(Some("<57>next".into())), next.map_err(|_| false));
+    }
+
+    #[test]
+    fn non_octet_decode_strips_trailing_carriage_return() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(128);
+        let mut buffer = BytesMut::with_capacity(16);
+
+        buffer.put(&b"<57>Mar 25 21:47:46 host app: msg\r\n"[..]);
+        let result = decoder.decode(&mut buffer);
+
+        assert_eq!(
+            Ok(Some("<57>Mar 25 21:47:46 host app: msg".into())),
+            result.map_err(|_| false)
+        );
     }
 
     #[test]
