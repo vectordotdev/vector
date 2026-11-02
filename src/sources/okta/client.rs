@@ -4,7 +4,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::StreamExt as _;
 use futures_util::{FutureExt, Stream, stream};
-use http::Uri;
+use http_0::Uri;
 use hyper::{Body, Request};
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
@@ -137,7 +137,7 @@ impl SourceConfig for OktaConfig {
 
         url_parts.path_and_query = Some(path_and_query.parse()?);
         if url_parts.scheme.is_none() {
-            url_parts.scheme = Some(http::uri::Scheme::HTTPS);
+            url_parts.scheme = Some(http_0::uri::Scheme::HTTPS);
         }
 
         let url = Uri::from_parts(url_parts).map_err(|_| {
@@ -194,10 +194,10 @@ fn enrich_events(events: &mut Vec<Event>, log_namespace: LogNamespace) {
 }
 
 type OktaRunResult =
-    Result<(http::response::Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
+    Result<(http_0::response::Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
 
 type OktaTimeoutResult =
-    Result<Result<http::Response<Body>, HttpError>, tokio::time::error::Elapsed>;
+    Result<Result<http_0::Response<Body>, HttpError>, tokio::time::error::Elapsed>;
 
 async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> OktaRunResult {
     let mut next: Option<Uri> = None;
@@ -215,7 +215,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 next = Some(next_url);
             }
 
-            let body = http_body::Body::collect(body).await?.to_bytes();
+            let body = http_body_0::Body::collect(body).await?.to_bytes();
 
             emit!(EndpointBytesReceived {
                 byte_size: body.len(),
@@ -348,13 +348,15 @@ async fn run(
 
                             let headers = request.headers_mut();
                             headers.insert(
-                                http::header::AUTHORIZATION,
+                                http_0::header::AUTHORIZATION,
                                 format!("SSWS {token}").parse().unwrap(),
                             );
-                            headers
-                                .insert(http::header::ACCEPT, "application/json".parse().unwrap());
                             headers.insert(
-                                http::header::CONTENT_TYPE,
+                                http_0::header::ACCEPT,
+                                "application/json".parse().unwrap(),
+                            );
+                            headers.insert(
+                                http_0::header::CONTENT_TYPE,
                                 "application/json".parse().unwrap(),
                             );
 

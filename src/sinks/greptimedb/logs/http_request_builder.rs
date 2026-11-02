@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
