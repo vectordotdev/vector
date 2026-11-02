@@ -117,22 +117,12 @@ Finally, a good fragment is concise and avoids implementation details.
 
 ### Breaking changes
 
-Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optional anchor, and
-`## Summary` / `## Migration` sections) so the release process can auto-generate the upgrade
-guide from them. See [Examples](#examples) below for the exact shape — or just run the
-scaffolder from [Quick start](#quick-start). The generated guide lives in the release
-page's Markdown and is rendered below the VRL changelog.
+Breaking fragments (`*.breaking.md`) generate an upgrade guide below the VRL changelog.
+Use the [scaffolder](#quick-start) or follow the [example](#breaking).
+VRL migration instructions are imported automatically.
 
-Release preparation also imports the selected VRL release's changelog. Current breaking
-entries supply their title, anchor, Summary, and Migration directly. Older entries under
-**Breaking Changes**, or with explicit migration notes or Before/After examples, remain
-supported. The VRL changelog retains the summary, contributor credit, and a link to the
-inline migration instructions.
-
-To preview both Vector and VRL release notes without preparing a release, run
-`cargo vdev release generate-cue --version <vector-version> --vrl-version <vrl-version>`.
-This generates new release files and keeps the source fragments; it refuses to overwrite
-existing release files.
+Preview with `cargo vdev release generate-cue --version <vector-version> --vrl-version <vrl-version>`.
+This keeps source fragments and refuses to overwrite release files.
 
 ## Authors
 
