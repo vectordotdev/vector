@@ -4,12 +4,10 @@ use bytes::Bytes;
 use http_1::{Request, StatusCode};
 use snafu::Snafu;
 use tracing::Instrument;
+use vector_http::full_body;
 
 use crate::{
-    http::{
-        Auth,
-        client_v1::{HttpClient, full_body},
-    },
+    http::{Auth, client_v1::HttpClient},
     sinks::{prelude::*, util::HttpEndpoint},
 };
 
@@ -39,9 +37,7 @@ pub enum LokiError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError {
-        error: crate::http::client_v1::HttpError,
-    },
+    HttpError { error: vector_http::HttpError },
 }
 
 #[derive(Debug, Snafu)]

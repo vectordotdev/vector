@@ -139,16 +139,6 @@ pub async fn get_received_gzip(
     .await
 }
 
-pub async fn get_received_zlib(
-    rx: mpsc::Receiver<(Parts, Bytes)>,
-    assert_parts: impl Fn(Parts),
-) -> Vec<String> {
-    get_received(rx, assert_parts, |body| {
-        CappedDecoder::zlib(body.reader()).into_reader()
-    })
-    .await
-}
-
 async fn get_received<D>(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),

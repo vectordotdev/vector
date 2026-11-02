@@ -1,0 +1,29 @@
+{{/* Returns the deprecation notices under content/deprecations as a dict:
+       active:  notices without `removed_in` (mounted from deprecation.d/)
+       enacted: notices with `removed_in` (content/en/deprecations/enacted/)
+     Each notice is a map with `what`, `deprecated_since`, `removed_in` (enacted
+     only) and the rendered body as `content`. Versions are normalized to X.Y.Z
+     by deprecations/version.html.
+     Active notices are sorted by `deprecated_since`, newest first. Enacted
+     notices are sorted by `removed_in`, newest first, then by
+     `deprecated_since`, newest first (`sort` is stable, so the secondary key
+     is applied first). Sorting uses the numeric `since_key`/`removed_key`, as
+     the version strings do not sort in version order. */}}
+{{- $active := slice -}}
+{{- $enacted := slice -}}
+{{- with site.GetPage "/deprecations" -}}
+  {{- range .RegularPagesRecursive -}}
+    {{- $since := partial "deprecations/version.html" .Params.deprecated_since -}}
+    {{- $entry := dict "what" .Params.what "deprecated_since" $since.version "since_key" $since.key "content" .Content -}}
+    {{- with .Params.removed_in -}}
+      {{- $removed := partial "deprecations/version.html" . -}}
+      {{- $enacted = $enacted | append (merge $entry (dict "removed_in" $removed.version "removed_key" $removed.key)) -}}
+    {{- else -}}
+      {{- $active = $active | append $entry -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict
+  "active" (sort $active "since_key" "desc")
+  "enacted" (sort (sort $enacted "since_key" "desc") "removed_key" "desc")
+) -}}

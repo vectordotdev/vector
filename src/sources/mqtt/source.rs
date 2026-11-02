@@ -88,7 +88,7 @@ impl MqttSource {
         emit!(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
-            endpoint: &self.connector.options.broker_address().0,
+            endpoint: &self.config.common.host,
         });
         let events_received = register!(EventsReceived);
 

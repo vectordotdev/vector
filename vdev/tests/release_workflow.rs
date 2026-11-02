@@ -1,4 +1,4 @@
-use std::{fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use tempfile::{TempDir, tempdir};
 
@@ -54,7 +54,7 @@ fn preparation() -> (TempDir, String) {
     preparation_with_breaking_changes(false)
 }
 
-fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
+fn development_checkout(breaking: bool) -> (TempDir, String) {
     let temp = tempdir().unwrap();
     let repo = temp.path();
     git(repo, &["init", "-b", "master"]);
@@ -63,6 +63,7 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     git(repo, &["config", "user.name", "Release test"]);
     git(repo, &["config", "user.email", "release@example.invalid"]);
     write(repo, "src/lib.rs", "");
+    write(repo, ".gitignore", "/target/\n");
     // Resolve a tiny registry dependency offline while exercising real Cargo metadata.
     write(
         repo,
@@ -106,6 +107,12 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
         "versions: [\n\"0.1.0\",\n]\n",
     );
     let base = commit(repo);
+    (temp, base)
+}
+
+fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
+    let (temp, base) = development_checkout(breaking);
+    let repo = temp.path();
     git(repo, &["switch", "-c", "prepare-v-0-59-0-website"]);
     version(repo, "0.59.0");
     write(
@@ -169,25 +176,40 @@ fn check_with_args(repo: &Path, base: &str, args: &[&str], success: bool) -> Str
     stderr
 }
 
-fn prepare_check(repo: &Path, success: bool) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+fn prepare_check(repo: &Path, args: &[&str], success: bool) -> String {
+    let output = vdev(repo)
         .args([
             "release",
             "workflow",
             "prepare-check",
-            "--version",
-            "0.59.0",
             "--bot-app",
             "release-bot",
             "--repository",
             "vectordotdev/vector",
         ])
-        .current_dir(repo)
+        .args(args)
         .output()
         .unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(output.status.success(), success, "{stderr}");
     stderr
+}
+
+fn vdev(repo: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_vdev"));
+    command
+        .env("GITHUB_OUTPUT", repo.join(".git/github-output"))
+        .env("GITHUB_STEP_SUMMARY", repo.join(".git/github-summary"))
+        .env(
+            "PATH",
+            env::join_paths(
+                std::iter::once(repo.join(".git/test-bin"))
+                    .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+            )
+            .unwrap(),
+        )
+        .current_dir(repo);
+    command
 }
 
 #[test]
@@ -220,7 +242,10 @@ fn release_preparation_retry_requires_the_requested_vrl_pin() {
     let repo = temp.path();
     check_with_args(repo, &base, &["--expected-vrl-version", "0.28.0"], true);
     let error = check_with_args(repo, &base, &["--expected-vrl-version", "0.28.1"], false);
-    assert!(error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"));
+    assert!(
+        error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -417,8 +442,425 @@ fn release_preparation_rejects_a_remote_only_release_tag() {
     git(repo, &["push", "origin", "refs/tags/v0.59.0"]);
     git(repo, &["tag", "--delete", "v0.59.0"]);
 
-    let error = prepare_check(repo, false);
-    assert!(error.contains("tag v0.59.0 already exists"));
+    for args in [&[][..], &["--version", "0.59.0"][..]] {
+        let error = prepare_check(repo, args, false);
+        assert!(error.contains("tag v0.59.0 already exists"));
+    }
+}
+
+#[cfg(unix)]
+mod prepare {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    fn stub(repo: &Path, program: &str, body: &str) {
+        let path = format!(".git/test-bin/{program}");
+        write(repo, &path, &format!("#!/bin/sh\n{body}\n"));
+        fs::set_permissions(repo.join(path), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    fn add_origin(repo: &Path) -> TempDir {
+        let remote = tempdir().unwrap();
+        git(remote.path(), &["init", "--bare"]);
+        git(
+            repo,
+            &["remote", "add", "origin", remote.path().to_str().unwrap()],
+        );
+        remote
+    }
+
+    fn fixture() -> (TempDir, TempDir) {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        git(repo, &["switch", "master"]);
+        let remote = add_origin(repo);
+        stub(repo, "gh", r"printf '[]\n'");
+        // Exercise real remote tag discovery without accessing GitHub.
+        let vrl_remote = repo.join(".git/vrl-remote");
+        git(repo, &["init", "--bare", vrl_remote.to_str().unwrap()]);
+        git(
+            repo,
+            &[
+                "push",
+                vrl_remote.to_str().unwrap(),
+                "HEAD:refs/tags/v0.9.0",
+                "HEAD:refs/tags/v0.28.0",
+                "HEAD:refs/tags/v0.29.0",
+                "HEAD:refs/tags/v0.30.0-rc.1",
+                "HEAD:refs/tags/v0.30.0+build",
+                "HEAD:refs/tags/vdev-v99.0.0",
+            ],
+        );
+        git(
+            repo,
+            &[
+                "config",
+                &format!("url.{}.insteadOf", vrl_remote.display()),
+                "https://github.com/vectordotdev/vrl.git",
+            ],
+        );
+        (temp, remote)
+    }
+
+    #[test]
+    fn default_and_explicit_versions_produce_the_same_preparation_outputs() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        for args in [
+            &[][..],
+            &["--version", "0.59.0", "--vrl-version", "0.29.0"][..],
+        ] {
+            write(repo, ".git/github-output", "");
+            prepare_check(repo, args, true);
+            assert_eq!(
+                fs::read_to_string(repo.join(".git/github-output")).unwrap(),
+                "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.29.0\nresume=false\nskip=false\n"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_vrl_version_skips_the_tag_lookup() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
+        prepare_check(repo, &["--vrl-version", "0.27.0"], true);
+        assert!(
+            fs::read_to_string(repo.join(".git/github-output"))
+                .unwrap()
+                .contains("vrl_version=0.27.0\n")
+        );
+
+        let error = prepare_check(repo, &["--vrl-version", "0.29.0-rc.1"], false);
+        assert!(
+            error.contains("VRL version must be a stable semantic version"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn retry_reuses_the_preparation_vrl_pin() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(repo, &["push", "origin", "prepare-v-0-59-0-website"]);
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
+        prepare_check(repo, &[], true);
+        assert_eq!(
+            fs::read_to_string(repo.join(".git/github-output")).unwrap(),
+            "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.28.0\nresume=true\nskip=false\n"
+        );
+    }
+
+    #[test]
+    fn tag_lookup_failure_stops_preparation() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
+        let error = prepare_check(repo, &[], false);
+        assert!(
+            error.contains("failed to fetch the latest stable VRL tag"),
+            "{error}"
+        );
+        let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
+        assert!(!output.contains("vrl_version="));
+        assert!(!output.contains("skip=false"));
+    }
+
+    #[test]
+    fn no_stable_vrl_tag_stops_preparation() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(
+            &repo.join(".git/vrl-remote"),
+            &["tag", "--delete", "v0.9.0", "v0.28.0", "v0.29.0"],
+        );
+        let error = prepare_check(repo, &[], false);
+        assert!(
+            error.contains("no tag matched the release pattern"),
+            "{error}"
+        );
+        let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
+        assert!(!output.contains("vrl_version="));
+        assert!(!output.contains("skip=false"));
+    }
+
+    fn cli_fixture(repo: &Path, previous_release: &str) {
+        // Exercise real Cargo resolution offline, with GitHub and CUE stubbed.
+        let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+        write(
+            repo,
+            "Cargo.toml",
+            &manifest.replace(
+                r#"git = "https://github.com/vectordotdev/vrl.git", branch = "main""#,
+                r#"version = "0.28.0""#,
+            ),
+        );
+        write(
+            repo,
+            &format!("website/content/en/releases/{previous_release}.md"),
+            "---\nweight: 1\n---\n",
+        );
+        stub(
+            repo,
+            "gh",
+            r#"printf '%s\n' "$@" >> .git/gh-calls
+printf '## 0.28.0\n- Release fixture\n'"#,
+        );
+        stub(repo, "cue", "exit 0");
+    }
+
+    fn prepare_cli(repo: &Path, args: &[&str], expected_error: Option<&str>) {
+        let output = vdev(repo)
+            .args(["release", "prepare"])
+            .args(args)
+            .env("CARGO_NET_OFFLINE", "true")
+            .output()
+            .unwrap();
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), expected_error.is_none(), "{error}");
+        if let Some(expected) = expected_error {
+            assert!(error.contains(expected), "{error}");
+        }
+    }
+
+    fn assert_release_files(repo: &Path, version: &str) {
+        let manifest: toml::Value =
+            toml::from_str(&fs::read_to_string(repo.join("Cargo.toml")).unwrap()).unwrap();
+        assert_eq!(manifest["package"]["version"].as_str(), Some(version));
+        assert_eq!(
+            manifest["workspace"]["dependencies"]["vrl"]["version"].as_str(),
+            Some("0.28.0")
+        );
+        for path in [
+            format!("website/cue/reference/releases/{version}.cue"),
+            format!("website/content/en/releases/{version}.md"),
+        ] {
+            assert!(repo.join(&path).is_file(), "missing {path}");
+        }
+        assert!(
+            fs::read_to_string(repo.join("distribution/install.sh"))
+                .unwrap()
+                .contains(version)
+        );
+        assert!(
+            fs::read_to_string(repo.join(".git/gh-calls"))
+                .unwrap()
+                .contains("CHANGELOG.md?ref=v0.28.0")
+        );
+    }
+
+    fn assert_published(repo: &Path, remote: &Path, version: &str, base: &str, master: &str) {
+        assert_release_files(repo, version);
+        let branch = format!("prepare-v-{}-website", version.replace('.', "-"));
+        assert_eq!(git(repo, &["branch", "--show-current"]), branch);
+        assert_eq!(git(repo, &["rev-parse", "HEAD^"]), base);
+        assert_eq!(git(remote, &["rev-parse", "refs/heads/master"]), master);
+        assert_eq!(git(remote, &["rev-parse", "refs/heads/v0.59"]), base);
+        assert_eq!(
+            git(remote, &["rev-parse", &format!("refs/heads/{branch}")]),
+            git(repo, &["rev-parse", "HEAD"])
+        );
+        assert!(
+            fs::read_to_string(repo.join(".git/gh-calls"))
+                .unwrap()
+                .contains("--base\nv0.59\n")
+        );
+    }
+
+    fn reject_default(repo: &Path, message: &str) {
+        let checks = [
+            &["branch", "--show-current"][..],
+            &["for-each-ref", "refs/heads"][..],
+            &["status", "--porcelain"][..],
+        ];
+        let before = checks.map(|args| git(repo, args));
+        prepare_cli(repo, &["--vrl-version", "0.28.0"], Some(message));
+        assert_eq!(checks.map(|args| git(repo, args)), before);
+    }
+
+    #[test]
+    fn cli_default_preparation_rejects_uncommitted_changes() {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        write(repo, "local-changes.txt", "work in progress\n");
+        reject_default(
+            repo,
+            "requires a clean master checkout; commit or stash your changes and retry",
+        );
+        assert_eq!(
+            fs::read_to_string(repo.join("local-changes.txt")).unwrap(),
+            "work in progress\n"
+        );
+    }
+
+    #[test]
+    fn cli_default_preparation_rejects_other_branches() {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        git(repo, &["switch", "-c", "feature"]);
+        reject_default(
+            repo,
+            "must start on master (currently feature); switch to master and retry",
+        );
+    }
+
+    #[test]
+    fn cli_default_preparation_rejects_stale_master_after_fetching() {
+        let (temp, base) = development_checkout(false);
+        let repo = temp.path();
+        let remote = add_origin(repo);
+        // Keep the same development version: freshness must compare commits.
+        write(repo, "upstream-change.txt", "upstream change\n");
+        let upstream = commit(repo);
+        git(repo, &["push", "origin", "master"]);
+        git(repo, &["reset", "--hard", &base]);
+        git(repo, &["update-ref", "refs/remotes/origin/master", &base]);
+        let remote_refs = git(remote.path(), &["for-each-ref", "refs/heads"]);
+        reject_default(
+            repo,
+            "requires master to match origin/master; update your local master and retry",
+        );
+        assert_eq!(git(repo, &["rev-parse", "origin/master"]), upstream);
+        assert_eq!(
+            git(remote.path(), &["for-each-ref", "refs/heads"]),
+            remote_refs
+        );
+    }
+
+    #[test]
+    fn cli_default_preparation_rejects_stale_branches() {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        let remote = add_origin(repo);
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let base = commit(repo);
+        let branches = ["v0.59", "prepare-v-0-59-0-website"];
+        for branch in branches {
+            git(repo, &["branch", branch, &base]);
+        }
+        // Both branches still have the expected version, but omit this commit.
+        write(repo, "master-only.txt", "latest master change\n");
+        let master = commit(repo);
+        git(repo, &["push", "origin", "master"]);
+        let remote_refs = git(remote.path(), &["for-each-ref", "refs/heads"]);
+        for branch in branches {
+            reject_default(
+                repo,
+                &format!(
+                    "requires existing branch {branch} to match master; rename the existing branch and retry"
+                ),
+            );
+            assert_eq!(
+                git(remote.path(), &["for-each-ref", "refs/heads"]),
+                remote_refs
+            );
+            git(repo, &["branch", "-f", branch, &master]);
+        }
+    }
+
+    fn cli_default_preparation(reuse_branches: bool) {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        let remote = add_origin(repo);
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let master = commit(repo);
+        git(repo, &["push", "-u", "origin", "master"]);
+        if reuse_branches {
+            for branch in ["v0.59", "prepare-v-0-59-0-website"] {
+                git(repo, &["branch", branch, &master]);
+            }
+        }
+        prepare_cli(repo, &["--vrl-version", "0.28.0"], None);
+        assert_published(repo, remote.path(), "0.59.0", &master, &master);
+    }
+
+    #[test]
+    fn cli_default_preparation_accepts_current_master() {
+        cli_default_preparation(false);
+    }
+
+    #[test]
+    fn cli_default_preparation_accepts_matching_branches() {
+        cli_default_preparation(true);
+    }
+
+    fn patch_fixture() -> (TempDir, TempDir, String, String) {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let remote = add_origin(repo);
+        git(repo, &["switch", "-c", "v0.59"]);
+        git(repo, &["tag", "v0.59.0"]);
+        version(repo, "0.59.1-dev");
+        cli_fixture(repo, "0.59.0");
+        write(repo, "patch-only.txt", "patch branch\n");
+        let patch_base = commit(repo);
+        git(repo, &["switch", "master"]);
+        version(repo, "0.60.0-dev");
+        write(repo, "master-only.txt", "next minor\n");
+        let master = commit(repo);
+        git(repo, &["push", "-u", "origin", "master", "v0.59"]);
+        (temp, remote, patch_base, master)
+    }
+
+    #[test]
+    fn cli_patch_preparation_rejects_mismatched_version_before_publishing() {
+        let (temp, remote, ..) = patch_fixture();
+        let remote_refs = git(remote.path(), &["for-each-ref", "refs/heads"]);
+        prepare_cli(
+            temp.path(),
+            &["--version", "0.59.2", "--vrl-version", "0.28.0"],
+            Some("expected Cargo.toml version 0.59.2-dev, found 0.59.1-dev"),
+        );
+        assert_eq!(
+            git(remote.path(), &["for-each-ref", "refs/heads"]),
+            remote_refs
+        );
+    }
+
+    #[test]
+    fn cli_patch_preparation_validates_the_selected_release_branch() {
+        let (temp, remote, patch_base, master) = patch_fixture();
+        let repo = temp.path();
+        prepare_cli(
+            repo,
+            &["--version", "0.59.1", "--vrl-version", "0.28.0"],
+            None,
+        );
+        assert_published(repo, remote.path(), "0.59.1", &patch_base, &master);
+        assert!(repo.join("patch-only.txt").is_file());
+        assert!(!repo.join("master-only.txt").exists());
+    }
+
+    fn cli_dry_run(explicit: bool) {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let mut args = vec!["--dry-run"];
+        if explicit {
+            fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
+            args.extend(["--version", "0.59.0", "--vrl-version", "0.28.0"]);
+        } else {
+            git(
+                &repo.join(".git/vrl-remote"),
+                &["tag", "--delete", "v0.29.0"],
+            );
+        }
+        prepare_cli(repo, &args, None);
+        assert_release_files(repo, "0.59.0");
+    }
+
+    #[test]
+    fn cli_prepare_defaults_generate_release_files() {
+        cli_dry_run(false);
+    }
+
+    #[test]
+    fn cli_prepare_overrides_generate_release_files() {
+        cli_dry_run(true);
+    }
 }
 
 #[test]

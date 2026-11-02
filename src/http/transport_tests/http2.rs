@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use http_1::{Method, Version, header};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use rstest::rstest;
+use vector_http::{Http2Client, RequestBody};
 
 use super::{
     TestClient, TestResponse, assert_success, client_tls, has_proxy_authorization, native_get,
@@ -14,7 +15,6 @@ use super::{
 };
 use crate::{
     config::ProxyConfig,
-    http::client_v1::{Http2Client, RequestBody},
     tls::{MaybeTlsSettings, TEST_PEM_CA_PATH, TlsConfig},
 };
 

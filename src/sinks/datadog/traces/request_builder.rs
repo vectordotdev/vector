@@ -73,6 +73,7 @@ pub struct DatadogTracesRequestBuilder {
     max_size: usize,
     /// Contains the Aggregated stats across a time window.
     stats_aggregator: Arc<Mutex<Aggregator>>,
+    disable_apm_stats: bool,
 }
 
 impl DatadogTracesRequestBuilder {
@@ -82,6 +83,7 @@ impl DatadogTracesRequestBuilder {
         compression: Compression,
         max_size: usize,
         stats_aggregator: Arc<Mutex<Aggregator>>,
+        disable_apm_stats: bool,
     ) -> Self {
         Self {
             api_key,
@@ -89,6 +91,7 @@ impl DatadogTracesRequestBuilder {
             compression,
             max_size,
             stats_aggregator,
+            disable_apm_stats,
         }
     }
 }
@@ -119,7 +122,9 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
         // separately from the sink framework, by the thread `flush_apm_stats_thread()`
-        compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
+        if !self.disable_apm_stats {
+            compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
+        }
 
         encode_traces(&key, trace_events, self.max_size)
             .into_iter()

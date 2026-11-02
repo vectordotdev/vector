@@ -707,6 +707,7 @@ async fn test_parse_config_with_uri_auth() {
         Distribution::Elasticsearch,
         &endpoint,
         &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
         &mut version,
     )
     .await;
@@ -723,10 +724,8 @@ async fn test_parse_config_with_uri_auth() {
         password: SensitiveString::from("pass".to_string()),
     };
 
-    let got_auth_inner = match common.auth.as_ref().unwrap() {
-        Auth::Basic(auth) => auth,
-        #[cfg(feature = "aws-core")]
-        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    let Some(Auth::Basic(got_auth_inner)) = &common.auth else {
+        panic!("Expected auth to be Basic");
     };
 
     assert_eq!(
@@ -754,6 +753,7 @@ async fn test_parse_config_with_config_auth() {
         Distribution::Elasticsearch,
         &endpoint,
         &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
         &mut version,
     )
     .await;
@@ -765,10 +765,8 @@ async fn test_parse_config_with_config_auth() {
         password: SensitiveString::from("config_pass".to_string()),
     };
 
-    let got_auth_inner = match common.auth.as_ref().unwrap() {
-        Auth::Basic(auth) => auth,
-        #[cfg(feature = "aws-core")]
-        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    let Some(Auth::Basic(got_auth_inner)) = &common.auth else {
+        panic!("Expected auth to be Basic");
     };
 
     assert_eq!(
@@ -796,6 +794,7 @@ async fn test_parse_config_with_conflicting_auth() {
         Distribution::Elasticsearch,
         &endpoint,
         &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
         &mut version,
     )
     .await;
@@ -886,6 +885,7 @@ async fn api_version_uses_selected_distribution() {
             distribution,
             &endpoint,
             &ProxyConfig::default(),
+            &ElasticsearchCommon::build_client(&config, &ProxyConfig::default()).unwrap(),
             &mut version,
         )
         .await
@@ -905,4 +905,91 @@ async fn api_version_uses_selected_distribution() {
         );
         server.abort();
     }
+}
+
+#[tokio::test]
+async fn bulk_request_shape_and_compressed_error_response() {
+    use std::io::{Read, Write};
+
+    use flate2::write::GzEncoder;
+    use futures::StreamExt;
+    use hyper::Body;
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event};
+
+    use crate::{
+        config::{SinkConfig, SinkContext},
+        sinks::util::{Compression, test::build_test_server_generic},
+        test_util::addr::next_addr,
+    };
+
+    // Partial bulk failures are only visible in the decoded response body.
+    let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder
+        .write_all(br#"{"took":1,"errors":true,"items":[{"index":{"_index":"vector","status":400,"error":{"type":"mapper_parsing_exception","reason":"bad"}}}]}"#)
+        .unwrap();
+    let response_body = bytes::Bytes::from(encoder.finish().unwrap());
+
+    let (_guard, addr) = next_addr();
+    let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
+        http::Response::builder()
+            .header("Content-Encoding", "gzip")
+            .body(Body::from(response_body.clone()))
+            .unwrap()
+    });
+    tokio::spawn(server);
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::Basic {
+            user: "user".to_string(),
+            password: SensitiveString::from("pass".to_string()),
+        }),
+        endpoints: vec![HttpEndpoint::parse(&format!("http://{addr}")).unwrap()],
+        bulk: BulkConfig {
+            index: parse_template("vector"),
+            ..Default::default()
+        },
+        compression: Compression::gzip_default(),
+        api_version: ElasticsearchApiVersion::V8,
+        ..Default::default()
+    };
+    let (sink, _healthcheck) = SinkConfig::build(&config, SinkContext::default())
+        .await
+        .unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from("hello there").with_batch_notifier(&batch);
+    drop(batch);
+    sink.run_events(vec![Event::from(event)]).await.unwrap();
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    let (parts, body) = rx.next().await.unwrap();
+    assert_eq!(parts.method, http::Method::POST);
+    assert_eq!(parts.uri.path(), "/_bulk");
+    assert_eq!(
+        parts.uri.query(),
+        Some(format!("timeout={}s", config.request.tower.timeout_secs).as_str())
+    );
+    let header = |name: &str| parts.headers.get(name).map(|value| value.to_str().unwrap());
+    assert_eq!(header("content-type"), Some("application/x-ndjson"));
+    assert_eq!(header("content-encoding"), Some("gzip"));
+    assert_eq!(header("accept-encoding"), Some("gzip"));
+    assert_eq!(header("authorization"), Some("Basic dXNlcjpwYXNz"));
+    assert_eq!(
+        header("content-length"),
+        Some(body.len().to_string().as_str())
+    );
+
+    let mut payload = String::new();
+    vector_common::decompression::CappedDecoder::gzip(&body[..])
+        .into_reader()
+        .read_to_string(&mut payload)
+        .unwrap();
+    let mut lines = payload.lines();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(lines.next().unwrap()).unwrap(),
+        serde_json::json!({"index": {"_index": "vector"}})
+    );
+    let document = serde_json::from_str::<serde_json::Value>(lines.next().unwrap()).unwrap();
+    assert_eq!(document["message"], "hello there");
+    assert_eq!(lines.next(), None);
 }

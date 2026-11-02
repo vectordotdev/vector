@@ -6,16 +6,14 @@ use http_1::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::Framer;
 
 use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{
-        Auth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, client_v1::HttpClient},
     sinks::{
         HTTPV1RequestBuilderSnafu, HealthcheckError,
         prelude::*,

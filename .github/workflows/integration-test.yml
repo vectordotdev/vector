@@ -2,7 +2,6 @@
 #
 # This workflow is used to run an integration test on demand.
 # An input for the test name needs to be provided.
-# TODO: check if the input is "all" , and run all, without a timeout?
 
 name: Integration Test
 
@@ -57,15 +56,8 @@ jobs:
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
-      - run: make test-integration-${{ inputs.test_name }}
+      # Preserve the retry policy used by integration test.
+      - run: cargo vdev --verbose integration run "$TEST_NAME" --retries 0
         env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-
-      - run: make test-integration-${{ inputs.test_name }}-cleanup
-        if: ${{ always() }}
-        env:
+          TEST_NAME: ${{ inputs.test_name }}
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}

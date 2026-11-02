@@ -12,6 +12,7 @@ use http_1::{
 };
 use tower::Service;
 use tracing::Instrument;
+use vector_http::full_body;
 use vector_lib::{
     event::{EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -19,7 +20,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     sinks::{
         datadog::DatadogApiError,
         util::{Compression, http::validate_headers, retries::RetryLogic},

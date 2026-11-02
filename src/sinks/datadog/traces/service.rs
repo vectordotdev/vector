@@ -9,6 +9,7 @@ use http_1::{Request, StatusCode, Uri};
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tower::Service;
+use vector_http::{HttpError, full_body};
 use vector_lib::{
     event::{EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -16,7 +17,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::{HttpClient, HttpError, full_body},
+    http::client_v1::HttpClient,
     sinks::{
         HTTPV1RequestBuilderSnafu,
         util::retries::{RetryAction, RetryLogic},
