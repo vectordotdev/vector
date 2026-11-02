@@ -4,6 +4,7 @@ mod github;
 mod prepare;
 #[cfg(feature = "package-repositories")]
 mod repositories;
+mod versions;
 mod workflow;
 
 use anyhow::{Result, ensure};
