@@ -12,11 +12,9 @@ MINIKUBE_VERSION="${MINIKUBE_VERSION:?required}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:?required}"
 GITHUB_TOKEN="${GITHUB_TOKEN:?required}"
 
-# For Kubernetes versions newer than its built-in list, `minikube start` looks
-# up the release tag on GitHub with an unauthenticated client, which hits the
-# shared runner IP rate limit. Do that check here with authentication and pass
-# `--force` to skip minikube's own lookup. Runs before `set -x` to keep the
-# token out of the log.
+# minikube checks unknown Kubernetes versions on GitHub without auth and can hit
+# the rate limit. Check with auth here; `--force` below makes minikube ignore a
+# failed lookup. Runs before `set -x` to keep the token out of the log.
 curl -fsS --head -o /dev/null --retry 3 \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Accept: application/vnd.github+json" \
