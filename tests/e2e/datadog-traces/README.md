@@ -76,7 +76,9 @@ The [Rust test](../datadog/traces/mod.rs) verifies:
   payloads and chunks may differ.
 
 Results are written to the `datadog_traces_evidence` volume: `summary.md`,
-`coverage.json`, `differences.txt` and the decoded `input.txt` and `output.txt`.
+`coverage.json`, `differences.txt` and the decoded `input.txt` and `output.txt`. CI does
+not upload that volume, so a failure also prints the first three differences in the test
+log.
 
 ## Why this workload
 

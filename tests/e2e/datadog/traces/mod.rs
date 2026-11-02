@@ -17,6 +17,9 @@ use super::*;
 
 const OUTPUT: &str = "/output/datadog-traces";
 const TRACES_ENDPOINT: &str = "/api/v0.2/traces";
+/// Differences shown in the error, so CI logs are debuggable without the evidence volume.
+const LOGGED_DIFFERENCES: usize = 3;
+const LOGGED_DIFFERENCE_BYTES: usize = 4_000;
 const REQUIRED_TRACERS: &[&str] = &["go", "nodejs", "python"];
 /// Checkouts sent by `workload/python/client.py`.
 const CHECKOUTS: usize = 6;
@@ -296,10 +299,21 @@ fn validate_captures(
         &format!("# Datadog Agent trace validation\n\n```json\n{coverage_json}\n```\n\n{result}\n"),
     )?;
     if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures.join("\n"))
+        return Ok(());
     }
+    for difference in differences.iter().take(LOGGED_DIFFERENCES) {
+        failures.push(truncate(difference, LOGGED_DIFFERENCE_BYTES));
+    }
+    Err(failures.join("\n\n"))
+}
+
+fn truncate(text: &str, max_bytes: usize) -> String {
+    if text.len() <= max_bytes {
+        return text.to_string();
+    }
+    let end = text.floor_char_boundary(max_bytes);
+    let kept = text.get(..end).unwrap_or_default();
+    format!("{kept}\n... ({} more bytes)", text.len() - end)
 }
 
 async fn captured_payloads(base: &str) -> Vec<AgentPayload> {
@@ -445,6 +459,12 @@ mod tests {
     }
 
     #[test]
+    fn truncation_keeps_utf8_boundaries() {
+        assert_eq!(truncate("short", 10), "short");
+        assert_eq!(truncate("éé", 3), "é\n... (2 more bytes)");
+    }
+
+    #[test]
     fn finalized_captures_can_be_validated_repeatedly() {
         let directory = tempfile::tempdir().unwrap();
         let input = covered();
@@ -452,6 +472,12 @@ mod tests {
         fs::write(directory.path().join("capture-complete"), "").unwrap();
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
+
+        let mut changed = input.clone();
+        changed[0].tracer_payloads[0].chunks[0].spans[0].name = "changed".into();
+        let error = validate_captures(directory.path(), &input, &changed).unwrap_err();
+        assert!(error.contains("1 differing span identities"), "{error}");
+        assert!(error.contains("name: \"changed\""), "{error}");
 
         let mut indexed = input.clone();
         indexed[0]
