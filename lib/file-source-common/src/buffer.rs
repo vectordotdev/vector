@@ -8,6 +8,9 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 pub struct ReadResult {
     pub successfully_read: Option<usize>,
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
+    /// The error that stopped the read, when returning `Err` would lose a discard found earlier
+    /// in the same call.
+    pub read_error: Option<io::Error>,
 }
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
@@ -64,12 +67,13 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
         let available: &[u8] = match reader.fill_buf().await {
             Ok(n) => n,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            // Hand back a discard found earlier in this call, because the next call treats an
-            // over-limit `buf` as already reported. A lasting error comes back on that call.
-            Err(_) if !discarded_for_size_and_truncated.is_empty() => {
+            // Hand back a discard found earlier in this call along with the error, because the
+            // next call treats an over-limit `buf` as already reported.
+            Err(e) if !discarded_for_size_and_truncated.is_empty() => {
                 return Ok(ReadResult {
                     successfully_read: None,
                     discarded_for_size_and_truncated,
+                    read_error: Some(e),
                 });
             }
             Err(e) => return Err(e),
@@ -83,9 +87,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
             // We already know that we have a partial delimiter match from the previous buffer.
             // Here we check what part of the delimiter is missing and whether the new buffer
             // contains the remaining part.
-            if available.len() >= expected_suffix_len
-                && &available[..expected_suffix_len] == expected_suffix
-            {
+            if available.starts_with(expected_suffix) {
                 // Complete delimiter found! Consume the remainder of the delimiter so we can start
                 // processing data after the delimiter.
                 reader.consume(expected_suffix_len);
@@ -98,6 +100,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                 return Ok(ReadResult {
                     successfully_read: Some(total_read),
                     discarded_for_size_and_truncated,
+                    read_error: None,
                 });
             }
             // Not a complete delimiter after all.
@@ -205,6 +208,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                 return Ok(ReadResult {
                     successfully_read: Some(total_read),
                     discarded_for_size_and_truncated,
+                    read_error: None,
                 });
             }
         } else if used == 0 && at_eof {
@@ -216,6 +220,7 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
             return Ok(ReadResult {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
+                read_error: None,
             });
         }
     }
@@ -322,7 +327,7 @@ mod test {
             {
                 ReadResult {
                     successfully_read: None,
-                    discarded_for_size_and_truncated: _,
+                    ..
                 } => {
                     // Subject only returns None if this is the last chunk _and_
                     // the chunk did not contain a delimiter _or_ the delimiter
@@ -334,7 +339,7 @@ mod test {
                 }
                 ReadResult {
                     successfully_read: Some(total_read),
-                    discarded_for_size_and_truncated: _,
+                    ..
                 } => {
                     // Now that the function has returned we confirm that the
                     // returned details match our `first_delim` and also that
@@ -566,13 +571,14 @@ mod test {
                 .await;
         assert!(result.is_err());
 
-        // An error after crossing the limit does not lose the report.
+        // An error after crossing the limit does not lose the report, and comes back with it.
         let result =
             read_until_with_max_size(&mut reader, &mut position, b"\n", &mut buffer, max_size)
                 .await
                 .unwrap();
         assert_eq!(result.successfully_read, None);
         assert_eq!(result.discarded_for_size_and_truncated.len(), 1);
+        assert!(result.read_error.is_some());
 
         // An error after the report is returned, and the line is not reported again.
         let result =
