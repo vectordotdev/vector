@@ -2,7 +2,7 @@ use std::{num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use http::StatusCode;
+use http_0::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use vector_lib::{

@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response, Uri};
+use http::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
@@ -18,10 +18,12 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
+#[cfg(feature = "aws-core")]
+use super::http::SigV4Config;
 use crate::{
     http::client_v1::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
-    sinks::util::{http::HttpRequest, sink},
+    sinks::util::{http::HttpRequest, sink, uri::protocol_endpoint},
 };
 
 /// Builds a native `http 1` request from a buffered HTTP sink request.
@@ -73,12 +75,14 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// Native `http 1` equivalent of the legacy `HttpService`.
+/// Generic `Service` implementation for HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpService<B, T: Send> {
     client: HttpClient,
     request_builder: Arc<B>,
     response_decompression: bool,
+    #[cfg(feature = "aws-core")]
+    sig_v4_config: Option<Arc<SigV4Config>>,
     _phantom: PhantomData<fn() -> T>,
 }
 
@@ -92,7 +96,26 @@ where
             client,
             request_builder: Arc::new(request_builder),
             response_decompression: false,
+            #[cfg(feature = "aws-core")]
+            sig_v4_config: None,
             _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a service that signs every built request with AWS `SigV4` before sending it.
+    ///
+    /// The signature covers the method, URI, headers and body produced by `request_builder`,
+    /// without adding an `x-amz-content-sha256` header. A request that cannot be signed fails
+    /// with a non-retriable [`HttpError`].
+    #[cfg(feature = "aws-core")]
+    pub fn new_with_sig_v4(
+        client: HttpClient,
+        request_builder: B,
+        sig_v4_config: SigV4Config,
+    ) -> Self {
+        Self {
+            sig_v4_config: Some(Arc::new(sig_v4_config)),
+            ..Self::new(client, request_builder)
         }
     }
 
@@ -104,6 +127,25 @@ where
         self.response_decompression = true;
         self
     }
+}
+
+#[cfg(feature = "aws-core")]
+async fn sign_request(
+    mut request: Request<Bytes>,
+    sig_v4_config: Option<&SigV4Config>,
+) -> Result<Request<Bytes>, HttpError> {
+    if let Some(sig_v4_config) = sig_v4_config {
+        crate::aws::sign_request_v1(
+            &sig_v4_config.service,
+            &mut request,
+            &sig_v4_config.shared_credentials_provider,
+            Some(&sig_v4_config.region),
+            false,
+        )
+        .await
+        .map_err(HttpError::from)?;
+    }
+    Ok(request)
 }
 
 impl<B, T> Service<HttpRequest<T>> for HttpService<B, T>
@@ -123,6 +165,8 @@ where
         let request_builder = Arc::clone(&self.request_builder);
         let client = self.client.clone();
         let response_decompression = self.response_decompression;
+        #[cfg(feature = "aws-core")]
+        let sig_v4_config = self.sig_v4_config.clone();
         let metadata = std::mem::take(request.metadata_mut());
         let raw_byte_size = metadata.request_encoded_size();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
@@ -134,8 +178,10 @@ where
                     emit!(SinkRequestBuildError { error });
                 })
                 .map_err(HttpError::from)?;
+            #[cfg(feature = "aws-core")]
+            let request = sign_request(request, sig_v4_config.as_deref()).await?;
             let byte_size = request.body().len();
-            let (protocol, endpoint) = protocol_endpoint(request.uri());
+            let (protocol, endpoint) = protocol_endpoint(request.uri().clone());
             let request = request.map(full_body);
             let response = if response_decompression {
                 let mut service = Decompression::new(service_fn(|request| client.send(request)));
@@ -165,7 +211,7 @@ async fn collect_response<B>(
     endpoint: &str,
 ) -> Result<Response<Bytes>, B::Error>
 where
-    B: http_body_1::Body<Data = Bytes>,
+    B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
         emit!(EndpointBytesSent {
@@ -187,12 +233,11 @@ where
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> http_1::StatusCode + Clone + Send + Sync + 'static,
+    impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
-    HttpError,
 > {
-    super::http::HttpStatusRetryLogic::new_with_error(
+    super::http::HttpStatusRetryLogic::new(
         |response: &HttpResponse| {
             let status = response.response.status();
             if !status.is_success() {
@@ -214,19 +259,12 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     )
 }
 
-fn protocol_endpoint(uri: &Uri) -> (String, String) {
-    let uri = uri
-        .to_string()
-        .parse::<http::Uri>()
-        .expect("a valid HTTP/1 URI is valid as an HTTP URI");
-    super::uri::protocol_endpoint(uri)
-}
-
 #[cfg(test)]
 mod tests {
     use std::{convert::Infallible, io::Write};
 
     use flate2::write::GzEncoder;
+    use http_body_util::Full;
     use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
     use super::*;
@@ -242,7 +280,7 @@ mod tests {
 
     #[derive(Clone)]
     struct RequestBuilder {
-        uri: Uri,
+        uri: http::Uri,
     }
 
     impl HttpServiceRequestBuilder<()> for RequestBuilder {
@@ -256,7 +294,7 @@ mod tests {
             let body = body.clone();
             async move {
                 assert_eq!(request.headers()["accept-encoding"], "zstd,gzip,deflate,br");
-                let request_body = http_body::Body::collect(request.into_body())
+                let request_body = http_body_util::BodyExt::collect(request.into_body())
                     .await
                     .unwrap()
                     .to_bytes();
@@ -266,23 +304,29 @@ mod tests {
                         .status(http::StatusCode::SERVICE_UNAVAILABLE)
                         .header("content-encoding", "gzip")
                         .header("content-length", body.len())
-                        .body(hyper::Body::from(body))
+                        .body(Full::new(Bytes::from(body)))
                         .unwrap(),
                 )
             }
         })
         .await;
-        let client = HttpClient::new(
+        HttpService::new(client(), request_builder(&uri)).with_response_decompression()
+    }
+
+    fn client() -> HttpClient {
+        HttpClient::new(
             MaybeTlsSettings::from_config(None, false).unwrap(),
             &ProxyConfig::default(),
         )
-        .unwrap();
-        let builder = RequestBuilder {
-            uri: crate::sinks::util::HttpEndpoint::new(uri)
+        .unwrap()
+    }
+
+    fn request_builder(uri: &http::Uri) -> RequestBuilder {
+        RequestBuilder {
+            uri: crate::sinks::util::HttpEndpoint::new(uri.clone())
                 .unwrap()
-                .into_v1(),
-        };
-        HttpService::new(client, builder).with_response_decompression()
+                .into_uri(),
+        }
     }
 
     fn request() -> HttpRequest<()> {
@@ -304,7 +348,7 @@ mod tests {
 
         assert_eq!(
             response.response.status(),
-            http_1::StatusCode::SERVICE_UNAVAILABLE
+            http::StatusCode::SERVICE_UNAVAILABLE
         );
         assert_eq!(response.response.body().as_ref(), message);
         assert!(!response.response.headers().contains_key("content-encoding"));
@@ -322,5 +366,112 @@ mod tests {
         let error = service.call(request()).await.unwrap_err();
         let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);
         assert!(!retry_logic.is_retriable_error(&error));
+    }
+
+    #[cfg(feature = "aws-core")]
+    mod sig_v4 {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use aws_credential_types::{
+            Credentials,
+            provider::{
+                ProvideCredentials, SharedCredentialsProvider, error::CredentialsError, future,
+            },
+        };
+        use aws_types::region::Region;
+
+        use super::*;
+
+        fn sig_v4_service(
+            uri: &http::Uri,
+            credentials: impl ProvideCredentials + 'static,
+        ) -> HttpService<RequestBuilder, ()> {
+            HttpService::new_with_sig_v4(
+                client(),
+                request_builder(uri),
+                SigV4Config {
+                    shared_credentials_provider: SharedCredentialsProvider::new(credentials),
+                    region: Region::new("us-east-1"),
+                    service: "example-service".to_owned(),
+                },
+            )
+            .with_response_decompression()
+        }
+
+        #[tokio::test]
+        async fn signs_request_before_response_decompression() {
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let uri = spawn_blackhole_http_server(move |request| {
+                let tx = tx.clone();
+                async move {
+                    let (parts, body) = request.into_parts();
+                    let body = http_body_util::BodyExt::collect(body)
+                        .await
+                        .unwrap()
+                        .to_bytes();
+                    tx.send((parts.headers, body)).unwrap();
+                    Ok::<_, Infallible>(http::Response::new(Full::default()))
+                }
+            })
+            .await;
+            let mut service = sig_v4_service(&uri, Credentials::from_keys("AKID", "SECRET", None));
+
+            let response = service.call(request()).await.unwrap();
+            assert_eq!(response.response.status(), http::StatusCode::OK);
+
+            let (headers, body) = rx.recv().await.unwrap();
+            assert_eq!(body, "events");
+            assert_eq!(headers["accept-encoding"], "zstd,gzip,deflate,br");
+            assert!(headers.contains_key("x-amz-date"));
+            assert!(!headers.contains_key("x-amz-content-sha256"));
+            let authorization = headers["authorization"].to_str().unwrap();
+            assert!(
+                authorization.starts_with("AWS4-HMAC-SHA256 Credential=AKID/")
+                    && authorization.contains("/us-east-1/example-service/aws4_request,"),
+                "unexpected authorization: {authorization}"
+            );
+            let signed_headers = authorization
+                .split_once("SignedHeaders=")
+                .and_then(|(_, rest)| rest.split_once(','))
+                .map(|(signed_headers, _)| signed_headers)
+                .unwrap();
+            assert!(
+                signed_headers
+                    .split(';')
+                    .all(|name| name != "accept-encoding"),
+                "response decompression headers must not be signed: {signed_headers}"
+            );
+        }
+
+        #[derive(Debug)]
+        struct MissingCredentials;
+
+        impl ProvideCredentials for MissingCredentials {
+            fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+            where
+                Self: 'a,
+            {
+                future::ProvideCredentials::ready(Err(CredentialsError::not_loaded(
+                    "no credentials",
+                )))
+            }
+        }
+
+        #[tokio::test]
+        async fn unsigned_request_is_not_sent_or_retried() {
+            let requests = Arc::new(AtomicUsize::new(0));
+            let received = Arc::clone(&requests);
+            let uri = spawn_blackhole_http_server(move |_| {
+                received.fetch_add(1, Ordering::Relaxed);
+                async { Ok::<_, Infallible>(http::Response::new(Full::default())) }
+            })
+            .await;
+            let mut service = sig_v4_service(&uri, MissingCredentials);
+
+            let error = service.call(request()).await.unwrap_err();
+            let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);
+            assert!(!retry_logic.is_retriable_error(&error));
+            assert_eq!(requests.load(Ordering::Relaxed), 0);
+        }
     }
 }

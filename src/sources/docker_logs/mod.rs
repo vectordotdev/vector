@@ -272,10 +272,11 @@ impl SourceConfig for DockerLogsConfig {
         let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
-            Ok(tokio::select! {
+            tokio::select! {
                 () = fut => {}
                 _ = shutdown => {}
-            })
+            }
+            Ok(())
         }))
     }
 
@@ -826,7 +827,7 @@ impl EventStreamBuilder {
                         // On any error, restart connection
                         match &error {
                             DockerError::DockerResponseServerError { status_code, .. }
-                                if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
+                                if *status_code == http_0::StatusCode::NOT_IMPLEMENTED =>
                             {
                                 emit!(DockerLogsLoggingDriverUnsupportedError {
                                     error,
