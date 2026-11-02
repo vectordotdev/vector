@@ -1,4 +1,4 @@
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use vector_http::empty_body;
 
 use super::append_loki_path;
@@ -9,7 +9,7 @@ use crate::{
 };
 
 async fn fetch_status(
-    uri: http_1::Uri,
+    uri: http::Uri,
     auth: Option<&Auth>,
     client: &HttpClient,
 ) -> crate::Result<StatusCode> {
@@ -32,8 +32,7 @@ pub async fn healthcheck(
 ) -> crate::Result<()> {
     // Healthcheck URI has been explicitly configured
     if let Some(uri) = healthcheck_uri {
-        let status =
-            fetch_status(uri.uri_v1()?, uri.auth.as_ref().or(auth.as_ref()), &client).await?;
+        let status = fetch_status(uri.uri, uri.auth.as_ref().or(auth.as_ref()), &client).await?;
         return match status {
             StatusCode::OK => Ok(()),
             _ => Err(format!("A non-successful status returned: {status}").into()),
@@ -41,7 +40,7 @@ pub async fn healthcheck(
     }
 
     let status = match fetch_status(
-        append_loki_path(&base_endpoint, "ready")?.into_v1(),
+        append_loki_path(&base_endpoint, "ready")?.into_uri(),
         auth.as_ref(),
         &client,
     )
@@ -55,7 +54,7 @@ pub async fn healthcheck(
             // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
             // rejects non-200 responses rather than following them.
             fetch_status(
-                append_loki_path(&base_endpoint, "/")?.into_v1(),
+                append_loki_path(&base_endpoint, "/")?.into_uri(),
                 auth.as_ref(),
                 &client,
             )

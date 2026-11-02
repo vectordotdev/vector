@@ -1,9 +1,12 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::{ensure_stable, generate_cue, preparation_branch};
+use crate::commands::release::{
+    ensure_stable, generate_cue, preparation_branch,
+    versions::{VersionOptions, current_cargo_version, preparation_version},
+};
 use crate::utils::{command::run_command, git, paths};
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use semver::Version;
 use std::{
     env, fs,
@@ -19,12 +22,8 @@ const INSTALL_SCRIPT: &str = "distribution/install.sh";
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The new Vector version.
-    #[arg(long)]
-    version: Version,
-    /// The new VRL version.
-    #[arg(long)]
-    vrl_version: Version,
+    #[command(flatten)]
+    versions: VersionOptions,
     /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
@@ -42,18 +41,66 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        ensure_stable(&self.version, "release version")?;
-        ensure_stable(&self.vrl_version, "VRL version")?;
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
+        if !self.dry_run {
+            if self.versions.vector_version.is_none() {
+                git::ensure_worktree_clean().context(
+                    "release preparation without --version requires a clean master checkout; commit or stash your changes and retry",
+                )?;
+                let branch = git::current_branch()?;
+                ensure!(
+                    branch == git::MASTER_BRANCH,
+                    "release preparation without --version must start on master (currently {branch}); switch to master and retry"
+                );
+                git::run_and_check_output(&[
+                    "fetch",
+                    "origin",
+                    "--tags",
+                    "+refs/heads/master:refs/remotes/origin/master",
+                ])?;
+                ensure!(
+                    git::run_and_check_output(&["rev-parse", "HEAD"])?
+                        == git::run_and_check_output(&["rev-parse", "origin/master"])?,
+                    "release preparation without --version requires master to match origin/master; update your local master and retry"
+                );
+            } else {
+                git::run_and_check_output(&["fetch"])?;
+                git::checkout_main_branch()?;
+            }
+        }
+        let version = match self.versions.vector_version {
+            Some(ref version) => {
+                ensure_stable(version, "release version")?;
+                version.clone()
+            }
+            None => self.versions.resolve_vector()?,
+        };
+        let release_branch = format!("v{}.{}", version.major, version.minor);
+        let release_preparation_branch = preparation_branch(&version);
+        if !self.dry_run && self.versions.vector_version.is_none() {
+            let master = git::run_and_check_output(&["rev-parse", "HEAD"])?;
+            for branch in [&release_branch, &release_preparation_branch] {
+                ensure!(
+                    !git::branch_exists(branch)?
+                        || git::run_and_check_output(&[
+                            "rev-parse",
+                            &format!("refs/heads/{branch}"),
+                        ])? == master,
+                    "release preparation without --version requires existing branch {branch} to match master; rename the existing branch and retry"
+                );
+            }
+        }
+        let vrl_version = self.versions.resolve_vrl(None)?;
+
         let prepare = Prepare {
-            new_vector_version: self.version.clone(),
-            vrl_version: self.vrl_version,
+            new_vector_version: version,
+            vrl_version,
             repo_root,
             latest_vector_version: git::latest_release_version()?,
-            release_branch: format!("v{}.{}", self.version.major, self.version.minor),
-            release_preparation_branch: preparation_branch(&self.version),
+            release_branch,
+            release_preparation_branch,
             dry_run: self.dry_run,
         };
         prepare.run()
@@ -88,14 +135,19 @@ impl Prepare {
                 "dry-run: generating changes on HEAD ({}) without switching branches",
                 head.trim()
             );
+        } else {
+            git::checkout_or_create_branch(self.release_branch.as_str())?;
+        }
+
+        // Explicit versions must match the selected release branch, not master.
+        preparation_version(
+            &current_cargo_version()?,
+            Some(self.new_vector_version.clone()),
+        )?;
+        if self.dry_run {
             return Ok(());
         }
 
-        // Step 1: Sync with remote and start from master.
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
-
-        git::checkout_or_create_branch(self.release_branch.as_str())?;
         git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch

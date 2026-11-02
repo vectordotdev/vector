@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use codecs::{
     NativeJsonDeserializerConfig, NativeJsonSerializerConfig, decoding::format::Deserializer,
     encoding::format::Serializer,
@@ -42,7 +42,7 @@ fn histogram_metric_roundtrip() {
         MetricKind::Absolute,
         MetricValue::AggregatedHistogram {
             count: 1,
-            sum: 1.0,
+            sum: Some(1.0),
             buckets: buckets!(
                 f64::NEG_INFINITY => 10 ,
                 f64::MIN => 10, 1.5 => 10,
@@ -94,32 +94,47 @@ fn histogram_metric_roundtrip() {
     );
 }
 
-/// Newer encoders omit `sum` on a histogram that reported no sum. It must still decode, as zero.
+/// A histogram that reports no sum omits the key rather than emitting `"sum": null`, and an absent
+/// key decodes back to an absent sum. Those two have to agree, or the value would not survive a
+/// round-trip -- which is also why the field's serde default must be "absent" and not zero.
 #[test]
-fn histogram_without_sum_decodes_as_zero() {
-    let json = r#"{
-        "metric": {
-            "name": "histogram",
+fn histogram_without_sum_metric_roundtrip() {
+    let histogram_event = Event::from(Metric::new(
+        "histogram",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 3,
+            sum: None,
+            buckets: buckets!(1.0 => 1, 2.0 => 2),
+        },
+    ));
+
+    let expected_json_value = serde_json::from_str(
+        r#"
+        {
+            "aggregated_histogram":  {
+                "buckets": [
+                    {
+                        "count": 1,
+                        "upper_limit": 1.0
+                    },
+                    {
+                        "count": 2,
+                        "upper_limit": 2.0
+                    }
+                ],
+                "count": 3
+            },
             "kind": "absolute",
-            "aggregated_histogram": {
-                "buckets": [{"upper_limit": 1.0, "count": 1}],
-                "count": 1
-            }
-        }
-    }"#;
+            "name": "histogram"
+        }"#,
+    )
+    .unwrap();
 
-    let events = NativeJsonDeserializerConfig::default()
-        .build()
-        .parse(Bytes::from(json), LogNamespace::Vector)
-        .unwrap();
-
-    assert_eq!(events.len(), 1);
-    assert_eq!(
-        events[0].as_metric().value(),
-        &MetricValue::AggregatedHistogram {
-            buckets: buckets!(1.0 => 1),
-            count: 1,
-            sum: 0.0,
-        }
+    assert_roundtrip(
+        histogram_event,
+        &mut NativeJsonSerializerConfig.build(),
+        &NativeJsonDeserializerConfig::default().build(),
+        expected_json_value,
     );
 }

@@ -397,7 +397,7 @@ impl Handler {
             (false, _, _) => {
                 *response.status_mut() = StatusCode::UNAUTHORIZED;
                 response.headers_mut().insert(
-                    http::header::WWW_AUTHENTICATE,
+                    http_0::header::WWW_AUTHENTICATE,
                     HeaderValue::from_static("Basic, Bearer"),
                 );
             }
@@ -1067,7 +1067,7 @@ mod tests {
 
         if let Some(ref encoding) = encoding {
             request.headers_mut().insert(
-                http::header::ACCEPT_ENCODING,
+                http_0::header::ACCEPT_ENCODING,
                 HeaderValue::from_str(encoding.as_str()).unwrap(),
             );
         }
@@ -1085,12 +1085,12 @@ mod tests {
             assert!(
                 result
                     .headers()
-                    .contains_key(http::header::CONTENT_ENCODING)
+                    .contains_key(http_0::header::CONTENT_ENCODING)
             );
         }
 
         let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = http_body_0::Body::collect(body)
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1114,7 +1114,7 @@ mod tests {
         client_auth_config: Option<Auth>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
-    ) -> Result<String, http::status::StatusCode> {
+    ) -> Result<String, http_0::status::StatusCode> {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
@@ -1172,7 +1172,7 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = http_body_0::Body::collect(body)
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1719,7 +1719,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not send request");
-        let result = http_body::Body::collect(result.into_body())
+        let result = http_body_0::Body::collect(result.into_body())
             .await
             .expect("Error fetching body")
             .to_bytes();
@@ -1737,7 +1737,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not fetch query");
-        let result = http_body::Body::collect(result.into_body())
+        let result = http_body_0::Body::collect(result.into_body())
             .await
             .expect("Error fetching body")
             .to_bytes();
