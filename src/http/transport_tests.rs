@@ -217,10 +217,12 @@ impl TestClient for AwsHttpClient {
     ) -> Result<TestResponse, String> {
         let request = get_request(uri, headers, SdkBody::empty())?;
         let request = HttpRequest::try_from(request).map_err(|error| error.to_string())?;
-        let connector = self.0.http_connector(
-            &HttpConnectorSettings::default(),
-            &test_runtime_components(),
-        );
+        // A connect timeout makes the transport derive a client from its base one, as an SDK
+        // client with `timeout.connect_timeout_seconds` does, so these cases cover that client.
+        let settings = HttpConnectorSettings::builder()
+            .connect_timeout(REQUEST_TIMEOUT)
+            .build();
+        let connector = self.0.http_connector(&settings, &test_runtime_components());
         let response = timeout(REQUEST_TIMEOUT, connector.call(request))
             .await
             .map_err(|_| "request timed out".to_owned())?

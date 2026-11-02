@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
     error::Error,
     fmt, io,
-    sync::{Arc, PoisonError, RwLock},
+    sync::{PoisonError, RwLock},
     time::Duration,
 };
 
@@ -37,38 +37,36 @@ use crate::{config::ProxyConfig, tls::MaybeTlsSettings};
 
 /// Serves one [`SdkHttpConnector`] per connect and read timeout, like the SDK's own Hyper client.
 pub(crate) struct SdkHttpClient {
-    tls: MaybeTlsSettings,
-    proxy: ProxyConfig,
+    /// The client for requests without a connect timeout. Clients with one are derived from it.
+    client: vector_http::HttpClient,
     connectors: RwLock<HashMap<CacheKey, SharedHttpConnector>>,
 }
 
 impl SdkHttpClient {
-    /// Builds the client for requests without connect and read timeouts, so that invalid TLS or
-    /// proxy settings are reported here rather than by the first request.
+    /// Builds the client, so that invalid TLS or proxy settings are reported here rather than by
+    /// the first request.
     ///
     /// # Errors
     ///
     /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot build a
     /// connector.
     pub(crate) fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> crate::Result<Self> {
-        let client = vector_http::HttpClient::new(tls.clone(), proxy)?;
+        let client = vector_http::HttpClient::new(tls, proxy)?;
         let connector = SharedHttpConnector::new(SdkHttpConnector {
-            client: Ok(client),
+            client: client.clone(),
             read_timeout: None,
         });
 
         Ok(Self {
-            tls,
-            proxy: proxy.clone(),
+            client,
             connectors: RwLock::new(HashMap::from([(CacheKey::default(), connector)])),
         })
     }
 
     fn build_connector(&self, key: CacheKey, components: &RuntimeComponents) -> SdkHttpConnector {
-        let options = ConnectionOptions::default().connect_timeout(key.connect_timeout);
-        let client =
-            vector_http::HttpClient::new_with_options(self.tls.clone(), &self.proxy, options)
-                .map_err(|error| BuildError(Arc::from(error)));
+        let client = self
+            .client
+            .with_options(ConnectionOptions::default().connect_timeout(key.connect_timeout));
         let read_timeout = key.read_timeout.map(|duration| ReadTimeout {
             sleep: components
                 .sleep_impl()
@@ -141,24 +139,14 @@ struct ReadTimeout {
 /// Sends SDK requests with a [`vector_http::HttpClient`] built for one set of connector settings.
 #[derive(Debug)]
 struct SdkHttpConnector {
-    /// The build error is kept because the SDK cannot fail when it asks for a connector. The
-    /// settings already built a client once in [`SdkHttpClient::new`], so this is unexpected.
-    client: Result<vector_http::HttpClient, BuildError>,
+    client: vector_http::HttpClient,
     /// Limits the wait for the response headers.
     read_timeout: Option<ReadTimeout>,
 }
 
 impl HttpConnector for SdkHttpConnector {
     fn call(&self, request: HttpRequest) -> HttpConnectorFuture {
-        let client = match &self.client {
-            Ok(client) => client.clone(),
-            Err(error) => {
-                return HttpConnectorFuture::ready(Err(ConnectorError::other(
-                    Box::new(error.clone()),
-                    None,
-                )));
-            }
-        };
+        let client = self.client.clone();
 
         let mut request = match request.try_into_http1x() {
             Ok(request) => request.map(BodyExt::boxed_unsync),
@@ -291,22 +279,6 @@ fn find_source<'a, E: Error + 'static>(error: &'a (dyn Error + 'static)) -> Opti
         next = error.source();
     }
     None
-}
-
-/// Building the client of a connector failed. Every request through that connector fails with it.
-#[derive(Clone, Debug)]
-struct BuildError(Arc<dyn Error + Send + Sync>);
-
-impl fmt::Display for BuildError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "failed to build the AWS HTTP client: {}", self.0)
-    }
-}
-
-impl Error for BuildError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(self.0.as_ref())
-    }
 }
 
 /// The response headers did not arrive within the read timeout.
