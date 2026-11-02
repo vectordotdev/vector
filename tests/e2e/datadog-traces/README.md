@@ -1,6 +1,6 @@
 # Datadog Agent trace validation
 
-This manual E2E test checks that Vector relays native Datadog tracer traffic from a real
+This E2E test checks that Vector relays native Datadog tracer traffic from a real
 Datadog Agent without losing or changing spans. It provides evidence for the
 [trace model RFC](../../../rfcs/2026-04-29-25329-trace-data-model.md) migration PRs on the
 Datadog side, as the
@@ -81,7 +81,8 @@ In CI, a Vector-team member can submit a PR review starting with
 `/ci-run-e2e-datadog-traces` to run it against the reviewed commit, or
 `/ci-run-e2e-trace-model` to also run the
 [multiservice OpenTelemetry test](../opentelemetry-traces-multiservice/README.md).
-Automatic PR CI does not run it.
+The merge queue runs it automatically when the paths in
+[test.yaml](config/test.yaml) change.
 
 ## Known gaps
 

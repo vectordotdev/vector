@@ -15,4 +15,17 @@ runner:
 matrix:
   agent_version: ["7.84.6"]
 
-# Intentionally absent from the automatic CI matrices and changed-file filters for now.
+# changes to these files/paths will invoke the e2e test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/common/datadog.rs"
+  - "src/sources/datadog_agent/**"
+  - "src/internal_events/datadog_*"
+  - "src/sinks/datadog/traces/**"
+  - "src/sinks/util/**"
+  - "lib/datadog-proto/**"
+  - "lib/vector-core/src/event/trace.rs"
+  - "lib/vector-core/src/event/typed_trace/**"
+  - "tests/e2e/datadog/mod.rs"
+  - "tests/e2e/datadog/traces/**"
+  - "tests/e2e/datadog-traces/**"
