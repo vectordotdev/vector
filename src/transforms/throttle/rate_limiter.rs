@@ -4,7 +4,7 @@ use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::Das
 use tokio;
 
 use super::transform::Throttle;
-use crate::cpu_time::spawn_timed;
+use vector_lib::cpu_time::spawn_timed;
 
 /// A keyed rate limiter with a `DashMap` state store and no middleware.
 type KeyedRateLimiter<K, C> =

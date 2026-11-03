@@ -12,9 +12,10 @@ use snafu::Snafu;
 use tokio::task::JoinError;
 use vector_lib::{
     buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
+    utilization::Utilization,
 };
 
-use crate::{config::ComponentKey, utilization::Utilization};
+use crate::config::ComponentKey;
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum TaskOutput {
