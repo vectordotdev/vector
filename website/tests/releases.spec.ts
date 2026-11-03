@@ -41,7 +41,7 @@ test("handwritten release descriptions retain their content", async ({ page }) =
 });
 
 for (const width of [1280, 390]) {
-  test(`multiline VRL entries stay inside their cards at ${width}px`, async ({ page }) => {
+  test(`VRL migration links to its upgrade-guide card at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/releases/0.61.0/#vrl-fixes");
     const changelog = page.locator(".vrl-changelog");
@@ -50,28 +50,36 @@ for (const width of [1280, 390]) {
     });
 
     await expect(changelog.locator(".vrl-changelog-entry")).toHaveCount(6);
-    await expect(entry).toContainText("they no longer compile until the error is handled");
-    await expect(entry.locator("pre")).toHaveText([
+    await expect(entry).toContainText("the compiler previously rejected error handling for this call as unnecessary");
+    await expect(entry.locator("pre")).toHaveCount(0);
+    await entry.getByRole("link", { name: "Migration instructions", exact: true }).click();
+    await expect(page).toHaveURL(/#vrl-to-unix-timestamp-nanoseconds$/);
+    const migration = page.locator(".upgrade-guide-entry").filter({
+      has: page.locator("#vrl-to-unix-timestamp-nanoseconds")
+    });
+    await expect(migration).toContainText("they no longer compile until the error is handled");
+    await expect(migration.locator("pre")).toHaveText([
       'to_unix_timestamp(ts, unit: "nanoseconds")',
       'to_unix_timestamp!(ts, unit: "nanoseconds")',
       'to_unix_timestamp(ts, unit: "nanoseconds") ?? 0'
     ]);
     await expect(entry.getByRole("link", { name: "suryakant-source", exact: true })).toBeVisible();
 
-    const card = (await entry.boundingBox())!;
+    await expect(migration.getByRole("link", { name: "suryakant-source", exact: true })).toBeVisible();
+    const card = (await migration.boundingBox())!;
     expect(card.x).toBeGreaterThanOrEqual(0);
     expect(card.x + card.width).toBeLessThanOrEqual(width);
-    for (const block of await entry.locator("pre, p").all()) {
+    for (const block of await migration.locator("pre, p").all()) {
       const box = (await block.boundingBox())!;
       expect(box.x).toBeGreaterThan(card.x);
       expect(box.x + box.width).toBeLessThan(card.x + card.width);
       expect(box.y + box.height).toBeLessThan(card.y + card.height);
     }
-    await expect(entry).toHaveCSS("border-top-width", "1px");
-    await expect(entry).toHaveCSS("border-bottom-width", "1px");
-    const background = await entry.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await expect(migration).toHaveCSS("border-top-width", "1px");
+    await expect(migration).toHaveCSS("border-bottom-width", "1px");
+    const background = await migration.evaluate((element) => getComputedStyle(element).backgroundColor);
     await page.getByRole("button", { name: "Toggle dark mode" }).click();
-    await expect(entry).not.toHaveCSS("background-color", background);
+    await expect(migration).not.toHaveCSS("background-color", background);
   });
 }
 

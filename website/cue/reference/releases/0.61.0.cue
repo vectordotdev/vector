@@ -266,26 +266,7 @@ releases: "0.61.0": {
 		64-bit nanosecond value, but the compiler previously rejected error handling for this
 		call as unnecessary.
 		
-		Programs that call `to_unix_timestamp` with `unit: "nanoseconds"` are affected: they no
-		longer compile until the error is handled. Other units are unaffected.
-		
-		**Before**
-		
-		```vrl
-		to_unix_timestamp(ts, unit: "nanoseconds")
-		```
-		
-		**After**
-		
-		```vrl
-		to_unix_timestamp!(ts, unit: "nanoseconds")
-		```
-		
-		or with error coalescing:
-		
-		```vrl
-		to_unix_timestamp(ts, unit: "nanoseconds") ?? 0
-		```
+		[Migration instructions](/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds).
 		
 		*Thanks to [suryakant-source](https://github.com/suryakant-source) for contributing PR [#2001](https://github.com/vectordotdev/vrl/pull/2001)!*
 		
