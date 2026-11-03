@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use governor::clock;
 use serde_with::serde_as;
@@ -29,6 +29,19 @@ pub struct ThrottleInternalMetricsConfig {
     /// Only set this to true if you know that the number of unique keys is bounded.
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
+
+    /// Extra tags to add to the `events_discarded_total` internal metric.
+    ///
+    /// Values are event templates evaluated only for discarded events when
+    /// `emit_events_discarded_per_key` is true. Missing fields or empty results omit that tag.
+    /// These tags do not change rate-limit buckets or `component_discarded_events_total`.
+    /// The `key` tag and Vector's global metric tags, such as `component_id`, are reserved.
+    /// Only use values with bounded cardinality to avoid creating unbounded metric series.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An event template for an additional discard metric tag."
+    ))]
+    pub events_discarded_tags: HashMap<String, UnconfinedTemplate>,
 
     /// Whether or not to include the `group` tag on the `component_discarded_events_total`
     /// internal metric.

@@ -25,6 +25,23 @@ generated: components: transforms: throttle: configuration: {
 				required: false
 				type: bool: default: false
 			}
+			events_discarded_tags: {
+				description: """
+					Extra tags to add to the `events_discarded_total` internal metric.
+
+					Values are event templates evaluated only for discarded events when
+					`emit_events_discarded_per_key` is true. Missing fields or empty results omit that tag.
+					These tags do not change rate-limit buckets or `component_discarded_events_total`.
+					The `key` tag and Vector's global metric tags, such as `component_id`, are reserved.
+					Only use values with bounded cardinality to avoid creating unbounded metric series.
+					"""
+				required: false
+				type: object: options: "*": {
+					description: "An event template for an additional discard metric tag."
+					required:    true
+					type: string: syntax: "template"
+				}
+			}
 			include_group_tag: {
 				description: """
 					Whether or not to include the `group` tag on the `component_discarded_events_total`

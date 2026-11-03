@@ -44,6 +44,17 @@ where
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
+        if let Some(tag) = config
+            .internal_metrics
+            .events_discarded_tags
+            .keys()
+            .find(|tag| tag.as_str() == "key" || vector_lib::metrics::LABELS.contains(tag.as_str()))
+        {
+            return Err(Box::new(ConfigError::ReservedMetricTag {
+                tag: tag.clone(),
+            }));
+        }
+
         let flush_keys_interval = config.window_secs;
 
         let Some(threshold) = NonZeroU32::new(config.threshold) else {
@@ -81,9 +92,23 @@ where
         RateLimiterRunner::start(self)
     }
 
-    pub fn emit_event_discarded(&self, key: String) {
+    pub fn emit_event_discarded(&self, key: String, event: &Event) {
+        let tags = self
+            .internal_metrics
+            .events_discarded_tags
+            .iter()
+            .filter(|_| self.internal_metrics.emit_events_discarded_per_key)
+            .filter_map(|(name, template)| {
+                template
+                    .render_string(event)
+                    .ok()
+                    .filter(|value| !value.is_empty())
+                    .map(|value| (name.clone(), value))
+            })
+            .collect();
         emit!(ThrottleEventDiscarded {
             key,
+            tags,
             emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
             include_group_tag: self.internal_metrics.include_group_tag,
         });
@@ -129,7 +154,7 @@ where
                     if limiter.check_key(&key) {
                         Some(event)
                     } else {
-                        self.emit_event_discarded(key.unwrap_or_else(|| "None".to_string()));
+                        self.emit_event_discarded(key.unwrap_or_else(|| "None".to_string()), &event);
                         None
                     }
                 } else {
@@ -147,6 +172,10 @@ where
 pub enum ConfigError {
     #[snafu(display("`threshold`, and `window_secs` must be non-zero"))]
     NonZero,
+    #[snafu(display(
+        "`internal_metrics.events_discarded_tags` cannot override reserved tag `{tag}`"
+    ))]
+    ReservedMetricTag { tag: String },
 }
 
 #[cfg(test)]
@@ -165,6 +194,137 @@ mod tests {
         test_util::components::assert_transform_compliance,
         transforms::{Transform, test::create_topology},
     };
+
+    async fn discard_metrics_case(emit_per_key: bool, extra_tags: bool) {
+        vector_lib::metrics::init_test();
+        let mut config: ThrottleConfig = serde_yaml::from_str(indoc! {r#"
+            threshold: 1
+            window_secs: 60
+            key_field: "{{ entity }}"
+        "#})
+        .unwrap();
+        config.internal_metrics.emit_events_discarded_per_key = emit_per_key;
+        if extra_tags {
+            config.internal_metrics.events_discarded_tags = [
+                ("tenant".to_owned(), "{{ tenant }}".try_into().unwrap()),
+                ("region".to_owned(), "{{ region }}".try_into().unwrap()),
+            ]
+            .into();
+        }
+        let throttle = Throttle::new(
+            &config,
+            &TransformContext::default(),
+            clock::FakeRelativeClock::default(),
+        )
+        .unwrap();
+        let events = [
+            Some("first"),
+            Some("second"),
+            Some("second"),
+            Some("third"),
+            None,
+            Some(""),
+        ]
+        .into_iter()
+        .map(|tenant| {
+            let mut event = LogEvent::default();
+            event.insert(event_path!("entity"), "shared-bucket");
+            event.insert(event_path!("region"), "east");
+            if let Some(tenant) = tenant {
+                event.insert(event_path!("tenant"), tenant);
+            }
+            Event::from(event)
+        });
+        let output = Box::new(throttle)
+            .transform(Box::pin(futures::stream::iter(events)))
+            .collect::<Vec<_>>()
+            .await;
+        // Tag changes cannot grant another allowance in the same entity's bucket.
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].as_log().get(event_path!("tenant")),
+            Some(&"first".into())
+        );
+
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        let mut discards = metrics
+            .iter()
+            .filter(|metric| metric.name() == "events_discarded_total")
+            .map(|metric| {
+                assert_eq!(metric.tag_value("key").as_deref(), Some("shared-bucket"));
+                let crate::event::MetricValue::Counter { value } = metric.value() else {
+                    panic!("expected counter");
+                };
+                assert_eq!(
+                    metric.tag_value("region").as_deref(),
+                    extra_tags.then_some("east")
+                );
+                (metric.tag_value("tenant"), *value)
+            })
+            .collect::<Vec<_>>();
+        discards.sort_by(|left, right| left.0.cmp(&right.0));
+        let expected = match (emit_per_key, extra_tags) {
+            (false, _) => vec![],
+            (true, false) => vec![(None, 5.0)],
+            (true, true) => vec![
+                (None, 2.0),
+                (Some("second".to_owned()), 2.0),
+                (Some("third".to_owned()), 1.0),
+            ],
+        };
+        assert_eq!(discards, expected);
+        let aggregate = metrics
+            .iter()
+            .find(|metric| metric.name() == "component_discarded_events_total")
+            .unwrap();
+        assert_eq!(
+            aggregate.value(),
+            &crate::event::MetricValue::Counter { value: 5.0 }
+        );
+        assert_eq!(aggregate.tag_value("tenant"), None);
+        assert_eq!(aggregate.tag_value("region"), None);
+    }
+
+    #[tokio::test]
+    async fn discard_tags_preserves_bucket_and_counts_missing_fields() {
+        discard_metrics_case(true, true).await;
+    }
+
+    #[tokio::test]
+    async fn discard_tags_disabled_preserves_aggregate() {
+        discard_metrics_case(false, true).await;
+    }
+
+    #[tokio::test]
+    async fn discard_tags_unconfigured_preserves_existing_labels() {
+        discard_metrics_case(true, false).await;
+    }
+
+    #[test]
+    fn discard_tags_cannot_override_builtin_tags() {
+        for tag in std::iter::once("key").chain(vector_lib::metrics::LABELS.iter().copied()) {
+            let config = ThrottleConfig {
+                threshold: 1,
+                window_secs: Duration::from_secs(1),
+                internal_metrics: ThrottleInternalMetricsConfig {
+                    events_discarded_tags: [(tag.to_owned(), "override".try_into().unwrap())]
+                        .into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let error = Throttle::new(
+                &config,
+                &TransformContext::default(),
+                clock::FakeRelativeClock::default(),
+            )
+            .err()
+            .expect("reserved metric tag must be rejected");
+            assert!(error.to_string().contains(&format!("reserved tag `{tag}`")));
+        }
+    }
 
     #[tokio::test]
     async fn throttle_events() {
