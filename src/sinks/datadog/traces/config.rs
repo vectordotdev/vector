@@ -17,7 +17,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{

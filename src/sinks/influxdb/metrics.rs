@@ -26,7 +26,7 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,

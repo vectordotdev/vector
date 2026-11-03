@@ -240,6 +240,12 @@ where
     WriterSeekFailed { source: WriterError<T> },
 }
 
+/// The writer and reader halves of a disk buffer.
+type BufferParts<T, FS> = (BufferWriter<T, FS>, BufferReader<T, FS>);
+
+/// The writer and reader halves of a disk buffer, plus the ledger they share.
+type BufferPartsWithLedger<T, FS> = (BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>);
+
 /// Helper type for creating a disk buffer.
 pub struct Buffer<T> {
     _t: PhantomData<T>,
@@ -253,7 +259,7 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<BufferPartsWithLedger<T, FS>, BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -335,7 +341,7 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>), BufferError<T>>
+    ) -> Result<BufferParts<T, FS>, BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,

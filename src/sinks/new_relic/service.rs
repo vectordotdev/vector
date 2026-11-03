@@ -12,7 +12,7 @@ use tracing::Instrument;
 use vector_http::full_body;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{http::client_v1::HttpClient, sinks::prelude::*};
+use crate::{http::HttpClient, sinks::prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {

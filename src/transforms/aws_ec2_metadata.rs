@@ -33,7 +33,7 @@ use crate::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
     event::Event,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
     tls::MaybeTlsSettings,

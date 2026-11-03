@@ -17,7 +17,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsParseError, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,

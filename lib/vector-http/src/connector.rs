@@ -685,7 +685,7 @@ mod tests {
         time::Duration,
     };
 
-    use http::Request;
+    use http::{HeaderValue, Request, Uri};
     use http_body_util::BodyExt as _;
     use hyper_util::rt::TokioIo;
     use tokio::{
@@ -698,8 +698,78 @@ mod tests {
         tls::{MaybeTls, MaybeTlsSettings},
     };
 
-    use super::{MaxAgeIo, connect_authority, tls_host};
+    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, tls_host};
     use crate::{ConnectionOptions, HttpClient, empty_body};
+
+    /// Returns the proxy URI and `Proxy-Authorization` value of the route to `destination`.
+    fn proxy_route(config: &ProxyConfig, destination: &str) -> (Uri, Option<HeaderValue>) {
+        let route = RoutePlanner::new(config)
+            .unwrap()
+            .route(&destination.parse().unwrap())
+            .unwrap();
+        match route {
+            Route::ForwardProxy {
+                proxy,
+                authorization,
+            }
+            | Route::ConnectProxy {
+                proxy,
+                authorization,
+                ..
+            } => (proxy, authorization),
+            Route::Direct { .. } => panic!("{destination} must be proxied"),
+        }
+    }
+
+    #[test]
+    fn routes_each_scheme_to_its_proxy() {
+        let config = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+
+        let (proxy, authorization) = proxy_route(&config, "http://example.com/");
+        assert_eq!(proxy, "http://1.2.3.4:5678/");
+        assert!(authorization.is_none());
+
+        let (proxy, authorization) = proxy_route(&config, "https://example.com/");
+        assert_eq!(proxy, "https://2.3.4.5:9876/");
+        assert!(authorization.is_none());
+    }
+
+    #[test]
+    fn proxy_credentials_become_proxy_authorization() {
+        let config = ProxyConfig {
+            http: Some("http://user:pass@1.2.3.4:5678".into()),
+            https: Some("https://user:pass@2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+
+        for (destination, expected_proxy) in [
+            ("http://example.com/", "http://1.2.3.4:5678/"),
+            ("https://example.com/", "https://2.3.4.5:9876/"),
+        ] {
+            let (proxy, authorization) = proxy_route(&config, destination);
+            // The credentials leave the proxy URI and go only into `Proxy-Authorization`.
+            assert_eq!(proxy, expected_proxy);
+            let authorization = authorization.expect("proxy credentials are configured");
+            assert_eq!(authorization, "Basic dXNlcjpwYXNz");
+            assert!(authorization.is_sensitive());
+        }
+    }
+
+    #[test]
+    fn proxy_credentials_are_percent_decoded() {
+        let config = ProxyConfig {
+            http: Some("http://user:P%40ssw0rd@1.2.3.4:5678".into()),
+            ..Default::default()
+        };
+
+        let (_, authorization) = proxy_route(&config, "http://example.com/");
+        // base64("user:P@ssw0rd")
+        assert_eq!(authorization.unwrap(), "Basic dXNlcjpQQHNzdzByZA==");
+    }
 
     #[test]
     fn connect_authority_includes_a_port() {

@@ -32,7 +32,7 @@ use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     schema,
     sinks::{
         Healthcheck,

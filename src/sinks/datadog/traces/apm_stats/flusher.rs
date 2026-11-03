@@ -15,7 +15,7 @@ use super::{
     build_request,
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
     sinks::{
         HTTPV1RequestBuilderSnafu,

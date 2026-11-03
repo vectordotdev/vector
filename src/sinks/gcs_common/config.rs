@@ -8,7 +8,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,

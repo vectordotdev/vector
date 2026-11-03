@@ -30,7 +30,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    http::{Auth, QueryParameterValue, QueryParameters, client_v1::HttpClient},
+    http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,

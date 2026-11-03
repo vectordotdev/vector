@@ -73,50 +73,6 @@ pub trait HttpResponseTelemetry {
     }
 }
 
-// ── Implementations for the legacy http 0.2 / hyper 0.14 types (full data) ────
-
-impl<T: hyper::body::HttpBody> HttpRequestTelemetry for http_0::Request<T> {
-    fn method(&self) -> &str {
-        self.method().as_str()
-    }
-
-    fn uri(&self) -> String {
-        self.uri().to_string()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_legacy_headers(self.headers())
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        convert_legacy_version(self.version())
-    }
-}
-
-impl<T: hyper::body::HttpBody> HttpResponseTelemetry for http_0::Response<T> {
-    fn status_u16(&self) -> u16 {
-        self.status().as_u16()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_legacy_headers(self.headers())
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        convert_legacy_version(self.version())
-    }
-}
-
 // ── Events ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, NamedInternalEvent)]
@@ -253,34 +209,6 @@ impl<T: Body> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
     }
 }
 
-/// Converts legacy http 0.2 headers to http 1 headers, keeping repeated headers.
-fn convert_legacy_headers(headers: &http_0::HeaderMap) -> HeaderMap<HeaderValue> {
-    headers.iter().fold(
-        HeaderMap::with_capacity(headers.len()),
-        |mut converted, (name, value)| {
-            let name = HeaderName::from_bytes(name.as_str().as_bytes())
-                .expect("http 0.2 header names are valid http 1 header names");
-            let mut converted_value = HeaderValue::from_bytes(value.as_bytes())
-                .expect("http 0.2 header values are valid http 1 header values");
-            // Callers mark their own credential headers sensitive; keep that for redaction.
-            converted_value.set_sensitive(value.is_sensitive());
-            converted.append(name, converted_value);
-            converted
-        },
-    )
-}
-
-const fn convert_legacy_version(version: http_0::Version) -> Option<Version> {
-    match version {
-        http_0::Version::HTTP_09 => Some(Version::HTTP_09),
-        http_0::Version::HTTP_10 => Some(Version::HTTP_10),
-        http_0::Version::HTTP_11 => Some(Version::HTTP_11),
-        http_0::Version::HTTP_2 => Some(Version::HTTP_2),
-        http_0::Version::HTTP_3 => Some(Version::HTTP_3),
-        _ => None,
-    }
-}
-
 fn remove_sensitive(
     mut headers: HeaderMap<HeaderValue>,
     extra: &'static [HeaderName],
@@ -332,12 +260,9 @@ impl std::fmt::Display for FormatBodySizeHint {
 
 #[cfg(test)]
 mod tests {
-    use http::{
-        Version,
-        header::{self, HeaderMap, HeaderName, HeaderValue},
-    };
+    use http::header::{self, HeaderMap, HeaderName, HeaderValue};
 
-    use super::{HttpRequestTelemetry, HttpResponseTelemetry, remove_sensitive};
+    use super::remove_sensitive;
 
     fn is_sensitive(map: &HeaderMap, name: &HeaderName) -> Vec<bool> {
         map.get_all(name)
@@ -414,62 +339,6 @@ mod tests {
             is_sensitive(&result, &header::CONTENT_TYPE)
                 .iter()
                 .all(|&s| !s)
-        );
-    }
-
-    #[test]
-    fn legacy_request_converts_headers_and_version() {
-        let request = http_0::Request::builder()
-            .version(http_0::Version::HTTP_11)
-            .header("x-api-key", "key-one")
-            .header("x-api-key", "key-two")
-            .header(http_0::header::CONTENT_TYPE, "application/json")
-            .body(hyper::Body::empty())
-            .unwrap();
-
-        let headers = HttpRequestTelemetry::sanitized_headers(&request);
-        let x_api_key = HeaderName::from_static("x-api-key");
-        let values: Vec<_> = headers.get_all(&x_api_key).iter().collect();
-        assert_eq!(values, ["key-one", "key-two"]);
-        assert_eq!(is_sensitive(&headers, &x_api_key), [true, true]);
-        assert_eq!(headers[header::CONTENT_TYPE], "application/json");
-        assert_eq!(is_sensitive(&headers, &header::CONTENT_TYPE), [false]);
-        assert_eq!(
-            HttpRequestTelemetry::version(&request),
-            Some(Version::HTTP_11)
-        );
-    }
-
-    #[test]
-    fn legacy_request_keeps_caller_marked_sensitive_headers() {
-        let mut token = http_0::HeaderValue::from_static("secret");
-        token.set_sensitive(true);
-        let request = http_0::Request::builder()
-            .header("x-custom-token", token)
-            .body(hyper::Body::empty())
-            .unwrap();
-
-        let headers = HttpRequestTelemetry::sanitized_headers(&request);
-        let x_custom_token = HeaderName::from_static("x-custom-token");
-        assert_eq!(is_sensitive(&headers, &x_custom_token), [true]);
-    }
-
-    #[test]
-    fn legacy_response_converts_headers_and_version() {
-        let response = http_0::Response::builder()
-            .version(http_0::Version::HTTP_2)
-            .header(http_0::header::SET_COOKIE, "a=1")
-            .header(http_0::header::SET_COOKIE, "b=2")
-            .body(hyper::Body::empty())
-            .unwrap();
-
-        let headers = HttpResponseTelemetry::sanitized_headers(&response);
-        let values: Vec<_> = headers.get_all(header::SET_COOKIE).iter().collect();
-        assert_eq!(values, ["a=1", "b=2"]);
-        assert_eq!(is_sensitive(&headers, &header::SET_COOKIE), [true, true]);
-        assert_eq!(
-            HttpResponseTelemetry::version(&response),
-            Some(Version::HTTP_2)
         );
     }
 }

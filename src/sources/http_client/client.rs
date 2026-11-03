@@ -34,10 +34,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     format_vrl_diagnostics,
-    http::{
-        Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters,
-        client_v1::HttpClient,
-    },
+    http::{Auth, HttpClient, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
