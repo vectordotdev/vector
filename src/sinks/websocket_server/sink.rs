@@ -33,11 +33,12 @@ use futures::{
     future, pin_mut,
     stream::BoxStream,
 };
-use http_0::StatusCode;
+use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    Message,
+    Message, Utf8Bytes,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::WebSocketConfig,
 };
 use tokio_util::codec::Encoder as _;
 use url::Url;
@@ -218,7 +219,7 @@ impl WebSocketListenerSink {
                 ));
                 return Ok(response);
             };
-            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
+            match auth.handle_auth_v1(Some(&addr), req.headers(), req.uri().path()) {
                 Ok(_) => {
                     extra_tags.append(&mut Self::extract_extra_tags(
                         &extra_tags_config,
@@ -266,15 +267,23 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {err}");
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                });
-            })?;
+        // tungstenite allocates `read_buffer_size` bytes up front for each connection (default
+        // 128 KiB). This sink can serve many clients that send only small acks, so keep the 4 KiB
+        // read buffer of earlier tungstenite releases.
+        let ws_config = WebSocketConfig::default().read_buffer_size(4096);
+        let ws_stream = tokio_tungstenite::accept_hdr_async_with_config(
+            stream,
+            header_callback,
+            Some(ws_config),
+        )
+        .await
+        .map_err(|err| {
+            debug!("Error during websocket handshake: {err}");
+            emit!(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone()
+            });
+        })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -408,7 +417,12 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        let bytes = bytes.freeze();
+                        let text = match Utf8Bytes::try_from(bytes.clone()) {
+                            Ok(text) => text,
+                            Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                        };
+                        Message::Text(text)
                     };
                     let message_len = message.len();
 
