@@ -3739,6 +3739,7 @@ dependencies = [
 name = "datadog-proto"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "prost 0.13.5",
  "prost-build 0.13.5",
 ]

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{cell::Cell, collections::BTreeMap, fmt};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
@@ -19,6 +19,122 @@ use ddtrace_proto::idx::{
 
 const SAMPLING_MECHANISM_TAG: &str = "_dd.p.dm";
 const TRACE_ID_HIGH_TAG: &str = "_dd.p.tid";
+// Approximates the container (`Value` or map entry) that holds each copied string, so refs to
+// empty strings still count.
+const STRING_COPY_OVERHEAD_BYTES: usize = std::mem::size_of::<Value>();
+
+/// Bounds the bytes copied out of idx string tables, and the payload-level values copied into
+/// every chunk, across all idx tracer payloads in one request.
+///
+/// A single string table entry can be referenced any number of times, so the decoded events can
+/// be far larger than the request body that the decompression limit already bounds.
+pub(super) struct ExpansionBudget {
+    limit: usize,
+    used: Cell<usize>,
+}
+
+impl ExpansionBudget {
+    pub(super) const fn new(limit: usize) -> Self {
+        Self {
+            limit,
+            used: Cell::new(0),
+        }
+    }
+
+    fn charge(&self, bytes: usize) -> Result<(), IdxConversionError> {
+        self.used
+            .get()
+            .checked_add(bytes)
+            .filter(|&used| used <= self.limit)
+            .map(|used| self.used.set(used))
+            .ok_or(IdxConversionError::ExpansionLimitExceeded { limit: self.limit })
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum IdxConversionError {
+    InvalidStringRef(InvalidStringRef),
+    ExpansionLimitExceeded { limit: usize },
+}
+
+impl From<InvalidStringRef> for IdxConversionError {
+    fn from(error: InvalidStringRef) -> Self {
+        Self::InvalidStringRef(error)
+    }
+}
+
+impl fmt::Display for IdxConversionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidStringRef(error) => error.fmt(formatter),
+            Self::ExpansionLimitExceeded { limit } => write!(
+                formatter,
+                "idx trace payload expands beyond the limit of {limit} bytes"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for IdxConversionError {}
+
+/// A string table whose lookups are charged to the request's [`ExpansionBudget`].
+///
+/// Every lookup is charged before the caller copies the string, so callers must only look up
+/// strings they are about to copy.
+#[derive(Clone, Copy)]
+struct PayloadStrings<'a> {
+    table: StringTable<'a>,
+    budget: &'a ExpansionBudget,
+}
+
+impl<'a> PayloadStrings<'a> {
+    fn get(&self, index: u32) -> Result<&'a str, IdxConversionError> {
+        let value = self.table.get(index)?;
+        self.budget
+            .charge(value.len().saturating_add(STRING_COPY_OVERHEAD_BYTES))?;
+        Ok(value)
+    }
+
+    /// Looks up a string that is copied into a JSON value and then into its escaped text.
+    fn get_for_json(&self, index: u32) -> Result<&'a str, IdxConversionError> {
+        let value = self.table.get(index)?;
+        self.budget.charge(
+            value
+                .len()
+                .saturating_add(json_string_len(value))
+                .saturating_add(STRING_COPY_OVERHEAD_BYTES),
+        )?;
+        Ok(value)
+    }
+}
+
+/// The length of `value` serialized as a JSON string by `serde_json`, including its quotes.
+fn json_string_len(value: &str) -> usize {
+    value
+        .bytes()
+        .map(|byte| match byte {
+            b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
+            0x00..=0x1f => 6,
+            _ => 1,
+        })
+        .fold(2, usize::saturating_add)
+}
+
+/// The length of `String::from_utf8_lossy(bytes)`, which replaces each invalid sequence with the
+/// three-byte U+FFFD.
+fn lossy_utf8_len(bytes: &[u8]) -> usize {
+    bytes
+        .utf8_chunks()
+        .map(|chunk| {
+            chunk.valid().len()
+                + if chunk.invalid().is_empty() {
+                    0
+                } else {
+                    char::REPLACEMENT_CHARACTER.len_utf8()
+                }
+        })
+        .fold(0, usize::saturating_add)
+}
 
 struct IdxTracerFields<'a> {
     tags: &'a ObjectMap,
@@ -28,21 +144,51 @@ struct IdxTracerFields<'a> {
     tracer_version: &'a str,
     runtime_id: &'a str,
     app_version: &'a str,
+    /// The bytes copied into every chunk's event from the fields above.
+    per_chunk_copy_bytes: usize,
 }
 
 pub(super) fn convert_idx_tracer_payload(
     payload: ddtrace_proto::idx::TracerPayload,
-) -> Result<Vec<TraceEvent>, InvalidStringRef> {
-    let strings = StringTable::new(&payload.strings);
+    budget: &ExpansionBudget,
+) -> Result<Vec<TraceEvent>, IdxConversionError> {
+    let strings = PayloadStrings {
+        table: StringTable::new(&payload.strings),
+        budget,
+    };
     let payload_tags = attributes_as_strings(&strings, &payload.attributes)?;
+    let container_id = strings.get(payload.container_id_ref)?;
+    let language_name = strings.get(payload.language_name_ref)?;
+    let language_version = strings.get(payload.language_version_ref)?;
+    let tracer_version = strings.get(payload.tracer_version_ref)?;
+    let runtime_id = strings.get(payload.runtime_id_ref)?;
+    let app_version = strings.get(payload.app_version_ref)?;
+    let per_chunk_copy_bytes = payload_tags
+        .iter()
+        .map(|(key, value)| {
+            key.len() + value.as_bytes().map_or(0, Bytes::len) + STRING_COPY_OVERHEAD_BYTES
+        })
+        .chain(
+            [
+                container_id,
+                language_name,
+                language_version,
+                tracer_version,
+                runtime_id,
+                app_version,
+            ]
+            .map(|value| value.len() + STRING_COPY_OVERHEAD_BYTES),
+        )
+        .fold(0, usize::saturating_add);
     let fields = IdxTracerFields {
         tags: &payload_tags,
-        container_id: strings.get(payload.container_id_ref)?,
-        language_name: strings.get(payload.language_name_ref)?,
-        language_version: strings.get(payload.language_version_ref)?,
-        tracer_version: strings.get(payload.tracer_version_ref)?,
-        runtime_id: strings.get(payload.runtime_id_ref)?,
-        app_version: strings.get(payload.app_version_ref)?,
+        container_id,
+        language_name,
+        language_version,
+        tracer_version,
+        runtime_id,
+        app_version,
+        per_chunk_copy_bytes,
     };
 
     payload
@@ -53,10 +199,11 @@ pub(super) fn convert_idx_tracer_payload(
 }
 
 fn convert_idx_chunk(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     fields: &IdxTracerFields<'_>,
     chunk: ddtrace_proto::idx::TraceChunk,
-) -> Result<TraceEvent, InvalidStringRef> {
+) -> Result<TraceEvent, IdxConversionError> {
+    strings.budget.charge(fields.per_chunk_copy_bytes)?;
     let (trace_id_high, trace_id_low) = split_trace_id(&chunk.trace_id);
     let trace_id_high_tag = (trace_id_high != 0).then(|| format!("{trace_id_high:016x}"));
 
@@ -114,11 +261,11 @@ fn convert_idx_chunk(
 }
 
 fn convert_idx_span(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     span: ddtrace_proto::idx::Span,
     trace_id_low: u64,
     trace_id_high_tag: Option<&str>,
-) -> Result<ObjectMap, InvalidStringRef> {
+) -> Result<ObjectMap, IdxConversionError> {
     let mut attributes = SpanAttributes::from_attributes(strings, span.attributes)?;
     if let Some(trace_id_high_tag) = trace_id_high_tag
         && !attributes.meta.contains_key(TRACE_ID_HIGH_TAG)
@@ -171,9 +318,9 @@ fn convert_idx_span(
 }
 
 fn convert_idx_link(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     link: &ddtrace_proto::idx::SpanLink,
-) -> Result<ObjectMap, InvalidStringRef> {
+) -> Result<ObjectMap, IdxConversionError> {
     let (trace_id_high, trace_id_low) = split_trace_id(&link.trace_id);
     Ok(ObjectMap::from([
         (
@@ -201,9 +348,9 @@ fn convert_idx_link(
 }
 
 fn convert_idx_event(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     event: &ddtrace_proto::idx::SpanEvent,
-) -> Result<ObjectMap, InvalidStringRef> {
+) -> Result<ObjectMap, IdxConversionError> {
     Ok(ObjectMap::from([
         (
             "time_unix_nano".into(),
@@ -225,9 +372,9 @@ struct SpanAttributes {
 
 impl SpanAttributes {
     fn from_attributes(
-        strings: &StringTable<'_>,
+        strings: &PayloadStrings<'_>,
         attributes: BTreeMap<u32, AnyValue>,
-    ) -> Result<Self, InvalidStringRef> {
+    ) -> Result<Self, IdxConversionError> {
         let mut split = Self {
             meta: ObjectMap::new(),
             metrics: ObjectMap::new(),
@@ -287,9 +434,9 @@ impl SpanAttributes {
 }
 
 fn attributes_as_strings(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     attributes: &BTreeMap<u32, AnyValue>,
-) -> Result<ObjectMap, InvalidStringRef> {
+) -> Result<ObjectMap, IdxConversionError> {
     attributes
         .iter()
         .map(|(key_ref, value)| {
@@ -302,9 +449,9 @@ fn attributes_as_strings(
 }
 
 fn event_attributes(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     attributes: &BTreeMap<u32, AnyValue>,
-) -> Result<ObjectMap, InvalidStringRef> {
+) -> Result<ObjectMap, IdxConversionError> {
     attributes
         .iter()
         .map(|(key_ref, value)| {
@@ -317,9 +464,9 @@ fn event_attributes(
 }
 
 fn event_attribute_value(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     value: &AnyValue,
-) -> Result<Value, InvalidStringRef> {
+) -> Result<Value, IdxConversionError> {
     match &value.value {
         None => Ok(Value::Null),
         Some(IdxValue::StringValueRef(index)) => Ok(Value::from(strings.get(*index)?)),
@@ -354,9 +501,9 @@ const fn is_scalar(value: &AnyValue) -> bool {
 }
 
 fn any_value_as_string(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     value: &AnyValue,
-) -> Result<String, InvalidStringRef> {
+) -> Result<String, IdxConversionError> {
     match &value.value {
         None => Ok(String::new()),
         Some(IdxValue::StringValueRef(index)) => Ok(strings.get(*index)?.to_owned()),
@@ -365,7 +512,12 @@ fn any_value_as_string(
         }
         Some(IdxValue::IntValue(int_value)) => Ok(int_value.to_string()),
         Some(IdxValue::DoubleValue(double_value)) => Ok(format_f64(*double_value)),
-        Some(IdxValue::BytesValue(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+        Some(IdxValue::BytesValue(bytes)) => {
+            strings
+                .budget
+                .charge(lossy_utf8_len(bytes).saturating_add(STRING_COPY_OVERHEAD_BYTES))?;
+            Ok(String::from_utf8_lossy(bytes).into_owned())
+        }
         Some(IdxValue::ArrayValue(_) | IdxValue::KeyValueList(_)) => {
             Ok(json_text(&any_value_json(strings, value)?))
         }
@@ -373,17 +525,22 @@ fn any_value_as_string(
 }
 
 fn any_value_json(
-    strings: &StringTable<'_>,
+    strings: &PayloadStrings<'_>,
     value: &AnyValue,
-) -> Result<JsonValue, InvalidStringRef> {
+) -> Result<JsonValue, IdxConversionError> {
     match &value.value {
         Some(IdxValue::StringValueRef(index)) => {
-            Ok(JsonValue::String(strings.get(*index)?.to_owned()))
+            Ok(JsonValue::String(strings.get_for_json(*index)?.to_owned()))
         }
         Some(IdxValue::BoolValue(bool_value)) => Ok(JsonValue::Bool(*bool_value)),
         Some(IdxValue::IntValue(int_value)) => Ok(JsonValue::Number((*int_value).into())),
         Some(IdxValue::DoubleValue(double_value)) => Ok(json_f64(*double_value)),
-        Some(IdxValue::BytesValue(bytes)) => Ok(JsonValue::String(BASE64_STANDARD.encode(bytes))),
+        Some(IdxValue::BytesValue(bytes)) => {
+            strings
+                .budget
+                .charge(bytes.len().div_ceil(3).saturating_mul(4 * 2))?;
+            Ok(JsonValue::String(BASE64_STANDARD.encode(bytes)))
+        }
         Some(IdxValue::ArrayValue(array)) => Ok(JsonValue::Array(
             array
                 .values
@@ -394,7 +551,7 @@ fn any_value_json(
         Some(IdxValue::KeyValueList(list)) => {
             let mut entries = Vec::with_capacity(list.key_values.len());
             for entry in &list.key_values {
-                let key = strings.get(entry.key)?.to_owned();
+                let key = strings.get_for_json(entry.key)?.to_owned();
                 let json = entry
                     .value
                     .as_ref()
@@ -469,12 +626,14 @@ mod tests {
     use std::{cell::RefCell, collections::BTreeMap};
 
     use bytes::Bytes;
+    use proptest::prelude::*;
     use similar_asserts::assert_eq;
     use vrl::value;
 
     use super::{
         super::{super::ddtrace_proto, handler::convert_dd_tracer_payload},
-        convert_idx_tracer_payload,
+        ExpansionBudget, IdxConversionError, convert_idx_tracer_payload, json_string_len,
+        lossy_utf8_len,
     };
     use crate::event::{ObjectMap, TraceEvent, Value};
     use ddtrace_proto::idx::{
@@ -604,7 +763,11 @@ mod tests {
     }
 
     fn convert(payload: ddtrace_proto::idx::TracerPayload) -> Vec<TraceEvent> {
-        convert_idx_tracer_payload(payload).unwrap()
+        convert_idx_tracer_payload(payload, &ExpansionBudget::new(usize::MAX)).unwrap()
+    }
+
+    fn convert_err(payload: ddtrace_proto::idx::TracerPayload) -> IdxConversionError {
+        convert_idx_tracer_payload(payload, &ExpansionBudget::new(usize::MAX)).unwrap_err()
     }
 
     fn span_at(event: &TraceEvent, index: usize) -> &ObjectMap {
@@ -926,9 +1089,11 @@ mod tests {
         let strings = Strings::new();
         let mut span = base_span(&strings);
         span.service_ref = 99;
-        let error = convert_idx_tracer_payload(strings.into_payload(vec![chunk(0, 1, vec![span])]))
-            .unwrap_err();
-        assert_eq!(error.index, 99);
+        let error = convert_err(strings.into_payload(vec![chunk(0, 1, vec![span])]));
+        assert!(matches!(
+            error,
+            IdxConversionError::InvalidStringRef(ref error) if error.index == 99
+        ));
     }
 
     #[test]
@@ -939,9 +1104,126 @@ mod tests {
             tracestate_ref: 99,
             ..Default::default()
         }];
-        let error = convert_idx_tracer_payload(strings.into_payload(vec![chunk(0, 1, vec![span])]))
-            .unwrap_err();
-        assert_eq!(error.index, 99);
+        let error = convert_err(strings.into_payload(vec![chunk(0, 1, vec![span])]));
+        assert!(matches!(
+            error,
+            IdxConversionError::InvalidStringRef(ref error) if error.index == 99
+        ));
+    }
+
+    fn resource_fan_out_payload(
+        resource_len: usize,
+        spans: usize,
+    ) -> ddtrace_proto::idx::TracerPayload {
+        let strings = Strings::new();
+        let resource_ref = strings.intern(&"r".repeat(resource_len));
+        let spans = (0..spans)
+            .map(|_| {
+                let mut span = base_span(&strings);
+                span.resource_ref = resource_ref;
+                span
+            })
+            .collect();
+        strings.into_payload(vec![chunk(0, 1, spans)])
+    }
+
+    #[test]
+    fn repeated_string_refs_exceed_the_expansion_budget() {
+        let payload = resource_fan_out_payload(1024, 64);
+        let error =
+            convert_idx_tracer_payload(payload, &ExpansionBudget::new(32 * 1024)).unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { limit: 32_768 }
+        ));
+
+        let payload = resource_fan_out_payload(1024, 64);
+        let events =
+            convert_idx_tracer_payload(payload, &ExpansionBudget::new(128 * 1024)).unwrap();
+        assert_eq!(events[0].as_map()["spans"].as_array().unwrap().len(), 64);
+    }
+
+    #[test]
+    fn payload_tags_copied_into_each_chunk_count_against_the_budget() {
+        let strings = Strings::new();
+        let payload_tag = strings.string(&"t".repeat(1024));
+        let chunks = (1..=64).map(|low| chunk(0, low, Vec::new())).collect();
+        let mut payload = strings.into_payload(chunks);
+        let tag_key = u32::try_from(payload.strings.len()).unwrap();
+        payload.strings.push("payload-tag".to_owned());
+        payload.attributes = BTreeMap::from([(tag_key, payload_tag)]);
+
+        let error =
+            convert_idx_tracer_payload(payload, &ExpansionBudget::new(32 * 1024)).unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
+    }
+
+    proptest! {
+        #[test]
+        fn json_string_len_matches_serde_json(value: String) {
+            prop_assert_eq!(
+                json_string_len(&value),
+                serde_json::to_string(&value).unwrap().len()
+            );
+        }
+
+        #[test]
+        fn lossy_utf8_len_matches_from_utf8_lossy(bytes: Vec<u8>) {
+            prop_assert_eq!(
+                lossy_utf8_len(&bytes),
+                String::from_utf8_lossy(&bytes).len()
+            );
+        }
+    }
+
+    #[test]
+    fn lossy_utf8_replacement_counts_against_the_budget() {
+        let strings = Strings::new();
+        let mut trace = chunk(0, 1, Vec::new());
+        trace.attributes = strings.map(vec![("k", Strings::bytes(&[0xff; 1024]))]);
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(2048),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn json_escaping_counts_against_the_budget() {
+        let strings = Strings::new();
+        let mut span = base_span(&strings);
+        span.attributes = strings.map(vec![(
+            "k",
+            Strings::array(vec![strings.string(&"\u{1}".repeat(1024))]),
+        )]);
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![chunk(0, 1, vec![span])]),
+            &ExpansionBudget::new(4096),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn expansion_budget_is_shared_across_payloads() {
+        let budget = ExpansionBudget::new(96 * 1024);
+        convert_idx_tracer_payload(resource_fan_out_payload(1024, 64), &budget).unwrap();
+        let error =
+            convert_idx_tracer_payload(resource_fan_out_payload(1024, 64), &budget).unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
     }
 
     #[test]

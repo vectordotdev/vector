@@ -14,3 +14,6 @@ prost = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
 prost-build.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

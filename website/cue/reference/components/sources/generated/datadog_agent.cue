@@ -71,6 +71,22 @@ generated: components: sources: datadog_agent: configuration: {
 		required:    false
 		type:        _schemaDefinitions["vector::http::KeepaliveConfig"]
 	}
+	max_trace_expansion_bytes: {
+		description: """
+			The maximum number of bytes that indexed trace payloads in a single request can expand to
+			while being converted into trace events.
+
+			Indexed trace payloads store each string once and reference it from any number of spans,
+			so the converted events can be much larger than the request body. Requests that would
+			exceed this limit are rejected with an HTTP 422 Unprocessable Entity response before the
+			excess data is copied.
+			"""
+		required: false
+		type: uint: {
+			default: 104857600
+			unit:    "bytes"
+		}
+	}
 	multiple_outputs: {
 		description: """
 			If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.

@@ -16,13 +16,14 @@ use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath,
 
 use super::{
     super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, TRACES, ddtrace_proto},
-    idx::convert_idx_tracer_payload,
+    idx::{ExpansionBudget, IdxConversionError, convert_idx_tracer_payload},
 };
 use crate::{
     common::{datadog::encode_u64_id_hex, http::ErrorMessage},
     event::{Event, ObjectMap, TraceEvent, Value},
     internal_events::{
-        DatadogAgentInvalidIdxStringRefError, DatadogAgentUnsupportedTracePayloadError,
+        DatadogAgentIdxExpansionLimitError, DatadogAgentInvalidIdxStringRefError,
+        DatadogAgentUnsupportedTracePayloadError,
     },
     sources::util::http::capped_body,
 };
@@ -118,11 +119,19 @@ fn handle_dd_trace_payload(
         .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
+    let budget = ExpansionBudget::new(source.max_trace_expansion_bytes);
     for payload in decoded_payload.idx_tracer_payloads {
-        match convert_idx_tracer_payload(payload) {
+        match convert_idx_tracer_payload(payload, &budget) {
             Ok(events) => trace_events.extend(events),
             Err(error) => {
-                emit!(DatadogAgentInvalidIdxStringRefError { index: error.index });
+                match &error {
+                    IdxConversionError::InvalidStringRef(error) => {
+                        emit!(DatadogAgentInvalidIdxStringRefError { index: error.index });
+                    }
+                    IdxConversionError::ExpansionLimitExceeded { limit } => {
+                        emit!(DatadogAgentIdxExpansionLimitError { limit: *limit });
+                    }
+                }
                 return Err(error.into());
             }
         }

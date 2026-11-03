@@ -71,3 +71,27 @@ impl InternalEvent for DatadogAgentInvalidIdxStringRefError {
         .increment(1);
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DatadogAgentIdxExpansionLimitError {
+    pub limit: usize,
+}
+
+impl InternalEvent for DatadogAgentIdxExpansionLimitError {
+    fn emit(self) {
+        error!(
+            message = "Datadog Agent idx trace payload expands beyond the configured limit.",
+            error_code = "idx_expansion_limit_exceeded",
+            limit = self.limit,
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => "idx_expansion_limit_exceeded",
+        )
+        .increment(1);
+    }
+}

@@ -50,7 +50,8 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        ddmetric_v3_proto, ddtrace_proto, default_max_trace_expansion_bytes, logs::decode_log_body,
+        metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -1914,6 +1915,72 @@ async fn decode_traces_idx_bad_string_ref_is_rejected() {
     .await;
 }
 
+#[tokio::test]
+async fn decode_traces_idx_expansion_over_limit_is_rejected() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 65536
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let resource = "r".repeat(1024);
+        let names = [resource.as_str()];
+        let span = ddtrace_proto::idx::Span {
+            resource_ref: idx_ref(&names, &resource),
+            ..Default::default()
+        };
+        let chunk = ddtrace_proto::idx::TraceChunk {
+            spans: vec![span; 32],
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload {
+            idx_tracer_payloads: vec![
+                ddtrace_proto::idx::TracerPayload {
+                    strings: idx_strings(&names),
+                    chunks: vec![chunk],
+                    ..Default::default()
+                };
+                2
+            ],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+        assert!(buf.len() < 65536 / 4);
+
+        assert_eq!(
+            422,
+            send_with_path(address, buf, dd_api_key_headers(), DD_API_TRACES_PATH).await
+        );
+
+        let events = crate::test_util::collect_ready(rx);
+        assert!(events.is_empty());
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        assert!(
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_expansion_limit_exceeded")
+            }),
+            "expected component_errors_total with error_code=idx_expansion_limit_exceeded"
+        );
+    })
+    .await;
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
@@ -2127,6 +2194,7 @@ fn test_config_outputs_with_disabled_data_types() {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let outputs: Vec<DataType> = config
@@ -2575,6 +2643,7 @@ fn test_config_outputs() {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let mut outputs = config
@@ -3931,6 +4000,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();

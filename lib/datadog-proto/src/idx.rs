@@ -138,26 +138,30 @@ pub fn parse_sampling_mechanism(value: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+    use proptest::{collection::vec, prelude::*};
+
     use super::{
         InvalidStringRef, StringTable, format_sampling_mechanism, join_trace_id,
         parse_sampling_mechanism, span_kind_from_name, span_kind_name, split_trace_id,
     };
     use crate::trace::idx::SpanKind;
 
-    #[test]
-    fn string_table_rejects_out_of_range_refs() {
-        let empty = StringTable::new(&[]);
-        assert_eq!(empty.get(0), Err(InvalidStringRef { index: 0 }));
+    fn arb_strings() -> impl Strategy<Value = Vec<String>> {
+        vec(any::<String>(), 0..=8)
+    }
 
-        let strings = vec![String::new(), "service".to_owned()];
-        let table = StringTable::new(&strings);
-        assert_eq!(table.get(0).unwrap(), "");
-        assert_eq!(table.get(1).unwrap(), "service");
-        assert_eq!(table.get(2), Err(InvalidStringRef { index: 2 }));
-        assert_eq!(
-            table.get(u32::MAX),
-            Err(InvalidStringRef { index: u32::MAX })
-        );
+    fn arb_table_lookup() -> impl Strategy<Value = (Vec<String>, u32)> {
+        vec(any::<String>(), 1..=8).prop_flat_map(|strings| {
+            let len = u32::try_from(strings.len()).unwrap();
+            (0..len).prop_map(move |index| (strings.clone(), index))
+        })
+    }
+
+    fn arb_missing_table_lookup() -> impl Strategy<Value = (Vec<String>, u32)> {
+        arb_strings().prop_flat_map(|strings| {
+            let len = u32::try_from(strings.len()).unwrap();
+            (len..=u32::MAX).prop_map(move |index| (strings.clone(), index))
+        })
     }
 
     #[test]
@@ -168,11 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn trace_ids_split_and_join_with_legacy_alignment() {
-        let high = 0x0123_4567_89ab_cdef;
-        let low = 0xfedc_ba98_7654_3210;
-        assert_eq!(split_trace_id(&join_trace_id(high, low)), (high, low));
-
+    fn trace_ids_split_with_legacy_alignment() {
         assert_eq!(split_trace_id(&[]), (0, 0));
         assert_eq!(split_trace_id(&[0x01, 0x02]), (0, 0x0102));
         assert_eq!(split_trace_id(&[0xff; 8]), (0, u64::MAX));
@@ -181,9 +181,12 @@ mod tests {
             (0x01, 0x0203_0405_0607_0809)
         );
 
-        let mut overlong = join_trace_id(high, low).to_vec();
+        let mut overlong = join_trace_id(0x0123_4567_89ab_cdef, 0xfedc_ba98_7654_3210).to_vec();
         overlong.push(0xaa);
-        assert_eq!(split_trace_id(&overlong), (high, low));
+        assert_eq!(
+            split_trace_id(&overlong),
+            (0x0123_4567_89ab_cdef, 0xfedc_ba98_7654_3210)
+        );
     }
 
     #[test]
@@ -205,19 +208,49 @@ mod tests {
     }
 
     #[test]
-    fn sampling_mechanism_formats_and_parses() {
-        assert_eq!(format_sampling_mechanism(4), "-4");
-        assert_eq!(parse_sampling_mechanism("-4"), Some(4));
-        assert_eq!(
-            parse_sampling_mechanism(&format_sampling_mechanism(0)),
-            Some(0)
-        );
-        assert_eq!(parse_sampling_mechanism("12"), Some(12));
-        assert_eq!(parse_sampling_mechanism("-0"), Some(0));
+    fn sampling_mechanism_rejects_non_integers() {
         assert_eq!(parse_sampling_mechanism(""), None);
         assert_eq!(parse_sampling_mechanism("-"), None);
         assert_eq!(parse_sampling_mechanism("+1"), None);
         assert_eq!(parse_sampling_mechanism("1.5"), None);
         assert_eq!(parse_sampling_mechanism("-4extra"), None);
+    }
+
+    proptest! {
+        #[test]
+        fn string_table_returns_in_range_refs((strings, index) in arb_table_lookup()) {
+            let table = StringTable::new(&strings);
+            prop_assert_eq!(
+                table.get(index),
+                Ok(strings[usize::try_from(index).unwrap()].as_str())
+            );
+        }
+
+        #[test]
+        fn string_table_rejects_out_of_range_refs((strings, index) in arb_missing_table_lookup()) {
+            let table = StringTable::new(&strings);
+            prop_assert_eq!(table.get(index), Err(InvalidStringRef { index }));
+        }
+
+        #[test]
+        fn joined_trace_ids_split_back_into_their_halves(high: u64, low: u64) {
+            prop_assert_eq!(split_trace_id(&join_trace_id(high, low)), (high, low));
+        }
+
+        #[test]
+        fn formatted_sampling_mechanism_parses_back(mechanism: u32) {
+            prop_assert_eq!(
+                format_sampling_mechanism(mechanism),
+                format!("-{mechanism}")
+            );
+            prop_assert_eq!(
+                parse_sampling_mechanism(&format_sampling_mechanism(mechanism)),
+                Some(mechanism)
+            );
+            prop_assert_eq!(
+                parse_sampling_mechanism(&mechanism.to_string()),
+                Some(mechanism)
+            );
+        }
     }
 }
