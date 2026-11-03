@@ -15,11 +15,14 @@ use tokio::{
 use tracing::Instrument;
 use vector_lib::{
     buffers::{BufferConfig, topology::channel::BufferSender},
+    extra_context::ExtraContext,
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
+    spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
+    utilization::UtilizationRegistry,
 };
 
 use super::{
@@ -37,12 +40,9 @@ use crate::{
         enrichment_table_sinks,
     },
     event::EventArray,
-    extra_context::ExtraContext,
     internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
-    spawn_named,
-    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -1602,12 +1602,11 @@ mod tests {
 
     use tokio::sync::{mpsc, oneshot};
     use tokio_test::{assert_pending, task::spawn};
-    use vector_lib::config::ComponentKey;
+    use vector_lib::{config::ComponentKey, extra_context::ExtraContext};
 
     use super::RunningTopology;
     use crate::{
         config::Config,
-        extra_context::ExtraContext,
         test_util::{
             mock::{basic_sink, basic_source, basic_transform},
             start_topology, trace_init,

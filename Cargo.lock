@@ -1838,12 +1838,8 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
- "h2 0.3.26",
  "h2 0.4.19",
- "http 0.2.12",
  "http 1.5.0",
- "http-body 0.4.6",
- "hyper 0.14.32",
  "hyper 1.11.1",
  "hyper-rustls",
  "hyper-util",
@@ -1898,7 +1894,6 @@ checksum = "b82e438d30e02a825d363bd639a9efaed68a8089d86101054b0081e7e0d3e606"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",
- "aws-smithy-http-client",
  "aws-smithy-observability",
  "aws-smithy-runtime-api",
  "aws-smithy-schema",
@@ -9449,9 +9444,9 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.13.5"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "278e9268c93b9e498a2da46c34d90ba93a3255eb99009646398f34bc73ab36eb"
+checksum = "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b"
 dependencies = [
  "bitflags 2.13.2",
  "memchr",
@@ -13348,7 +13343,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.38"
+version = "0.3.39"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -13514,7 +13509,6 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "mlua",
- "mock_instant",
  "mongodb",
  "nix 0.31.3",
  "nkeys",
@@ -13617,7 +13611,6 @@ dependencies = [
  "warp",
  "windows 0.58.0",
  "windows-service",
- "windows-sys 0.52.0",
  "wiremock",
  "zstd 0.13.2",
 ]
@@ -13699,6 +13692,7 @@ dependencies = [
  "futures",
  "indexmap 2.14.2",
  "itertools 0.15.0",
+ "libc",
  "metrics",
  "pastey",
  "pin-project",
@@ -13712,6 +13706,7 @@ dependencies = [
  "vector-common-macros",
  "vector-config",
  "vrl",
+ "windows-sys 0.52.0",
  "zstd 0.13.2",
 ]
 
@@ -13813,6 +13808,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mlua",
+ "mock_instant",
  "ndarray",
  "ndarray-stats",
  "noisy_float",
@@ -13837,6 +13833,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "serial_test",
  "similar-asserts",
  "smallvec",
  "snafu 0.9.2",

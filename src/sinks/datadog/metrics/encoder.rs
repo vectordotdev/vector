@@ -23,7 +23,9 @@ use vector_lib::{
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::DATADOG_METRIC_RESOURCE_TAG_PREFIX,
-    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
+    sinks::util::{
+        Compression, Compressor, encode_metric_tag, encode_namespace, request_builder::EncodeResult,
+    },
 };
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
@@ -626,7 +628,7 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
             tags.push(encode_tag(tag, value));
         }
     }
-    tags.sort();
+    tags.sort_unstable();
 
     SeriesTags {
         tags,
@@ -771,15 +773,14 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
 
 fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
     let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
-    pairs.sort();
+    pairs.sort_unstable();
     pairs
 }
 
 fn encode_tag(name: &str, value: Option<&str>) -> String {
-    match value {
-        Some(value) => format!("{name}:{value}"),
-        None => name.into(),
-    }
+    let mut encoded = String::new();
+    encode_metric_tag(&mut encoded, name, value);
+    encoded
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {

@@ -14,7 +14,7 @@ use vector_lib::{
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
-    pub url: http_0::Uri,
+    pub url: http::Uri,
     pub body: Cow<'a, str>,
 }
 
