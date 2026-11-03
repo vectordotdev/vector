@@ -97,21 +97,9 @@ impl ReduceState {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
                 match self.fields.entry(parsed_path) {
                     Entry::Vacant(entry) => {
-                        if let Some(strategy) = maybe_strategy {
-                            match get_value_merger(value.clone(), strategy) {
-                                Ok(m) => {
-                                    entry.insert(m);
-                                }
-                                Err(error) => {
-                                    warn!(message = "Failed to merge value.", %error);
-                                }
-                            }
-                        } else {
-                            entry.insert(value.clone().into());
-                        }
+                        entry.insert(value.clone().into());
                     }
                     Entry::Occupied(mut entry) => {
                         if let Err(error) = entry.get_mut().add(value.clone()) {
@@ -209,6 +197,9 @@ impl Reduce {
                 .merge_strategies
                 .iter()
                 .filter_map(|(path, strategy)| {
+                    // TODO: dont think the below todo is relevant, as an hard error is sent via
+                    // validate_merge_strategies just above.
+
                     // TODO Invalid paths are ignored to preserve backwards compatibility.
                     //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
                     //      which means an invalid path would result in an configuration error.
@@ -299,16 +290,14 @@ impl Reduce {
 
             self.push_or_new_reduce_state(&event, discriminant);
         } else if ends_here {
-            emitter.emit(
-                if let Some(mut state) = self.merge_states.remove(&discriminant) {
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                } else {
-                    let mut state = ReduceState::new();
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                },
-            );
+            emitter.emit({
+                let mut state = self
+                    .merge_states
+                    .remove(&discriminant)
+                    .unwrap_or_else(ReduceState::new);
+                state.add_event(&event, &self.merge_strategies);
+                state.flush().into()
+            });
         } else {
             self.push_or_new_reduce_state(&event, discriminant);
         }
