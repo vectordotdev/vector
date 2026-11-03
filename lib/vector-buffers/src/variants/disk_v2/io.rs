@@ -40,7 +40,10 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for writing, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File>;
+    fn open_file_writable(
+        &self,
+        path: &Path,
+    ) -> impl Future<Output = io::Result<Self::File>> + Send;
 
     /// Opens a file for writing, creating it if it does not already exist, but atomically.
     ///
@@ -54,7 +57,10 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If a general I/O error occurred when attempting to open the file for writing, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File>;
+    fn open_file_writable_atomic(
+        &self,
+        path: &Path,
+    ) -> impl Future<Output = io::Result<Self::File>> + Send;
 
     /// Opens a file for reading, creating it if it does not exist.
     ///
@@ -64,7 +70,10 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File>;
+    fn open_file_readable(
+        &self,
+        path: &Path,
+    ) -> impl Future<Output = io::Result<Self::File>> + Send;
 
     /// Opens a file as a readable memory-mapped region.
     ///
@@ -72,7 +81,10 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, or attempting to
     /// memory map the file, an error variant will be returned describing the underlying error.
-    async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap>;
+    fn open_mmap_readable(
+        &self,
+        path: &Path,
+    ) -> impl Future<Output = io::Result<Self::MemoryMap>> + Send;
 
     /// Opens a file as a writable memory-mapped region.
     ///
@@ -80,7 +92,10 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, or attempting to
     /// memory map the file, an error variant will be returned describing the underlying error.
-    async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap>;
+    fn open_mmap_writable(
+        &self,
+        path: &Path,
+    ) -> impl Future<Output = io::Result<Self::MutableMemoryMap>> + Send;
 
     /// Durably truncates a file to `size`, creating it when it does not exist.
     ///
@@ -91,7 +106,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If `size` is greater than the current file size, or an I/O error occurs while truncating or
     /// synchronizing the file, an error is returned.
-    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()>;
+    fn truncate_file(&self, path: &Path, size: u64) -> impl Future<Output = io::Result<()>> + Send;
 
     /// Deletes a file.
     ///
@@ -128,14 +143,14 @@ pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
     ///
     /// If an I/O error occurred when attempting to get the metadata for the file, an error variant
     /// will be returned describing the underlying error.
-    async fn metadata(&self) -> io::Result<Metadata>;
+    fn metadata(&self) -> impl Future<Output = io::Result<Metadata>> + Send;
 
     /// Truncates the underlying file to the specified size.
     ///
     /// # Errors
     /// If `size` is greater than the current file size, or an I/O error occurred when attempting to
     /// truncate the file, an error variant will be returned describing the underlying error.
-    async fn truncate(&self, size: u64) -> io::Result<()>;
+    fn truncate(&self, size: u64) -> impl Future<Output = io::Result<()>> + Send;
 
     /// Attempts to synchronize all OS-internal data, and metadata, to disk.
     ///
@@ -146,7 +161,7 @@ pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
     /// # Errors
     /// If an I/O error occurred when attempting to synchronize the file data and metadata to disk,
     /// an error variant will be returned describing the underlying error.
-    async fn sync_all(&self) -> io::Result<()>;
+    fn sync_all(&self) -> impl Future<Output = io::Result<()>> + Send;
 }
 
 pub trait ReadableMemoryMap: AsRef<[u8]> + Send + Sync {}

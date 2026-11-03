@@ -158,6 +158,10 @@ where
 
 /// Generalized interface for describing and building enrichment table components.
 #[enum_dispatch]
+#[expect(
+    async_fn_in_trait,
+    reason = "`enum_dispatch` cannot forward `-> impl Future + Send` methods; callers only use concrete types, where `Send` is still checked"
+)]
 pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the enrichment table with the given globals and previous table state.
     ///
