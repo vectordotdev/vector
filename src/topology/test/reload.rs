@@ -113,7 +113,7 @@ async fn topology_rebuild_old() {
 }
 
 #[tokio::test]
-async fn topology_records_last_reload_diff() {
+async fn topology_reload_returns_applied_diff() {
     test_util::trace_init();
 
     let (_guard, address) = next_addr();
@@ -126,15 +126,12 @@ async fn topology_records_last_reload_diff() {
     new_config.add_sink("out2", &["in"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(topology.last_reload_diff().is_none());
-
     topology.extend_reload_set(HashSet::from([ComponentKey::from("out")]));
-    topology
+    let diff = topology
         .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
-    let diff = topology.last_reload_diff().unwrap();
     assert!(diff.sources.to_change.is_empty());
     assert_eq!(
         diff.sinks.to_change,
@@ -143,37 +140,6 @@ async fn topology_records_last_reload_diff() {
     assert_eq!(
         diff.sinks.to_add,
         HashSet::from([ComponentKey::from("out2")])
-    );
-}
-
-#[tokio::test]
-async fn topology_records_last_reload_diff_on_rollback() {
-    test_util::trace_init();
-
-    let (_guard_0, address_0) = next_addr();
-    let (_guard_1, address_1) = next_addr();
-
-    let mut old_config = Config::builder();
-    old_config.add_source("in", splunk_source_config(address_0));
-    old_config.add_sink("out", &["in"], basic_sink(1).1);
-
-    let mut new_config = Config::builder();
-    new_config.add_source("in", splunk_source_config(address_1));
-    new_config.add_sink("out", &["in"], basic_sink(1).1);
-
-    // Will cause the new_config to fail on build
-    let _bind = TcpListener::bind(address_1).unwrap();
-
-    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    let result = topology
-        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
-        .await;
-    assert!(matches!(result, Err(TopologyBuildFailed)));
-
-    let diff = topology.last_reload_diff().unwrap();
-    assert_eq!(
-        diff.sources.to_change,
-        HashSet::from([ComponentKey::from("in")])
     );
 }
 

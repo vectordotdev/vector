@@ -61,7 +61,8 @@ impl std::fmt::Debug for TopologyController {
 #[derive(Clone, Debug)]
 pub enum ReloadOutcome {
     MissingApiKey,
-    Success,
+    /// Carries the diff applied by the reload.
+    Success(Box<config::ConfigDiff>),
     RolledBack,
     FatalError(ShutdownError),
 }
@@ -112,11 +113,11 @@ impl TopologyController {
             .reload_config_and_respawn(new_config, self.extra_context.clone())
             .await
         {
-            Ok(()) => {
+            Ok(diff) => {
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });
-                ReloadOutcome::Success
+                ReloadOutcome::Success(Box::new(diff))
             }
             Err(ReloadError::GlobalOptionsChanged { changed_fields }) => {
                 error!(

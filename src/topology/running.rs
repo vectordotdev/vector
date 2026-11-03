@@ -80,7 +80,6 @@ pub struct RunningTopology {
     metrics_task: Option<TaskHandle>,
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
-    last_reload_diff: Option<ConfigDiff>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
     orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
 }
@@ -108,7 +107,6 @@ impl RunningTopology {
             metrics_task: None,
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
-            last_reload_diff: None,
             sink_confinement_gauges: HashMap::new(),
             orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
         }
@@ -127,18 +125,6 @@ impl RunningTopology {
             None => self.pending_reload = Some(new_set),
             Some(existing) => existing.extend(new_set),
         }
-    }
-
-    /// Gets the diff computed by the last call to `reload_config_and_respawn`, including the
-    /// components queued with `extend_reload_set`.
-    ///
-    /// The components it changes or removes were stopped. On success, the components it changes or
-    /// adds were then spawned. On rollback, the ones it changes or removes were restored instead.
-    ///
-    /// Returns `None` if no reload happened yet, or if the last one was rejected before diffing.
-    #[must_use]
-    pub const fn last_reload_diff(&self) -> Option<&ConfigDiff> {
-        self.last_reload_diff.as_ref()
     }
 
     /// Creates a subscription to topology changes.
@@ -311,8 +297,8 @@ impl RunningTopology {
     /// Attempts to load a new configuration and update this running topology.
     ///
     /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then
-    /// `Ok(())` is returned.
+    /// old components, changing of existing components, adding of new components -- then the
+    /// applied diff is returned. It includes the components queued with `extend_reload_set`.
     ///
     /// If the new configuration is not valid, or not all of the changes in the new configuration
     /// were able to be made, then this method will attempt to undo the changes made and bring the
@@ -327,9 +313,8 @@ impl RunningTopology {
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<(), ReloadError> {
+    ) -> Result<ConfigDiff, ReloadError> {
         info!("Reloading running topology with new configuration.");
-        self.last_reload_diff = None;
 
         if self.config.global != new_config.global {
             return match self.config.global.diff(&new_config.global) {
@@ -345,7 +330,6 @@ impl RunningTopology {
         // We also shutdown any component that is simply being removed entirely.
         let components_to_reload = self.pending_reload.take().unwrap_or_default();
         let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
-        self.last_reload_diff = Some(diff.clone());
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Try to build all of the new components coming from the new configuration.  If we can
@@ -375,7 +359,7 @@ impl RunningTopology {
 
                 info!("New configuration loaded successfully.");
 
-                return Ok(());
+                return Ok(diff);
             }
         }
 
