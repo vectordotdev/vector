@@ -119,6 +119,7 @@ fn handle_dd_trace_payload(
         .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
+    let has_idx_payloads = !decoded_payload.idx_tracer_payloads.is_empty();
     let budget = ExpansionBudget::new(source.max_trace_expansion_bytes);
     for payload in decoded_payload.idx_tracer_payloads {
         match convert_idx_tracer_payload(payload, &budget) {
@@ -137,11 +138,6 @@ fn handle_dd_trace_payload(
         }
     }
 
-    source.events_received.emit(CountByteSize(
-        trace_events.len(),
-        trace_events.estimated_json_encoded_size_of(),
-    ));
-
     let tags = convert_tags(decoded_payload.tags);
     let fields = AgentTraceFields {
         env: &decoded_payload.env,
@@ -151,6 +147,26 @@ fn handle_dd_trace_payload(
         error_tps: decoded_payload.error_tps,
         tags: &tags,
     };
+    if has_idx_payloads
+        && let Err(error) = budget.charge_agent_metadata(
+            trace_events.len(),
+            fields.hostname,
+            fields.env,
+            fields.agent_version,
+            fields.tags,
+        )
+    {
+        if let IdxConversionError::ExpansionLimitExceeded { limit } = &error {
+            emit!(DatadogAgentIdxExpansionLimitError { limit: *limit });
+        }
+        return Err(error.into());
+    }
+
+    source.events_received.emit(CountByteSize(
+        trace_events.len(),
+        trace_events.estimated_json_encoded_size_of(),
+    ));
+
     Ok(trace_events
         .into_iter()
         .map(|trace_event| enrich_trace_event(trace_event, api_key, source, &fields))

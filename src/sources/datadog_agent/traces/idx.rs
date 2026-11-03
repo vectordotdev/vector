@@ -49,6 +49,35 @@ impl ExpansionBudget {
             .map(|used| self.used.set(used))
             .ok_or(IdxConversionError::ExpansionLimitExceeded { limit: self.limit })
     }
+
+    /// Charges one copy of the Agent fields written onto every trace event.
+    ///
+    /// `copies` is the number of events the request will emit. The caller uses this only when the
+    /// request contains indexed payloads, because those payloads can contain many more chunks than
+    /// the encoded body size suggests.
+    pub(super) fn charge_agent_metadata(
+        &self,
+        copies: usize,
+        hostname: &str,
+        env: &str,
+        agent_version: &str,
+        tags: &ObjectMap,
+    ) -> Result<(), IdxConversionError> {
+        let per_copy = [hostname, env, agent_version]
+            .into_iter()
+            .map(|value| value.len().saturating_add(STRING_COPY_OVERHEAD_BYTES))
+            .chain(tags.iter().map(|(key, value)| {
+                key.len()
+                    .saturating_add(value.as_bytes().map_or(0, Bytes::len))
+                    .saturating_add(STRING_COPY_OVERHEAD_BYTES)
+            }))
+            .fold(0, usize::saturating_add);
+        self.charge(
+            per_copy
+                .checked_mul(copies)
+                .ok_or(IdxConversionError::ExpansionLimitExceeded { limit: self.limit })?,
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -228,6 +257,7 @@ fn convert_idx_chunk(
         .spans
         .iter()
         .find(|span| span.parent_id == 0)
+        .or_else(|| chunk.spans.first())
         .map(|span| span.span_id);
     trace_event.insert(
         event_path!("spans"),
@@ -962,6 +992,26 @@ mod tests {
             span_at(&events[0], 1).get("trace_id").unwrap(),
             &Value::from(123)
         );
+    }
+
+    #[test]
+    fn trace_id_high_falls_back_to_the_first_span_when_no_span_is_a_root() {
+        let strings = Strings::new();
+        let mut first = base_span(&strings);
+        first.span_id = 1;
+        first.parent_id = 9;
+        let mut second = base_span(&strings);
+        second.span_id = 2;
+        second.parent_id = 9;
+        let events = convert(strings.into_payload(vec![chunk(0xab, 123, vec![first, second])]));
+        let first_meta = object(span_at(&events[0], 0).get("meta").unwrap());
+        let second_meta = object(span_at(&events[0], 1).get("meta").unwrap());
+
+        assert_eq!(
+            first_meta.get("_dd.p.tid").unwrap(),
+            &Value::from("00000000000000ab")
+        );
+        assert!(!second_meta.contains_key("_dd.p.tid"));
     }
 
     #[test]

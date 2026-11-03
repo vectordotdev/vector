@@ -1981,6 +1981,128 @@ async fn decode_traces_idx_expansion_over_limit_is_rejected() {
     .await;
 }
 
+fn repeated_chunk_payload(idx: bool, env: String, chunks: u64) -> Vec<u8> {
+    let mut payload = ddtrace_proto::AgentPayload {
+        env,
+        ..Default::default()
+    };
+    if idx {
+        let names = ["svc"];
+        payload.idx_tracer_payloads = vec![ddtrace_proto::idx::TracerPayload {
+            strings: idx_strings(&names),
+            chunks: (0..chunks)
+                .map(|_| ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: idx_ref(&names, "svc"),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }];
+    } else {
+        payload.tracer_payloads = vec![ddtrace_proto::TracerPayload {
+            chunks: (0..chunks)
+                .map(|_| ddtrace_proto::TraceChunk {
+                    spans: vec![ddtrace_proto::Span {
+                        service: "svc".to_owned(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }];
+    }
+    let mut buf = Vec::new();
+    payload.encode(&mut buf).unwrap();
+    buf
+}
+
+#[tokio::test]
+async fn decode_traces_idx_agent_metadata_copies_count_against_the_budget() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 262144
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let env = "e".repeat(64 * 1024);
+        let idx_body = repeated_chunk_payload(true, env.clone(), 8);
+        assert!(idx_body.len() < 262_144);
+
+        assert_eq!(
+            422,
+            send_with_path(address, idx_body, dd_api_key_headers(), DD_API_TRACES_PATH).await
+        );
+        assert!(crate::test_util::collect_ready(rx).is_empty());
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        assert!(
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_expansion_limit_exceeded")
+            }),
+            "expected component_errors_total with error_code=idx_expansion_limit_exceeded"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_legacy_agent_metadata_copies_are_not_budgeted() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 262144
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        address,
+                        repeated_chunk_payload(false, "e".repeat(64 * 1024), 8),
+                        dd_api_key_headers(),
+                        DD_API_TRACES_PATH,
+                    )
+                    .await
+                );
+            },
+            rx,
+            8,
+        )
+        .await;
+        assert_eq!(events.len(), 8);
+    })
+    .await;
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
