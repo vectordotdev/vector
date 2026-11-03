@@ -1,16 +1,14 @@
 # Cleanup GHCR Images
 #
-# Keep five test-runner versions weekly and clean up dated nightlies older
-# than 14 days daily, including their unreferenced multi-platform children.
+# Weekly cleanup: keep five test-runner versions and remove dated nightlies
+# older than 14 days, including their unreferenced multi-platform children.
 
 name: Cleanup GHCR Images
 
 on:
   schedule:
-    # Test-runner cleanup: Sundays at 2 AM UTC
+    # Sundays at 2 AM UTC
     - cron: "0 2 * * 0"
-    # Nightly cleanup: daily at 2:30 AM UTC
-    - cron: "30 2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -23,10 +21,7 @@ permissions:
 
 jobs:
   cleanup-test-runner:
-    if: >-
-      github.repository == 'vectordotdev/vector' &&
-      (github.event.schedule == '0 2 * * 0' ||
-       (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
+    if: ${{ github.repository == 'vectordotdev/vector' && !inputs.dry_run }}
     runs-on: ubuntu-24.04
     permissions:
       packages: write # Required to delete package versions from GHCR
@@ -39,9 +34,7 @@ jobs:
           min-versions-to-keep: 5
 
   cleanup-nightlies:
-    if: >-
-      github.repository == 'vectordotdev/vector' &&
-      (github.event.schedule == '30 2 * * *' || github.event_name == 'workflow_dispatch')
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
