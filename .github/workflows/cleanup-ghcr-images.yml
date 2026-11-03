@@ -1,11 +1,7 @@
 # Cleanup GHCR Images
 #
-# Keep the five most recent test-runner versions (weekly), and remove dated
-# nightly versions once their UTC tag date is at least 14 days old (daily).
-# Release tags and moving nightly aliases are preserved. Untagged children
-# are removed only when exclusive to expired nightlies.
-# GITHUB_TOKEN needs Admin access to the vector container package under
-# Package settings > Manage Actions access to delete its versions.
+# Keep five test-runner versions weekly and clean up dated nightlies older
+# than 14 days daily, including their unreferenced multi-platform children.
 
 name: Cleanup GHCR Images
 
@@ -15,10 +11,6 @@ on:
     - cron: "0 2 * * 0"
     # Nightly cleanup: daily at 2:30 AM UTC
     - cron: "30 2 * * *"
-  pull_request:
-    paths:
-      - ".github/ghcr-cleanup/**"
-      - ".github/workflows/cleanup-ghcr-images.yml"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -30,16 +22,6 @@ permissions:
   contents: read # Restrictive default
 
 jobs:
-  test-nightly-cleanup:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Test nightly selection, manifest references, and dry run
-        run: node --test .github/ghcr-cleanup/cleanup.test.mjs
-
   cleanup-test-runner:
     if: >-
       github.repository == 'vectordotdev/vector' &&
@@ -60,7 +42,6 @@ jobs:
     if: >-
       github.repository == 'vectordotdev/vector' &&
       (github.event.schedule == '30 2 * * *' || github.event_name == 'workflow_dispatch')
-    needs: test-nightly-cleanup
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
@@ -70,18 +51,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Delete nightly images older than 14 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
-          persist-credentials: false
-      - name: Clean up dated nightly images
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GHCR_OWNER: vectordotdev
-          GHCR_PACKAGE: vector
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: |
-          args=()
-          if [[ "$DRY_RUN" != "true" ]]; then
-            args+=(--apply)
-          fi
-          node .github/ghcr-cleanup/cleanup.mjs "${args[@]}"
+          package: vector
+          delete-tags: nightly-????-??-??-*
+          older-than: 14 days
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
