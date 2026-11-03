@@ -101,6 +101,13 @@ where
             .filter_map(|(name, template)| {
                 template
                     .render_string(event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some(name),
+                            drop_event: false,
+                        });
+                    })
                     .ok()
                     .filter(|value| !value.is_empty())
                     .map(|value| (name.clone(), value))
@@ -197,6 +204,7 @@ mod tests {
 
     async fn discard_metrics_case(emit_per_key: bool, extra_tags: bool) {
         vector_lib::metrics::init_test();
+        vector_lib::event_test_util::clear_recorded_events();
         let mut config: ThrottleConfig = serde_yaml::from_str(indoc! {r#"
             threshold: 1
             window_secs: 60
@@ -246,9 +254,18 @@ mod tests {
             Some(&"first".into())
         );
 
+        assert_eq!(
+            vector_lib::event_test_util::contains_name_once("TemplateRenderingError").is_ok(),
+            emit_per_key && extra_tags,
+        );
         let metrics = vector_lib::metrics::Controller::get()
             .unwrap()
             .capture_metrics();
+        assert!(
+            metrics
+                .iter()
+                .all(|metric| metric.name() != "component_errors_total")
+        );
         let mut discards = metrics
             .iter()
             .filter(|metric| metric.name() == "events_discarded_total")

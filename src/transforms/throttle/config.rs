@@ -33,7 +33,8 @@ pub struct ThrottleInternalMetricsConfig {
     /// Extra tags to add to the `events_discarded_total` internal metric.
     ///
     /// Values are event templates evaluated only for discarded events when
-    /// `emit_events_discarded_per_key` is true. Missing fields or empty results omit that tag.
+    /// `emit_events_discarded_per_key` is true. Missing fields emit a warning and omit that tag.
+    /// Empty results also omit the tag.
     /// These tags do not change rate-limit buckets or `component_discarded_events_total`.
     /// The `key` tag and Vector's global metric tags, such as `component_id`, are reserved.
     /// Only use values with bounded cardinality to avoid creating unbounded metric series.
