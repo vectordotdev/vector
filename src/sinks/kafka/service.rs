@@ -32,6 +32,12 @@ pub struct KafkaRequestMetadata {
     pub topic: String,
 }
 
+impl Finalizable for KafkaRequestMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub struct KafkaResponse {
     event_byte_size: GroupedCountByteSize,
     raw_byte_size: usize,

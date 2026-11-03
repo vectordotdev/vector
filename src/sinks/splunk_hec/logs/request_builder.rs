@@ -33,6 +33,12 @@ pub struct HecRequestMetadata {
     host: Option<String>,
 }
 
+impl Finalizable for HecRequestMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
     type Metadata = HecRequestMetadata;
     type Events = Vec<HecProcessedEvent>;

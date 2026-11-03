@@ -19,6 +19,12 @@ pub(super) struct PulsarMetadata {
     pub topic: String,
 }
 
+impl Finalizable for PulsarMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub(super) struct PulsarRequestBuilder {
     pub(super) encoder: PulsarEncoder,
 }

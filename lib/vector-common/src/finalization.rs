@@ -486,6 +486,13 @@ impl<T: Finalizable> Finalizable for Vec<T> {
     }
 }
 
+/// Supports sink request metadata stored as `(routing metadata, finalizers)`.
+impl<T> Finalizable for (T, EventFinalizers) {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        mem::take(&mut self.1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tokio::sync::oneshot::error::TryRecvError::Empty;
@@ -496,6 +503,19 @@ mod tests {
     fn defaults() {
         let finalizer = EventFinalizers::default();
         assert_eq!(finalizer.len(), 0);
+    }
+
+    #[test]
+    fn tuple_metadata_exposes_its_finalizers() {
+        let (finalizers, mut receiver) = make_finalizer();
+        let mut metadata = ("partition", finalizers);
+
+        let finalizers = metadata.take_finalizers();
+        assert!(metadata.1.is_empty());
+        assert_eq!(receiver.try_recv(), Err(Empty));
+
+        drop(finalizers);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     #[test]

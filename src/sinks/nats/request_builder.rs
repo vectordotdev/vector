@@ -43,6 +43,12 @@ pub(super) struct NatsMetadata {
     finalizers: EventFinalizers,
 }
 
+impl Finalizable for NatsMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub(super) struct NatsRequestBuilder {
     pub(super) encoder: NatsEncoder,
     pub(super) headers: Option<NatsHeaderConfig>,

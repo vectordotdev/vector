@@ -22,6 +22,12 @@ pub(super) struct SSMetadata {
     pub(super) message_deduplication_id: Option<String>,
 }
 
+impl Finalizable for SSMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),

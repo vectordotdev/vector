@@ -16,6 +16,12 @@ pub(super) struct AmqpMetadata {
     finalizers: EventFinalizers,
 }
 
+impl Finalizable for AmqpMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 /// Build the request to send to `AMQP` by using the encoder to convert it into
 /// raw bytes and pass along the resolved template fields to determine where to
 /// route the event.
