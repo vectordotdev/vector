@@ -125,10 +125,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		connection_send_errors_total: {
-			description:       "The total number of errors sending data via the connection."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			description:        "The total number of errors sending data via the connection."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _internal_metrics_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
@@ -856,10 +858,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		metadata_refresh_failed_total: {
-			description:       "The total number of failed efforts to refresh AWS EC2 metadata."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
+			description:        "The total number of failed efforts to refresh AWS EC2 metadata."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		metadata_refresh_successful_total: {
 			description:       "The total number of AWS EC2 metadata refreshes."

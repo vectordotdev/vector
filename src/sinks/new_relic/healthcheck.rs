@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use http_1::Request;
+use http::Request;
 use vector_http::empty_body;
 
 use super::NewRelicCredentials;

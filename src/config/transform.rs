@@ -22,8 +22,9 @@ use vector_lib::{
 };
 use vector_vrl_metrics::MetricsStorage;
 
+use vector_lib::extra_context::ExtraContext;
+
 use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
-use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
 

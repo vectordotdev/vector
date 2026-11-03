@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use azure_core::credentials::{AccessToken, TokenCredential};
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     HeaderValue, Request, StatusCode, Uri,
     header::{self, HeaderMap},
 };
@@ -86,7 +86,7 @@ pub struct AzureLogsIngestionService {
 pub(super) fn request_path(
     dcr_immutable_id: &str,
     stream_name: &str,
-) -> crate::Result<http_1::uri::PathAndQuery> {
+) -> crate::Result<http::uri::PathAndQuery> {
     format!(
         "/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}"
     )
@@ -99,7 +99,7 @@ impl AzureLogsIngestionService {
     pub fn new(
         client: HttpClient,
         endpoint: Uri,
-        path_and_query: http_1::uri::PathAndQuery,
+        path_and_query: http::uri::PathAndQuery,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
     ) -> crate::Result<Self> {

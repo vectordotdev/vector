@@ -178,11 +178,12 @@ impl FileConfig {
     }
 
     /// Load the configured file into memory. Required to create a new file enrichment table.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or read, a row is not valid CSV or has a
+    /// different number of fields than the others, a column's configured schema type is invalid
+    /// or a value cannot be converted to it, or the file's modification time cannot be read.
     pub fn load_file(&self, timezone: TimeZone) -> crate::Result<FileData> {
         let Encoding::Csv {
             include_headers,
@@ -262,6 +263,9 @@ pub struct FileData {
     pub modified: SystemTime,
 }
 
+/// Maps a hash of the indexed field values to the matching row numbers.
+type FieldIndex = HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>;
+
 /// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
@@ -269,11 +273,7 @@ pub struct File {
     last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
-    indexes: Vec<(
-        Case,
-        Vec<usize>,
-        HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
-    )>,
+    indexes: Vec<(Case, Vec<usize>, FieldIndex)>,
 }
 
 impl File {
@@ -406,11 +406,7 @@ impl File {
     /// the index of the row in the data.
     ///
     /// Ensure fields that are searched via a comparison are not included in the index!
-    fn index_data(
-        &self,
-        fieldidx: &[usize],
-        case: Case,
-    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, Error> {
+    fn index_data(&self, fieldidx: &[usize], case: Case) -> Result<FieldIndex, Error> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
             hash_hasher::HashBuildHasher::default(),

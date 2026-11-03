@@ -1,7 +1,6 @@
-use crate::{
-    http::HttpError,
-    sinks::{elasticsearch::service::ElasticsearchResponse, util::service::HealthLogic},
-};
+use vector_http::HttpError;
+
+use crate::sinks::{elasticsearch::service::ElasticsearchResponse, util::service::HealthLogic};
 
 #[derive(Clone)]
 pub struct ElasticsearchHealthLogic;
@@ -22,8 +21,9 @@ impl HealthLogic for ElasticsearchHealthLogic {
                     None
                 }
             }
+            // Retriable errors are transport failures of the request.
             Err(error) => match error.downcast_ref::<HttpError>() {
-                Some(HttpError::CallRequest { .. }) => Some(false),
+                Some(error) if error.is_retriable() => Some(false),
                 _ => None,
             },
         }

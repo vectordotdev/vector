@@ -137,9 +137,7 @@ pub enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
-    HTTPRequestBuilderError { source: ::http::Error },
-    #[snafu(display("HTTP request build error: {}", source))]
-    HTTPV1RequestBuilderError { source: ::http_1::Error },
+    HTTPV1RequestBuilderError { source: ::http::Error },
 }
 
 /// Common healthcheck errors
@@ -150,12 +148,9 @@ pub enum HealthcheckError {
 }
 
 impl HealthcheckError {
-    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code of either `http`
-    /// crate version.
+    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code.
     #[must_use]
-    pub fn unexpected_status(status: impl util::http::IntoStatusCode) -> Self {
-        Self::UnexpectedStatus {
-            status: status.into_status_code(),
-        }
+    pub const fn unexpected_status(status: ::http::StatusCode) -> Self {
+        Self::UnexpectedStatus { status }
     }
 }
