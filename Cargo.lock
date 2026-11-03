@@ -4503,17 +4503,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "evmap-derive"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "332b1937705b7ed2fce76837024e9ae6f41cd2ad18a32c052de081f89982561b"
-dependencies = [
- "proc-macro2 1.0.107",
- "quote 1.0.47",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "exitcode"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13462,7 +13451,6 @@ dependencies = [
  "encoding_rs",
  "enum_dispatch",
  "evmap",
- "evmap-derive",
  "exitcode",
  "fakedata",
  "flate2",

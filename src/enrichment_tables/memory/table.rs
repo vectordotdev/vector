@@ -1,6 +1,5 @@
-#![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
-
 use std::{
+    mem::ManuallyDrop,
     num::NonZeroU64,
     pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
@@ -9,10 +8,9 @@ use std::{
 
 use async_trait::async_trait;
 use evmap::{
-    shallow_copy::CopyValue,
+    shallow_copy::{CopyValue, ShallowCopy},
     {self},
 };
-use evmap_derive::ShallowCopy;
 use futures::{
     Stream, StreamExt,
     stream::{self, BoxStream},
@@ -50,11 +48,25 @@ use crate::{
 };
 
 /// Single memory entry containing the value and TTL
-#[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct MemoryEntry {
     value: String,
     update_time: CopyValue<Instant>,
     ttl: u64,
+}
+
+impl ShallowCopy for MemoryEntry {
+    unsafe fn shallow_copy(&self) -> ManuallyDrop<Self> {
+        // SAFETY: The caller upholds the `ShallowCopy` contract for `self`, which covers every
+        // field: none of them is mutated, and only one copy is dropped.
+        unsafe {
+            ManuallyDrop::new(Self {
+                value: ManuallyDrop::into_inner(self.value.shallow_copy()),
+                update_time: ManuallyDrop::into_inner(self.update_time.shallow_copy()),
+                ttl: ManuallyDrop::into_inner(self.ttl.shallow_copy()),
+            })
+        }
+    }
 }
 
 impl ByteSizeOf for MemoryEntry {
@@ -117,8 +129,9 @@ pub struct Memory {
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
-    #[allow(dead_code)]
-    expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
+    /// Never read. Holding a receiver keeps the channel open, so `expired_items_sender.send`
+    /// does not fail when no memory source is subscribed.
+    _expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
     expired_items_sender: Sender<Vec<MemoryEntryPair>>,
 }
 
@@ -140,7 +153,7 @@ impl Memory {
                 metadata: MemoryMetadata::default(),
             })),
             expired_items_sender: expired_tx,
-            expired_items_receiver: expired_rx,
+            _expired_items_receiver: expired_rx,
         }
     }
 
@@ -153,11 +166,7 @@ impl Memory {
         if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
             Self {
                 config,
-                read_handle_factory: prev_memory.read_handle_factory,
-                read_handle: prev_memory.read_handle,
-                write_handle: prev_memory.write_handle,
-                expired_items_sender: prev_memory.expired_items_sender,
-                expired_items_receiver: prev_memory.expired_items_receiver,
+                ..*prev_memory
             }
         } else {
             Self::new(config)
@@ -337,7 +346,7 @@ impl Clone for Memory {
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
             expired_items_sender: self.expired_items_sender.clone(),
-            expired_items_receiver: self.expired_items_sender.subscribe(),
+            _expired_items_receiver: self.expired_items_sender.subscribe(),
         }
     }
 }
