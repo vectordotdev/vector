@@ -328,6 +328,8 @@ The rules below cover only where the indexed form differs.
   request, because a small payload can reference one large string many times. A
   request over the bound is rejected with a non-retryable `4xx` and reported; the
   Agent retries `408`, `429`, and `5xx`. The bound is an implementation choice.
+- Decoding rejects `AnyValue` nesting beyond a fixed depth. An implementation that
+  relies on the protobuf library's limit verifies it with a test.
 
 **Identifiers and grouping.**
 
