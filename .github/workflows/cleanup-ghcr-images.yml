@@ -2,7 +2,8 @@
 #
 # Keep the five most recent test-runner versions (weekly), and remove dated
 # nightly versions once their UTC tag date is at least 14 days old (daily).
-# Release tags, moving nightly aliases, and untagged manifests are preserved.
+# Release tags and moving nightly aliases are preserved. Untagged children
+# are removed only when exclusive to expired nightlies.
 # GITHUB_TOKEN needs Admin access to the vector container package under
 # Package settings > Manage Actions access to delete its versions.
 
@@ -36,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Test nightly selection, pagination, and dry run
+      - name: Test nightly selection, manifest references, and dry run
         run: node --test .github/ghcr-cleanup/cleanup.test.mjs
 
   cleanup-test-runner:
