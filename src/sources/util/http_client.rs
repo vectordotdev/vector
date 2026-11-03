@@ -506,9 +506,11 @@ async fn send_request_with_redirects(
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?
             .to_owned();
 
-        // The HTTP specification requires 301, 302 and 303 to change the method to GET for
-        // everything but HEAD. 307 and 308 preserve the method and the body.
-        if matches!(status.as_u16(), 301 | 302 | 303) && http_method != HttpMethod::Head {
+        // 301, 302 and 303 change non-GET, non-HEAD requests to GET. 307 and 308 preserve the
+        // method and the body.
+        if matches!(status.as_u16(), 301 | 302 | 303)
+            && !matches!(http_method, HttpMethod::Head | HttpMethod::Get)
+        {
             http_method = HttpMethod::Get;
             body = None;
             body_dropped = true;
@@ -891,6 +893,37 @@ mod tests {
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "GET|||");
+    }
+
+    #[tokio::test]
+    async fn preserves_get_body_on_temporary_redirect() {
+        let routes = warp::path("start")
+            .and(redirect_to(StatusCode::FOUND, "/target"))
+            .or(warp::path("target").and(echo_request()));
+        let (_guard, addr) = next_addr();
+        tokio::spawn(warp::serve(routes).run(addr));
+        wait_for_tcp(addr).await;
+
+        let inputs = test_inputs(
+            Redirects {
+                follow: Some(true),
+                ..Default::default()
+            },
+            HeaderMap::new(),
+            None,
+        );
+
+        let (status, body) = send(
+            &format!("http://{addr}/start"),
+            HttpMethod::Get,
+            Some("search query"),
+            &inputs,
+        )
+        .await
+        .expect("redirected request should succeed");
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "GET|search query||");
     }
 
     #[tokio::test]
