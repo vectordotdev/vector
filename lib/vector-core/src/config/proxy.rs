@@ -144,7 +144,7 @@ mod tests {
                     https,
                     // TODO: Neither NoProxy nor IpCidr contained with in it supports proptest. Once
                     // they support proptest, add another any here.
-                    no_proxy: Default::default(),
+                    no_proxy: NoProxy::default(),
                 })
                 .boxed()
         }
