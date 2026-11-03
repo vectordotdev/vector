@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 #[cfg(feature = "sinks-pulsar")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 
 #[cfg(feature = "sinks-pulsar")]
 mod sink {
@@ -20,7 +20,7 @@ mod sink {
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct PulsarSendingError {
+    pub(crate) struct PulsarSendingError {
         pub count: usize,
         pub error: vector_lib::Error,
     }
@@ -48,7 +48,7 @@ mod sink {
     }
 
     #[derive(NamedInternalEvent)]
-    pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
+    pub(crate) struct PulsarPropertyExtractionError<F: std::fmt::Display> {
         pub property_field: F,
     }
 
@@ -73,13 +73,17 @@ mod sink {
 }
 
 #[cfg(feature = "sources-pulsar")]
-pub enum PulsarErrorEventType {
+pub(crate) enum PulsarErrorEventType {
     Read,
     Ack,
     NAck,
 }
 
 #[cfg(feature = "sources-pulsar")]
+#[expect(
+    unreachable_pub,
+    reason = "`registered_event!` generates a `pub` handle whose `emit` takes this type"
+)]
 pub struct PulsarErrorEventData {
     pub msg: String,
     pub error_type: PulsarErrorEventType,
