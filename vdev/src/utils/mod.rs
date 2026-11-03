@@ -27,6 +27,7 @@ pub mod features;
 pub mod git;
 pub mod paths;
 pub mod platform;
+pub mod semver;
 
 /// Check if stdout is connected to a TTY
 pub static IS_A_TTY: LazyLock<bool> = LazyLock::new(|| std::io::stdout().is_terminal());

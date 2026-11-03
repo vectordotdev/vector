@@ -27,7 +27,6 @@ use crate::{
     },
     event::Event,
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, http::HttpMethod},
@@ -48,18 +47,13 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:9091"))]
     address: SocketAddr,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -72,8 +66,8 @@ pub struct PrometheusPushgatewayConfig {
 }
 
 impl GenerateConfig for PrometheusPushgatewayConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "127.0.0.1:9091".parse().unwrap(),
             tls: None,
             auth: None,
@@ -91,12 +85,13 @@ impl SourceConfig for PrometheusPushgatewayConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = PushgatewaySource {
             aggregate_metrics: self.aggregate_metrics,
+            log_namespace: cx.log_namespace(None),
         };
         source.run(
             self.address,
             "",
             HttpMethod::Post,
-            http::StatusCode::OK,
+            http_0::StatusCode::OK,
             false,
             self.tls.as_ref(),
             self.auth.as_ref(),
@@ -118,6 +113,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 #[derive(Clone)]
 struct PushgatewaySource {
     aggregate_metrics: bool,
+    log_namespace: LogNamespace,
 }
 
 impl PushgatewaySource {
@@ -127,6 +123,14 @@ impl PushgatewaySource {
 }
 
 impl HttpSource for PushgatewaySource {
+    fn name() -> &'static str {
+        PrometheusPushgatewayConfig::NAME
+    }
+
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
     fn build_events(
         &self,
         body: Bytes,
@@ -141,7 +145,7 @@ impl HttpSource for PushgatewaySource {
         parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled()).map_err(
             |error| {
                 ErrorMessage::new(
-                    http::StatusCode::UNPROCESSABLE_ENTITY,
+                    http_0::StatusCode::UNPROCESSABLE_ENTITY,
                     format!("Failed to parse metrics body: {error}"),
                 )
             },
@@ -152,7 +156,7 @@ impl HttpSource for PushgatewaySource {
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
     if !path.starts_with("/metrics/job") {
         return Err(ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            http_0::StatusCode::BAD_REQUEST,
             "Path must begin with '/metrics/job'".to_owned(),
         ));
     }
@@ -172,7 +176,7 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> 
         .map(|mut c| {
             c.next().zip(c.next()).ok_or_else(|| {
                 ErrorMessage::new(
-                    http::StatusCode::BAD_REQUEST,
+                    http_0::StatusCode::BAD_REQUEST,
                     "Request path must have an even number of segments to form grouping key"
                         .to_string(),
                 )
@@ -205,12 +209,12 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
         // An empty job label isn't valid, so return an error if that's the key
         if stripped_key == "job" {
             return Err(ErrorMessage::new(
-                http::StatusCode::BAD_REQUEST,
+                http_0::StatusCode::BAD_REQUEST,
                 "Job must not have an empty value".to_owned(),
             ));
         }
 
-        return Ok((stripped_key.to_owned(), "".to_owned()));
+        return Ok((stripped_key.to_owned(), String::new()));
     }
 
     // The Prometheus Pushgateway has a fairly permissive base64 implementation
@@ -230,14 +234,14 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
 
     let decoded_bytes = BASE64_URL_SAFE.decode(padded_value).map_err(|_| {
         ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            http_0::StatusCode::BAD_REQUEST,
             format!("Grouping key invalid - invalid base64 value for key {k}: {v}"),
         )
     })?;
 
     let decoded = String::from_utf8(decoded_bytes).map_err(|_| {
         ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            http_0::StatusCode::BAD_REQUEST,
             format!("Grouping key invalid - invalid UTF-8 in decoded base64 value for key {k}"),
         )
     })?;
@@ -362,6 +366,10 @@ mod test {
     async fn test_whole_request_happy_path_https() {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (_guard, address) = test_util::addr::next_addr();
@@ -386,13 +394,7 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!(
-                "{}://{}:{}/{}",
-                proto,
-                address.ip(),
-                address.port(),
-                push_path
-            );
+            let push_url = format!("{proto}://{}:{}/{push_path}", address.ip(), address.port());
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs
@@ -448,7 +450,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(

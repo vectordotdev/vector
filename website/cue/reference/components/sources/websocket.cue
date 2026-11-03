@@ -57,7 +57,6 @@ components: sources: websocket: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.websocket.configuration & {

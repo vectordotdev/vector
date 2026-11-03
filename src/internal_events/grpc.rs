@@ -67,6 +67,36 @@ pub struct GrpcError<E> {
     pub error: E,
 }
 
+/// A structurally valid gRPC event protobuf could not be converted into a Vector event.
+#[cfg(feature = "sources-vector")]
+#[derive(Debug, NamedInternalEvent)]
+pub struct GrpcEventDecodeError<E> {
+    pub error: E,
+}
+
+#[cfg(feature = "sources-vector")]
+impl<E> InternalEvent for GrpcEventDecodeError<E>
+where
+    E: std::fmt::Display,
+{
+    fn emit(self) {
+        error!(
+            message = "Failed to decode Vector protobuf event.",
+            error = %self.error,
+            error_code = "event_proto_decode",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "event_proto_decode",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
 impl<E> InternalEvent for GrpcError<E>
 where
     E: std::fmt::Display,

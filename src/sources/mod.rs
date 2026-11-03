@@ -71,9 +71,9 @@ pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
-    feature = "sources-prometheus-pushgateway"
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
+    feature = "sources-prometheus_pushgateway"
 ))]
 pub mod prometheus;
 #[cfg(feature = "sources-pulsar")]
@@ -99,14 +99,14 @@ pub mod windows_event_log;
 
 pub mod util;
 
-pub use vector_lib::source::Source;
+pub use vector_lib::source::{Source, SourceError, opaque_source, source_with_error};
 
 #[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
-    UriParseError { source: ::http::uri::InvalidUri },
+    UriParseError { source: ::http_0::uri::InvalidUri },
     #[snafu(display("VRL compilation error: {}", message))]
     VrlCompilationError { message: String },
 }

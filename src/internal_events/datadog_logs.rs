@@ -5,6 +5,24 @@ use vector_lib::{
 use vrl::path::OwnedTargetPath;
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct DatadogLogsEventTruncated {
+    pub max_log_bytes: usize,
+    pub original_encoded_size: usize,
+}
+
+impl InternalEvent for DatadogLogsEventTruncated {
+    fn emit(self) {
+        debug!(
+            message = "Truncated a Datadog log event that exceeded the per-log size limit.",
+            max_log_bytes = self.max_log_bytes,
+            original_encoded_size = self.original_encoded_size,
+            internal_log_rate_limit = true,
+        );
+        counter!(CounterName::DatadogLogsEventsTruncatedTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct DatadogLogsReservedAttributeConflict<'a> {
     pub meaning: &'static str,
     pub source_path: &'a OwnedTargetPath,

@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use http::Response;
+use http_0::Response;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
@@ -69,6 +69,8 @@ pub struct HttpEventsReceived<'a> {
 }
 
 impl InternalEvent for HttpEventsReceived<'_> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -104,6 +106,7 @@ pub struct HttpBadRequest<'a> {
 
 #[cfg(feature = "sources-utils-http")]
 impl<'a> HttpBadRequest<'a> {
+    #[must_use]
     pub fn new(code: u16, message: &'a str) -> Self {
         Self {
             code,

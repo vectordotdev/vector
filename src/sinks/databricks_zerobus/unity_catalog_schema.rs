@@ -4,16 +4,16 @@
 //! [`databricks_zerobus_ingest_sdk::schema`]; this module only wraps it with
 //! the HTTP fetching that the sink needs.
 
-use bytes::Buf;
+use bytes::{Buf, Bytes};
 use databricks_zerobus_ingest_sdk::schema::arrow_schema_from_uc_schema;
 use http::{Request, StatusCode, Uri};
-use http_body::Body as HttpBody;
-use hyper::Body;
+use http_body_util::{BodyExt, Collected};
 use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
 use serde::Deserialize;
+use vector_http::{empty_body, full_body};
 
 use super::error::ZerobusSinkError;
-use crate::http::HttpClient;
+use crate::http::client_v1::HttpClient;
 
 /// Whether a Unity Catalog HTTP response status should be retried.
 ///
@@ -67,28 +67,27 @@ pub async fn fetch_table_schema(
         .collect::<Vec<_>>()
         .join(".");
     let url = format!(
-        "{}/api/2.1/unity-catalog/tables/{}",
-        unity_catalog_endpoint.trim_end_matches('/'),
-        encoded_table_name
+        "{}/api/2.1/unity-catalog/tables/{encoded_table_name}",
+        unity_catalog_endpoint.trim_end_matches('/')
     );
 
     let uri: Uri = url.parse().map_err(|e| ZerobusSinkError::ConfigError {
-        message: format!("Invalid Unity Catalog endpoint URL: {}", e),
+        message: format!("Invalid Unity Catalog endpoint URL: {e}"),
     })?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .header("Content-Type", "application/json")
-        .body(Body::empty())
+        .body(empty_body())
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to build request: {}", e),
+            message: format!("Failed to build request: {e}"),
         })?;
 
     let response = http_client
         .send(request)
         .await
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to fetch table schema: {}", e),
+            message: format!("Failed to fetch table schema: {e}"),
             retryable: true,
         })?;
 
@@ -98,14 +97,11 @@ pub async fn fetch_table_schema(
             .into_body()
             .collect()
             .await
-            .map(|c| c.to_bytes())
+            .map(Collected::to_bytes)
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
-            message: format!(
-                "Unity Catalog API returned error {}: {}",
-                status, error_text
-            ),
+            message: format!("Unity Catalog API returned error {status}: {error_text}"),
             retryable: status_is_retryable(status),
         });
     }
@@ -114,16 +110,16 @@ pub async fn fetch_table_schema(
         .into_body()
         .collect()
         .await
-        .map(|c| c.to_bytes())
+        .map(Collected::to_bytes)
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to read response body: {}", e),
+            message: format!("Failed to read response body: {e}"),
             retryable: true,
         })?;
 
     let schema: UnityCatalogTableSchema =
         serde_json::from_reader(body_bytes.reader()).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to parse table schema response: {}", e),
+                message: format!("Failed to parse table schema response: {e}"),
             }
         })?;
 
@@ -145,7 +141,7 @@ async fn get_oauth_token(
     let uri: Uri = token_url
         .parse()
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Invalid token endpoint URL: {}", e),
+            message: format!("Invalid token endpoint URL: {e}"),
         })?;
 
     // Build form-encoded body
@@ -157,16 +153,17 @@ async fn get_oauth_token(
 
     let request = Request::post(uri)
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(Body::from(form_body))
+        .body(Bytes::from(form_body))
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to build OAuth request: {}", e),
-        })?;
+            message: format!("Failed to build OAuth request: {e}"),
+        })?
+        .map(full_body);
 
     let response = http_client
         .send(request)
         .await
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to get OAuth token: {}", e),
+            message: format!("Failed to get OAuth token: {e}"),
             retryable: true,
         })?;
 
@@ -176,11 +173,11 @@ async fn get_oauth_token(
             .into_body()
             .collect()
             .await
-            .map(|c| c.to_bytes())
+            .map(Collected::to_bytes)
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
-            message: format!("OAuth token request failed {}: {}", status, error_text),
+            message: format!("OAuth token request failed {status}: {error_text}"),
             retryable: status_is_retryable(status),
         });
     }
@@ -189,16 +186,16 @@ async fn get_oauth_token(
         .into_body()
         .collect()
         .await
-        .map(|c| c.to_bytes())
+        .map(Collected::to_bytes)
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to read OAuth response body: {}", e),
+            message: format!("Failed to read OAuth response body: {e}"),
             retryable: true,
         })?;
 
     let token_response: OAuthTokenResponse =
         serde_json::from_reader(body_bytes.reader()).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to parse OAuth token response: {}", e),
+                message: format!("Failed to parse OAuth token response: {e}"),
             }
         })?;
 
@@ -220,13 +217,13 @@ pub fn generate_arrow_schema_from_schema(
 ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
     let arrow_schema =
         arrow_schema_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to convert Unity Catalog schema to Arrow: {}", e),
+            message: format!("Failed to convert Unity Catalog schema to Arrow: {e}"),
         })?;
 
     if tracing::enabled!(tracing::Level::INFO) {
         info!(
-            "Inferred Arrow schema from Unity Catalog table {}.{}.{}:\n{:#?}",
-            schema.catalog_name, schema.schema_name, schema.name, arrow_schema
+            "Inferred Arrow schema from Unity Catalog table {}.{}.{}:\n{arrow_schema:#?}",
+            schema.catalog_name, schema.schema_name, schema.name
         );
     }
 
@@ -236,6 +233,182 @@ pub fn generate_arrow_schema_from_schema(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    use futures::{StreamExt, channel::mpsc};
+
+    use crate::{
+        config::ProxyConfig,
+        sinks::util::test::build_test_server_generic,
+        test_util::addr::{PortGuard, next_addr},
+        tls::TlsSettings,
+    };
+
+    const OAUTH_RESPONSE: &str = r#"{"access_token":"test-token"}"#;
+    const SCHEMA_RESPONSE: &str = r#"{"name":"t/bl","catalog_name":"my cat","schema_name":"sch#ema","columns":[{"name":"id","type_text":"bigint","type_name":"LONG","position":0,"nullable":false,"type_json":"{}"}]}"#;
+
+    /// Local Unity Catalog endpoint. The first request (the OAuth token POST)
+    /// gets the `oauth` response and every later one (the table lookup) gets
+    /// the `lookup` response. Only successful requests are recorded.
+    struct MockUnityCatalog {
+        endpoint: String,
+        requests: mpsc::Receiver<(http::request::Parts, Bytes)>,
+        _trigger: stream_cancel::Trigger,
+        _guard: PortGuard,
+    }
+
+    fn mock_unity_catalog(
+        oauth: (u16, &'static str),
+        lookup: (u16, &'static str),
+    ) -> MockUnityCatalog {
+        let (guard, addr) = next_addr();
+        let token_served = Arc::new(AtomicBool::new(false));
+        let (requests, trigger, server) = build_test_server_generic(addr, move || {
+            let (status, body) = if token_served.swap(true, Ordering::Relaxed) {
+                lookup
+            } else {
+                oauth
+            };
+            http::Response::builder()
+                .status(status)
+                .body(http_body_util::Full::new(Bytes::from(body)))
+                .expect("valid mock response")
+        });
+        tokio::spawn(server);
+        MockUnityCatalog {
+            endpoint: format!("http://{addr}/"),
+            requests,
+            _trigger: trigger,
+            _guard: guard,
+        }
+    }
+
+    fn test_client() -> HttpClient {
+        let tls = TlsSettings::from_options(None).expect("TLS settings should build");
+        HttpClient::new(tls.into(), &ProxyConfig::default()).expect("HTTP client should build")
+    }
+
+    /// Reserved characters in the credentials and in each table-name segment
+    /// are percent-encoded on the wire, and the token is sent to the lookup.
+    #[tokio::test]
+    async fn fetch_table_schema_encodes_credentials_and_table_path() {
+        let mut mock = mock_unity_catalog((200, OAUTH_RESPONSE), (200, SCHEMA_RESPONSE));
+
+        let schema = fetch_table_schema(
+            &mock.endpoint,
+            "my cat.sch#ema.t/bl",
+            "id&scope=x",
+            "s3cr+t/=?",
+            &test_client(),
+        )
+        .await
+        .expect("schema should be fetched");
+        assert_eq!(schema.name, "t/bl");
+        assert_eq!(schema.columns.len(), 1);
+
+        let mut requests = [
+            mock.requests.next().await.expect("OAuth request"),
+            mock.requests.next().await.expect("lookup request"),
+        ];
+        // Bodies are recorded asynchronously; order by method, not arrival.
+        requests.sort_by_key(|(parts, _)| parts.method != http::Method::POST);
+
+        let (oauth, oauth_body) = &requests[0];
+        assert_eq!(oauth.method, http::Method::POST);
+        assert_eq!(oauth.uri.path(), "/oidc/v1/token");
+        assert_eq!(oauth.uri.query(), None);
+        assert_eq!(
+            oauth.headers["content-type"],
+            "application/x-www-form-urlencoded"
+        );
+        assert!(!oauth.headers.contains_key("authorization"));
+        assert_eq!(
+            &oauth_body[..],
+            b"grant_type=client_credentials&client_id=id%26scope%3Dx&client_secret=s3cr%2Bt%2F%3D%3F&scope=all-apis"
+        );
+
+        let (lookup, lookup_body) = &requests[1];
+        assert_eq!(lookup.method, http::Method::GET);
+        assert_eq!(
+            lookup.uri.path(),
+            "/api/2.1/unity-catalog/tables/my%20cat.sch%23ema.t%2Fbl"
+        );
+        assert_eq!(lookup.uri.query(), None);
+        assert_eq!(lookup.headers["authorization"], "Bearer test-token");
+        assert_eq!(lookup.headers["content-type"], "application/json");
+        assert!(lookup_body.is_empty());
+    }
+
+    #[rstest::rstest]
+    #[case::oauth_unavailable(
+        (503, "busy"),
+        (200, SCHEMA_RESPONSE),
+        true,
+        "Schema resolution failed: OAuth token request failed 503 Service Unavailable: busy"
+    )]
+    #[case::oauth_unauthorized(
+        (401, "denied"),
+        (200, SCHEMA_RESPONSE),
+        false,
+        "Schema resolution failed: OAuth token request failed 401 Unauthorized: denied"
+    )]
+    #[case::oauth_malformed(
+        (200, "not json"),
+        (200, SCHEMA_RESPONSE),
+        false,
+        "Configuration error: Failed to parse OAuth token response: "
+    )]
+    #[case::lookup_rate_limited(
+        (200, OAUTH_RESPONSE),
+        (429, "slow down"),
+        true,
+        "Schema resolution failed: Unity Catalog API returned error 429 Too Many Requests: slow down"
+    )]
+    #[case::lookup_not_implemented(
+        (200, OAUTH_RESPONSE),
+        (501, ""),
+        false,
+        "Schema resolution failed: Unity Catalog API returned error 501 Not Implemented: "
+    )]
+    #[case::lookup_not_found(
+        (200, OAUTH_RESPONSE),
+        (404, "missing"),
+        false,
+        "Schema resolution failed: Unity Catalog API returned error 404 Not Found: missing"
+    )]
+    #[case::lookup_malformed(
+        (200, OAUTH_RESPONSE),
+        (200, "not json"),
+        false,
+        "Configuration error: Failed to parse table schema response: "
+    )]
+    #[tokio::test]
+    async fn fetch_table_schema_classifies_failures(
+        #[case] oauth: (u16, &'static str),
+        #[case] lookup: (u16, &'static str),
+        #[case] retryable: bool,
+        #[case] expected: &'static str,
+    ) {
+        let mock = mock_unity_catalog(oauth, lookup);
+
+        let error = fetch_table_schema(
+            &mock.endpoint,
+            "main.default.logs",
+            "client",
+            "secret",
+            &test_client(),
+        )
+        .await
+        .expect_err("fetch should fail");
+
+        let message = error.to_string();
+        assert!(message.starts_with(expected), "unexpected error: {message}");
+        assert_eq!(error.is_retryable(), retryable);
+    }
 
     #[test]
     fn status_is_retryable_matches_canonical_policy() {

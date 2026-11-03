@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use futures::StreamExt as _;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -89,11 +89,10 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
                 }
             }
             assert_eq!(*count, 1);
+            let sum = sum.expect("Vector's internal histograms always report a sum");
             assert!(
-                (*sum - expected).abs() <= 0.002,
-                "Histogram sum does not match expected sum: {} vs {}",
-                *sum,
-                expected,
+                (sum - expected).abs() <= 0.002,
+                "Histogram sum does not match expected sum: {sum} vs {expected}",
             );
         }
         _ => panic!("source_lag_time_seconds has invalid type"),

@@ -37,7 +37,6 @@ components: sources: aws_s3: components._aws & {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

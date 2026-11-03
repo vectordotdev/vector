@@ -12,6 +12,8 @@ pub struct WebSocketListenerConnectionEstablished {
 }
 
 impl InternalEvent for WebSocketListenerConnectionEstablished {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         debug!(
             message = format!(
@@ -39,7 +41,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
         );
-        let mut all_tags = self.extra_tags.clone();
+        let mut all_tags = self.extra_tags;
         all_tags.extend([
             ("error_code".to_string(), "ws_connection_failed".to_string()),
             (
@@ -61,6 +63,8 @@ pub struct WebSocketListenerConnectionShutdown {
 }
 
 impl InternalEvent for WebSocketListenerConnectionShutdown {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         info!(
             message = format!(

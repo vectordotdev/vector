@@ -73,10 +73,11 @@ local/
 # vscode
 .vscode/
 
-# Claude skill-generated reports (published to Confluence, not tracked)
-.claude/skill-reports/
-# Local Claude Code settings (machine-specific permissions)
-.claude/settings.local.json
+# Claude Code project directory (local tooling, not tracked)
+.claude/
+
+# agent skill-generated reports (published to Confluence, not tracked)
+agents/reports/
 
 # antithesis scratchbook (private knowledge store)
 /tests/antithesis/scratchbook/

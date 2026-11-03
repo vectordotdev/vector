@@ -17,7 +17,6 @@ use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext}
 #[configurable_component(transform("test_noop", "Test (no-op)"))]
 #[derive(Clone, Debug)]
 pub struct NoopTransformConfig {
-    #[configurable(derived)]
     transform_type: TransformType,
 
     /// Optional per-event/array delay, in milliseconds.
@@ -46,8 +45,8 @@ pub struct NoopTransformConfig {
 }
 
 impl GenerateConfig for NoopTransformConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(&Self {
             transform_type: TransformType::Function,
             delay_ms: None,
             cpu_burn_ms: None,
@@ -58,16 +57,19 @@ impl GenerateConfig for NoopTransformConfig {
 }
 
 impl NoopTransformConfig {
+    #[must_use]
     pub fn with_delay_ms(mut self, delay_ms: u64) -> Self {
         self.delay_ms = Some(delay_ms);
         self
     }
 
+    #[must_use]
     pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
         self.cpu_burn_ms = Some(cpu_burn_ms);
         self
     }
 
+    #[must_use]
     pub fn with_concurrency(mut self) -> Self {
         self.enable_concurrency = true;
         self

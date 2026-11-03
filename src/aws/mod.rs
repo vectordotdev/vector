@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
@@ -37,9 +37,8 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use futures_util::FutureExt;
-use http::HeaderMap;
-use http_body::{Body, combinators::BoxBody};
+use http_0::{HeaderMap, HeaderName, header::HeaderValue};
+use http_body_0::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -49,7 +48,13 @@ pub use timeout::AwsTimeout;
 use crate::{
     config::ProxyConfig,
     http::{build_proxy_connector, build_tls_connector, status},
-    internal_events::AwsBytesSent,
+    internal_events::{
+        AwsBytesSent,
+        http_client::{
+            AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestTelemetry,
+            HttpResponseTelemetry,
+        },
+    },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
@@ -103,7 +108,7 @@ fn check_response(res: &HttpResponse) -> bool {
 }
 
 /// Creates the http connector that has been configured to use the given proxy and TLS settings.
-/// All AWS requests should use this connector as the aws crates by default use RustTLS which we
+/// All AWS requests should use this connector as the aws crates by default use `RustTLS` which we
 /// have turned off as we want to consistently use openssl.
 fn connector(
     proxy: &ProxyConfig,
@@ -130,10 +135,15 @@ pub trait ClientBuilder {
 }
 
 /// Provides the configured AWS region.
+///
+/// # Errors
+///
+/// Returns an error if the TLS settings are invalid or the proxy or TLS connector cannot be built.
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion + use<>> {
+    // Region is not yet known here, so we cannot wrap with AwsHttpClient for observability.
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 
@@ -165,6 +175,11 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
+///
+/// # Errors
+///
+/// Returns an error if the client cannot be created. See [`create_client_and_region`] for the
+/// specific errors.
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -183,6 +198,12 @@ where
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
+///
+/// # Errors
+///
+/// Returns an error if no region is configured and none can be resolved from the environment,
+/// profile files, or IMDS; if the TLS settings are invalid or the proxy or TLS connector cannot
+/// be built; or if the credentials provider for `auth` cannot be created.
 pub async fn create_client_and_region<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -210,13 +231,14 @@ where
     let connector = AwsHttpClient {
         http: connector,
         region: region.clone(),
+        emit_bytes_sent: true,
     };
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
         .http_client(connector)
         .sleep_impl(Arc::new(TokioSleep::new()))
-        .identity_cache(auth.credentials_cache().await?)
+        .identity_cache(auth.credentials_cache()?)
         .credentials_provider(
             auth.credentials_provider(region.clone(), proxy, tls_options)
                 .await?,
@@ -264,26 +286,69 @@ enum SigningError {
     NotUTF8Header,
 }
 
-/// Sign the request prior to sending to AWS.
+/// Sign the request prior to sending to AWS, using `http` 1.x request types.
 /// The signature is added to the provided `request`.
-pub async fn sign_request(
+///
+/// # Errors
+///
+/// Returns an error if a header value is not valid UTF-8, the credentials cannot be
+/// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, region, or service name contains characters that are not valid
+/// in an HTTP header value, such as a newline.
+pub async fn sign_request_v1(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    let headers = request
-        .headers()
-        .iter()
+    sign_request_v1_at(
+        service_name,
+        request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+        SystemTime::now,
+    )
+    .await
+}
+
+/// Collect a request's headers as `(&str, &str)` pairs for signing, rejecting headers whose
+/// values are not valid UTF-8 with [`SigningError::NotUTF8Header`].
+fn signable_headers<'a>(
+    headers: impl Iterator<Item = (&'a str, &'a [u8])>,
+) -> Result<Vec<(&'a str, &'a str)>, SigningError> {
+    headers
         .map(|(k, v)| {
             Ok((
-                k.as_str(),
-                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+                k,
+                std::str::from_utf8(v).map_err(|_| SigningError::NotUTF8Header)?,
             ))
         })
-        .collect::<Result<Vec<_>, SigningError>>()?;
+        .collect()
+}
 
+/// Signs `request` like [`sign_request_v1`], taking the signing time from `signing_time`.
+///
+/// `signing_time` is called after the credentials are provided, so a slow credential lookup
+/// does not make the signature's `x-amz-date` stale.
+async fn sign_request_v1_at(
+    service_name: &str,
+    request: &mut http::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+    signing_time: impl FnOnce() -> SystemTime,
+) -> crate::Result<()> {
+    let headers = signable_headers(
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_bytes())),
+    )?;
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
@@ -304,9 +369,9 @@ pub async fn sign_request(
 
     let signing_params_builder = v4::SigningParams::builder()
         .identity(&identity)
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
+        .region(region.as_ref().map_or("", std::convert::AsRef::as_ref))
         .name(service_name)
-        .time(SystemTime::now())
+        .time(signing_time())
         .settings(signing_settings);
 
     let signing_params = signing_params_builder
@@ -315,7 +380,7 @@ pub async fn sign_request(
 
     let (signing_instructions, _signature) =
         aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
-    signing_instructions.apply_to_request_http0x(request);
+    signing_instructions.apply_to_request_http1x(request);
 
     Ok(())
 }
@@ -324,6 +389,10 @@ pub async fn sign_request(
 struct AwsHttpClient<T> {
     http: T,
     region: Region,
+    /// When `false`, the connector skips `AwsBytesSent` so that control-plane
+    /// traffic (STS `AssumeRole`, IMDS, SSO token exchange) does not inflate
+    /// `component_sent_bytes_total`.
+    emit_bytes_sent: bool,
 }
 
 impl<T> HttpClient for AwsHttpClient<T>
@@ -340,6 +409,7 @@ where
         SharedHttpConnector::new(AwsConnector {
             region: self.region.clone(),
             http: http_connector,
+            emit_bytes_sent: self.emit_bytes_sent,
         })
     }
 }
@@ -348,6 +418,122 @@ where
 struct AwsConnector<T> {
     http: T,
     region: Region,
+    emit_bytes_sent: bool,
+}
+
+// ── Telemetry trait implementations for the AWS SDK HTTP types ────────────────
+//
+// `HttpRequest` and `HttpResponse` are the SDK's own structs (not `http::Request`
+// / `http::Response`), so they cannot implement the hyper-specific body/version
+// accessors.  The required method impls (method/uri and status) are enough for
+// metric labels; the optional rich-logging fields fall back to `None`.
+
+impl HttpRequestTelemetry for HttpRequest {
+    fn method(&self) -> &str {
+        self.method()
+    }
+
+    fn uri(&self) -> String {
+        self.uri().to_string()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
+}
+
+impl HttpResponseTelemetry for HttpResponse {
+    fn status_u16(&self) -> u16 {
+        self.status().as_u16()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
+}
+
+/// AWS-specific headers that carry credential material and must never appear in
+/// logs.
+///
+/// - `x-amz-security-token`    — STS temporary session token
+/// - `x-amz-sso_bearer_token`  — IAM Identity Center access token (exchangeable for role credentials)
+/// - `x-aws-ec2-metadata-token` — `IMDSv2` session token (valid for up to 6 h)
+static AWS_EXTRA_SENSITIVE_HEADERS: [HeaderName; 3] = [
+    HeaderName::from_static("x-amz-security-token"),
+    HeaderName::from_static("x-amz-sso_bearer_token"),
+    HeaderName::from_static("x-aws-ec2-metadata-token"),
+];
+
+/// Converts the AWS SDK's string-pair header iterator into an `http::HeaderMap`.
+/// Sanitization (marking sensitive headers) is handled by the trait's default
+/// `sanitized_headers` method.
+fn smithy_headers_to_map(
+    headers: &aws_smithy_runtime_api::http::Headers,
+) -> HeaderMap<HeaderValue> {
+    let mut map = HeaderMap::with_capacity(headers.len());
+    for (name, value) in headers {
+        let Ok(header_name) = http_0::HeaderName::from_bytes(name.as_bytes()) else {
+            continue;
+        };
+        let Ok(header_value) = HeaderValue::from_str(value) else {
+            continue;
+        };
+        map.insert(header_name, header_value);
+    }
+    map
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+impl<T> AwsConnector<T>
+where
+    T: HttpConnector,
+{
+    /// Calls the inner HTTP connector and emits common telemetry.
+    /// Does not emit `AwsBytesSent` telemetry.
+    fn call_inner(&self, req: HttpRequest) -> HttpConnectorFuture {
+        emit!(AboutToSendHttpRequest { request: &req });
+
+        let fut: HttpConnectorFuture = self.http.call(req);
+
+        HttpConnectorFuture::new(async move {
+            let before = Instant::now();
+            let result = fut.await;
+            let roundtrip = before.elapsed();
+
+            match &result {
+                Ok(response) => {
+                    emit!(GotHttpResponse {
+                        response,
+                        roundtrip
+                    });
+                }
+                Err(error) => {
+                    emit!(GotHttpWarning { error, roundtrip });
+                }
+            }
+
+            result
+        })
+    }
 }
 
 impl<T> HttpConnector for AwsConnector<T>
@@ -355,7 +541,12 @@ where
     T: HttpConnector,
 {
     fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
-        let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        if !self.emit_bytes_sent {
+            return HttpConnectorFuture::new(self.call_inner(req));
+        }
+
+        let bytes_sent = Arc::new(AtomicUsize::new(0));
+
         let req = req.map(|body| {
             let bytes_sent = Arc::clone(&bytes_sent);
             body.map_preserve_contents(move |body| {
@@ -364,20 +555,25 @@ where
             })
         });
 
-        let fut = self.http.call(req);
+        let fut = self.call_inner(req);
         let region = self.region.clone();
 
-        HttpConnectorFuture::new(fut.inspect(move |result| {
-            let byte_size = bytes_sent.load(Ordering::Relaxed);
-            if let Ok(result) = result
-                && result.status().is_success()
+        HttpConnectorFuture::new(async move {
+            let result = fut.await;
+
+            if let Ok(response) = &result
+                && response.status().is_success()
             {
+                let byte_size = bytes_sent.load(Ordering::Relaxed);
+
                 emit!(AwsBytesSent {
                     byte_size,
                     region: Some(region),
                 });
             }
-        }))
+
+            result
+        })
     }
 }
 
@@ -424,5 +620,73 @@ impl Body for MeasuredBody {
         _cx: &mut Context<'_>,
     ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aws_credential_types::Credentials;
+
+    /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
+    /// credentials, region, and service, and leave the URI unchanged.
+    #[tokio::test]
+    async fn sign_request_v1_signs_with_fixed_time() {
+        const SERVICE_NAME: &str = "example-service";
+        const URI: &str =
+            "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
+        const BODY: &[u8] = b"some non-empty request body";
+        let signing_time = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+
+        let credentials_provider =
+            SharedCredentialsProvider::new(Credentials::from_keys("AKID", "SECRET", None));
+        let region = Region::new("us-east-1");
+
+        let mut request = http::Request::post(URI)
+            .header("content-type", "application/json")
+            .body(Bytes::from_static(BODY))
+            .expect("valid request");
+
+        sign_request_v1_at(
+            SERVICE_NAME,
+            &mut request,
+            &credentials_provider,
+            Some(&region),
+            true,
+            || signing_time,
+        )
+        .await
+        .expect("signing should succeed");
+
+        let header = |name: &str| {
+            request
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_else(|| panic!("`{name}` header must be set by signing"))
+        };
+
+        let authorization = header("authorization");
+        assert!(
+            authorization.starts_with("AWS4-HMAC-SHA256 Credential=AKID/"),
+            "`authorization` header must be an AWS v4 signature for the test credentials: {authorization}"
+        );
+        assert_eq!(
+            authorization,
+            "AWS4-HMAC-SHA256 \
+             Credential=AKID/20231114/us-east-1/example-service/aws4_request, \
+             SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, \
+             Signature=f486a00bdba23adbad2fa7ef1467edd40078469c99f77a83773fa3444fb69144"
+        );
+        assert_eq!(header("x-amz-date"), "20231114T221320Z");
+        assert_eq!(
+            header("x-amz-content-sha256"),
+            "3ec836486ef3ca1ae62a9438c68c7c08659ea6913b487fdfbec70056a8457539"
+        );
+        assert_eq!(
+            request.uri().to_string(),
+            URI,
+            "URI (including signed query) must be unchanged by signing"
+        );
     }
 }

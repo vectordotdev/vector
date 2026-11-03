@@ -1,0 +1,6 @@
+sources:
+  my_source_id:
+    type: heroku_logs
+    address: 0.0.0.0:80
+    query_parameters:
+      - application

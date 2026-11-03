@@ -6,7 +6,7 @@
 
 {{ range $index, $form := .form }}
 {{ $form_id_array = $form_id_array | append $form.form_id }}
-<div id={{ $form.form_id }} class="hidden bg-black dark:bg-white bg-opacity-50 dark:bg-opacity-50 z-50 fixed top-0 left-0 w-full h-full overflow-auto">
+<div id={{ $form.form_id }} class="hidden bg-black/50 dark:bg-white/50 z-50 fixed top-0 left-0 w-full h-full overflow-auto">
     <div class="max-w-full md:max-w-2xl w-auto mx-auto my-6 px-2.5 py-2">
         <div id="modal-container--{{ $form.form_id }}" class="bg-white dark:bg-gray-900 rounded flex flex-col">
             <div class="relative text-center p-4 flex items-start justify-between">

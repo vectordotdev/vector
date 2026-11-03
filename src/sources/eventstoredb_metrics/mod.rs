@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use futures::{FutureExt, StreamExt};
-use http::Uri;
-use http_body::Collected;
+use http_0::Uri;
+use http_body_0::Collected;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
@@ -56,6 +56,7 @@ const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
@@ -67,7 +68,7 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
-            self.endpoint.clone(),
+            &self.endpoint,
             self.scrape_interval_secs,
             self.default_namespace.clone(),
             cx,
@@ -84,7 +85,7 @@ impl SourceConfig for EventStoreDbConfig {
 }
 
 fn eventstoredb(
-    endpoint: String,
+    endpoint: &str,
     interval: Duration,
     namespace: Option<String>,
     mut cx: SourceContext,
@@ -92,7 +93,7 @@ fn eventstoredb(
     let mut ticks = IntervalStream::new(tokio::time::interval(interval)).take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
-    let url: Uri = endpoint.as_str().parse()?;
+    let url: Uri = endpoint.parse()?;
 
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let events_received = register!(EventsReceived);
@@ -110,11 +111,10 @@ fn eventstoredb(
                         emit!(EventStoreDbMetricsHttpError {
                             error: error.into(),
                         });
-                        continue;
                     }
 
                     Ok(resp) => {
-                        let bytes = match http_body::Body::collect(resp.into_body())
+                        let bytes = match http_body_0::Body::collect(resp.into_body())
                             .await
                             .map(Collected::to_bytes)
                         {
@@ -131,7 +131,6 @@ fn eventstoredb(
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
                                 emit!(EventStoreDbStatsParsingError { error });
-                                continue;
                             }
 
                             Ok(stats) => {

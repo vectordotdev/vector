@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use metrics::counter;
-use quick_xml::{Reader, events::Event as XmlEvent};
+use quick_xml::{Reader, escape::unescape, events::Event as XmlEvent};
 
 use super::config::WindowsEventLogConfig;
-use super::error::*;
+use super::error::WindowsEventLogError;
 
 /// Truncate a string at a UTF-8 safe boundary, appending a suffix.
 pub(crate) fn truncate_utf8(s: &mut String, max_bytes: usize) {
@@ -44,7 +44,7 @@ pub struct SystemFields {
     pub system_time: Option<String>,
 }
 
-/// Result from EventData parsing (supports both named and positional formats).
+/// Result from `EventData` parsing (supports both named and positional formats).
 #[derive(Debug, Clone)]
 pub struct EventDataResult {
     pub structured_data: HashMap<String, String>,
@@ -78,7 +78,7 @@ pub struct WindowsEvent {
     pub task_name: Option<String>,
     pub opcode_name: Option<String>,
     pub keyword_names: Vec<String>,
-    /// Resolved account name from user_id SID (e.g. "NT AUTHORITY\SYSTEM").
+    /// Resolved account name from `user_id` SID (e.g. "NT AUTHORITY\SYSTEM").
     pub user_name: Option<String>,
     pub version: Option<u8>,
     pub qualifiers: Option<u16>,
@@ -89,15 +89,14 @@ impl WindowsEvent {
     /// Returns the human-readable level name for this event.
     ///
     /// Level 0 maps to "Information" per standard convention. Windows uses
-    /// Level=0 for "LogAlways" and for all Security audit events. Mapping it to
+    /// Level=0 for "`LogAlways`" and for all Security audit events. Mapping it to
     /// "Information" prevents SOC analysts from seeing "Unknown" on every logon event.
     pub const fn level_name(&self) -> &'static str {
         match self.level {
-            0 => "Information",
             1 => "Critical",
             2 => "Error",
             3 => "Warning",
-            4 => "Information",
+            0 | 4 => "Information",
             5 => "Verbose",
             _ => "Unknown",
         }
@@ -124,16 +123,16 @@ enum TextTarget {
 /// Replaces ~28 individual `extract_xml_value`/`extract_xml_attribute`/
 /// `extract_provider_name` calls with one `quick_xml::Reader` traversal.
 pub fn parse_system_section(xml: &str) -> SystemFields {
+    const MAX_ITERATIONS: usize = 2000;
+
     let mut fields = SystemFields::default();
     let mut reader = Reader::from_str(xml);
-    reader.trim_text(true);
-    let mut buf = Vec::new();
+    reader.config_mut().trim_text(true);
 
     let mut in_system = false;
     let mut text_target = TextTarget::None;
     let mut text_buf = String::new();
 
-    const MAX_ITERATIONS: usize = 2000;
     let mut iterations = 0;
 
     loop {
@@ -142,72 +141,71 @@ pub fn parse_system_section(xml: &str) -> SystemFields {
         }
         iterations += 1;
 
-        match reader.read_event_into(&mut buf) {
-            Ok(XmlEvent::Start(ref e)) => {
+        match reader.read_event() {
+            Ok(XmlEvent::Start(e)) => {
                 let local = e.name().local_name();
                 let local = local.as_ref();
 
-                if local == b"System" {
+                if local == "System" {
                     in_system = true;
                 } else if in_system {
                     text_target = TextTarget::None;
                     text_buf.clear();
 
                     match local {
-                        b"Provider" => extract_provider_attrs(e, &mut fields),
-                        b"EventID" => {
-                            extract_qualifiers_attr(e, &mut fields);
+                        "Provider" => extract_provider_attrs(&e, &mut fields),
+                        "EventID" => {
+                            extract_qualifiers_attr(&e, &mut fields);
                             text_target = TextTarget::EventID;
                         }
-                        b"Version" => text_target = TextTarget::Version,
-                        b"Level" => text_target = TextTarget::Level,
-                        b"Task" => text_target = TextTarget::Task,
-                        b"Opcode" => text_target = TextTarget::Opcode,
-                        b"Keywords" => text_target = TextTarget::Keywords,
-                        b"TimeCreated" => extract_time_created_attr(e, &mut fields),
-                        b"EventRecordID" => text_target = TextTarget::EventRecordID,
-                        b"Correlation" => extract_correlation_attrs(e, &mut fields),
-                        b"Execution" => extract_execution_attrs(e, &mut fields),
-                        b"Channel" => text_target = TextTarget::Channel,
-                        b"Computer" => text_target = TextTarget::Computer,
-                        b"Security" => extract_security_attrs(e, &mut fields),
+                        "Version" => text_target = TextTarget::Version,
+                        "Level" => text_target = TextTarget::Level,
+                        "Task" => text_target = TextTarget::Task,
+                        "Opcode" => text_target = TextTarget::Opcode,
+                        "Keywords" => text_target = TextTarget::Keywords,
+                        "TimeCreated" => extract_time_created_attr(&e, &mut fields),
+                        "EventRecordID" => text_target = TextTarget::EventRecordID,
+                        "Correlation" => extract_correlation_attrs(&e, &mut fields),
+                        "Execution" => extract_execution_attrs(&e, &mut fields),
+                        "Channel" => text_target = TextTarget::Channel,
+                        "Computer" => text_target = TextTarget::Computer,
+                        "Security" => extract_security_attrs(&e, &mut fields),
                         _ => {}
                     }
                 }
             }
-            Ok(XmlEvent::Empty(ref e)) => {
+            Ok(XmlEvent::Empty(e)) => {
                 if !in_system {
-                    if e.name().local_name().as_ref() == b"System" {
+                    if e.name().local_name().as_ref() == "System" {
                         // Empty <System/> — nothing to extract
                         break;
                     }
-                    buf.clear();
                     continue;
                 }
                 let local = e.name().local_name();
                 let local = local.as_ref();
                 match local {
-                    b"Provider" => extract_provider_attrs(e, &mut fields),
-                    b"TimeCreated" => extract_time_created_attr(e, &mut fields),
-                    b"Correlation" => extract_correlation_attrs(e, &mut fields),
-                    b"Execution" => extract_execution_attrs(e, &mut fields),
-                    b"Security" => extract_security_attrs(e, &mut fields),
+                    "Provider" => extract_provider_attrs(&e, &mut fields),
+                    "TimeCreated" => extract_time_created_attr(&e, &mut fields),
+                    "Correlation" => extract_correlation_attrs(&e, &mut fields),
+                    "Execution" => extract_execution_attrs(&e, &mut fields),
+                    "Security" => extract_security_attrs(&e, &mut fields),
                     _ => {}
                 }
             }
-            Ok(XmlEvent::Text(ref e)) => {
+            Ok(XmlEvent::Text(e)) => {
                 if in_system && text_target != TextTarget::None {
-                    if let Ok(text) = e.unescape() {
+                    if let Ok(text) = unescape(&e) {
                         if text_buf.len() + text.len() <= 4096 {
                             text_buf.push_str(&text);
                         }
                     }
                 }
             }
-            Ok(XmlEvent::End(ref e)) => {
+            Ok(XmlEvent::End(e)) => {
                 let local = e.name().local_name();
                 let local = local.as_ref();
-                if local == b"System" {
+                if local == "System" {
                     // Commit any pending text before exiting
                     commit_text(&text_target, &text_buf, &mut fields);
                     break;
@@ -218,18 +216,14 @@ pub fn parse_system_section(xml: &str) -> SystemFields {
                     text_buf.clear();
                 }
             }
-            Ok(XmlEvent::Eof) => break,
-            Err(_) => break,
+            Ok(XmlEvent::Eof) | Err(_) => break,
             _ => {}
         }
-
-        buf.clear();
     }
 
     fields
 }
-
-/// Commit collected element text into the appropriate SystemFields field.
+/// Commit collected element text into the appropriate `SystemFields` field.
 fn commit_text(target: &TextTarget, text: &str, fields: &mut SystemFields) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -260,10 +254,8 @@ fn parse_keywords_hex(s: &str) -> u64 {
 fn extract_provider_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
         match attr.key.local_name().as_ref() {
-            b"Name" => fields.provider_name = String::from_utf8_lossy(&attr.value).into_owned(),
-            b"Guid" => {
-                fields.provider_guid = Some(String::from_utf8_lossy(&attr.value).into_owned())
-            }
+            "Name" => fields.provider_name = attr.value.clone().into_owned(),
+            "Guid" => fields.provider_guid = Some(attr.value.clone().into_owned()),
             _ => {}
         }
     }
@@ -271,16 +263,16 @@ fn extract_provider_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut Sy
 
 fn extract_qualifiers_attr(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"Qualifiers" {
-            fields.qualifiers = String::from_utf8_lossy(&attr.value).parse().ok();
+        if attr.key.local_name().as_ref() == "Qualifiers" {
+            fields.qualifiers = attr.value.parse().ok();
         }
     }
 }
 
 fn extract_time_created_attr(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"SystemTime" {
-            fields.system_time = Some(String::from_utf8_lossy(&attr.value).into_owned());
+        if attr.key.local_name().as_ref() == "SystemTime" {
+            fields.system_time = Some(attr.value.clone().into_owned());
         }
     }
 }
@@ -288,11 +280,9 @@ fn extract_time_created_attr(e: &quick_xml::events::BytesStart<'_>, fields: &mut
 fn extract_correlation_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
         match attr.key.local_name().as_ref() {
-            b"ActivityID" => {
-                fields.activity_id = Some(String::from_utf8_lossy(&attr.value).into_owned())
-            }
-            b"RelatedActivityID" => {
-                fields.related_activity_id = Some(String::from_utf8_lossy(&attr.value).into_owned())
+            "ActivityID" => fields.activity_id = Some(attr.value.clone().into_owned()),
+            "RelatedActivityID" => {
+                fields.related_activity_id = Some(attr.value.clone().into_owned());
             }
             _ => {}
         }
@@ -302,12 +292,8 @@ fn extract_correlation_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut
 fn extract_execution_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
         match attr.key.local_name().as_ref() {
-            b"ProcessID" => {
-                fields.process_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
-            }
-            b"ThreadID" => {
-                fields.thread_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
-            }
+            "ProcessID" => fields.process_id = attr.value.parse().unwrap_or(0),
+            "ThreadID" => fields.thread_id = attr.value.parse().unwrap_or(0),
             _ => {}
         }
     }
@@ -315,16 +301,24 @@ fn extract_execution_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut S
 
 fn extract_security_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"UserID" {
-            fields.user_id = Some(String::from_utf8_lossy(&attr.value).into_owned());
+        if attr.key.local_name().as_ref() == "UserID" {
+            fields.user_id = Some(attr.value.clone().into_owned());
         }
     }
 }
 
-/// Build a WindowsEvent from pre-parsed SystemFields and raw XML.
+/// Build a `WindowsEvent` from pre-parsed `SystemFields` and raw XML.
 ///
 /// Applies event ID filters, age filters, and parses EventData/UserData.
 /// Returns `Ok(None)` for filtered events.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn build_event(
     xml: String,
     channel: &str,
@@ -368,7 +362,7 @@ pub fn build_event(
                 .or_else(|_| DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%z"))
                 .ok()
         })
-        .map(|dt| {
+        .map_or_else(Utc::now, |dt| {
             let dt_utc = dt.with_timezone(&Utc);
             let diff = (Utc::now() - dt_utc).num_days().abs();
             if diff > 365 * 10 {
@@ -380,8 +374,7 @@ pub fn build_event(
                 );
             }
             dt_utc
-        })
-        .unwrap_or_else(Utc::now);
+        });
 
     // Apply age filter
     if let Some(max_age_secs) = config.max_event_age_secs {
@@ -419,7 +412,7 @@ pub fn build_event(
         rendered_message,
         raw_xml: if config.include_xml {
             let mut raw = xml;
-            truncate_utf8(&mut raw, 32768);
+            truncate_utf8(&mut raw, 32_768);
             raw
         } else {
             String::new()
@@ -450,7 +443,7 @@ pub fn parse_event_xml(
     build_event(xml, channel, config, rendered_message, system_fields)
 }
 
-/// Extract EventData and UserData sections from event XML.
+/// Extract `EventData` and `UserData` sections from event XML.
 pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
     let mut structured_data = HashMap::new();
     let mut string_inserts = Vec::new();
@@ -467,7 +460,7 @@ pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDat
         for value in user_data.values_mut() {
             truncate_utf8(value, config.max_event_data_length);
         }
-        for value in string_inserts.iter_mut() {
+        for value in &mut string_inserts {
             truncate_utf8(value, config.max_event_data_length);
         }
     }
@@ -479,24 +472,25 @@ pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDat
     }
 }
 
-/// Parse a specific XML section (EventData or UserData).
+/// Parse a specific XML section (`EventData` or `UserData`).
 fn parse_section(
     xml: &str,
     section_name: &str,
     named_data: &mut HashMap<String, String>,
     inserts: &mut Vec<String>,
 ) {
-    let mut reader = Reader::from_str(xml);
-    reader.trim_text(true);
+    const MAX_FIELDS: usize = 100;
 
-    let mut buf = Vec::new();
+    const MAX_ITERATIONS: usize = 500;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
     let mut inside_section = false;
     let mut inside_data = false;
     let mut current_data_name = String::new();
     let mut current_data_value = String::new();
 
-    const MAX_ITERATIONS: usize = 500;
-    const MAX_FIELDS: usize = 100;
     let mut iterations = 0;
 
     loop {
@@ -507,32 +501,32 @@ fn parse_section(
         }
         iterations += 1;
 
-        match reader.read_event_into(&mut buf) {
-            Ok(XmlEvent::Start(ref e)) => {
+        match reader.read_event() {
+            Ok(XmlEvent::Start(e)) => {
                 let name = e.name();
-                if name.as_ref() == section_name.as_bytes() {
+                if name.as_ref() == section_name {
                     inside_section = true;
-                } else if inside_section && name.as_ref() == b"Data" {
+                } else if inside_section && name.as_ref() == "Data" {
                     inside_data = true;
                     current_data_name.clear();
                     current_data_value.clear();
 
                     for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"Name" {
-                            let name_value = String::from_utf8_lossy(&attr.value);
+                        if attr.key.as_ref() == "Name" {
+                            let name_value = attr.value.clone().into_owned();
                             if name_value.len() <= 128 && !name_value.trim().is_empty() {
-                                current_data_name = name_value.into_owned();
+                                current_data_name = name_value;
                             }
                             break;
                         }
                     }
                 }
             }
-            Ok(XmlEvent::End(ref e)) => {
+            Ok(XmlEvent::End(e)) => {
                 let name = e.name();
-                if name.as_ref() == section_name.as_bytes() {
+                if name.as_ref() == section_name {
                     inside_section = false;
-                } else if name.as_ref() == b"Data" && inside_data {
+                } else if name.as_ref() == "Data" && inside_data {
                     inside_data = false;
 
                     if !current_data_name.is_empty() {
@@ -542,10 +536,10 @@ fn parse_section(
                     }
                 }
             }
-            Ok(XmlEvent::Text(ref e)) => {
+            Ok(XmlEvent::Text(e)) => {
                 if inside_section
                     && inside_data
-                    && let Ok(text) = e.unescape()
+                    && let Ok(text) = unescape(&e)
                 {
                     const MAX_VALUE_SIZE: usize = 1024 * 1024;
                     if current_data_value.len() + text.len() <= MAX_VALUE_SIZE {
@@ -553,12 +547,9 @@ fn parse_section(
                     }
                 }
             }
-            Ok(XmlEvent::Eof) => break,
-            Err(_) => break,
+            Ok(XmlEvent::Eof) | Err(_) => break,
             _ => {}
         }
-
-        buf.clear();
     }
 }
 
@@ -573,14 +564,14 @@ pub fn is_valid_bookmark_xml(xml: &str) -> bool {
 /// This function is retained for one-off lookups outside the hot path.
 #[cfg(test)]
 pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
-    let mut reader = Reader::from_str(xml);
-    reader.trim_text(true);
+    const MAX_ITERATIONS: usize = 5000;
 
-    let mut buf = Vec::new();
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
     let mut inside_target = false;
     let mut current_element = String::new();
 
-    const MAX_ITERATIONS: usize = 5000;
     let mut iterations = 0;
 
     loop {
@@ -590,18 +581,17 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
         }
         iterations += 1;
 
-        match reader.read_event_into(&mut buf) {
-            Ok(XmlEvent::Start(ref e)) => {
-                let name = e.name();
-                let element_name = String::from_utf8_lossy(name.as_ref());
+        match reader.read_event() {
+            Ok(XmlEvent::Start(e)) => {
+                let element_name = e.name().as_ref().to_string();
                 if element_name == tag {
                     inside_target = true;
                     current_element.clear();
                 }
             }
-            Ok(XmlEvent::Text(ref e)) => {
+            Ok(XmlEvent::Text(e)) => {
                 if inside_target {
-                    match e.unescape() {
+                    match unescape(&e) {
                         Ok(text) => {
                             if current_element.len() + text.len() > 4096 {
                                 warn!(message = "XML element text too long, truncating.");
@@ -613,9 +603,8 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
                     }
                 }
             }
-            Ok(XmlEvent::End(ref e)) => {
-                let name = e.name();
-                let element_name = String::from_utf8_lossy(name.as_ref());
+            Ok(XmlEvent::End(e)) => {
+                let element_name = e.name().as_ref().to_string();
                 if element_name == tag && inside_target {
                     return Some(current_element.trim().to_string());
                 }
@@ -624,8 +613,6 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
             Err(_) => return None,
             _ => {}
         }
-
-        buf.clear();
     }
 
     None
@@ -689,17 +676,17 @@ mod tests {
             Some("{A68CA8B7-004F-D7B6-A698-07E2DE0F1F5D}")
         );
         assert_eq!(fields.event_id, 1);
-        assert_eq!(fields.qualifiers, Some(16384));
+        assert_eq!(fields.qualifiers, Some(16_384));
         assert_eq!(fields.version, Some(2));
         assert_eq!(fields.level, 4);
         assert_eq!(fields.task, 100);
         assert_eq!(fields.opcode, 1);
-        assert_eq!(fields.keywords, 0x8000000000000000);
+        assert_eq!(fields.keywords, 0x8000_0000_0000_0000);
         assert_eq!(
             fields.system_time.as_deref(),
             Some("2025-08-29T00:15:41.123456Z")
         );
-        assert_eq!(fields.record_id, 12345);
+        assert_eq!(fields.record_id, 12_345);
         assert_eq!(fields.activity_id.as_deref(), Some("{AAAA-BBBB}"));
         assert_eq!(fields.related_activity_id.as_deref(), Some("{CCCC-DDDD}"));
         assert_eq!(fields.process_id, 1234);
@@ -850,9 +837,9 @@ mod tests {
             record_id: 1,
             event_id: 4624,
             level: 0,
-            task: 12544,
+            task: 12_544,
             opcode: 0,
-            keywords: 0x0020000000000000,
+            keywords: 0x0020_0000_0000_0000,
             time_created: Utc::now(),
             provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
             provider_guid: None,
@@ -885,14 +872,14 @@ mod tests {
     #[test]
     fn test_security_limits() {
         let large_xml = format!(
-            r#"
+            r"
         <Event>
             <System>
                 <EventID>{}</EventID>
             </System>
         </Event>
-        "#,
-            "x".repeat(10000)
+        ",
+            "x".repeat(10_000)
         );
 
         let result = extract_xml_value(&large_xml, "EventID");
@@ -977,9 +964,9 @@ mod tests {
 
     #[test]
     fn test_is_valid_bookmark_xml() {
-        let valid = r#"<BookmarkList>
+        let valid = r"<BookmarkList>
   <Bookmark Channel='Application' RecordId='12345' IsCurrent='true'/>
-</BookmarkList>"#;
+</BookmarkList>";
         assert!(
             is_valid_bookmark_xml(valid),
             "Should accept valid bookmark with RecordId"
@@ -1028,7 +1015,7 @@ mod tests {
 
         let event = result.unwrap().unwrap();
         assert_eq!(event.event_id, 1000);
-        assert_eq!(event.record_id, 12345);
+        assert_eq!(event.record_id, 12_345);
         assert_eq!(event.provider_name, "TestProvider");
         assert_eq!(event.channel, "Application");
         assert_eq!(event.computer, "TEST-PC");
@@ -1069,11 +1056,20 @@ mod tests {
 
     #[test]
     fn test_keywords_hex_parsing() {
-        assert_eq!(parse_keywords_hex("0x8000000000000000"), 0x8000000000000000);
-        assert_eq!(parse_keywords_hex("0X8000000000000000"), 0x8000000000000000);
-        assert_eq!(parse_keywords_hex("12345"), 12345);
+        assert_eq!(
+            parse_keywords_hex("0x8000000000000000"),
+            0x8000_0000_0000_0000
+        );
+        assert_eq!(
+            parse_keywords_hex("0X8000000000000000"),
+            0x8000_0000_0000_0000
+        );
+        assert_eq!(parse_keywords_hex("12345"), 12_345);
         assert_eq!(parse_keywords_hex("invalid"), 0);
-        assert_eq!(parse_keywords_hex("0x0020000000000000"), 0x0020000000000000);
+        assert_eq!(
+            parse_keywords_hex("0x0020000000000000"),
+            0x0020_0000_0000_0000
+        );
     }
 
     #[test]

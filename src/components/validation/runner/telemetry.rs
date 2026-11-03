@@ -43,7 +43,7 @@ impl Telemetry {
             scrape_interval_secs: Duration::from_millis(100),
             ..Default::default()
         };
-        let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+        let mut vector_sink = VectorSinkConfig::from_address(&listen_addr.as_uri());
 
         // We want to ensure that the output sink is flushed as soon as
         // possible, so we set the batch timeout to a very low value. We also
@@ -93,7 +93,7 @@ impl Telemetry {
             let mut telemetry_events = Vec::new();
             'outer: loop {
                 select! {
-                    _ = telemetry_shutdown_handle.wait() => {
+                    () = telemetry_shutdown_handle.wait() => {
                         // After we receive the shutdown signal, we need to wait
                         // for two batches of event emissions from the internal_metrics
                         // source. This is to ensure that we've received all the
@@ -127,12 +127,10 @@ impl Telemetry {
                                         }
                                     }
                                 },
-                                _ = &mut timeout => break,
+                                () = &mut timeout => break,
                             }
                         }
-                        if batches_received != SHUTDOWN_TICKS {
-                            panic!("Did not receive {SHUTDOWN_TICKS} events while waiting for shutdown! Only received {batches_received}!");
-                        }
+                        assert!(batches_received == SHUTDOWN_TICKS, "Did not receive {SHUTDOWN_TICKS} events while waiting for shutdown! Only received {batches_received}!");
                         break 'outer;
                     },
                     maybe_telemetry_event = rx.recv() => match maybe_telemetry_event {

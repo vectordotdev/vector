@@ -64,6 +64,8 @@ impl SendRecord for KinesisFirehoseClient {
             .instrument(info_span!("request").or_current())
             .await
             .map(|output: PutRecordBatchOutput| KinesisResponse {
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_sign_loss, reason = "AWS failure counts are nonnegative")]
                 failure_count: output.failed_put_count() as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
                 #[cfg(feature = "sinks-aws_kinesis_streams")]

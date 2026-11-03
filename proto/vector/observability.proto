@@ -1,8 +1,8 @@
 syntax = "proto3";
 package vector.observability.v1;
 
-import "google/protobuf/timestamp.proto";
 import "event.proto";
+import "google/protobuf/timestamp.proto";
 
 // Observability service for monitoring Vector instances.
 service ObservabilityService {
@@ -195,7 +195,7 @@ message TappedEvent {
   string component_id = 1;
   string component_type = 2;
   string component_kind = 3;
-  event.EventWrapper event = 4;  // The actual event data (uses canonical proto definition)
+  event.EventWrapper event = 4; // The actual event data (uses canonical proto definition)
 }
 
 message EventNotification {

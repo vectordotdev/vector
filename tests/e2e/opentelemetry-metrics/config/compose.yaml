@@ -1,5 +1,15 @@
 name: opentelemetry-vector-e2e
 services:
+  # Wipe stale output before any writer starts: the file outputs append and the
+  # vector_target volume is external, so it survives `compose down --volumes`.
+  prepare-output:
+    image: alpine:3.20
+    command: ["/bin/sh", "-c", "rm -rf /output/opentelemetry-metrics && mkdir -p /output/opentelemetry-metrics"]
+    volumes:
+      - type: volume
+        source: vector_target
+        target: /output
+
   otel-collector-source:
     container_name: otel-collector-source
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
@@ -77,6 +87,17 @@ services:
           --telemetry-attributes='metric.type="exponential_histogram"' \
           --rate=0
 
+  # A detached `compose up` waits for all dependency conditions before starting this service.
+  # This keeps the test runner behind generator completion and complete captures.
+  metrics-ready:
+    image: alpine:3.20
+    depends_on:
+      metrics-generator:
+        condition: service_completed_successfully
+      otel-collector-sink:
+        condition: service_healthy
+    command: ["true"]
+
   otel-collector-sink:
     container_name: otel-collector-sink
     build:
@@ -85,12 +106,30 @@ services:
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
     user: "0:0" # test only, override special user with root
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - /capture_ready.sh
+        - /output/opentelemetry-metrics
+        - count:collector-file-exporter.log:timeUnixNano:400
+        - count:vector-file-sink.log:timeUnixNano:400
+      interval: 500ms
+      timeout: 1s
+      retries: 240
     volumes:
       - type: bind
         source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../opentelemetry-common/capture_ready.sh
+        target: /capture_ready.sh
         read_only: true
       - type: volume
         source: vector_target
@@ -102,6 +141,9 @@ services:
     container_name: vector-otel-metrics-e2e
     image: ${CONFIG_VECTOR_IMAGE}
     init: true
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
     volumes:
       - type: bind
         source: ../data/vector_otlp.yaml

@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: azure_blob
+    inputs:
+      - my-source-or-transform-id
+    connection_string: DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net
+    container_name: my-logs
+    encoding:
+      codec: json

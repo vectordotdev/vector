@@ -9,8 +9,10 @@ use vector_lib::{
 #[cfg(not(windows))]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType, Transformer},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
@@ -21,7 +23,6 @@ pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -70,7 +71,6 @@ pub struct UdpMode {
     #[serde(flatten)]
     config: UdpSinkConfig,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 
@@ -99,17 +99,19 @@ pub struct UnixSinkConfig {
 }
 
 impl GenerateConfig for SocketSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"address = "92.12.333.224:5000"
-            mode = "tcp"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"address: "92.12.333.224:5000"
+            mode: tcp
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
 
 impl SocketSinkConfig {
+    #[must_use]
     pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
         SocketSinkConfig {
             mode,
@@ -117,6 +119,7 @@ impl SocketSinkConfig {
         }
     }
 
+    #[must_use]
     pub fn make_basic_tcp_config(
         address: String,
         acknowledgements: AcknowledgementsConfig,
@@ -134,48 +137,79 @@ impl SocketSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    async fn build(
-        &self,
-        _cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    fn input(&self) -> Input {
+        let encoder_input_type = match &self.mode {
+            Mode::Tcp(TcpMode { encoding, .. })
+            | Mode::UnixStream(UnixMode { encoding, .. })
+            | Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
+        };
+        Input::new(encoder_input_type)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ValidatedSocket {
+    Tcp {
+        host: String,
+        port: u16,
+        transformer: Transformer,
+    },
+    Udp {
+        transformer: Transformer,
+    },
+    #[cfg(unix)]
+    UnixStream {
+        transformer: Transformer,
+    },
+    #[cfg(unix)]
+    UnixDatagram {
+        transformer: Transformer,
+    },
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SocketSinkConfig {
+    type Validated = ValidatedSocket;
+
+    fn validate(&self) -> crate::Result<ValidatedSocket> {
         match &self.mode {
             Mode::Tcp(TcpMode { config, encoding }) => {
+                let (host, port) = config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
-                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer, encoder)
+                Ok(ValidatedSocket::Tcp {
+                    host,
+                    port,
+                    transformer,
+                })
             }
             Mode::Udp(UdpMode { config, encoding }) => {
+                // Mirror the pure host/port check from `UdpSinkConfig::build`
+                // so malformed addresses are rejected here instead.
+                config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
-                let serializer = encoding.build()?;
-                let chunker = serializer.chunker();
-                let encoder = Encoder::<()>::new(serializer);
-                config.build(transformer, encoder, chunker)
+                Ok(ValidatedSocket::Udp { transformer })
             }
             #[cfg(unix)]
-            Mode::UnixStream(UnixMode { config, encoding }) => {
+            Mode::UnixStream(UnixMode { encoding, .. }) => {
+                encoding.validate()?;
                 let transformer = encoding.transformer();
-                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(
-                    transformer,
-                    encoder,
-                    super::util::service::net::UnixMode::Stream,
-                )
+                Ok(ValidatedSocket::UnixStream { transformer })
             }
             #[allow(unused)]
             #[cfg(unix)]
-            Mode::UnixDatagram(UnixMode { config, encoding }) => {
+            Mode::UnixDatagram(UnixMode { encoding, .. }) => {
                 cfg_if! {
                     if #[cfg(not(target_os = "macos"))] {
+                        encoding.validate()?;
                         let transformer = encoding.transformer();
-                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                        let encoder = Encoder::<Framer>::new(framer, serializer);
-                        config.build(
-                            transformer,
-                            encoder,
-                            super::util::service::net::UnixMode::Datagram,
-                        )
+                        Ok(ValidatedSocket::UnixDatagram { transformer })
                     }
                     else {
                         Err("UnixDatagram is not available on macOS platforms.".into())
@@ -189,18 +223,70 @@ impl SinkConfig for SocketSinkConfig {
         }
     }
 
-    fn input(&self) -> Input {
-        let encoder_input_type = match &self.mode {
-            Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
-            Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
-            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
-            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
-        };
-        Input::new(encoder_input_type)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+    async fn build(
+        &self,
+        validated: &ValidatedSocket,
+        _cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        match (validated, &self.mode) {
+            (
+                ValidatedSocket::Tcp {
+                    host,
+                    port,
+                    transformer,
+                },
+                Mode::Tcp(TcpMode { config, encoding }),
+            ) => {
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build_with_address(host.clone(), *port, transformer.clone(), encoder)
+            }
+            (ValidatedSocket::Udp { transformer }, Mode::Udp(UdpMode { config, encoding })) => {
+                let serializer = encoding.build()?;
+                let encoder = Encoder::<()>::new(serializer.clone());
+                let chunker = serializer.chunker();
+                config.build(transformer.clone(), encoder, chunker)
+            }
+            #[cfg(unix)]
+            (
+                ValidatedSocket::UnixStream { transformer },
+                Mode::UnixStream(UnixMode { config, encoding }),
+            ) => {
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(
+                    transformer.clone(),
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[allow(unused)]
+            #[cfg(unix)]
+            (
+                ValidatedSocket::UnixDatagram { transformer },
+                Mode::UnixDatagram(UnixMode { config, encoding }),
+            ) => {
+                cfg_if! {
+                    if #[cfg(not(target_os = "macos"))] {
+                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                        let encoder = Encoder::<Framer>::new(framer, serializer);
+                        config.build(
+                            transformer.clone(),
+                            encoder,
+                            super::util::service::net::UnixMode::Datagram,
+                        )
+                    }
+                    else {
+                        Err("UnixDatagram is not available on macOS platforms.".into())
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            (_, Mode::UnixStream(_)) | (_, Mode::UnixDatagram(_)) => {
+                Err("Unix modes are supported only on Unix platforms.".into())
+            }
+            _ => unreachable!("validated state does not match config mode"),
+        }
     }
 }
 
@@ -234,7 +320,7 @@ mod test {
     use std::os::unix::net::UnixDatagram;
 
     use crate::{
-        config::SinkContext,
+        config::{SinkContext, ValidatedSink},
         event::{Event, LogEvent},
         test_util::{
             CountReceiver,
@@ -247,6 +333,99 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address("127.0.0.1:5000".to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(matches!(validated, ValidatedSocket::Tcp { .. }));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_tcp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address("not a valid address".to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a malformed TCP address should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_tcp_address_without_port() {
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address("127.0.0.1".to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a TCP address without a port should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_udp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("not a valid address".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a malformed UDP address should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_udp_address_without_port() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("127.0.0.1".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a UDP address without a port should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_udp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("127.0.0.1:5000".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        config
+            .validate()
+            .expect("a valid UDP address should validate");
     }
 
     enum DatagramSocket {
@@ -278,16 +457,16 @@ mod test {
                 }),
                 #[cfg(all(unix, not(target_os = "macos")))]
                 DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
-                    config: UnixSinkConfig::new(path.to_path_buf()),
+                    config: UnixSinkConfig::new(path.clone()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();
         assert_sink_compliance(&SINK_TAGS, async move {
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
             let event = Event::Log(LogEvent::from("raw log line"));
             sink.run(stream::once(ready(event.into()))).await
@@ -349,7 +528,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let mut receiver = CountReceiver::receive_lines(addr);
@@ -358,7 +537,7 @@ mod test {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
             sink.run(events).await
         })
@@ -372,8 +551,8 @@ mod test {
         assert_eq!(lines.len(), output.len());
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let received = json.get("message").unwrap().as_str().unwrap();
-            assert_eq!(source, received);
+            let message = json.get("message").unwrap().as_str().unwrap();
+            assert_eq!(source, message);
         }
     }
 
@@ -390,14 +569,14 @@ mod test {
                 config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (expected, events) = random_metrics_with_stream(10, None, None);
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
             sink.run(events).await
         })
@@ -411,9 +590,9 @@ mod test {
         assert_eq!(expected.len(), output.len());
         for (source, received) in expected.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let received = json.get("metric").unwrap();
-            let received_name = received.get("name").unwrap().as_str().unwrap();
-            assert_eq!(source.as_metric().name(), received_name);
+            let metric = json.get("metric").unwrap();
+            let metric_name = metric.get("name").unwrap().as_str().unwrap();
+            assert_eq!(source.as_metric().name(), metric_name);
         }
     }
 
@@ -427,6 +606,10 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[tokio::test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Shortening this reconnect test is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn tcp_stream_detects_disconnect() {
         use std::{
             pin::Pin,
@@ -472,17 +655,17 @@ mod test {
                 ),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let context = SinkContext::default();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
         let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
             let stream = receiver
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();
-            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await
+            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await;
         });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -593,11 +776,11 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));

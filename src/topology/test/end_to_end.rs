@@ -20,7 +20,7 @@ use crate::{
 
 type Lock = Arc<Mutex<()>>;
 
-pub async fn respond(
+pub(super) async fn respond(
     waiter: Lock,
     tx: mpsc::Sender<()>,
     status: StatusCode,
@@ -35,7 +35,7 @@ pub async fn respond(
         .unwrap())
 }
 
-pub async fn http_server(
+pub(super) async fn http_server(
     address: SocketAddr,
     waiter: Lock,
     status: StatusCode,
@@ -59,7 +59,7 @@ pub async fn http_server(
     rx
 }
 
-pub fn http_client(
+pub(super) fn http_client(
     address: SocketAddr,
     body: impl Into<String>,
 ) -> (oneshot::Receiver<()>, JoinHandle<reqwest::Response>) {
@@ -88,7 +88,7 @@ async fn http_to_http(status: StatusCode, response: StatusCode) {
         &format!(
             r#"
 [sources.in]
-type = "http"
+type = "http_server"
 address = "{address1}"
 acknowledgements.enabled = true
 

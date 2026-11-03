@@ -1,7 +1,3 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use std::{io::Error, path::Path};
-
 use vector_lib::internal_event::{
     ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -121,12 +117,22 @@ impl InternalEvent for UnixSendIncompleteError {
     }
 }
 
+#[cfg(any(
+    feature = "sources-utils-net-unix",
+    feature = "sources-socket",
+    feature = "sources-dnstap"
+))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketFileDeleteError<'a> {
-    pub path: &'a Path,
-    pub error: Error,
+    pub path: &'a std::path::Path,
+    pub error: std::io::Error,
 }
 
+#[cfg(any(
+    feature = "sources-utils-net-unix",
+    feature = "sources-socket",
+    feature = "sources-dnstap"
+))]
 impl InternalEvent for UnixSocketFileDeleteError<'_> {
     fn emit(self) {
         error!(

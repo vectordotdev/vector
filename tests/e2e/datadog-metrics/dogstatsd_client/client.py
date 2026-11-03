@@ -42,6 +42,13 @@ for i in range(50):
     print("gauge")
     statsd.gauge('foo_metric.gauge', i, tags=["a_tag:2"])
 
+    print("resource")
+    statsd.gauge(
+        'foo_metric.resource',
+        i,
+        tags=['dd.internal.resource:database_instance:mongo-repro-01'],
+    )
+
     print("set")
     statsd.set('foo_metric.set', i, tags=["a_tag:3"])
 
@@ -54,3 +61,12 @@ for i in range(50):
     statsd.flush()
     time.sleep(0.01)
 
+# Keep the resource metric fresh while the E2E test binary is compiled and run.
+while True:
+    statsd.gauge(
+        'foo_metric.resource',
+        49,
+        tags=['dd.internal.resource:database_instance:mongo-repro-01'],
+    )
+    statsd.flush()
+    time.sleep(1)

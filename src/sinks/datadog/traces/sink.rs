@@ -9,7 +9,7 @@ use tokio::sync::oneshot::{Sender, channel};
 use tower::Service;
 use vector_lib::{
     config::log_schema,
-    event::Event,
+    event::{Event, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -62,12 +62,8 @@ impl Partitioner for EventPartitioner {
                 agent_version: t
                     .get(event_path!("agent_version"))
                     .map(|s| s.to_string_lossy().into_owned()),
-                target_tps: t
-                    .get(event_path!("target_tps"))
-                    .and_then(|tps| tps.as_integer()),
-                error_tps: t
-                    .get(event_path!("error_tps"))
-                    .and_then(|tps| tps.as_integer()),
+                target_tps: t.get(event_path!("target_tps")).and_then(Value::as_integer),
+                error_tps: t.get(event_path!("error_tps")).and_then(Value::as_integer),
             },
         }
     }
@@ -120,7 +116,7 @@ where
                         emit!(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
-                            dropped_events: dropped_events as usize,
+                            dropped_events,
                         });
                         None
                     }

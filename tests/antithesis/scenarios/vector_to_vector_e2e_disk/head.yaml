@@ -17,7 +17,7 @@ sinks:
   out:
     type: vector
     inputs: [in]
-    address: "tail:6000"
+    address: "http://tail:6000"
     compression: none
     # Aggressive keepalive so the crash-and-recover path is exercised quickly: a pooled connection
     # to a killed `tail` is probed while idle and evicted within seconds instead of being reused.

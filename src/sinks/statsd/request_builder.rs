@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-/// Incremental request builder specific to StatsD.
+/// Incremental request builder specific to `StatsD`.
 pub struct StatsdRequestBuilder {
     encoder: StatsdEncoder,
     request_max_size: usize,
@@ -122,7 +122,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                 // finalizers, etc.
                 request_buf.extend(&self.encode_buf[..]);
                 finalizers.merge(metric.take_finalizers());
-                request_metadata_builder.track_event(metric);
+                request_metadata_builder.track_event(&metric);
                 n += 1;
             }
 

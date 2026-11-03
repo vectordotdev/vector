@@ -47,9 +47,7 @@ impl WaitGroup {
     /// If the caller attempts to add a child after calling `wait_for_children` at least once, this
     /// method will panic.
     pub fn add_child(&self) -> WaitGroupChild {
-        if self.locked {
-            panic!("tried to add child after wait group locked");
-        }
+        assert!(!self.locked, "tried to add child after wait group locked");
 
         WaitGroupChild::from_state(&self.state)
     }
@@ -102,9 +100,10 @@ impl WaitGroupChild {
 
 impl Drop for WaitGroupChild {
     fn drop(&mut self) {
-        if !self.done {
-            panic!("wait group child dropped without being marked as done");
-        }
+        assert!(
+            self.done,
+            "wait group child dropped without being marked as done"
+        );
     }
 }
 

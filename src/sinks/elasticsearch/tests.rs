@@ -10,18 +10,23 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
-            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            BulkAction, BulkConfig, DataStreamConfig, Distribution, ElasticsearchApiVersion,
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType, sink::process_log,
         },
-        util::{auth::Auth, encoding::Encoder},
+        util::{HttpEndpoint, auth::Auth, encoding::Encoder},
     },
-    template::Template,
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
 
 // helper to unwrap template strings for tests only
 fn parse_template(input: &str) -> Template {
     Template::try_from(input).unwrap()
+}
+
+// `bulk.action` / `bulk.version` are unconfined templates.
+fn parse_unconfined(input: &str) -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from(input).unwrap()
 }
 
 #[tokio::test]
@@ -32,13 +37,13 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}te"),
+            action: parse_unconfined("{{ action }}te"),
             index: parse_template("vector"),
             template_fallback_index: None,
             version: None,
             version_type: VersionType::Internal,
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -74,14 +79,14 @@ async fn sets_create_action_when_configured() {
 async fn encoding_with_external_versioning_without_version_set_does_not_include_version() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             template_fallback_index: None,
             index: parse_template("vector"),
             version: None,
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -97,14 +102,14 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -147,14 +152,14 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::ExternalGte,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -237,7 +242,7 @@ async fn encode_datastream_mode() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -288,7 +293,7 @@ async fn encode_datastream_mode_no_routing() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
@@ -336,11 +341,11 @@ async fn encode_datastream_mode_no_routing() {
 async fn handle_metrics() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -381,11 +386,11 @@ async fn handle_metrics() {
 async fn decode_bulk_action_error() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}"),
+            action: parse_unconfined("{{ action }}"),
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -398,12 +403,12 @@ async fn decode_bulk_action_error() {
     assert!(action.is_none());
 }
 
-/// validates that the configuration parsing for ElasticsearchCommon succeeds when BulkConfig is
+/// validates that the configuration parsing for `ElasticsearchCommon` succeeds when `BulkConfig` is
 /// not explicitly set in the configuration (using defaults).
 #[tokio::test]
 async fn default_bulk_settings() {
     let config = ElasticsearchConfig {
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -414,11 +419,11 @@ async fn default_bulk_settings() {
 async fn decode_bulk_action() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -440,7 +445,7 @@ async fn encode_datastream_mode_no_sync() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
@@ -495,8 +500,11 @@ async fn allows_using_except_fields() {
         },
         encoding: Transformer::new(None, Some(vec!["idx".into(), "timestamp".into()]), None)
             .unwrap(),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -530,8 +538,11 @@ async fn allows_using_only_fields() {
             ..Default::default()
         },
         encoding: Transformer::new(Some(vec!["foo".into()]), None, None).unwrap(),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -558,6 +569,11 @@ async fn allows_using_only_fields() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the routing test cases together."
+)]
 async fn datastream_index_name() {
     #[derive(Clone, Debug)]
     struct TestCase {
@@ -572,7 +588,7 @@ async fn datastream_index_name() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -588,7 +604,7 @@ async fn datastream_index_name() {
         },
         TestCase {
             dtype: Some("type".to_string()),
-            dataset: Some("".to_string()),
+            dataset: Some(String::new()),
             namespace: Some("namespace".to_string()),
             want: "type-namespace".to_string(),
         },
@@ -600,8 +616,8 @@ async fn datastream_index_name() {
         },
         TestCase {
             dtype: Some("type".to_string()),
-            dataset: Some("".to_string()),
-            namespace: Some("".to_string()),
+            dataset: Some(String::new()),
+            namespace: Some(String::new()),
             want: "type".to_string(),
         },
         TestCase {
@@ -611,10 +627,10 @@ async fn datastream_index_name() {
             want: "type-generic-default".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
-            dataset: Some("".to_string()),
-            namespace: Some("".to_string()),
-            want: "".to_string(),
+            dtype: Some(String::new()),
+            dataset: Some(String::new()),
+            namespace: Some(String::new()),
+            want: String::new(),
         },
         TestCase {
             dtype: None,
@@ -623,7 +639,7 @@ async fn datastream_index_name() {
             want: "logs-generic-default".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
+            dtype: Some(String::new()),
             dataset: Some("dataset".to_string()),
             namespace: Some("namespace".to_string()),
             want: "dataset-namespace".to_string(),
@@ -635,8 +651,8 @@ async fn datastream_index_name() {
             want: "logs-dataset-namespace".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
-            dataset: Some("".to_string()),
+            dtype: Some(String::new()),
+            dataset: Some(String::new()),
             namespace: Some("namespace".to_string()),
             want: "namespace".to_string(),
         },
@@ -647,9 +663,9 @@ async fn datastream_index_name() {
             want: "logs-generic-namespace".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
+            dtype: Some(String::new()),
             dataset: Some("dataset".to_string()),
-            namespace: Some("".to_string()),
+            namespace: Some(String::new()),
             want: "dataset".to_string(),
         },
         TestCase {
@@ -679,16 +695,19 @@ async fn datastream_index_name() {
 #[tokio::test]
 async fn test_parse_config_with_uri_auth() {
     let config = ElasticsearchConfig {
-        endpoints: vec!["http://user:pass@localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap();
 
     let result = ElasticsearchCommon::parse_config(
         &config,
-        "http://user:pass@localhost:9200",
+        Distribution::Elasticsearch,
+        &endpoint,
         &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
         &mut version,
     )
     .await;
@@ -705,10 +724,8 @@ async fn test_parse_config_with_uri_auth() {
         password: SensitiveString::from("pass".to_string()),
     };
 
-    let got_auth_inner = match common.auth.as_ref().unwrap() {
-        Auth::Basic(auth) => auth,
-        #[cfg(feature = "aws-core")]
-        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    let Some(Auth::Basic(got_auth_inner)) = &common.auth else {
+        panic!("Expected auth to be Basic");
     };
 
     assert_eq!(
@@ -724,15 +741,22 @@ async fn test_parse_config_with_config_auth() {
             user: "config_user".to_string(),
             password: SensitiveString::from("config_pass".to_string()),
         }),
-        endpoints: vec!["http://localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
 
-    let result =
-        ElasticsearchCommon::parse_config(&config, "http://localhost:9200", &proxy, &mut version)
-            .await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        Distribution::Elasticsearch,
+        &endpoint,
+        &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
+        &mut version,
+    )
+    .await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -741,10 +765,8 @@ async fn test_parse_config_with_config_auth() {
         password: SensitiveString::from("config_pass".to_string()),
     };
 
-    let got_auth_inner = match common.auth.as_ref().unwrap() {
-        Auth::Basic(auth) => auth,
-        #[cfg(feature = "aws-core")]
-        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    let Some(Auth::Basic(got_auth_inner)) = &common.auth else {
+        panic!("Expected auth to be Basic");
     };
 
     assert_eq!(
@@ -760,20 +782,214 @@ async fn test_parse_config_with_conflicting_auth() {
             user: "config_user".to_string(),
             password: SensitiveString::from("config_pass".to_string()),
         }),
-        endpoints: vec!["http://uri_user:uri_pass@localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap();
 
     let result = ElasticsearchCommon::parse_config(
         &config,
-        "http://uri_user:uri_pass@localhost:9200",
+        Distribution::Elasticsearch,
+        &endpoint,
         &proxy,
+        &ElasticsearchCommon::build_client(&config, &proxy).unwrap(),
         &mut version,
     )
     .await;
 
     // Should fail due to auth being specified in both places
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn api_version_uses_selected_distribution() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    use http_body_util::Full;
+
+    use crate::{sinks::util::test::build_test_server_generic, test_util::addr::next_addr};
+
+    for (distribution, api_version, server_version, expected_version) in [
+        (
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "6.8.23",
+            6,
+        ),
+        (
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "7.17.0",
+            7,
+        ),
+        (
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "8.0.0",
+            8,
+        ),
+        (
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "1.3.0",
+            7,
+        ),
+        (
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "2.19.0",
+            7,
+        ),
+        (
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "3.6.0",
+            7,
+        ),
+        (
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::V7,
+            "3.6.0",
+            7,
+        ),
+        (
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::V8,
+            "3.6.0",
+            8,
+        ),
+    ] {
+        let (_guard, addr) = next_addr();
+        let body = serde_json::json!({"version": {"number": server_version}}).to_string();
+        let probes = Arc::new(AtomicUsize::new(0));
+        let server_probes = Arc::clone(&probes);
+        let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
+            server_probes.fetch_add(1, Ordering::Relaxed);
+            http::Response::new(Full::new(bytes::Bytes::from(body.clone())))
+        });
+        let server = tokio::spawn(server);
+        let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
+        let config = ElasticsearchConfig {
+            endpoints: vec![endpoint.clone()],
+            api_version,
+            ..Default::default()
+        };
+        let mut version = None;
+        let common = ElasticsearchCommon::parse_config(
+            &config,
+            distribution,
+            &endpoint,
+            &ProxyConfig::default(),
+            &ElasticsearchCommon::build_client(&config, &ProxyConfig::default()).unwrap(),
+            &mut version,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            version,
+            Some(expected_version),
+            "{distribution:?} with {:?} and server {server_version}",
+            config.api_version
+        );
+        let should_probe = distribution == Distribution::Elasticsearch
+            && config.api_version == ElasticsearchApiVersion::Auto;
+        assert_eq!(probes.load(Ordering::Relaxed), usize::from(should_probe));
+        assert_eq!(
+            common.request_builder.encoder.suppress_type_name,
+            expected_version >= 7
+        );
+        server.abort();
+    }
+}
+
+#[tokio::test]
+async fn bulk_request_shape_and_compressed_error_response() {
+    use std::io::{Read, Write};
+
+    use flate2::write::GzEncoder;
+    use futures::StreamExt;
+    use http_body_util::Full;
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event};
+
+    use crate::{
+        config::{SinkConfig, SinkContext},
+        sinks::util::{Compression, test::build_test_server_generic},
+        test_util::addr::next_addr,
+    };
+
+    // Partial bulk failures are only visible in the decoded response body.
+    let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder
+        .write_all(br#"{"took":1,"errors":true,"items":[{"index":{"_index":"vector","status":400,"error":{"type":"mapper_parsing_exception","reason":"bad"}}}]}"#)
+        .unwrap();
+    let response_body = bytes::Bytes::from(encoder.finish().unwrap());
+
+    let (_guard, addr) = next_addr();
+    let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
+        http::Response::builder()
+            .header("Content-Encoding", "gzip")
+            .body(Full::new(response_body.clone()))
+            .unwrap()
+    });
+    tokio::spawn(server);
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::Basic {
+            user: "user".to_string(),
+            password: SensitiveString::from("pass".to_string()),
+        }),
+        endpoints: vec![HttpEndpoint::parse(&format!("http://{addr}")).unwrap()],
+        bulk: BulkConfig {
+            index: parse_template("vector"),
+            ..Default::default()
+        },
+        compression: Compression::gzip_default(),
+        api_version: ElasticsearchApiVersion::V8,
+        ..Default::default()
+    };
+    let (sink, _healthcheck) = SinkConfig::build(&config, SinkContext::default())
+        .await
+        .unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from("hello there").with_batch_notifier(&batch);
+    drop(batch);
+    sink.run_events(vec![Event::from(event)]).await.unwrap();
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    let (parts, body) = rx.next().await.unwrap();
+    assert_eq!(parts.method, http::Method::POST);
+    assert_eq!(parts.uri.path(), "/_bulk");
+    assert_eq!(
+        parts.uri.query(),
+        Some(format!("timeout={}s", config.request.tower.timeout_secs).as_str())
+    );
+    let header = |name: &str| parts.headers.get(name).map(|value| value.to_str().unwrap());
+    assert_eq!(header("content-type"), Some("application/x-ndjson"));
+    assert_eq!(header("content-encoding"), Some("gzip"));
+    assert_eq!(header("accept-encoding"), Some("gzip"));
+    assert_eq!(header("authorization"), Some("Basic dXNlcjpwYXNz"));
+    assert_eq!(
+        header("content-length"),
+        Some(body.len().to_string().as_str())
+    );
+
+    let mut payload = String::new();
+    vector_common::decompression::CappedDecoder::gzip(&body[..])
+        .into_reader()
+        .read_to_string(&mut payload)
+        .unwrap();
+    let mut lines = payload.lines();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(lines.next().unwrap()).unwrap(),
+        serde_json::json!({"index": {"_index": "vector"}})
+    );
+    let document = serde_json::from_str::<serde_json::Value>(lines.next().unwrap()).unwrap();
+    assert_eq!(document["message"], "hello there");
+    assert_eq!(lines.next(), None);
 }

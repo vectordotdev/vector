@@ -36,6 +36,7 @@ pub struct EventFormatter {
 }
 
 impl EventFormatter {
+    #[must_use]
     pub fn new(meta: bool, format: TapEncodingFormat) -> Self {
         Self {
             meta,
@@ -46,6 +47,11 @@ impl EventFormatter {
         }
     }
 
+    /// # Panics
+    ///
+    /// Panics when YAML metadata is enabled and the event cannot be parsed as YAML
+    /// or the event wrapper cannot be serialized as YAML.
+    #[must_use]
     pub fn format<'a>(
         &self,
         component_id: &str,
@@ -56,14 +62,13 @@ impl EventFormatter {
         if self.meta {
             match self.format {
                 TapEncodingFormat::Json => format!(
-                    r#"{{"{}":"{}","{}":"{}","{}":"{}","event":{}}}"#,
+                    r#"{{"{}":"{}","{}":"{}","{}":"{}","event":{event}}}"#,
                     self.component_id_label,
                     component_id.green(),
                     self.component_kind_label,
                     component_kind.green(),
                     self.component_type_label,
-                    component_type.green(),
-                    event
+                    component_type.green()
                 )
                 .into(),
                 TapEncodingFormat::Yaml => {
@@ -85,14 +90,13 @@ impl EventFormatter {
                     .into()
                 }
                 TapEncodingFormat::Logfmt => format!(
-                    "{}={} {}={} {}={} {}",
+                    "{}={} {}={} {}={} {event}",
                     self.component_id_label,
                     component_id.green(),
                     self.component_kind_label,
                     component_kind.green(),
                     self.component_type_label,
-                    component_type.green(),
-                    event
+                    component_type.green()
                 )
                 .into(),
             }
@@ -118,6 +122,7 @@ pub enum TapExecutorError {
 }
 
 impl TapExecutorError {
+    #[must_use]
     pub fn is_fatal(&self) -> bool {
         matches!(self, TapExecutorError::Fatal(_))
     }
@@ -126,9 +131,9 @@ impl TapExecutorError {
 impl From<vector_api_client::Error> for TapExecutorError {
     fn from(err: vector_api_client::Error) -> Self {
         if err.is_fatal() {
-            TapExecutorError::Fatal(format!("{}", err))
+            TapExecutorError::Fatal(format!("{err}"))
         } else {
-            TapExecutorError::GrpcError(format!("{}", err))
+            TapExecutorError::GrpcError(format!("{err}"))
         }
     }
 }
@@ -142,6 +147,7 @@ pub struct TapRunner<'a> {
 }
 
 impl<'a> TapRunner<'a> {
+    #[must_use]
     pub fn new(
         url: &'a Url,
         input_patterns: Vec<String>,
@@ -156,6 +162,11 @@ impl<'a> TapRunner<'a> {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the URL is invalid, setting up the client or starting the stream
+    /// fails, or the stream reports an error or ends unexpectedly. The client opens its
+    /// connection with the stream RPC, so an unreachable API fails that RPC.
     pub async fn run_tap(
         &self,
         interval: i64,
@@ -169,13 +180,18 @@ impl<'a> TapRunner<'a> {
             .parse()
             .map_err(|e| TapExecutorError::Fatal(format!("Invalid URL: {e}")))?;
         let mut client = Client::new(uri);
-        client.connect().await?;
+        client.connect()?;
         self.run_tap_with_client(client, interval, limit, duration_ms, quiet)
             .await
     }
 
-    /// Run tap using a pre-connected client (avoids an extra connection round-trip when the
-    /// caller has already connected and health-checked the client).
+    /// Run tap using a connected client (reuses the connection when the caller has already
+    /// health-checked the client).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected, starting the stream fails, or the
+    /// stream reports an error or ends unexpectedly.
     pub async fn run_tap_with_client(
         &self,
         mut client: Client,
@@ -184,19 +200,23 @@ impl<'a> TapRunner<'a> {
         duration_ms: Option<u64>,
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve existing conversions pending range-validation review"
+        )]
+        let (limit, interval_ms) = (limit as i32, interval as i32);
         let request = StreamOutputEventsRequest {
             outputs_patterns: self.output_patterns.clone(),
             inputs_patterns: self.input_patterns.clone(),
-            limit: limit as i32,
-            interval_ms: interval as i32,
+            limit,
+            interval_ms,
         };
 
         let mut stream = client.stream_output_events(request).await?;
 
         let start_time = Instant::now();
-        let stream_duration = duration_ms
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::MAX);
+        let stream_duration = duration_ms.map_or(Duration::MAX, Duration::from_millis);
 
         // Loop over the returned results, processing tap events
         loop {
@@ -205,7 +225,8 @@ impl<'a> TapRunner<'a> {
                 return Ok(());
             }
 
-            let message = timeout(stream_duration - time_elapsed, stream.next()).await;
+            let message =
+                timeout(stream_duration.saturating_sub(time_elapsed), stream.next()).await;
             match message {
                 Ok(Some(Ok(output_event))) => {
                     // Filter out notifications if quiet mode is enabled
@@ -224,7 +245,7 @@ impl<'a> TapRunner<'a> {
 
                     match &self.output_channel {
                         OutputChannel::Stdout(formatter) => {
-                            self.output_event_stdout(&output_event, formatter);
+                            Self::output_event_stdout(&output_event, formatter);
                         }
                         OutputChannel::AsyncChannel(sender_tx) => {
                             if let Err(error) = sender_tx.send(vec![output_event]).await {
@@ -249,31 +270,34 @@ impl<'a> TapRunner<'a> {
         }
     }
 
-    /// Convert and serialize a protobuf EventWrapper to the requested format
+    /// Convert and serialize a protobuf `EventWrapper` to the requested format
     fn serialize_event(
         event_wrapper: &vector_api_client::proto::event::EventWrapper,
         format: TapEncodingFormat,
     ) -> Result<String, String> {
         // INTENTIONAL round-trip through protobuf bytes: `vector_api_client` compiles
-        // `event.proto` independently to avoid taking a dependency on `vector_core` (a large
-        // crate with many features). Both types share the same proto schema, so encoding one
-        // and decoding the other is always safe. If the schemas ever diverge this will surface
-        // as a runtime decode error.
+        // `event.proto` itself, so its `EventWrapper` is a different Rust type from the
+        // `vector_core` one. Both types share the same proto schema, so encoding one and
+        // decoding the other is always safe. If the schemas ever diverge this will surface as a
+        // runtime decode error.
         let bytes = event_wrapper.encode_to_vec();
 
         let core_event_wrapper =
             vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
-                .map_err(|e| format!("Failed to decode event: {}", e))?;
+                .map_err(|error| format!("Failed to decode event: {error}"))?;
 
         // Convert to vector-core Event (which has Serialize)
-        let event: Event = core_event_wrapper.into();
+        let event = Event::try_from(core_event_wrapper)
+            .map_err(|error| format!("Failed to convert event: {error}"))?;
 
         // Serialize based on format
         match format {
-            TapEncodingFormat::Json => serde_json::to_string(&event)
-                .map_err(|e| format!("JSON serialization failed: {}", e)),
-            TapEncodingFormat::Yaml => serde_yaml::to_string(&event)
-                .map_err(|e| format!("YAML serialization failed: {}", e)),
+            TapEncodingFormat::Json => {
+                serde_json::to_string(&event).map_err(|e| format!("JSON serialization failed: {e}"))
+            }
+            TapEncodingFormat::Yaml => {
+                serde_yaml::to_string(&event).map_err(|e| format!("YAML serialization failed: {e}"))
+            }
             TapEncodingFormat::Logfmt => {
                 // For logfmt, we need to extract the log event and serialize it
                 match event {
@@ -284,14 +308,11 @@ impl<'a> TapRunner<'a> {
                         // Wrap the LogEvent back into Event for the serializer
                         serializer
                             .encode(Event::Log(log_event), &mut bytes)
-                            .map_err(|e| format!("Logfmt serialization failed: {}", e))?;
+                            .map_err(|e| format!("Logfmt serialization failed: {e}"))?;
                         String::from_utf8(bytes.to_vec())
-                            .map_err(|e| format!("UTF-8 conversion failed: {}", e))
+                            .map_err(|e| format!("UTF-8 conversion failed: {e}"))
                     }
-                    Event::Metric(_) => {
-                        Err("logfmt format is only supported for log events".to_string())
-                    }
-                    Event::Trace(_) => {
+                    Event::Metric(_) | Event::Trace(_) => {
                         Err("logfmt format is only supported for log events".to_string())
                     }
                 }
@@ -300,11 +321,7 @@ impl<'a> TapRunner<'a> {
     }
 
     #[allow(clippy::print_stdout)]
-    fn output_event_stdout(
-        &self,
-        output_event: &StreamOutputEventsResponse,
-        formatter: &EventFormatter,
-    ) {
+    fn output_event_stdout(output_event: &StreamOutputEventsResponse, formatter: &EventFormatter) {
         use vector_api_client::proto::stream_output_events_response::Event as OutputEventType;
 
         match &output_event.event {
@@ -315,7 +332,7 @@ impl<'a> TapRunner<'a> {
                         Ok(s) => s,
                         Err(e) => {
                             error!(message = "Failed to serialize event.", error = %e);
-                            format!("{:?}", event_wrapper)
+                            format!("{event_wrapper:?}")
                         }
                     }
                 } else {

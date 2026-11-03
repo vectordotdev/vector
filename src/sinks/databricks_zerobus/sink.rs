@@ -9,8 +9,8 @@ use futures::stream::BoxStream;
 use vector_lib::finalization::Finalizable;
 
 use crate::sinks::prelude::*;
+use crate::sinks::util::TowerRequestSettings;
 use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings};
 
 use super::service::{
     RetryableErrorAsErroredLayer, ZerobusRequest, ZerobusRetryLogic, ZerobusService,
@@ -24,18 +24,16 @@ pub struct ZerobusSink {
 }
 
 impl ZerobusSink {
-    pub fn new(
+    pub const fn new(
         service: ZerobusService,
         request_limits: TowerRequestSettings,
-        batch_config: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
-    ) -> Result<Self, crate::Error> {
-        let batch_settings = batch_config.into_batcher_settings()?;
-
-        Ok(Self {
+        batch_settings: BatcherSettings,
+    ) -> Self {
+        Self {
             service,
             request_limits,
             batch_settings,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

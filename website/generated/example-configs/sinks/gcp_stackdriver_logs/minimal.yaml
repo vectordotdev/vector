@@ -1,0 +1,11 @@
+sinks:
+  my_sink_id:
+    type: gcp_stackdriver_logs
+    inputs:
+      - my-source-or-transform-id
+    log_id: my-log
+    project_id: my-project
+    resource:
+      instanceId: Twilight
+      zone: zone-{{ zone }}
+      type: gce_instance

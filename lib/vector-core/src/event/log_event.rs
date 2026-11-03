@@ -26,7 +26,7 @@ use vrl::{
 };
 
 use super::{
-    EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
+    EventFinalizers, Finalizable, KeyString, MergeFinalizable, ObjectMap, Value,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
@@ -46,6 +46,9 @@ static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::ne
         "source_type"
     )))
 });
+
+const _: () = assert!(AtomicCell::<Option<NonZeroUsize>>::is_lock_free());
+const _: () = assert!(AtomicCell::<Option<NonZeroJsonSize>>::is_lock_free());
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -221,6 +224,12 @@ impl ByteSizeOf for LogEvent {
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for LogEvent {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
     }
 }
 
@@ -786,9 +795,9 @@ impl From<&tracing::Event<'_>> for LogEvent {
         log.insert(
             &TRACING_TARGET_PATHS.kind,
             if meta.is_event() {
-                Value::Bytes("event".to_string().into())
+                Value::from_static_str("event")
             } else if meta.is_span() {
-                Value::Bytes("span".to_string().into())
+                Value::from_static_str("span")
             } else {
                 Value::Null
             },
@@ -797,7 +806,7 @@ impl From<&tracing::Event<'_>> for LogEvent {
         log.insert(
             &TRACING_TARGET_PATHS.module_path,
             meta.module_path()
-                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
+                .map_or(Value::Null, |mp| Value::from(mp.to_string())),
         );
         log.insert(&TRACING_TARGET_PATHS.target, meta.target().to_string());
         log

@@ -210,12 +210,16 @@ fn format_command_error(
 
 /// Short-cut wrapper to create a new command, feed in the args, set the working directory, and then
 /// run it, checking the resulting exit code.
-pub fn exec<T: AsRef<OsStr>>(
-    program: &str,
+pub fn exec<P: AsRef<OsStr>, T: AsRef<OsStr>>(
+    program: P,
     args: impl IntoIterator<Item = T>,
     in_repo: bool,
 ) -> Result<()> {
-    let mut command = match program.strip_prefix("scripts/") {
+    let program = program.as_ref();
+    let mut command = match program
+        .to_str()
+        .and_then(|program| program.strip_prefix("scripts/"))
+    {
         Some(script) => Command::script(script),
         None => Command::new(program),
     };
