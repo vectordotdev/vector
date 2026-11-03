@@ -47,7 +47,6 @@ pub mod internal_telemetry;
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
-#[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
 pub mod dns;
@@ -77,16 +76,15 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
-#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
-#[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub mod nats;
 pub mod net;
+// tonic-build generates `pub` items and has no option to narrow their visibility.
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -101,7 +99,6 @@ pub mod sinks;
 #[allow(unreachable_pub)]
 pub mod sources;
 #[cfg(feature = "api-client")]
-#[allow(unreachable_pub)]
 pub mod tap;
 pub mod template;
 pub mod test_util;
@@ -109,7 +106,6 @@ pub mod test_util;
 pub mod top;
 pub mod topology;
 pub mod trace;
-#[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
