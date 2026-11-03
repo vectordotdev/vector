@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt, future::ready, mem, sync::Arc, time::Durati
 
 use bytes::{Bytes, BytesMut};
 use futures::{StreamExt, stream::BoxStream};
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tower::{Service, ServiceBuilder};
 use vector_lib::{
@@ -329,10 +329,7 @@ struct InfluxDbMetricsRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<Arc<MetricBatch>> for InfluxDbMetricsRequestBuilder {
-    fn build(
-        &self,
-        request: HttpRequest<Arc<MetricBatch>>,
-    ) -> crate::Result<http_1::Request<Bytes>> {
+    fn build(&self, request: HttpRequest<Arc<MetricBatch>>) -> crate::Result<http::Request<Bytes>> {
         let body = encode_events(
             self.protocol_version,
             &request.get_additional_metadata().metrics,
@@ -525,7 +522,9 @@ fn get_type_and_fields(
                 })
                 .collect();
             fields.insert("count".into(), Field::UnsignedInt(*count));
-            fields.insert("sum".into(), Field::Float(*sum));
+            if let Some(sum) = sum {
+                fields.insert("sum".into(), Field::Float(*sum));
+            }
 
             ("histogram", Some(fields))
         }
@@ -836,7 +835,7 @@ mod tests {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                     count: 6,
-                    sum: 12.5,
+                    sum: Some(12.5),
                 },
             )
             .with_namespace(Some("ns"))
@@ -879,7 +878,7 @@ mod tests {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                     count: 6,
-                    sum: 12.5,
+                    sum: Some(12.5),
                 },
             )
             .with_namespace(Some("ns"))

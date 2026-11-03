@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response, Uri};
+use http::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
@@ -23,7 +23,7 @@ use super::http::SigV4Config;
 use crate::{
     http::client_v1::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
-    sinks::util::{http::HttpRequest, sink},
+    sinks::util::{http::HttpRequest, sink, uri::protocol_endpoint},
 };
 
 /// Builds a native `http 1` request from a buffered HTTP sink request.
@@ -75,7 +75,7 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// Native `http 1` equivalent of the legacy `HttpService`.
+/// Generic `Service` implementation for HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpService<B, T: Send> {
     client: HttpClient,
@@ -105,9 +105,8 @@ where
     /// Creates a service that signs every built request with AWS `SigV4` before sending it.
     ///
     /// The signature covers the method, URI, headers and body produced by `request_builder`,
-    /// without adding an `x-amz-content-sha256` header, matching the legacy
-    /// `HttpService::new_with_sig_v4`. A request that cannot be signed fails with a
-    /// non-retriable [`HttpError`].
+    /// without adding an `x-amz-content-sha256` header. A request that cannot be signed fails
+    /// with a non-retriable [`HttpError`].
     #[cfg(feature = "aws-core")]
     pub fn new_with_sig_v4(
         client: HttpClient,
@@ -182,7 +181,7 @@ where
             #[cfg(feature = "aws-core")]
             let request = sign_request(request, sig_v4_config.as_deref()).await?;
             let byte_size = request.body().len();
-            let (protocol, endpoint) = protocol_endpoint(request.uri());
+            let (protocol, endpoint) = protocol_endpoint(request.uri().clone());
             let request = request.map(full_body);
             let response = if response_decompression {
                 let mut service = Decompression::new(service_fn(|request| client.send(request)));
@@ -212,7 +211,7 @@ async fn collect_response<B>(
     endpoint: &str,
 ) -> Result<Response<Bytes>, B::Error>
 where
-    B: http_body_1::Body<Data = Bytes>,
+    B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
         emit!(EndpointBytesSent {
@@ -234,12 +233,11 @@ where
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> http_1::StatusCode + Clone + Send + Sync + 'static,
+    impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
-    HttpError,
 > {
-    super::http::HttpStatusRetryLogic::new_with_error(
+    super::http::HttpStatusRetryLogic::new(
         |response: &HttpResponse| {
             let status = response.response.status();
             if !status.is_success() {
@@ -261,19 +259,12 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     )
 }
 
-pub(crate) fn protocol_endpoint(uri: &Uri) -> (String, String) {
-    let uri = uri
-        .to_string()
-        .parse::<http::Uri>()
-        .expect("a valid HTTP/1 URI is valid as an HTTP URI");
-    super::uri::protocol_endpoint(uri)
-}
-
 #[cfg(test)]
 mod tests {
     use std::{convert::Infallible, io::Write};
 
     use flate2::write::GzEncoder;
+    use http_body_util::Full;
     use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
     use super::*;
@@ -289,7 +280,7 @@ mod tests {
 
     #[derive(Clone)]
     struct RequestBuilder {
-        uri: Uri,
+        uri: http::Uri,
     }
 
     impl HttpServiceRequestBuilder<()> for RequestBuilder {
@@ -303,7 +294,7 @@ mod tests {
             let body = body.clone();
             async move {
                 assert_eq!(request.headers()["accept-encoding"], "zstd,gzip,deflate,br");
-                let request_body = http_body::Body::collect(request.into_body())
+                let request_body = http_body_util::BodyExt::collect(request.into_body())
                     .await
                     .unwrap()
                     .to_bytes();
@@ -313,13 +304,13 @@ mod tests {
                         .status(http::StatusCode::SERVICE_UNAVAILABLE)
                         .header("content-encoding", "gzip")
                         .header("content-length", body.len())
-                        .body(hyper::Body::from(body))
+                        .body(Full::new(Bytes::from(body)))
                         .unwrap(),
                 )
             }
         })
         .await;
-        HttpService::new(client(), request_builder(uri)).with_response_decompression()
+        HttpService::new(client(), request_builder(&uri)).with_response_decompression()
     }
 
     fn client() -> HttpClient {
@@ -330,11 +321,11 @@ mod tests {
         .unwrap()
     }
 
-    fn request_builder(uri: http::Uri) -> RequestBuilder {
+    fn request_builder(uri: &http::Uri) -> RequestBuilder {
         RequestBuilder {
-            uri: crate::sinks::util::HttpEndpoint::new(uri)
+            uri: crate::sinks::util::HttpEndpoint::new(uri.clone())
                 .unwrap()
-                .into_v1(),
+                .into_uri(),
         }
     }
 
@@ -357,7 +348,7 @@ mod tests {
 
         assert_eq!(
             response.response.status(),
-            http_1::StatusCode::SERVICE_UNAVAILABLE
+            http::StatusCode::SERVICE_UNAVAILABLE
         );
         assert_eq!(response.response.body().as_ref(), message);
         assert!(!response.response.headers().contains_key("content-encoding"));
@@ -392,7 +383,7 @@ mod tests {
         use super::*;
 
         fn sig_v4_service(
-            uri: http::Uri,
+            uri: &http::Uri,
             credentials: impl ProvideCredentials + 'static,
         ) -> HttpService<RequestBuilder, ()> {
             HttpService::new_with_sig_v4(
@@ -414,16 +405,19 @@ mod tests {
                 let tx = tx.clone();
                 async move {
                     let (parts, body) = request.into_parts();
-                    let body = http_body::Body::collect(body).await.unwrap().to_bytes();
+                    let body = http_body_util::BodyExt::collect(body)
+                        .await
+                        .unwrap()
+                        .to_bytes();
                     tx.send((parts.headers, body)).unwrap();
-                    Ok::<_, Infallible>(http::Response::new(hyper::Body::empty()))
+                    Ok::<_, Infallible>(http::Response::new(Full::default()))
                 }
             })
             .await;
-            let mut service = sig_v4_service(uri, Credentials::from_keys("AKID", "SECRET", None));
+            let mut service = sig_v4_service(&uri, Credentials::from_keys("AKID", "SECRET", None));
 
             let response = service.call(request()).await.unwrap();
-            assert_eq!(response.response.status(), http_1::StatusCode::OK);
+            assert_eq!(response.response.status(), http::StatusCode::OK);
 
             let (headers, body) = rx.recv().await.unwrap();
             assert_eq!(body, "events");
@@ -469,10 +463,10 @@ mod tests {
             let received = Arc::clone(&requests);
             let uri = spawn_blackhole_http_server(move |_| {
                 received.fetch_add(1, Ordering::Relaxed);
-                async { Ok::<_, Infallible>(http::Response::new(hyper::Body::empty())) }
+                async { Ok::<_, Infallible>(http::Response::new(Full::default())) }
             })
             .await;
-            let mut service = sig_v4_service(uri, MissingCredentials);
+            let mut service = sig_v4_service(&uri, MissingCredentials);
 
             let error = service.call(request()).await.unwrap_err();
             let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use http_1::{Uri, header::HeaderValue};
+use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -219,7 +219,7 @@ impl NewRelicCredentials {
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return Ok(override_uri.clone().into_v1());
+            return Ok(override_uri.as_uri().clone());
         }
 
         match self.api {

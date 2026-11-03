@@ -48,14 +48,6 @@ releases: "0.61.0": {
 			contributors: ["pront"]
 		},
 		{
-			type: "feat"
-			description: #"""
-				VRL now includes a `range` function that creates an array of integers from a start value to an exclusive end value, with an optional step.
-				"""#
-			pr_numbers: [26876]
-			contributors: ["pront"]
-		},
-		{
 			type: "enhancement"
 			description: #"""
 				The `character_delimited` and `newline_delimited` decoding framers now report frames dropped for
@@ -182,14 +174,8 @@ releases: "0.61.0": {
 			title:    "Scheme-less `vector` sink endpoints default to `https`"
 			anchor:   "vector-sink-default-https"
 			description: #"""
-				`address` and `routing.endpoints` values in the `vector` sink that omit the scheme (for example,
-				`127.0.0.1:6000` instead of `http://127.0.0.1:6000`) now default to `https`. Previously they
-				defaulted to `http` unless TLS was enabled. The `http` default was
-				[deprecated in 0.59.0](https://vector.dev/deprecations/).
-				
-				Endpoints that already specify a scheme, and scheme-less endpoints in configurations that enable
-				TLS, are unaffected. A scheme-less endpoint pointing at a plaintext `vector` source now fails the
-				TLS handshake.
+				Scheme-less endpoints that connect to plaintext sources now fail TLS handshakes.
+				Use explicit `http://` endpoints or enable TLS on the receiving source.
 				"""#
 			pr_numbers: [26699]
 			contributors: ["JinchengCao"]
