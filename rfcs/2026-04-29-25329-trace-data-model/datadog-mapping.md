@@ -161,6 +161,9 @@ Rationale section below.
   keys, keeps span-event arrays and maps nested, renders span-event bytes as base64,
   and ignores numeric and bytes values in chunk, tracer, and link attributes; see the
   stringification paragraph under Rationale.
+- **Unparseable `_dd.p.dm` values** on standard input are not lifted into
+  `sampling_mechanism`. They stay ordinary attributes on ingress and, because the key
+  is sink-owned, are dropped on egress; see "Sampling mechanism."
 - **Unknown indexed `SpanKind` values** ingest as `Span.kind = Other(n)` and write no
   `span.kind` on standard egress; see "`Span.kind`."
 The Datadog-side consequences of the parent RFC's malformed-input rule, zero-ID
@@ -489,7 +492,7 @@ chunk-scoped like `priority` and is stored as
 - The `_dd.p.dm` key is sink-owned on Datadog egress, like `_dd.p.tid`. When the field
   is `Some(n)`, egress writes `_dd.p.dm = "-<n>"` into `TraceChunk.tags` and into the
   `meta` of every span in the chunk, replacing any attribute at that key. When it is
-  `None`, egress writes no `_dd.p.dm`.
+  `None`, egress writes no `_dd.p.dm` and drops any attribute at that key.
 
 The Datadog backend reads the mechanism from both the chunk tag and each span's
 `meta`, and its indexed reader writes the chunk value onto every span. Writing it on
