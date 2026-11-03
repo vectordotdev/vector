@@ -146,6 +146,50 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
 }
 
 #[test]
+#[cfg(feature = "sinks-console")]
+fn custom_buffer_and_duration_defaults_match_serde() {
+    const CONFIG: &str = indoc! {r"
+        expire_metrics:
+          secs: 300
+          nanos: 42
+        sinks:
+          out:
+            type: console
+            inputs: []
+            encoding:
+              codec: json
+            buffer: @BUFFER@
+    "};
+
+    for buffer in [
+        "{}",
+        "{type: memory, when_full: drop_newest}",
+        "[{}, {type: memory, max_size: 4096}]",
+        "{max_events: 'SECRET[backend.size]'}",
+        "{max_size: 'SECRET[backend.size]'}",
+        "{max_events: 1, max_size: 4096}",
+    ] {
+        let input = CONFIG.replace("@BUFFER@", buffer);
+        let expected = serde_yaml::from_str::<crate::config::ConfigBuilder>(
+            &input.replace("'SECRET[backend.size]'", "4096"),
+        );
+        let actual = ConfigBuilderLoader::default()
+            .interpolate_env(false)
+            .secrets(HashMap::from([("backend.size".into(), "4096".into())]))
+            .load_from_input(input.as_bytes(), crate::config::Format::Yaml);
+        match (expected, actual) {
+            (Ok(expected), Ok(actual)) => assert_eq!(
+                serde_json::to_value(actual).unwrap(),
+                serde_json::to_value(expected).unwrap(),
+                "{buffer}"
+            ),
+            (Err(_), Err(_)) => {}
+            (expected, actual) => panic!("{buffer}: serde={expected:?}, loader={actual:?}"),
+        }
+    }
+}
+
+#[test]
 #[cfg(feature = "sources-demo_logs")]
 fn namespaced_files_load_interpolated_scalars() {
     const CONFIG: &str = indoc! {r"
