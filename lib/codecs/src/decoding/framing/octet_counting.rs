@@ -494,6 +494,28 @@ mod tests {
     }
 
     #[test]
+    fn non_octet_decode_frames_after_discard_in_same_call() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+        let mut buffer = BytesMut::with_capacity(128);
+
+        // Push the decoder into the discarding state with an unterminated
+        // oversized frame.
+        buffer.put(&vec![b'x'; 100][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(decoder.newline_discarding);
+
+        // The tail of the discarded frame, its newline, and a complete
+        // well-formed line arriving together: framing must resume within
+        // the same call.
+        buffer.put(&b"tail\n<57>resumed\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>resumed".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+        assert!(!decoder.newline_discarding);
+    }
+
+    #[test]
     fn non_octet_decode_drops_oversized_terminated_line() {
         let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(64);
