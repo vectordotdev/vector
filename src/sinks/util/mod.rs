@@ -129,6 +129,7 @@ pub fn encode_namespace<'a>(
     }
 }
 
+#[cfg(any(feature = "sinks-datadog_metrics", feature = "sinks-statsd"))]
 pub(crate) fn encode_metric_tag(output: &mut String, name: &str, value: Option<&str>) {
     match value {
         Some(value) => {
@@ -160,7 +161,7 @@ pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "sinks-datadog_metrics", feature = "sinks-statsd")))]
 mod tests {
     use super::encode_metric_tag;
 
