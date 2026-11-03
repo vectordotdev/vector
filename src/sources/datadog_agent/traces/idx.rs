@@ -601,6 +601,11 @@ fn any_value_json(
     }
 }
 
+/// A double nested inside compound JSON.
+///
+/// Arrays and key-value lists become JSON text through `serde_json`. The Agent's
+/// `AnyValue.AsString` does not: it joins those values with commas. Non-finite
+/// doubles have no JSON number, so they become `null`.
 fn json_f64(value: f64) -> JsonValue {
     serde_json::Number::from_f64(value).map_or(JsonValue::Null, JsonValue::Number)
 }
@@ -609,19 +614,25 @@ fn json_text(value: &JsonValue) -> String {
     serde_json::to_string(value).expect("serializing a serde_json::Value cannot fail")
 }
 
+/// Renders `value` the way the Agent's `AnyValue.AsString` does.
+///
+/// That accessor uses `strconv.FormatFloat(value, 'f', -1, 64)`. Finite values use
+/// Rust's shortest fixed-point rendering, which matches that verb except on a few
+/// halfway decimals where both spellings parse back to the same float. Non-finite
+/// values use Go's spellings, which Rust's `Display` does not.
 fn format_f64(value: f64) -> String {
-    serde_json::Number::from_f64(value).map_or_else(
-        || {
-            if value.is_nan() {
-                "NaN".to_owned()
-            } else if value.is_sign_positive() {
-                "+Inf".to_owned()
-            } else {
-                "-Inf".to_owned()
-            }
-        },
-        |number| number.to_string(),
-    )
+    if value.is_nan() {
+        "NaN".to_owned()
+    } else if value.is_infinite() {
+        if value.is_sign_positive() {
+            "+Inf"
+        } else {
+            "-Inf"
+        }
+        .to_owned()
+    } else {
+        value.to_string()
+    }
 }
 
 fn promoted_span_kind(kind: i32) -> Option<&'static str> {
@@ -1046,6 +1057,36 @@ mod tests {
     }
 
     #[test]
+    fn chunk_attribute_doubles_match_the_agent_as_string() {
+        // Spellings taken from Go's strconv.FormatFloat(v, 'f', -1, 64), which
+        // AnyValue.AsString uses. Integral values have no decimal point, and
+        // large values stay in fixed point rather than scientific notation.
+        let cases = [
+            ("hundred", 100.0, "100"),
+            ("tiny", 1e-7, "0.0000001"),
+            ("huge", 1e21, "1000000000000000000000"),
+            ("neg-zero", -0.0, "-0"),
+            ("pos-inf", f64::INFINITY, "+Inf"),
+            ("neg-inf", f64::NEG_INFINITY, "-Inf"),
+            ("nan", f64::NAN, "NaN"),
+        ];
+        let strings = Strings::new();
+        let attributes = strings.map(
+            cases
+                .iter()
+                .map(|(key, value, _)| (*key, Strings::double(*value)))
+                .collect(),
+        );
+        let mut trace = chunk(0, 1, vec![base_span(&strings)]);
+        trace.attributes = attributes;
+        let events = convert(strings.into_payload(vec![trace]));
+        let tags = object(events[0].as_map().get("tags").unwrap());
+        for (key, _, expected) in cases {
+            assert_eq!(tags.get(key).unwrap(), &Value::from(expected));
+        }
+    }
+
+    #[test]
     fn sampling_mechanism_is_formatted_when_the_tag_is_absent() {
         let strings = Strings::new();
         let span = base_span(&strings);
@@ -1175,6 +1216,23 @@ mod tests {
             })
             .collect();
         strings.into_payload(vec![chunk(0, 1, spans)])
+    }
+
+    #[test]
+    fn empty_string_refs_still_count_against_the_budget() {
+        let strings = Strings::new();
+        let spans = (0..1024)
+            .map(|_| ddtrace_proto::idx::Span::default())
+            .collect();
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![chunk(0, 1, spans)]),
+            &ExpansionBudget::new(4096),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
     }
 
     #[test]

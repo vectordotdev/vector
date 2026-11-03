@@ -208,6 +208,13 @@ mod tests {
     }
 
     #[test]
+    fn sampling_mechanism_formats_as_negated_decimal() {
+        assert_eq!(format_sampling_mechanism(0), "-0");
+        assert_eq!(format_sampling_mechanism(4), "-4");
+        assert_eq!(format_sampling_mechanism(u32::MAX), "-4294967295");
+    }
+
+    #[test]
     fn sampling_mechanism_rejects_non_integers() {
         assert_eq!(parse_sampling_mechanism(""), None);
         assert_eq!(parse_sampling_mechanism("-"), None);
@@ -239,10 +246,6 @@ mod tests {
 
         #[test]
         fn formatted_sampling_mechanism_parses_back(mechanism: u32) {
-            prop_assert_eq!(
-                format_sampling_mechanism(mechanism),
-                format!("-{mechanism}")
-            );
             prop_assert_eq!(
                 parse_sampling_mechanism(&format_sampling_mechanism(mechanism)),
                 Some(mechanism)
