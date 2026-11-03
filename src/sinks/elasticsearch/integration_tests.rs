@@ -16,7 +16,7 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{SinkConfig, SinkContext},
-    http::{ParameterValue, QueryParameterValue, client_v1::HttpClient},
+    http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         HealthcheckError,
         util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},

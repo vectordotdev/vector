@@ -11,7 +11,7 @@ use vector_http::full_body;
 
 use super::request_builder::RemoteWriteRequest;
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::EndpointBytesSent,
     sinks::{
         HTTPV1RequestBuilderSnafu,

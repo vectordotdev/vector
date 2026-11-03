@@ -25,7 +25,7 @@ use tokio::{
 };
 use vector_http::{ConnectionOptions, RequestBody, empty_body};
 
-use super::client_v1::HttpClient;
+use super::HttpClient;
 #[cfg(feature = "aws-core")]
 use crate::aws::http_client::{SdkHttpClient, test_runtime_components};
 use crate::{

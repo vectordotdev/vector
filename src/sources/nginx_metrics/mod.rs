@@ -18,7 +18,7 @@ use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_componen
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,

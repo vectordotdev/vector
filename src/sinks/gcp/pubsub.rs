@@ -12,7 +12,7 @@ use vector_lib::stream::batcher::BatchConfig as StreamBatchConfig;
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::LargeEventDroppedError,
     sinks::{
         HTTPV1RequestBuilderSnafu,

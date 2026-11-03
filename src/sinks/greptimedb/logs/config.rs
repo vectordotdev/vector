@@ -8,7 +8,7 @@ use vector_lib::{
 
 use crate::{
     config::ValidatedSink,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,

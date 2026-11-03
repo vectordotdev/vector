@@ -14,7 +14,7 @@ use tracing::Instrument;
 use vector_http::full_body;
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{HTTPV1RequestBuilderSnafu, prelude::*},
 };
 

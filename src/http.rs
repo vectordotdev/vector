@@ -512,7 +512,8 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
-pub mod client_v1;
+mod client;
+pub use client::HttpClient;
 
 #[cfg(test)]
 mod transport_tests;
@@ -526,7 +527,7 @@ mod tests {
     use tower::ServiceBuilder;
     use vector_http::empty_body;
 
-    use super::{client_v1::HttpClient, *};
+    use super::*;
     use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
 
     #[test]

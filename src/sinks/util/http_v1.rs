@@ -21,7 +21,7 @@ use vector_lib::{
 #[cfg(feature = "aws-core")]
 use super::http::SigV4Config;
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::util::{http::HttpRequest, sink, uri::protocol_endpoint},
 };

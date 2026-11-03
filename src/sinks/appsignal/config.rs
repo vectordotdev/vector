@@ -17,7 +17,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},

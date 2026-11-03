@@ -35,7 +35,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     config::{SourceConfig, SourceContext},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,

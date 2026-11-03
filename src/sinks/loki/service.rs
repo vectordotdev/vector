@@ -7,7 +7,7 @@ use tracing::Instrument;
 use vector_http::full_body;
 
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{prelude::*, util::HttpEndpoint},
 };
 

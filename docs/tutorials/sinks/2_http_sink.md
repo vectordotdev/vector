@@ -13,7 +13,7 @@ use std::task::Poll;
 
 use crate::{
     sinks::prelude::*,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::SinkRequestBuildError,
 };
 use vector_core::config::telemetry;
@@ -549,7 +549,7 @@ BODY:
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
 [poll_ready]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.poll_ready
 [call]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.call
-[http_client]: ../../../src/http/client_v1.rs
+[http_client]: ../../../src/http/client.rs
 [encoder]: ../../../src/sinks/util/encoding.rs
 [event]: ../../../lib/vector-core/src/event/mod.rs
 [encoder_encode_input]: ../../../src/sinks/util/encoding.rs
