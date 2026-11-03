@@ -318,7 +318,6 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
 mod test {
     use crate::config::ProxyConfig;
     use crate::config::schema::Options;
-    use crate::extra_context::ExtraContext;
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
@@ -329,6 +328,7 @@ mod test {
         },
         thread,
     };
+    use vector_lib::extra_context::ExtraContext;
     use vector_lib::{codecs::Transformer, enrichment::TableRegistry};
     use vector_vrl_metrics::MetricsStorage;
 

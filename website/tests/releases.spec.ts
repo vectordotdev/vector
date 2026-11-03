@@ -56,3 +56,19 @@ test("older VRL migration notes and attribution formats retain their content", a
   await expect(legacy).toContainText("authors: armleth");
   await expect(legacy.locator('a[href="https://github.com/vectordotdev/vrl/pull/1649"]')).toBeVisible();
 });
+
+test("inline guide subheadings have scoped links", async ({ page }) => {
+  await page.goto("/releases/0.61.0/");
+  const guide = page.locator(".upgrade-guide");
+  await expect(guide.locator("#vector-sink-default-https")).toBeVisible();
+  const headings = await guide.locator("h4, h5, h6").evaluateAll((elements) => elements.map((element) => element.id));
+  expect(headings.length).toBeGreaterThan(0);
+  expect(headings.every((id) => id.startsWith("upgrade-guide-"))).toBe(true);
+
+  const old = guide.locator("#upgrade-guide-old");
+  await expect(old.locator('a[href="#upgrade-guide-old"]')).toHaveCount(1);
+  const tocLink = page.locator('#toc a[href="#upgrade-guide-old"]');
+  await tocLink.click();
+  await expect(page).toHaveURL(/#upgrade-guide-old$/);
+  await expect(old).toBeInViewport();
+});
