@@ -388,7 +388,7 @@ fn parse_absolute_url(uri: &Uri) -> Result<url::Url, Error> {
 }
 
 fn resolve_redirect(base: &url::Url, location: &str) -> Result<url::Url, Error> {
-    let url = base.join(location).map_err(Error::from)?;
+    let mut url = base.join(location).map_err(Error::from)?;
 
     if !matches!(url.scheme(), "http" | "https") {
         return Err(io::Error::new(
@@ -400,6 +400,9 @@ fn resolve_redirect(base: &url::Url, location: &str) -> Result<url::Url, Error> 
         )
         .into());
     }
+
+    // Fragments identify client-side locations and are never sent in HTTP requests.
+    url.set_fragment(None);
 
     Ok(url)
 }
@@ -1186,7 +1189,7 @@ mod tests {
     #[tokio::test]
     async fn resolves_relative_redirect_locations() {
         let routes = warp::path("start")
-            .and(redirect_to(StatusCode::FOUND, "next"))
+            .and(redirect_to(StatusCode::FOUND, "next#section"))
             .or(warp::path("next").and(echo_request()));
         let (_guard, addr) = next_addr();
         tokio::spawn(warp::serve(routes).run(addr));
