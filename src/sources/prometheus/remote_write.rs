@@ -130,6 +130,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             StatusCode::OK,
             true,
             self.tls.as_ref(),
+            None,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
