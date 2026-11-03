@@ -1,5 +1,9 @@
+#![expect(
+    unsafe_op_in_unsafe_fn,
+    reason = "`#[derive(ShallowCopy)]` from evmap-derive 0.2 calls unsafe functions without an `unsafe` block"
+)]
+
 use std::{
-    mem::ManuallyDrop,
     num::NonZeroU64,
     pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
@@ -8,9 +12,10 @@ use std::{
 
 use async_trait::async_trait;
 use evmap::{
-    shallow_copy::{CopyValue, ShallowCopy},
+    shallow_copy::CopyValue,
     {self},
 };
+use evmap_derive::ShallowCopy;
 use futures::{
     Stream, StreamExt,
     stream::{self, BoxStream},
@@ -48,25 +53,11 @@ use crate::{
 };
 
 /// Single memory entry containing the value and TTL
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
 pub struct MemoryEntry {
     value: String,
     update_time: CopyValue<Instant>,
     ttl: u64,
-}
-
-impl ShallowCopy for MemoryEntry {
-    unsafe fn shallow_copy(&self) -> ManuallyDrop<Self> {
-        // SAFETY: The caller upholds the `ShallowCopy` contract for `self`, which covers every
-        // field: none of them is mutated, and only one copy is dropped.
-        unsafe {
-            ManuallyDrop::new(Self {
-                value: ManuallyDrop::into_inner(self.value.shallow_copy()),
-                update_time: ManuallyDrop::into_inner(self.update_time.shallow_copy()),
-                ttl: ManuallyDrop::into_inner(self.ttl.shallow_copy()),
-            })
-        }
-    }
 }
 
 impl ByteSizeOf for MemoryEntry {
