@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[tokio::test]
-async fn stream_eof_retains_all_disk_stages_until_completion() {
+async fn stream_finish_waits_for_overflow_acknowledgements() {
     let dir = tempfile::tempdir().unwrap();
     let config = BufferConfig::Chained(vec![
         BufferType::Memory {
@@ -66,7 +66,7 @@ async fn stream_eof_retains_all_disk_stages_until_completion() {
 }
 
 #[tokio::test]
-async fn stream_completion_preserves_idle_and_pending_receivers() {
+async fn stream_finish_preserves_idle_and_pending_receivers() {
     for stage in [
         BufferType::Memory {
             size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()),

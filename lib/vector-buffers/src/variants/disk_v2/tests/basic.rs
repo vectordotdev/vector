@@ -6,7 +6,8 @@ use tokio_test::{assert_pending, task::spawn};
 use vector_common::finalization::Finalizable;
 
 use super::{
-    create_default_buffer_v2, create_default_buffer_v2_with_usage, read_next, read_next_some,
+    create_buffer_v2_with_max_data_file_size, create_default_buffer_v2,
+    create_default_buffer_v2_with_usage, read_next, read_next_some,
 };
 use crate::{
     EventCount, assert_buffer_is_empty,
@@ -104,7 +105,7 @@ async fn reader_eof_precedes_acknowledgement_completion() {
 }
 
 #[tokio::test]
-async fn reader_finish_requires_runtime_eof() {
+async fn reader_finish_requires_eof() {
     let dir = tempfile::tempdir().unwrap();
     let (mut writer, mut reader, _) = create_default_buffer_v2::<_, SizedRecord>(dir.path()).await;
     assert_eq!(
@@ -117,13 +118,14 @@ async fn reader_finish_requires_runtime_eof() {
 }
 
 #[tokio::test]
-async fn reader_completion_controls_replay_after_eof() {
+async fn reader_replays_unfinished_records_after_eof() {
+    let sizes = [128, 129, 130];
     for complete in [false, true] {
         let dir = tempfile::tempdir().unwrap();
         let (mut writer, mut reader, ledger) =
-            super::create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
+            create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
         let mut records = Vec::new();
-        for size in [128, 129, 130] {
+        for size in sizes {
             writer.write_record(SizedRecord::new(size)).await.unwrap();
             writer.flush().await.unwrap();
             records.push(read_next_some(&mut reader).await);
@@ -167,11 +169,7 @@ async fn reader_completion_controls_replay_after_eof() {
         let expected = if complete {
             vec![]
         } else {
-            vec![
-                SizedRecord::new(128),
-                SizedRecord::new(129),
-                SizedRecord::new(130),
-            ]
+            sizes.into_iter().map(SizedRecord::new).collect()
         };
         assert_eq!(replayed, expected);
     }
@@ -182,7 +180,7 @@ async fn reader_observes_final_write_and_rollover_before_eof() {
     for roll in [false, true] {
         let dir = tempfile::tempdir().unwrap();
         let (mut writer, mut reader, ledger) =
-            super::create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
+            create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
         writer.write_record(SizedRecord::new(128)).await.unwrap();
         writer.flush().await.unwrap();
         let first = read_next_some(&mut reader).await;

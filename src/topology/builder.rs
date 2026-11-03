@@ -760,8 +760,8 @@ impl<'a> Builder<'a> {
             .inspect_err(|error| debug!(%error, "Sink finished with an error."))
             .map_err(TaskError::from)?;
 
-            // Natural EOF lets the sink flush partial batches before we wait for their
-            // acknowledgements. A reload-detached stream has not reached EOF and is preserved.
+            // Let the sink flush its final batch before waiting for acknowledgements.
+            // This is a no-op if a reload interrupted the stream before EOF.
             rx.get_mut()
                 .finish()
                 .await

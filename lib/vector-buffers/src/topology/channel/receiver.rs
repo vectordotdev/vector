@@ -44,13 +44,6 @@ impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
-    async fn finish(&mut self) -> io::Result<()> {
-        match self {
-            Self::InMemory(_) => Ok(()),
-            Self::DiskV2(reader) => reader.finish().await,
-        }
-    }
-
     pub(crate) async fn next(&mut self) -> Option<T> {
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
@@ -163,19 +156,20 @@ impl<T: Bufferable> BufferReceiver<T> {
         BufferReceiverStream::new(self)
     }
 
-    /// Completes acknowledgement processing and checkpointing for every disk stage.
+    /// Waits for acknowledgements and persists checkpoints for all disk stages.
     ///
-    /// Call this after [`Self::next`] returns `None` and downstream consumers have finished
-    /// processing the records. Memory stages need no additional completion work.
+    /// Call after [`Self::next`] returns `None`. Memory stages need no additional work.
     ///
     /// # Errors
     ///
     /// Returns an error if a disk stage has not reached EOF or its checkpoint cannot be persisted.
-    #[async_recursion]
     pub async fn finish(&mut self) -> io::Result<()> {
-        self.base.finish().await?;
-        if let Some(overflow) = self.overflow.as_mut() {
-            overflow.finish().await?;
+        let mut receiver = Some(self);
+        while let Some(stage) = receiver {
+            if let ReceiverAdapter::DiskV2(reader) = &mut stage.base {
+                reader.finish().await?;
+            }
+            receiver = stage.overflow.as_deref_mut();
         }
         Ok(())
     }
@@ -201,10 +195,9 @@ impl<T: Bufferable> BufferReceiverStream<T> {
         }
     }
 
-    /// Completes acknowledgement processing and checkpointing after natural input EOF.
+    /// Finishes the receiver's acknowledgements and checkpoints after EOF.
     ///
-    /// If a consumer stopped before EOF, this leaves the receiver untouched so that it can be
-    /// reused, including when a receive operation is pending during a configuration reload.
+    /// Before EOF, this is a no-op so reloads can reuse idle or pending receivers.
     ///
     /// # Errors
     ///

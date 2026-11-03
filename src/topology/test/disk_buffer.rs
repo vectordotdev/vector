@@ -30,7 +30,7 @@ use crate::{
     topology::RunningTopology,
 };
 
-/// Test sink for exercising batching and finalization at the topology boundary.
+/// Sink that batches events or holds their finalizers for shutdown tests.
 #[configurable_component(sink("test_shutdown_batcher", "Test (shutdown batcher)."))]
 #[derive(Clone, Debug, Default)]
 struct ShutdownSinkConfig {
@@ -203,7 +203,7 @@ async fn topology_disk_buffer_flushes_partial_partitions_on_shutdown() {
 }
 
 #[tokio::test]
-async fn topology_disk_buffer_waits_for_completion_after_sink_returns() {
+async fn topology_disk_buffer_waits_for_acknowledgements_after_sink_returns() {
     for release_before_deadline in [true, false] {
         let dir = tempfile::tempdir().unwrap();
         let (finalizers, mut held_finalizers) = mpsc::unbounded_channel();
@@ -234,18 +234,12 @@ async fn topology_disk_buffer_waits_for_completion_after_sink_returns() {
         if release_before_deadline {
             finalizers.update_status(EventStatus::Delivered);
             drop(finalizers);
-            assert!(
-                tokio::time::timeout(Duration::from_secs(5), shutdown)
-                    .await
-                    .unwrap()
-            );
-        } else {
-            assert!(
-                !tokio::time::timeout(Duration::from_secs(5), shutdown)
-                    .await
-                    .unwrap()
-            );
-            drop(finalizers);
         }
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(5), shutdown)
+                .await
+                .unwrap(),
+            release_before_deadline
+        );
     }
 }

@@ -1000,8 +1000,7 @@ where
     ///
     /// If the writer is closed and all readable records have been returned, `None` is returned.
     /// Otherwise, reads the next record or waits until the next record is available.
-    /// After EOF, call [`Self::finish`] to process outstanding acknowledgements and persist the
-    /// reader checkpoint. EOF alone does not acknowledge records.
+    /// After EOF, call [`Self::finish`] to wait for acknowledgements and persist the reader checkpoint.
     ///
     /// # Errors
     ///
@@ -1042,9 +1041,8 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            // Observe closure before the file IDs and read below. If closure races with the
-            // read, its notification makes us retry, so a final write or rollover cannot be
-            // mistaken for EOF.
+            // Read the closure flag before the file IDs so a concurrent final write or rollover
+            // cannot be mistaken for EOF. If closure happens later, its notification wakes us.
             let writer_done = self.ledger.is_writer_done();
             if writer_done {
                 let total_buffer_size = self.ledger.get_total_buffer_size();
@@ -1254,13 +1252,12 @@ where
 
     /// Waits for outstanding acknowledgements and persists the reader checkpoint after EOF.
     ///
-    /// This does not read or acknowledge records. Callers must first drain input with
-    /// [`Self::next`] and allow downstream consumers to finalize the returned records.
+    /// Drain [`Self::next`] first. Downstream consumers must finalize the returned records.
     /// Cancellation leaves uncheckpointed records available for replay.
     ///
     /// # Errors
     ///
-    /// Returns an error if input has not reached runtime EOF or checkpoint persistence fails.
+    /// Returns an error if input has not reached EOF or checkpoint persistence fails.
     pub async fn finish(&mut self) -> io::Result<()> {
         if !self.input_exhausted {
             return Err(io::Error::new(
