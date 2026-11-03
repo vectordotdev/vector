@@ -28,6 +28,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> WebHdfsConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: crate::sinks::util::BatchConfig::default(),
+        request: crate::sinks::util::TowerRequestConfig::default(),
         acknowledgements: crate::config::AcknowledgementsConfig::default(),
         confinement: crate::template::ConfinementConfig::default(),
     }
@@ -98,4 +99,40 @@ fn webhdfs_build_request() {
 
     let req = build_request(Compression::zlib_default());
     assert!(req.metadata.partition_key.ends_with(".log.zz"));
+}
+
+#[test]
+fn webhdfs_config_request_options() {
+    let config = WebHdfsConfig {
+        ..default_config(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+        )
+    };
+    let settings = config.request.into_settings();
+    assert_eq!(settings.retry_attempts, isize::MAX as usize);
+}
+
+#[test]
+fn webhdfs_retry_logic_temporary_error() {
+    use crate::sinks::opendal_common::OpenDalRetryLogic;
+    use crate::sinks::util::retries::RetryLogic;
+
+    let logic = OpenDalRetryLogic;
+    let err = opendal::Error::new(opendal::ErrorKind::Unexpected, "network dropped connection")
+        .set_temporary();
+    assert!(logic.is_retriable_error(&err));
+}
+
+#[test]
+fn webhdfs_retry_logic_permanent_error() {
+    use crate::sinks::opendal_common::OpenDalRetryLogic;
+    use crate::sinks::util::retries::RetryLogic;
+
+    let logic = OpenDalRetryLogic;
+    let err = opendal::Error::new(opendal::ErrorKind::PermissionDenied, "access denied");
+    assert!(!logic.is_retriable_error(&err));
 }

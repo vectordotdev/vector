@@ -13,10 +13,11 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
-        opendal_common::{OpenDalRequestBuilder, OpenDalService, OpenDalSink},
+        opendal_common::{OpenDalRequestBuilder, OpenDalRetryLogic, OpenDalService, OpenDalSink},
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
-            partitioner::KeyPartitioner,
+            ServiceBuilderExt, TowerRequestConfig, partitioner::KeyPartitioner,
+            service::TowerRequestConfigDefaults,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
@@ -27,6 +28,12 @@ fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse("http://127.0.0.1:9870")
         .expect("static default endpoint should be a valid http(s) URL")
 }
+
+/// Default request settings for WebHDFS.
+#[derive(Clone, Copy, Debug)]
+pub struct WebHdfsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for WebHdfsTowerRequestConfigDefaults {}
 
 /// Configuration for the `webhdfs` sink.
 #[configurable_component(sink("webhdfs", "WebHDFS."))]
@@ -72,6 +79,9 @@ pub struct WebHdfsConfig {
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
+    #[serde(default)]
+    pub request: TowerRequestConfig<WebHdfsTowerRequestConfigDefaults>,
+
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -97,6 +107,7 @@ impl GenerateConfig for WebHdfsConfig {
                 .into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
 
             acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
@@ -197,8 +208,10 @@ impl WebHdfsConfig {
             compression: self.compression,
         };
 
-        // TODO: we can add tower middleware here.
-        let svc = ServiceBuilder::new().service(OpenDalService::new(op));
+        let request_settings = self.request.into_settings();
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, OpenDalRetryLogic)
+            .service(OpenDalService::new(op));
 
         let sink = OpenDalSink::new(
             svc,
@@ -257,6 +270,7 @@ mod tests {
                 .into(),
             compression: crate::sinks::util::Compression::None,
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }

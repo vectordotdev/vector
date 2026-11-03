@@ -120,6 +120,7 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
+        request: crate::sinks::util::TowerRequestConfig::default(),
         acknowledgements: crate::config::AcknowledgementsConfig::default(),
         confinement: crate::template::ConfinementConfig::default(),
     }
