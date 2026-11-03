@@ -6,6 +6,7 @@ sources:
     disable_logs: false
     disable_metrics: false
     disable_traces: false
+    drop_on_invalid_api_key: false
     multiple_outputs: false
     parse_ddtags: false
     split_metric_namespace: true
