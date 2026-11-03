@@ -84,9 +84,12 @@ pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub mod nats;
 pub mod net;
-#[allow(
-    unreachable_pub,
-    reason = "tonic-build generates `pub` items and has no option to narrow their visibility"
+#[cfg_attr(
+    any(feature = "api", feature = "sources-vector", feature = "sinks-vector"),
+    expect(
+        unreachable_pub,
+        reason = "tonic-build generates `pub` items and has no option to narrow their visibility"
+    )
 )]
 pub(crate) mod proto;
 pub mod providers;
