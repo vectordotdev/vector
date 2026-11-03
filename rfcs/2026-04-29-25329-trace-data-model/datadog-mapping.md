@@ -95,8 +95,8 @@ Trace Context, and other informational entries are defined in the
   (`priority`, `origin`, `dropped`, `sampling_mechanism`, `tags`).
 - Ingress of both the standard `tracerPayloads` form and the indexed
   `idxTracerPayloads` form into the same typed layout, so that a trace's typed
-  representation does not depend on which form the Datadog Agent sent, except where
-  the indexed form cannot express a standard distinction (see "Sampling mechanism").
+  representation does not depend on which form the Datadog Agent sent, except for the
+  value differences listed under "Indexed (`idx`) ingress".
 - The stable partition of each chunk by its wire spans' reconstructed trace ID and
   `Span.service` on ingress, storing the ID in `TraceEvent.trace_id`, and the
   corresponding re-coalescence by trace ID on egress.
@@ -215,7 +215,7 @@ A payload whose `tracerPayloads` is empty but whose `traces` or `transactions` f
 carry spans is the pre-`tracerPayloads` shape. The typed mapping does not ingest that
 shape: those spans are discarded and the request is acknowledged so it is not retried.
 This is not a lossless empty payload. Independent removal of that path must still report
-an empty-`tracerPayloads` payload.
+a payload whose `tracerPayloads` and `idxTracerPayloads` are both empty.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
 with at least one span expands into one `TraceEvent` per distinct
@@ -308,9 +308,10 @@ upstream behavior without requiring a specification amendment.
 
 #### Indexed (`idx`) ingress
 
-An `idx.TracerPayload` maps to the same typed fields as a standard `TracerPayload`;
-the only value difference is that the indexed form cannot express an absent sampling
-mechanism (see "Sampling mechanism").
+An `idx.TracerPayload` maps to the same typed fields as a standard `TracerPayload`.
+Two value differences remain: the indexed form cannot express an absent sampling
+mechanism (see "Sampling mechanism"), and its attributes may use more `AttrValue`
+variants (see "Placement notes").
 The rules below cover only where the indexed form differs.
 
 **String table.**
@@ -352,7 +353,7 @@ The rules below cover only where the indexed form differs.
 | `TraceChunk.attributes`                               | `DatadogChunkContext.tags` (typed `AttrValue`)                |
 | `Span.{serviceRef, nameRef, resourceRef, typeRef}`    | Same slots as standard `Span.{service, name, resource, type}` |
 | `Span.start`, `Span.duration` (unsigned)              | `Span.start_time`, `Span.duration`                            |
-| `Span.error` (bool)                                   | `Span.status` per the `error != 0` rule                       |
+| `Span.error` (bool)                                   | `Span.status` per the `error != 0` rule (see below)           |
 | `Span.kind`                                           | `Span.kind` (see "`Span.kind`")                               |
 | `Span.{envRef, versionRef, componentRef}` (non-empty) | `Span.attributes.{env, version, component}`                   |
 | `Span.attributes` string, bool, int, double           | `Span.attributes` `String`, `Bool`, `Int`, `Double`           |
@@ -371,6 +372,8 @@ The rules below cover only where the indexed form differs.
 - Key-value lists become `AttrValue::Map`. Keys that resolve to the same string use
   wire-order last-wins; each overwritten value saturating-increments the enclosing
   item's dropped-attribute count where the model carries one.
+- `Span.status` reads its message from the string `error.message` attribute in place
+  of `meta["error.message"]`; the attribute also stays in `Span.attributes`.
 - An unset `AnyValue` is `AttrValue::Null`.
 - `TracerPayload.containerDebug` is dropped, as for the standard form.
 
@@ -1027,8 +1030,9 @@ range value.
 
 Removing the obsolete `tracerPayloads`-empty ingest branch and adopting the upstream
 Datadog protos may land independently. That removal must report a payload whose
-`tracerPayloads` is empty, including one that still carries `traces` / `transactions`
-spans, rather than treating it as a lossless empty modern payload.
+`tracerPayloads` and `idxTracerPayloads` are both empty, including one that still
+carries `traces` / `transactions` spans, rather than treating it as a lossless empty
+modern payload. An indexed-only payload is decoded, not reported.
 
 The parent RFC's stages 2 and 4 define the common sink-local validation and subsequent
 coexistence integration. This sub-RFC supplies the following Datadog-specific work:
