@@ -5,7 +5,7 @@ use vector_lib::config::OutputId;
 
 use super::{ComponentKey, Config, EnrichmentTableOuter};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
@@ -73,7 +73,7 @@ impl ConfigDiff {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EnrichmentTableDiff {
     /// Difference for the enrichment table configuration keyed by table name.
     pub tables: Difference,
@@ -152,7 +152,7 @@ impl EnrichmentTableDiff {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::struct_field_names,
