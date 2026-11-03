@@ -7,7 +7,7 @@ use crate::{providers::BuildResult, signal};
 #[enum_dispatch]
 #[expect(
     async_fn_in_trait,
-    reason = "`enum_dispatch` cannot forward `-> impl Future + Send` methods; callers only use concrete types, where `Send` is still checked"
+    reason = "`enum_dispatch` cannot forward `impl Future` returns once variants have different future types; callers use concrete types, where `Send` is still checked"
 )]
 pub trait ProviderConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds a configuration.
