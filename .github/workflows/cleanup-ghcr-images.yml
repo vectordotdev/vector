@@ -1,27 +1,49 @@
 # Cleanup GHCR Images
 #
-# This workflow cleans up old images from GitHub Container Registry
-# to prevent unlimited storage growth. It runs weekly and removes:
-# 1. Old test-runner versions (keeps 5 most recent)
-#
-# Note: cleanup of dated vector nightly images requires a token with
-# delete:packages scope (GITHUB_TOKEN is insufficient for org-owned
-# container packages). This is tracked separately.
+# Keep the five most recent test-runner versions (weekly), and remove dated
+# nightly versions once their UTC tag date is at least 14 days old (daily).
+# Release tags, moving nightly aliases, and untagged manifests are preserved.
+# GITHUB_TOKEN needs Admin access to the vector container package under
+# Package settings > Manage Actions access to delete its versions.
 
 name: Cleanup GHCR Images
 
 on:
   schedule:
-    # Run weekly on Sundays at 2 AM UTC
+    # Test-runner cleanup: Sundays at 2 AM UTC
     - cron: "0 2 * * 0"
+    # Nightly cleanup: daily at 2:30 AM UTC
+    - cron: "30 2 * * *"
+  pull_request:
+    paths:
+      - ".github/ghcr-cleanup/**"
+      - ".github/workflows/cleanup-ghcr-images.yml"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview nightly cleanup without deleting any images"
+        type: boolean
+        default: true
 
 permissions:
   contents: read # Restrictive default
 
 jobs:
+  test-nightly-cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test nightly selection, pagination, and dry run
+        run: node --test .github/ghcr-cleanup/cleanup.test.mjs
+
   cleanup-test-runner:
-    if: ${{ github.repository == 'vectordotdev/vector' }}
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      (github.event.schedule == '0 2 * * 0' ||
+       (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
     runs-on: ubuntu-24.04
     permissions:
       packages: write # Required to delete package versions from GHCR
@@ -32,3 +54,33 @@ jobs:
           package-name: vector/test-runner
           package-type: container
           min-versions-to-keep: 5
+
+  cleanup-nightlies:
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      (github.event.schedule == '30 2 * * *' || github.event_name == 'workflow_dispatch')
+    needs: test-nightly-cleanup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: ghcr-nightly-cleanup
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Clean up dated nightly images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_OWNER: vectordotdev
+          GHCR_PACKAGE: vector
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          args=()
+          if [[ "$DRY_RUN" != "true" ]]; then
+            args+=(--apply)
+          fi
+          node .github/ghcr-cleanup/cleanup.mjs "${args[@]}"
