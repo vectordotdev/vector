@@ -49,8 +49,9 @@ use crate::{
     schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        DatadogAgentConfig, DatadogAgentSource, LLMOBS, LOGS, LogMsg, METRICS, TRACES,
+        ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body,
+        metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -1449,9 +1450,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
         serde_yaml::from_str::<DatadogAgentConfig>(&format!(
             r#"
                 address: "{dd_addr}"
-                disable_logs: true
-                disable_metrics: true
-                disable_llmobs: true
+                enabled_data_types: ["traces"]
                 multiple_outputs: true
             "#
         ))
@@ -1898,10 +1897,11 @@ fn test_config_outputs_with_disabled_data_types() {
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
-            disable_logs,
-            disable_metrics,
-            disable_traces,
-            disable_llmobs,
+            enabled_data_types: None,
+            disable_logs: Some(disable_logs),
+            disable_metrics: Some(disable_metrics),
+            disable_traces: Some(disable_traces),
+            disable_llmobs: Some(disable_llmobs),
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
@@ -1926,6 +1926,88 @@ fn test_config_outputs_with_disabled_data_types() {
             assert!(outputs.len() == 1);
         }
     }
+}
+
+#[test]
+fn test_config_outputs_with_enabled_data_types() {
+    for (multiple_outputs, enabled_data_types, want) in [
+        (true, "[logs]", vec![Some(LOGS)]),
+        (true, "[metrics, traces]", vec![Some(METRICS), Some(TRACES)]),
+        (true, "[llmobs]", vec![Some(LLMOBS)]),
+        (false, "[traces]", vec![None]),
+    ] {
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "0.0.0.0:8080"
+                multiple_outputs: {}
+                enabled_data_types: {}
+            "#},
+            multiple_outputs, enabled_data_types,
+        ))
+        .unwrap();
+
+        let outputs = config.outputs(LogNamespace::Legacy);
+        let ports: Vec<_> = outputs
+            .iter()
+            .map(|output| output.port.as_deref())
+            .collect();
+        assert_eq!(ports, want, "{enabled_data_types}");
+    }
+}
+
+#[tokio::test]
+async fn enabled_data_types_and_disable_options_cannot_be_combined() {
+    for disable_option in [
+        "disable_logs: false",
+        "disable_metrics: true",
+        "disable_traces: true",
+        "disable_llmobs: true",
+    ] {
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "0.0.0.0:8080"
+                enabled_data_types: ["logs"]
+                {}
+            "#},
+            disable_option,
+        ))
+        .unwrap();
+        let result = config
+            .build(SourceContext::new_test(SourceSender::new_test().0, None))
+            .await;
+        let Err(error) = result else {
+            panic!("conflicting options were accepted")
+        };
+        assert_eq!(
+            error.to_string(),
+            "`enabled_data_types` and `disable_*` options cannot be set together"
+        );
+    }
+}
+
+#[tokio::test]
+async fn enabled_data_types_rejects_requests_for_other_data_types() {
+    let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let (_guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address: "{}"
+            enabled_data_types: ["traces"]
+        "#},
+        address,
+    ))
+    .unwrap();
+    let source = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(source);
+    wait_for_tcp(address).await;
+
+    assert_eq!(
+        404,
+        send_with_path(address, "[]", HeaderMap::new(), DD_API_LOGS_V2_PATH).await
+    );
 }
 
 #[test]
@@ -2346,10 +2428,11 @@ fn test_config_outputs() {
             decoding,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
-            disable_logs: false,
-            disable_metrics: false,
-            disable_traces: false,
-            disable_llmobs: false,
+            enabled_data_types: None,
+            disable_logs: None,
+            disable_metrics: None,
+            disable_traces: None,
+            disable_llmobs: None,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
@@ -3702,10 +3785,11 @@ impl ValidatableComponent for DatadogAgentConfig {
             decoding: BytesDeserializerConfig::new().into(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs: false,
-            disable_logs: false,
-            disable_metrics: false,
-            disable_traces: false,
-            disable_llmobs: false,
+            enabled_data_types: None,
+            disable_logs: None,
+            disable_metrics: None,
+            disable_traces: None,
+            disable_llmobs: None,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
