@@ -82,7 +82,7 @@ pub(crate) enum PulsarErrorEventType {
 #[cfg(feature = "sources-pulsar")]
 #[expect(
     unreachable_pub,
-    reason = "`registered_event!` generates a `pub` handle whose `emit` takes this type"
+    reason = "`registered_event!` generates a public handle with this type as `InternalEventHandle::Data`"
 )]
 pub struct PulsarErrorEventData {
     pub msg: String,
