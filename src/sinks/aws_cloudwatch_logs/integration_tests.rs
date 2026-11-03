@@ -573,17 +573,18 @@ async fn cloudwatch_healthcheck() {
 
 #[tokio::test]
 async fn cloudwatch_healthcheck_without_create_nonexistent_log_group() {
-    trace_init();
     use super::healthcheck::healthcheck;
 
+    trace_init();
+
     let mut config: CloudwatchLogsSinkConfig = serde_yaml::from_str(
-        r#"
+        r"
         stream_name: test-stream
         group_name: nonexistent-group-name
         create_missing_group: false
         encoding:
           codec: text
-        "#,
+        ",
     )
     .unwrap();
     config.region = RegionOrEndpoint::with_both("us-east-1", cloudwatch_address());
@@ -595,8 +596,9 @@ async fn cloudwatch_healthcheck_without_create_nonexistent_log_group() {
 
 #[tokio::test]
 async fn cloudwatch_healthcheck_skips_network_for_dynamic_group_name() {
-    trace_init();
     use super::healthcheck::healthcheck;
+
+    trace_init();
 
     // If the healthcheck tries to dispatch to CloudWatch, this endpoint should fail fast.
     let mut config: CloudwatchLogsSinkConfig = serde_yaml::from_str(
