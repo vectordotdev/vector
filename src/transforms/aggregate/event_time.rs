@@ -217,8 +217,9 @@ impl Aggregate {
                 let bucket = self.event_time_buckets.entry(bucket_key).or_default();
                 Self::record_comparison_in_map(bucket, series, data, metadata, mode);
             }
-            AggregationMode::Mean | AggregationMode::Stdev => {
-                // `will_be_stored` has already guaranteed Absolute + Gauge.
+            AggregationMode::Mean | AggregationMode::Stdev | AggregationMode::Distribution => {
+                // `will_be_stored` has already guaranteed Absolute (+ Gauge for Mean/Stdev, or a
+                // convertible value for Distribution).
                 //
                 // Mean/Stdev write samples into `event_time_multi_buckets`;
                 // an empty entry is also placed in `event_time_buckets` so
@@ -463,6 +464,17 @@ impl Aggregate {
                 if let Some(multi_bucket) = self.event_time_multi_buckets.remove(&bucket_key) {
                     'outer: for (series, entries) in multi_bucket {
                         if entries.is_empty() {
+                            continue;
+                        }
+
+                        if matches!(self.config.mode, AggregationMode::Distribution) {
+                            if let Some((data, metadata)) =
+                                Self::distribution_from_entries(&entries)
+                            {
+                                output.push(Event::Metric(Metric::from_parts(
+                                    series, data, metadata,
+                                )));
+                            }
                             continue;
                         }
 

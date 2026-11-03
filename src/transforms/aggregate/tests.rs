@@ -17,7 +17,7 @@ use crate::{
     event::{
         BatchNotifier, BatchStatus, BatchStatusReceiver, DatadogMetricOriginMetadata, Event,
         EventMetadata, EventStatus, Metric,
-        metric::{MetricKind, MetricValue},
+        metric::{Bucket, MetricKind, MetricValue, Sample, StatisticKind},
     },
     schema::Definition,
     test_util::components::assert_transform_compliance,
@@ -134,6 +134,23 @@ fn assert_gauge(event: &Event, expected: f64) {
         MetricValue::Gauge { value } => assert_eq!(*value, expected),
         other => panic!("expected Gauge {expected}, got {other:?}"),
     }
+}
+
+/// Asserts `event` is a `Distribution` with exactly `expected_samples` (in order) and the given statistic.
+fn assert_distribution_samples(
+    event: &Event,
+    expected_samples: &[f64],
+    expected_statistic: StatisticKind,
+) {
+    let MetricValue::Distribution { samples, statistic } = event.as_metric().value() else {
+        panic!("expected Distribution, got {:?}", event.as_metric().value());
+    };
+    assert_eq!(*statistic, expected_statistic);
+    let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+    assert_eq!(
+        values, expected_samples,
+        "samples should match expected values and be sorted"
+    );
 }
 
 /// Deliver output events and assert every batch receiver resolves to Delivered.
@@ -1736,4 +1753,549 @@ fn event_time_count_counts_mixed_kinds_in_same_bucket() {
     let out = flush_final(&mut agg);
     assert_eq!(out.len(), 1);
     assert_counter(&out[0], 2.0);
+}
+
+#[test]
+fn absolute_distribution() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let gauge_a_1 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 25.0 },
+    );
+    let gauge_a_2 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 30.0 },
+    );
+    let gauge_a_3 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 35.0 },
+    );
+    let gauge_a_4 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 36.0 },
+    );
+    let gauge_a_5 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 37.0 },
+    );
+    let gauge_a_6 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 38.0 },
+    );
+    let gauge_a_7 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 39.0 },
+    );
+    let counter_a_1 = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 110.0 },
+    );
+    // Record seven gauge values in non-sorted order to verify sorting
+    agg.record(gauge_a_4); // 36.0
+    agg.record(gauge_a_1); // 25.0
+    agg.record(gauge_a_7); // 39.0
+    agg.record(gauge_a_2); // 30.0
+    agg.record(gauge_a_5); // 37.0
+    agg.record(gauge_a_3); // 35.0
+    agg.record(gauge_a_6); // 38.0
+    // Verify that incremental metrics are ignored
+    agg.record(counter_a_1);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+
+    // Verify it's a distribution with 7 samples, properly sorted
+    assert_distribution_samples(
+        &out[0],
+        &[25.0, 30.0, 35.0, 36.0, 37.0, 38.0, 39.0],
+        StatisticKind::Histogram,
+    );
+}
+
+#[test]
+fn absolute_distribution_distributions() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let distribution_a_1 = make_metric(
+        "dist_a",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vec![35.0, 25.0, 36.0, 30.0] // Intentionally unsorted
+                .into_iter()
+                .map(|v| Sample { value: v, rate: 1 })
+                .collect(),
+            statistic: StatisticKind::Summary,
+        },
+    );
+    let distribution_a_2 = make_metric(
+        "dist_a",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vec![39.0, 37.0, 38.0] // Intentionally unsorted
+                .into_iter()
+                .map(|v| Sample { value: v, rate: 1 })
+                .collect(),
+            statistic: StatisticKind::Summary,
+        },
+    );
+    let distribution_a_3 = make_metric(
+        "dist_a",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vec![456.2, 99.0, 113.0] // Intentionally unsorted
+                .into_iter()
+                .map(|v| Sample { value: v, rate: 1 })
+                .collect(),
+            statistic: StatisticKind::Summary,
+        },
+    );
+    // Record three Distribution values
+    agg.record(distribution_a_1);
+    agg.record(distribution_a_2);
+    agg.record(distribution_a_3);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+
+    // Verify it's a distribution with 10 samples, properly sorted
+    assert_distribution_samples(
+        &out[0],
+        &[25.0, 30.0, 35.0, 36.0, 37.0, 38.0, 39.0, 99.0, 113.0, 456.2],
+        StatisticKind::Histogram,
+    );
+}
+
+#[test]
+fn distribution_histogram() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let histogram_a_1 = make_metric(
+        "histogram_a",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 5,
+            sum: 18.0,
+            buckets: vec![
+                Bucket {
+                    upper_limit: 1.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 2.0,
+                    count: 2,
+                },
+                Bucket {
+                    upper_limit: 5.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 10.0,
+                    count: 1,
+                },
+            ],
+        },
+    );
+    let histogram_a_2 = make_metric(
+        "histogram_a",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 5,
+            sum: 18.0,
+            buckets: vec![
+                Bucket {
+                    upper_limit: 1.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 2.0,
+                    count: 2,
+                },
+                Bucket {
+                    upper_limit: 5.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 10.0,
+                    count: 1,
+                },
+            ],
+        },
+    );
+    let histogram_a_3 = make_metric(
+        "histogram_a",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 5,
+            sum: 18.0,
+            buckets: vec![
+                Bucket {
+                    upper_limit: 1.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 2.0,
+                    count: 2,
+                },
+                Bucket {
+                    upper_limit: 5.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 10.0,
+                    count: 1,
+                },
+            ],
+        },
+    );
+
+    let expected_vals = vec![
+        1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 5.0, 5.0, 5.0, 10.0, 10.0, 10.0,
+    ];
+
+    // Record Metrics Values
+    agg.record(histogram_a_1);
+    agg.record(histogram_a_2);
+    agg.record(histogram_a_3);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+
+    // Verify it's a distribution with 15 samples
+    assert_distribution_samples(&out[0], &expected_vals, StatisticKind::Histogram);
+}
+
+#[test]
+fn distribution_set() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let set_a_1 = make_metric(
+        "set_a",
+        MetricKind::Absolute,
+        MetricValue::Set {
+            values: vec![
+                "39".into(),
+                "25".into(),
+                "99".into(),
+                "35".into(),
+                "113".into(),
+                "30".into(),
+                "456.2".into(),
+                "36".into(),
+                "37".into(),
+                "38".into(),
+            ]
+            .into_iter()
+            .collect(),
+        },
+    );
+
+    let set_a_2 = make_metric(
+        "set_a",
+        MetricKind::Absolute,
+        MetricValue::Set {
+            values: vec![
+                "40".into(),
+                "26".into(),
+                "100".into(),
+                "36".into(),
+                "114".into(),
+                "31".into(),
+                "556.2".into(),
+                "37".into(),
+                "38".into(),
+                "39".into(),
+            ]
+            .into_iter()
+            .collect(),
+        },
+    );
+    // Record two set values
+    agg.record(set_a_1);
+    agg.record(set_a_2);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(
+        1,
+        out.len(),
+        "expected 1 output metric but got {}",
+        out.len()
+    );
+
+    // Verify it's a distribution with 20 samples (10 from each set), properly sorted
+    let expected = vec![
+        25.0, 26.0, 30.0, 31.0, 35.0, 36.0, 36.0, 37.0, 37.0, 38.0, 38.0, 39.0, 39.0, 40.0, 99.0,
+        100.0, 113.0, 114.0, 456.2, 556.2,
+    ];
+    assert_distribution_samples(&out[0], &expected, StatisticKind::Histogram);
+}
+
+#[test]
+fn distribution_mixed_types() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    // Test that different metric series can each become distributions
+    let gauge_a = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 10.0 },
+    );
+
+    let distribution_b = make_metric(
+        "dist_b",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vec![20.0, 30.0]
+                .into_iter()
+                .map(|v| Sample { value: v, rate: 1 })
+                .collect(),
+            statistic: StatisticKind::Summary,
+        },
+    );
+
+    let histogram_c = make_metric(
+        "histogram_c",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 2,
+            sum: 90.0,
+            buckets: vec![
+                Bucket {
+                    upper_limit: 40.0,
+                    count: 1,
+                },
+                Bucket {
+                    upper_limit: 50.0,
+                    count: 1,
+                },
+            ],
+        },
+    );
+
+    agg.record(gauge_a);
+    agg.record(distribution_b);
+    agg.record(histogram_c);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(3, out.len()); // Each different series produces its own distribution
+
+    // Verify all outputs are distributions
+    for event in out {
+        if let MetricValue::Distribution { samples, statistic } = event.as_metric().value() {
+            assert_eq!(*statistic, StatisticKind::Histogram);
+            assert!(!samples.is_empty());
+        } else {
+            panic!("Expected Distribution metric value");
+        }
+    }
+}
+
+#[test]
+fn distribution_set_with_invalid_values() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let set_with_invalid = make_metric(
+        "set_a",
+        MetricKind::Absolute,
+        MetricValue::Set {
+            values: vec![
+                "10.0".into(),
+                "not_a_number".into(), // Should be skipped
+                "20.0".into(),
+                "invalid".into(), // Should be skipped
+                "30.0".into(),
+            ]
+            .into_iter()
+            .collect(),
+        },
+    );
+
+    agg.record(set_with_invalid);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+
+    // Only the 3 valid numeric values should be included
+    assert_distribution_samples(&out[0], &[10.0, 20.0, 30.0], StatisticKind::Histogram);
+}
+
+#[test]
+fn distribution_multiple_series() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let gauge_a = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 10.0 },
+    );
+    let gauge_b = make_metric(
+        "gauge_b",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 20.0 },
+    );
+
+    agg.record(gauge_a);
+    agg.record(gauge_b);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+
+    // Should produce 2 separate distributions
+    assert_eq!(2, out.len());
+
+    for event in out {
+        if let MetricValue::Distribution { samples, .. } = event.as_metric().value() {
+            assert_eq!(samples.len(), 1);
+        } else {
+            panic!("Expected Distribution metric value");
+        }
+    }
+}
+
+#[test]
+fn distribution_incremental_passes_through_unchanged() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    let passthrough = agg.record(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 110.0 },
+    ));
+    assert_counter(
+        &passthrough.expect("incremental metrics pass through"),
+        110.0,
+    );
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert!(
+        out.is_empty(),
+        "passed-through metrics must not be aggregated"
+    );
+}
+
+#[test]
+fn distribution_ignores_absolute_values_without_samples() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Distribution)).unwrap();
+
+    // Absolute counters cannot contribute samples: not aggregated, not passed through.
+    assert!(
+        agg.record(make_metric(
+            "counter_a",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 5.0 },
+        ))
+        .is_none()
+    );
+    // A set with no numeric members yields no samples either.
+    let mut values = BTreeSet::new();
+    values.insert("not-a-number".to_string());
+    assert!(
+        agg.record(make_metric(
+            "set_a",
+            MetricKind::Absolute,
+            MetricValue::Set { values },
+        ))
+        .is_none()
+    );
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert!(out.is_empty(), "no empty distribution should be emitted");
+}
+
+#[test]
+fn event_time_distribution_buckets_and_passes_through() {
+    let interval_ms = 10_000;
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Distribution,
+        |et| et.max_future_ms = 600_000,
+    ))
+    .unwrap();
+
+    // Incremental metrics pass through without creating buckets or touching the watermark.
+    let passthrough = agg.record(make_metric(
+        "passthrough",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ));
+    assert!(passthrough.is_some());
+    assert!(agg.event_time_buckets.is_empty());
+    assert!(agg.event_time_multi_buckets.is_empty());
+
+    // Absolute values that cannot yield samples must not materialise a bucket.
+    assert!(
+        agg.record(make_metric_with_timestamp(
+            "ignored",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+            event_time_bucket_timestamp(interval_ms, 1),
+        ))
+        .is_none()
+    );
+    assert!(agg.event_time_buckets.is_empty());
+    assert!(agg.event_time_multi_buckets.is_empty());
+
+    // Mixed convertible types in the same bucket merge into one sorted distribution.
+    let ts = event_time_bucket_timestamp(interval_ms, 1);
+    agg.record(make_metric_with_timestamp(
+        "mixed",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 3.0 },
+        ts,
+    ));
+    agg.record(make_metric_with_timestamp(
+        "mixed",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vec![
+                Sample {
+                    value: 1.0,
+                    rate: 1,
+                },
+                Sample {
+                    value: 2.0,
+                    rate: 1,
+                },
+            ],
+            statistic: StatisticKind::Histogram,
+        },
+        ts,
+    ));
+    agg.record(make_metric_with_timestamp(
+        "mixed",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            buckets: vec![Bucket {
+                upper_limit: 4.0,
+                count: 2,
+            }],
+            count: 2,
+            sum: 8.0,
+        },
+        ts,
+    ));
+
+    let out = flush_final(&mut agg);
+    assert_eq!(out.len(), 1);
+    assert_distribution_samples(
+        &out[0],
+        &[1.0, 2.0, 3.0, 4.0, 4.0],
+        StatisticKind::Histogram,
+    );
 }
