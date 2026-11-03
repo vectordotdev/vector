@@ -3,17 +3,17 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http::Uri;
-use http_1::{
-    Request, StatusCode,
+use http::{
+    Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 use tracing::debug;
+use vector_http::HttpError;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, client_v1::HttpError},
+    http::Auth,
     sinks::{
         UriParseSnafu,
         clickhouse::config::Format,

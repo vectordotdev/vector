@@ -14,13 +14,13 @@ use tokio::{
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     config::{ComponentKey, OutputId},
+    extra_context::ExtraContext,
     source_sender::SourceSenderItem,
 };
 
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{Event, EventArray, EventContainer, LogEvent, into_event_stream},
-    extra_context::ExtraContext,
     schema::Definition,
     test_util::{
         mock::{
@@ -40,6 +40,8 @@ mod confinement_gauge;
 mod cpu_metrics;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
+#[cfg(feature = "sinks-greptimedb_metrics")]
+mod crypto_provider;
 mod doesnt_reload;
 #[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;

@@ -41,16 +41,16 @@ impl GrpcServer {
     /// it in the background. The server will shut down gracefully when this struct
     /// is dropped.
     ///
-    /// Returns an error if the server fails to bind to the configured address.
+    /// # Errors
+    ///
+    /// Returns an error if `config.api.address` is not set, the server fails to bind to the
+    /// configured address, or the bound listener's local address cannot be read.
+    ///
+    /// # Panics
+    ///
+    /// The spawned server task panics if the gRPC reflection service cannot be built from the
+    /// embedded file descriptor sets.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
     #[allow(
         clippy::used_underscore_binding,
         reason = "Keep the existing binding names and resource lifetimes during the lint rollout."

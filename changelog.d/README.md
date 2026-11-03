@@ -117,10 +117,11 @@ Finally, a good fragment is concise and avoids implementation details.
 
 ### Breaking changes
 
-Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optional anchor, and
-`## Summary` / `## Migration` sections) so the release process can auto-generate the upgrade
-guide from them. See [Examples](#examples) below for the exact shape — or just run the
-scaffolder from [Quick start](#quick-start).
+Breaking fragments (`*.breaking.md`) generate an upgrade guide below the VRL changelog.
+Use the [scaffolder](#quick-start) or follow the [example](#breaking).
+
+Preview with `cargo vdev release generate-cue --version <vector-version>`.
+This keeps source fragments and refuses to overwrite release files.
 
 ## Authors
 

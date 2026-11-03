@@ -9,7 +9,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use http_1::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
+use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
 use http_body_util::{BodyExt as _, Full};
 use hyper::body::HttpBody as _;
 use hyper_1::{body::Incoming, client::conn, service::service_fn};
@@ -24,11 +24,9 @@ use tokio::{
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
+use vector_http::{ConnectionOptions, RequestBody, empty_body};
 
-use super::{
-    HttpClient as LegacyHttpClient,
-    client_v1::{ConnectionOptions, HttpClient, RequestBody, empty_body},
-};
+use super::{HttpClient as LegacyHttpClient, client_v1::HttpClient};
 use crate::{
     config::ProxyConfig,
     tls::{
@@ -142,16 +140,16 @@ impl TestClient for LegacyHttpClient {
         uri: &str,
         headers: &[(&str, &str)],
     ) -> Result<TestResponse, String> {
-        let mut request = http::Request::get(uri)
+        let mut request = http_0::Request::get(uri)
             .body(hyper::Body::empty())
             .map_err(|error| error.to_string())?;
         for &(name, value) in headers {
             request.headers_mut().insert(
-                http::header::HeaderName::from_bytes(name.as_bytes())
+                http_0::header::HeaderName::from_bytes(name.as_bytes())
                     .map_err(|error| error.to_string())?,
                 value
                     .parse()
-                    .map_err(|error: http::header::InvalidHeaderValue| error.to_string())?,
+                    .map_err(|error: http_0::header::InvalidHeaderValue| error.to_string())?,
             );
         }
         let response = timeout(REQUEST_TIMEOUT, self.send(request))
@@ -654,10 +652,7 @@ async fn v1_max_connection_age_recycles_connections(
     #[case] expected_connections: usize,
 ) {
     let origin = spawn_origin(no_tls()).await;
-    let options = ConnectionOptions {
-        max_connection_age,
-        ..ConnectionOptions::default()
-    };
+    let options = ConnectionOptions::default().max_connection_age(max_connection_age);
     let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
@@ -692,10 +687,7 @@ async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
         stream.write_all(b"rest of the body").await.ok();
     });
 
-    let options = ConnectionOptions {
-        max_connection_age: Some(Duration::from_millis(300)),
-        ..ConnectionOptions::default()
-    };
+    let options = ConnectionOptions::default().max_connection_age(Some(Duration::from_millis(300)));
     let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
 
     let response = client

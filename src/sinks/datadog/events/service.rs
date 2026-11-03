@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http_1::{Request, Uri};
+use http::{Request, Uri};
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 

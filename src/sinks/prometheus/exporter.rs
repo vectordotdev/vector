@@ -3,13 +3,15 @@ use std::{
     hash::Hash,
     mem::{Discriminant, discriminant},
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    pin::Pin,
     sync::{Arc, RwLock},
+    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
-use futures::{FutureExt, StreamExt, future, stream::BoxStream};
+use futures::{FutureExt, Stream, StreamExt, future, stream::BoxStream};
 use hyper::{
     Body, Method, Request, Response, Server, StatusCode,
     body::HttpBody,
@@ -19,6 +21,7 @@ use hyper::{
 use indexmap::{IndexMap, map::Entry};
 use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
+use tokio::sync::oneshot;
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
@@ -228,9 +231,26 @@ impl ValidatedSink for PrometheusExporterConfig {
 }
 
 struct PrometheusExporter {
-    server_shutdown_trigger: Option<Trigger>,
+    /// Shutdown trigger of the running HTTP server, and a receiver that completes when the server
+    /// closes its listener.
+    server: Option<(Trigger, oneshot::Receiver<()>)>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
+}
+
+/// Accept stream that drops `_closed` after it closes its listener.
+struct NotifyOnClose<S> {
+    // Rust drops fields in declaration order, so the listener is closed before `_closed` is dropped.
+    incoming: S,
+    _closed: oneshot::Sender<()>,
+}
+
+impl<S: Stream + Unpin> Stream for NotifyOnClose<S> {
+    type Item = S::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {
+        self.incoming.poll_next_unpin(cx)
+    }
 }
 
 /// Expiration metadata for a metric.
@@ -377,7 +397,7 @@ impl Handler {
             (false, _, _) => {
                 *response.status_mut() = StatusCode::UNAUTHORIZED;
                 response.headers_mut().insert(
-                    http::header::WWW_AUTHENTICATE,
+                    http_0::header::WWW_AUTHENTICATE,
                     HeaderValue::from_static("Basic, Bearer"),
                 );
             }
@@ -430,14 +450,14 @@ impl Handler {
 impl PrometheusExporter {
     fn new(config: PrometheusExporterConfig) -> Self {
         Self {
-            server_shutdown_trigger: None,
+            server: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
         }
     }
 
     async fn start_server_if_needed(&mut self) -> crate::Result<()> {
-        if self.server_shutdown_trigger.is_some() {
+        if self.server.is_some() {
             return Ok(());
         }
 
@@ -479,21 +499,28 @@ impl PrometheusExporter {
 
         let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
+        // On shutdown, the server drops its accept stream at once and then drains open
+        // connections. The stream drops `closed` with the listener.
+        let (closed, listener_closed) = oneshot::channel();
+        let incoming = NotifyOnClose {
+            incoming: listener.accept_stream(),
+            _closed: closed,
+        };
 
         crate::spawn_in_current_span(async move {
             info!(message = "Building HTTP server.", address = %address);
 
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+            if let Err(error) = Server::builder(hyper::server::accept::from_stream(incoming))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| error!("Server error: {error}."))?;
-
-            Ok::<(), ()>(())
+            {
+                error!("Server error: {error}.");
+            }
         });
 
-        self.server_shutdown_trigger = Some(trigger);
+        self.server = Some((trigger, listener_closed));
         Ok(())
     }
 
@@ -614,6 +641,15 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
             finalizers.update_status(EventStatus::Delivered);
         }
 
+        // Wait for the server to close its listener before the sink finishes, because a reload
+        // that binds the same address starts only after the old sink finishes. Open connections
+        // continue to drain in the server task, so a stalled client cannot block the sink.
+        if let Some((trigger, listener_closed)) = self.server.take() {
+            drop(trigger);
+            // The sender never sends. The receive completes when the sender is dropped.
+            _ = listener_closed.await;
+        }
+
         Ok(())
     }
 }
@@ -642,7 +678,7 @@ mod tests {
         test_util::{
             addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            random_string, trace_init,
+            random_string, trace_init, wait_for_tcp,
         },
         tls::MaybeTlsSettings,
     };
@@ -667,6 +703,61 @@ mod tests {
         PrometheusExporterConfig::default()
             .validate()
             .expect("default config should validate");
+    }
+
+    #[tokio::test]
+    async fn finished_sink_releases_address() {
+        let (_guard, address) = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            ..Default::default()
+        };
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
+
+        sink.run(stream::empty::<Event>().map(Into::into))
+            .await
+            .unwrap();
+
+        // A reload binds the address again as soon as the old sink finishes.
+        std::net::TcpListener::bind(address).expect("finished sink still holds its address");
+    }
+
+    #[tokio::test]
+    async fn stalled_scrape_does_not_block_sink_finish() {
+        use tokio::{io::AsyncWriteExt, net::TcpStream, sync::mpsc};
+        use tokio_stream::wrappers::UnboundedReceiverStream;
+
+        let (_guard, address) = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            ..Default::default()
+        };
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
+        let (tx, rx) = mpsc::unbounded_channel::<Event>();
+        let sink_handle = tokio::spawn(sink.run(UnboundedReceiverStream::new(rx).map(Into::into)));
+        wait_for_tcp(address).await;
+
+        // A client that never completes its request keeps its connection busy, so a graceful
+        // drain of the server waits for it.
+        let mut client = TcpStream::connect(address).await.unwrap();
+        client
+            .write_all(b"GET /metrics HTTP/1.1\r\n")
+            .await
+            .unwrap();
+        time::sleep(std::time::Duration::from_millis(100)).await;
+
+        drop(tx);
+        time::timeout(std::time::Duration::from_secs(5), sink_handle)
+            .await
+            .expect("stalled scrape blocked the sink")
+            .unwrap()
+            .unwrap();
+        std::net::TcpListener::bind(address).expect("finished sink still holds its address");
+        drop(client);
     }
 
     #[tokio::test]
@@ -976,7 +1067,7 @@ mod tests {
 
         if let Some(ref encoding) = encoding {
             request.headers_mut().insert(
-                http::header::ACCEPT_ENCODING,
+                http_0::header::ACCEPT_ENCODING,
                 HeaderValue::from_str(encoding.as_str()).unwrap(),
             );
         }
@@ -994,12 +1085,12 @@ mod tests {
             assert!(
                 result
                     .headers()
-                    .contains_key(http::header::CONTENT_ENCODING)
+                    .contains_key(http_0::header::CONTENT_ENCODING)
             );
         }
 
         let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = http_body_0::Body::collect(body)
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1023,7 +1114,7 @@ mod tests {
         client_auth_config: Option<Auth>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
-    ) -> Result<String, http::status::StatusCode> {
+    ) -> Result<String, http_0::status::StatusCode> {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
@@ -1081,7 +1172,7 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = http_body_0::Body::collect(body)
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1628,7 +1719,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not send request");
-        let result = http_body::Body::collect(result.into_body())
+        let result = http_body_0::Body::collect(result.into_body())
             .await
             .expect("Error fetching body")
             .to_bytes();
@@ -1646,7 +1737,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not fetch query");
-        let result = http_body::Body::collect(result.into_body())
+        let result = http_body_0::Body::collect(result.into_body())
             .await
             .expect("Error fetching body")
             .to_bytes();

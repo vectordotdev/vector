@@ -10,11 +10,10 @@ use std::{
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
-use http::{
-    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
-    uri::InvalidUri,
+use http::Request as RequestV1;
+use http_0::{
+    HeaderMap, Request, Response, Version, header::HeaderValue, request::Builder, uri::InvalidUri,
 };
-use http_1::Request as RequestV1;
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -22,7 +21,6 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use rand::RngExt;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
@@ -63,7 +61,7 @@ pub enum HttpError {
     #[snafu(display("Failed to make HTTP(S) request: {}", source))]
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
-    BuildRequest { source: http::Error },
+    BuildRequest { source: http_0::Error },
 }
 
 impl HttpError {
@@ -78,7 +76,7 @@ impl HttpError {
     }
 }
 
-pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
+pub type HttpClientFuture = <HttpClient as Service<http_0::Request<Body>>>::Future;
 pub type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
 /// An HTTP client generic over the underlying connector `C`.
@@ -100,8 +98,17 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Creates a client that uses the given TLS settings and proxy configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -109,8 +116,18 @@ where
         HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Creates a client like [`HttpClient::new`], using `client_builder` to configure the
+    /// underlying hyper client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -140,6 +157,11 @@ where
     /// It only matters for the case of a plaintext-`http` request sent through an HTTP proxy, where
     /// `Proxy-Authorization` must ride on the request itself. HTTPS-through-proxy is unaffected:
     /// proxy auth happens during the CONNECT handshake inside the connector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the build-time application name and version do not form a valid `User-Agent`
+    /// header value.
     pub fn new_with_connector(connector: C, client_builder: &mut client::Builder) -> Self {
         let client = client_builder.build(connector);
 
@@ -153,7 +175,7 @@ where
     pub fn send(
         &self,
         mut request: Request<B>,
-    ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
+    ) -> BoxFuture<'static, Result<http_0::Response<Body>, HttpError>> {
         let span = tracing::info_span!("http");
         let _enter = span.enter();
 
@@ -218,9 +240,17 @@ fn default_user_agent() -> HeaderValue {
         .expect("Invalid header value for user-agent!")
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+/// Builds a proxy-aware HTTPS connector from the given TLS settings and proxy configuration.
+///
+/// # Errors
+///
+/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
+/// `tls_settings`, [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created, or
+/// [`HttpError::MakeProxyConnector`] if a configured proxy URL is not a valid URI.
+///
+/// # Panics
+///
+/// Panics if OpenSSL fails to create the proxy connector's default TLS connector.
 pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
@@ -270,8 +300,12 @@ pub fn build_proxy_connector(
     Ok(proxy)
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Builds an HTTPS connector from the given TLS settings, without proxy support.
+///
+/// # Errors
+///
+/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
+/// `tls_settings`, or [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created.
 pub fn build_tls_connector(
     tls_settings: MaybeTlsSettings,
 ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
@@ -291,7 +325,7 @@ struct TlsProxyAuthorities {
 }
 
 impl TlsProxyAuthorities {
-    fn matches(&self, uri: &http::Uri) -> bool {
+    fn matches(&self, uri: &http_0::Uri) -> bool {
         if self.http.is_none() && self.https.is_none() {
             return false;
         }
@@ -308,7 +342,7 @@ impl TlsProxyAuthorities {
 /// Extract the authority (host and optional port) of a proxy URL, but only when it is reached over
 /// TLS (an `https://` URL). Returns `None` for plaintext proxies or unparseable URLs.
 fn tls_proxy_authority(url: Option<&str>) -> Option<(String, Option<u16>)> {
-    let uri = url?.parse::<http::Uri>().ok()?;
+    let uri = url?.parse::<http_0::Uri>().ok()?;
     if uri.scheme_str() != Some("https") {
         return None;
     }
@@ -368,7 +402,7 @@ where
     B::Error: Into<crate::Error> + Send,
     C: Connect + Clone + Send + Sync + 'static,
 {
-    type Response = http::Response<Body>;
+    type Response = http_0::Response<Body>;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -456,8 +490,11 @@ pub enum Auth {
 }
 
 pub trait MaybeAuth: Sized {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Returns whichever of `self` and `other` is set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both `self` and `other` are set.
     fn choose_one(&self, other: &Self) -> crate::Result<Self>;
 }
 
@@ -502,7 +539,7 @@ impl Auth {
                 // Expected format: "SSWS token123" or "Bearer token123", etc.
                 match HeaderValue::from_str(value) {
                     Ok(header_val) => {
-                        map.insert(http::header::AUTHORIZATION, header_val);
+                        map.insert(http_0::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
                         error!(message = "Invalid custom auth header value.", value = %value, %error);
@@ -514,7 +551,7 @@ impl Auth {
         }
     }
 
-    fn apply_headers_map_v1(&self, map: &mut http_1::HeaderMap) {
+    fn apply_headers_map_v1(&self, map: &mut http::HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
                 let auth = AuthorizationV1::basic(user.as_str(), password.inner());
@@ -527,9 +564,9 @@ impl Auth {
             Auth::Custom { value } => {
                 // The value contains just the value of the Authorization header
                 // Expected format: "SSWS token123" or "Bearer token123", etc.
-                match http_1::HeaderValue::from_str(value) {
+                match http::HeaderValue::from_str(value) {
                     Ok(header_val) => {
-                        map.insert(http_1::header::AUTHORIZATION, header_val);
+                        map.insert(http::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
                         error!(message = "Invalid custom auth header value.", value = %value, %error);
@@ -542,9 +579,12 @@ impl Auth {
     }
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
-pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
+/// Returns the scheme of `uri` as a static string, defaulting to `"http"` when it has none.
+///
+/// # Panics
+///
+/// Panics if `uri` has a scheme other than `http` or `https`.
+pub fn get_http_scheme_from_uri(uri: &http::Uri) -> &'static str {
     // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
     uri.scheme_str().map_or("http", |scheme| match scheme {
@@ -562,6 +602,10 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
 ///
 /// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
 #[must_use]
+#[expect(
+    clippy::type_complexity,
+    reason = "The closure types are `impl Fn` and cannot be named in a type alias."
+)]
 pub fn build_http_trace_layer<T, U>(
     span: Span,
 ) -> TraceLayer<
@@ -676,18 +720,9 @@ impl MaxConnectionAgeLayer {
     pub fn new(max_connection_age: Duration, jitter_factor: f64, peer_addr: SocketAddr) -> Self {
         Self {
             start_reference: Instant::now(),
-            max_connection_age: Self::jittered_duration(max_connection_age, jitter_factor),
+            max_connection_age: vector_http::jittered_duration(max_connection_age, jitter_factor),
             peer_addr,
         }
-    }
-
-    fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
-        // Ensure the jitter_factor is between 0.0 and 1.0
-        let jitter_factor = jitter_factor.clamp(0.0, 1.0);
-        // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::rng();
-        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
-        duration.mul_f64(random_jitter_factor)
     }
 }
 
@@ -927,7 +962,7 @@ mod tests {
             http: None,
             https: tls_proxy_authority(Some("https://proxy.example:3128")),
         };
-        let uri = |s: &str| s.parse::<http::Uri>().unwrap();
+        let uri = |s: &str| s.parse::<http_0::Uri>().unwrap();
 
         // The proxy connection itself matches and skips the override.
         assert!(authorities.matches(&uri("https://proxy.example:3128")));
@@ -971,35 +1006,35 @@ mod tests {
 
     #[test]
     fn test_auth_apply_v1() {
-        let mut basic = http_1::Request::get("http://example.com").body(()).unwrap();
+        let mut basic = http::Request::get("http://example.com").body(()).unwrap();
         Auth::Basic {
             user: "user".to_owned(),
             password: SensitiveString::from("pass".to_owned()),
         }
         .apply_v1(&mut basic);
         assert_eq!(
-            basic.headers().get(http_1::header::AUTHORIZATION),
-            Some(&http_1::HeaderValue::from_static("Basic dXNlcjpwYXNz"))
+            basic.headers().get(http::header::AUTHORIZATION),
+            Some(&http::HeaderValue::from_static("Basic dXNlcjpwYXNz"))
         );
 
-        let mut bearer = http_1::Request::get("http://example.com").body(()).unwrap();
+        let mut bearer = http::Request::get("http://example.com").body(()).unwrap();
         Auth::Bearer {
             token: SensitiveString::from("token".to_owned()),
         }
         .apply_v1(&mut bearer);
         assert_eq!(
-            bearer.headers().get(http_1::header::AUTHORIZATION),
-            Some(&http_1::HeaderValue::from_static("Bearer token"))
+            bearer.headers().get(http::header::AUTHORIZATION),
+            Some(&http::HeaderValue::from_static("Bearer token"))
         );
 
-        let mut custom = http_1::Request::get("http://example.com").body(()).unwrap();
+        let mut custom = http::Request::get("http://example.com").body(()).unwrap();
         Auth::Custom {
             value: "SSWS token123".to_owned(),
         }
         .apply_v1(&mut custom);
         assert_eq!(
-            custom.headers().get(http_1::header::AUTHORIZATION),
-            Some(&http_1::HeaderValue::from_static("SSWS token123"))
+            custom.headers().get(http::header::AUTHORIZATION),
+            Some(&http::HeaderValue::from_static("SSWS token123"))
         );
     }
 
@@ -1007,7 +1042,7 @@ mod tests {
         #[test]
         fn test_jittered_duration(duration_in_secs in 0u64..120, jitter_factor in 0.0..1.0) {
             let duration = Duration::from_secs(duration_in_secs);
-            let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+            let jittered_duration = vector_http::jittered_duration(duration, jitter_factor);
 
             // Check properties based on the range of inputs
             if jitter_factor == 0.0 {
