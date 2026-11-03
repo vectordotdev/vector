@@ -19,7 +19,7 @@ use super::{
     acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},

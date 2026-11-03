@@ -10,7 +10,7 @@ use super::parser;
 use crate::{
     Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    http::{Auth, QueryParameters, client_v1::HttpClient},
+    http::{Auth, HttpClient, QueryParameters},
     internal_events::PrometheusParseError,
     sources::{
         self,

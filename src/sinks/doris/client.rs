@@ -1,5 +1,5 @@
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::EndpointBytesSent,
     sinks::util::Compression,
 };

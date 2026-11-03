@@ -2,7 +2,7 @@
 
 use crate::config::ProxyConfig;
 use crate::event::Event;
-use crate::http::client_v1::HttpClient;
+use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
 use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{

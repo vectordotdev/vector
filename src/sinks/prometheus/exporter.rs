@@ -678,7 +678,7 @@ mod tests {
     use crate::{
         config::ProxyConfig,
         event::metric::{Metric, MetricValue},
-        http::client_v1::HttpClient,
+        http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{
             addr::next_addr,
@@ -1697,7 +1697,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::ProxyConfig,
-        http::client_v1::HttpClient,
+        http::HttpClient,
         test_util::{
             components::{SINK_TAGS, run_and_assert_sink_compliance},
             trace_init,

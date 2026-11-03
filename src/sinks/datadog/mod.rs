@@ -13,7 +13,7 @@ use vector_lib::{
 use super::Healthcheck;
 use crate::{
     common::datadog,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{HealthcheckError, util::HttpEndpoint},
 };
 

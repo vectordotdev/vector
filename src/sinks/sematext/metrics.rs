@@ -23,7 +23,7 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue},
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         HTTPV1RequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,

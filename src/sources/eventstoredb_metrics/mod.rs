@@ -16,7 +16,7 @@ use vector_lib::{
 use self::types::Stats;
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
         StreamClosedError,

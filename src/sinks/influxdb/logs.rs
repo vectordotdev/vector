@@ -35,7 +35,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{InfluxdbEncodingError, LargeEventDroppedError, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,

@@ -1242,7 +1242,7 @@ mod integration_tests {
         config::{ComponentKey, ProxyConfig},
         event::EventStatus,
         gcp,
-        http::client_v1::HttpClient,
+        http::HttpClient,
         shutdown,
         test_util::{
             self, components,

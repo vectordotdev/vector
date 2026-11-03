@@ -20,7 +20,7 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,

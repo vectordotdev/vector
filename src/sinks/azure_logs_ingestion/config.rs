@@ -8,7 +8,7 @@ use vrl::value::Kind;
 
 use crate::{
     config::ValidatedSink,
-    http::{client_v1::HttpClient, get_http_scheme_from_uri},
+    http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,

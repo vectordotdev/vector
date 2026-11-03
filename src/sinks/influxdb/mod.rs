@@ -17,7 +17,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
 };
 
@@ -897,7 +897,7 @@ mod tests {
 mod integration_tests {
     use crate::{
         config::ProxyConfig,
-        http::client_v1::HttpClient,
+        http::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},

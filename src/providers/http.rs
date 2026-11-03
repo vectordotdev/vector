@@ -11,7 +11,7 @@ use vector_lib::configurable::configurable_component;
 use super::BuildResult;
 use crate::{
     config::{self, Format, ProxyConfig, interpolate, provider::ProviderConfig},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
 };
