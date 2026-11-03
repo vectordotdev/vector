@@ -1,1 +1,5 @@
-Fix AWS Cloudwatch Logs sink healthcheck: if a log group name is templated, exit the healthcheck with Ok instead of attempting to verify that it exists
+The `aws_cloudwatch_logs` sink skips the log-group healthcheck for templated
+`group_name` values, avoiding invalid CloudWatch requests during startup and
+`vector validate`.
+
+authors: iandelahorne
