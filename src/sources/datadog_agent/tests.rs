@@ -1955,33 +1955,30 @@ fn test_config_outputs_with_enabled_data_types() {
     }
 }
 
-#[tokio::test]
-async fn enabled_data_types_and_disable_options_cannot_be_combined() {
-    for disable_option in [
-        "disable_logs: false",
-        "disable_metrics: true",
-        "disable_traces: true",
-        "disable_llmobs: true",
+#[test]
+fn test_config_outputs_with_enabled_and_disabled_data_types() {
+    for (disable_option, want) in [
+        ("disable_traces: true", vec![Some(LOGS)]),
+        ("disable_traces: false", vec![Some(LOGS), Some(TRACES)]),
+        ("disable_metrics: true", vec![Some(LOGS), Some(TRACES)]),
     ] {
         let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
             indoc! { r#"
                 address: "0.0.0.0:8080"
-                enabled_data_types: ["logs"]
+                multiple_outputs: true
+                enabled_data_types: [logs, traces]
                 {}
             "#},
             disable_option,
         ))
         .unwrap();
-        let result = config
-            .build(SourceContext::new_test(SourceSender::new_test().0, None))
-            .await;
-        let Err(error) = result else {
-            panic!("conflicting options were accepted")
-        };
-        assert_eq!(
-            error.to_string(),
-            "`enabled_data_types` and `disable_*` options cannot be set together"
-        );
+
+        let outputs = config.outputs(LogNamespace::Legacy);
+        let ports: Vec<_> = outputs
+            .iter()
+            .map(|output| output.port.as_deref())
+            .collect();
+        assert_eq!(ports, want, "{disable_option}");
     }
 }
 

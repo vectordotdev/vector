@@ -97,7 +97,8 @@ pub struct DatadogAgentConfig {
     /// The data types accepted by the component. Defaults to all data types.
     ///
     /// When `multiple_outputs` is enabled, each data type is sent to its own output.
-    /// Cannot be used with the deprecated `disable_*` options.
+    /// Data types disabled by the deprecated `disable_*` options are removed from this list.
+    #[configurable(metadata(docs::examples = "example_enabled_data_types()"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     enabled_data_types: Option<Vec<DatadogAgentDataType>>,
 
@@ -201,6 +202,10 @@ pub enum DatadogAgentDataType {
     Llmobs,
 }
 
+const fn example_enabled_data_types() -> [&'static str; 3] {
+    ["logs", "metrics", "traces"]
+}
+
 impl GenerateConfig for DatadogAgentConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
@@ -230,20 +235,15 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let disable_options_set = [
+        if [
             self.disable_logs,
             self.disable_metrics,
             self.disable_traces,
             self.disable_llmobs,
         ]
         .iter()
-        .any(Option::is_some);
-        if self.enabled_data_types.is_some() && disable_options_set {
-            return Err(
-                "`enabled_data_types` and `disable_*` options cannot be set together".into(),
-            );
-        }
-        if disable_options_set {
+        .any(Option::is_some)
+        {
             warn!(
                 "DEPRECATED: `disable_logs`, `disable_metrics`, `disable_traces`, and `disable_llmobs` are deprecated. Use `enabled_data_types` instead. See https://vector.dev/deprecations/#datadog_agent-disable_options for migration instructions."
             );
@@ -467,16 +467,16 @@ impl SourceConfig for DatadogAgentConfig {
 
 impl DatadogAgentConfig {
     fn is_enabled(&self, data_type: DatadogAgentDataType) -> bool {
-        if let Some(data_types) = &self.enabled_data_types {
-            return data_types.contains(&data_type);
-        }
         let disabled = match data_type {
             DatadogAgentDataType::Logs => self.disable_logs,
             DatadogAgentDataType::Metrics => self.disable_metrics,
             DatadogAgentDataType::Traces => self.disable_traces,
             DatadogAgentDataType::Llmobs => self.disable_llmobs,
         };
-        !disabled.unwrap_or(false)
+        self.enabled_data_types
+            .as_ref()
+            .is_none_or(|data_types| data_types.contains(&data_type))
+            && !disabled.unwrap_or(false)
     }
 }
 

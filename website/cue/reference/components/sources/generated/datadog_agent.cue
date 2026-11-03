@@ -68,14 +68,17 @@ generated: components: sources: datadog_agent: configuration: {
 			The data types accepted by the component. Defaults to all data types.
 
 			When `multiple_outputs` is enabled, each data type is sent to its own output.
-			Cannot be used with the deprecated `disable_*` options.
+			Data types disabled by the deprecated `disable_*` options are removed from this list.
 			"""
 		required: false
-		type: array: items: type: string: enum: {
-			llmobs:  "LLM Observability events."
-			logs:    "Logs."
-			metrics: "Metrics (beta)."
-			traces:  "Traces (alpha)."
+		type: array: items: type: string: {
+			enum: {
+				llmobs:  "LLM Observability events."
+				logs:    "Logs."
+				metrics: "Metrics (beta)."
+				traces:  "Traces (alpha)."
+			}
+			examples: ["logs", "metrics", "traces"]
 		}
 	}
 	framing: {

@@ -29,4 +29,5 @@ When migrating:
 - Leave out `enabled_data_types` to accept all data types.
 - Use the data type names `logs`, `metrics`, `traces`, and `llmobs`. When `multiple_outputs` is enabled,
   each data type is sent to the output of the same name.
-- Remove all `disable_*` options when adding `enabled_data_types`. Setting both prevents Vector from starting.
+- Remove all `disable_*` options when adding `enabled_data_types`. If both are set, data types disabled by
+  `disable_*` are removed from `enabled_data_types`.
