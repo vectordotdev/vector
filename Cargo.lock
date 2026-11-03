@@ -5810,24 +5810,6 @@ dependencies = [
 
 [[package]]
 name = "hyper-openssl"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6ee5d7a8f718585d1c3c61dfde28ef5b0bb14734b4db13f5ada856cdc6c612b"
-dependencies = [
- "http 0.2.12",
- "hyper 0.14.32",
- "linked_hash_set",
- "once_cell",
- "openssl",
- "openssl-sys",
- "parking_lot",
- "tokio",
- "tokio-openssl",
- "tower-layer",
-]
-
-[[package]]
-name = "hyper-openssl"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "527d4d619ca2c2aafa31ec139a3d1d60bf557bf7578a1f20f743637eccd9ca19"
@@ -5842,23 +5824,6 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "hyper-proxy"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
-dependencies = [
- "bytes",
- "futures",
- "headers 0.3.9",
- "http 0.2.12",
- "hyper 0.14.32",
- "openssl",
- "tokio",
- "tokio-openssl",
  "tower-service",
 ]
 
@@ -6684,7 +6649,7 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.11.1",
- "hyper-openssl 0.10.2",
+ "hyper-openssl",
  "hyper-timeout",
  "hyper-util",
  "jiff",
@@ -13488,8 +13453,6 @@ dependencies = [
  "http-serde",
  "hyper 0.14.32",
  "hyper 1.11.1",
- "hyper-openssl 0.9.2",
- "hyper-proxy",
  "hyper-util",
  "indexmap 2.14.2",
  "indoc",
@@ -13781,7 +13744,6 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "async-trait",
- "base64 0.23.1",
  "bitmask-enum",
  "bytes",
  "cfg-if",
@@ -13797,9 +13759,6 @@ dependencies = [
  "float_eq",
  "futures",
  "futures-util",
- "headers 0.3.9",
- "http 0.2.12",
- "hyper-proxy",
  "indexmap 2.14.2",
  "inventory",
  "ipnet",
@@ -13847,8 +13806,6 @@ dependencies = [
  "toml 0.9.8",
  "tonic 0.12.3",
  "tracing 0.1.44",
- "url",
- "urlencoding",
  "uuid",
  "vector-buffers",
  "vector-common",
@@ -13869,7 +13826,7 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.11.1",
- "hyper-openssl 0.10.2",
+ "hyper-openssl",
  "hyper-util",
  "openssl",
  "percent-encoding",

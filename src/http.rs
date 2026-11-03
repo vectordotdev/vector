@@ -1,35 +1,20 @@
 #![allow(missing_docs)]
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::Request as RequestV1;
-use http_0::{
-    HeaderMap, Request, Response, Version, header::HeaderValue, request::Builder, uri::InvalidUri,
-};
-use hyper::{
-    body::{Body, HttpBody},
-    client,
-    client::{Client, HttpConnector, connect::Connect},
-};
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use http_0::{HeaderMap, Request, Response, Version, header::HeaderValue};
+use hyper::body::Body;
 use serde_with::serde_as;
-use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
     classify::{ServerErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
-use tracing::{Instrument, Span};
+use tracing::Span;
 use vector_lib::{
     configurable::configurable_component, sensitive_string::SensitiveString,
     tcp::TcpKeepaliveConfig,
@@ -37,403 +22,12 @@ use vector_lib::{
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
-use crate::{
-    config::ProxyConfig,
-    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
-    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
-};
+use crate::internal_events::{HttpServerRequestReceived, HttpServerResponseSent};
 
 pub mod status {
     pub const FORBIDDEN: u16 = 403;
     pub const NOT_FOUND: u16 = 404;
     pub const TOO_MANY_REQUESTS: u16 = 429;
-}
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
-pub enum HttpError {
-    #[snafu(display("Failed to build TLS connector: {}", source))]
-    BuildTlsConnector { source: TlsError },
-    #[snafu(display("Failed to build HTTPS connector: {}", source))]
-    MakeHttpsConnector { source: openssl::error::ErrorStack },
-    #[snafu(display("Failed to build Proxy connector: {}", source))]
-    MakeProxyConnector { source: InvalidUri },
-    #[snafu(display("Failed to make HTTP(S) request: {}", source))]
-    CallRequest { source: hyper::Error },
-    #[snafu(display("Failed to build HTTP request: {}", source))]
-    BuildRequest { source: http_0::Error },
-}
-
-impl HttpError {
-    #[must_use]
-    pub const fn is_retriable(&self) -> bool {
-        match self {
-            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
-            HttpError::CallRequest { .. }
-            | HttpError::BuildTlsConnector { .. }
-            | HttpError::MakeHttpsConnector { .. } => true,
-        }
-    }
-}
-
-pub type HttpClientFuture = <HttpClient as Service<http_0::Request<Body>>>::Future;
-pub type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
-
-/// An HTTP client generic over the underlying connector `C`.
-///
-/// `C` defaults to [`HttpProxyConnector`], the proxy-aware TLS connector built from Vector's
-/// [`MaybeTlsSettings`]/[`ProxyConfig`]. Callers that need a custom connector can supply
-/// their own via [`HttpClient::new_with_connector`].
-pub struct HttpClient<B = Body, C = HttpProxyConnector> {
-    client: Client<C, B>,
-    user_agent: HeaderValue,
-    // Proxy-header injection only applies when the client owns a `ProxyConnector`. A custom
-    // connector supplied via `new_with_connector` sets this to `None`.
-    proxy_connector: Option<HttpProxyConnector>,
-}
-
-impl<B> HttpClient<B, HttpProxyConnector>
-where
-    B: fmt::Debug + HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error>,
-{
-    /// Creates a client that uses the given TLS settings and proxy configuration.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
-    /// connector cannot be created, or a configured proxy URL is not a valid URI.
-    ///
-    /// # Panics
-    ///
-    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
-    /// build-time application name and version do not form a valid `User-Agent` header value.
-    pub fn new(
-        tls_settings: impl Into<MaybeTlsSettings>,
-        proxy_config: &ProxyConfig,
-    ) -> Result<Self, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
-    }
-
-    /// Creates a client like [`HttpClient::new`], using `client_builder` to configure the
-    /// underlying hyper client.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
-    /// connector cannot be created, or a configured proxy URL is not a valid URI.
-    ///
-    /// # Panics
-    ///
-    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
-    /// build-time application name and version do not form a valid `User-Agent` header value.
-    pub fn new_with_custom_client(
-        tls_settings: impl Into<MaybeTlsSettings>,
-        proxy_config: &ProxyConfig,
-        client_builder: &mut client::Builder,
-    ) -> Result<Self, HttpError> {
-        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let client = client_builder.build(proxy_connector.clone());
-
-        Ok(HttpClient {
-            client,
-            user_agent: default_user_agent(),
-            proxy_connector: Some(proxy_connector),
-        })
-    }
-}
-
-impl<B, C> HttpClient<B, C>
-where
-    B: fmt::Debug + HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error>,
-    C: Connect + Clone + Send + Sync + 'static,
-{
-    /// Build an `HttpClient` from a pre-constructed connector.
-    ///
-    /// Proxy-header injection is disabled for custom connectors (`proxy_connector` is always `None`).
-    /// It only matters for the case of a plaintext-`http` request sent through an HTTP proxy, where
-    /// `Proxy-Authorization` must ride on the request itself. HTTPS-through-proxy is unaffected:
-    /// proxy auth happens during the CONNECT handshake inside the connector.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the build-time application name and version do not form a valid `User-Agent`
-    /// header value.
-    pub fn new_with_connector(connector: C, client_builder: &mut client::Builder) -> Self {
-        let client = client_builder.build(connector);
-
-        HttpClient {
-            client,
-            user_agent: default_user_agent(),
-            proxy_connector: None,
-        }
-    }
-
-    pub fn send(
-        &self,
-        mut request: Request<B>,
-    ) -> BoxFuture<'static, Result<http_0::Response<Body>, HttpError>> {
-        let span = tracing::info_span!("http");
-        let _enter = span.enter();
-
-        default_request_headers(&mut request, &self.user_agent);
-        self.maybe_add_proxy_headers(&mut request);
-
-        emit!(http_client::AboutToSendHttpRequest { request: &request });
-
-        let response = self.client.request(request);
-
-        let fut = async move {
-            // Capture the time right before we issue the request.
-            // Request doesn't start the processing until we start polling it.
-            let before = std::time::Instant::now();
-
-            // Send request and wait for the result.
-            let response_result = response.await;
-
-            // Compute the roundtrip time it took to send the request and get
-            // the response or error.
-            let roundtrip = before.elapsed();
-
-            // Handle the errors and extract the response.
-            let response = response_result
-                .inspect_err(|error| {
-                    // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpWarning { error, roundtrip });
-                })
-                .context(CallRequestSnafu)?;
-
-            // Emit the response into the internal events system.
-            emit!(http_client::GotHttpResponse {
-                response: &response,
-                roundtrip
-            });
-            Ok(response)
-        }
-        .instrument(span.clone().or_current());
-
-        Box::pin(fut)
-    }
-
-    fn maybe_add_proxy_headers(&self, request: &mut Request<B>) {
-        let Some(proxy_connector) = &self.proxy_connector else {
-            return;
-        };
-        if let Some(proxy_headers) = proxy_connector.http_headers(request.uri()) {
-            for (k, v) in proxy_headers {
-                let request_headers = request.headers_mut();
-                if !request_headers.contains_key(k) {
-                    request_headers.insert(k, v.into());
-                }
-            }
-        }
-    }
-}
-
-fn default_user_agent() -> HeaderValue {
-    let app_name = crate::get_app_name();
-    let version = crate::get_version();
-    HeaderValue::from_str(&format!("{app_name}/{version}"))
-        .expect("Invalid header value for user-agent!")
-}
-
-/// Builds a proxy-aware HTTPS connector from the given TLS settings and proxy configuration.
-///
-/// # Errors
-///
-/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
-/// `tls_settings`, [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created, or
-/// [`HttpError::MakeProxyConnector`] if a configured proxy URL is not a valid URI.
-///
-/// # Panics
-///
-/// Panics if OpenSSL fails to create the proxy connector's default TLS connector.
-pub fn build_proxy_connector(
-    tls_settings: MaybeTlsSettings,
-    proxy_config: &ProxyConfig,
-) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
-    // The inner connector dials the proxy for proxied requests and the destination directly for
-    // `no_proxy` requests. The `server_name` override must apply only to the destination, so
-    // collect the authorities of proxies reached over TLS to exclude from it; otherwise an HTTPS
-    // proxy's own certificate would be verified against the destination name and fail with a
-    // hostname mismatch.
-    let proxy_authorities = if proxy_config.enabled {
-        TlsProxyAuthorities {
-            http: tls_proxy_authority(proxy_config.http.as_deref()),
-            https: tls_proxy_authority(proxy_config.https.as_deref()),
-        }
-    } else {
-        TlsProxyAuthorities::default()
-    };
-
-    // `server_name` still cannot be applied to the tunneled destination TLS of a proxied HTTPS
-    // request: `hyper-proxy` offers no per-connection callback there and verifies against the
-    // destination URL host. Warn when that combination is configured.
-    if proxy_config.enabled
-        && (proxy_config.http.is_some() || proxy_config.https.is_some())
-        && let Some(tls) = tls_settings.tls()
-        && tls.server_name().is_some()
-        && tls.verify_hostname()
-    {
-        warn!(
-            message = "`tls.server_name` is set with hostname verification enabled, but a proxy is configured. \
-                       `server_name` is not applied to proxied (tunneled) TLS connections, so certificate \
-                       verification may fail with a hostname mismatch."
-        );
-    }
-
-    // Create dedicated TLS connector for the proxied connection with user TLS settings.
-    let tls = tls_connector_builder(&tls_settings)
-        .context(BuildTlsConnectorSnafu)?
-        .build();
-    let https = build_https_connector(tls_settings, proxy_authorities)?;
-    let mut proxy = ProxyConnector::new(https).unwrap();
-    // Make proxy connector aware of user TLS settings by setting the TLS connector:
-    // https://github.com/vectordotdev/vector/issues/13683
-    proxy.set_tls(Some(tls));
-    proxy_config
-        .configure(&mut proxy)
-        .context(MakeProxyConnectorSnafu)?;
-    Ok(proxy)
-}
-
-/// Builds an HTTPS connector from the given TLS settings, without proxy support.
-///
-/// # Errors
-///
-/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
-/// `tls_settings`, or [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created.
-pub fn build_tls_connector(
-    tls_settings: MaybeTlsSettings,
-) -> Result<HttpsConnector<HttpConnector>, HttpError> {
-    build_https_connector(tls_settings, TlsProxyAuthorities::default())
-}
-
-/// Authorities (host and optional port) of the configured forward proxies that are reached over TLS
-/// (i.e. `https://` proxy URLs). Used to skip the `tls.server_name` override for the connection to
-/// such a proxy, so its own certificate is verified against the proxy authority rather than the
-/// destination name. Plaintext (`http://`) proxies never trigger a TLS handshake to the proxy, so
-/// they are not tracked; matching on the full authority also avoids mistaking a direct connection
-/// to a destination that merely shares a host with a proxy (e.g. on a different port).
-#[derive(Clone, Default)]
-struct TlsProxyAuthorities {
-    http: Option<(String, Option<u16>)>,
-    https: Option<(String, Option<u16>)>,
-}
-
-impl TlsProxyAuthorities {
-    fn matches(&self, uri: &http_0::Uri) -> bool {
-        if self.http.is_none() && self.https.is_none() {
-            return false;
-        }
-        let target = (uri.host(), uri.port_u16());
-        let matches_one = |authority: &Option<(String, Option<u16>)>| {
-            authority
-                .as_ref()
-                .is_some_and(|(host, port)| target.0 == Some(host.as_str()) && target.1 == *port)
-        };
-        matches_one(&self.http) || matches_one(&self.https)
-    }
-}
-
-/// Extract the authority (host and optional port) of a proxy URL, but only when it is reached over
-/// TLS (an `https://` URL). Returns `None` for plaintext proxies or unparseable URLs.
-fn tls_proxy_authority(url: Option<&str>) -> Option<(String, Option<u16>)> {
-    let uri = url?.parse::<http_0::Uri>().ok()?;
-    if uri.scheme_str() != Some("https") {
-        return None;
-    }
-    Some((uri.host()?.to_owned(), uri.port_u16()))
-}
-
-/// Build an HTTPS connector, skipping the `tls.server_name` override for connections to one of
-/// `proxy_authorities`. The override must only apply to the upstream destination; applying it to a
-/// proxy connection would verify the proxy certificate against the destination name.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Preserve ownership and drop timing"
-)]
-fn build_https_connector(
-    tls_settings: MaybeTlsSettings,
-    proxy_authorities: TlsProxyAuthorities,
-) -> Result<HttpsConnector<HttpConnector>, HttpError> {
-    let mut http = HttpConnector::new();
-    http.enforce_http(false);
-
-    let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
-    let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
-
-    let settings = tls_settings.tls().cloned();
-    https.set_callback(move |c, uri| {
-        if let Some(settings) = &settings {
-            let skip_server_name = proxy_authorities.matches(uri);
-            settings.apply_connect_configuration(c, skip_server_name)
-        } else {
-            Ok(())
-        }
-    });
-    Ok(https)
-}
-
-fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
-    if !request.headers().contains_key("User-Agent") {
-        request
-            .headers_mut()
-            .insert("User-Agent", user_agent.clone());
-    }
-
-    if !request.headers().contains_key("Accept-Encoding") {
-        // hardcoding until we support compressed responses:
-        // https://github.com/vectordotdev/vector/issues/5440
-        request
-            .headers_mut()
-            .insert("Accept-Encoding", HeaderValue::from_static("identity"));
-    }
-}
-
-impl<B, C> Service<Request<B>> for HttpClient<B, C>
-where
-    B: fmt::Debug + HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error> + Send,
-    C: Connect + Clone + Send + Sync + 'static,
-{
-    type Response = http_0::Response<Body>;
-    type Error = HttpError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, request: Request<B>) -> Self::Future {
-        self.send(request)
-    }
-}
-
-impl<B, C: Clone> Clone for HttpClient<B, C> {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            user_agent: self.user_agent.clone(),
-            proxy_connector: self.proxy_connector.clone(),
-        }
-    }
-}
-
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_fields_in_debug, reason = "Preserve diagnostic fields")]
-impl<B, C> fmt::Debug for HttpClient<B, C> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("HttpClient")
-            .field("client", &self.client)
-            .field("user_agent", &self.user_agent)
-            .finish()
-    }
 }
 
 /// Configuration of the authentication strategy for HTTP requests.
@@ -511,13 +105,6 @@ impl MaybeAuth for Option<Auth> {
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         self.apply_headers_map(req.headers_mut());
-    }
-
-    pub fn apply_builder(&self, mut builder: Builder) -> Builder {
-        if let Some(map) = builder.headers_mut() {
-            self.apply_headers_map(map);
-        }
-        builder
     }
 
     pub fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
@@ -937,72 +524,10 @@ mod tests {
     use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
+    use vector_http::empty_body;
 
-    use super::*;
-    use crate::test_util::addr::next_addr;
-
-    #[test]
-    fn tls_proxy_authority_only_tracks_https_proxies() {
-        assert_eq!(
-            tls_proxy_authority(Some("https://proxy.example:3128")),
-            Some(("proxy.example".to_owned(), Some(3128)))
-        );
-        assert_eq!(
-            tls_proxy_authority(Some("https://proxy.example")),
-            Some(("proxy.example".to_owned(), None))
-        );
-        // Plaintext proxies never trigger a TLS handshake to the proxy.
-        assert_eq!(tls_proxy_authority(Some("http://proxy.example:3128")), None);
-        assert_eq!(tls_proxy_authority(None), None);
-    }
-
-    #[test]
-    fn proxy_authorities_match_full_authority() {
-        let authorities = TlsProxyAuthorities {
-            http: None,
-            https: tls_proxy_authority(Some("https://proxy.example:3128")),
-        };
-        let uri = |s: &str| s.parse::<http_0::Uri>().unwrap();
-
-        // The proxy connection itself matches and skips the override.
-        assert!(authorities.matches(&uri("https://proxy.example:3128")));
-
-        // A direct destination sharing the host but on a different port must not match, so the
-        // `server_name` override still applies.
-        assert!(!authorities.matches(&uri("https://proxy.example:8443")));
-        // A different host does not match either.
-        assert!(!authorities.matches(&uri("https://destination.example:3128")));
-    }
-
-    #[test]
-    fn test_default_request_headers_defaults() {
-        let user_agent = HeaderValue::from_static("vector");
-        let mut request = Request::post("http://example.com").body(()).unwrap();
-        default_request_headers(&mut request, &user_agent);
-        assert_eq!(
-            request.headers().get("Accept-Encoding"),
-            Some(&HeaderValue::from_static("identity")),
-        );
-        assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
-    }
-
-    #[test]
-    fn test_default_request_headers_does_not_overwrite() {
-        let mut request = Request::post("http://example.com")
-            .header("Accept-Encoding", "gzip")
-            .header("User-Agent", "foo")
-            .body(())
-            .unwrap();
-        default_request_headers(&mut request, &HeaderValue::from_static("vector"));
-        assert_eq!(
-            request.headers().get("Accept-Encoding"),
-            Some(&HeaderValue::from_static("gzip")),
-        );
-        assert_eq!(
-            request.headers().get("User-Agent"),
-            Some(&HeaderValue::from_static("foo"))
-        );
-    }
+    use super::{client_v1::HttpClient, *};
+    use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
 
     #[test]
     fn test_auth_apply_v1() {
@@ -1216,18 +741,18 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Create a client, which has its own connection pool.
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default()).unwrap();
 
         // Responses generated before the client's max connection age has elapsed do not
         // include a `Connection: close` header in the response.
-        let req = Request::get(format!("http://{addr}/"))
-            .body(Body::empty())
+        let req = RequestV1::get(format!("http://{addr}/"))
+            .body(empty_body())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
 
-        let req = Request::get(format!("http://{addr}/"))
-            .body(Body::empty())
+        let req = RequestV1::get(format!("http://{addr}/"))
+            .body(empty_body())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
@@ -1235,20 +760,20 @@ mod tests {
         // The first response generated after the client's max connection age has elapsed should
         // include the `Connection: close` header.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        let req = Request::get(format!("http://{addr}/"))
-            .body(Body::empty())
+        let req = RequestV1::get(format!("http://{addr}/"))
+            .body(empty_body())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(
             response.headers().get("Connection"),
-            Some(&HeaderValue::from_static("close")),
+            Some(&http::HeaderValue::from_static("close")),
         );
 
         // The next request should establish a new connection.
         // Importantly, this also confirms that each connection has its own independent
         // connection age timer.
-        let req = Request::get(format!("http://{addr}/"))
-            .body(Body::empty())
+        let req = RequestV1::get(format!("http://{addr}/"))
+            .body(empty_body())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
