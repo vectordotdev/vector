@@ -253,7 +253,7 @@ pub(crate) async fn call<
             let mut request = builder.body(body).expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
-                auth.apply_v1(&mut request);
+                auth.apply(&mut request);
             }
 
             let send = async move { client.send(request).await };

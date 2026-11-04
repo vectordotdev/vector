@@ -15,7 +15,7 @@ use vector_http::full_body;
 
 use crate::{
     http::HttpClient,
-    sinks::{HTTPV1RequestBuilderSnafu, prelude::*},
+    sinks::{HTTPRequestBuilderSnafu, prelude::*},
 };
 
 /// Log Ingestion API version
@@ -126,7 +126,7 @@ impl AzureLogsIngestionService {
     async fn build_request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
         let mut request = Request::post(&self.endpoint)
             .body(body)
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
         // TODO: make this an option, for sovereign clouds
         let access_token: AccessToken = self

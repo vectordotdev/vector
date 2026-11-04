@@ -11,7 +11,7 @@ use super::prelude::http_error_code;
     feature = "sources-okta"
 ))]
 #[derive(Debug, NamedInternalEvent)]
-pub struct HttpClientEventsReceived {
+pub(crate) struct HttpClientEventsReceived {
     pub byte_size: vector_lib::json_size::JsonSize,
     pub count: usize,
     pub url: String,
@@ -44,7 +44,7 @@ impl InternalEvent for HttpClientEventsReceived {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HttpClientHttpResponseError {
+pub(crate) struct HttpClientHttpResponseError {
     pub code: http::StatusCode,
     pub url: String,
 }
@@ -70,7 +70,7 @@ impl InternalEvent for HttpClientHttpResponseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HttpClientHttpError {
+pub(crate) struct HttpClientHttpError {
     pub error: crate::Error,
     pub url: String,
 }

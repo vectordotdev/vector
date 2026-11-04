@@ -23,7 +23,7 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::oneshot;
 use tower::ServiceBuilder;
-use tower_http_1::compression::CompressionLayer;
+use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -1157,7 +1157,7 @@ mod tests {
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply_v1(&mut request);
+            client_auth_config.apply(&mut request);
         }
 
         let proxy = ProxyConfig::default();

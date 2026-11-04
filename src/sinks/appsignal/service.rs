@@ -5,10 +5,11 @@ use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
-    HTTPV1RequestBuilderSnafu,
+    HTTPRequestBuilderSnafu,
     util::{
-        HttpEndpoint, buffer::compression::Compression, http::HttpRequest,
-        http_v1::HttpServiceRequestBuilder,
+        HttpEndpoint,
+        buffer::compression::Compression,
+        http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
 
@@ -37,7 +38,7 @@ impl HttpServiceRequestBuilder<()> for AppsignalSvcRequestBuilder {
 
         builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)
     }
 }

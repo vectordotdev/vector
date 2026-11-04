@@ -10,7 +10,7 @@ use vector_lib::{
 const GRPC_STATUS_LABEL: &str = "grpc_status";
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct GrpcServerRequestReceived;
+pub(crate) struct GrpcServerRequestReceived;
 
 impl InternalEvent for GrpcServerRequestReceived {
     fn emit(self) {
@@ -19,7 +19,7 @@ impl InternalEvent for GrpcServerRequestReceived {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct GrpcServerResponseSent<'a, B> {
+pub(crate) struct GrpcServerResponseSent<'a, B> {
     pub response: &'a Response<B>,
     pub latency: Duration,
 }
@@ -41,7 +41,7 @@ impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct GrpcInvalidCompressionSchemeError<'a> {
+pub(crate) struct GrpcInvalidCompressionSchemeError<'a> {
     pub status: &'a tonic::Status,
 }
 
@@ -63,14 +63,14 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct GrpcError<E> {
+pub(crate) struct GrpcError<E> {
     pub error: E,
 }
 
 /// A structurally valid gRPC event protobuf could not be converted into a Vector event.
 #[cfg(feature = "sources-vector")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct GrpcEventDecodeError<E> {
+pub(crate) struct GrpcEventDecodeError<E> {
     pub error: E,
 }
 

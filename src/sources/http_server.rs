@@ -477,7 +477,7 @@ mod tests {
         write::{GzEncoder, ZlibEncoder},
     };
     use futures::Stream;
-    use headers_1::{Authorization, authorization::Credentials};
+    use headers::{Authorization, authorization::Credentials};
     use http::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
     use vector_lib::{

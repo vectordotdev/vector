@@ -14,9 +14,9 @@ use crate::{
     http::HttpClient,
     internal_events::EndpointBytesSent,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         prelude::*,
-        util::{auth::Auth, http_v1::HttpResponse},
+        util::{auth::Auth, http::HttpResponse},
     },
 };
 
@@ -133,16 +133,16 @@ pub(super) async fn build_request(
         builder = builder.header(name, value);
     }
 
-    let mut request = builder.body(body).context(HTTPV1RequestBuilderSnafu)?;
+    let mut request = builder.body(body).context(HTTPRequestBuilderSnafu)?;
 
     match auth {
-        Some(Auth::Basic(http_auth)) => http_auth.apply_v1(&mut request),
+        Some(Auth::Basic(http_auth)) => http_auth.apply(&mut request),
         #[cfg(feature = "aws-core")]
         Some(Auth::Aws {
             credentials_provider,
             region,
         }) => {
-            crate::aws::sign_request_v1(
+            crate::aws::sign_request(
                 "aps",
                 &mut request,
                 credentials_provider,

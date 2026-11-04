@@ -27,8 +27,7 @@ use crate::{
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },

@@ -131,7 +131,7 @@ impl Service<LokiRequest> for LokiService {
         let mut req = req.body(request.payload).unwrap();
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut req);
+            auth.apply(&mut req);
         }
 
         let client = self.client.clone();
