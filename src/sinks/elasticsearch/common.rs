@@ -436,7 +436,7 @@ pub async fn sign_request(
     // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
     // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
-    crate::aws::sign_request_v1(
+    crate::aws::sign_request(
         service_type.as_str(),
         request,
         credentials_provider,

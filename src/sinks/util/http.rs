@@ -528,7 +528,7 @@ async fn sign_request(
     sig_v4_config: Option<&SigV4Config>,
 ) -> Result<Request<Bytes>, HttpError> {
     if let Some(sig_v4_config) = sig_v4_config {
-        crate::aws::sign_request_v1(
+        crate::aws::sign_request(
             &sig_v4_config.service,
             &mut request,
             &sig_v4_config.shared_credentials_provider,

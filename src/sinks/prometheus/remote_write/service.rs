@@ -142,7 +142,7 @@ pub(super) async fn build_request(
             credentials_provider,
             region,
         }) => {
-            crate::aws::sign_request_v1(
+            crate::aws::sign_request(
                 "aps",
                 &mut request,
                 credentials_provider,

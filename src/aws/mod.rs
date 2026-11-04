@@ -294,14 +294,14 @@ enum SigningError {
 ///
 /// Panics if the access key ID, region, or service name contains characters that are not valid
 /// in an HTTP header value, such as a newline.
-pub async fn sign_request_v1(
+pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    sign_request_v1_at(
+    sign_request_at(
         service_name,
         request,
         credentials_provider,
@@ -327,11 +327,11 @@ fn signable_headers<'a>(
         .collect()
 }
 
-/// Signs `request` like [`sign_request_v1`], taking the signing time from `signing_time`.
+/// Signs `request` like [`sign_request`], taking the signing time from `signing_time`.
 ///
 /// `signing_time` is called after the credentials are provided, so a slow credential lookup
 /// does not make the signature's `x-amz-date` stale.
-async fn sign_request_v1_at(
+async fn sign_request_at(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
@@ -789,7 +789,7 @@ mod tests {
     /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
     /// credentials, region, and service, and leave the URI unchanged.
     #[tokio::test]
-    async fn sign_request_v1_signs_with_fixed_time() {
+    async fn sign_request_signs_with_fixed_time() {
         const SERVICE_NAME: &str = "example-service";
         const URI: &str =
             "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
@@ -805,7 +805,7 @@ mod tests {
             .body(Bytes::from_static(BODY))
             .expect("valid request");
 
-        sign_request_v1_at(
+        sign_request_at(
             SERVICE_NAME,
             &mut request,
             &credentials_provider,
