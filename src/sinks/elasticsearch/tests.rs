@@ -90,6 +90,17 @@ impl PartialRetryResponse {
 }
 
 #[tokio::test]
+async fn successful_batch_delivery_metrics() {
+    assert_partial_retry_outcomes(
+        &[PartialRetryResponse::Bulk(&[201, 201, 201])],
+        &[3],
+        0,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn partial_retry_terminal_outcome_metrics() {
     for status in [
         StatusCode::NOT_IMPLEMENTED,

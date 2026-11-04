@@ -256,7 +256,11 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
 
             let event_status = get_event_status(&http_response);
             let delivered = if event_status == EventStatus::Delivered {
-                Some(vec![true; original_events.len()])
+                if delivery.record_batch(&event_indices, &events_byte_size) {
+                    None
+                } else {
+                    Some(vec![true; original_events.len()])
+                }
             } else if http_response.status().is_success() {
                 super::retry::successful_items(http_response.body(), original_events.len())
             } else {

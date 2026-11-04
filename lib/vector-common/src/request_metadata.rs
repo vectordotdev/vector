@@ -382,6 +382,32 @@ impl RequestDelivery {
         }
     }
 
+    /// Records a batch using its precomputed totals and original event indices.
+    /// Returns false without changing progress if any event was already recorded,
+    /// so the caller can fall back to per-event accounting.
+    ///
+    /// # Panics
+    ///
+    /// Panics if indices are not strictly increasing, an index is outside the
+    /// original request, or the lock is poisoned.
+    #[must_use]
+    pub fn record_batch(&self, indices: &[usize], size: &GroupedCountByteSize) -> bool {
+        assert!(indices.windows(2).all(|pair| pair[0] < pair[1]));
+        let mut progress = self.0.lock().expect("Request delivery lock poisoned");
+        if indices.iter().any(|&index| progress.delivered[index]) {
+            return false;
+        }
+        for &index in indices {
+            progress.delivered[index] = true;
+        }
+        progress.remaining -= indices.len();
+        progress.events_sent = Some(match progress.events_sent.take() {
+            Some(sent) => sent + size,
+            None => size.clone(),
+        });
+        true
+    }
+
     /// Returns confirmed deliveries, if any, and the number of events still unconfirmed.
     ///
     /// # Panics
@@ -456,6 +482,49 @@ mod tests {
             size.add_event(&event, JsonSize::new(12));
             expected.insert(event.get_tags(), CountByteSize(1, JsonSize::new(12)));
             delivery.record(index, size);
+        }
+        let (sent, remaining) = delivery.snapshot();
+        assert_eq!(remaining, 0);
+        assert_eq!(sent.unwrap().sizes(), Some(&expected));
+    }
+
+    #[test]
+    fn delivery_batch_overlap_leaves_progress_for_per_event_fallback() {
+        let delivery = RequestDelivery::new(3);
+        assert!(delivery.record_batch(&[0, 1], &CountByteSize(2, JsonSize::new(30)).into()));
+        assert!(!delivery.record_batch(&[1, 2], &CountByteSize(2, JsonSize::new(50)).into()));
+        let (sent, remaining) = delivery.snapshot();
+        assert_eq!(remaining, 1);
+        assert_eq!(
+            sent.unwrap().size(),
+            Some(CountByteSize(2, JsonSize::new(30)))
+        );
+
+        delivery.record(1, CountByteSize(1, JsonSize::new(20)).into());
+        delivery.record(2, CountByteSize(1, JsonSize::new(30)).into());
+        let (sent, remaining) = delivery.snapshot();
+        assert_eq!(remaining, 0);
+        assert_eq!(
+            sent.unwrap().size(),
+            Some(CountByteSize(3, JsonSize::new(60)))
+        );
+    }
+
+    #[test]
+    fn delivery_batches_preserve_tags_across_narrowed_retries() {
+        let delivery = RequestDelivery::new(4);
+        let mut expected = HashMap::new();
+        for (indices, service) in [([0, 2], "first"), ([1, 3], "second")] {
+            let event = DummyEvent {
+                source: None.into(),
+                service: Some(service.to_owned()).into(),
+            };
+            let mut size = GroupedCountByteSize::new_tagged();
+            size.add_event(&event, JsonSize::new(10));
+            size.add_event(&event, JsonSize::new(20));
+            expected.insert(event.get_tags(), CountByteSize(2, JsonSize::new(30)));
+            assert!(delivery.record_batch(&indices, &size));
+            assert!(!delivery.record_batch(&indices, &size));
         }
         let (sent, remaining) = delivery.snapshot();
         assert_eq!(remaining, 0);
