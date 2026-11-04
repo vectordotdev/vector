@@ -1,9 +1,9 @@
 // ## skip check-dropped-events ##
 
 #[cfg(feature = "sinks-splunk_hec")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(feature = "sources-splunk_hec")]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
@@ -22,7 +22,7 @@ mod sink {
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkEventEncodeError {
+    pub(crate) struct SplunkEventEncodeError {
         pub error: vector_lib::Error,
     }
 
@@ -80,7 +80,7 @@ mod sink {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkResponseParseError {
+    pub(crate) struct SplunkResponseParseError {
         pub error: Error,
     }
 
@@ -104,7 +104,7 @@ mod sink {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkIndexerAcknowledgementAPIError {
+    pub(crate) struct SplunkIndexerAcknowledgementAPIError {
         pub message: &'static str,
         pub error: HecAckApiError,
     }
@@ -129,7 +129,7 @@ mod sink {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkIndexerAcknowledgementUnavailableError<E> {
+    pub(crate) struct SplunkIndexerAcknowledgementUnavailableError<E> {
         pub error: E,
     }
 
@@ -153,7 +153,7 @@ mod sink {
     }
 
     #[derive(NamedInternalEvent)]
-    pub struct SplunkIndexerAcknowledgementAckAdded;
+    pub(crate) struct SplunkIndexerAcknowledgementAckAdded;
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
         fn emit(self) {
@@ -162,7 +162,7 @@ mod sink {
     }
 
     #[derive(NamedInternalEvent)]
-    pub struct SplunkIndexerAcknowledgementAcksRemoved {
+    pub(crate) struct SplunkIndexerAcknowledgementAcksRemoved {
         pub count: f64,
     }
 
@@ -173,7 +173,7 @@ mod sink {
     }
 
     #[derive(NamedInternalEvent)]
-    pub struct SplunkEventTimestampInvalidType<'a> {
+    pub(crate) struct SplunkEventTimestampInvalidType<'a> {
         pub r#type: &'a str,
     }
 
@@ -188,7 +188,7 @@ mod sink {
     }
 
     #[derive(NamedInternalEvent)]
-    pub struct SplunkEventTimestampMissing;
+    pub(crate) struct SplunkEventTimestampMissing;
 
     impl InternalEvent for SplunkEventTimestampMissing {
         fn emit(self) {
@@ -207,7 +207,7 @@ mod source {
     use crate::sources::splunk_hec::ApiError;
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkHecRequestBodyInvalidError {
+    pub(crate) struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
 
@@ -231,7 +231,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SplunkHecRequestError {
+    pub(crate) struct SplunkHecRequestError {
         pub(crate) error: ApiError,
     }
 

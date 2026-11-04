@@ -6,7 +6,7 @@ use http::{
     Request,
     header::{HeaderName, HeaderValue},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tower::Service;
 use vector_http::{HttpError, full_body};
 use vector_lib::{
@@ -17,7 +17,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::util::HttpEndpoint,
 };
 

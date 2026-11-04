@@ -10,13 +10,13 @@ use indoc::indoc;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
-    extra_context::ExtraContext,
     sinks::{
         VectorSink,
         datadog::test_utils::{ApiStatus, test_server},
@@ -460,7 +460,7 @@ async fn retries_transport_errors() {
 
     use http::{Response, StatusCode};
     use http_body_util::{BodyExt as _, Full};
-    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,

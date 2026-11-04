@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use http_0::StatusCode;
+use http::StatusCode;
 use tokio_util::codec::Decoder;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,

@@ -10,14 +10,16 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu, gcp,
+        HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             HttpEndpoint,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             service::TowerRequestConfigDefaults,
         },
     },
@@ -218,7 +220,7 @@ impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
 
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
 
         self.auth.apply(&mut request);

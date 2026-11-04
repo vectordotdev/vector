@@ -14,13 +14,12 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,

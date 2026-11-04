@@ -1,5 +1,6 @@
 //! Shared functionality for the AWS components.
 pub mod auth;
+pub(crate) mod http_client;
 pub mod region;
 pub mod timeout;
 
@@ -10,7 +11,7 @@ use std::{
         Arc, OnceLock,
         atomic::{AtomicUsize, Ordering},
     },
-    task::{Context, Poll},
+    task::{Context, Poll, ready},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -24,7 +25,6 @@ use aws_sigv4::{
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
-use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
 use aws_smithy_runtime_api::client::{
     http::{
         HttpClient, HttpConnector, HttpConnectorFuture, HttpConnectorSettings, SharedHttpConnector,
@@ -37,8 +37,8 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use http_0::{HeaderMap, HeaderName, header::HeaderValue};
-use http_body_0::{Body, combinators::BoxBody};
+use http::{HeaderMap, HeaderName, HeaderValue};
+use http_body::{Body, Frame};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -47,7 +47,7 @@ pub use timeout::AwsTimeout;
 
 use crate::{
     config::ProxyConfig,
-    http::{build_proxy_connector, build_tls_connector, status},
+    http::status,
     internal_events::{
         AwsBytesSent,
         http_client::{
@@ -107,22 +107,18 @@ fn check_response(res: &HttpResponse) -> bool {
         || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
-/// Creates the http connector that has been configured to use the given proxy and TLS settings.
-/// All AWS requests should use this connector as the aws crates by default use `RustTLS` which we
-/// have turned off as we want to consistently use openssl.
+/// Creates the HTTP client that sends AWS requests with Vector's OpenSSL TLS settings and proxy
+/// routing. All AWS requests should use it, as the AWS crates by default use `RustTLS`, which we
+/// have turned off to consistently use OpenSSL.
 fn connector(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<SharedHttpClient> {
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-
-    if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        Ok(HyperClientBuilder::new().build(proxy))
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        Ok(HyperClientBuilder::new().build(tls_connector))
-    }
+    Ok(SharedHttpClient::new(http_client::SdkHttpClient::new(
+        tls_settings,
+        proxy,
+    )?))
 }
 
 /// Implement for each AWS service to create the appropriate AWS sdk client.
@@ -298,14 +294,14 @@ enum SigningError {
 ///
 /// Panics if the access key ID, region, or service name contains characters that are not valid
 /// in an HTTP header value, such as a newline.
-pub async fn sign_request_v1(
+pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    sign_request_v1_at(
+    sign_request_at(
         service_name,
         request,
         credentials_provider,
@@ -331,11 +327,11 @@ fn signable_headers<'a>(
         .collect()
 }
 
-/// Signs `request` like [`sign_request_v1`], taking the signing time from `signing_time`.
+/// Signs `request` like [`sign_request`], taking the signing time from `signing_time`.
 ///
 /// `signing_time` is called after the credentials are provided, so a slow credential lookup
 /// does not make the signature's `x-amz-date` stale.
-async fn sign_request_v1_at(
+async fn sign_request_at(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
@@ -490,7 +486,7 @@ fn smithy_headers_to_map(
 ) -> HeaderMap<HeaderValue> {
     let mut map = HeaderMap::with_capacity(headers.len());
     for (name, value) in headers {
-        let Ok(header_name) = http_0::HeaderName::from_bytes(name.as_bytes()) else {
+        let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) else {
             continue;
         };
         let Ok(header_value) = HeaderValue::from_str(value) else {
@@ -551,7 +547,7 @@ where
             let bytes_sent = Arc::clone(&bytes_sent);
             body.map_preserve_contents(move |body| {
                 let body = MeasuredBody::new(body, Arc::clone(&bytes_sent));
-                SdkBody::from_body_0_4(BoxBody::new(body))
+                SdkBody::from_body_1_x(body)
             })
         });
 
@@ -597,41 +593,203 @@ impl Body for MeasuredBody {
     type Data = Bytes;
     type Error = Box<dyn Error + Send + Sync>;
 
-    fn poll_data(
+    fn poll_frame(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         let this = self.project();
 
-        match this.inner.poll_data(cx) {
-            Poll::Ready(Some(Ok(data))) => {
-                this.shared_bytes_sent
-                    .fetch_add(data.len(), Ordering::Release);
-                Poll::Ready(Some(Ok(data)))
-            }
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Pending => Poll::Pending,
+        match ready!(this.inner.poll_frame(cx)) {
+            Some(Ok(frame)) => match frame.into_data() {
+                Ok(data) => {
+                    this.shared_bytes_sent
+                        .fetch_add(data.len(), Ordering::Release);
+                    Poll::Ready(Some(Ok(Frame::data(data))))
+                }
+                // Trailers are dropped.
+                Err(_trailers) => Poll::Ready(None),
+            },
+            other => Poll::Ready(other),
         }
-    }
-
-    fn poll_trailers(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
-        Poll::Ready(Ok(None))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::convert::Infallible;
+
     use aws_credential_types::Credentials;
+    use http_body_util::{BodyExt, Full};
+    use hyper::body::Incoming;
+    use tokio::{io::AsyncReadExt, net::TcpListener, sync::mpsc};
+
+    use super::*;
+    use crate::test_util::http::spawn_blackhole_http_server;
+
+    /// A request sent through the SDK connector reaches the server with its method, URI, headers,
+    /// and body, and the response status, headers, and body reach the SDK.
+    #[tokio::test]
+    async fn connector_sends_request_and_returns_response() {
+        let (observed_tx, mut observed_rx) = mpsc::unbounded_channel();
+        let uri = spawn_blackhole_http_server(move |request: http::Request<Incoming>| {
+            let observed_tx = observed_tx.clone();
+            async move {
+                let (parts, body) = request.into_parts();
+                let body = body.collect().await.expect("request body").to_bytes();
+                observed_tx
+                    .send((parts, body))
+                    .expect("test receives the request");
+                Ok::<_, Infallible>(
+                    http::Response::builder()
+                        .header("x-amz-request-id", "request-1")
+                        .body(Full::new(Bytes::from_static(b"response body")))
+                        .expect("valid response"),
+                )
+            }
+        })
+        .await;
+
+        let http_connector = connector(&ProxyConfig::default(), None)
+            .expect("connector builds")
+            .http_connector(
+                &HttpConnectorSettings::default(),
+                &http_client::test_runtime_components(),
+            );
+        let request = http::Request::post(format!("{uri}path?query=1"))
+            .header("content-type", "application/json")
+            .header("x-amz-target", "Test.Operation")
+            .body(SdkBody::from("request body"))
+            .expect("valid request");
+        let request = HttpRequest::try_from(request).expect("valid SDK request");
+
+        let response = http_connector
+            .call(request)
+            .await
+            .expect("request succeeds");
+
+        assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(
+            response.headers().get("x-amz-request-id"),
+            Some("request-1")
+        );
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("response body")
+            .to_bytes();
+        assert_eq!(body, Bytes::from_static(b"response body"));
+
+        let (parts, body) = observed_rx.recv().await.expect("server saw the request");
+        assert_eq!(parts.method, http::Method::POST);
+        assert_eq!(parts.uri.path(), "/path");
+        assert_eq!(parts.uri.query(), Some("query=1"));
+        assert_eq!(parts.headers["content-type"], "application/json");
+        assert_eq!(parts.headers["x-amz-target"], "Test.Operation");
+        assert!(
+            !parts.headers.contains_key("user-agent")
+                && !parts.headers.contains_key("accept-encoding"),
+            "the transport must not add Vector's default headers: {:?}",
+            parts.headers
+        );
+        assert_eq!(body, Bytes::from_static(b"request body"));
+    }
+
+    /// A server that reads the request but never responds makes the SDK connector fail with a
+    /// timeout once the read timeout elapses.
+    #[tokio::test]
+    async fn connector_times_out_waiting_for_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let address = listener.local_addr().expect("local address");
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accept");
+            let mut buffer = [0; 1024];
+            // Keeps the connection open, without responding, until the client closes it.
+            while stream.read(&mut buffer).await.is_ok_and(|read| read > 0) {}
+        });
+
+        let settings = HttpConnectorSettings::builder()
+            .read_timeout(Duration::from_millis(200))
+            .build();
+        let http_connector = connector(&ProxyConfig::default(), None)
+            .expect("connector builds")
+            .http_connector(&settings, &http_client::test_runtime_components());
+        let request = http::Request::get(format!("http://{address}/"))
+            .body(SdkBody::empty())
+            .expect("valid request");
+        let request = HttpRequest::try_from(request).expect("valid SDK request");
+
+        let error = tokio::time::timeout(Duration::from_secs(5), http_connector.call(request))
+            .await
+            .expect("the read timeout elapses first")
+            .expect_err("the server never responds");
+
+        assert!(error.is_timeout(), "expected a timeout error: {error:?}");
+    }
+
+    /// A stream the server refuses over HTTP/2 was not processed, so the SDK connector reports
+    /// it as an I/O error that the SDK treats as transient.
+    #[tokio::test]
+    async fn connector_reports_refused_http2_stream_as_io_error() {
+        use crate::tls::{
+            TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsEnableableConfig,
+        };
+
+        let server_tls = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    alpn_protocols: Some(vec!["h2".to_owned()]),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .expect("server TLS settings");
+        let mut listener = server_tls
+            .bind(&"127.0.0.1:0".parse().expect("address"))
+            .await
+            .expect("bind");
+        let port = listener.local_addr().expect("local address").port();
+        tokio::spawn(async move {
+            let mut stream = listener.accept().await.expect("accept");
+            stream.handshake().await.expect("TLS handshake");
+            let mut connection = h2::server::handshake(stream).await.expect("h2 handshake");
+            while let Some(Ok((_request, mut respond))) = connection.accept().await {
+                respond.send_reset(h2::Reason::REFUSED_STREAM);
+            }
+        });
+
+        let client_tls = TlsConfig {
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
+            alpn_protocols: Some(vec!["h2".to_owned()]),
+            ..Default::default()
+        };
+        let http_connector = connector(&ProxyConfig::default(), Some(&client_tls))
+            .expect("connector builds")
+            .http_connector(
+                &HttpConnectorSettings::default(),
+                &http_client::test_runtime_components(),
+            );
+        let request = http::Request::get(format!("https://localhost:{port}/"))
+            .body(SdkBody::empty())
+            .expect("valid request");
+        let request = HttpRequest::try_from(request).expect("valid SDK request");
+
+        let error = tokio::time::timeout(Duration::from_secs(5), http_connector.call(request))
+            .await
+            .expect("the server answers")
+            .expect_err("the server refuses the stream");
+
+        assert!(error.is_io(), "expected an I/O error: {error:?}");
+    }
 
     /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
     /// credentials, region, and service, and leave the URI unchanged.
     #[tokio::test]
-    async fn sign_request_v1_signs_with_fixed_time() {
+    async fn sign_request_signs_with_fixed_time() {
         const SERVICE_NAME: &str = "example-service";
         const URI: &str =
             "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
@@ -647,7 +805,7 @@ mod tests {
             .body(Bytes::from_static(BODY))
             .expect("valid request");
 
-        sign_request_v1_at(
+        sign_request_at(
             SERVICE_NAME,
             &mut request,
             &credentials_provider,
