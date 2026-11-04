@@ -50,6 +50,7 @@ pub(super) struct ChangelogEntry {
 #[derive(Debug, Deserialize)]
 pub(super) struct Release {
     pub(super) description: Option<String>,
+    #[serde(default)]
     pub(super) changelog: Vec<ChangelogEntry>,
 }
 

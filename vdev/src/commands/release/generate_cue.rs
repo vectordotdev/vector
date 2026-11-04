@@ -1207,19 +1207,19 @@ mod tests {
     }
 
     #[test]
-    fn leaves_handwritten_description_unchanged() {
+    fn leaves_legacy_handwritten_description_without_changelog_unchanged() {
         let tmp = tempfile::tempdir().unwrap();
-        let path = tmp.path().join(RELEASES_DIR).join("0.57.0.cue");
+        let path = tmp.path().join(RELEASES_DIR).join("0.18.1.cue");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let original = indoc::indoc! {r#"
             package metadata
-            releases: "0.57.0": {
+            releases: "0.18.1": {
                 description: "Handwritten migration notes."
-                changelog: []
+                commits: [{description: "Keep this legacy commit."}]
             }
         "#};
         fs::write(&path, original).unwrap();
-        fill_missing_description(tmp.path(), &Version::new(0, 57, 0)).unwrap();
+        fill_missing_description(tmp.path(), &Version::new(0, 18, 1)).unwrap();
         assert_eq!(fs::read_to_string(path).unwrap(), original);
     }
 
