@@ -20,6 +20,32 @@ fn write_files(root: &Path, files: &[(&str, &str)]) {
 }
 
 #[test]
+#[cfg(feature = "sinks-amqp")]
+fn amqp_priority_accepts_interpolated_hex_integer() {
+    const CONFIG: &str = indoc! {r"
+        sinks:
+          out:
+            type: amqp
+            inputs: []
+            connection_string: amqp://127.0.0.1:5672/%2f
+            exchange: test
+            encoding:
+              codec: json
+            properties:
+              priority: ${VECTOR_TEST_COMPAT_UNSET:-0x2}
+    "};
+
+    let input = with_absent_env_var(CONFIG);
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .load_from_input(input.as_bytes(), crate::config::Format::Yaml)
+        .unwrap();
+
+    let config = serde_json::to_value(builder).unwrap();
+    assert_eq!(config["sinks"]["out"]["properties"]["priority"], 2);
+}
+
+#[test]
 fn no_proxy_preserves_string_and_list_matching() {
     for (input, matches_hosts) in [
         (json!("localhost,127.0.0.1"), true),
