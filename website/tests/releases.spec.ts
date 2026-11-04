@@ -1,5 +1,45 @@
 import { test, expect } from "./fixtures";
 
+for (const version of ["0.58.0", "0.59.0", "0.60.0", "0.61.0"]) {
+  test(`generated description fills the listing and release page for ${version}`, async ({ page }) => {
+    await page.goto("/releases/");
+    const card = page.locator(`a[href="/releases/${version}/"]`).filter({ hasText: `Version ${version}` });
+    const listing = card.locator("xpath=following-sibling::div[1]").locator(".release-description");
+    await expect(listing).toContainText(`is happy to announce Vector ${version}!`);
+    await expect(listing).toContainText(/Thanks to the \d+ contributors who made the \d+ changes/);
+    await expect(listing.getByRole("link", { name: "upgrade guide", exact: true })).toBeVisible();
+    await listing.getByRole("link", { name: "View the full release notes" }).click();
+    await expect(page).toHaveURL(`/releases/${version}/`);
+
+    const description = page.locator(".release-description");
+    await expect(description).toContainText(`is happy to announce Vector ${version}!`);
+    await expect(description.getByRole("link", { name: "View the full release notes" })).toHaveCount(0);
+    for (const link of await description.locator("li a").all()) {
+      const label = await link.innerText();
+      const href = (await link.getAttribute("href"))!;
+      const anchor = new URL(href, page.url()).hash;
+      await expect(page.locator(anchor)).toHaveText(label);
+    }
+    await description.getByRole("link", { name: "upgrade guide", exact: true }).click();
+    await expect(
+      page
+        .locator("h1, h2")
+        .filter({ hasText: /Upgrade Guide/i })
+        .first()
+    ).toBeVisible();
+  });
+}
+
+test("handwritten release descriptions retain their content", async ({ page }) => {
+  for (const path of ["/releases/", "/releases/0.57.0/"]) {
+    await page.goto(path);
+    const description = page.locator(".release-description").filter({ hasText: "over-restrict now and relax later" });
+    await expect(description).toContainText("Breaking Changes");
+    await expect(description).not.toContainText("is happy to announce Vector");
+    await expect(description).toContainText("environment variable interpolation is now disabled by default");
+  }
+});
+
 for (const width of [1280, 390]) {
   test(`multiline VRL entries stay inside their cards at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

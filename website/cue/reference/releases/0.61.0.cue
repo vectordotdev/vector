@@ -1,6 +1,20 @@
 package metadata
 
 releases: "0.61.0": {
+	description: #"""
+		The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.61.0`! 🚀
+
+		Thanks to the 10 contributors who made the 23 changes in this release:
+
+		- [1 breaking change](/releases/0.61.0/#breaking-changes)
+		- [3 security changes](/releases/0.61.0/#security-changes)
+		- [2 new features](/releases/0.61.0/#new-features)
+		- [6 enhancements](/releases/0.61.0/#enhancements)
+		- [11 bug fixes](/releases/0.61.0/#bug-fixes)
+
+		Upgrading to 0.61? Read the [upgrade guide](/releases/0.61.0/#upgrade-guide).
+		"""#
+
 	date: "2026-10-29"
 
 	changelog: [
