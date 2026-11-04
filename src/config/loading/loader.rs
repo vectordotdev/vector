@@ -23,7 +23,7 @@ pub enum ComponentHint {
 impl ComponentHint {
     /// Returns the component string field that should host a component -- e.g. sources,
     /// transforms, etc.
-    const fn as_component_field(&self) -> &str {
+    pub(super) const fn as_component_field(&self) -> &str {
         match self {
             ComponentHint::Source => "sources",
             ComponentHint::Transform => "transforms",
