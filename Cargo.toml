@@ -701,6 +701,9 @@ protobuf-build = ["dep:tonic-prost-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
+# Microsoft Entra ID credentials shared by the Azure sinks and the `kafka` source.
+azure-core = ["dep:azure_core", "dep:azure_identity"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
@@ -982,8 +985,8 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
-sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
+sinks-azure_blob = ["azure-core", "dep:azure_storage_blob"]
+sinks-azure_logs_ingestion = ["azure-core", "dep:azure_storage_blob"]
 sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "codecs-arrow"]
