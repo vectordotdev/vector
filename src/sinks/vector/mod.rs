@@ -66,7 +66,7 @@ mod tests {
     use futures::{StreamExt, channel::mpsc};
     use http::{Method, Response, request::Parts};
     use http_body_util::Full;
-    use hyper_1::service::service_fn;
+    use hyper::service::service_fn;
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,

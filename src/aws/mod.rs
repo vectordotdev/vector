@@ -620,7 +620,7 @@ mod tests {
 
     use aws_credential_types::Credentials;
     use http_body_util::{BodyExt, Full};
-    use hyper_1::body::Incoming;
+    use hyper::body::Incoming;
     use tokio::{io::AsyncReadExt, net::TcpListener, sync::mpsc};
 
     use super::*;

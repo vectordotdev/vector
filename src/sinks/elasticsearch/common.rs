@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use http::{Request, Response, StatusCode, Uri};
 use http_body_util::BodyExt;
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use serde::Deserialize;
 use vector_http::full_body;
 use vector_lib::config::{LogNamespace, proxy::ProxyConfig};

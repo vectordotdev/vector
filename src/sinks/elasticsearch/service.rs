@@ -8,7 +8,7 @@ use futures::future::BoxFuture;
 use http::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
-use tower_http_1::decompression::Decompression;
+use tower_http::decompression::Decompression;
 use vector_http::full_body;
 use vector_lib::{
     ByteSizeOf,

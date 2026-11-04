@@ -5,9 +5,9 @@ use std::{
 };
 
 use futures::{Stream, StreamExt, future::BoxFuture};
-use headers_1::{Authorization, HeaderMapExt};
+use headers::{Authorization, HeaderMapExt};
 use http::{Request, Response, Version};
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::{conn::auto::Builder as ConnectionBuilder, graceful::GracefulShutdown},
@@ -16,7 +16,7 @@ use hyper_util::{
 use serde_with::serde_as;
 use tokio::{net::TcpStream, time::Instant};
 use tower::{Layer, Service};
-use tower_http_1::{
+use tower_http::{
     classify::{ServerErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };

@@ -23,7 +23,7 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::oneshot;
 use tower::ServiceBuilder;
-use tower_http_1::compression::CompressionLayer;
+use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,

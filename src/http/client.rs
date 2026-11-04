@@ -4,7 +4,7 @@ use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tracing::Instrument;
 use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 

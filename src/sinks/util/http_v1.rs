@@ -9,7 +9,7 @@ use futures::future::BoxFuture;
 use http::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
-use tower_http_1::decompression::Decompression;
+use tower_http::decompression::Decompression;
 use tracing::debug;
 use vector_http::{HttpError, full_body};
 use vector_lib::{
