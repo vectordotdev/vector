@@ -1,6 +1,7 @@
-The `throttle` transform can add configurable event-derived tags to discard
-metrics using `internal_metrics.events_discarded_tags`. Set `internal_metrics.include_key_tag`
-to false to omit the throttle key from `events_discarded_total`. These options do not change
-rate-limit buckets. Missing template fields warn and omit the tag; empty values omit it.
+The `throttle` transform supports `internal_metrics.events_discarded_tags` to enable
+`events_discarded_total` with selected event-derived tags. The map fully selects attribution
+tags, including `key`; an empty map emits without attribution tags. Existing configurations
+without the map retain their behavior. Rate-limit buckets are unchanged. Missing template
+fields warn and omit the tag; empty values omit it.
 
 authors: akashvbabu91

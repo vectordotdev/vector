@@ -12,32 +12,34 @@ generated: components: transforms: throttle: configuration: {
 		type: object: options: {
 			emit_events_discarded_per_key: {
 				description: """
-					Whether or not to emit the `events_discarded_total` internal metric.
+					Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
 
-					If true, the counter is incremented for each discarded event. The `key` tag is included
-					by default; set `include_key_tag` to false to omit it. If false, the counter is not emitted.
-					Discard counts remain available through `component_discarded_events_total`.
-
-					This defaults to false because the `key` tag has potentially unbounded cardinality.
-					Only enable the counter with tags whose cardinality is bounded.
+					This legacy option applies only when `events_discarded_tags` is not configured.
+					When false, discard counts remain available through `component_discarded_events_total`.
+					Defaults to false because the `key` tag has potentially unbounded cardinality.
 					"""
 				required: false
 				type: bool: default: false
 			}
 			events_discarded_tags: {
 				description: """
-					Extra tags to add to the `events_discarded_total` internal metric.
+					Tags to include on the `events_discarded_total` internal metric.
 
-					Values are event templates evaluated only for discarded events when
-					`emit_events_discarded_per_key` is true. Missing fields emit a warning and omit that tag.
-					Empty results also omit the tag.
-					These tags do not change rate-limit buckets or `component_discarded_events_total`.
-					The `key` tag and Vector's global metric tags, such as `component_id`, are reserved.
-					Only use values with bounded cardinality to avoid creating unbounded metric series.
+					Configuring this map enables the counter and replaces the legacy `key` tag selection,
+					regardless of `emit_events_discarded_per_key`. An empty map emits the counter without
+					attribution tags. Vector's component and collector tags are still added normally.
+					When this option is absent, `emit_events_discarded_per_key` retains its existing behavior.
+					To include a `key` tag, select it explicitly with a template, such as `key: "{{ workload_id }}"`.
+					It is an ordinary log template, not a reference to Vector's resolved throttle key.
+
+					Values are event templates evaluated only for discarded events. Missing fields emit a
+					warning and omit that tag; empty results also omit it. These tags do not change rate-limit
+					buckets or `component_discarded_events_total`. Vector's global metric tags, such as
+					`component_id`, are reserved. Only use values with bounded cardinality.
 					"""
 				required: false
 				type: object: options: "*": {
-					description: "An event template for an additional discard metric tag."
+					description: "An event template for a discard metric tag."
 					required:    true
 					type: string: syntax: "template"
 				}
@@ -55,19 +57,6 @@ generated: components: transforms: throttle: configuration: {
 					"""
 				required: false
 				type: bool: default: false
-			}
-			include_key_tag: {
-				description: """
-					Whether to include the `key` tag on `events_discarded_total`.
-
-					Defaults to true to preserve existing per-key metrics. The tag contains the rendered
-					`key_field` value, or `None` when no key is available. Setting this to false aggregates
-					discard counts across throttle keys that have the same remaining metric tags.
-					This does not change rate-limit buckets or the `include_group_tag` setting.
-					Requires `emit_events_discarded_per_key` to be enabled.
-					"""
-				required: false
-				type: bool: default: true
 			}
 		}
 	}

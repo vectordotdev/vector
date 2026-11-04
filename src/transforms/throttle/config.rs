@@ -15,43 +15,35 @@ use crate::{
 
 /// Configuration of internal metrics for the Throttle transform.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleInternalMetricsConfig {
-    /// Whether or not to emit the `events_discarded_total` internal metric.
+    /// Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
     ///
-    /// If true, the counter is incremented for each discarded event. The `key` tag is included
-    /// by default; set `include_key_tag` to false to omit it. If false, the counter is not emitted.
-    /// Discard counts remain available through `component_discarded_events_total`.
-    ///
-    /// This defaults to false because the `key` tag has potentially unbounded cardinality.
-    /// Only enable the counter with tags whose cardinality is bounded.
+    /// This legacy option applies only when `events_discarded_tags` is not configured.
+    /// When false, discard counts remain available through `component_discarded_events_total`.
+    /// Defaults to false because the `key` tag has potentially unbounded cardinality.
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
 
-    /// Whether to include the `key` tag on `events_discarded_total`.
+    /// Tags to include on the `events_discarded_total` internal metric.
     ///
-    /// Defaults to true to preserve existing per-key metrics. The tag contains the rendered
-    /// `key_field` value, or `None` when no key is available. Setting this to false aggregates
-    /// discard counts across throttle keys that have the same remaining metric tags.
-    /// This does not change rate-limit buckets or the `include_group_tag` setting.
-    /// Requires `emit_events_discarded_per_key` to be enabled.
-    #[serde(default = "crate::serde::default_true")]
-    pub include_key_tag: bool,
-
-    /// Extra tags to add to the `events_discarded_total` internal metric.
+    /// Configuring this map enables the counter and replaces the legacy `key` tag selection,
+    /// regardless of `emit_events_discarded_per_key`. An empty map emits the counter without
+    /// attribution tags. Vector's component and collector tags are still added normally.
+    /// When this option is absent, `emit_events_discarded_per_key` retains its existing behavior.
+    /// To include a `key` tag, select it explicitly with a template, such as `key: "{{ workload_id }}"`.
+    /// It is an ordinary log template, not a reference to Vector's resolved throttle key.
     ///
-    /// Values are event templates evaluated only for discarded events when
-    /// `emit_events_discarded_per_key` is true. Missing fields emit a warning and omit that tag.
-    /// Empty results also omit the tag.
-    /// These tags do not change rate-limit buckets or `component_discarded_events_total`.
-    /// The `key` tag and Vector's global metric tags, such as `component_id`, are reserved.
-    /// Only use values with bounded cardinality to avoid creating unbounded metric series.
-    #[serde(default)]
+    /// Values are event templates evaluated only for discarded events. Missing fields emit a
+    /// warning and omit that tag; empty results also omit it. These tags do not change rate-limit
+    /// buckets or `component_discarded_events_total`. Vector's global metric tags, such as
+    /// `component_id`, are reserved. Only use values with bounded cardinality.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(
-        docs::additional_props_description = "An event template for an additional discard metric tag."
+        docs::additional_props_description = "An event template for a discard metric tag."
     ))]
-    pub events_discarded_tags: HashMap<String, UnconfinedTemplate>,
+    pub events_discarded_tags: Option<HashMap<String, UnconfinedTemplate>>,
 
     /// Whether or not to include the `group` tag on the `component_discarded_events_total`
     /// internal metric.
@@ -65,23 +57,13 @@ pub struct ThrottleInternalMetricsConfig {
     pub include_group_tag: bool,
 }
 
-impl Default for ThrottleInternalMetricsConfig {
-    fn default() -> Self {
-        Self {
-            emit_events_discarded_per_key: false,
-            include_key_tag: true,
-            events_discarded_tags: HashMap::new(),
-            include_group_tag: false,
-        }
-    }
-}
-
 impl ThrottleInternalMetricsConfig {
     pub(super) fn validate(&self) -> Result<(), ConfigError> {
         if let Some(tag) = self
             .events_discarded_tags
-            .keys()
-            .find(|tag| tag.as_str() == "key" || vector_lib::metrics::LABELS.contains(tag.as_str()))
+            .iter()
+            .flat_map(|tags| tags.keys())
+            .find(|tag| vector_lib::metrics::LABELS.contains(tag.as_str()))
         {
             return Err(ConfigError::ReservedMetricTag { tag: tag.clone() });
         }
@@ -185,11 +167,27 @@ mod tests {
         )
         .unwrap();
         assert!(!config.internal_metrics.include_group_tag);
-        assert!(config.internal_metrics.include_key_tag);
-        assert!(ThrottleConfig::default().internal_metrics.include_key_tag);
+        assert!(config.internal_metrics.events_discarded_tags.is_none());
+        assert!(!config.internal_metrics.emit_events_discarded_per_key);
+        assert!(
+            serde_json::to_value(&config).unwrap()["internal_metrics"]
+                .get("events_discarded_tags")
+                .is_none()
+        );
+        assert!(
+            ThrottleConfig::default()
+                .internal_metrics
+                .events_discarded_tags
+                .is_none()
+        );
         let without_internal_metrics =
             serde_yaml::from_str::<ThrottleConfig>("threshold: 1\nwindow_secs: 1\n").unwrap();
-        assert!(without_internal_metrics.internal_metrics.include_key_tag);
+        assert!(
+            without_internal_metrics
+                .internal_metrics
+                .events_discarded_tags
+                .is_none()
+        );
     }
 
     #[test]

@@ -84,31 +84,34 @@ where
     }
 
     pub fn emit_event_discarded(&self, key: String, event: &Event) {
-        let tags = self
-            .internal_metrics
-            .events_discarded_tags
-            .iter()
-            .filter(|_| self.internal_metrics.emit_events_discarded_per_key)
-            .filter_map(|(name, template)| {
-                template
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some(name),
-                            drop_event: false,
-                        });
+        let tags = match &self.internal_metrics.events_discarded_tags {
+            Some(templates) => Some(
+                templates
+                    .iter()
+                    .filter_map(|(name, template)| {
+                        template
+                            .render_string(event)
+                            .map_err(|error| {
+                                emit!(TemplateRenderingError {
+                                    error,
+                                    field: Some(name),
+                                    drop_event: false,
+                                });
+                            })
+                            .ok()
+                            .filter(|value| !value.is_empty())
+                            .map(|value| (name.clone(), value))
                     })
-                    .ok()
-                    .filter(|value| !value.is_empty())
-                    .map(|value| (name.clone(), value))
-            })
-            .collect();
+                    .collect(),
+            ),
+            None => self
+                .internal_metrics
+                .emit_events_discarded_per_key
+                .then(|| vec![("key".to_owned(), key.clone())]),
+        };
         emit!(ThrottleEventDiscarded {
             key,
             tags,
-            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
-            include_key_tag: self.internal_metrics.include_key_tag,
             include_group_tag: self.internal_metrics.include_group_tag,
         });
     }
@@ -179,7 +182,7 @@ pub enum ConfigError {
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use std::{collections::HashMap, task::Poll};
 
     use futures::SinkExt;
     use indoc::indoc;
@@ -206,11 +209,10 @@ mod tests {
         .unwrap();
         config.internal_metrics.emit_events_discarded_per_key = emit_per_key;
         if extra_tags {
-            config.internal_metrics.events_discarded_tags = [
+            config.internal_metrics.events_discarded_tags = Some(HashMap::from([
                 ("tenant".to_owned(), "{{ tenant }}".try_into().unwrap()),
-                ("region".to_owned(), "{{ region }}".try_into().unwrap()),
-            ]
-            .into();
+                ("key".to_owned(), "{{ region }}".try_into().unwrap()),
+            ]));
         }
         config.validate_structure().unwrap();
         let throttle = Throttle::new(
@@ -250,7 +252,7 @@ mod tests {
 
         assert_eq!(
             vector_lib::event_test_util::contains_name_once("TemplateRenderingError").is_ok(),
-            emit_per_key && extra_tags,
+            extra_tags,
         );
         let metrics = vector_lib::metrics::Controller::get()
             .unwrap()
@@ -264,22 +266,21 @@ mod tests {
             .iter()
             .filter(|metric| metric.name() == "events_discarded_total")
             .map(|metric| {
-                assert_eq!(metric.tag_value("key").as_deref(), Some("shared-bucket"));
+                assert_eq!(
+                    metric.tag_value("key").as_deref(),
+                    Some(if extra_tags { "east" } else { "shared-bucket" })
+                );
                 let crate::event::MetricValue::Counter { value } = metric.value() else {
                     panic!("expected counter");
                 };
-                assert_eq!(
-                    metric.tag_value("region").as_deref(),
-                    extra_tags.then_some("east")
-                );
                 (metric.tag_value("tenant"), *value)
             })
             .collect::<Vec<_>>();
         discards.sort_by(|left, right| left.0.cmp(&right.0));
         let expected = match (emit_per_key, extra_tags) {
-            (false, _) => vec![],
+            (false, false) => vec![],
             (true, false) => vec![(None, 5.0)],
-            (true, true) => vec![
+            (_, true) => vec![
                 (None, 2.0),
                 (Some("second".to_owned()), 2.0),
                 (Some("third".to_owned()), 1.0),
@@ -295,7 +296,7 @@ mod tests {
             &crate::event::MetricValue::Counter { value: 5.0 }
         );
         assert_eq!(aggregate.tag_value("tenant"), None);
-        assert_eq!(aggregate.tag_value("region"), None);
+        assert_eq!(aggregate.tag_value("key"), None);
     }
 
     #[tokio::test]
@@ -305,6 +306,11 @@ mod tests {
 
     #[tokio::test]
     async fn discard_tags_disabled_preserves_aggregate() {
+        discard_metrics_case(false, false).await;
+    }
+
+    #[tokio::test]
+    async fn discard_tags_enable_counter_without_legacy_flag() {
         discard_metrics_case(false, true).await;
     }
 
@@ -314,24 +320,25 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case(false)]
-    #[case(true)]
     #[tokio::test]
-    async fn discard_tags_without_key_aggregate_across_buckets(#[case] extra_tags: bool) {
+    async fn discard_tags_without_key_aggregate_across_buckets(
+        #[values(false, true)] legacy_enabled: bool,
+        #[values(false, true)] extra_tags: bool,
+    ) {
         vector_lib::metrics::init_test();
         let mut config: ThrottleConfig = serde_yaml::from_str(indoc! {r#"
             threshold: 1
             window_secs: 60
             key_field: "{{ entity }}"
             internal_metrics:
-              emit_events_discarded_per_key: true
-              include_key_tag: false
+              events_discarded_tags: {}
               include_group_tag: true
         "#})
         .unwrap();
+        config.internal_metrics.emit_events_discarded_per_key = legacy_enabled;
         if extra_tags {
             config.internal_metrics.events_discarded_tags =
-                [("tenant".to_owned(), "{{ tenant }}".try_into().unwrap())].into();
+                Some([("tenant".to_owned(), "{{ tenant }}".try_into().unwrap())].into());
         }
         config.validate_structure().unwrap();
         let throttle = Throttle::new(
@@ -399,13 +406,14 @@ mod tests {
 
     #[test]
     fn discard_tags_cannot_override_builtin_tags() {
-        for tag in std::iter::once("key").chain(vector_lib::metrics::LABELS.iter().copied()) {
+        for &tag in vector_lib::metrics::LABELS.iter() {
             let config = ThrottleConfig {
                 threshold: 1,
                 window_secs: Duration::from_secs(1),
                 internal_metrics: ThrottleInternalMetricsConfig {
-                    events_discarded_tags: [(tag.to_owned(), "override".try_into().unwrap())]
-                        .into(),
+                    events_discarded_tags: Some(
+                        [(tag.to_owned(), "override".try_into().unwrap())].into(),
+                    ),
                     ..Default::default()
                 },
                 ..Default::default()
