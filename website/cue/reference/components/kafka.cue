@@ -88,7 +88,7 @@ components: _kafka: {
 				It is possible to use the `kafka` source and sink with [Azure Event Hubs](\(urls.azure_event_hubs))
 				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
 				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
-				sink to connect to Azure Event Hubs set the following options:
+				sink to connect to Azure Event Hubs with a shared access key, set the following options:
 				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
 				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must
 				  be specified as `$$Default` to escape the `$` used for environment variables.
@@ -100,6 +100,29 @@ components: _kafka: {
 				- `tls.enabled` - Set to `true`.
 				- `tls.ca_file` - The certificate authority file.
 				- `tls.verify_certificate` - Set to `true`.
+
+				The `kafka` source can authenticate with a Microsoft Entra ID token instead of a shared
+				access key, as Microsoft [recommends](\(urls.azure_event_hubs_authorization)) where possible.
+				The `kafka` sink does not support this yet, so it still needs the connection string. For the
+				source, keep `bootstrap_servers`, `group_id`, `topics`, `tls.ca_file`, and `tls.verify_certificate`
+				from above, do not set `sasl.mechanism`, `sasl.username`, or `sasl.password`, and set these
+				options:
+				- `sasl.azure.token_scope` - Set to `https://<namespace name>.servicebus.windows.net/.default`.
+				- `sasl.azure.auth` - The Azure credential, for example `azure_credential_kind: workload_identity`
+				  on Kubernetes or `azure_credential_kind: managed_identity` on an Azure virtual machine.
+				- `tls.enabled` - Set to `true`. `sasl.azure` requires it.
+
+				`sasl.azure` enables SASL, so `sasl.enabled` can stay unset. The identity needs the
+				[Azure Event Hubs Data Receiver](\(urls.azure_event_hubs_entra_id)) role on the event hub or on
+				its namespace. For [workload identity](\(urls.azure_workload_identity)) on Azure Kubernetes
+				Service, the pod needs the label `azure.workload.identity/use: "true"`, and its service account
+				needs the annotation `azure.workload.identity/client-id` with the client ID of the identity.
+
+				Token requests do not use the global `proxy` option. They use the `HTTPS_PROXY`, `HTTP_PROXY`,
+				`ALL_PROXY`, and `NO_PROXY` environment variables. An uppercase variable takes precedence over
+				its lowercase form, even when its value is empty. If a managed identity gets its tokens from the
+				Azure instance metadata service, add `169.254.169.254` to `NO_PROXY`, because Azure does
+				[not support](\(urls.azure_imds_proxies)) requests to that service through a proxy.
 				"""
 		}
 	}
