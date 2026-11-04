@@ -94,22 +94,42 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
+    /// The data types accepted by the component. Defaults to all data types.
+    ///
+    /// When `multiple_outputs` is enabled, each data type is sent to its own output.
+    /// Data types disabled by the deprecated `disable_*` options are removed from this list.
+    #[configurable(metadata(docs::examples = "example_enabled_data_types()"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    enabled_data_types: Option<Vec<DatadogAgentDataType>>,
+
     /// If this is set to `true`, logs are not accepted by the component.
-    #[serde(default = "crate::serde::default_false")]
-    disable_logs: bool,
+    #[configurable(
+        deprecated = "This option has been deprecated, use `enabled_data_types` instead."
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disable_logs: Option<bool>,
 
     /// If this is set to `true`, metrics (beta) are not accepted by the component.
-    #[serde(default = "crate::serde::default_false")]
-    disable_metrics: bool,
+    #[configurable(
+        deprecated = "This option has been deprecated, use `enabled_data_types` instead."
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disable_metrics: Option<bool>,
 
     /// If this is set to `true`, traces (alpha) are not accepted by the component.
-    #[serde(default = "crate::serde::default_false")]
-    disable_traces: bool,
+    #[configurable(
+        deprecated = "This option has been deprecated, use `enabled_data_types` instead."
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disable_traces: Option<bool>,
 
     /// If this is set to `true`, LLM Observability events are not accepted by the component.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `enabled_data_types` instead."
+    )]
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::serde::default_false")]
-    disable_llmobs: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disable_llmobs: Option<bool>,
 
     /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
@@ -164,6 +184,28 @@ pub struct DatadogAgentConfig {
     send_timeout_secs: Option<f64>,
 }
 
+/// Data types accepted by the `datadog_agent` source.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum DatadogAgentDataType {
+    /// Logs.
+    Logs,
+
+    /// Metrics (beta).
+    Metrics,
+
+    /// Traces (alpha).
+    Traces,
+
+    /// LLM Observability events.
+    Llmobs,
+}
+
+const fn example_enabled_data_types() -> [&'static str; 3] {
+    ["logs", "metrics", "traces"]
+}
+
 impl GenerateConfig for DatadogAgentConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
@@ -173,10 +215,11 @@ impl GenerateConfig for DatadogAgentConfig {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
-            disable_logs: false,
-            disable_metrics: false,
-            disable_traces: false,
-            disable_llmobs: false,
+            enabled_data_types: None,
+            disable_logs: None,
+            disable_metrics: None,
+            disable_traces: None,
+            disable_llmobs: None,
             multiple_outputs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
@@ -192,6 +235,19 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        if [
+            self.disable_logs,
+            self.disable_metrics,
+            self.disable_traces,
+            self.disable_llmobs,
+        ]
+        .iter()
+        .any(Option::is_some)
+        {
+            warn!(
+                "DEPRECATED: `disable_logs`, `disable_metrics`, `disable_traces`, and `disable_llmobs` are deprecated. Use `enabled_data_types` instead. See https://vector.dev/deprecations/#datadog_agent-disable_options for migration instructions."
+            );
+        }
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let logs_schema_definition = cx
@@ -371,17 +427,17 @@ impl SourceConfig for DatadogAgentConfig {
         let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
-            if !self.disable_logs {
+            if self.is_enabled(DatadogAgentDataType::Logs) {
                 output
                     .push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS));
             }
-            if !self.disable_metrics {
+            if self.is_enabled(DatadogAgentDataType::Metrics) {
                 output.push(SourceOutput::new_metrics().with_port(METRICS));
             }
-            if !self.disable_traces {
+            if self.is_enabled(DatadogAgentDataType::Traces) {
                 output.push(SourceOutput::new_traces().with_port(TRACES));
             }
-            if !self.disable_llmobs {
+            if self.is_enabled(DatadogAgentDataType::Llmobs) {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
@@ -406,6 +462,21 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn send_timeout(&self) -> Option<Duration> {
         self.send_timeout_secs.map(Duration::from_secs_f64)
+    }
+}
+
+impl DatadogAgentConfig {
+    fn is_enabled(&self, data_type: DatadogAgentDataType) -> bool {
+        let disabled = match data_type {
+            DatadogAgentDataType::Logs => self.disable_logs,
+            DatadogAgentDataType::Metrics => self.disable_metrics,
+            DatadogAgentDataType::Traces => self.disable_traces,
+            DatadogAgentDataType::Llmobs => self.disable_llmobs,
+        };
+        self.enabled_data_types
+            .as_ref()
+            .is_none_or(|data_types| data_types.contains(&data_type))
+            && !disabled.unwrap_or(false)
     }
 }
 
@@ -503,24 +574,25 @@ impl DatadogAgentSource {
         handler: RequestHandler,
         config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let mut filters =
-            (!config.disable_logs).then(|| logs::build_warp_filter(handler.clone(), self.clone()));
+        let mut filters = config
+            .is_enabled(DatadogAgentDataType::Logs)
+            .then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
-        if !config.disable_traces {
+        if config.is_enabled(DatadogAgentDataType::Traces) {
             let trace_filter = traces::build_warp_filter(handler.clone(), self.clone());
             filters = filters
                 .map(|f| f.or(trace_filter.clone()).unify().boxed())
                 .or(Some(trace_filter));
         }
 
-        if !config.disable_metrics {
+        if config.is_enabled(DatadogAgentDataType::Metrics) {
             let metrics_filter = metrics::build_warp_filter(handler.clone(), self.clone());
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
         }
 
-        if !config.disable_llmobs {
+        if config.is_enabled(DatadogAgentDataType::Llmobs) {
             let llmobs_filter = llmobs::build_warp_filter(handler, self.clone());
             filters = filters
                 .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
