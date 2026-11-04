@@ -156,6 +156,23 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
 
+    /// The amount of time, in seconds, that a metric's internal normalization cache entry
+    /// is retained after the metric was last seen before being evicted.
+    ///
+    /// Vector must track per-series state in order to convert absolute metrics into
+    /// incremental ones (and vice versa) for the Datadog metrics API. Without a limit on
+    /// how long that state is retained, series that stop being emitted (for example, due to
+    /// tags that include ephemeral identifiers like container or task IDs) will never have
+    /// their cached state removed, causing unbounded memory growth over time.
+    ///
+    /// If unset, sending metrics with unbounded series cardinality to this sink can cause
+    /// indefinite memory growth.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 3600.0))]
+    #[configurable(metadata(docs::required = false))]
+    pub expire_metrics_secs: Option<f64>,
+
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -310,6 +327,7 @@ impl DatadogMetricsConfig {
             sketches_batcher_settings,
             protocol,
             self.series_api_version,
+            self.expire_metrics_secs,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -426,6 +444,19 @@ mod tests {
                 .expect("v2, v3, and the unset default must all parse");
             assert_eq!(config.series_api_version, expected);
         }
+    }
+
+    #[test]
+    fn expire_metrics_secs_is_configurable() {
+        let config = serde_yaml::from_str::<DatadogMetricsConfig>("default_api_key: unused")
+            .expect("config without expire_metrics_secs must parse");
+        assert_eq!(config.expire_metrics_secs, None);
+
+        let config = serde_yaml::from_str::<DatadogMetricsConfig>(
+            "default_api_key: unused\nexpire_metrics_secs: 3600",
+        )
+        .expect("config with expire_metrics_secs must parse");
+        assert_eq!(config.expire_metrics_secs, Some(3600.0));
     }
 
     #[test]
