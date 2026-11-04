@@ -18,7 +18,7 @@ impl BytesPath {
         Self { path }
     }
     #[cfg(windows)]
-    pub fn new(path: Bytes) -> Self {
+    pub(super) fn new(path: Bytes) -> Self {
         let utf8_string = String::from_utf8_lossy(&path[..]);
         let path = std::path::PathBuf::from(utf8_string.as_ref());
         Self { path }
