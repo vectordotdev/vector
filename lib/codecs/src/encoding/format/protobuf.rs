@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::encoding::BuildError;
 use bytes::BytesMut;
-use prost_reflect::{MessageDescriptor, prost::Message as _};
+use prost::Message as _;
+use prost_reflect::MessageDescriptor;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -25,11 +26,11 @@ pub struct ProtobufSerializerConfig {
 
 impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `desc_file` cannot be read or decoded as a protobuf descriptor set, or
+    /// if it does not contain `message_type`.
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
         let message_descriptor =
             get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
@@ -108,11 +109,11 @@ impl ProtobufSerializer {
     }
 
     /// Creates a new serializer instance using the descriptor bytes directly.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `desc_bytes` cannot be decoded as a protobuf descriptor set, or if it
+    /// does not contain `message_type`.
     pub fn new_from_bytes(
         desc_bytes: &[u8],
         message_type: &str,

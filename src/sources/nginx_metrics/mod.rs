@@ -6,13 +6,13 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
-use http::{Request, StatusCode};
-use http_body::Collected;
-use hyper::{Body, Uri};
+use http::{Request, StatusCode, Uri};
+use http_body_util::{BodyExt as _, Collected};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::empty_body;
 use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
@@ -32,16 +32,28 @@ use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr_2021) => {
-        MetricValue::Counter {
-            value: $value as f64,
+        {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_lossless,
+                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
+            )]
+            let value = $value as f64;
+            MetricValue::Counter { value }
         }
     };
 }
 
 macro_rules! gauge {
     ($value:expr_2021) => {
-        MetricValue::Gauge {
-            value: $value as f64,
+        {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_lossless,
+                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
+            )]
+            let value = $value as f64;
+            MetricValue::Gauge { value }
         }
     };
 }
@@ -94,6 +106,7 @@ pub(super) const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "nginx".to_string()
 }
@@ -105,11 +118,11 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let http_client = HttpClient::new(tls, &cx.proxy)?;
+        let http_client = HttpClient::new(tls.into(), &cx.proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let mut sources = Vec::with_capacity(self.endpoints.len());
-        for endpoint in self.endpoints.iter() {
+        for endpoint in &self.endpoints {
             sources.push(NginxMetrics::new(
                 http_client.clone(),
                 endpoint.clone(),
@@ -120,11 +133,11 @@ impl SourceConfig for NginxMetricsConfig {
 
         let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
+        Ok(crate::sources::source_with_error(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
-                let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
+                let metrics = join_all(sources.iter().map(NginxMetrics::collect)).await;
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
@@ -133,9 +146,9 @@ impl SourceConfig for NginxMetricsConfig {
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
                 let count = metrics.len();
 
-                if (cx.out.send_batch(metrics).await).is_err() {
+                if let Err(error) = cx.out.send_batch(metrics).await {
                     emit!(StreamClosedError { count });
-                    return Err(());
+                    return Err(error);
                 }
             }
 
@@ -214,7 +227,7 @@ impl NginxMetrics {
             emit!(NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
-            })
+            });
         })?;
         emit!(EndpointBytesReceived {
             byte_size: response.len(),
@@ -227,7 +240,7 @@ impl NginxMetrics {
                 emit!(NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
-                })
+                });
             })?;
 
         Ok(vec![
@@ -242,18 +255,15 @@ impl NginxMetrics {
     }
 
     async fn get_nginx_response(&self) -> crate::Result<Bytes> {
-        let mut request = Request::get(&self.endpoint).body(Body::empty())?;
+        let mut request = Request::get(&self.endpoint).body(empty_body())?;
         if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
+            auth.apply_v1(&mut request);
         }
 
         let response = self.http_client.send(request).await?;
         let (parts, body) = response.into_parts();
         match parts.status {
-            StatusCode::OK => http_body::Body::collect(body)
-                .err_into()
-                .await
-                .map(Collected::to_bytes),
+            StatusCode::OK => body.collect().err_into().await.map(Collected::to_bytes),
             status => Err(Box::new(NginxError::InvalidResponseStatus { status })),
         }
     }
@@ -323,7 +333,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_stub_status() {
         let url = format!("{}/basic_status", nginx_address());
-        test_nginx(url, None, ProxyConfig::default()).await
+        test_nginx(url, None, ProxyConfig::default()).await;
     }
 
     #[tokio::test]
@@ -337,7 +347,7 @@ mod integration_tests {
             }),
             ProxyConfig::default(),
         )
-        .await
+        .await;
     }
 
     // This integration test verifies that proxy support is wired up correctly in Vector
@@ -353,6 +363,6 @@ mod integration_tests {
                 ..Default::default()
             },
         )
-        .await
+        .await;
     }
 }

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use clap::{CommandFactory, Parser};
 use clap_complete::{Shell, generate};

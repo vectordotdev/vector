@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Functionality to handle enrichment tables.
 use std::path::PathBuf;
 

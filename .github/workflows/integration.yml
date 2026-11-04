@@ -3,6 +3,10 @@
 # This workflow runs the integration tests. If the workflow is triggered in the merge queue, all integration tests
 # are run. If the workflow is triggered in a PR commit, then the files changed in the PR are evaluated to determine
 # if any integration tests will run.
+#
+# Release preparation PRs (`prepare-v-*` branches in this repository opened by `vectordotdev-bot[bot]`) run all
+# integration and e2e tests on every PR commit, because they are squash-merged directly and never go through the
+# merge queue. Manually opened preparation PRs use the `/ci-run-integration-all` and `/ci-run-e2e-all` review commands.
 
 name: Integration Test Suite
 
@@ -15,7 +19,7 @@ on:
         type: boolean
         default: false
       coverage:
-        description: "Collect code coverage (outputs target/coverage/lcov.info per service)"
+        description: "Collect per-environment integration coverage (requires ci-coverage-tools from coverage.yml)"
         required: false
         type: boolean
         default: false
@@ -70,6 +74,10 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
       github.event_name == 'workflow_call' ||
       inputs.run_all == true ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
+      startsWith(github.head_ref, 'prepare-v-')) ||
       (github.event_name == 'merge_group' &&
       needs.changes.result == 'success' &&
       (needs.changes.outputs.dependencies == 'true' ||
@@ -96,7 +104,11 @@ jobs:
       always() && !failure() && !cancelled() &&
       needs.build-test-runner.result == 'success' &&
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' ||
-       github.event_name == 'workflow_call' || inputs.run_all == true) &&
+       github.event_name == 'workflow_call' || inputs.run_all == true ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
+        startsWith(github.head_ref, 'prepare-v-'))) &&
       github.repository == 'vectordotdev/vector'
     strategy:
       fail-fast: false
@@ -143,16 +155,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
 
       - name: Determine if test should run
         id: check
+        # The job gate only admits `pull_request` events for release preparation PRs.
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                 "${{ github.event_name }}" == "workflow_call" || \
+                "${{ github.event_name }}" == "pull_request" || \
                 "${{ inputs.run_all }}" == "true" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" || \
                 "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
@@ -178,9 +192,22 @@ jobs:
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
         with:
-          vdev: true
+          vdev: ${{ !inputs.coverage }}
           mold: false
           datadog-ci: true
+
+      - name: Download coverage tooling
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools
+
+      - name: Use workflow coverage tooling
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        run: |
+          chmod +x "$RUNNER_TEMP/coverage-tools/vdev"
+          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
 
       - name: Pull test runner image
         if: steps.check.outputs.should_run == 'true'
@@ -197,13 +224,23 @@ jobs:
           max_attempts: 3
           command: vdev integration run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
+      - name: Seal integration reports
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        env:
+          COVERAGE_ARTIFACT: coverage-int-${{ matrix.service }}
+        run: |
+          vdev build coverage seal \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --artifact "$COVERAGE_ARTIFACT" --directory target/coverage
+
       - name: Upload coverage artifact
-        if: inputs.coverage && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-int-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          path: target/coverage/
+          if-no-files-found: error
+          overwrite: true
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
@@ -230,16 +267,18 @@ jobs:
 
     steps:
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes
 
       - name: Determine if test should run
         id: check
+        # The job gate only admits `pull_request` events for release preparation PRs.
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                 "${{ github.event_name }}" == "workflow_call" || \
+                "${{ github.event_name }}" == "pull_request" || \
                 "${{ inputs.run_all }}" == "true" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" || \
                 "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
@@ -282,15 +321,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: vdev e2e run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
-
-      - name: Upload coverage artifact
-        if: inputs.coverage && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: coverage-e2e-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   integration-test-suite:
     name: Integration Test Suite

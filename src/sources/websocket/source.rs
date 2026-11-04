@@ -1,5 +1,6 @@
 use std::pin::Pin;
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
@@ -66,7 +67,7 @@ pub enum WebSocketSourceError {
     ConnectionClosedPrematurely,
 
     #[snafu(display("Connection closed by server with code '{}' and reason: '{}'", frame.code, frame.reason))]
-    RemoteClosed { frame: CloseFrame<'static> },
+    RemoteClosed { frame: CloseFrame },
 
     #[snafu(display("Connection closed by server without a close frame"))]
     RemoteClosedEmpty,
@@ -193,7 +194,7 @@ impl WebSocketSource {
                 Ok(())
             }
             Message::Ping(_) => Ok(()),
-            Message::Close(frame) => self.handle_close_frame(frame),
+            Message::Close(frame) => Self::handle_close_frame(frame),
             Message::Frame(_) => {
                 warn!("Unsupported message type received: frame.");
                 Ok(())
@@ -315,7 +316,7 @@ impl WebSocketSource {
     ) -> Result<(), WebSocketSourceError> {
         let initial_message = self.config.initial_message.as_ref().unwrap();
         ws_sink
-            .send(Message::Text(initial_message.clone()))
+            .send(Message::text(initial_message.clone()))
             .await
             .map_err(|error| {
                 emit!(WebSocketSendError { error: &error });
@@ -345,24 +346,19 @@ impl WebSocketSource {
                 self.process_message(&bin, WebSocketKind::Binary, out).await;
                 Ok(())
             }
-            Message::Close(frame) => self.handle_close_frame(frame),
+            Message::Close(frame) => Self::handle_close_frame(frame),
             _ => Ok(()),
         }
     }
 
-    fn handle_close_frame(
-        &self,
-        frame: Option<CloseFrame<'_>>,
-    ) -> Result<(), WebSocketSourceError> {
+    fn handle_close_frame(frame: Option<CloseFrame>) -> Result<(), WebSocketSourceError> {
         let (error_message, specific_error) = match frame {
             Some(frame) => {
                 let msg = format!(
                     "Connection closed by server with code '{}' and reason: '{}'",
                     frame.code, frame.reason
                 );
-                let err = WebSocketSourceError::RemoteClosed {
-                    frame: frame.into_owned(),
-                };
+                let err = WebSocketSourceError::RemoteClosed { frame };
                 (msg, err)
             }
             None => (
@@ -397,9 +393,9 @@ struct PingManager {
 impl PingManager {
     fn new(config: &WebSocketConfig) -> Self {
         let ping_message = if let Some(ping_msg) = &config.ping_message {
-            Message::Text(ping_msg.clone())
+            Message::text(ping_msg.clone())
         } else {
-            Message::Ping(vec![])
+            Message::Ping(Bytes::new())
         };
 
         Self {
@@ -432,7 +428,8 @@ impl PingManager {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, num::NonZeroU64};
+    use std::num::NonZeroU64;
+    use vector_lib::codecs::decoding::JsonDeserializerConfig;
 
     use futures::{StreamExt, sink::SinkExt};
     use tokio::{net::TcpListener, time::Duration};
@@ -477,9 +474,9 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
 
-            let binary_payload = br#"{"message": "binary data"}"#.to_vec();
+            let binary_payload = br#"{"message": "binary data"}"#.as_slice();
             websocket
-                .send(Message::Binary(binary_payload))
+                .send(Message::binary(binary_payload))
                 .await
                 .unwrap();
         });
@@ -500,7 +497,7 @@ mod tests {
 
             // Immediately send a message to the connected client (which will be our source)
             websocket
-                .send(Message::Text("message from server".to_string()))
+                .send(Message::text("message from server"))
                 .await
                 .unwrap();
         });
@@ -525,7 +522,7 @@ mod tests {
             {
                 // Received correct initial message, send response
                 websocket
-                    .send(Message::Text(response_message))
+                    .send(Message::text(response_message))
                     .await
                     .unwrap();
             }
@@ -544,7 +541,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("first message".to_string()))
+                .send(Message::text("first message"))
                 .await
                 .unwrap();
             // Close the connection to force a reconnect from the client
@@ -554,7 +551,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("second message".to_string()))
+                .send(Message::text("second message"))
                 .await
                 .unwrap();
         });
@@ -588,7 +585,7 @@ mod tests {
     async fn websocket_source_consume_binary_event() {
         let server_addr = start_binary_push_server().await;
         let mut config = make_config(&server_addr);
-        let decoding = DeserializerConfig::Json(Default::default());
+        let decoding = DeserializerConfig::Json(JsonDeserializerConfig::default());
         config.decoding = decoding;
 
         let events =
@@ -646,7 +643,7 @@ mod tests {
             if websocket.next().await.is_some() {
                 let close_frame = CloseFrame {
                     code: CloseCode::Error,
-                    reason: Cow::from("Simulated Internal Server Error"),
+                    reason: "Simulated Internal Server Error".into(),
                 };
                 websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
             }

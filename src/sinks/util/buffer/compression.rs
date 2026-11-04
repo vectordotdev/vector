@@ -163,7 +163,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "snappy" => Ok(Compression::Snappy),
                     _ => Err(de::Error::invalid_value(
                         de::Unexpected::Str(s),
-                        &r#""none" or "gzip" or "zlib" or "zstd""#,
+                        &r#""none" or "gzip" or "zlib" or "zstd" or "snappy""#,
                     )),
                 }
             }
@@ -577,7 +577,7 @@ mod test {
             ),
             (
                 r#""b42""#,
-                r#"invalid value: string "b42", expected "none" or "gzip" or "zlib" or "zstd" at line 1 column 5"#,
+                r#"invalid value: string "b42", expected "none" or "gzip" or "zlib" or "zstd" or "snappy" at line 1 column 5"#,
             ),
             (
                 r#"{"algorithm": "b42"}"#,

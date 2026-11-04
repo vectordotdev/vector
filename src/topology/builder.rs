@@ -31,12 +31,19 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuTimedExt, spawn_timed},
     enrichment::Table,
+    extra_context::ExtraContext,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -54,18 +61,11 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
-    extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -121,7 +121,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -177,6 +177,9 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        // Library callers may build topologies without going through CLI startup.
+        vector_lib::tls::install_default_crypto_provider();
+
         let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;
@@ -459,17 +462,12 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|()| TaskError::Opaque),
+                result = server => result.map_err(Into::into),
             };
 
-            // Even though we already tried to receive any pump task error above, we may have exited
-            // on the source itself returning an error due to task scheduling, where the pump task
-            // encountered an error, sent it over the oneshot, but we were polling the source
-            // already and hit an error trying to send to the now-shutdown pump task.
-            //
-            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
-            // time to see if the pump task encountered an error, using _that_ instead if so, to
-            // propagate the true error that caused the source to have to stop.
+            // The pump may fail while the source is being polled, before its error is received
+            // above. Prefer the pump error if both tasks fail: a source send error can be a
+            // consequence of the pump stopping, even when the source reports its cause.
             if let Ok(e) = pump_error_rx.try_recv() {
                 result = Err(e);
             }
@@ -480,7 +478,7 @@ impl<'a> Builder<'a> {
                     Ok(TaskOutput::Source)
                 }
                 Err(e) => {
-                    debug!("Source finished with an error.");
+                    debug!(error = %e, "Source finished with an error.");
                     Err(e)
                 }
             }
@@ -583,7 +581,7 @@ impl<'a> Builder<'a> {
             // `None` when `measure_cpu_usage` is false (the default): no counter
             // is registered and no per-poll `ThreadTime` measurement takes place.
             cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
+                Some(cpu_time::register_counter())
             } else {
                 None
             },
@@ -763,10 +761,8 @@ impl<'a> Builder<'a> {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|()| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
+            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+            .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);
@@ -1261,7 +1257,7 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,
@@ -1378,7 +1374,8 @@ impl Runner {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(error)) => return Err(TaskError::from(error)),
+                        None => unreachable!("bad poll"),
                     }
                 }
 

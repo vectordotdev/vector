@@ -1,23 +1,25 @@
-#![warn(clippy::pedantic)]
-
 pub mod logs;
 pub mod metrics;
 
 use std::collections::HashMap;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http::{StatusCode, Uri};
-use tower::Service;
+use http::{Request, StatusCode, Uri};
+use serde::{Deserialize, Deserializer, de::Error as _};
+use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     event::{KeyString, MetricTags},
     sensitive_string::SensitiveString,
 };
 
-use crate::http::HttpClient;
-use crate::sinks::util::HttpEndpoint;
+use crate::{
+    http::HttpClient,
+    sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
+};
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -40,33 +42,17 @@ pub(in crate::sinks) enum ProtocolVersion {
     V2,
 }
 
-/// The InfluxDB API version to use.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InfluxDbVersion {
-    /// InfluxDB v0.x/v1.x.
-    #[serde(rename = "1")]
-    V1,
-    /// InfluxDB v2.x.
-    #[serde(rename = "2")]
-    V2,
-}
-
 /// Configuration settings for InfluxDB v0.x/v1.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDb1Settings {
     /// The name of the database to write into.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::examples = "iot-store"))]
     database: String,
 
     /// The consistency level to use for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "any"))]
     #[configurable(metadata(docs::examples = "one"))]
     #[configurable(metadata(docs::examples = "quorum"))]
@@ -74,22 +60,16 @@ pub struct InfluxDb1Settings {
     consistency: Option<String>,
 
     /// The target retention policy for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "autogen"))]
     #[configurable(metadata(docs::examples = "one_day_only"))]
     retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "todd"))]
     #[configurable(metadata(docs::examples = "vector-source"))]
     username: Option<String>,
 
     /// The password to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
     #[configurable(metadata(docs::examples = "influxdb4ever"))]
     password: Option<SensitiveString>,
@@ -101,22 +81,16 @@ pub struct InfluxDb1Settings {
 #[serde(deny_unknown_fields)]
 pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
     org: String,
 
     /// The name of the bucket to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
@@ -124,18 +98,54 @@ pub struct InfluxDb2Settings {
     token: SensitiveString,
 }
 
-/// InfluxDB connection settings, either for v0.x/v1.x or v2.x.
+/// InfluxDB connection settings, selected by the `version` option.
 ///
-/// The two versions have disjoint configuration fields, so exactly one version's
-/// settings must be provided. Providing both or neither is a configuration error.
-#[configurable_component]
+/// Each version only accepts its own settings.
+#[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
-#[serde(untagged)]
+#[serde(tag = "version")]
+#[configurable(metadata(docs::enum_tag_description = "The InfluxDB API version to use."))]
 pub enum InfluxDbSettings {
-    /// Settings for InfluxDB v0.x/v1.x.
+    /// InfluxDB v0.x/v1.x.
+    #[serde(rename = "1")]
     V1(InfluxDb1Settings),
-    /// Settings for InfluxDB v2.x.
+    /// InfluxDB v2.x.
+    #[serde(rename = "2")]
     V2(InfluxDb2Settings),
+}
+
+// The derived internally tagged deserializer would match integer tags by variant index, so an
+// unquoted `version: 1` would resolve to v2. Parse the tag with a plain enum instead, which only
+// accepts the strings "1" and "2", and hand the remaining fields to the per-version settings.
+impl<'de> Deserialize<'de> for InfluxDbSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Version {
+            #[serde(rename = "1")]
+            V1,
+            #[serde(rename = "2")]
+            V2,
+        }
+
+        #[derive(Deserialize)]
+        struct Tagged {
+            version: Version,
+            #[serde(flatten)]
+            settings: serde_json::Map<String, serde_json::Value>,
+        }
+
+        let Tagged { version, settings } = Tagged::deserialize(deserializer)?;
+
+        let settings = serde_json::Value::Object(settings);
+        match version {
+            Version::V1 => InfluxDb1Settings::deserialize(settings).map(Self::V1),
+            Version::V2 => InfluxDb2Settings::deserialize(settings).map(Self::V2),
+        }
+        .map_err(D::Error::custom)
+    }
 }
 
 trait InfluxDbConnection: std::fmt::Debug {
@@ -212,25 +222,47 @@ fn influxdb_settings(settings: InfluxDbSettings) -> Box<dyn InfluxDbConnection> 
 fn healthcheck(
     endpoint: HttpEndpoint,
     settings: InfluxDbSettings,
-    mut client: HttpClient,
+    client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(settings);
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = Request::get(uri).body(empty_body())?;
 
     Ok(async move {
-        client
-            .call(request)
-            .await
-            .map_err(Into::into)
-            .and_then(|response| match response.status() {
-                StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
-                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-            })
+        let response = client.send(request).await?;
+        match response.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            other => Err(super::HealthcheckError::unexpected_status(other).into()),
+        }
     }
     .boxed())
+}
+
+/// Builds the write requests of the logs and metrics sinks.
+#[derive(Clone)]
+struct InfluxDbWriteRequest {
+    uri: Uri,
+    authorization: String,
+}
+
+impl InfluxDbWriteRequest {
+    fn new(uri: Uri, token: &SensitiveString) -> Self {
+        Self {
+            uri,
+            authorization: format!("Token {}", token.inner()),
+        }
+    }
+
+    fn request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
+        Request::post(self.uri.clone())
+            .header("Content-Type", "text/plain")
+            .header("Authorization", self.authorization.as_str())
+            .body(body)
+            .context(HTTPV1RequestBuilderSnafu)
+            .map_err(Into::into)
+    }
 }
 
 // https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/
@@ -455,24 +487,26 @@ pub mod test_util {
         (measurement, tags, fields.to_string(), ts)
     }
 
-    fn client() -> reqwest::Client {
+    fn client() -> reqwest_13::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
 
-        reqwest::Client::builder()
+        reqwest_13::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .unwrap()
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest_13::Response {
         client()
-            .get(format!("{endpoint}/query"))
-            .query(&[("q", query)])
+            .get(
+                reqwest_13::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                    .unwrap(),
+            )
             .send()
             .await
             .unwrap()
@@ -526,7 +560,7 @@ pub mod test_util {
         body.insert("bucket", BUCKET);
         body.insert("token", TOKEN);
 
-        let client = reqwest::Client::builder()
+        let client = reqwest_13::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
@@ -542,7 +576,7 @@ pub mod test_util {
         let status = res.status();
 
         assert!(
-            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
+            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
             "UnexpectedStatus: {status}"
         );
     }
@@ -869,6 +903,7 @@ mod integration_tests {
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
         sinks::util::HttpEndpoint,
+        tls::MaybeTlsSettings,
     };
 
     #[tokio::test]
@@ -883,7 +918,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -903,7 +938,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -923,7 +958,7 @@ mod integration_tests {
             password: None,
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -943,7 +978,7 @@ mod integration_tests {
             password: None,
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()

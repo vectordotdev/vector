@@ -174,7 +174,7 @@ impl ValidatedSink for NewRelicConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let healthcheck = Self::build_healthcheck(client.clone(), Arc::clone(credentials));
 
@@ -207,6 +207,12 @@ pub struct NewRelicCredentials {
 }
 
 impl NewRelicCredentials {
+    /// Returns the sink endpoint.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the credentials produce an invalid URI.
+    #[must_use]
     pub fn get_uri(&self) -> Uri {
         self.try_get_uri().expect("URI should be valid")
     }

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use bytes::{Bytes, BytesMut};
 use encoding_rs::{CoderResult, Encoding};

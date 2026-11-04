@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Functionality for managing template fields used by Vector's sinks.
 mod configurable;
 mod confined;

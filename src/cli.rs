@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 
 use std::{
@@ -336,6 +335,8 @@ impl RootOpts {
     /// # Panics
     /// Panics if global metrics initialization fails.
     pub fn init_global(&self) {
+        vector_lib::tls::install_default_crypto_provider();
+
         if !self.openssl_no_probe {
             // SAFETY: Initialization runs before worker threads start.
             unsafe {
@@ -587,7 +588,6 @@ mod tests {
     #[cfg(unix)]
     use nix::sys::resource::{Resource, getrlimit, setrlimit};
 
-    #[cfg(unix)]
     fn run_in_subprocess(test_name: &str) {
         let exe = std::env::current_exe().unwrap();
         let output = std::process::Command::new(exe)
@@ -601,6 +601,64 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
         );
+    }
+
+    #[test]
+    fn test_init_global_installs_crypto_provider() {
+        use clap::Parser;
+
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_init_global_installs_crypto_provider");
+            return;
+        }
+
+        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
+        super::RootOpts::parse_from(["vector", "--openssl-no-probe"]).init_global();
+
+        // These clients must work without another component installing a provider.
+        let _config = rustls::ClientConfig::builder()
+            .with_root_certificates(rustls::RootCertStore::empty())
+            .with_no_client_auth();
+
+        #[cfg(feature = "docker")]
+        bollard::Docker::connect_with_ssl(
+            "https://localhost:2376",
+            std::path::Path::new("tests/data/ca/intermediate_client/private/localhost.key.pem"),
+            std::path::Path::new(
+                "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem",
+            ),
+            std::path::Path::new("tests/data/ca/certs/ca.cert.pem"),
+            120,
+            bollard::API_DEFAULT_VERSION,
+        )
+        .expect("Docker HTTPS should have a crypto provider");
+
+        #[cfg(feature = "sinks-databricks_zerobus")]
+        databricks_zerobus_ingest_sdk::ProxyConnector::new("http://localhost:3128")
+            .expect("Zerobus proxy should have a crypto provider");
+    }
+
+    #[test]
+    fn test_init_global_preserves_crypto_provider() {
+        use clap::Parser;
+
+        if std::env::var("__VECTOR_SUBPROCESS_TEST").is_err() {
+            run_in_subprocess("cli::tests::test_init_global_preserves_crypto_provider");
+            return;
+        }
+
+        let mut provider = rustls::crypto::ring::default_provider();
+        provider.cipher_suites.truncate(1);
+        provider.install_default().unwrap();
+        let original =
+            std::sync::Arc::clone(rustls::crypto::CryptoProvider::get_default().unwrap());
+
+        super::RootOpts::parse_from(["vector", "--openssl-no-probe"]).init_global();
+
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            rustls::crypto::CryptoProvider::get_default().unwrap(),
+        ));
     }
 
     #[test]

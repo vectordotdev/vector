@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
@@ -23,10 +21,9 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     ComponentKey, DynValidatedSink, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
 };
-use crate::{
-    extra_context::ExtraContext,
-    sinks::{Healthcheck, util::UriSerde},
-};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::sinks::{Healthcheck, util::UriSerde};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 
@@ -108,9 +105,16 @@ where
     /// Every sink participates in the validated lifecycle, so the validated state is
     /// always present (filled in during config compilation) and the sink is built
     /// through the `DynValidatedSink` boundary.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sink or its healthcheck cannot be built, for example when an
+    /// HTTP client, credentials, or other environment-dependent resources cannot be set up.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the validated state is missing because the sink was not validated during
+    /// config compilation, or if its type does not match the sink's expected validated state type.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let validated = self
             .validated

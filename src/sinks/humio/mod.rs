@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
 
 pub mod logs;

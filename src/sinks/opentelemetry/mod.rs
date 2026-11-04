@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
 use vector_lib::{codecs::encoding::SerializerConfig, configurable::configurable_component};

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{collections::HashMap, path::PathBuf};
 
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};

@@ -61,7 +61,7 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
-const fn tcp_state_to_string(state: TcpState) -> &'static str {
+const fn tcp_state_to_string(state: &TcpState) -> &'static str {
     match state {
         TcpState::Established => "established",
         TcpState::SynSent => "syn_sent",
@@ -80,7 +80,7 @@ const fn tcp_state_to_string(state: TcpState) -> &'static str {
 
 fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
     for entry in entries {
-        let state_str = tcp_state_to_string(entry.state);
+        let state_str = tcp_state_to_string(&entry.state);
         *tcp_stats
             .conn_states
             .entry(state_str.to_string())
@@ -112,15 +112,15 @@ fn build_tcp_stats() -> Result<TcpStats, procfs::ProcError> {
     let mut tcp_stats = TcpStats::default();
 
     // Read IPv4 TCP sockets
-    let tcp_entries = procfs::net::tcp()?;
-    parse_tcp_entries(tcp_entries, &mut tcp_stats);
+    let ipv4_socket_table = procfs::net::tcp()?;
+    parse_tcp_entries(ipv4_socket_table, &mut tcp_stats);
 
     // Read IPv6 TCP sockets if IPv6 is enabled.
     // Failure here is fatal: silently returning IPv4-only metrics on an IPv6-enabled host
     // would undercount connections, matching the behavior of the prior implementation.
     if is_ipv6_enabled() {
-        let tcp6_entries = procfs::net::tcp6()?;
-        parse_tcp_entries(tcp6_entries, &mut tcp_stats);
+        let ipv6_connections = procfs::net::tcp6()?;
+        parse_tcp_entries(ipv6_connections, &mut tcp_stats);
     }
 
     Ok(tcp_stats)
@@ -143,21 +143,25 @@ mod tests {
     #[test]
     fn tcp_state_to_string_handles_all_variants() {
         // Verify all 12 TCP states map correctly
-        assert_eq!(tcp_state_to_string(TcpState::Established), "established");
-        assert_eq!(tcp_state_to_string(TcpState::SynSent), "syn_sent");
-        assert_eq!(tcp_state_to_string(TcpState::SynRecv), "syn_recv");
-        assert_eq!(tcp_state_to_string(TcpState::FinWait1), "fin_wait1");
-        assert_eq!(tcp_state_to_string(TcpState::FinWait2), "fin_wait2");
-        assert_eq!(tcp_state_to_string(TcpState::TimeWait), "time_wait");
-        assert_eq!(tcp_state_to_string(TcpState::Close), "close");
-        assert_eq!(tcp_state_to_string(TcpState::CloseWait), "close_wait");
-        assert_eq!(tcp_state_to_string(TcpState::LastAck), "last_ack");
-        assert_eq!(tcp_state_to_string(TcpState::Listen), "listen");
-        assert_eq!(tcp_state_to_string(TcpState::Closing), "closing");
-        assert_eq!(tcp_state_to_string(TcpState::NewSynRecv), "new_syn_recv");
+        assert_eq!(tcp_state_to_string(&TcpState::Established), "established");
+        assert_eq!(tcp_state_to_string(&TcpState::SynSent), "syn_sent");
+        assert_eq!(tcp_state_to_string(&TcpState::SynRecv), "syn_recv");
+        assert_eq!(tcp_state_to_string(&TcpState::FinWait1), "fin_wait1");
+        assert_eq!(tcp_state_to_string(&TcpState::FinWait2), "fin_wait2");
+        assert_eq!(tcp_state_to_string(&TcpState::TimeWait), "time_wait");
+        assert_eq!(tcp_state_to_string(&TcpState::Close), "close");
+        assert_eq!(tcp_state_to_string(&TcpState::CloseWait), "close_wait");
+        assert_eq!(tcp_state_to_string(&TcpState::LastAck), "last_ack");
+        assert_eq!(tcp_state_to_string(&TcpState::Listen), "listen");
+        assert_eq!(tcp_state_to_string(&TcpState::Closing), "closing");
+        assert_eq!(tcp_state_to_string(&TcpState::NewSynRecv), "new_syn_recv");
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "Empty input leaves the counters at exactly zero."
+    )]
     fn parse_tcp_entries_handles_empty_list() {
         use super::{TcpStats, parse_tcp_entries};
 
@@ -180,8 +184,8 @@ mod tests {
 
         assert!(!metrics.is_empty());
 
-        let mut n_tx_queued_bytes_metric = 0;
-        let mut n_rx_queued_bytes_metric = 0;
+        let mut transmit_queue_metric_count = 0;
+        let mut received_bytes_metric_count = 0;
 
         for metric in &metrics {
             if metric.name() == TCP_CONNS_TOTAL.as_str() {
@@ -196,9 +200,9 @@ mod tests {
                     "Metric tcp_connections_total must have a state tag"
                 );
             } else if metric.name() == TCP_TX_QUEUED_BYTES_TOTAL.as_str() {
-                n_tx_queued_bytes_metric += 1;
+                transmit_queue_metric_count += 1;
             } else if metric.name() == TCP_RX_QUEUED_BYTES_TOTAL.as_str() {
-                n_rx_queued_bytes_metric += 1;
+                received_bytes_metric_count += 1;
             } else {
                 panic!("unrecognized metric name: {}", metric.name());
             }
@@ -206,11 +210,11 @@ mod tests {
 
         // Queue metrics should always be present (even if zero)
         assert_eq!(
-            n_tx_queued_bytes_metric, 1,
+            transmit_queue_metric_count, 1,
             "Expected exactly one tcp_tx_queued_bytes_total metric"
         );
         assert_eq!(
-            n_rx_queued_bytes_metric, 1,
+            received_bytes_metric_count, 1,
             "Expected exactly one tcp_rx_queued_bytes_total metric"
         );
 

@@ -71,7 +71,7 @@ async fn component_spec_compliance() {
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
+    config.endpoint = HttpEndpoint::new(mock_endpoint).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

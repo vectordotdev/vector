@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{
     convert::Infallible,
     fmt,
@@ -37,6 +35,10 @@ fn metric_ttl(maybe_ttl_secs: Option<f64>) -> Option<Duration> {
 }
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
+
+/// The stream returned by [`SinkBuilderExt::incremental_request_builder`].
+type IncrementalRequests<St, Request, Error> =
+    Map<St, Box<dyn FnMut(<St as Stream>::Item) -> Vec<Result<Request, Error>> + Send + Sync>>;
 
 pub trait SinkBuilderExt: Stream {
     /// Converts a stream of infallible results by unwrapping them.
@@ -186,7 +188,7 @@ pub trait SinkBuilderExt: Stream {
     fn incremental_request_builder<B>(
         self,
         mut builder: B,
-    ) -> Map<Self, Box<dyn FnMut(Self::Item) -> Vec<Result<B::Request, B::Error>> + Send + Sync>>
+    ) -> IncrementalRequests<Self, B::Request, B::Error>
     where
         Self: Sized,
         Self::Item: Send + 'static,

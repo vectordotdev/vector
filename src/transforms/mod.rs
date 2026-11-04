@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 #[allow(unused_imports)]
 use std::collections::HashSet;

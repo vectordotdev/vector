@@ -36,8 +36,9 @@ use futures::{
 use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    Message,
+    Message, Utf8Bytes,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::WebSocketConfig,
 };
 use tokio_util::codec::Encoder as _;
 use url::Url;
@@ -49,7 +50,7 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
     },
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
@@ -218,7 +219,7 @@ impl WebSocketListenerSink {
                 ));
                 return Ok(response);
             };
-            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
+            match auth.handle_auth_v1(Some(&addr), req.headers(), req.uri().path()) {
                 Ok(_) => {
                     extra_tags.append(&mut Self::extract_extra_tags(
                         &extra_tags_config,
@@ -266,15 +267,23 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {err}");
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                });
-            })?;
+        // tungstenite allocates `read_buffer_size` bytes up front for each connection (default
+        // 128 KiB). This sink can serve many clients that send only small acks, so keep the 4 KiB
+        // read buffer of earlier tungstenite releases.
+        let ws_config = WebSocketConfig::default().read_buffer_size(4096);
+        let ws_stream = tokio_tungstenite::accept_hdr_async_with_config(
+            stream,
+            header_callback,
+            Some(ws_config),
+        )
+        .await
+        .map_err(|err| {
+            debug!("Error during websocket handshake: {err}");
+            emit!(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone()
+            });
+        })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -360,8 +369,8 @@ impl WebSocketListenerSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for WebSocketListenerSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<Event, SinkError> for WebSocketListenerSink {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -369,7 +378,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
-        let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
+        let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
 
         let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
@@ -408,7 +417,12 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        let bytes = bytes.freeze();
+                        let text = match Utf8Bytes::try_from(bytes.clone()) {
+                            Ok(text) => text,
+                            Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                        };
+                        Message::Text(text)
                     };
                     let message_len = message.len();
 
@@ -685,7 +699,7 @@ mod tests {
         .unwrap();
 
         run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             stream::once(ready(event)),
             &SINK_TAGS,
         )
@@ -839,7 +853,7 @@ mod tests {
         let sink = WebSocketListenerSink::new(config, &SinkContext::default()).unwrap();
 
         let compliance_assertion = tokio::spawn(run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             events,
             &SINK_TAGS,
         ));

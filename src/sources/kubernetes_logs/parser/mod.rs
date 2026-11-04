@@ -43,14 +43,11 @@ impl FunctionTransform for Parser {
         match &mut self.state {
             ParserState::Uninitialized => {
                 let message_field = get_message_path(self.log_namespace);
-                let message = match event.as_log().get(&message_field) {
-                    Some(message) => message,
-                    None => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event without a message"
-                        });
-                        return;
-                    }
+                let Some(message) = event.as_log().get(&message_field) else {
+                    emit!(KubernetesLogsFormatPickerEdgeCase {
+                        what: "got an event without a message"
+                    });
+                    return;
                 };
 
                 let bytes = match message {
@@ -69,7 +66,7 @@ impl FunctionTransform for Parser {
                 } else {
                     ParserState::Cri(cri::Cri::new(self.log_namespace))
                 };
-                self.transform(output, event)
+                self.transform(output, event);
             }
             ParserState::Docker(t) => t.transform(output, event),
             ParserState::Cri(t) => t.transform(output, event),

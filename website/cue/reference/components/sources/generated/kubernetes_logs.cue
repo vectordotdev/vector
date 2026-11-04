@@ -430,7 +430,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_node_name: {
 				description: """
-					Event field for the Pod's node_name.
+					Event field for the Pod's `node_name`.
 
 					Set to `""` to suppress this key.
 					"""

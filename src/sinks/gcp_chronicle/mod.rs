@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 #[cfg(feature = "sinks-gcp-chronicle")]
 pub mod chronicle_unstructured;
 pub mod compression;

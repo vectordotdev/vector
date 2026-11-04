@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{io, io::BufWriter};
 
 use bytes::{BufMut, BytesMut};

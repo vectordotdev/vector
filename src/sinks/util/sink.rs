@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! This module contains all our internal sink utilities
 //!
 //! All vector "sinks" are built around the `Sink` type which
@@ -18,8 +16,8 @@
 //! and will provide full batching, and request dispatching based on
 //! the settings passed.
 //!
-//! For more advanced use cases like HTTP based sinks, one should use the
-//! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
+//! HTTP based sinks instead use a `StreamSink` that drives the native HTTP 1
+//! `http_v1::HttpService`.
 //!
 //! # Driving to completion
 //!
@@ -66,6 +64,13 @@ use crate::event::EventStatus;
 
 // === BatchSink ===
 
+/// The [`PartitionBatchSink`] used by [`BatchSink`], with a single unit partition.
+type UnpartitionedBatchSink<S, B> = PartitionBatchSink<
+    Map<S, PartitionInnerBuffer<<B as Batch>::Output, ()>, <B as Batch>::Output>,
+    PartitionBuffer<B, ()>,
+    (),
+>;
+
 /// A `Sink` interface that wraps a `Service` and a
 /// `Batch`.
 ///
@@ -90,11 +95,7 @@ where
     B: Batch,
 {
     #[pin]
-    inner: PartitionBatchSink<
-        Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
-        PartitionBuffer<B, ()>,
-        (),
-    >,
+    inner: UnpartitionedBatchSink<S, B>,
 }
 
 impl<S, B> BatchSink<S, B>

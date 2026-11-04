@@ -61,7 +61,7 @@ impl<const N: usize> Bufferable for Message<N> {}
 
 impl<const N: usize> Finalizable for Message<N> {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        Default::default() // This benchmark doesn't need finalization
+        EventFinalizers::default() // This benchmark doesn't need finalization
     }
 }
 
@@ -126,6 +126,9 @@ impl<const N: usize> FixedEncodable for Message<N> {
 
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
+/// # Panics
+///
+/// Panics if the benchmark buffer cannot be configured or built.
 pub async fn setup<const N: usize>(
     variant: BufferType,
     total_events: usize,
@@ -153,6 +156,9 @@ pub async fn setup<const N: usize>(
     (tx, rx, messages)
 }
 
+/// # Panics
+///
+/// Panics if the global metrics recorder cannot be installed.
 pub fn init_instrumentation() {
     let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
     if tracing::subscriber::set_global_default(subscriber).is_ok() {
@@ -171,12 +177,15 @@ pub fn init_instrumentation() {
 // reads it from the buffer.
 //
 
+/// # Panics
+///
+/// Panics if a benchmark message cannot be sent.
 pub async fn wtr_measurement<const N: usize>(
     mut sender: BufferSender<Message<N>>,
     mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
 ) {
-    for msg in messages.into_iter() {
+    for msg in messages {
         sender.send(msg, None).await.unwrap();
     }
     drop(sender);
@@ -184,12 +193,15 @@ pub async fn wtr_measurement<const N: usize>(
     while receiver.next().await.is_some() {}
 }
 
+/// # Panics
+///
+/// Panics if a benchmark message cannot be sent or received.
 pub async fn war_measurement<const N: usize>(
     mut sender: BufferSender<Message<N>>,
     mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
 ) {
-    for msg in messages.into_iter() {
+    for msg in messages {
         sender.send(msg, None).await.unwrap();
         _ = receiver.next().await.unwrap();
     }

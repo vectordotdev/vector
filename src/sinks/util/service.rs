@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{hash::Hash, marker::PhantomData, num::NonZeroU64, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::stream::{self, BoxStream};

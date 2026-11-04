@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{fmt::Display, io};
 
 use super::buffer::compression::CompressionLevel;
