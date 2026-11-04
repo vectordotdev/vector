@@ -11,7 +11,9 @@ use windows_service::{
     service_dispatcher,
 };
 
-use crate::{app::Application, extra_context::ExtraContext, signal::SignalTo};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::{app::Application, signal::SignalTo};
 
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;

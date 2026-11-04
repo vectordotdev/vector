@@ -1,4 +1,4 @@
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
@@ -10,7 +10,7 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
@@ -56,7 +56,7 @@ impl DatadogEventsConfig {
         let base = datadog::get_api_base_endpoint(endpoint, site);
         Ok(HttpEndpoint::parse(&base)?
             .append_path("/api/v1/events")?
-            .into_v1())
+            .into_uri())
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

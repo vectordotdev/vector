@@ -1,6 +1,20 @@
 package metadata
 
 releases: "0.61.0": {
+	description: #"""
+		The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.61.0`! 🚀
+
+		Thanks to the 10 contributors who made the 23 changes in this release:
+
+		- [1 breaking change](/releases/0.61.0/#breaking-changes)
+		- [3 security changes](/releases/0.61.0/#security-changes)
+		- [2 new features](/releases/0.61.0/#new-features)
+		- [6 enhancements](/releases/0.61.0/#enhancements)
+		- [11 bug fixes](/releases/0.61.0/#bug-fixes)
+
+		Upgrading to 0.61? Read the [upgrade guide](/releases/0.61.0/#upgrade-guide).
+		"""#
+
 	date: "2026-10-29"
 
 	changelog: [
@@ -174,14 +188,8 @@ releases: "0.61.0": {
 			title:    "Scheme-less `vector` sink endpoints default to `https`"
 			anchor:   "vector-sink-default-https"
 			description: #"""
-				`address` and `routing.endpoints` values in the `vector` sink that omit the scheme (for example,
-				`127.0.0.1:6000` instead of `http://127.0.0.1:6000`) now default to `https`. Previously they
-				defaulted to `http` unless TLS was enabled. The `http` default was
-				[deprecated in 0.59.0](https://vector.dev/deprecations/).
-				
-				Endpoints that already specify a scheme, and scheme-less endpoints in configurations that enable
-				TLS, are unaffected. A scheme-less endpoint pointing at a plaintext `vector` source now fails the
-				TLS handshake.
+				Scheme-less endpoints that connect to plaintext sources now fail TLS handshakes.
+				Use explicit `http://` endpoints or enable TLS on the receiving source.
 				"""#
 			pr_numbers: [26699]
 			contributors: ["JinchengCao"]
