@@ -197,7 +197,7 @@ mod source {
 
     #[cfg(feature = "azure-core")]
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaOAuthTokenRefreshError<'a> {
+    pub(crate) struct KafkaOAuthTokenRefreshError<'a> {
         pub error: &'a dyn std::error::Error,
     }
 
