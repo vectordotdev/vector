@@ -1,6 +1,6 @@
 //! Service implementation for the `appsignal` sink.
 use bytes::Bytes;
-use http_1::{Request, header::AUTHORIZATION};
+use http::{Request, header::AUTHORIZATION};
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -24,7 +24,7 @@ pub(super) struct AppsignalSvcRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for AppsignalSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let mut builder = Request::post(self.endpoint.clone().into_v1())
+        let mut builder = Request::post(self.endpoint.as_uri().clone())
             .header("Content-Type", "application/json")
             .header(
                 AUTHORIZATION,

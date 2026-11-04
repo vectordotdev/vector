@@ -5,7 +5,7 @@ use tonic::body::BoxBody;
 use tonic_health::pb::{
     HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
 };
-use vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE;
+use vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE;
 use vector_core::{
     config::proxy::ProxyConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -84,7 +84,7 @@ impl Client {
         };
 
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(HTTP2_MAX_HEADER_LIST_SIZE);
         let transport = GrpcTransport(
             Http2Client::new(tls, &ProxyConfig::default(), builder)
                 .map_err(|source| Error::Connection { source })?,

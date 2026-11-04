@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
@@ -13,7 +13,7 @@ use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{
         HTTPV1RequestBuilderSnafu, HealthcheckError,
         prelude::*,

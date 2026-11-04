@@ -2,8 +2,7 @@
 
 use std::fmt;
 
-use http::Uri;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode, Uri};
 use vector_http::empty_body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
@@ -21,7 +20,7 @@ use super::{
 };
 use crate::{
     config::{SinkContext, ValidatedSink},
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
