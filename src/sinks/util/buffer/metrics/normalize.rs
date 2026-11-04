@@ -640,7 +640,16 @@ impl MetricSet {
     }
 
     /// Perform TTL cleanup if configured and needed.
-    fn maybe_cleanup(&mut self) {
+    ///
+    /// This is normally driven internally by `make_absolute`, `make_incremental`, and
+    /// `insert_update`. It's `pub(crate)` so that a `MetricNormalize` implementation whose
+    /// `normalize` doesn't go through any of those for some metric kinds (for example, one that
+    /// passes certain values straight through without touching `state`) can still drive the
+    /// periodic TTL sweep for every metric it sees — see `DatadogMetricsNormalizer`'s `Sketch`
+    /// arm, which otherwise would never trigger cleanup during sketch-only traffic. Cheap to call
+    /// redundantly: it no-ops unless `TtlPolicy::cleanup_interval` has actually elapsed, and reads
+    /// the clock only when a TTL policy is configured at all.
+    pub(crate) fn maybe_cleanup(&mut self) {
         // Check if cleanup is needed and get the current timestamp in one operation
         let Some(now) = self.ttl_policy().and_then(TtlPolicy::should_cleanup) else {
             return;
