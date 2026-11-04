@@ -1,6 +1,6 @@
 [package]
 name = "k8s-test-framework"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "Kubernetes Test Framework used to test Vector in Kubernetes"

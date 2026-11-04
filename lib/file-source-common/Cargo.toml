@@ -1,6 +1,6 @@
 [package]
 name = "file-source-common"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
 edition = "2024"
 publish = false

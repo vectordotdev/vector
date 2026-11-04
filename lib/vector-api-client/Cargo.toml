@@ -1,6 +1,6 @@
 [package]
 name = "vector-api-client"
-version = "0.2.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false

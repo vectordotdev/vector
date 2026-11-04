@@ -1,6 +1,6 @@
 [package]
 name = "vector-vrl-web-playground"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 repository = "https://github.com/vectordotdev/vector"
 description = "A playground for experimenting with VRL"
