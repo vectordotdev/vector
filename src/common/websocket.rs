@@ -80,12 +80,12 @@ impl WebSocketConnector {
     pub(crate) fn parse_headers(
         headers: &HashMap<String, Vec<String>>,
     ) -> Result<HeaderMap<HeaderValue>, WebSocketError> {
-        let mut result = HeaderMap::with_capacity(headers.iter().map(|(_, v)| v.len()).sum());
+        let mut result = HeaderMap::with_capacity(headers.values().map(Vec::len).sum());
 
         for (key, values) in headers {
             for v in values {
                 result.append(
-                    HeaderName::from_str(&key).context(InvalidHeaderNameSnafu)?,
+                    HeaderName::from_str(key).context(InvalidHeaderNameSnafu)?,
                     v.parse().context(InvalidHeaderValueSnafu)?,
                 );
             }
@@ -98,7 +98,7 @@ impl WebSocketConnector {
     /// Used by callers whose `validate` already parsed the URI, so the parsed
     /// value is plumbed through the validated state rather than re-parsed
     /// here. TLS resolution still happens in this method.
-    pub(crate) fn from_validated(
+    pub(crate) const fn from_validated(
         uri: Uri,
         tls: MaybeTlsSettings,
         auth: Option<Auth>,
@@ -318,7 +318,7 @@ impl Default for WebSocketCommonConfig {
     fn default() -> Self {
         Self {
             uri: "ws://127.0.0.1:8080".to_owned(),
-            headers: Default::default(),
+            headers: HashMap::default(),
             ping_interval: None,
             ping_timeout: None,
             tls: None,

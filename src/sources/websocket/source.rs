@@ -348,6 +348,8 @@ impl WebSocketSource {
         });
         let mut stream = DecoderFramedRead::new(payload_bytes, self.params.decoder.clone());
 
+        let mut last_received_message_id = None;
+
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, _)) => {
@@ -385,7 +387,7 @@ impl WebSocketSource {
                         // Only ACK on successful send
                         // We only care about the latest message ID, because it is used to replay
                         if let Some(last_message_id) = message_ids.last() {
-                            _ = ack_tx.send(last_message_id.clone()).await;
+                            last_received_message_id = Some(last_message_id.clone());
                         }
                     }
                 }
@@ -395,6 +397,11 @@ impl WebSocketSource {
                     }
                 }
             }
+        }
+
+        // Finally send the ACK for latest received message ID
+        if let Some(last_message_id) = last_received_message_id {
+            _ = ack_tx.send(last_message_id).await;
         }
     }
 

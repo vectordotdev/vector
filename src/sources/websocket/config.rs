@@ -90,6 +90,8 @@ impl PongValidation {
 pub struct ReplayAckConfig {
     pub encoding: EncodingConfig,
 
+    // Clippy wants backticks around ACKed
+    #[allow(clippy::doc_markdown)]
     /// Name of the field that should contain the ACKed message ID.
     ///
     /// Use "." if message ID is the root of the message.
@@ -225,7 +227,7 @@ impl SourceConfig for WebSocketConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let data_dir = if self.replay.as_ref().map(|r| r.stateful).unwrap_or(false) {
+        let data_dir = if self.replay.as_ref().is_some_and(|r| r.stateful) {
             // add the source name as a subdir, so that multiple sources can
             // operate within the same given data_dir (e.g. the global one)
             Some(cx.globals.resolve_and_make_data_subdir(
