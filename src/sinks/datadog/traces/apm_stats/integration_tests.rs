@@ -189,12 +189,12 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
     // sends a trace to each of the urls
     async fn send_trace(urls: &Vec<String>, start: i64, duration: i64, span_id: i64) -> bool {
         let traces_payload = build_traces_payload(start, duration, span_id);
-        let client = reqwest_13::Client::new();
+        let client = reqwest::Client::new();
 
         for url in urls {
             let res = client
                 .post(url)
-                .header(reqwest_13::header::CONTENT_TYPE, "application/json")
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .json(&traces_payload)
                 .send()
                 .await

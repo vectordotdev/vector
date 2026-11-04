@@ -435,29 +435,23 @@ mod tests {
     fn test_generate_arrow_schema_simple_schema() {
         use arrow::datatypes::DataType;
 
-        let schema = UnityCatalogTableSchema {
-            name: "test_table".to_string(),
-            catalog_name: "test_catalog".to_string(),
-            schema_name: "test_schema".to_string(),
-            columns: vec![
-                UnityCatalogColumn {
-                    name: "id".to_string(),
-                    type_text: "bigint".to_string(),
-                    type_name: "BIGINT".to_string(),
-                    position: 1,
-                    nullable: false,
-                    type_json: "{}".to_string(),
-                },
-                UnityCatalogColumn {
-                    name: "body".to_string(),
-                    type_text: "string".to_string(),
-                    type_name: "STRING".to_string(),
-                    position: 2,
-                    nullable: true,
-                    type_json: "{}".to_string(),
-                },
+        let schema = UnityCatalogTableSchema::new(
+            "test_catalog",
+            "test_schema",
+            "test_table",
+            vec![
+                UnityCatalogColumn::new("id", "BIGINT")
+                    .with_type_text("bigint")
+                    .with_type_json("{}")
+                    .with_nullable(false)
+                    .with_position(1),
+                UnityCatalogColumn::new("body", "STRING")
+                    .with_type_text("string")
+                    .with_type_json("{}")
+                    .with_nullable(true)
+                    .with_position(2),
             ],
-        };
+        );
 
         let arrow_schema =
             generate_arrow_schema_from_schema(&schema).expect("arrow schema should be generated");
