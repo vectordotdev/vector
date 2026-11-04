@@ -6,6 +6,7 @@ mod release_notes;
 #[cfg(feature = "package-repositories")]
 mod repositories;
 mod versions;
+mod vrl_changelog;
 mod workflow;
 
 use anyhow::{Result, ensure};

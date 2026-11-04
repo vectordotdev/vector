@@ -11,10 +11,9 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
+use super::{release_notes, vrl_changelog};
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
-
-use super::release_notes;
 
 pub(super) const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
@@ -42,6 +41,10 @@ pub struct Cli {
     /// Fill a missing description in an existing release, preserving all other metadata.
     #[arg(long)]
     description_only: bool,
+
+    /// Include notes and upgrade instructions from this VRL release.
+    #[arg(long)]
+    vrl_version: Option<Version>,
 }
 
 impl Cli {
@@ -57,7 +60,16 @@ impl Cli {
             }
             return Ok(());
         }
-        run(&self.version, PullRequestMetadata::Optional)?;
+        let vrl_notes = self
+            .vrl_version
+            .as_ref()
+            .map(vrl_changelog::fetch)
+            .transpose()?;
+        run(
+            &self.version,
+            PullRequestMetadata::Optional,
+            vrl_notes.as_deref(),
+        )?;
         Ok(())
     }
 }
@@ -69,6 +81,7 @@ impl Cli {
 pub(super) fn run(
     new_version: &Version,
     pull_request_metadata: PullRequestMetadata,
+    vrl_notes: Option<&str>,
 ) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -108,11 +121,17 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
+    let vrl = vrl_notes
+        .map(|notes| vrl_changelog::extract(notes, &new_version))
+        .transpose()?;
     let breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
         .collect();
-    let upgrade_guide = if breaking.is_empty() {
+    let vrl_migrations = vrl
+        .as_ref()
+        .map_or(&[][..], |vrl| vrl.migrations.as_slice());
+    let upgrade_guide = if breaking.is_empty() && vrl_migrations.is_empty() {
         String::new()
     } else {
         // Refuse a second source for a release that already has a standalone guide.
@@ -125,7 +144,7 @@ pub(super) fn run(
             );
         }
         validate_breaking_anchors(&breaking)?;
-        render_upgrade_guide(&breaking)
+        render_upgrade_guide(&breaking, vrl_migrations)
     };
 
     let upgrade_url = if upgrade_guide.is_empty() {
@@ -155,7 +174,12 @@ pub(super) fn run(
         &release_notes::load_template(&repo_root, None)?,
         release_notes::Target::Website,
     )?;
-    let cue_text = render_release_cue(&new_version, &changelog_entries, &description);
+    let cue_text = render_release_cue(
+        &new_version,
+        &changelog_entries,
+        &description,
+        vrl.as_ref().map(|vrl| vrl.notes.as_str()),
+    );
 
     // Everything valid — write the release data and its inline migration content.
     atomic_write(&cue_path, &cue_text)?;
@@ -681,10 +705,26 @@ fn render_release_cue(
     version: &Version,
     changelog: &[ChangelogEntry],
     description: &str,
+    vrl_notes: Option<&str>,
 ) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
     let description_field = render_description_field(description);
+    // Only release/category headings move down one level; authored list content stays intact.
+    let vrl_block = vrl_notes.map_or_else(String::new, |notes| {
+        let notes = notes
+            .lines()
+            .map(|line| {
+                if line.starts_with("## ") || line.starts_with("### ") {
+                    format!("#{line}")
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("\n\tvrl_changelog: {}\n", json!(notes))
+    });
 
     indoc::formatdoc! {"
         package metadata
@@ -697,7 +737,7 @@ fn render_release_cue(
         \tchangelog: [
         {changelog_block}
         \t]
-        }}
+        {vrl_block}}}
     "}
 }
 
@@ -877,7 +917,10 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_upgrade_guide(breaking: &[&BreakingDetails]) -> String {
+fn render_upgrade_guide(
+    breaking: &[&BreakingDetails],
+    vrl_migrations: &[vrl_changelog::Migration],
+) -> String {
     let mut out = String::new();
 
     // Each fragment becomes an H2 (`## Title`), with Summary/Migration under it at H3.
@@ -896,6 +939,14 @@ fn render_upgrade_guide(breaking: &[&BreakingDetails]) -> String {
         }
     }
 
+    for migration in vrl_migrations {
+        writeln!(
+            out,
+            "## VRL: {} {{#{}}}\n\n{}\n",
+            migration.title, migration.anchor, migration.body
+        )
+        .unwrap();
+    }
     out
 }
 
@@ -1158,7 +1209,7 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries, "Release overview.");
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, "Release overview.", None);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
@@ -1447,7 +1498,7 @@ mod tests {
             "A deprecated label is gone.",
             "N/A",
         );
-        let md = render_upgrade_guide(&[&d1, &d2]);
+        let md = render_upgrade_guide(&[&d1, &d2], &[]);
         let expected = indoc::indoc! {r"
             ## First breaking change {#first}
 
@@ -1488,7 +1539,7 @@ mod tests {
     #[test]
     fn render_upgrade_guide_empty_migration() {
         let d = bd("A change", "a-change", "Something changed.", "");
-        let md = render_upgrade_guide(&[&d]);
+        let md = render_upgrade_guide(&[&d], &[]);
         let expected = indoc::indoc! {r"
             ## A change {#a-change}
 
