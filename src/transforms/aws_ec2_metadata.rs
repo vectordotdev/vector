@@ -917,8 +917,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
@@ -948,8 +948,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
