@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use http::Uri;
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -203,6 +205,10 @@ impl ValidatedSink for DatadogMetricsConfig {
     type Validated = ValidatedMetrics;
 
     fn validate(&self) -> crate::Result<ValidatedMetrics> {
+        if let Some(expire_metrics_secs) = self.expire_metrics_secs {
+            validate_expire_metrics_secs(expire_metrics_secs)?;
+        }
+
         let (batcher_settings, sketches_batcher_settings) =
             resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
 
@@ -357,6 +363,27 @@ fn resolve_endpoint_batch_settings(
     Ok((series, sketches))
 }
 
+/// Rejects `expire_metrics_secs` values that `metric_ttl`
+/// (`src/sinks/util/builder.rs`) would otherwise silently treat as "no TTL configured": zero,
+/// negative, NaN/infinite, or too large to represent as a `Duration`. Without this, a config
+/// mistake (for example a stray `-1`) would silently leave the normalization cache unbounded,
+/// defeating the entire purpose of setting it in the first place.
+fn validate_expire_metrics_secs(expire_metrics_secs: f64) -> crate::Result<()> {
+    let ttl = Duration::try_from_secs_f64(expire_metrics_secs).map_err(|_| {
+        format!(
+            "`expire_metrics_secs` must be a positive, finite number of seconds representable \
+             as a duration, got {expire_metrics_secs}"
+        )
+    })?;
+    if ttl.is_zero() {
+        return Err(format!(
+            "`expire_metrics_secs` must be greater than zero, got {expire_metrics_secs}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
     Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
@@ -445,6 +472,40 @@ mod tests {
                 .expect("v2, v3, and the unset default must all parse");
             assert_eq!(config.series_api_version, expected);
         }
+    }
+
+    // Regression test for a Codex-flagged gap: `metric_ttl` (`src/sinks/util/builder.rs`) maps
+    // zero, negative, NaN, infinite, and un-representable `expire_metrics_secs` values to "no
+    // TTL", so without validation, a config mistake here would silently leave the normalization
+    // cache unbounded instead of being rejected at startup.
+    #[test]
+    fn validate_rejects_invalid_expire_metrics_secs() {
+        for invalid in [
+            0.0,
+            -1.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::MAX,
+        ] {
+            let config = DatadogMetricsConfig {
+                expire_metrics_secs: Some(invalid),
+                ..Default::default()
+            };
+            assert!(
+                config.validate().is_err(),
+                "expire_metrics_secs = {invalid} should have been rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_accepts_positive_finite_expire_metrics_secs() {
+        let config = DatadogMetricsConfig {
+            expire_metrics_secs: Some(3600.0),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
     }
 
     #[test]
