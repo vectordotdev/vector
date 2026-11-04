@@ -322,8 +322,16 @@ impl FileWatcher {
     /// # Errors
     /// Returns an error if opening the path, reading metadata, or removing the file fails.
     pub(super) async fn remove_file(&self) -> io::Result<bool> {
-        let file = File::open(&self.path).await?;
-        let file_info = file.file_info().await?;
+        // Checking file identity must not require permission to read its contents.
+        #[cfg(unix)]
+        let file_info = tokio::fs::metadata(&self.path).await?;
+        #[cfg(windows)]
+        let file_info = tokio::fs::OpenOptions::new()
+            .access_mode(0)
+            .open(&self.path)
+            .await?
+            .file_info()
+            .await?;
         if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
             return Ok(false);
         }
