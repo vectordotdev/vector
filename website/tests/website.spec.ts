@@ -62,7 +62,21 @@ test("exact component search supports keyboard navigation", async ({ page }) => 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Remap");
 });
 
-test("VRL search accepts function prefixes and navigates to the function", async ({ page }) => {
+test("VRL search accepts function prefixes and navigates to the function", async ({ page, browserName }) => {
+  if (browserName === "firefox") {
+    // Reproduce Firefox scrolling to the fragment before DOM-ready controls change its position.
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => document.querySelector(":target")?.scrollIntoView(), {
+        capture: true
+      });
+      window.addEventListener("DOMContentLoaded", () => {
+        const target = document.querySelector(":target");
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        sessionStorage.setItem("fragment-in-view-after-init", String(rect.top < innerHeight && rect.bottom > 0));
+      });
+    });
+  }
   await page.goto(quickstart);
   await page.locator("#site-search").getByRole("button", { name: "Search", exact: false }).click();
   await page.getByRole("searchbox").fill("parse_jso");
@@ -71,6 +85,9 @@ test("VRL search accepts function prefixes and navigates to the function", async
   await result.click();
   // The click resolves at commit; WebKit on CI can still be parsing this large page, so wait for load.
   await page.waitForURL(/\/docs\/reference\/vrl\/functions\/#parse_json$/);
+  if (browserName === "firefox") {
+    expect(await page.evaluate(() => sessionStorage.getItem("fragment-in-view-after-init"))).toBe("true");
+  }
   await expect(page.getByRole("heading", { name: "parse_json", exact: true })).toBeInViewport();
 });
 
