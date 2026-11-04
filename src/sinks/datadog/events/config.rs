@@ -10,7 +10,7 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},

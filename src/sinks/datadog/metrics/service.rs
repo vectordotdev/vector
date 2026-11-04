@@ -19,7 +19,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{HTTPV1RequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
 };
 

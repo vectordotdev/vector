@@ -17,7 +17,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::util::HttpEndpoint,
 };
 

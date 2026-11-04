@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{prelude::*, util::HttpEndpoint, util::service::TowerRequestSettings},
 };
 

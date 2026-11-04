@@ -20,7 +20,7 @@ use vector_lib::{
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},

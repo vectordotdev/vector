@@ -4,7 +4,7 @@ use http::Request;
 use vector_http::empty_body;
 
 use super::NewRelicCredentials;
-use crate::{http::client_v1::HttpClient, sinks::HealthcheckError};
+use crate::{http::HttpClient, sinks::HealthcheckError};
 
 pub(crate) async fn healthcheck(
     client: HttpClient,

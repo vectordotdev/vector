@@ -10,7 +10,7 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         HTTPV1RequestBuilderSnafu, gcp,
         prelude::*,

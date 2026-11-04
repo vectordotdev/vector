@@ -45,7 +45,7 @@ impl InternalEvent for HttpClientEventsReceived {
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpResponseError {
-    pub code: hyper::StatusCode,
+    pub code: http::StatusCode,
     pub url: String,
 }
 
