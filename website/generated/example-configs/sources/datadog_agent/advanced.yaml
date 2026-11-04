@@ -6,6 +6,8 @@ sources:
     disable_logs: false
     disable_metrics: false
     disable_traces: false
+    enabled_data_types:
+      - logs
     max_trace_expansion_bytes: 104857600
     multiple_outputs: false
     parse_ddtags: false

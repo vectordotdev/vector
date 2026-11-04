@@ -47,7 +47,6 @@ pub mod internal_telemetry;
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
-#[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
 pub mod dns;
@@ -57,7 +56,6 @@ pub mod expiring_hash_map;
 pub mod generate;
 pub mod generate_schema;
 #[macro_use]
-#[allow(unreachable_pub)]
 pub mod internal_events;
 #[cfg(feature = "lapin")]
 pub mod amqp;
@@ -70,7 +68,6 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
-pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 #[cfg(feature = "gcp")]
@@ -78,17 +75,21 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
-#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
-#[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub mod nats;
 pub mod net;
-#[allow(unreachable_pub)]
+#[cfg_attr(
+    any(feature = "api", feature = "sources-vector", feature = "sinks-vector"),
+    expect(
+        unreachable_pub,
+        reason = "tonic-build generates `pub` items and has no option to narrow their visibility"
+    )
+)]
 pub(crate) mod proto;
 pub mod providers;
 pub mod secrets;
@@ -102,7 +103,6 @@ pub mod sinks;
 #[allow(unreachable_pub)]
 pub mod sources;
 #[cfg(feature = "api-client")]
-#[allow(unreachable_pub)]
 pub mod tap;
 pub mod template;
 pub mod test_util;
@@ -110,11 +110,9 @@ pub mod test_util;
 pub mod top;
 pub mod topology;
 pub mod trace;
-#[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
-pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;

@@ -20,15 +20,14 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },

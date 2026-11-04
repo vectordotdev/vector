@@ -15,11 +15,8 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
-#![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
 pub mod config;
 pub mod event;
@@ -40,6 +37,7 @@ mod test_util;
 pub mod time;
 pub mod tls;
 pub mod transform;
+pub mod utilization;
 pub mod vrl;
 
 use std::path::PathBuf;

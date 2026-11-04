@@ -5,7 +5,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct MetricToLogSerializeError {
+pub(crate) struct MetricToLogSerializeError {
     pub error: Error,
 }
 

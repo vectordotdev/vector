@@ -11,7 +11,7 @@ use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     schema,
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},

@@ -12,9 +12,9 @@ use vector_lib::{
 
 #[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusParseError<'a> {
+pub(crate) struct PrometheusParseError<'a> {
     pub error: ParserError,
-    pub url: http_0::Uri,
+    pub url: http::Uri,
     pub body: Cow<'a, str>,
 }
 
@@ -44,7 +44,7 @@ impl InternalEvent for PrometheusParseError<'_> {
 
 #[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusRemoteWriteParseError {
+pub(crate) struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
@@ -67,7 +67,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusInvalidMetricError;
+pub(crate) struct PrometheusInvalidMetricError;
 
 impl InternalEvent for PrometheusInvalidMetricError {
     fn emit(self) {

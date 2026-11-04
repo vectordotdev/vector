@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogAgentJsonParseError<'a> {
+pub(crate) struct DatadogAgentJsonParseError<'a> {
     pub error: &'a serde_json::Error,
 }
 
@@ -26,7 +26,7 @@ impl InternalEvent for DatadogAgentJsonParseError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogAgentUnsupportedTracePayloadError {
+pub(crate) struct DatadogAgentUnsupportedTracePayloadError {
     pub error_code: &'static str,
 }
 
@@ -49,7 +49,7 @@ impl InternalEvent for DatadogAgentUnsupportedTracePayloadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogAgentInvalidIdxStringRefError {
+pub(crate) struct DatadogAgentInvalidIdxStringRefError {
     pub index: u32,
 }
 
@@ -73,7 +73,7 @@ impl InternalEvent for DatadogAgentInvalidIdxStringRefError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogAgentIdxExpansionLimitError {
+pub(crate) struct DatadogAgentIdxExpansionLimitError {
     pub limit: usize,
 }
 

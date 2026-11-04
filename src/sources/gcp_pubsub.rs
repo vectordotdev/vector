@@ -284,7 +284,7 @@ impl SourceConfig for PubsubConfig {
         // Pub/Sub's configured CAs supplement system roots, as they did with Tonic.
         let tls = TlsSettings::from_options(Some(&tls_config))?.with_system_roots();
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
         let client = Http2Client::new(tls.into(), &cx.proxy, builder)?;
 
         let token_generator = auth.spawn_regenerate_token();
@@ -1230,8 +1230,8 @@ mod integration_tests {
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
-    use http_0::method::Method;
-    use hyper::{Request, StatusCode};
+    use http::{Method, Request, StatusCode};
+    use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
     use tokio::time::{Duration, Instant};
     use vrl::{btreemap, event_path};
@@ -1395,7 +1395,7 @@ mod integration_tests {
         components::init_test();
 
         let tls_settings = TlsSettings::from_options(None).unwrap();
-        let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
+        let client = HttpClient::new(tls_settings.into(), &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
         let (rx, shutdown) = tester.spawn_source(status).await;
@@ -1514,14 +1514,11 @@ mod integration_tests {
             let request = Request::builder()
                 .method(method)
                 .uri(uri)
-                .body(body.into())
+                .body(vector_http::full_body(body))
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = http_body_0::Body::collect(response.into_body())
-                .await
-                .unwrap()
-                .to_bytes();
+            let body = response.into_body().collect().await.unwrap().to_bytes();
             serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 

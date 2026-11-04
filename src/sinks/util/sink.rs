@@ -17,7 +17,7 @@
 //! the settings passed.
 //!
 //! HTTP based sinks instead use a `StreamSink` that drives the native HTTP 1
-//! `http_v1::HttpService`.
+//! `http::HttpService`.
 //!
 //! # Driving to completion
 //!

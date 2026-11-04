@@ -15,14 +15,13 @@ use super::{
     service::{HttpRequestBuilder, MetadataFields},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{
             SinkBatchSettings,
-            http::HttpRequest,
-            http_v1::{HttpService, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpService, HttpServiceRequestBuilder},
         },
     },
     template::ConfinedTemplate,
