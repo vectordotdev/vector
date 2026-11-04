@@ -121,7 +121,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
         let mut request = builder.body(payload).map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)

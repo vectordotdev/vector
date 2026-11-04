@@ -189,7 +189,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .context(HTTPV1RequestBuilderSnafu)
             .map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)
@@ -256,7 +256,7 @@ pub(super) async fn http_healthcheck(
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

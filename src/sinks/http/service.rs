@@ -96,7 +96,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
             .map_err(Into::<crate::Error>::into)?;
 
         if let Some(auth) = auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)

@@ -507,7 +507,7 @@ async fn get(
     if let Some(auth) = auth {
         match auth {
             Auth::Basic(http_auth) => {
-                http_auth.apply_v1(&mut request);
+                http_auth.apply(&mut request);
             }
             #[cfg(feature = "aws-core")]
             Auth::Aws {

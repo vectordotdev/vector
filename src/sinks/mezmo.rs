@@ -572,7 +572,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for MezmoServiceRequestBuilder {
             .body(request.take_payload())
             .context(HTTPV1RequestBuilderSnafu)?;
 
-        self.auth.apply_v1(&mut http_request);
+        self.auth.apply(&mut http_request);
 
         Ok(http_request)
     }

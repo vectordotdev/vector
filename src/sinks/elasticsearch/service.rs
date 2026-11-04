@@ -157,7 +157,7 @@ impl HttpRequestBuilder {
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(auth) => {
-                    auth.apply_v1(&mut request);
+                    auth.apply(&mut request);
                 }
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {

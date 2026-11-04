@@ -1157,7 +1157,7 @@ mod tests {
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply_v1(&mut request);
+            client_auth_config.apply(&mut request);
         }
 
         let proxy = ProxyConfig::default();

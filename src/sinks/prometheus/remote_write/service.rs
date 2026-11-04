@@ -136,7 +136,7 @@ pub(super) async fn build_request(
     let mut request = builder.body(body).context(HTTPV1RequestBuilderSnafu)?;
 
     match auth {
-        Some(Auth::Basic(http_auth)) => http_auth.apply_v1(&mut request),
+        Some(Auth::Basic(http_auth)) => http_auth.apply(&mut request),
         #[cfg(feature = "aws-core")]
         Some(Auth::Aws {
             credentials_provider,

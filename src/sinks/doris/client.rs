@@ -201,7 +201,7 @@ impl DorisSinkClient {
         })?;
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         debug!(
@@ -364,7 +364,7 @@ impl DorisSinkClient {
             .map_err(|source| HealthCheckError::HealthCheckBuildRequest { source })?;
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         let response = self.http_client.send(request).await?;
