@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fs, path::PathBuf, pin::Pin};
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
@@ -164,7 +164,8 @@ impl WebSocketSource {
                 },
 
                 Some(ack) = ack_rx.recv() => {
-                    Ok(self.handle_ack(&mut ws_sink, ack, stateful).await)
+                    self.handle_ack(&mut ws_sink, ack, stateful).await;
+                    Ok(())
                 }
 
                 // Split "fairly" between pings and incoming messages
@@ -618,7 +619,7 @@ impl WebSocketSource {
             let message = if ack_serializer.is_binary() {
                 Message::binary(message_bytes)
             } else {
-                Message::text(String::from_utf8_lossy(&message_bytes))
+                Message::text(String::from_utf8_lossy(&message_bytes).as_ref())
             };
 
             _ = ws_sink
@@ -993,7 +994,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("message1".to_string()))
+                .send(Message::text("message1".to_string()))
                 .await
                 .unwrap();
             // Wait for ack
@@ -1002,7 +1003,7 @@ mod tests {
             };
             assert_eq!(ack, "message1");
             websocket
-                .send(Message::Text("message2".to_string()))
+                .send(Message::text("message2".to_string()))
                 .await
                 .unwrap();
             // Wait for ack
@@ -1045,7 +1046,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("message1".to_string()))
+                .send(Message::text("message1".to_string()))
                 .await
                 .unwrap();
             // Close the connection to force a reconnect from the client
@@ -1069,7 +1070,7 @@ mod tests {
             .await
             .expect("Failed to accept");
             websocket
-                .send(Message::Text("message2".to_string()))
+                .send(Message::text("message2".to_string()))
                 .await
                 .unwrap();
             let _ = websocket.next().await;
