@@ -43,7 +43,7 @@ fn default_endpoint() -> HttpEndpoint {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct GreptimeDBLogsConfig {
+pub(super) struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
     #[derivative(Default(value = "default_endpoint()"))]
@@ -152,7 +152,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedGreptimeDBLogs {
+pub(super) struct ValidatedGreptimeDBLogs {
     confined_table: ConfinedTemplate,
     confined_dbname: ConfinedTemplate,
     confined_pipeline_name: ConfinedTemplate,

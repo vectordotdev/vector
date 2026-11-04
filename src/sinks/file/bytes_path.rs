@@ -5,7 +5,7 @@ use std::path::Path;
 use bytes::Bytes;
 
 #[derive(Debug, Clone)]
-pub struct BytesPath {
+pub(super) struct BytesPath {
     #[cfg(unix)]
     path: Bytes,
     #[cfg(windows)]
@@ -14,7 +14,7 @@ pub struct BytesPath {
 
 impl BytesPath {
     #[cfg(unix)]
-    pub const fn new(path: Bytes) -> Self {
+    pub(super) const fn new(path: Bytes) -> Self {
         Self { path }
     }
     #[cfg(windows)]

@@ -39,7 +39,7 @@ pub(super) struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
-    pub const fn new(
+    pub(super) const fn new(
         db: ConfinedTemplate,
         table: ConfinedTemplate,
         pipeline_name: ConfinedTemplate,

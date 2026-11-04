@@ -261,7 +261,7 @@ struct MetricMetadata {
 }
 
 impl MetricMetadata {
-    pub fn new(expiration_window: Duration) -> Self {
+    fn new(expiration_window: Duration) -> Self {
         Self {
             expiration_window,
             expires_at: Instant::now() + expiration_window,
@@ -269,14 +269,14 @@ impl MetricMetadata {
     }
 
     /// Resets the expiration deadline.
-    pub fn refresh(&mut self) {
+    fn refresh(&mut self) {
         self.expires_at = Instant::now() + self.expiration_window;
     }
 
     /// Whether or not the referenced metric has expired yet.
     ///
     /// A zero expiration window means expiration is disabled, so the metric never expires.
-    pub fn has_expired(&self, now: Instant) -> bool {
+    fn has_expired(&self, now: Instant) -> bool {
         !self.expiration_window.is_zero() && now >= self.expires_at
     }
 }
@@ -298,7 +298,7 @@ struct MetricRef {
 
 impl MetricRef {
     /// Creates a `MetricRef` based on the given `Metric`.
-    pub fn from_metric(metric: &Metric) -> Self {
+    fn from_metric(metric: &Metric) -> Self {
         // Either the buckets for an aggregated histogram, or the quantiles for an aggregated summary.
         let bounds = match metric.value() {
             MetricValue::AggregatedHistogram { buckets, .. } => {
@@ -1209,11 +1209,14 @@ mod tests {
         )));
     }
 
-    pub fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
+    pub(super) fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
         create_metric(name, MetricValue::Gauge { value })
     }
 
-    pub fn create_metric_set(name: Option<String>, values: Vec<&'static str>) -> (String, Event) {
+    pub(super) fn create_metric_set(
+        name: Option<String>,
+        values: Vec<&'static str>,
+    ) -> (String, Event) {
         create_metric(
             name,
             MetricValue::Set {

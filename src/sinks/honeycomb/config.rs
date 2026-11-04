@@ -29,7 +29,7 @@ pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     /// Honeycomb's endpoint to send logs to
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
@@ -113,7 +113,7 @@ impl SinkConfig for HoneycombConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedHoneycomb {
+pub(super) struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
     request_limits: TowerRequestSettings,

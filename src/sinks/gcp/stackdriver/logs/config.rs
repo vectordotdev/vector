@@ -42,7 +42,7 @@ enum HealthcheckError {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct StackdriverTowerRequestConfigDefaults;
+pub(super) struct StackdriverTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
@@ -356,7 +356,7 @@ impl ValidatedSink for StackdriverConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedStackdriverLogs {
+pub(super) struct ValidatedStackdriverLogs {
     encoder: StackdriverLogsEncoder,
     batch_settings: BatcherSettings,
 }

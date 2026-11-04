@@ -24,7 +24,7 @@ async fn fetch_status(
     Ok(response.status())
 }
 
-pub async fn healthcheck(
+pub(super) async fn healthcheck(
     base_endpoint: HttpEndpoint,
     auth: Option<Auth>,
     healthcheck_uri: Option<UriSerde>,

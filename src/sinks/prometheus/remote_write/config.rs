@@ -27,7 +27,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
-pub struct RemoteWriteBatchConfig {
+pub(crate) struct RemoteWriteBatchConfig {
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
@@ -45,7 +45,7 @@ pub struct RemoteWriteBatchConfig {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct RemoteWriteConfig {
+pub(crate) struct RemoteWriteConfig {
     /// The endpoint to send data to.
     ///
     /// The endpoint should include the scheme and the path to write to.
@@ -138,7 +138,7 @@ impl_generate_config_from_default!(RemoteWriteConfig);
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
-pub struct RemoteWriteRequestConfig {
+pub(crate) struct RemoteWriteRequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
 
@@ -216,7 +216,7 @@ impl SinkConfig for RemoteWriteConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedRemoteWrite {
+pub(crate) struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
     validated_headers: CustomHeaders,
     batch_settings: BatcherSettings,
