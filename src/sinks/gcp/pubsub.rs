@@ -15,14 +15,16 @@ use crate::{
     http::HttpClient,
     internal_events::LargeEventDroppedError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             HttpEndpoint,
             encoding::Encoder as SinkEncoder,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -434,7 +436,7 @@ impl HttpServiceRequestBuilder<()> for PubsubServiceRequestBuilder {
         let mut request = Request::post(self.uri.clone())
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
         self.auth.apply(&mut request);
 
         Ok(request)

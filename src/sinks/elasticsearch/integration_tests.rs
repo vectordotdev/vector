@@ -97,7 +97,7 @@ impl ElasticsearchCommon {
         let mut request = builder.body(Bytes::new())?;
         if let Some(auth) = &self.auth {
             match auth {
-                Auth::Basic(http_auth) => http_auth.apply_v1(&mut request),
+                Auth::Basic(http_auth) => http_auth.apply(&mut request),
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,

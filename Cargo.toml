@@ -364,7 +364,7 @@ opendal-http-transport-reqwest = { version = "0.58.2", default-features = false,
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http-1 = { package = "tower-http", version = "0.6.8", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
+tower-http = { version = "0.6.8", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
@@ -444,13 +444,13 @@ governor = { version = "0.10.0", default-features = false, features = ["dashmap"
 h2 = { version = "0.4.11", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
-headers-1 = { package = "headers", version = "0.4.1", default-features = false }
+headers = { version = "0.4.1", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
 http = { version = "1.0", default-features = false, features = ["std"] }
 http-serde = "2"
 http-body = { version = "1", default-features = false }
 http-body-util = { version = "0.1", default-features = false }
-hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["client", "http1", "http2", "server"] }
+hyper = { version = "1", default-features = false, features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "server", "server-auto", "server-graceful", "service", "tokio"] }
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
@@ -838,7 +838,7 @@ sources-websocket = ["dep:tokio-tungstenite"]
 sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
 sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
-sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "http-body-util/channel", "protobuf-build", "tower-http-1/trace"]
+sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "http-body-util/channel", "protobuf-build", "tower-http/trace"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]

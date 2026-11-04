@@ -7,7 +7,7 @@ use std::{
 
 use bytes::{Buf, Bytes};
 use futures::stream;
-use headers_1::{Authorization, HeaderMapExt};
+use headers::{Authorization, HeaderMapExt};
 use http::{Method, Response, StatusCode};
 use http_body_util::Full;
 use serde::{Deserialize, de};
