@@ -1038,7 +1038,9 @@ mod tests {
         source.abort();
     }
 
-    #[tokio::test(start_paused = true)]
+    // Real TLS I/O cannot advance with Tokio's paused clock. Auto-advancing the
+    // timeout can otherwise expire before the operating system services the retry.
+    #[tokio::test]
     async fn connection_failures_keep_error_event_and_retry_delay() {
         use crate::test_util::components::{COMPONENT_TESTS_ERROR, init_test};
         use tokio::{io::AsyncReadExt as _, time::Instant};
