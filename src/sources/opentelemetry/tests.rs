@@ -2484,3 +2484,159 @@ mod otlp_decoding_config_tests {
         assert_eq!(traces_output.ty, DataType::Trace); // Should always be Trace regardless of OTLP decoding
     }
 }
+
+#[tokio::test]
+async fn empty_exports_are_noops_over_http_and_grpc() {
+    for preserve in [false, true] {
+        let mut env = build_otlp_test_env_with(TRACES, None, preserve).await;
+        let client = reqwest::Client::new();
+        for signal in [TRACES, LOGS, METRICS] {
+            // Default request, empty resource, empty scope, then repeat the default.
+            for payload in [
+                vec![],
+                vec![0x0a, 0x00],
+                vec![0x0a, 0x02, 0x12, 0x00],
+                vec![],
+            ] {
+                let response = client
+                    .post(format!("http://{}/v1/{signal}", env.config.http.address))
+                    .header("content-type", "application/x-protobuf")
+                    .body(payload)
+                    .send()
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), reqwest::StatusCode::OK);
+                assert_eq!(response.headers()["content-type"], "application/x-protobuf");
+                assert!(response.bytes().await.unwrap().is_empty());
+            }
+        }
+        let endpoint = format!("http://{}", env.grpc_addr);
+        let mut traces = TraceServiceClient::connect(endpoint.clone()).await.unwrap();
+        let mut logs = LogsServiceClient::connect(endpoint.clone()).await.unwrap();
+        let mut metrics = MetricsServiceClient::connect(endpoint).await.unwrap();
+        for _ in 0..2 {
+            assert!(
+                traces
+                    .export(ExportTraceServiceRequest::default())
+                    .await
+                    .unwrap()
+                    .into_inner()
+                    .partial_success
+                    .is_none()
+            );
+            assert!(
+                logs.export(ExportLogsServiceRequest::default())
+                    .await
+                    .unwrap()
+                    .into_inner()
+                    .partial_success
+                    .is_none()
+            );
+            assert!(
+                metrics
+                    .export(ExportMetricsServiceRequest::default())
+                    .await
+                    .unwrap()
+                    .into_inner()
+                    .partial_success
+                    .is_none()
+            );
+        }
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), env.output.next())
+                .await
+                .is_err()
+        );
+        let malformed = client
+            .post(format!("http://{}/v1/traces", env.config.http.address))
+            .header("content-type", "application/x-protobuf")
+            .body(vec![0x80])
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(malformed.status(), reqwest::StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
+async fn preserved_zero_duration_span_keeps_its_identity() {
+    use tokio_util::codec::Encoder;
+    use vector_lib::codecs::encoding::OtlpSerializer;
+
+    let mut env = build_otlp_test_env_with(TRACES, None, true).await;
+    let mut request = create_test_traces_request();
+    let span = &mut request.resource_spans[0].scope_spans[0].spans[0];
+    span.end_time_unix_nano = span.start_time_unix_nano;
+    let response = reqwest::Client::new()
+        .post(format!("http://{}/v1/traces", env.config.http.address))
+        .header("content-type", "application/x-protobuf")
+        .body(request.encode_to_vec())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let event = tokio::time::timeout(std::time::Duration::from_secs(1), env.output.next())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(super::count_otlp_items(std::slice::from_ref(&event)), 1);
+    let mut encoded = bytes::BytesMut::new();
+    OtlpSerializer::new()
+        .unwrap()
+        .encode(event, &mut encoded)
+        .unwrap();
+    assert_eq!(
+        ExportTraceServiceRequest::decode(encoded.freeze()).unwrap(),
+        request
+    );
+}
+
+#[tokio::test]
+async fn json_empty_exports_use_json_receipts_and_keep_errors_separate() {
+    let mut env = build_otlp_test_env_with(TRACES, None, true).await;
+    let client = reqwest::Client::new();
+    for (signal, resources, scopes) in [
+        (TRACES, "resourceSpans", "scopeSpans"),
+        (LOGS, "resourceLogs", "scopeLogs"),
+        (METRICS, "resourceMetrics", "scopeMetrics"),
+    ] {
+        for body in [
+            "{}".to_owned(),
+            format!(r#"{{"{resources}":[]}}"#),
+            format!(r#"{{"{resources}":[{{"{scopes}":[{{}}]}}]}}"#),
+        ] {
+            let response = client
+                .post(format!("http://{}/v1/{signal}", env.config.http.address))
+                .header("content-type", "application/json")
+                .body(body)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::OK);
+            assert_eq!(response.headers()["content-type"], "application/json");
+            assert_eq!(
+                response.json::<serde_json::Value>().await.unwrap(),
+                serde_json::json!({})
+            );
+        }
+    }
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(50), env.output.next())
+            .await
+            .is_err()
+    );
+    for body in ["", " ", "{", "null", "[]", r#"{"resourceSpans":false}"#] {
+        let response = client
+            .post(format!("http://{}/v1/traces", env.config.http.address))
+            .header("content-type", "application/json")
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let status = response.json::<serde_json::Value>().await.unwrap();
+        assert!(status["code"].is_number());
+        assert!(!status["message"].as_str().unwrap().is_empty());
+    }
+}

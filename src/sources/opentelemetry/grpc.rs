@@ -56,7 +56,9 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+        let events = if super::empty::traces(request.get_ref()) {
+            Vec::new()
+        } else if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
             deserializer
@@ -88,7 +90,9 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+        let events = if super::empty::logs(request.get_ref()) {
+            Vec::new()
+        } else if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
             deserializer
@@ -120,7 +124,9 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+        let events = if super::empty::metrics(request.get_ref()) {
+            Vec::new()
+        } else if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             // Major caveat here, the output event will be logs.
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -164,6 +170,9 @@ impl Service {
         let byte_size = events.estimated_json_encoded_size_of();
         self.events_received.emit(CountByteSize(count, byte_size));
 
+        if events.is_empty() {
+            return Ok(None);
+        }
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 
         self.pipeline
