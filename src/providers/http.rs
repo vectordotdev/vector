@@ -222,7 +222,7 @@ impl_generate_config_from_default!(HttpConfig);
 mod parse_first_tests {
     use std::{convert::Infallible, future::ready};
 
-    use hyper::{Body, Response};
+    use http::Response;
 
     use super::{Format, IndexMap, ProxyConfig, Url, http_request_to_config_builder};
     use crate::test_util::http::spawn_blackhole_http_server;
@@ -239,7 +239,7 @@ mod parse_first_tests {
                 count: '42'
         "};
         let uri = spawn_blackhole_http_server(move |_| {
-            ready(Ok::<_, Infallible>(Response::new(Body::from(input))))
+            ready(Ok::<_, Infallible>(Response::new(input.into())))
         })
         .await;
 
