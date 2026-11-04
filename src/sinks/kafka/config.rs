@@ -169,6 +169,10 @@ impl KafkaSinkConfig {
             )
             .set("statistics.interval.ms", "1000");
 
+        // The producer and the healthcheck client have no SASL/OAUTHBEARER token provider yet.
+        if self.auth.sasl_azure().is_some() {
+            return Err("`sasl.azure` is not supported yet by the `kafka` sink".into());
+        }
         self.auth.apply(&mut client_config)?;
 
         // All batch options are producer only.
@@ -542,6 +546,55 @@ mod tests {
             config.validate().is_ok(),
             "batch options without conflicting librdkafka options should pass validation"
         );
+    }
+
+    #[test]
+    fn validate_rejects_sasl_azure() {
+        // `sasl.azure` also enables SASL when `sasl.enabled` is not set.
+        for enabled in ["enabled: true", ""] {
+            let config: KafkaSinkConfig = serde_yaml::from_str(&format!(
+                r#"
+                bootstrap_servers: "mynamespace.servicebus.windows.net:9093"
+                topic: "test-topic"
+                encoding:
+                    codec: "json"
+                sasl:
+                    {enabled}
+                    azure:
+                        token_scope: "https://mynamespace.servicebus.windows.net/.default"
+                        auth:
+                            azure_credential_kind: managed_identity
+                tls:
+                    enabled: true
+                "#
+            ))
+            .unwrap();
+            let error = config.validate().unwrap_err().to_string();
+            assert!(
+                error.contains("`sasl.azure` is not supported yet by the `kafka` sink"),
+                "unexpected error with `{enabled}`: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_ignores_sasl_azure_when_sasl_is_disabled() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            sasl:
+                enabled: false
+                azure:
+                    token_scope: "https://mynamespace.servicebus.windows.net/.default"
+                    auth:
+                        azure_credential_kind: managed_identity
+            "#,
+        )
+        .unwrap();
+        assert!(config.validate().is_ok());
     }
 
     #[tokio::test]

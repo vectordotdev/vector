@@ -195,6 +195,45 @@ mod source {
         }
     }
 
+    #[cfg(feature = "azure-core")]
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct KafkaOAuthTokenRefreshError<'a> {
+        pub error: &'a dyn std::error::Error,
+    }
+
+    #[cfg(feature = "azure-core")]
+    impl InternalEvent for KafkaOAuthTokenRefreshError<'_> {
+        fn emit(self) {
+            // Azure SDK errors print only their own message, so add the text of each source that
+            // the message does not contain yet. A source often holds the cause, for example the
+            // connection or TLS error under a failed token request.
+            let mut error = self.error.to_string();
+            let mut source = self.error.source();
+            while let Some(cause) = source {
+                let cause_text = cause.to_string();
+                if !error.contains(&cause_text) {
+                    error.push_str(": ");
+                    error.push_str(&cause_text);
+                }
+                source = cause.source();
+            }
+            error!(
+                message = "Failed to get a SASL/OAUTHBEARER token.",
+                %error,
+                error_code = "oauth_token_refresh",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "oauth_token_refresh",
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+        }
+    }
+
     #[derive(Debug, NamedInternalEvent)]
     pub struct KafkaPayloadDecompressionError<'a> {
         pub error: &'a std::io::Error,
