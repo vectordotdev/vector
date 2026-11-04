@@ -34,7 +34,7 @@ use crate::{
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
-pub async fn flush_apm_stats_thread(
+pub(crate) async fn flush_apm_stats_thread(
     mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
     compression: Compression,

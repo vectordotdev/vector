@@ -26,7 +26,7 @@ use crate::sinks::{
     util::http::OrderedHeaderName,
 };
 
-pub struct CloudwatchFuture {
+pub(super) struct CloudwatchFuture {
     client: RequestClient,
     state: State,
     create_missing_group: bool,
@@ -251,7 +251,7 @@ impl Future for CloudwatchFuture {
 }
 
 impl RequestClient {
-    pub fn put_logs(
+    fn put_logs(
         &self,
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
@@ -280,9 +280,7 @@ impl RequestClient {
         })
     }
 
-    pub fn describe_stream(
-        &self,
-    ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
+    fn describe_stream(&self) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
@@ -296,7 +294,7 @@ impl RequestClient {
         })
     }
 
-    pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
+    fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let kms_key = self.kms_key.clone();
@@ -313,7 +311,7 @@ impl RequestClient {
         })
     }
 
-    pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
+    fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
@@ -328,7 +326,7 @@ impl RequestClient {
         })
     }
 
-    pub fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+    fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let retention_days = self.retention_days;

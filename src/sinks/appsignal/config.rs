@@ -144,7 +144,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedAppsignal {
+pub(super) struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
@@ -209,7 +209,7 @@ async fn healthcheck(
     }
 }
 
-pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+pub(super) fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
     Ok(endpoint.append_path(path)?)
 }
 

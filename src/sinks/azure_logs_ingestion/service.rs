@@ -25,7 +25,7 @@ const API_VERSION: &str = "2023-01-01";
 const CONTENT_TYPE: &str = "application/json";
 
 #[derive(Debug, Clone)]
-pub struct AzureLogsIngestionRequest {
+pub(super) struct AzureLogsIngestionRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -47,7 +47,7 @@ impl Finalizable for AzureLogsIngestionRequest {
     }
 }
 
-pub struct AzureLogsIngestionResponse {
+pub(super) struct AzureLogsIngestionResponse {
     pub http_status: StatusCode,
     pub events_byte_size: GroupedCountByteSize,
     pub raw_byte_size: usize,
@@ -73,7 +73,7 @@ impl DriverResponse for AzureLogsIngestionResponse {
 
 /// `AzureLogsIngestionService` is a `Tower` service used to send logs to Azure.
 #[derive(Debug, Clone)]
-pub struct AzureLogsIngestionService {
+pub(super) struct AzureLogsIngestionService {
     client: HttpClient,
     endpoint: Uri,
     credential: Arc<dyn TokenCredential>,
@@ -96,7 +96,7 @@ pub(super) fn request_path(
 
 impl AzureLogsIngestionService {
     /// Creates a new `AzureLogsIngestionService`.
-    pub fn new(
+    pub(super) fn new(
         client: HttpClient,
         endpoint: Uri,
         path_and_query: http::uri::PathAndQuery,
@@ -145,7 +145,7 @@ impl AzureLogsIngestionService {
         Ok(request)
     }
 
-    pub fn healthcheck(&self) -> Healthcheck {
+    pub(super) fn healthcheck(&self) -> Healthcheck {
         let service = self.clone();
         Box::pin(async move {
             let request = service.build_request(Bytes::from("[]")).await?;
