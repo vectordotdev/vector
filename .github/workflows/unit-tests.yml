@@ -76,7 +76,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          cue: true
           cargo-nextest: true
           cargo-llvm-cov: ${{ inputs.coverage }}
           datadog-ci: ${{ !inputs.coverage }}

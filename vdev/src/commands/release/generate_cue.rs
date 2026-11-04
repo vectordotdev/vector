@@ -705,6 +705,16 @@ fn render_release_cue(
 /// must not be overwritten, even when this command is repeated after a template change.
 fn fill_missing_description(repo_root: &Path, version: &Version) -> Result<bool> {
     let release = release_notes::read_release(repo_root, version)?;
+    write_missing_description(repo_root, version, &release)
+}
+
+/// Apply the backfill to already-exported release data. Keeping command execution at
+/// the caller lets tests cover parsing, rendering, and file updates without CUE.
+fn write_missing_description(
+    repo_root: &Path,
+    version: &Version,
+    release: &release_notes::Release,
+) -> Result<bool> {
     if release.description.is_some() {
         return Ok(false);
     }
@@ -1187,22 +1197,31 @@ mod tests {
             .path()
             .join("vdev/src/commands/release/release_notes.hbs");
         fs::create_dir_all(template.parent().unwrap()).unwrap();
-        fs::write(&template, include_str!("release_notes.hbs")).unwrap();
+        fs::write(
+            &template,
+            "{{contributors}} who made the {{#if one_change}}change{{else}}{{changes}} changes{{/if}}.\n\
+             {{#each sections}}[{{count}} {{noun}}]({{url}})\n{{/each}}",
+        )
+        .unwrap();
+        let mut release = release_notes::parse_release(
+            br#"{"changelog":[{"type":"fix","description":"Fixed it.","contributors":["alice"]}]}"#,
+        )
+        .unwrap();
 
-        fill_missing_description(tmp.path(), &version).unwrap();
+        assert!(write_missing_description(tmp.path(), &version, &release).unwrap());
         let updated = fs::read_to_string(&path).unwrap();
-        let release = release_notes::read_release(tmp.path(), &version).unwrap();
-        let description = release.description.unwrap();
-        assert!(description.contains("contributor who made the change"));
-        assert!(description.contains("[1 bug fix](/releases/0.99.0/#bug-fixes)"));
-        assert!(!description.contains("upgrade guide"));
+        let description =
+            "contributor who made the change.\n[1 bug fix](/releases/0.99.0/#bug-fixes)";
+        assert!(updated.contains(description.lines().next().unwrap()));
+        assert!(updated.contains("[1 bug fix](/releases/0.99.0/#bug-fixes)"));
         assert_eq!(
-            updated.replace(&format!("\n{}", render_description_field(&description)), ""),
+            updated.replace(&format!("\n{}", render_description_field(description)), ""),
             original
         );
 
+        release.description = Some(description.to_owned());
         fs::write(template, "Changed template").unwrap();
-        fill_missing_description(tmp.path(), &version).unwrap();
+        assert!(!write_missing_description(tmp.path(), &version, &release).unwrap());
         assert_eq!(fs::read_to_string(path).unwrap(), updated);
     }
 
@@ -1219,7 +1238,12 @@ mod tests {
             }
         "#};
         fs::write(&path, original).unwrap();
-        fill_missing_description(tmp.path(), &Version::new(0, 18, 1)).unwrap();
+        let release = release_notes::parse_release(
+            br#"{"description":"Handwritten migration notes.","commits":[{"description":"Keep this legacy commit."}]}"#,
+        )
+        .unwrap();
+        assert!(release.changelog.is_empty());
+        assert!(!write_missing_description(tmp.path(), &Version::new(0, 18, 1), &release).unwrap());
         assert_eq!(fs::read_to_string(path).unwrap(), original);
     }
 

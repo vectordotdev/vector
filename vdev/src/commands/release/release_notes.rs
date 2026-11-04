@@ -132,8 +132,13 @@ pub(super) fn read_release(repo_root: &Path, version: &Version) -> Result<Releas
         );
     }
 
-    serde_json::from_slice(&output.stdout)
-        .with_context(|| format!("Failed to parse the changelog in {}", cue_path.display()))
+    parse_release(&output.stdout)
+        .with_context(|| format!("Failed to parse release metadata in {}", cue_path.display()))
+}
+
+/// Parse exported metadata independently of the external CUE command.
+pub(super) fn parse_release(exported: &[u8]) -> Result<Release> {
+    serde_json::from_slice(exported).context("Invalid exported release metadata")
 }
 
 /// Data injected into the release notes template (`release_notes.hbs`).
