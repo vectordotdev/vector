@@ -30,14 +30,14 @@ package-repositories = [
 ]
 
 [dependencies]
-aws-config = { version = "=1.12.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-s3 = { version = "=1.146.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-sts = { version = "=1.114.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-iam = { version = "1.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-config = { workspace = true, optional = true }
+aws-sdk-s3 = { workspace = true, optional = true }
+aws-sdk-sts = { workspace = true, optional = true }
+aws-sdk-iam = { version = "1.133.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 # Match Vector's Ring provider when both packages are built together.
-aws-smithy-http-client = { version = "1.4", default-features = false, features = ["rustls-ring"], optional = true }
-aws-smithy-runtime-api = { version = "1.16", features = ["client"], optional = true }
-aws-smithy-types = { version = "1", optional = true }
+aws-smithy-http-client = { version = "1.5.2", default-features = false, features = ["rustls-ring"], optional = true }
+aws-smithy-runtime-api = { workspace = true, features = ["client"], optional = true }
+aws-smithy-types = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["blocking"], optional = true }
