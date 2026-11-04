@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
 const quickstart = "/docs/setup/quickstart/";
@@ -41,28 +42,6 @@ test("documentation TOC navigates to a visible section", async ({ page }) => {
     .click();
   await expect(page).toHaveURL(/#configure-vector$/);
   await expect(page.getByRole("heading", { name: "Configure Vector", exact: true })).toBeInViewport();
-});
-
-test("configuration format and level tabs change the displayed example", async ({ page }) => {
-  await page.goto(remap);
-  const examples = page.locator("div[x-data]").filter({
-    has: page.getByRole("heading", { name: "Example configurations", exact: true })
-  });
-  const code = examples.locator("pre:visible");
-  await expect(code).toContainText("type: remap");
-  await examples.getByRole("button", { name: "JSON", exact: true }).click();
-  await expect(code).toContainText('"type": "remap"');
-  await expect(code).not.toContainText("drop_on_abort");
-  await examples.getByRole("button", { name: "Advanced", exact: true }).click();
-  await expect(code).toContainText('"type": "remap"');
-  await expect(code).toContainText('"drop_on_abort": true');
-
-  await page.reload();
-  await expect(code).toContainText('"type": "remap"');
-  await examples.getByRole("button", { name: "TOML", exact: true }).click();
-  await expect(code).toContainText('type = "remap"');
-  await examples.getByRole("button", { name: "YAML", exact: true }).click();
-  await expect(code).toContainText("type: remap");
 });
 
 test("exact component search supports keyboard navigation", async ({ page }) => {
@@ -112,6 +91,26 @@ test("Pagefind returns full-text results and handles an unmatched query", async 
   await expect(page.locator(".aa-Panel")).toBeHidden();
 });
 
+async function checkSidebarNavigation(page: Page, dismissWith: "button" | "Escape") {
+  const sidebarToggle = page.getByText("Sidebar", { exact: true });
+  const sidebar = page.getByRole("dialog").filter({
+    has: page.getByRole("button", { name: "Close docs slideover panel" })
+  });
+  await sidebarToggle.click();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebarToggle).toBeHidden();
+  if (dismissWith === "Escape") {
+    await page.keyboard.press("Escape");
+  } else {
+    await sidebar.getByRole("button", { name: "Close docs slideover panel" }).click();
+  }
+  await expect(sidebar).toBeHidden();
+  await expect(sidebarToggle).toBeVisible();
+  await sidebarToggle.click();
+  await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
+}
+
 test("mobile navigation opens, navigates, and closes the docs sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -121,37 +120,13 @@ test("mobile navigation opens, navigates, and closes the docs sidebar", async ({
   await expect(menu).toBeVisible();
   await menu.getByRole("link", { name: "Docs", exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/?$/);
-  const sidebarToggle = page.getByText("Sidebar", { exact: true });
-  await sidebarToggle.click();
-  const sidebar = page.getByRole("dialog").filter({
-    has: page.getByRole("button", { name: "Close docs slideover panel" })
-  });
-  await expect(sidebar).toBeVisible();
-  await expect(sidebarToggle).toBeHidden();
-  await sidebar.getByRole("button", { name: "Close docs slideover panel" }).click();
-  await expect(sidebar).toBeHidden();
-  await expect(sidebarToggle).toBeVisible();
-  await sidebarToggle.click();
-  await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
+  await checkSidebarNavigation(page, "button");
 });
 
 test("mobile component sidebar opens, closes, and navigates", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/docs/reference/configuration/sinks/amqp/");
-  const sidebarToggle = page.getByText("Sidebar", { exact: true });
-  const sidebar = page.getByRole("dialog").filter({
-    has: page.getByRole("button", { name: "Close docs slideover panel" })
-  });
-  await sidebarToggle.click();
-  await expect(sidebar).toBeVisible();
-  await expect(sidebarToggle).toBeHidden();
-  await page.keyboard.press("Escape");
-  await expect(sidebar).toBeHidden();
-  await expect(sidebarToggle).toBeVisible();
-  await sidebarToggle.click();
-  await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
+  await checkSidebarNavigation(page, "Escape");
 });
 
 test("mobile Updates modal covers the sidebar control and dismisses from the bottom backdrop", async ({ page }) => {

@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn stages_scripts_and_regenerates_stub() {
+    fn regenerates_stub_and_removes_obsolete_scripts() {
         use std::os::unix::fs::PermissionsExt as _;
 
         let temp = tempfile::tempdir().unwrap();
@@ -121,9 +121,14 @@ mod tests {
         fs::write(scripts.join("preinst"), "{{config_stub~}}").unwrap();
         fs::write(scripts.join("postinst"), "#!/bin/sh\n").unwrap();
         fs::set_permissions(scripts.join("preinst"), fs::Permissions::from_mode(0o755)).unwrap();
-        for stub in ["# first\n", "# changed\n"] {
+        fs::write(scripts.join("prerm"), "#!/bin/sh\n").unwrap();
+        for (generation, stub) in ["# first\n", "# changed\n"].into_iter().enumerate() {
             fs::write(source.join("vector.yaml"), stub).unwrap();
             generate(&source, &output).unwrap();
+            assert_eq!(output.join("prerm").exists(), generation == 0);
+            if generation == 0 {
+                fs::remove_file(scripts.join("prerm")).unwrap();
+            }
             assert_eq!(fs::read_to_string(output.join("preinst")).unwrap(), stub);
             assert_eq!(
                 fs::read(output.join("postinst")).unwrap(),
@@ -138,29 +143,6 @@ mod tests {
                 0o755
             );
         }
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn removes_obsolete_scripts_on_regeneration() {
-        let temp = tempfile::tempdir().unwrap();
-        let source = temp.path().join("source");
-        let scripts = source.join("scripts");
-        let output = temp.path().join("output");
-        fs::create_dir_all(&scripts).unwrap();
-        fs::write(source.join("vector.yaml"), "# stub\n").unwrap();
-        fs::write(scripts.join("preinst"), "{{config_stub~}}").unwrap();
-        fs::write(scripts.join("prerm"), "#!/bin/sh\n").unwrap();
-        generate(&source, &output).unwrap();
-        assert!(output.join("prerm").exists());
-
-        fs::remove_file(scripts.join("prerm")).unwrap();
-        generate(&source, &output).unwrap();
-        assert!(!output.join("prerm").exists());
-        assert_eq!(
-            fs::read_to_string(output.join("preinst")).unwrap(),
-            "# stub\n"
-        );
     }
 
     #[test]
