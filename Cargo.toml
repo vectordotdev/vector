@@ -384,7 +384,7 @@ protobuf = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.7.1", optional = true, features = ["arrow-flight"] }
+databricks-zerobus-ingest-sdk = { version = "3.1.1", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -405,8 +405,8 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 # External libs
 arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "59.2.0", default-features = false, features = ["ipc"], optional = true }
-parquet = { version = "59.2.0", default-features = false, features = [
+arrow = { version = "60.1.0", default-features = false, features = ["ipc"], optional = true }
+parquet = { version = "60.1.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
