@@ -8,6 +8,7 @@ pub(crate) struct ThrottleEventDiscarded {
     pub key: String,
     pub tags: Vec<(String, String)>,
     pub emit_events_discarded_per_key: bool,
+    pub include_key_tag: bool,
     pub include_group_tag: bool,
 }
 
@@ -18,7 +19,9 @@ impl InternalEvent for ThrottleEventDiscarded {
         debug!(message, key = %self.key);
         if self.emit_events_discarded_per_key {
             let mut tags = self.tags;
-            tags.push(("key".to_owned(), self.key.clone()));
+            if self.include_key_tag {
+                tags.push(("key".to_owned(), self.key.clone()));
+            }
             counter!(CounterName::EventsDiscardedTotal, &tags).increment(1);
         }
 
@@ -66,6 +69,7 @@ mod tests {
                 key: key.to_string(),
                 tags: vec![],
                 emit_events_discarded_per_key: false,
+                include_key_tag: true,
                 include_group_tag: true,
             }
             .emit();
@@ -87,6 +91,7 @@ mod tests {
             key: "group-a".to_string(),
             tags: vec![],
             emit_events_discarded_per_key: false,
+            include_key_tag: true,
             include_group_tag: false,
         }
         .emit();

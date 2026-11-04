@@ -15,20 +15,29 @@ use crate::{
 
 /// Configuration of internal metrics for the Throttle transform.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleInternalMetricsConfig {
-    /// Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
+    /// Whether or not to emit the `events_discarded_total` internal metric.
     ///
-    /// If true, the counter will be incremented for each discarded event, including the key value
-    /// associated with the discarded event. If false, the counter will not be emitted. Instead, the
-    /// number of discarded events can be seen through the `component_discarded_events_total` internal
-    /// metric.
+    /// If true, the counter is incremented for each discarded event. The `key` tag is included
+    /// by default; set `include_key_tag` to false to omit it. If false, the counter is not emitted.
+    /// Discard counts remain available through `component_discarded_events_total`.
     ///
-    /// Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-    /// Only set this to true if you know that the number of unique keys is bounded.
+    /// This defaults to false because the `key` tag has potentially unbounded cardinality.
+    /// Only enable the counter with tags whose cardinality is bounded.
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
+
+    /// Whether to include the `key` tag on `events_discarded_total`.
+    ///
+    /// Defaults to true to preserve existing per-key metrics. The tag contains the rendered
+    /// `key_field` value, or `None` when no key is available. Setting this to false aggregates
+    /// discard counts across throttle keys that have the same remaining metric tags.
+    /// This does not change rate-limit buckets or the `include_group_tag` setting.
+    /// Requires `emit_events_discarded_per_key` to be enabled.
+    #[serde(default = "crate::serde::default_true")]
+    pub include_key_tag: bool,
 
     /// Extra tags to add to the `events_discarded_total` internal metric.
     ///
@@ -54,6 +63,17 @@ pub struct ThrottleInternalMetricsConfig {
     /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
     #[serde(default)]
     pub include_group_tag: bool,
+}
+
+impl Default for ThrottleInternalMetricsConfig {
+    fn default() -> Self {
+        Self {
+            emit_events_discarded_per_key: false,
+            include_key_tag: true,
+            events_discarded_tags: HashMap::new(),
+            include_group_tag: false,
+        }
+    }
 }
 
 impl ThrottleInternalMetricsConfig {
@@ -159,12 +179,17 @@ mod tests {
     }
 
     #[test]
-    fn internal_metrics_include_group_tag_defaults_to_false() {
+    fn internal_metrics_defaults_preserve_existing_labels() {
         let config = serde_yaml::from_str::<ThrottleConfig>(
             "threshold: 1\nwindow_secs: 1\ninternal_metrics: {}\n",
         )
         .unwrap();
         assert!(!config.internal_metrics.include_group_tag);
+        assert!(config.internal_metrics.include_key_tag);
+        assert!(ThrottleConfig::default().internal_metrics.include_key_tag);
+        let without_internal_metrics =
+            serde_yaml::from_str::<ThrottleConfig>("threshold: 1\nwindow_secs: 1\n").unwrap();
+        assert!(without_internal_metrics.internal_metrics.include_key_tag);
     }
 
     #[test]

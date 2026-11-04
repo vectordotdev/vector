@@ -309,6 +309,7 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of events discarded by this component.
 				The throttle transform can add event-derived tags using `internal_metrics.events_discarded_tags`.
+				Set `internal_metrics.include_key_tag` to false to omit its throttle key tag.
 				"""
 			type:              "counter"
 			default_namespace: "vector"

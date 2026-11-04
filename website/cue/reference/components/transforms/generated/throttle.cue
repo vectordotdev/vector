@@ -12,15 +12,14 @@ generated: components: transforms: throttle: configuration: {
 		type: object: options: {
 			emit_events_discarded_per_key: {
 				description: """
-					Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
+					Whether or not to emit the `events_discarded_total` internal metric.
 
-					If true, the counter will be incremented for each discarded event, including the key value
-					associated with the discarded event. If false, the counter will not be emitted. Instead, the
-					number of discarded events can be seen through the `component_discarded_events_total` internal
-					metric.
+					If true, the counter is incremented for each discarded event. The `key` tag is included
+					by default; set `include_key_tag` to false to omit it. If false, the counter is not emitted.
+					Discard counts remain available through `component_discarded_events_total`.
 
-					Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-					Only set this to true if you know that the number of unique keys is bounded.
+					This defaults to false because the `key` tag has potentially unbounded cardinality.
+					Only enable the counter with tags whose cardinality is bounded.
 					"""
 				required: false
 				type: bool: default: false
@@ -56,6 +55,19 @@ generated: components: transforms: throttle: configuration: {
 					"""
 				required: false
 				type: bool: default: false
+			}
+			include_key_tag: {
+				description: """
+					Whether to include the `key` tag on `events_discarded_total`.
+
+					Defaults to true to preserve existing per-key metrics. The tag contains the rendered
+					`key_field` value, or `None` when no key is available. Setting this to false aggregates
+					discard counts across throttle keys that have the same remaining metric tags.
+					This does not change rate-limit buckets or the `include_group_tag` setting.
+					Requires `emit_events_discarded_per_key` to be enabled.
+					"""
+				required: false
+				type: bool: default: true
 			}
 		}
 	}

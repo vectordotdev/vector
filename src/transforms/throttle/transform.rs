@@ -108,6 +108,7 @@ where
             key,
             tags,
             emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
+            include_key_tag: self.internal_metrics.include_key_tag,
             include_group_tag: self.internal_metrics.include_group_tag,
         });
     }
@@ -310,6 +311,90 @@ mod tests {
     #[tokio::test]
     async fn discard_tags_unconfigured_preserves_existing_labels() {
         discard_metrics_case(true, false).await;
+    }
+
+    #[rstest::rstest]
+    #[case(false)]
+    #[case(true)]
+    #[tokio::test]
+    async fn discard_tags_without_key_aggregate_across_buckets(#[case] extra_tags: bool) {
+        vector_lib::metrics::init_test();
+        let mut config: ThrottleConfig = serde_yaml::from_str(indoc! {r#"
+            threshold: 1
+            window_secs: 60
+            key_field: "{{ entity }}"
+            internal_metrics:
+              emit_events_discarded_per_key: true
+              include_key_tag: false
+              include_group_tag: true
+        "#})
+        .unwrap();
+        if extra_tags {
+            config.internal_metrics.events_discarded_tags =
+                [("tenant".to_owned(), "{{ tenant }}".try_into().unwrap())].into();
+        }
+        config.validate_structure().unwrap();
+        let throttle = Throttle::new(
+            &config,
+            &TransformContext::default(),
+            clock::FakeRelativeClock::default(),
+        )
+        .unwrap();
+        let events = ["a", "a", "a", "b", "b", "b"].map(|entity| {
+            let mut event = LogEvent::default();
+            event.insert(event_path!("entity"), entity);
+            event.insert(event_path!("tenant"), "shared");
+            Event::from(event)
+        });
+        let output = Box::new(throttle)
+            .transform(Box::pin(futures::stream::iter(events)))
+            .collect::<Vec<_>>()
+            .await;
+        assert_eq!(
+            output
+                .iter()
+                .map(|event| event
+                    .as_log()
+                    .get(event_path!("entity"))
+                    .unwrap()
+                    .to_string_lossy())
+                .collect::<Vec<_>>(),
+            ["a", "b"],
+        );
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        let discards = metrics
+            .iter()
+            .filter(|metric| metric.name() == "events_discarded_total")
+            .collect::<Vec<_>>();
+        assert_eq!(discards.len(), 1);
+        assert_eq!(discards[0].tag_value("key"), None);
+        assert_eq!(
+            discards[0].tag_value("tenant").as_deref(),
+            extra_tags.then_some("shared")
+        );
+        assert_eq!(
+            discards[0].value(),
+            &crate::event::MetricValue::Counter { value: 4.0 }
+        );
+
+        let grouped = metrics
+            .iter()
+            .filter(|metric| metric.name() == "component_discarded_events_total")
+            .collect::<Vec<_>>();
+        assert_eq!(grouped.len(), 2);
+        for group in ["a", "b"] {
+            let metric = grouped
+                .iter()
+                .find(|metric| metric.tag_value("group").as_deref() == Some(group))
+                .unwrap();
+            assert_eq!(
+                metric.value(),
+                &crate::event::MetricValue::Counter { value: 2.0 }
+            );
+            assert_eq!(metric.tag_value("tenant"), None);
+        }
     }
 
     #[test]
