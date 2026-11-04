@@ -616,10 +616,8 @@ fn json_text(value: &JsonValue) -> String {
 
 /// Renders `value` the way the Agent's `AnyValue.AsString` does.
 ///
-/// That accessor uses `strconv.FormatFloat(value, 'f', -1, 64)`. Finite values use
-/// Rust's shortest fixed-point rendering, which matches that verb except on a few
-/// halfway decimals where both spellings parse back to the same float. Non-finite
-/// values use Go's spellings, which Rust's `Display` does not.
+/// That accessor uses `strconv.FormatFloat(value, 'f', -1, 64)`. Non-finite values use
+/// Go's spellings. Finite values delegate to [`format_f64_fixed`].
 fn format_f64(value: f64) -> String {
     if value.is_nan() {
         "NaN".to_owned()
@@ -631,8 +629,75 @@ fn format_f64(value: f64) -> String {
         }
         .to_owned()
     } else {
-        value.to_string()
+        format_f64_fixed(value)
     }
+}
+
+/// Renders a finite `value` like Go's `strconv.FormatFloat(value, 'f', -1, 64)`.
+///
+/// Digits come from `ryu`, a line-by-line port of the same Ryu algorithm Go's `strconv`
+/// uses, so it breaks an exact tie between two equally short round-trip spellings to
+/// even, the way Go does (`f64::to_string` instead rounds such a tie away from zero).
+/// `ryu`'s own layout differs from Go's fixed-point `'f'`, though: it appends `.0` to
+/// integers and switches to scientific notation outside roughly `1e-5..1e16`. This
+/// re-parses its digits and expands them into Go's always-fixed layout instead of using
+/// that string directly.
+fn format_f64_fixed(value: f64) -> String {
+    debug_assert!(value.is_finite(), "format_f64 handles non-finite values");
+    if value == 0.0 {
+        return if value.is_sign_negative() { "-0" } else { "0" }.to_owned();
+    }
+
+    let mut buffer = ryu::Buffer::new();
+    let shortest = buffer.format_finite(value);
+    let (sign, shortest) = shortest
+        .strip_prefix('-')
+        .map_or(("", shortest), |rest| ("-", rest));
+
+    // Split into significant digits and a decimal point position: `|value| = 0.<digits>
+    // * 10^point`, so the point sits `point` places after the first digit (negative
+    // means leading zeros after `"0."`), before trimming insignificant zeros below.
+    let (mantissa, exponent) =
+        shortest
+            .split_once('e')
+            .map_or((shortest, 0), |(mantissa, exponent)| {
+                (
+                    mantissa,
+                    exponent
+                        .parse()
+                        .expect("ryu exponent is a valid base-10 integer"),
+                )
+            });
+    let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let mut digits: Vec<u8> = int_part.bytes().chain(frac_part.bytes()).collect();
+    let mut point = i32::try_from(int_part.len()).expect("mantissa fits in i32") + exponent;
+    while digits.len() > 1 && digits.first() == Some(&b'0') {
+        digits.remove(0);
+        point -= 1;
+    }
+    while digits.len() > 1 && digits.last() == Some(&b'0') {
+        digits.pop();
+    }
+    let length = i32::try_from(digits.len()).expect("digit count fits in i32");
+
+    let body = if point <= 0 {
+        let leading_zeros = usize::try_from(-point).expect("point <= 0 here");
+        format!("0.{}{}", "0".repeat(leading_zeros), ascii_digits(&digits))
+    } else if point >= length {
+        let trailing_zeros = usize::try_from(point - length).expect("point >= length here");
+        format!("{}{}", ascii_digits(&digits), "0".repeat(trailing_zeros))
+    } else {
+        let split = usize::try_from(point).expect("0 < point < length here");
+        let (whole, fraction) = digits.split_at(split);
+        format!("{}.{}", ascii_digits(whole), ascii_digits(fraction))
+    };
+    format!("{sign}{body}")
+}
+
+/// Interprets `bytes` as ASCII decimal digits, which is how [`format_f64_fixed`]
+/// builds its working buffer.
+fn ascii_digits(bytes: &[u8]) -> &str {
+    std::str::from_utf8(bytes).expect("ryu digits are ASCII")
 }
 
 fn promoted_span_kind(kind: i32) -> Option<&'static str> {
@@ -667,14 +732,17 @@ mod tests {
     use std::{cell::RefCell, collections::BTreeMap};
 
     use bytes::Bytes;
-    use proptest::prelude::*;
+    use proptest::{
+        num::f64::{NEGATIVE, NORMAL, POSITIVE, SUBNORMAL, ZERO},
+        prelude::*,
+    };
     use similar_asserts::assert_eq;
     use vrl::value;
 
     use super::{
         super::{super::ddtrace_proto, handler::convert_dd_tracer_payload},
-        ExpansionBudget, IdxConversionError, convert_idx_tracer_payload, json_string_len,
-        lossy_utf8_len,
+        ExpansionBudget, IdxConversionError, convert_idx_tracer_payload, format_f64_fixed,
+        json_string_len, lossy_utf8_len,
     };
     use crate::event::{ObjectMap, TraceEvent, Value};
     use ddtrace_proto::idx::{
@@ -1069,6 +1137,16 @@ mod tests {
             ("pos-inf", f64::INFINITY, "+Inf"),
             ("neg-inf", f64::NEG_INFINITY, "-Inf"),
             ("nan", f64::NAN, "NaN"),
+            ("negative", -1.5, "-1.5"),
+            // f64::from_bits(0x42d85e4863b34e08) is exactly 107172881943864.125,
+            // halfway between its two shortest round-trip spellings. Go's Ryu port
+            // breaks the tie to even (.12); Rust's `Display` breaks it the other way
+            // (.13), so this pins the Go spelling independent of `to_string`.
+            (
+                "tie",
+                f64::from_bits(0x42d8_5e48_63b3_4e08),
+                "107172881943864.12",
+            ),
         ];
         let strings = Strings::new();
         let attributes = strings.map(
@@ -1284,6 +1362,17 @@ mod tests {
                 lossy_utf8_len(&bytes),
                 String::from_utf8_lossy(&bytes).len()
             );
+        }
+
+        /// Parsing the output must recover the input bits, so digit placement cannot
+        /// drift; the literal cases in `chunk_attribute_doubles_match_the_agent_as_string`
+        /// pin Go's tie-breaking, which this cannot observe on its own (`f64::parse`
+        /// accepts both the tied spellings and ryu's own scientific-notation layout).
+        #[test]
+        fn format_f64_fixed_round_trips(value in POSITIVE | NEGATIVE | NORMAL | SUBNORMAL | ZERO) {
+            let formatted = format_f64_fixed(value);
+            prop_assert!(!formatted.contains('e'));
+            prop_assert_eq!(formatted.parse::<f64>().unwrap().to_bits(), value.to_bits());
         }
     }
 
