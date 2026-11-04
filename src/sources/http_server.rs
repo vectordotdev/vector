@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http_0::StatusCode;
+use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
@@ -477,8 +477,8 @@ mod tests {
         write::{GzEncoder, ZlibEncoder},
     };
     use futures::Stream;
-    use headers::{Authorization, authorization::Credentials};
-    use http_0::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
+    use headers_1::{Authorization, authorization::Credentials};
+    use http::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{
@@ -575,7 +575,7 @@ mod tests {
     }
 
     async fn send(address: SocketAddr, body: &str) -> u16 {
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .post(format!("http://{address}/"))
             .body(body.to_owned())
             .send()
@@ -586,7 +586,7 @@ mod tests {
     }
 
     async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .post(format!("http://{address}/"))
             .headers(headers)
             .body(body.to_owned())
@@ -598,7 +598,7 @@ mod tests {
     }
 
     async fn send_with_query(address: SocketAddr, body: &str, query: &str) -> u16 {
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .post(format!("http://{address}?{query}"))
             .body(body.to_owned())
             .send()
@@ -609,7 +609,7 @@ mod tests {
     }
 
     async fn send_with_path(address: SocketAddr, body: &str, path: &str) -> u16 {
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .post(format!("http://{address}{path}"))
             .body(body.to_owned())
             .send()
@@ -621,7 +621,7 @@ mod tests {
 
     async fn send_request(address: SocketAddr, method: &str, body: &str, path: &str) -> u16 {
         let method = Method::from_bytes(method.to_owned().as_bytes()).unwrap();
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .request(method, format!("http://{address}{path}"))
             .body(body.to_owned())
             .send()
@@ -632,7 +632,7 @@ mod tests {
     }
 
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
-        reqwest::Client::new()
+        reqwest_13::Client::new()
             .post(format!("http://{address}/"))
             .headers(headers)
             .body(body)
