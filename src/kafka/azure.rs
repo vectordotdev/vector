@@ -315,7 +315,8 @@ mod tests {
     }
 
     /// Returns the error that a workload identity credential returns after a refused connection.
-    /// Like other Azure SDK errors, each error in it prints only its own message.
+    /// Like other Azure SDK errors, each error in it prints only its own message, and like
+    /// `azure_identity`, the message ends with a troubleshooting link on a line of its own.
     fn connection_refused() -> azure_core::Error {
         let transport = azure_core::Error::with_error(
             ErrorKind::Io,
@@ -324,7 +325,10 @@ mod tests {
         );
         let retry = transport
             .with_context("retry policy expired and the request will no longer be retried");
-        let message = format!("WorkloadIdentityCredential authentication failed. {retry}");
+        let message = format!(
+            "WorkloadIdentityCredential authentication failed. {retry}\n\
+             To troubleshoot, visit https://aka.ms/azsdk/rust/identity/troubleshoot#workload"
+        );
         azure_core::Error::with_error(ErrorKind::Credential, retry, message)
     }
 
@@ -680,7 +684,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn refresh_errors_show_their_causes_but_no_token() {
+    async fn refresh_errors_show_their_causes_on_one_line_but_no_token() {
         let (logs, _guard) = capture_logs();
         let credential = ScriptedCredential::new([
             Ok(token("test-access-token", Duration::from_mins(10))),
@@ -694,17 +698,39 @@ mod tests {
         assert_eq!(credential.requests(), 2);
         assert_eq!(cached_token(&provider), "test-access-token");
         let text = read_logs(&logs);
+        // The causes and the troubleshooting link are on the line of the message.
+        let lines: Vec<&str> = text
+            .lines()
+            .filter(|line| line.contains("Failed to get a SASL/OAUTHBEARER token."))
+            .collect();
+        assert_eq!(lines.len(), 1, "{text}");
         assert!(
-            text.contains(
+            lines[0].contains(
                 "WorkloadIdentityCredential authentication failed. retry policy expired and the \
-                 request will no longer be retried: failed to execute `reqwest` request: \
-                 connection refused"
+                 request will no longer be retried; To troubleshoot, visit \
+                 https://aka.ms/azsdk/rust/identity/troubleshoot#workload: failed to execute \
+                 `reqwest` request: connection refused"
             ),
             "{text}"
         );
         assert_eq!(text.matches("retry policy expired").count(), 1, "{text}");
         assert!(text.contains("oauth_token_refresh"), "{text}");
         assert!(!text.contains("test-access-token"), "{text}");
+    }
+
+    #[test]
+    fn refresh_errors_with_line_breaks_are_logged_on_one_line() {
+        let (logs, _guard) = capture_logs();
+        let cause = std::io::Error::other("first line\r\nsecond line\n");
+        let error = azure_core::Error::with_error(ErrorKind::Io, cause, "token request failed");
+        emit(KafkaOAuthTokenRefreshError { error: &error });
+
+        let text = read_logs(&logs);
+        assert_eq!(text.lines().count(), 1, "{text}");
+        assert!(
+            text.contains("token request failed: first line; second line"),
+            "{text}"
+        );
     }
 
     #[tokio::test(start_paused = true)]
