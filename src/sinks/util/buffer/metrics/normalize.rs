@@ -573,9 +573,37 @@ impl MetricSet {
             .map_or(0, |cp| cp.current_memory() as u64)
     }
 
-    /// Creates a timestamp if TTL is enabled.
-    fn create_timestamp(&self) -> Option<Instant> {
-        self.ttl_policy.as_ref().map(|_| Instant::now())
+    /// Creates a timestamp if TTL is enabled, using the given reference time.
+    const fn create_timestamp(&self, now: Instant) -> Option<Instant> {
+        if self.ttl_policy.is_some() {
+            Some(now)
+        } else {
+            None
+        }
+    }
+
+    /// Returns a mutable reference to the entry for `series`, treating an entry that has
+    /// already exceeded the configured TTL as absent.
+    ///
+    /// `maybe_cleanup` only sweeps the whole cache periodically (at most once per
+    /// `TtlPolicy::cleanup_interval`, which is clamped to at least 10 seconds), so an
+    /// individual entry can remain in the map for a while after it has technically expired.
+    /// Without this check, a series that reappears after `expire_metrics_secs` has elapsed —
+    /// but before the next sweep — would be normalized against its stale baseline, producing a
+    /// bogus delta instead of being treated as a new series. This evicts such an entry
+    /// immediately so callers always see `None` for it, exactly as if it had never been seen.
+    fn get_fresh_mut(&mut self, series: &MetricSeries, now: Instant) -> Option<&mut MetricEntry> {
+        if let Some(ttl) = self.ttl_policy.as_ref().map(|policy| policy.ttl) {
+            let is_expired = self
+                .inner
+                .get_mut(series)
+                .is_some_and(|entry| entry.is_expired(ttl, now));
+            if is_expired {
+                self.remove(series);
+                return None;
+            }
+        }
+        self.inner.get_mut(series)
     }
 
     /// Enforce memory and entry limits by evicting LRU entries.
@@ -722,12 +750,15 @@ impl MetricSet {
     /// for example across config reloads, would re-emit every increment passed through in
     /// between when the next absolute value is subtracted from the stale baseline.
     fn absorb_increment(&mut self, metric: &Metric) {
-        let Some(reference) = self.inner.get_mut(metric.series()) else {
+        let now = Instant::now();
+        // An entry that has already exceeded its TTL is treated as absent here (and evicted),
+        // rather than reused as a stale baseline — see `get_fresh_mut`.
+        let Some(reference) = self.get_fresh_mut(metric.series(), now) else {
             return;
         };
         let mut new_reference = reference.clone();
         if new_reference.data.value.add(metric.value()) {
-            new_reference.timestamp = self.create_timestamp();
+            new_reference.timestamp = self.create_timestamp(now);
             self.insert_with_tracking(metric.series().clone(), new_reference);
         } else {
             // Incompatible values, such as histograms with different buckets: the baseline can no
@@ -740,9 +771,12 @@ impl MetricSet {
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
-        let timestamp = self.create_timestamp();
-        // We always call insert() to track memory usage
-        if let Some(existing) = self.inner.get_mut(metric.series()) {
+        let now = Instant::now();
+        let timestamp = self.create_timestamp(now);
+        // We always call insert() to track memory usage. An entry that has already exceeded
+        // its TTL is treated as absent here (and evicted), rather than reused as a stale
+        // baseline — see `get_fresh_mut`.
+        if let Some(existing) = self.get_fresh_mut(metric.series(), now) {
             let mut new_value = existing.data.value().clone();
             if new_value.add(metric.value()) {
                 // Update the stored value
@@ -780,9 +814,12 @@ impl MetricSet {
         // introducing a small amount of lag before a metric is emitted by having to wait to see it
         // again, but this is a behavior we have to observe for sinks that can only handle
         // incremental updates.
-        let timestamp = self.create_timestamp();
-        // We always call insert() to track memory usage
-        if let Some(reference) = self.inner.get_mut(metric.series()) {
+        let now = Instant::now();
+        let timestamp = self.create_timestamp(now);
+        // We always call insert() to track memory usage. An entry that has already exceeded
+        // its TTL is treated as absent here (and evicted), rather than reused as a stale
+        // baseline — see `get_fresh_mut`.
+        if let Some(reference) = self.get_fresh_mut(metric.series(), now) {
             let new_value = metric.value().clone();
             // Create a copy of the reference so we can insert and
             // replace the existing entry, tracking memory usage
@@ -810,12 +847,15 @@ impl MetricSet {
 
     pub fn insert_update(&mut self, metric: Metric) {
         self.maybe_cleanup();
-        let timestamp = self.create_timestamp();
+        let now = Instant::now();
+        let timestamp = self.create_timestamp(now);
         let update = match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
-                // Incremental metrics update existing entries, if present
-                match self.inner.get_mut(metric.series()) {
+                // Incremental metrics update existing entries, if present. An entry that has
+                // already exceeded its TTL is treated as absent (and evicted) rather than
+                // merged into as a stale baseline — see `get_fresh_mut`.
+                match self.get_fresh_mut(metric.series(), now) {
                     Some(existing) => {
                         // Create a copy of the reference so we can insert and
                         // replace the existing entry, tracking memory usage
@@ -957,5 +997,61 @@ mod tests {
             ..Default::default()
         });
         assert!(matches!(set.inner, MetricSetInner::Bounded(_)));
+    }
+
+    // Regression test for a per-access TTL check: `TtlPolicy::cleanup_interval` is clamped to
+    // at least 10 seconds, so a short TTL can expire an entry long before the periodic sweep
+    // (`maybe_cleanup`) removes it from the cache. If `absolute_to_incremental` reused that
+    // stale, unswept entry as the reference value, a counter that reset after an idle period
+    // (e.g. a process restart) would be emitted as a huge bogus delta against the old value,
+    // instead of being treated as a fresh series.
+    #[test]
+    fn expired_entry_is_not_reused_as_stale_baseline_before_sweep() {
+        use std::{thread, time::Duration};
+
+        let ttl = Duration::from_millis(50);
+        let mut set = MetricSet::with_policies(None, Some(TtlPolicy::new(ttl)));
+
+        // First absolute sample seeds the baseline at 100; nothing is emitted yet.
+        let out = set.make_incremental(counter("hits", 100.0, MetricKind::Absolute));
+        assert_eq!(out, None);
+
+        // Let the entry exceed its TTL. `cleanup_interval` (>= 10s) has not elapsed, so the
+        // stale entry is still physically present in the cache at this point.
+        thread::sleep(ttl + Duration::from_millis(50));
+
+        // A fresh absolute sample arrives for the same series (e.g. the counter reset after
+        // the source process restarted). Reusing the stale baseline of 100.0 here would wrongly
+        // emit a delta of 5.0 - 100.0 = -95.0. It must instead be treated as a new baseline and
+        // emit nothing.
+        let out = set.make_incremental(counter("hits", 5.0, MetricKind::Absolute));
+        assert_eq!(out, None);
+
+        // The cache now holds the new baseline (5.0), not the stale one (100.0).
+        let metrics = set.into_metrics();
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].value(), &MetricValue::Counter { value: 5.0 });
+    }
+
+    // Same scenario as above, but for the `incremental_to_absolute` direction: an incremental
+    // sample arriving after its reference has gone stale (but before the periodic sweep) must
+    // not be accumulated onto the old value.
+    #[test]
+    fn expired_entry_is_not_added_to_in_incremental_to_absolute() {
+        use std::{thread, time::Duration};
+
+        let ttl = Duration::from_millis(50);
+        let mut set = MetricSet::with_policies(None, Some(TtlPolicy::new(ttl)));
+
+        // First incremental sample becomes the baseline, emitted as absolute 10.0.
+        let out = set.make_absolute(counter("hits", 10.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 10.0 });
+
+        thread::sleep(ttl + Duration::from_millis(50));
+
+        // Reusing the stale baseline (10.0) here would wrongly emit 10.0 + 2.0 = 12.0. It must
+        // instead be treated as a fresh series and emitted as-is.
+        let out = set.make_absolute(counter("hits", 2.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 2.0 });
     }
 }
