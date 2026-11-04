@@ -266,7 +266,7 @@ releases: "0.61.0": {
 		64-bit nanosecond value, but the compiler previously rejected error handling for this
 		call as unnecessary.
 		
-		[Migration instructions](/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds).
+		Refer to the [upgrade guide](/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds) for migration instructions.
 		
 		*Thanks to [suryakant-source](https://github.com/suryakant-source) for contributing PR [#2001](https://github.com/vectordotdev/vrl/pull/2001)!*
 		

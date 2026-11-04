@@ -94,7 +94,7 @@ pub(super) fn extract(notes: &str, vector_version: &Version) -> Result<Changelog
         );
         let title = entry[2].to_owned();
         output.push_str(notes.get(cursor..header.start()).unwrap());
-        write!(output, "- **{title}**\n\n  [Migration instructions](/releases/{vector_version}/#{anchor}).\n\n  {credit}\n\n").unwrap();
+        write!(output, "- **{title}**\n\n  Refer to the [upgrade guide](/releases/{vector_version}/#{anchor}) for migration instructions.\n\n  {credit}\n\n").unwrap();
         migrations.push(Migration {
             title,
             anchor,
