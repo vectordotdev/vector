@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
 use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
+use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport<BoxBody>>,
+    pub client: proto_vector::Client<GrpcTransport<TonicBody>>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -69,7 +69,7 @@ impl VectorService {
     ///
     /// Fails if `uri` has no scheme or authority.
     pub fn new(
-        client: Http2Client<BoxBody>,
+        client: Http2Client<TonicBody>,
         uri: Uri,
         compression: VectorCompression,
     ) -> crate::Result<Self> {

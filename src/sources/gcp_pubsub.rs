@@ -19,7 +19,7 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Code, Request, Status, body::BoxBody, metadata::MetadataValue};
+use tonic::{Code, Request, Status, body::Body as TonicBody, metadata::MetadataValue};
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     byte_size_of::ByteSizeOf,
@@ -367,7 +367,7 @@ impl_generate_config_from_default!(PubsubConfig);
 
 #[derive(Clone)]
 struct PubsubSource {
-    client: Http2Client<BoxBody>,
+    client: Http2Client<TonicBody>,
     origin: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
