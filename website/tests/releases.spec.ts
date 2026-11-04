@@ -52,7 +52,7 @@ for (const width of [1280, 390]) {
     await expect(changelog.locator(".vrl-changelog-entry")).toHaveCount(6);
     await expect(entry).toContainText("the compiler previously rejected error handling for this call as unnecessary");
     await expect(entry.locator("pre")).toHaveCount(0);
-    await entry.getByRole("link", { name: "Migration instructions", exact: true }).click();
+    await entry.getByRole("link", { name: "upgrade guide", exact: true }).click();
     await expect(page).toHaveURL(/#vrl-to-unix-timestamp-nanoseconds$/);
     const migration = page.locator(".upgrade-guide-entry").filter({
       has: page.locator("#vrl-to-unix-timestamp-nanoseconds")
