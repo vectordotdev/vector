@@ -30,7 +30,7 @@ for (const version of ["0.58.0", "0.59.0", "0.60.0", "0.61.0"]) {
   });
 }
 
-test("handwritten release descriptions take precedence over generated summaries", async ({ page }) => {
+test("handwritten release descriptions retain their content", async ({ page }) => {
   for (const path of ["/releases/", "/releases/0.57.0/"]) {
     await page.goto(path);
     const description = page.locator(".release-description").filter({ hasText: "over-restrict now and relax later" });

@@ -14,6 +14,8 @@ use serde_json::json;
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
+use super::release_notes;
+
 pub(super) const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 pub(super) const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
@@ -36,10 +38,25 @@ pub struct Cli {
     /// The version being released (e.g. `0.58.0`).
     #[arg(long)]
     version: Version,
+
+    /// Fill a missing description in an existing release, preserving all other metadata.
+    #[arg(long)]
+    description_only: bool,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        if self.description_only {
+            if fill_missing_description(&paths::find_repo_root()?, &self.version)? {
+                success!("Added description for release {}.", self.version);
+            } else {
+                info!(
+                    "Release {} already has a description; leaving it unchanged.",
+                    self.version
+                );
+            }
+            return Ok(());
+        }
         run(&self.version, PullRequestMetadata::Optional)?;
         Ok(())
     }
@@ -91,7 +108,6 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
-    let cue_text = render_release_cue(&new_version, &changelog_entries);
     let breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
@@ -111,6 +127,35 @@ pub(super) fn run(
         validate_breaking_anchors(&breaking)?;
         render_upgrade_guide(&breaking)
     };
+
+    let upgrade_url = if upgrade_guide.is_empty() {
+        release_notes::upgrade_guide_url(&repo_root, &new_version)?
+    } else {
+        Some(format!(
+            "{}/releases/{new_version}/#upgrade-guide",
+            release_notes::WEBSITE_URL
+        ))
+    };
+    let entries = changelog_entries
+        .iter()
+        .map(|entry| release_notes::ChangelogEntry {
+            kind: entry.cue_type.clone(),
+            breaking: entry.breaking,
+            contributors: entry.contributors.clone(),
+            title: entry
+                .breaking_details
+                .as_ref()
+                .map(|details| details.title.clone()),
+        })
+        .collect::<Vec<_>>();
+    let description = release_notes::render_notes(
+        &new_version,
+        &entries,
+        upgrade_url.as_deref(),
+        &release_notes::load_template(&repo_root, None)?,
+        release_notes::Target::Website,
+    )?;
+    let cue_text = render_release_cue(&new_version, &changelog_entries, &description);
 
     // Everything valid — write the release data and its inline migration content.
     atomic_write(&cue_path, &cue_text)?;
@@ -632,9 +677,14 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
 
 // ---------- CUE rendering ----------
 
-fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String {
+fn render_release_cue(
+    version: &Version,
+    changelog: &[ChangelogEntry],
+    description: &str,
+) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
+    let description_field = render_description_field(description);
 
     indoc::formatdoc! {"
         package metadata
@@ -642,11 +692,55 @@ fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String
         releases: \"{version}\": {{
         \tdate:     \"{date}\"
 
+        {description_field}
+
         \tchangelog: [
         {changelog_block}
         \t]
         }}
     "}
+}
+
+/// Backfill only the release overview. Existing descriptions are editorial content and
+/// must not be overwritten, even when this command is repeated after a template change.
+fn fill_missing_description(repo_root: &Path, version: &Version) -> Result<bool> {
+    let release = release_notes::read_release(repo_root, version)?;
+    if release.description.is_some() {
+        return Ok(false);
+    }
+    let description = release_notes::render_notes(
+        version,
+        &release.changelog,
+        release_notes::upgrade_guide_url(repo_root, version)?.as_deref(),
+        &release_notes::load_template(repo_root, None)?,
+        release_notes::Target::Website,
+    )?;
+    let path = repo_root.join(RELEASES_DIR).join(format!("{version}.cue"));
+    let contents = fs::read_to_string(&path)?;
+    let header = format!("releases: \"{version}\": {{");
+    if !contents.contains(&header) {
+        bail!("Could not find the release block in {}", path.display());
+    }
+    let updated = contents.replacen(
+        &header,
+        &format!("{header}\n{}", render_description_field(&description)),
+        1,
+    );
+    atomic_write(&path, &updated)?;
+    Ok(true)
+}
+
+fn render_description_field(description: &str) -> String {
+    let mut field = String::from("\tdescription: #\"\"\"\n");
+    for line in description.lines() {
+        if line.is_empty() {
+            field.push('\n');
+        } else {
+            writeln!(field, "\t\t{line}").unwrap();
+        }
+    }
+    field.push_str("\t\t\"\"\"#\n");
+    field
 }
 
 fn render_changelog(entries: &[ChangelogEntry]) -> String {
@@ -1054,10 +1148,11 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, "Release overview.");
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
+        assert!(out.contains("\tdescription: #\"\"\"\n\t\tRelease overview.\n\t\t\"\"\"#"));
         assert!(out.contains("\t\t\ttype: \"feat\"\n"));
         assert!(out.contains("\t\t\t\tAdds a thing.\n"));
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
@@ -1070,6 +1165,62 @@ mod tests {
         assert!(out.contains("\t\t\ttitle: \"Legacy thing removed\"\n"));
         assert!(out.contains("\t\t\tanchor: \"legacy-thing-removed\"\n"));
         assert!(!out.contains("commits:"));
+    }
+
+    #[test]
+    fn backfills_description_once_without_changing_other_release_data() {
+        let tmp = tempfile::tempdir().unwrap();
+        let version = Version::new(0, 99, 0);
+        let path = tmp.path().join(RELEASES_DIR).join("0.99.0.cue");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let original = indoc::indoc! {r#"
+            package metadata
+
+            releases: "0.99.0": {
+                date: "2026-01-01"
+                changelog: [{type: "fix", description: "Fixed it.", contributors: ["alice"]}]
+                vrl_changelog: "Keep the VRL notes."
+            }
+        "#};
+        fs::write(&path, original).unwrap();
+        let template = tmp
+            .path()
+            .join("vdev/src/commands/release/release_notes.hbs");
+        fs::create_dir_all(template.parent().unwrap()).unwrap();
+        fs::write(&template, include_str!("release_notes.hbs")).unwrap();
+
+        fill_missing_description(tmp.path(), &version).unwrap();
+        let updated = fs::read_to_string(&path).unwrap();
+        let release = release_notes::read_release(tmp.path(), &version).unwrap();
+        let description = release.description.unwrap();
+        assert!(description.contains("contributor who made the change"));
+        assert!(description.contains("[1 bug fix](/releases/0.99.0/#bug-fixes)"));
+        assert!(!description.contains("upgrade guide"));
+        assert_eq!(
+            updated.replace(&format!("\n{}", render_description_field(&description)), ""),
+            original
+        );
+
+        fs::write(template, "Changed template").unwrap();
+        fill_missing_description(tmp.path(), &version).unwrap();
+        assert_eq!(fs::read_to_string(path).unwrap(), updated);
+    }
+
+    #[test]
+    fn leaves_handwritten_description_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(RELEASES_DIR).join("0.57.0.cue");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let original = indoc::indoc! {r#"
+            package metadata
+            releases: "0.57.0": {
+                description: "Handwritten migration notes."
+                changelog: []
+            }
+        "#};
+        fs::write(&path, original).unwrap();
+        fill_missing_description(tmp.path(), &Version::new(0, 57, 0)).unwrap();
+        assert_eq!(fs::read_to_string(path).unwrap(), original);
     }
 
     #[test]

@@ -585,6 +585,11 @@ mod prepare {
     }
 
     fn cli_fixture(repo: &Path, previous_release: &str) {
+        write(
+            repo,
+            "vdev/src/commands/release/release_notes.hbs",
+            include_str!("../src/commands/release/release_notes.hbs"),
+        );
         // Exercise real Cargo resolution offline, with GitHub and CUE stubbed.
         let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
         write(
@@ -624,6 +629,12 @@ printf '## 0.28.0\n- Release fixture\n'"#,
     }
 
     fn assert_release_files(repo: &Path, version: &str) {
+        let release_cue =
+            fs::read_to_string(repo.join(format!("website/cue/reference/releases/{version}.cue")))
+                .unwrap();
+        assert!(release_cue.contains("description: #\"\"\""));
+        assert!(release_cue.contains(&format!("is happy to announce Vector `{version}`!")));
+        assert!(!release_cue.contains("[View the full release notes]"));
         let manifest: toml::Value =
             toml::from_str(&fs::read_to_string(repo.join("Cargo.toml")).unwrap()).unwrap();
         assert_eq!(manifest["package"]["version"].as_str(), Some(version));
