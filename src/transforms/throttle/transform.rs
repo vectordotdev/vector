@@ -44,16 +44,7 @@ where
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
-        if let Some(tag) = config
-            .internal_metrics
-            .events_discarded_tags
-            .keys()
-            .find(|tag| tag.as_str() == "key" || vector_lib::metrics::LABELS.contains(tag.as_str()))
-        {
-            return Err(Box::new(ConfigError::ReservedMetricTag {
-                tag: tag.clone(),
-            }));
-        }
+        config.internal_metrics.validate()?;
 
         let flush_keys_interval = config.window_secs;
 
@@ -197,6 +188,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::TransformConfig,
         event::LogEvent,
         test_util::components::assert_transform_compliance,
         transforms::{Transform, test::create_topology},
@@ -219,6 +211,7 @@ mod tests {
             ]
             .into();
         }
+        config.validate_structure().unwrap();
         let throttle = Throttle::new(
             &config,
             &TransformContext::default(),
@@ -332,6 +325,9 @@ mod tests {
                 },
                 ..Default::default()
             };
+            let validation_errors = config
+                .validate_structure()
+                .expect_err("reserved metric tag must fail structural validation");
             let error = Throttle::new(
                 &config,
                 &TransformContext::default(),
@@ -340,6 +336,7 @@ mod tests {
             .err()
             .expect("reserved metric tag must be rejected");
             assert!(error.to_string().contains(&format!("reserved tag `{tag}`")));
+            assert_eq!(validation_errors, vec![error.to_string()]);
         }
     }
 

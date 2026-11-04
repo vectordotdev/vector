@@ -4,7 +4,7 @@ use governor::clock;
 use serde_with::serde_as;
 use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
-use super::transform::Throttle;
+use super::transform::{ConfigError, Throttle};
 use crate::{
     conditions::AnyCondition,
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -54,6 +54,19 @@ pub struct ThrottleInternalMetricsConfig {
     /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
     #[serde(default)]
     pub include_group_tag: bool,
+}
+
+impl ThrottleInternalMetricsConfig {
+    pub(super) fn validate(&self) -> Result<(), ConfigError> {
+        if let Some(tag) = self
+            .events_discarded_tags
+            .keys()
+            .find(|tag| tag.as_str() == "key" || vector_lib::metrics::LABELS.contains(tag.as_str()))
+        {
+            return Err(ConfigError::ReservedMetricTag { tag: tag.clone() });
+        }
+        Ok(())
+    }
 }
 
 /// Configuration for the `throttle` transform.
@@ -117,7 +130,9 @@ impl TransformConfig for ThrottleConfig {
                 "`threshold` and `window_secs` must be non-zero".to_string(),
             ])
         } else {
-            Ok(())
+            self.internal_metrics
+                .validate()
+                .map_err(|error| vec![error.to_string()])
         }
     }
 
