@@ -224,7 +224,7 @@ rand = { version = "0.10.1", default-features = false, features = ["thread_rng"]
 rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
 rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
@@ -270,8 +270,7 @@ strum = { version = "0.28", features = ["derive"] }
 [dependencies]
 jsonschema.workspace = true
 cfg-if.workspace = true
-reqwest.workspace = true
-reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "native-tls", "rustls-no-provider"] }
+reqwest = { workspace = true, features = ["rustls-no-provider"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
@@ -546,14 +545,12 @@ base64.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 # Test mock servers use `warp::serve` and `warp::test`.
 warp = { version = "0.4.3", default-features = false, features = ["server", "test"] }
-# Legacy HTTP stack, only for tests and benches that still use hyper 0.14 or reqwest 0.11.
-http-0 = { package = "http", version = "0.2.9", default-features = false }
-hyper = { version = "0.14.32", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream", "backports", "deprecated"] }
+# `form` and `query` build requests in tests; production code does not use them.
+reqwest = { workspace = true, features = ["form", "query"] }
 itertools.workspace = true
 libc.workspace = true
 proptest.workspace = true
 quickcheck.workspace = true
-reqwest.workspace = true
 rstest = { version = "0.26.1" }
 rustls.workspace = true
 serial_test.workspace = true
