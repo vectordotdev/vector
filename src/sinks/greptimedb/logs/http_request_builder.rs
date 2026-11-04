@@ -15,7 +15,7 @@ use crate::{
     event::{Event, EventFinalizers, Finalizable},
     http::{Auth, HttpClient},
     sinks::{
-        HTTPV1RequestBuilderSnafu, HealthcheckError,
+        HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
         util::{
             HttpEndpoint,
@@ -189,7 +189,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 
         let mut request = builder
             .body(payload)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);

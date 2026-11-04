@@ -13,7 +13,7 @@ use super::{config::HttpMethod, sink::PartitionKey};
 use crate::{
     http::{Auth, MaybeAuth},
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::{
             UriSerde,
             http::{HttpRequest, HttpServiceRequestBuilder},
@@ -95,7 +95,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
         // The request building should not have errors at this point
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(Into::<crate::Error>::into)?;
 
         if let Some(auth) = auth {

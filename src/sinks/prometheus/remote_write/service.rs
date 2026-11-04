@@ -14,7 +14,7 @@ use crate::{
     http::HttpClient,
     internal_events::EndpointBytesSent,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         prelude::*,
         util::{auth::Auth, http::HttpResponse},
     },
@@ -133,7 +133,7 @@ pub(super) async fn build_request(
         builder = builder.header(name, value);
     }
 
-    let mut request = builder.body(body).context(HTTPV1RequestBuilderSnafu)?;
+    let mut request = builder.body(body).context(HTTPRequestBuilderSnafu)?;
 
     match auth {
         Some(Auth::Basic(http_auth)) => http_auth.apply(&mut request),

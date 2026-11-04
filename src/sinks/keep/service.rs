@@ -7,7 +7,7 @@ use vector_lib::sensitive_string::SensitiveString;
 
 use super::config::HTTP_HEADER_KEEP_API_KEY;
 use crate::sinks::{
-    HTTPV1RequestBuilderSnafu,
+    HTTPRequestBuilderSnafu,
     util::{
         HttpEndpoint,
         http::{HttpRequest, HttpServiceRequestBuilder},
@@ -29,7 +29,7 @@ impl HttpServiceRequestBuilder<()> for KeepSvcRequestBuilder {
 
         builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)
     }
 }

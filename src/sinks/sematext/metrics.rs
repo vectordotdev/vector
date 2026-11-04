@@ -26,7 +26,7 @@ use crate::{
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
-        HTTPV1RequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,
+        HTTPRequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
             BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
@@ -294,7 +294,7 @@ impl HttpServiceRequestBuilder<()> for SematextMetricsRequestBuilder {
         Request::post(self.uri.clone())
             .header("Content-Type", "text/plain")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
 }

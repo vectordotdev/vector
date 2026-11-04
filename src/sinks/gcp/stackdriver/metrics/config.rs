@@ -12,7 +12,7 @@ use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu, gcp,
+        HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             HttpEndpoint,
@@ -220,7 +220,7 @@ impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
 
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
 
         self.auth.apply(&mut request);

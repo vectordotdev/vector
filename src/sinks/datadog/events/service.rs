@@ -7,7 +7,7 @@ use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
-    HTTPV1RequestBuilderSnafu,
+    HTTPRequestBuilderSnafu,
     util::http::{HttpRequest, HttpServiceRequestBuilder},
 };
 
@@ -33,7 +33,7 @@ impl HttpServiceRequestBuilder<Option<Arc<str>>> for DatadogEventsServiceRequest
             .header("DD-API-KEY", api_key)
             .header("Content-Length", body.len())
             .body(body)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)
     }
 }
