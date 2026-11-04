@@ -44,7 +44,6 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
 pub mod internal_telemetry;
 
 #[macro_use]
-#[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
 #[allow(unreachable_pub)]
@@ -97,7 +96,6 @@ pub mod signal;
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
-#[allow(unreachable_pub)]
 pub mod sources;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]

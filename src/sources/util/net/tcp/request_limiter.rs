@@ -54,7 +54,7 @@ impl RequestLimiterData {
         clippy::cast_precision_loss,
         reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn update_average(&mut self, num_events: usize) {
+    fn update_average(&mut self, num_events: usize) {
         if num_events > 0 {
             self.average_request_size.update(num_events as f64);
         }
@@ -69,7 +69,7 @@ impl RequestLimiterData {
         clippy::cast_sign_loss,
         reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn target_requests_in_flight(&self) -> usize {
+    fn target_requests_in_flight(&self) -> usize {
         let target = (self.event_limit_target as f64) / self.average_request_size.average();
         #[allow(clippy::manual_clamp)]
         (target as usize)
@@ -77,12 +77,12 @@ impl RequestLimiterData {
             .min(self.max_requests)
     }
 
-    pub fn increase_permits(&mut self) {
+    fn increase_permits(&mut self) {
         self.total_permits += 1;
         self.semaphore.add_permits(1);
     }
 
-    pub fn decrease_permits(&mut self, permit: OwnedSemaphorePermit) {
+    fn decrease_permits(&mut self, permit: OwnedSemaphorePermit) {
         if self.total_permits > MINIMUM_PERMITS {
             permit.forget();
             self.total_permits -= 1;
