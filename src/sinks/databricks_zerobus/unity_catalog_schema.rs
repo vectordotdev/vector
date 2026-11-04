@@ -6,14 +6,14 @@
 
 use bytes::{Buf, Bytes};
 use databricks_zerobus_ingest_sdk::schema::arrow_schema_from_uc_schema;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body_util::{BodyExt, Collected};
 use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
 use serde::Deserialize;
 use vector_http::{empty_body, full_body};
 
 use super::error::ZerobusSinkError;
-use crate::http::client_v1::HttpClient;
+use crate::http::HttpClient;
 
 /// Whether a Unity Catalog HTTP response status should be retried.
 ///
@@ -275,7 +275,7 @@ mod tests {
             };
             http::Response::builder()
                 .status(status)
-                .body(hyper::Body::from(body))
+                .body(http_body_util::Full::new(Bytes::from(body)))
                 .expect("valid mock response")
         });
         tokio::spawn(server);

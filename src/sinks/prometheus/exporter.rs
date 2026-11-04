@@ -397,7 +397,7 @@ impl Handler {
             (false, _, _) => {
                 *response.status_mut() = StatusCode::UNAUTHORIZED;
                 response.headers_mut().insert(
-                    http::header::WWW_AUTHENTICATE,
+                    http_0::header::WWW_AUTHENTICATE,
                     HeaderValue::from_static("Basic, Bearer"),
                 );
             }
@@ -658,6 +658,11 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
 mod tests {
     use chrono::{Duration, Utc};
     use futures::stream;
+    use http::{
+        HeaderValue, Request, StatusCode,
+        header::{ACCEPT_ENCODING, CONTENT_ENCODING},
+    };
+    use http_body_util::BodyExt as _;
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
@@ -1024,7 +1029,7 @@ mod tests {
         mut events: Vec<Event>,
         suppress_timestamp: bool,
         encoding: Option<String>,
-    ) -> hyper::body::Bytes {
+    ) -> bytes::Bytes {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
@@ -1062,12 +1067,12 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let mut request = Request::get(format!("{proto}://{address}/metrics"))
-            .body(Body::empty())
+            .body(vector_http::empty_body())
             .expect("Error creating request.");
 
-        if let Some(ref encoding) = encoding {
+        if let Some(encoding) = &encoding {
             request.headers_mut().insert(
-                http::header::ACCEPT_ENCODING,
+                ACCEPT_ENCODING,
                 HeaderValue::from_str(encoding.as_str()).unwrap(),
             );
         }
@@ -1082,15 +1087,12 @@ mod tests {
         assert!(result.status().is_success());
 
         if encoding.is_some() {
-            assert!(
-                result
-                    .headers()
-                    .contains_key(http::header::CONTENT_ENCODING)
-            );
+            assert!(result.headers().contains_key(CONTENT_ENCODING));
         }
 
-        let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = result
+            .into_body()
+            .collect()
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1114,7 +1116,7 @@ mod tests {
         client_auth_config: Option<Auth>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
-    ) -> Result<String, http::status::StatusCode> {
+    ) -> Result<String, StatusCode> {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
@@ -1153,11 +1155,11 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let mut request = Request::get(format!("{proto}://{address}/metrics"))
-            .body(Body::empty())
+            .body(vector_http::empty_body())
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply(&mut request);
+            client_auth_config.apply_v1(&mut request);
         }
 
         let proxy = ProxyConfig::default();
@@ -1171,8 +1173,9 @@ mod tests {
             return Err(result.status());
         }
 
-        let body = result.into_body();
-        let bytes = http_body::Body::collect(body)
+        let bytes = result
+            .into_body()
+            .collect()
             .await
             .expect("Reading body failed")
             .to_bytes();
@@ -1686,6 +1689,7 @@ mod integration_tests {
 
     use chrono::Utc;
     use futures::{future::ready, stream};
+    use http_body_util::BodyExt as _;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -1710,16 +1714,18 @@ mod integration_tests {
 
     async fn fetch_exporter_body() -> String {
         let url = format!("http://{}/metrics", sink_exporter_address());
-        let request = Request::get(url)
-            .body(Body::empty())
+        let request = http::Request::get(url)
+            .body(vector_http::empty_body())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
+        let result = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)
             .unwrap()
             .send(request)
             .await
             .expect("Could not send request");
-        let result = http_body::Body::collect(result.into_body())
+        let result = result
+            .into_body()
+            .collect()
             .await
             .expect("Error fetching body")
             .to_bytes();
@@ -1728,16 +1734,18 @@ mod integration_tests {
 
     async fn prometheus_query(query: &str) -> Value {
         let url = format!("http://{}/api/v1/query?query={query}", prometheus_address());
-        let request = Request::post(url)
-            .body(Body::empty())
+        let request = http::Request::post(url)
+            .body(vector_http::empty_body())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
+        let result = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)
             .unwrap()
             .send(request)
             .await
             .expect("Could not fetch query");
-        let result = http_body::Body::collect(result.into_body())
+        let result = result
+            .into_body()
+            .collect()
             .await
             .expect("Error fetching body")
             .to_bytes();

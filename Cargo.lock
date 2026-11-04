@@ -1838,12 +1838,8 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
- "h2 0.3.26",
  "h2 0.4.19",
- "http 0.2.12",
  "http 1.5.0",
- "http-body 0.4.6",
- "hyper 0.14.32",
  "hyper 1.11.1",
  "hyper-rustls",
  "hyper-util",
@@ -1898,7 +1894,6 @@ checksum = "b82e438d30e02a825d363bd639a9efaed68a8089d86101054b0081e7e0d3e606"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",
- "aws-smithy-http-client",
  "aws-smithy-observability",
  "aws-smithy-runtime-api",
  "aws-smithy-schema",
@@ -5815,24 +5810,6 @@ dependencies = [
 
 [[package]]
 name = "hyper-openssl"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6ee5d7a8f718585d1c3c61dfde28ef5b0bb14734b4db13f5ada856cdc6c612b"
-dependencies = [
- "http 0.2.12",
- "hyper 0.14.32",
- "linked_hash_set",
- "once_cell",
- "openssl",
- "openssl-sys",
- "parking_lot",
- "tokio",
- "tokio-openssl",
- "tower-layer",
-]
-
-[[package]]
-name = "hyper-openssl"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "527d4d619ca2c2aafa31ec139a3d1d60bf557bf7578a1f20f743637eccd9ca19"
@@ -5847,23 +5824,6 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "hyper-proxy"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
-dependencies = [
- "bytes",
- "futures",
- "headers 0.3.9",
- "http 0.2.12",
- "hyper 0.14.32",
- "openssl",
- "tokio",
- "tokio-openssl",
  "tower-service",
 ]
 
@@ -5945,7 +5905,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tokio",
  "tower-service",
  "tracing 0.1.44",
@@ -6689,7 +6649,7 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.11.1",
- "hyper-openssl 0.10.2",
+ "hyper-openssl",
  "hyper-timeout",
  "hyper-util",
  "jiff",
@@ -9215,7 +9175,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -9235,7 +9195,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9256,7 +9216,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -9269,7 +9229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -9449,9 +9409,9 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.13.5"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "278e9268c93b9e498a2da46c34d90ba93a3255eb99009646398f34bc73ab36eb"
+checksum = "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b"
 dependencies = [
  "bitflags 2.13.2",
  "memchr",
@@ -12361,14 +12321,14 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.20.1"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
 dependencies = [
  "futures-util",
  "log",
  "tokio",
- "tungstenite 0.20.1",
+ "tungstenite 0.30.0",
 ]
 
 [[package]]
@@ -12972,25 +12932,6 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.20.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e3dac10fd62eaf6617d3a904ae222845979aec67c615d1c842b4002c7666fb9"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http 0.2.12",
- "httparse",
- "log",
- "rand 0.8.6",
- "sha1 0.10.6",
- "thiserror 1.0.68",
- "url",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c01152af293afb9c7c2a57e4b559c5620b421f6d133261c60dd2d0cdb38e6b8"
@@ -13004,6 +12945,22 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "sha1 0.10.6",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http 1.5.0",
+ "httparse",
+ "log",
+ "rand 0.10.2",
+ "sha1 0.11.0",
  "thiserror 2.0.18",
 ]
 
@@ -13282,12 +13239,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
-name = "utf-8"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
 name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13348,7 +13299,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.38"
+version = "0.3.39"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -13493,8 +13444,6 @@ dependencies = [
  "http-serde",
  "hyper 0.14.32",
  "hyper 1.11.1",
- "hyper-openssl 0.9.2",
- "hyper-proxy",
  "hyper-util",
  "indexmap 2.14.2",
  "indoc",
@@ -13514,7 +13463,6 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "mlua",
- "mock_instant",
  "mongodb",
  "nix 0.31.3",
  "nkeys",
@@ -13617,7 +13565,6 @@ dependencies = [
  "warp",
  "windows 0.58.0",
  "windows-service",
- "windows-sys 0.52.0",
  "wiremock",
  "zstd 0.13.2",
 ]
@@ -13699,6 +13646,7 @@ dependencies = [
  "futures",
  "indexmap 2.14.2",
  "itertools 0.15.0",
+ "libc",
  "metrics",
  "pastey",
  "pin-project",
@@ -13712,6 +13660,7 @@ dependencies = [
  "vector-common-macros",
  "vector-config",
  "vrl",
+ "windows-sys 0.52.0",
  "zstd 0.13.2",
 ]
 
@@ -13733,6 +13682,7 @@ dependencies = [
  "chrono-tz",
  "encoding_rs",
  "http 0.2.12",
+ "http 1.5.0",
  "indexmap 2.14.2",
  "inventory",
  "jsonschema",
@@ -13785,7 +13735,6 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "async-trait",
- "base64 0.23.1",
  "bitmask-enum",
  "bytes",
  "cfg-if",
@@ -13801,9 +13750,6 @@ dependencies = [
  "float_eq",
  "futures",
  "futures-util",
- "headers 0.3.9",
- "http 0.2.12",
- "hyper-proxy",
  "indexmap 2.14.2",
  "inventory",
  "ipnet",
@@ -13812,6 +13758,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mlua",
+ "mock_instant",
  "ndarray",
  "ndarray-stats",
  "noisy_float",
@@ -13836,6 +13783,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "serial_test",
  "similar-asserts",
  "smallvec",
  "snafu 0.9.2",
@@ -13849,8 +13797,6 @@ dependencies = [
  "toml 0.9.8",
  "tonic 0.12.3",
  "tracing 0.1.44",
- "url",
- "urlencoding",
  "uuid",
  "vector-buffers",
  "vector-common",
@@ -13871,7 +13817,7 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.11.1",
- "hyper-openssl 0.10.2",
+ "hyper-openssl",
  "hyper-util",
  "openssl",
  "percent-encoding",

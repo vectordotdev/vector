@@ -1,6 +1,6 @@
 use std::fmt;
 
-use http_1::{
+use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
@@ -134,5 +134,36 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
         request
             .headers_mut()
             .insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::{
+        HeaderValue, Request,
+        header::{ACCEPT_ENCODING, USER_AGENT},
+    };
+
+    use super::default_request_headers;
+
+    #[test]
+    fn default_request_headers_are_added() {
+        let user_agent = HeaderValue::from_static("vector");
+        let mut request = Request::post("http://example.com").body(()).unwrap();
+        default_request_headers(&mut request, &user_agent);
+        assert_eq!(request.headers()[ACCEPT_ENCODING], "identity");
+        assert_eq!(request.headers()[USER_AGENT], user_agent);
+    }
+
+    #[test]
+    fn default_request_headers_do_not_overwrite() {
+        let mut request = Request::post("http://example.com")
+            .header(ACCEPT_ENCODING, "gzip")
+            .header(USER_AGENT, "foo")
+            .body(())
+            .unwrap();
+        default_request_headers(&mut request, &HeaderValue::from_static("vector"));
+        assert_eq!(request.headers()[ACCEPT_ENCODING], "gzip");
+        assert_eq!(request.headers()[USER_AGENT], "foo");
     }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response, Uri};
+use http::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
@@ -20,12 +20,12 @@ use vector_lib::{
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
         util::{
-            Compression, ElementCount, auth::Auth, http::RequestConfig, http_v1::protocol_endpoint,
+            Compression, ElementCount, auth::Auth, http::RequestConfig, uri::protocol_endpoint,
         },
     },
 };
@@ -87,7 +87,7 @@ impl ElasticsearchService {
         http_client: HttpClient,
         http_request_builder: HttpRequestBuilder,
     ) -> ElasticsearchService {
-        let (protocol, endpoint) = protocol_endpoint(&http_request_builder.bulk_uri);
+        let (protocol, endpoint) = protocol_endpoint(http_request_builder.bulk_uri.clone());
         ElasticsearchService {
             client: http_client,
             http_request_builder: Arc::new(http_request_builder),

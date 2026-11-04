@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use http_1::{Request, Response, StatusCode, Uri};
+use http::{Request, Response, StatusCode, Uri};
 use http_body_util::BodyExt;
 use hyper_1::body::Incoming;
 use serde::Deserialize;
@@ -11,9 +11,7 @@ use super::{
     request_builder::ElasticsearchRequestBuilder,
 };
 use crate::{
-    http::{
-        MaybeAuth, ParameterValue, QueryParameterValue, QueryParameters, client_v1::HttpClient,
-    },
+    http::{HttpClient, MaybeAuth, ParameterValue, QueryParameterValue, QueryParameters},
     sinks::{
         HealthcheckError,
         elasticsearch::{

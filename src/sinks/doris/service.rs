@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use http_1::Response;
+use http::Response;
 use serde_json;
 use snafu::Snafu;
 use std::task::{Context, Poll};

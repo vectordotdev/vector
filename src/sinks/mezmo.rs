@@ -2,7 +2,7 @@ use std::{io, time::SystemTime};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future, stream::BoxStream};
-use http_1::{Request, StatusCode, Uri, uri::InvalidUri};
+use http::{Request, StatusCode, Uri, uri::InvalidUri};
 use serde_json::{
     json,
     value::{RawValue, to_raw_value},
@@ -36,7 +36,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::{LargeEventDroppedError, SinkRequestBuildError},
     schema,
     sinks::{
