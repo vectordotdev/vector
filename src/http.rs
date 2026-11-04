@@ -404,14 +404,12 @@ where
     B::Data: Send,
     B::Error: Into<Box<dyn StdError + Send + Sync>>,
 {
-    const HTTP2_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
-
     let mut builder = ConnectionBuilder::new(TokioExecutor::new());
     builder.http1().header_read_timeout(None);
     builder
         .http2()
         .max_concurrent_streams(None)
-        .max_header_list_size(HTTP2_MAX_HEADER_LIST_SIZE);
+        .max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
     let graceful = GracefulShutdown::new();
     let mut incoming = Box::pin(incoming);
     let mut shutdown = pin!(shutdown);
