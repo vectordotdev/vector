@@ -5300,41 +5300,17 @@ dependencies = [
 
 [[package]]
 name = "headers"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
-dependencies = [
- "base64 0.21.7",
- "bytes",
- "headers-core 0.2.0",
- "http 0.2.12",
- "httpdate",
- "mime",
- "sha1 0.10.6",
-]
-
-[[package]]
-name = "headers"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
 dependencies = [
  "base64 0.22.1",
  "bytes",
- "headers-core 0.3.0",
+ "headers-core",
  "http 1.5.0",
  "httpdate",
  "mime",
  "sha1 0.10.6",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
-dependencies = [
- "http 0.2.12",
 ]
 
 [[package]]
@@ -5778,7 +5754,7 @@ checksum = "7ad4b0a1e37510028bc4ba81d0e38d239c39671b0f0ce9e02dfa93a8133f7c08"
 dependencies = [
  "bytes",
  "futures-util",
- "headers 0.4.1",
+ "headers",
  "http 1.5.0",
  "hyper 1.11.1",
  "hyper-util",
@@ -13403,8 +13379,7 @@ dependencies = [
  "h2 0.4.19",
  "hash_hasher",
  "hashbrown 0.14.5",
- "headers 0.3.9",
- "headers 0.4.1",
+ "headers",
  "heim",
  "hex",
  "hostname 0.4.2",
@@ -14159,7 +14134,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
- "headers 0.4.1",
+ "headers",
  "http 1.5.0",
  "http-body 1.0.1",
  "http-body-util",

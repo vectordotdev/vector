@@ -542,7 +542,6 @@ criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 # Test mock servers use `warp::serve` and `warp::test`.
 warp = { version = "0.4.3", default-features = false, features = ["server", "test"] }
 # Legacy HTTP stack, only for tests and benches that still use hyper 0.14 or reqwest 0.11.
-headers = { version = "0.3.9", default-features = false }
 http-0 = { package = "http", version = "0.2.9", default-features = false }
 hyper = { version = "0.14.32", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream", "backports", "deprecated"] }
 itertools.workspace = true
