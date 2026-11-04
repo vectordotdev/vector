@@ -216,6 +216,15 @@ mod source {
                 }
                 source = cause.source();
             }
+            // Some messages have line breaks, for example before the troubleshooting link that
+            // `azure_identity` adds, and a text log would show the rest of the error on lines of
+            // its own. So log the error on one line, with `; ` in place of each line break.
+            let error = error
+                .split(['\r', '\n'])
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
             error!(
                 message = "Failed to get a SASL/OAUTHBEARER token.",
                 %error,
