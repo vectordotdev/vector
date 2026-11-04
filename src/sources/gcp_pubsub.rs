@@ -284,7 +284,7 @@ impl SourceConfig for PubsubConfig {
         // Pub/Sub's configured CAs supplement system roots, as they did with Tonic.
         let tls = TlsSettings::from_options(Some(&tls_config))?.with_system_roots();
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
         let client = Http2Client::new(tls.into(), &cx.proxy, builder)?;
 
         let token_generator = auth.spawn_regenerate_token();
