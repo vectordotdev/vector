@@ -7,7 +7,7 @@ use vector_lib::event::{
 };
 
 use super::AggregationMode;
-use super::config::{EventTimeConfig, MissingTimestamp};
+use super::config::{EventTimeConfig, LateEvents, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
 use crate::{
     event::{Event, EventMetadata},
@@ -81,17 +81,23 @@ impl Aggregate {
 
         let bucket_key = self.bucket_key(ts);
 
-        if self.was_bucket_flushed(bucket_key) {
-            emit!(AggregateEventDropped {
-                reason: "Event timestamp is too late; bucket already flushed."
-            });
-            return None;
-        }
-
-        if self.is_past_bucket_cutoff(bucket_key, now_ms) {
-            emit!(AggregateEventDropped {
-                reason: "Event timestamp is too late; bucket window has ended."
-            });
+        let late_reason = if self.was_bucket_flushed(bucket_key) {
+            Some("Event timestamp is too late; bucket already flushed.")
+        } else if self.is_past_bucket_cutoff(bucket_key, now_ms) {
+            Some("Event timestamp is too late; bucket window has ended.")
+        } else {
+            None
+        };
+        if let Some(reason) = late_reason {
+            let keep = match event_time.late_events {
+                LateEvents::Forward => true,
+                LateEvents::ForwardDistribution => Self::is_distribution_like(&data),
+                LateEvents::Drop => false,
+            };
+            if keep {
+                return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
+            }
+            emit!(AggregateEventDropped { reason });
             return None;
         }
 
@@ -102,6 +108,17 @@ impl Aggregate {
         self.record_into_bucket(bucket_key, series, data, metadata);
         emit!(AggregateEventRecorded);
         None
+    }
+
+    /// Returns `true` for value types that the Datadog Metrics sink sends as
+    /// distributions (merged server-side), used by `LateEvents::ForwardDistribution`.
+    fn is_distribution_like(data: &MetricData) -> bool {
+        matches!(
+            data.value(),
+            MetricValue::Distribution { .. }
+                | MetricValue::AggregatedHistogram { .. }
+                | MetricValue::Sketch { .. }
+        )
     }
 
     /// Start of the half-open window `[bucket_key, bucket_key + interval_ms)` containing

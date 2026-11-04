@@ -46,13 +46,27 @@ pub struct EventTimeConfig {
     /// `bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
     /// event-time window. That cutoff is enforced when events are recorded, not only when a
     /// periodic flush runs. Once a bucket is emitted it is closed permanently; any later
-    /// events whose timestamp falls inside it are dropped and counted via
-    /// `component_discarded_events_total`.
+    /// events whose timestamp falls inside it are handled according to `late_events`.
     ///
     /// Set to 0 for strict ordering (no late events allowed).
     #[serde(default)]
     #[configurable(metadata(docs::examples = 0, docs::examples = 5000, docs::examples = 30000))]
     pub allowed_lateness_ms: u64,
+
+    /// How to handle events that arrive after their bucket's cutoff.
+    ///
+    /// - `drop` (default) discards the event and increments `component_discarded_events_total`
+    /// - `forward` skips aggregation and forwards the event downstream unchanged
+    /// - `forward_distribution` forwards distribution-like events (`distribution`,
+    ///   `aggregated_histogram`, and `sketch`) downstream unchanged and drops all others
+    ///
+    /// Forwarded events keep their original timestamp, so they can share a timestamp with the
+    /// aggregate emitted for their bucket. Sinks that overwrite values for an identical timestamp,
+    /// such as the Datadog Metrics sink, may then replace the aggregate with the late value.
+    /// Forwarded events also carry their raw value, not a count or delta, in `count` and `diff`
+    /// modes.
+    #[serde(default)]
+    pub late_events: LateEvents,
 
     /// How to handle events with missing timestamps.
     ///
@@ -83,6 +97,7 @@ impl Default for EventTimeConfig {
     fn default() -> Self {
         Self {
             allowed_lateness_ms: 0,
+            late_events: LateEvents::Drop,
             missing_timestamp: MissingTimestamp::Drop,
             max_future_ms: default_max_future_ms(),
         }
@@ -101,6 +116,28 @@ pub enum MissingTimestamp {
 
     /// Use the current system time as the event timestamp.
     UseSystemTime,
+}
+
+/// Behavior for metrics that arrive after their bucket's cutoff in event-time mode.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[configurable(description = "How to handle metrics that arrive after their bucket's cutoff.")]
+#[serde(rename_all = "snake_case")]
+pub enum LateEvents {
+    /// Drop the event and count it via `component_discarded_events_total`.
+    #[default]
+    Drop,
+
+    /// Skip aggregation and forward the event downstream unchanged.
+    Forward,
+
+    /// Forward distribution-like events (`distribution`, `aggregated_histogram`, and `sketch`)
+    /// downstream unchanged; drop all others and count them via
+    /// `component_discarded_events_total`.
+    ///
+    /// These are the types the Datadog Metrics sink sends as distributions, which are merged
+    /// rather than overwritten, so a late value does not replace the bucket's aggregate.
+    ForwardDistribution,
 }
 
 pub(crate) const fn default_max_future_ms() -> u64 {

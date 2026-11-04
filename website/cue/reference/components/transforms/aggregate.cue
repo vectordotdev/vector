@@ -214,6 +214,20 @@ components: transforms: aggregate: {
 						`allowed_lateness_ms = 0` enforces strict lateness even if the flush interval is
 						long or misaligned.
 
+						Set `event_time.late_events` to `forward` to send late events downstream
+						unchanged instead of dropping them. Forwarded events skip aggregation and do not
+						create buckets or affect the watermark. Because they keep their original
+						timestamp, they can share a timestamp with the aggregate emitted for their bucket;
+						sinks that overwrite values for an identical timestamp, such as the Datadog Metrics
+						sink, may then replace the aggregate with the late value. In `count` and `diff`
+						modes, forwarded events carry their raw value rather than a count or delta.
+
+						Set `event_time.late_events` to `forward_distribution` to forward only late
+						`distribution`, `aggregated_histogram`, and `sketch` events and drop every other
+						late event. These are the types the Datadog Metrics sink sends as distributions,
+						which are merged rather than overwritten, so a late value does not replace the
+						bucket's aggregate.
+
 						Metrics the configured `mode` does not aggregate (for example an `incremental`
 						event in `mean` mode, or an `absolute` event in `sum` mode) pass through
 						unchanged, matching system-time behavior, without creating buckets or affecting

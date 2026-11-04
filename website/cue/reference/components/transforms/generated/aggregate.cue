@@ -18,8 +18,7 @@ generated: components: transforms: aggregate: configuration: {
 					`bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
 					event-time window. That cutoff is enforced when events are recorded, not only when a
 					periodic flush runs. Once a bucket is emitted it is closed permanently; any later
-					events whose timestamp falls inside it are dropped and counted via
-					`component_discarded_events_total`.
+					events whose timestamp falls inside it are handled according to `late_events`.
 
 					Set to 0 for strict ordering (no late events allowed).
 					"""
@@ -27,6 +26,38 @@ generated: components: transforms: aggregate: configuration: {
 				type: uint: {
 					default: 0
 					examples: [0, 5000, 30000]
+				}
+			}
+			late_events: {
+				description: """
+					How to handle events that arrive after their bucket's cutoff.
+
+					- `drop` (default) discards the event and increments `component_discarded_events_total`
+					- `forward` skips aggregation and forwards the event downstream unchanged
+					- `forward_distribution` forwards distribution-like events (`distribution`,
+					  `aggregated_histogram`, and `sketch`) downstream unchanged and drops all others
+
+					Forwarded events keep their original timestamp, so they can share a timestamp with the
+					aggregate emitted for their bucket. Sinks that overwrite values for an identical timestamp,
+					such as the Datadog Metrics sink, may then replace the aggregate with the late value.
+					Forwarded events also carry their raw value, not a count or delta, in `count` and `diff`
+					modes.
+					"""
+				required: false
+				type: string: {
+					default: "drop"
+					enum: {
+						drop:    "Drop the event and count it via `component_discarded_events_total`."
+						forward: "Skip aggregation and forward the event downstream unchanged."
+						forward_distribution: """
+															Forward distribution-like events (`distribution`, `aggregated_histogram`, and `sketch`)
+															downstream unchanged; drop all others and count them via
+															`component_discarded_events_total`.
+
+															These are the types the Datadog Metrics sink sends as distributions, which are merged
+															rather than overwritten, so a late value does not replace the bucket's aggregate.
+															"""
+					}
 				}
 			}
 			max_future_ms: {
