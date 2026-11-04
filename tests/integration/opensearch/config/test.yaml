@@ -1,5 +1,5 @@
 features:
-  - es-integration-tests
+  - opensearch-integration-tests
 
 test_filter: "::elasticsearch::integration_tests::"
 
@@ -20,6 +20,7 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
   - "src/sinks/elasticsearch/**"
+  - "src/sinks/opensearch.rs"
   - "src/sinks/util/**"
   - "tests/data/ca/**"
   - "tests/integration/opensearch/**"

@@ -1,11 +1,12 @@
 use std::{env, time::Duration};
 
 use futures::StreamExt;
-use http_body::Collected;
-use hyper::{Body, Request};
+use http::{Request, StatusCode};
+use http_body_util::{BodyExt as _, Collected};
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::empty_body;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
@@ -22,6 +23,7 @@ use crate::{
         HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
+    tls::MaybeTlsSettings,
 };
 
 mod parser;
@@ -102,8 +104,8 @@ pub struct AwsEcsMetricsSourceConfig {
     namespace: String,
 }
 
-const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
-const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI";
 
 #[must_use]
 pub fn default_endpoint() -> String {
@@ -159,7 +161,7 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
-        let http_client = HttpClient::new(None, &cx.proxy)?;
+        let http_client = HttpClient::new(MaybeTlsSettings::Raw(()), &cx.proxy)?;
 
         Ok(crate::sources::source_with_error(aws_ecs_metrics(
             http_client,
@@ -192,13 +194,15 @@ async fn aws_ecs_metrics(
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let request = Request::get(&url)
-            .body(Body::empty())
+            .body(empty_body())
             .expect("error creating request");
         let uri = request.uri().clone();
 
         match http_client.send(request).await {
-            Ok(response) if response.status() == hyper::StatusCode::OK => {
-                match http_body::Body::collect(response.into_body())
+            Ok(response) if response.status() == StatusCode::OK => {
+                match response
+                    .into_body()
+                    .collect()
                     .await
                     .map(Collected::to_bytes)
                 {
@@ -256,21 +260,19 @@ async fn aws_ecs_metrics(
 
 #[cfg(test)]
 mod test {
-    use crate::event::Event;
-    use hyper::{
-        Body, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use std::convert::Infallible;
+
+    use bytes::Bytes;
+    use http::Response;
+    use http_body_util::Full;
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
-        Error,
-        event::MetricValue,
+        event::{Event, MetricValue},
         test_util::{
-            addr::next_addr,
             components::{SOURCE_TAGS, run_and_assert_source_compliance},
-            wait_for_tcp,
+            http::spawn_blackhole_http_server,
         },
     };
 
@@ -280,12 +282,9 @@ mod test {
     )]
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
-        let (_guard, in_addr) = next_addr();
-
-        let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(Response::new(Body::from(
-                    r#"
+        let uri = spawn_blackhole_http_server(|_| async {
+            Ok::<_, Infallible>(Response::new(Full::new(Bytes::from_static(
+                r#"
                     {
                         "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-3822082590": {
                             "read": "2020-09-23T20:32:26.292561674Z",
@@ -576,17 +575,12 @@ mod test {
                             }
                         }
                     }
-                    "#,
-                )))
-            }))
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", %error);
-            }
-        });
-        wait_for_tcp(in_addr).await;
+                    "#
+                .as_bytes(),
+            ))))
+        })
+        .await;
+        let in_addr = uri.authority().unwrap();
 
         let config = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{in_addr}"),

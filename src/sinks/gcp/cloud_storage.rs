@@ -299,7 +299,7 @@ impl ValidatedSink for GcsSinkConfig {
 
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
@@ -580,19 +580,19 @@ mod tests {
 
         let context = SinkContext::default();
 
-        let tls = TlsSettings::default();
-        let client =
-            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
+        let client = HttpClient::new(tls.into(), context.proxy())
+            .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::new(mock_endpoint.clone()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+                HttpEndpoint::new(mock_endpoint).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 &context,
                 &validated,

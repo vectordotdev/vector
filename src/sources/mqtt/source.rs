@@ -2,7 +2,7 @@ use std::{collections::VecDeque, time::Duration};
 
 use futures::{StreamExt, stream::BoxStream};
 use itertools::Itertools;
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use rumqttc::{ConnectionError, Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
@@ -32,20 +32,6 @@ const SUBSCRIPTION_QOS: QoS = QoS::AtLeastOnce;
 /// fail again immediately, and reconnecting on every failure would thrash the
 /// connection; this cooldown caps that to at most once per interval.
 const FORCED_RECONNECT_COOLDOWN: Duration = Duration::from_secs(30);
-
-/// How long to wait, after sending a graceful `Disconnect`, for the broker to
-/// close the connection before dropping it locally. [MQTT-3.14.4-2] puts the
-/// close obligation on the client anyway; the server only SHOULD close. A
-/// broker that keeps the socket open would otherwise leave `ack_suppressed`
-/// pinned for the rest of the (never-ending) generation, stalling delivery
-/// with nothing left to trigger recovery.
-const FORCED_RECONNECT_ESCALATION_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// How long to wait before re-attempting to queue a forced-reconnect
-/// `Disconnect` after rumqttc's request channel was too full to accept it.
-/// Non-zero so the retry timer can't monopolize the select loop while the
-/// event loop drains the channel.
-const FORCED_RECONNECT_RETRY_DELAY: Duration = Duration::from_millis(100);
 
 /// How long to wait before resending a (re)subscribe after the broker
 /// rejected it (SUBACK failure return code, e.g. an ACL denial). Immediate
@@ -130,17 +116,27 @@ struct FinalizedPublishDecision {
     just_suppressed: bool,
 }
 
-/// Schedules the graceful forced reconnects triggered by withheld acks (see
+/// Schedules the forced reconnects triggered by withheld acks (see
 /// `FORCED_RECONNECT_COOLDOWN`). A suppression inside the cooldown window
 /// must schedule the reconnect for when the cooldown expires rather than skip
 /// it: `just_suppressed` fires only once per connection generation, so a
 /// skipped reconnect would never get another trigger and the source would
 /// stay connected (and stuck) indefinitely.
+///
+/// The reconnect itself is a priority `DISCONNECT` (`try_disconnect_now`)
+/// followed by rebuilding the client and event loop: in rumqttc-v4-next a
+/// client-requested disconnect is terminal for its `EventLoop` (`poll` then
+/// returns `RequestsDone` forever), so recovery needs a fresh one, which
+/// reconnects with the same client ID and resumes the persistent session.
+/// `disconnect_now` sends a real MQTT `DISCONNECT` (an abrupt socket drop was
+/// verified against EMQX to stop delivery entirely), and dropping the old
+/// `EventLoop` closes our side of the socket as [MQTT-3.14.4-2] requires --
+/// no escalation timer is needed for a broker that never closes its side.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ForcedReconnectSchedule {
     due_at: Option<tokio::time::Instant>,
     cooldown_until: Option<tokio::time::Instant>,
-    escalate_at: Option<tokio::time::Instant>,
+    disconnect_sent: bool,
 }
 
 impl ForcedReconnectSchedule {
@@ -156,43 +152,28 @@ impl ForcedReconnectSchedule {
         self.due_at
     }
 
-    /// The disconnect was queued: clear the schedule, start the cooldown, and
-    /// arm the escalation deadline in case the broker never closes the
-    /// connection in response (see `FORCED_RECONNECT_ESCALATION_TIMEOUT`).
+    /// The disconnect was queued: clear the schedule and start the cooldown.
+    /// The event loop now winds down to `RequestsDone`, at which point `run`
+    /// rebuilds it.
     fn sent(&mut self, now: tokio::time::Instant) {
         self.due_at = None;
         self.cooldown_until = Some(now + FORCED_RECONNECT_COOLDOWN);
-        self.escalate_at = Some(now + FORCED_RECONNECT_ESCALATION_TIMEOUT);
+        self.disconnect_sent = true;
     }
 
-    /// The disconnect couldn't be queued (rumqttc's request channel was
-    /// full): retry shortly, once the event loop has drained the channel.
-    fn retry(&mut self, now: tokio::time::Instant) {
-        self.due_at = Some(now + FORCED_RECONNECT_RETRY_DELAY);
-    }
-
-    /// When to drop the connection locally because the broker never closed it
-    /// after our `Disconnect`, if one was sent and is still unanswered.
-    const fn escalate_at(&self) -> Option<tokio::time::Instant> {
-        self.escalate_at
-    }
-
-    /// A `Disconnect` has been sent and the connection hasn't dropped yet, so
-    /// nothing further should be written to it ([MQTT-3.14.4-1]).
+    /// A `DISCONNECT` has been queued and the event loop hasn't wound down
+    /// yet, so nothing further should be queued for it ([MQTT-3.14.4-1]; the
+    /// library also discards anything it receives after the barrier).
     const fn disconnect_sent(&self) -> bool {
-        self.escalate_at.is_some()
+        self.disconnect_sent
     }
 
-    /// The escalation fired: the local teardown is happening now.
-    const fn escalated(&mut self) {
-        self.escalate_at = None;
-    }
-
-    /// The connection dropped: whatever reconnect or escalation was scheduled
-    /// has been achieved by that disconnect.
+    /// The connection is gone: whatever reconnect was scheduled has been
+    /// achieved by that disconnect. The cooldown deliberately survives, so a
+    /// suppression right after reconnecting is still paced.
     const fn cancel(&mut self) {
         self.due_at = None;
-        self.escalate_at = None;
+        self.disconnect_sent = false;
     }
 }
 
@@ -370,58 +351,6 @@ fn partition_buffered_events(
     (kept, orphaned)
 }
 
-/// Whether a request rumqttc had queued in `connection.pending` (moved there
-/// by `EventLoop::clean()`, either drained from the outgoing request channel
-/// or resurrected from rumqttc's own outgoing-publish/QoS 2 state) when the
-/// connection died should survive into the next connection.
-///
-/// Deliberately an exhaustive match with no wildcard arm: `Request` is a
-/// third-party enum, so reasoning about it variant-by-variant means a future
-/// rumqttc upgrade that adds one must fail to compile here until someone
-/// decides which bucket it belongs in, instead of a wildcard silently
-/// picking a default (which is exactly how this scrub originally missed
-/// `PubComp` -- the previous `!matches!(request, A | B | C)` form kept
-/// everything not explicitly named, the wrong default for a connection-
-/// scoped packet).
-#[allow(
-    clippy::match_same_arms,
-    reason = "Drop arms are grouped by *why* each variant is dropped, with a rationale per group."
-)]
-const fn keep_pending_request_after_disconnect(request: &rumqttc::Request) -> bool {
-    match request {
-        // Each of these carries connection-scoped state: a packet id that's
-        // only valid on the connection that just died (a fresh session can
-        // reuse it, acking -- or, for PubComp, completing -- the wrong
-        // exchange), or a Disconnect that would tear down the very
-        // connection it gets replayed onto. This source never builds a
-        // `Publish` or `PubRel` itself (subscribe-only, so it's never the
-        // QoS 1/2 publisher these belong to), but if either ever appeared
-        // here regardless, the safe default for a connection-scoped packet
-        // is still to drop it.
-        rumqttc::Request::PubAck(_)
-        | rumqttc::Request::PubRec(_)
-        | rumqttc::Request::PubComp(_)
-        | rumqttc::Request::Disconnect(_)
-        | rumqttc::Request::Publish(_)
-        | rumqttc::Request::PubRel(_) => false,
-        // This source never unsubscribes, and SubAck/UnsubAck are broker-to-
-        // client packets in the protocol -- rumqttc's `Request` enum has
-        // client-authored variants of the same name, but there's no code
-        // path that constructs one here. Unreachable in practice; dropped
-        // for the same reason as above in case that ever changes.
-        rumqttc::Request::Unsubscribe(_)
-        | rumqttc::Request::SubAck(_)
-        | rumqttc::Request::UnsubAck(_) => false,
-        // Harmless to replay: a resubscribe is idempotent (and
-        // `ProtocolState::pending_resubscribe`'s own SUBACK-confirmation
-        // retry doesn't depend on this surviving either way), and keepalive
-        // packets carry no session-scoped state at all.
-        rumqttc::Request::Subscribe(_)
-        | rumqttc::Request::PingReq(_)
-        | rumqttc::Request::PingResp(_) => true,
-    }
-}
-
 fn publish_ack_decision(acknowledgements: bool, qos: QoS) -> PublishAckDecision {
     let defer_ack = acknowledgements && publish_supports_end_to_end_acknowledgements(qos);
 
@@ -559,7 +488,7 @@ impl MqttSource {
         mut out: SourceSender,
         shutdown: ShutdownSignal,
     ) -> Result<(), SourceError> {
-        let (client, mut connection) = self.connector.connect();
+        let (mut client, mut connection) = self.connector.connect();
 
         // Finalizer drives end-to-end acknowledgements: each in-flight publish is
         // registered with its batch-status receiver, and we send the QoS-1 PUBACK
@@ -654,50 +583,24 @@ impl MqttSource {
                         }
                     }
                 },
-                // A scheduled forced reconnect is due: gracefully disconnect
-                // (`try_disconnect` queues an MQTT `Disconnect` packet) so the
-                // broker redelivers the withheld publish once reconnected.
-                // Graceful rather than dropping the network directly: an
-                // earlier attempt at the latter (`EventLoop::clean()`) was
-                // verified against a live EMQX broker to trigger a broker-side
-                // `unexpected_sock_close` error that stopped delivery
-                // entirely, whereas an explicit `Disconnect` is a normal,
-                // expected client-initiated close.
+                // A scheduled forced reconnect is due: queue a priority MQTT
+                // `DISCONNECT` so the broker redelivers the withheld publish
+                // once a fresh event loop reconnects (see
+                // `ForcedReconnectSchedule`; the rebuild happens when this
+                // event loop reports `RequestsDone`, in the poll arm below).
                 () = tokio::time::sleep_until(
                     forced_reconnect.due_at().unwrap_or_else(tokio::time::Instant::now)
                 ), if forced_reconnect.due_at().is_some() && protocol_state.connected => {
-                    let now = tokio::time::Instant::now();
-                    if client.try_disconnect().is_ok() {
-                        warn_forcing_reconnect_after_suppressed_ack();
-                        forced_reconnect.sent(now);
+                    // `disconnect_now` uses an unbounded channel, so this can
+                    // only fail if the event loop is gone -- impossible while
+                    // `run` owns it. Mark the reconnect sent either way so the
+                    // cooldown still applies.
+                    if let Err(error) = client.try_disconnect_now() {
+                        warn!(message = "Failed to queue MQTT forced-reconnect disconnect.", %error);
                     } else {
-                        // rumqttc's request channel is full; the event loop
-                        // branch below drains it, so retrying stays live.
-                        forced_reconnect.retry(now);
+                        warn_forcing_reconnect_after_suppressed_ack();
                     }
-                },
-                // The broker never closed the connection in response to our
-                // `Disconnect`: close it locally, as [MQTT-3.14.4-2] requires
-                // of the client anyway. Safe to be abrupt here -- the session
-                // was already ended gracefully by the `Disconnect` packet, so
-                // this is not the mid-session socket drop that upset brokers
-                // when tried previously (see the comment on the branch above).
-                () = tokio::time::sleep_until(
-                    forced_reconnect.escalate_at().unwrap_or_else(tokio::time::Instant::now)
-                ), if forced_reconnect.escalate_at().is_some() => {
-                    forced_reconnect.escalated();
-                    connection.clean();
-                    (finalizer, ack_stream) = self.handle_connection_lost(
-                        &mut connection,
-                        &mut protocol_state,
-                        ConnectionAuxState {
-                            pending_acks: &mut pending_acks,
-                            forced_reconnect: &mut forced_reconnect,
-                            resubscribe_retry_at: &mut resubscribe_retry_at,
-                            orphaned_publishes: &mut orphaned_publishes,
-                        },
-                        &shutdown,
-                    );
+                    forced_reconnect.sent(tokio::time::Instant::now());
                 },
                 // The broker rejected a (re)subscribe earlier; the pacing
                 // delay has passed, so try again.
@@ -829,7 +732,7 @@ impl MqttSource {
                         // `EventLoop::clean()` internally before returning this
                         // error; scrub everything from the dead connection that
                         // rumqttc would otherwise carry over into the next one.
-                        Err(_) => {
+                        Err(error) => {
                             (finalizer, ack_stream) = self.handle_connection_lost(
                                 &mut connection,
                                 &mut protocol_state,
@@ -841,6 +744,16 @@ impl MqttSource {
                                 },
                                 &shutdown,
                             );
+                            // Our forced-reconnect `DISCONNECT` completed. That
+                            // is terminal for this event loop (every later poll
+                            // returns `RequestsDone`), so replace it: the fresh
+                            // one reconnects with the same client ID and
+                            // resumes the persistent session. Only `run` issues
+                            // disconnects, and it holds `client`, so nothing
+                            // else ends polling this way.
+                            if matches!(error, ConnectionError::RequestsDone) {
+                                (client, connection) = self.connector.connect();
+                            }
                         }
                         _ => {}
                     }
@@ -856,68 +769,71 @@ impl MqttSource {
     ///
     /// # rumqttc state inventory across a reconnect
     ///
-    /// rumqttc reuses ONE `EventLoop` (and its `MqttState`) for the process
-    /// lifetime; `EventLoop::clean()` -- run inside `poll()` before it
-    /// returns an error, or called by us on the escalation path -- is the
-    /// only fix-up between connections. Everything it does NOT reset either
-    /// needs scrubbing here or needs an argument for why it's safe. The
-    /// complete inventory, verified against rumqttc 0.24 (`eventloop.rs`,
-    /// `state.rs`, `framed.rs`):
+    /// rumqttc reuses one `EventLoop` (and its `MqttState`) across ordinary
+    /// reconnects; `EventLoop::clean()`, run inside `poll()` before it returns
+    /// a connection error, is the only fix-up between connections. Everything
+    /// it does not reset either needs scrubbing here or needs an argument for
+    /// why it's safe. The complete inventory, verified against
+    /// rumqttc-v4-next 0.34 (`eventloop.rs`, `state.rs`, `framed.rs`):
     ///
-    /// Reset by rumqttc itself (`MqttState::clean` / `EventLoop::clean`) --
-    /// nothing for us to do:
-    /// - `state.write` (cleared: partial packet bytes never reach the next
-    ///   connection's socket), `state.await_pingresp`,
-    ///   `state.collision_ping_count`, `state.inflight`,
-    ///   `state.incoming_pub`, `keepalive_timeout`, `network` (dropped).
-    /// - `state.outgoing_pub`/`state.outgoing_rel` are drained into
-    ///   `pending` as `Request::Publish`/`Request::PubRel` -- always empty
-    ///   for this subscribe-only source, and our `pending` scrub drops them
-    ///   anyway.
+    /// Reset or handled by rumqttc itself -- nothing for us to do:
+    /// - The network (and with it the `Framed` read and write buffers),
+    ///   `keepalive_timeout`, any pending graceful disconnect, ping state,
+    ///   `inflight`, and `incoming_puback` (QoS 1 receive tracking is not
+    ///   session state).
+    /// - The private replay queue: `clean()` replays queued requests on the
+    ///   next connection *except* `PubAck`/`PubRec`, whose packet ids belong
+    ///   to the dead connection. This source relies on that instead of
+    ///   scrubbing the queue (pinned by `connection_lost_scrubs_the_rumqttc_seam`,
+    ///   so an upgrade that starts replaying acks fails a test).
+    /// - `session_present = false`: `reset_session_state` rebuilds
+    ///   `MqttState` wholesale and fails tracked requests.
     ///
     /// Persists, scrubbed here:
-    /// - `connection.pending`: queued-but-unsent requests, replayed with
-    ///   priority on the next connection. Filtered by the exhaustive
-    ///   `keep_pending_request_after_disconnect`.
     /// - `state.events`: incoming packets parsed but not yet yielded.
-    ///   `select()` drains this (one per `poll()`, no I/O in between) before
-    ///   attempting a network read, and `readb()` cannot fail once it has
-    ///   parsed a packet in a given call -- so this is only non-empty at
-    ///   error time when a parsed batch's ack-flush failed
-    ///   (`Network::flush` is a no-op on an empty `state.write`, so in
-    ///   manual-ack mode that needs an incoming PUBREL, i.e. a nonconformant
-    ///   broker delivering QoS 2 to our QoS 1 subscription), or when the
-    ///   escalation path calls `clean()` on a live connection mid-drain.
-    ///   Split by `partition_buffered_events` (unprocessed manual-ack
-    ///   QoS 1/2 publishes wait for the next `ConnAck`'s session outcome) and
-    ///   filtered by `keep_buffered_event_after_disconnect`.
+    ///   `select()` drains this before reading the network, but `readb()`
+    ///   parses a whole burst and returns `ConnectionAborted` (or a
+    ///   deserialization error) if the burst's next frame is EOF or
+    ///   malformed -- so a broker that closes the connection right after a
+    ///   burst of publishes leaves them buffered at error time. Split by
+    ///   `partition_buffered_events` (unprocessed manual-ack QoS 1/2
+    ///   publishes wait for the next `ConnAck`'s session outcome in
+    ///   `orphaned_publishes`) and filtered by
+    ///   `keep_buffered_event_after_disconnect`. Left in place, they would be
+    ///   yielded after the next `ConnAck` and tagged with the new generation.
     ///
-    /// Persists, safe by construction (do NOT "fix" these without a reason):
-    /// - `state.collision` (+ the request-branch gate on it): only ever set
-    ///   by outgoing publishes, which this source never sends. If it could
-    ///   be set, a stale collision would disable the request branch and
-    ///   starve PUBACKs -- if this source ever grows a publish path, this
-    ///   entry is the reminder.
-    /// - `state.last_pkid`: allocates packet ids for outgoing packets (only
-    ///   SUBSCRIBE here), wrapping at `max_inflight`; nothing we do matches
-    ///   on SUBSCRIBE packet ids.
-    /// - `state.last_puback`, `last_incoming`/`last_outgoing`: only
-    ///   meaningful for outgoing-publish ack ordering / diagnostics.
+    /// Kept in this source even though rumqttc validates acks:
+    /// - Generation tagging (`FinalizerEntry::connection_generation`).
+    ///   rumqttc rejects an ack for a packet id it has no record of on the
+    ///   current connection, but not one the broker has reused for a
+    ///   *different* publish on a fresh session -- acking that would lose
+    ///   it. And a rejected ack is not a no-op: it surfaces as
+    ///   `StateError::Unsolicited` out of `poll()` and tears down a healthy
+    ///   connection. So stale acks must never be sent at all.
+    ///
+    /// Not a reconnect -- a replacement:
+    /// - A client-requested `DISCONNECT` is terminal for its `EventLoop`
+    ///   (`poll()` returns `RequestsDone` forever), so the forced reconnect
+    ///   rebuilds the client and event loop instead (see
+    ///   `ForcedReconnectSchedule`). Dropping the old `EventLoop` closes our
+    ///   side of the socket.
+    ///
+    /// Persists, safe by construction (do not "fix" these without a reason):
+    /// - `state.collision`: only ever set by outgoing publishes, which this
+    ///   source never sends; if it could be set, it would gate the request
+    ///   path and starve acks -- a reminder for any future publish path.
+    /// - Outbound packet-id allocation: used only for SUBSCRIBE here, and
+    ///   nothing matches on SUBSCRIBE packet ids.
     ///
     /// Residual risks that cannot be closed at this layer (documented so
     /// they're a decision, not an oversight):
-    /// - `Network.read` (private field): bytes received but not yet parsed
-    ///   -- possibly whole publishes -- die with the network object. If the
-    ///   next reconnect also loses the session, they're gone. Same class as
-    ///   `orphaned_publishes`, but unreachable from outside rumqttc; the
-    ///   at-least-once guarantee is conditional on session retention, as the
-    ///   user docs state.
-    /// - `Network::flush` is not cancellation-safe upstream: a partial
-    ///   `write_all` cancelled mid-write doesn't clear `state.write`, so the
-    ///   retry re-sends the prefix and corrupts the stream. Worst case is a
-    ///   broker-side close and a normal reconnect/redelivery cycle.
-    /// - Auto-ack mode can ack a publish rumqttc buffered before we process
-    ///   it; a crash in that window loses it (identical to master's
+    /// - Bytes received but not yet decoded live in the private `Framed`
+    ///   read buffer and die with the network. If the next reconnect also
+    ///   loses the session, those publishes are gone; the at-least-once
+    ///   guarantee is conditional on session retention, as the user docs
+    ///   state.
+    /// - Auto-ack mode acks a publish as rumqttc parses it, before we
+    ///   process it; a crash in that window loses it (identical to master's
     ///   behavior; manual-ack mode exists to close exactly this gap).
     fn handle_connection_lost(
         &self,
@@ -939,13 +855,6 @@ impl MqttSource {
         let actions = protocol_state.on_disconnect();
         if actions.clear_pending_acks {
             pending_acks.clear();
-            // `EventLoop::clean()` moved any queued-but-unsent requests into
-            // `connection.pending` for automatic replay on the next
-            // connection; keep only what's safe to replay -- see
-            // `keep_pending_request_after_disconnect`.
-            connection
-                .pending
-                .retain(keep_pending_request_after_disconnect);
             // rumqttc buffers batches of incoming packets in `state.events`
             // and yields them one per poll; `clean()` does NOT clear that
             // buffer, so events from the dead connection would otherwise be
@@ -1051,13 +960,16 @@ impl MqttSource {
         emit!(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
-            endpoint: &self.connector.options.broker_address().0,
+            endpoint: &self.config.common.host,
         });
         let events_received = register!(EventsReceived);
 
         let ack_decision = publish_ack_decision(finalizer.is_some(), publish.qos);
         if ack_decision.warn_unsupported_qos {
-            warn_unsupported_acknowledgement_qos(publish.qos, &publish.topic);
+            warn_unsupported_acknowledgement_qos(
+                publish.qos,
+                &String::from_utf8_lossy(&publish.topic),
+            );
         }
 
         let (batch, batch_receiver) =
@@ -1219,45 +1131,6 @@ mod tests {
         assert!(orphaned.is_empty());
     }
 
-    // Every `rumqttc::Request` variant, named explicitly (no catch-all): the
-    // exhaustive match in `keep_pending_request_after_disconnect` is the
-    // real guard (a 13th variant fails to compile), but this test pins down
-    // *which* bucket each of today's 12 variants falls into, so a change to
-    // any single one shows up as a one-line diff instead of requiring a
-    // re-derivation from the match arms.
-    #[test]
-    fn pending_request_scrub_matrix_for_disconnect() {
-        for (request, keep) in [
-            (rumqttc::Request::PubAck(rumqttc::PubAck::new(7)), false),
-            (rumqttc::Request::PubRec(rumqttc::PubRec::new(7)), false),
-            (rumqttc::Request::PubComp(rumqttc::PubComp::new(7)), false),
-            (rumqttc::Request::Disconnect(rumqttc::Disconnect), false),
-            (rumqttc::Request::Publish(publish(7)), false),
-            (rumqttc::Request::PubRel(rumqttc::PubRel::new(7)), false),
-            (
-                rumqttc::Request::Unsubscribe(rumqttc::Unsubscribe::new("topic")),
-                false,
-            ),
-            (
-                rumqttc::Request::SubAck(rumqttc::SubAck::new(7, vec![])),
-                false,
-            ),
-            (rumqttc::Request::UnsubAck(rumqttc::UnsubAck::new(7)), false),
-            (
-                rumqttc::Request::Subscribe(rumqttc::Subscribe::new("topic", QoS::AtLeastOnce)),
-                true,
-            ),
-            (rumqttc::Request::PingReq(rumqttc::PingReq), true),
-            (rumqttc::Request::PingResp(rumqttc::PingResp), true),
-        ] {
-            assert_eq!(
-                keep_pending_request_after_disconnect(&request),
-                keep,
-                "request {request:?}"
-            );
-        }
-    }
-
     // The disconnect scrub exercised end-to-end against a REAL rumqttc
     // `EventLoop` (constructed without a network -- everything it carries
     // across reconnects is reachable), so the seam every recent review
@@ -1280,17 +1153,18 @@ mod tests {
 
         for acknowledgements in [true, false] {
             let source = MqttSource::new(
-                MqttConnector::new(rumqttc::MqttOptions::new("seam-test", "localhost", 1883)),
+                MqttConnector::new(rumqttc::MqttOptions::new("seam-test", ("localhost", 1883))),
                 Decoder::default(),
                 LogNamespace::Legacy,
                 MqttSourceConfig::default(),
                 acknowledgements,
             )
             .unwrap();
-            let (_client, mut connection) = rumqttc::AsyncClient::new(
-                rumqttc::MqttOptions::new("seam-test", "localhost", 1883),
-                8,
-            );
+            let (client, mut connection) = rumqttc::AsyncClient::builder(
+                rumqttc::MqttOptions::new("seam-test", ("localhost", 1883)),
+            )
+            .capacity(8)
+            .build();
 
             // What rumqttc can hold at the moment a connection dies: parsed-
             // but-unyielded incoming packets, and queued-but-unsent requests.
@@ -1304,12 +1178,11 @@ mod tests {
                 MqttEvent::Incoming(Incoming::Publish(publish_with_qos(3, QoS::ExactlyOnce))),
                 MqttEvent::Outgoing(rumqttc::Outgoing::PingReq),
             ]);
-            connection.pending = VecDeque::from([
-                rumqttc::Request::PubAck(rumqttc::PubAck::new(2)),
-                rumqttc::Request::Subscribe(rumqttc::Subscribe::new("topic", QoS::AtLeastOnce)),
-                rumqttc::Request::Disconnect(rumqttc::Disconnect),
-                rumqttc::Request::PingReq(rumqttc::PingReq),
-            ]);
+            // Queued-but-unsent requests: a stale PUBACK and a SUBSCRIBE.
+            client
+                .try_manual_ack(rumqttc::ManualAck::PubAck(rumqttc::PubAck::new(2)))
+                .unwrap();
+            client.try_subscribe("topic", QoS::AtLeastOnce).unwrap();
 
             // Vector-side per-connection state, all armed.
             let mut protocol_state = ProtocolState {
@@ -1326,6 +1199,10 @@ mod tests {
             forced_reconnect.schedule(now);
             let mut resubscribe_retry_at = Some(now + Duration::from_secs(5));
             let mut orphaned_publishes: Vec<(Publish, u64)> = Vec::new();
+
+            // What `poll()` runs internally before returning a connection
+            // error.
+            connection.clean();
 
             let shutdown = ShutdownSignal::noop();
             let (finalizer, _ack_stream) = source.handle_connection_lost(
@@ -1349,20 +1226,19 @@ mod tests {
             assert_eq!(protocol_state.connection_generation, generation);
             assert!(pending_acks.publishes.is_empty());
             assert_eq!(forced_reconnect.due_at(), None);
-            assert_eq!(forced_reconnect.escalate_at(), None);
+            assert!(!forced_reconnect.disconnect_sent());
             assert!(forced_reconnect.cooldown_until.is_some());
             assert_eq!(resubscribe_retry_at, None);
             assert_eq!(finalizer.is_some(), acknowledgements);
 
-            // rumqttc's replay queue: only replay-safe requests survive, in
-            // order. The stale PUBACK and the Disconnect must be gone.
-            assert_eq!(
-                connection.pending,
-                VecDeque::from([
-                    rumqttc::Request::Subscribe(rumqttc::Subscribe::new("topic", QoS::AtLeastOnce)),
-                    rumqttc::Request::PingReq(rumqttc::PingReq),
-                ])
-            );
+            // rumqttc's replay queue (private since rumqttc-v4-next, so
+            // observed by length): `clean()` must replay the SUBSCRIBE and
+            // drop the stale PUBACK, whose packet id belongs to the dead
+            // connection. This source relies on that instead of scrubbing
+            // the queue itself, so this pins the library contract: an
+            // upgrade that starts replaying acks fails here, not in
+            // production.
+            assert_eq!(connection.pending_len(), 1);
 
             if acknowledgements {
                 // Unprocessed manual-ack QoS 1/2 publishes wait for the next
@@ -1829,57 +1705,41 @@ mod tests {
         assert_eq!(schedule.due_at(), Some(t2));
     }
 
+    // Sending the disconnect marks the schedule as draining (nothing more
+    // may be queued for the dying event loop) and starts the cooldown; the
+    // resulting disconnect -- or any other one -- cancels both the schedule
+    // and the draining flag, but deliberately keeps the cooldown.
     #[test]
-    fn forced_reconnect_schedule_retry_and_cancel() {
-        let mut schedule = ForcedReconnectSchedule::default();
-        let t0 = tokio::time::Instant::now();
-
-        // Queueing the disconnect failed: retried shortly (not immediately,
-        // which would let the timer branch monopolize the select loop).
-        schedule.schedule(t0);
-        let t1 = t0 + Duration::from_millis(10);
-        schedule.retry(t1);
-        assert_eq!(schedule.due_at(), Some(t1 + FORCED_RECONNECT_RETRY_DELAY));
-
-        // A natural disconnect supersedes the scheduled one.
-        schedule.cancel();
-        assert_eq!(schedule.due_at(), None);
-    }
-
-    // rumqttc never closes its own side of the connection after sending
-    // DISCONNECT, and the broker is only required to SHOULD-close: if it
-    // doesn't, nothing else would ever end the generation whose acks are
-    // suppressed. Sending the disconnect must therefore arm an escalation
-    // deadline for closing the connection locally, cleared either by
-    // escalating or by the disconnect actually happening.
-    #[test]
-    fn forced_reconnect_escalates_when_broker_never_closes() {
+    fn forced_reconnect_schedule_sent_and_cancel() {
         let mut schedule = ForcedReconnectSchedule::default();
         let t0 = tokio::time::Instant::now();
 
         assert!(!schedule.disconnect_sent());
         schedule.schedule(t0);
+        assert_eq!(schedule.due_at(), Some(t0));
         assert!(!schedule.disconnect_sent());
 
         schedule.sent(t0);
+        assert_eq!(schedule.due_at(), None);
         assert!(schedule.disconnect_sent());
         assert_eq!(
-            schedule.escalate_at(),
-            Some(t0 + FORCED_RECONNECT_ESCALATION_TIMEOUT)
+            schedule.cooldown_until,
+            Some(t0 + FORCED_RECONNECT_COOLDOWN)
         );
 
-        // The deadline fires: local teardown happens, nothing further armed.
-        schedule.escalated();
-        assert!(!schedule.disconnect_sent());
-        assert_eq!(schedule.escalate_at(), None);
-
-        // Alternate path: the broker closes in time, the resulting poll error
-        // cancels both the schedule and the escalation.
-        schedule.sent(t0 + Duration::from_mins(1));
-        assert!(schedule.disconnect_sent());
         schedule.cancel();
+        assert_eq!(schedule.due_at(), None);
         assert!(!schedule.disconnect_sent());
-        assert_eq!(schedule.escalate_at(), None);
+        assert_eq!(
+            schedule.cooldown_until,
+            Some(t0 + FORCED_RECONNECT_COOLDOWN)
+        );
+
+        // A disconnect that happens before a scheduled reconnect fires
+        // supersedes it.
+        schedule.schedule(t0 + Duration::from_mins(1));
+        schedule.cancel();
+        assert_eq!(schedule.due_at(), None);
     }
 
     // The initial subscribe must be confirmed by a SUBACK exactly like a
@@ -1965,12 +1825,13 @@ mod tests {
         /// `poll()` returned an error (includes failed reconnect attempts,
         /// so it is legal in any state).
         PollError,
-        /// The forced-reconnect timer fired; `disconnect_queued` is the
-        /// outcome of `try_disconnect`.
-        ForcedReconnectDue { disconnect_queued: bool },
-        /// The escalation deadline fired: the broker never closed after our
-        /// `Disconnect`, so the connection is dropped locally.
-        EscalationDue,
+        /// The forced-reconnect timer fired and queued `disconnect_now`
+        /// (an unbounded channel, so queueing cannot fail).
+        ForcedReconnectDue,
+        /// The event loop finished our `DISCONNECT` and returned
+        /// `RequestsDone`; `run` scrubs the dead connection and rebuilds
+        /// the client and event loop.
+        DisconnectCompleted,
         /// The paced resubscribe retry timer fired.
         ResubscribeRetryDue { subscribe_queued: bool },
         /// The top-of-loop resubscribe retry ran (it runs before every
@@ -1978,7 +1839,7 @@ mod tests {
         LoopTopResubscribe { subscribe_queued: bool },
     }
 
-    const MODEL_EVENTS: [ModelEvent; 15] = [
+    const MODEL_EVENTS: [ModelEvent; 14] = [
         ModelEvent::ConnAck {
             session_present: false,
             subscribe_queued: false,
@@ -2005,13 +1866,8 @@ mod tests {
         ModelEvent::SubAck { all_granted: true },
         ModelEvent::SubAck { all_granted: false },
         ModelEvent::PollError,
-        ModelEvent::ForcedReconnectDue {
-            disconnect_queued: true,
-        },
-        ModelEvent::ForcedReconnectDue {
-            disconnect_queued: false,
-        },
-        ModelEvent::EscalationDue,
+        ModelEvent::ForcedReconnectDue,
+        ModelEvent::DisconnectCompleted,
         ModelEvent::ResubscribeRetryDue {
             subscribe_queued: true,
         },
@@ -2057,7 +1913,7 @@ mod tests {
                 self.state.connection_generation.min(MODEL_MAX_GENERATION),
                 self.forced.due_at().is_some(),
                 self.forced.cooldown_until.is_some(),
-                self.forced.escalate_at().is_some(),
+                self.forced.disconnect_sent(),
                 self.resubscribe_retry_scheduled,
                 self.inflight,
             )
@@ -2076,10 +1932,10 @@ mod tests {
                     self.state.connected && self.state.resubscribe_awaiting_suback
                 }
                 ModelEvent::PollError => true,
-                ModelEvent::ForcedReconnectDue { .. } => {
+                ModelEvent::ForcedReconnectDue => {
                     self.forced.due_at().is_some() && self.state.connected
                 }
-                ModelEvent::EscalationDue => self.forced.escalate_at().is_some(),
+                ModelEvent::DisconnectCompleted => self.forced.disconnect_sent(),
                 ModelEvent::ResubscribeRetryDue { .. } => self.resubscribe_retry_scheduled,
                 ModelEvent::LoopTopResubscribe { .. } => {
                     self.state.loop_actions().retry_resubscribe && !self.forced.disconnect_sent()
@@ -2132,24 +1988,18 @@ mod tests {
                         self.resubscribe_retry_scheduled = true;
                     }
                 }
-                ModelEvent::PollError => self.connection_lost(),
-                ModelEvent::ForcedReconnectDue { disconnect_queued } => {
-                    // Firing the timer while a previous `Disconnect` is
-                    // still unanswered would send a second one.
+                // A natural connection error and the end of our own
+                // `DISCONNECT` (followed by a fresh event loop) both run
+                // `handle_connection_lost`.
+                ModelEvent::PollError | ModelEvent::DisconnectCompleted => self.connection_lost(),
+                ModelEvent::ForcedReconnectDue => {
+                    // Firing the timer while a previous `DISCONNECT` is
+                    // still pending would send a second one.
                     assert!(
                         !self.forced.disconnect_sent(),
-                        "forced-reconnect timer fired while a Disconnect is already unanswered"
+                        "forced-reconnect timer fired while a Disconnect is already pending"
                     );
-                    if disconnect_queued {
-                        self.forced.sent(self.now);
-                    } else {
-                        self.forced.retry(self.now);
-                    }
-                }
-                ModelEvent::EscalationDue => {
-                    self.forced.escalated();
-                    // `connection.clean()` + shared disconnect handling.
-                    self.connection_lost();
+                    self.forced.sent(self.now);
                 }
                 ModelEvent::ResubscribeRetryDue { subscribe_queued } => {
                     self.resubscribe_retry_scheduled = false;
@@ -2185,11 +2035,13 @@ mod tests {
 
             // The invariant behind the cooldown-skip finding: a suppressed,
             // still-connected generation must always have a recovery action
-            // armed (the reconnect timer or the escalation deadline), or the
-            // source is stuck forever with nothing left to trigger recovery.
+            // armed (the reconnect timer, or a queued `DISCONNECT`, which the
+            // event loop is guaranteed to complete with `RequestsDone`), or
+            // the source is stuck forever with nothing left to trigger
+            // recovery.
             if self.state.connected && self.state.ack_suppressed {
                 assert!(
-                    self.forced.due_at().is_some() || self.forced.escalate_at().is_some(),
+                    self.forced.due_at().is_some() || self.forced.disconnect_sent(),
                     "suppressed generation with no recovery action armed\n{}",
                     describe()
                 );
@@ -2200,7 +2052,7 @@ mod tests {
             if !self.state.connected {
                 assert!(
                     self.forced.due_at().is_none()
-                        && self.forced.escalate_at().is_none()
+                        && !self.forced.disconnect_sent()
                         && !self.resubscribe_retry_scheduled,
                     "per-connection schedule survived a disconnect\n{}",
                     describe()

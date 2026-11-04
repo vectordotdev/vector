@@ -87,18 +87,26 @@ fn common_sketch_assertions(sketches: &SketchIntake) {
     assert!(found, "Didn't receive metric type distribution");
 }
 
-async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
-    info!("getting sketch payloads");
-    let payloads =
-        get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
+async fn get_sketches_from_pipeline(address: String, deadline: Instant) -> SketchIntake {
+    let sketches = loop {
+        info!("getting sketch payloads from {address}");
+        let payloads =
+            get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
-    info!("unpacking payloads");
-    let payloads = unpack_proto_payloads(&payloads)
-        .await
-        .expect("Failed to unpack sketch payloads");
+        let payloads = unpack_proto_payloads(&payloads)
+            .await
+            .expect("Failed to unpack sketch payloads");
+        let sketches = generate_sketch_intake(payloads);
 
-    info!("generating sketch intake");
-    let sketches = generate_sketch_intake(payloads);
+        if sketches
+            .keys()
+            .any(|context| context.metric_name.starts_with("foo_metric.distribution"))
+            || Instant::now() >= deadline
+        {
+            break sketches;
+        }
+        sleep(Duration::from_secs(1)).await;
+    };
 
     common_sketch_assertions(&sketches);
 
@@ -107,12 +115,12 @@ async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
     sketches
 }
 
-pub(super) async fn validate() {
+pub(super) async fn validate(deadline: Instant) {
     info!("==== getting sketch data from agent-only pipeline ==== ");
-    let agent_sketches = get_sketches_from_pipeline(fake_intake_agent_address()).await;
+    let agent_sketches = get_sketches_from_pipeline(fake_intake_agent_address(), deadline).await;
 
     info!("==== getting sketch data from agent-vector pipeline ====");
-    let vector_sketches = get_sketches_from_pipeline(fake_intake_vector_address()).await;
+    let vector_sketches = get_sketches_from_pipeline(fake_intake_vector_address(), deadline).await;
 
     agent_sketches
         .iter()

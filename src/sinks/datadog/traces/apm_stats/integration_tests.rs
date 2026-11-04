@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use http_body::Body as _;
+use http_body_util::BodyExt as _;
 
 use axum::{
     Router,
@@ -83,10 +83,8 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     info!("HTTP server for `{name}` listening on {addr}");
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
 // Needed for the sink healthcheck
@@ -191,18 +189,18 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
     // sends a trace to each of the urls
     async fn send_trace(urls: &Vec<String>, start: i64, duration: i64, span_id: i64) -> bool {
         let traces_payload = build_traces_payload(start, duration, span_id);
-        let client = reqwest::Client::new();
+        let client = reqwest_13::Client::new();
 
         for url in urls {
             let res = client
                 .post(url)
-                .header(CONTENT_TYPE, "application/json")
+                .header(reqwest_13::header::CONTENT_TYPE, "application/json")
                 .json(&traces_payload)
                 .send()
                 .await
                 .unwrap();
 
-            if res.status() != hyper::StatusCode::OK {
+            if res.status() != http::StatusCode::OK {
                 error!("Error sending traces to {url}, res: {res:?}.");
                 return false;
             }

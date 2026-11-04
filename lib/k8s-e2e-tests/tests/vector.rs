@@ -26,7 +26,7 @@ fn helm_values_stdout_sink(agent_override_name: &str) -> String {
         vector:
           type: vector
           inputs: [kubernetes_logs]
-          address: aggregator-vector:6000
+          address: http://aggregator-vector:6000
           version: "2"
     "#,
         agent_override_name,
@@ -53,7 +53,7 @@ fn helm_values_haproxy(agent_override_name: &str) -> String {
         vector:
           type: vector
           inputs: [kubernetes_logs]
-          address: aggregator-vector-haproxy:6000
+          address: http://aggregator-vector-haproxy:6000
           version: "2"
     "#,
         agent_override_name,

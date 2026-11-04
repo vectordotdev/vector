@@ -35,6 +35,20 @@ fn my_function() {
 
 - Group imports: `std` → external crates → internal (`crate::`)
 
+**Trait imports:**
+
+When importing a trait only to use its methods, import it as `_`. This makes the intent explicit
+without introducing a name that is otherwise unused:
+
+```rust
+use std::io::Write as _;
+
+use futures::StreamExt as _;
+```
+
+Keep a named import when the trait is also referenced by name, such as in a trait bound, an `impl`
+block, a trait object, or a fully qualified method call.
+
 ## Unit tests
 
 Unit tests for a type live in the same source file as that type (`#[cfg(test)] mod tests` at

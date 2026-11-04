@@ -11,19 +11,15 @@ use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
 };
-use http::{Uri, uri::PathAndQuery};
-use http_1::{Uri as UriV1, header::AUTHORIZATION as AUTHORIZATION_V1};
-use http_body::{Body as _, Collected};
-use hyper::header::AUTHORIZATION;
+use http::{Uri, header::AUTHORIZATION, uri::PathAndQuery};
+use http_body_util::{BodyExt as _, Collected};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::watch;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::{
-    config::ProxyConfig,
-    http::{HttpClient, HttpError},
-};
+use crate::{config::ProxyConfig, http::HttpClient, tls::MaybeTlsSettings};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -55,7 +51,7 @@ pub enum GcpError {
     #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text: {}", source))]
-    GetTokenBytes { source: hyper::Error },
+    GetTokenBytes { source: hyper_1::Error },
     #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
     #[snafu(display("Failed to parse OAuth token JSON: {}", source))]
@@ -63,7 +59,7 @@ pub enum GcpError {
     #[snafu(display("Failed to parse OAuth token JSON text: {}", source))]
     TokenJsonFromStr { source: serde_json::Error },
     #[snafu(display("Failed to build HTTP client: {}", source))]
-    BuildHttpClient { source: HttpError },
+    BuildHttpClient { source: crate::Error },
 }
 
 /// Configuration of the authentication strategy for interacting with GCP services.
@@ -178,20 +174,6 @@ impl GcpAuthenticator {
         self.apply_uri(request.uri_mut());
     }
 
-    /// Applies authentication to a native `http 1` request, mirroring [`Self::apply`].
-    ///
-    /// # Panics
-    /// Panics if the token lock is poisoned, the token is not a valid header value, or
-    /// adding the API key produces an invalid URI.
-    pub fn apply_v1<T>(&self, request: &mut http_1::Request<T>) {
-        if let Some(token) = self.make_token() {
-            request
-                .headers_mut()
-                .insert(AUTHORIZATION_V1, token.parse().unwrap());
-        }
-        self.apply_uri_v1(request.uri_mut());
-    }
-
     /// # Panics
     /// Panics if adding the API key produces an invalid URI.
     pub fn apply_uri(&self, uri: &mut Uri) {
@@ -211,27 +193,6 @@ impl GcpAuthenticator {
                 parts.path_and_query =
                     Some(paq.parse().expect("Could not re-parse path and query"));
                 *uri = Uri::from_parts(parts).expect("Could not re-parse URL");
-            }
-        }
-    }
-
-    fn apply_uri_v1(&self, uri: &mut UriV1) {
-        match self {
-            Self::Credentials(_) | Self::None => (),
-            Self::ApiKey(api_key) => {
-                let mut parts = uri.clone().into_parts();
-                let path = parts
-                    .path_and_query
-                    .as_ref()
-                    .map_or("/", http_1::uri::PathAndQuery::path);
-                let paq = format!("{path}?key={api_key}");
-                // The API key is verified above to only contain
-                // URL-safe characters. That key is added to a path
-                // that came from a successfully parsed URI. As such,
-                // re-parsing the string cannot fail.
-                parts.path_and_query =
-                    Some(paq.parse().expect("Could not re-parse path and query"));
-                *uri = UriV1::from_parts(parts).expect("Could not re-parse URL");
             }
         }
     }
@@ -334,11 +295,11 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
     debug!("Fetching implicit GCP authentication token.");
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
-        .body(hyper::Body::empty())
+        .body(empty_body())
         .unwrap();
 
     let proxy = ProxyConfig::from_env();
-    let res = HttpClient::new(None, &proxy)
+    let res = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)
         .context(BuildHttpClientSnafu)?
         .send(req)
         .await

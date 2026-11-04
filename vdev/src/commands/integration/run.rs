@@ -28,7 +28,7 @@ pub struct Cli {
     #[arg(short = 'r', long, default_value = "2")]
     retries: u8,
 
-    /// Collect code coverage using cargo-llvm-cov (outputs target/coverage/lcov.info)
+    /// Collect code coverage using cargo-llvm-cov (outputs target/coverage/lcov-<environment>.info)
     #[arg(long)]
     coverage: bool,
 

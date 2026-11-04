@@ -4,7 +4,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use futures::{Stream, StreamExt};
-use rumqttc::{AsyncClient, Event as MqttEvent, Incoming, MqttOptions, QoS};
+use rumqttc::{AsyncClient, Event as MqttEvent, Incoming, MqttOptions, PublishOptions};
 use tokio::time::timeout;
 
 use crate::{
@@ -34,7 +34,7 @@ fn mqtt_broker_port() -> u16 {
 async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<String>) {
     for message in messages {
         client
-            .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+            .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
             .await
             .unwrap();
     }
@@ -55,12 +55,11 @@ fn get_mqtt_client() -> AsyncClient {
     // run concurrently, which manifests as spurious publish timeouts.
     let mut mqtt_options = MqttOptions::new(
         format!("integration-test-producer-{}", random_string(6)),
-        mqtt_broker_address(),
-        mqtt_broker_port(),
+        (mqtt_broker_address(), mqtt_broker_port()),
     );
-    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(5);
 
-    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_options).capacity(10).build();
 
     tokio::spawn(async move {
         loop {
@@ -178,7 +177,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
 
     let producer = get_mqtt_client();
     producer
-        .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+        .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
         .await
         .unwrap();
 
@@ -233,10 +232,10 @@ async fn mqtt_redelivers_unacknowledged_messages() {
 /// immediately afterwards, freeing the client ID for the victim to
 /// reconnect.
 async fn kick_mqtt_client(client_id: &str, discard_session: bool) {
-    let mut options = MqttOptions::new(client_id, mqtt_broker_address(), mqtt_broker_port());
-    options.set_keep_alive(Duration::from_secs(5));
+    let mut options = MqttOptions::new(client_id, (mqtt_broker_address(), mqtt_broker_port()));
+    options.set_keep_alive(5);
     options.set_clean_session(discard_session);
-    let (client, mut eventloop) = AsyncClient::new(options, 10);
+    let (client, mut eventloop) = AsyncClient::builder(options).capacity(10).build();
 
     // Wait until the broker accepts the takeover (kicking the victim).
     loop {
@@ -320,7 +319,7 @@ async fn mqtt_forces_reconnect_after_withheld_ack() {
 
     let producer = get_mqtt_client();
     producer
-        .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+        .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
         .await
         .unwrap();
 
@@ -386,7 +385,11 @@ async fn mqtt_recovers_from_server_side_disconnect() {
 
     let producer = get_mqtt_client();
     producer
-        .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
+        .publish(
+            topic,
+            msg_before.as_bytes(),
+            PublishOptions::at_least_once(),
+        )
         .await
         .unwrap();
     let received = timeout(Duration::from_secs(5), rx.next())
@@ -400,7 +403,7 @@ async fn mqtt_recovers_from_server_side_disconnect() {
     // the message for delivery once the source has reconnected.
     kick_mqtt_client(&client_id, false).await;
     producer
-        .publish(topic, QoS::AtLeastOnce, false, msg_after.as_bytes())
+        .publish(topic, msg_after.as_bytes(), PublishOptions::at_least_once())
         .await
         .unwrap();
 
@@ -453,7 +456,11 @@ async fn mqtt_resubscribes_after_broker_discards_the_session() {
 
     let producer = get_mqtt_client();
     producer
-        .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
+        .publish(
+            topic,
+            msg_before.as_bytes(),
+            PublishOptions::at_least_once(),
+        )
         .await
         .unwrap();
     let received = timeout(Duration::from_secs(5), rx.next())
@@ -472,7 +479,7 @@ async fn mqtt_resubscribes_after_broker_discards_the_session() {
     let mut received_after = None;
     for _ in 0..20 {
         producer
-            .publish(topic, QoS::AtLeastOnce, false, msg_after.as_bytes())
+            .publish(topic, msg_after.as_bytes(), PublishOptions::at_least_once())
             .await
             .unwrap();
         if let Ok(event) = timeout(Duration::from_millis(500), rx.next()).await {

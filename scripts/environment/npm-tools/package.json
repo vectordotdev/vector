@@ -4,7 +4,7 @@
   "dependencies": {
     "@datadog/datadog-ci": "5.23.0",
     "@kjanat/actionlint": "1.17.0",
-    "markdownlint-cli2": "0.23.3",
+    "markdownlint-cli2": "0.24.0",
     "prettier": "3.8.1"
   }
 }

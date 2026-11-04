@@ -45,9 +45,9 @@ impl UriSerde {
             parts.authority = Some(Authority::from_static("127.0.0.1"));
         }
         if parts.path_and_query.is_none() {
-            // just an empty `path_and_query`,
-            // but `from_parts` will fail without this.
-            parts.path_and_query = Some(PathAndQuery::from_static(""));
+            // `from_parts` fails without a `path_and_query` once a scheme is set.
+            // An absolute URI renders an empty path as `/`, so this is the same URI.
+            parts.path_and_query = Some(PathAndQuery::from_static("/"));
         }
         let uri = Uri::from_parts(parts).expect("invalid parts");
         Self {
@@ -127,7 +127,7 @@ impl TryFrom<Uri> for UriSerde {
     /// Fallible construction from a parsed `Uri`, extracting any basic auth
     /// credentials from the authority.
     ///
-    /// This can fail: `http::Uri` accepts authorities that `url::Url` rejects
+    /// This can fail: `Uri` accepts authorities that `url::Url` rejects
     /// (e.g. a non-numeric port), in which case the basic auth cannot be
     /// extracted.
     fn try_from(uri: Uri) -> Result<Self, Self::Error> {
@@ -147,7 +147,7 @@ impl TryFrom<Uri> for UriSerde {
 }
 
 fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Auth>)> {
-    // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
+    // `Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
     let url = url::Url::parse(&format!("http://{authority}"))?;
@@ -324,7 +324,7 @@ impl HttpEndpoint {
     /// usable port.
     ///
     /// The authority check alone is not enough: `http://:8080` parses as a
-    /// valid `http::Uri` with an authority but an empty host, and
+    /// valid `Uri` with an authority but an empty host, and
     /// `http://localhost:notaport` parses with a nonempty host but a port that
     /// cannot be dialed. Both are checked explicitly.
     ///
@@ -358,27 +358,7 @@ impl HttpEndpoint {
     ///
     /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        Self::parse_with_default_scheme(endpoint, "https")
-    }
-
-    /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
-    ///
-    /// A missing scheme is defaulted to `http` (unlike [`Self::parse`], which
-    /// defaults to `https`). An explicit `http`/`https` scheme is preserved.
-    /// Endpoints that still lack a host after defaulting are rejected.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
-    pub fn parse_default_http(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        Self::parse_with_default_scheme(endpoint, "http")
-    }
-
-    fn parse_with_default_scheme(
-        endpoint: &str,
-        default_scheme: &str,
-    ) -> Result<Self, HttpEndpointError> {
-        // Default a missing scheme to `default_scheme`. `http::Uri` cannot
+        // Default a missing scheme to `https`. `Uri` cannot
         // parse `host:port/path` without a scheme (it reads `host` as a
         // scheme), so the scheme is added up front rather than relying on
         // the parser to accept authority-form input.
@@ -393,7 +373,7 @@ impl HttpEndpoint {
         let uri = if has_scheme(endpoint) {
             parse(endpoint)?
         } else {
-            parse(&format!("{default_scheme}://{endpoint}"))?
+            parse(&format!("https://{endpoint}"))?
         };
         Self::new(uri)
     }
@@ -402,34 +382,10 @@ impl HttpEndpoint {
     pub const fn as_uri(&self) -> &Uri {
         &self.0
     }
-    /// Returns the URI as a string, redacting any userinfo credentials so
-    /// they are never written to logs.
-    pub fn redacted_uri(&self) -> String {
-        redact_uri(&self.0)
-    }
 
     /// Consumes the endpoint, returning the underlying `Uri`.
     pub fn into_uri(self) -> Uri {
         self.0
-    }
-
-    /// Consumes the endpoint, returning the underlying `Uri` as an `http 1` `Uri`.
-    ///
-    /// The two `http` crate versions share no conversion traits, so the bridge
-    /// is a string round-trip. `Display` of a validated absolute `http(s)` URL
-    /// is always parseable back by `http 1` (the `http 1` parser descends from
-    /// the `http 0.2` parser and accepts the same absolute forms), so this
-    /// cannot fail — the same invariant `protocol_endpoint` relies on.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the validated URI cannot be parsed by `http 1`, violating the
-    /// parser compatibility invariant above.
-    pub fn into_v1(self) -> http_1::Uri {
-        self.0
-            .to_string()
-            .parse()
-            .expect("a validated HTTP endpoint is a valid `http 1` URI")
     }
 
     /// Extracts basic-auth credentials embedded in the authority, returning a
@@ -545,7 +501,7 @@ impl fmt::Display for HttpEndpoint {
 /// Returns `true` if the URI's authority contains a port that is not a valid
 /// `u16`.
 ///
-/// `http::Uri` accepts non-numeric ports (for example
+/// `Uri` accepts non-numeric ports (for example
 /// `http://localhost:notaport`), which `HttpClient` cannot dial. `Authority::port`
 /// returns `None` for both a missing port and an invalid one, so the raw
 /// authority is inspected instead.
@@ -575,7 +531,7 @@ fn authority_has_invalid_port(uri: &Uri) -> bool {
 /// The scheme must be at the very start: a `://` later in the path or query
 /// (for example `localhost:8080/write?target=http://upstream`) is not a scheme
 /// marker, so the endpoint is still defaulted to `https`.
-pub(crate) fn has_scheme(endpoint: &str) -> bool {
+fn has_scheme(endpoint: &str) -> bool {
     let Some(scheme_end) = endpoint.find("://") else {
         return false;
     };
@@ -646,8 +602,45 @@ mod tests {
     }
 
     #[test]
+    fn with_default_parts_fills_missing_parts() {
+        for (input, expected) in [
+            // Authority only: the scheme and an empty path are filled in.
+            ("localhost:8080", "http://localhost:8080/"),
+            // Path only: the scheme and authority are filled in.
+            ("/api/test", "http://127.0.0.1/api/test"),
+            // Absolute URIs are left unchanged.
+            (
+                "https://example.com/path?q=1",
+                "https://example.com/path?q=1",
+            ),
+        ] {
+            let uri: UriSerde = input.parse().unwrap();
+            assert_eq!(
+                uri.with_default_parts().uri.to_string(),
+                expected,
+                "{input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn http_endpoint_rejects_empty_host_accepted_by_parser() {
+        // `Uri` parses an authority with a port but no host; the host check
+        // must reject it as not absolute rather than as a parse error.
+        for endpoint in ["http://:8080", "http://:8080/path", ":8080"] {
+            assert!(
+                matches!(
+                    HttpEndpoint::parse(endpoint),
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
+                ),
+                "expected `{endpoint}` to be rejected as not absolute"
+            );
+        }
+    }
+
+    #[test]
     fn parse_rejects_malformed_authority_without_panicking() {
-        // `http::Uri` accepts a non-numeric port in the authority, but
+        // `Uri` accepts a non-numeric port in the authority, but
         // `url::Url` rejects it. This must be a parse error, not a panic.
         let result = "http://user:pass@localhost:notaport/path".parse::<UriSerde>();
         assert!(result.is_err());
@@ -757,21 +750,20 @@ mod tests {
 
     #[test]
     fn http_endpoint_defaults_missing_scheme_to_https() {
-        for endpoint in [
-            "example.com",
-            "example.com:8080",
-            "localhost:8080/path",
-            "[::1]:8080",
+        // Only the scheme is added; host, port, path, and userinfo are kept.
+        for (endpoint, expected) in [
+            ("example.com", "https://example.com/"),
+            ("example.com:8080", "https://example.com:8080/"),
+            ("localhost:8080/path", "https://localhost:8080/path"),
+            ("[::1]:8080", "https://[::1]:8080/"),
+            (
+                "user:pass@example.com:8080",
+                "https://user:pass@example.com:8080/",
+            ),
         ] {
-            let endpoint =
+            let parsed =
                 HttpEndpoint::parse(endpoint).expect("should default a missing scheme to https");
-            assert_eq!(endpoint.as_uri().scheme_str(), Some("https"));
-            assert!(
-                endpoint
-                    .as_uri()
-                    .host()
-                    .is_some_and(|host| !host.is_empty())
-            );
+            assert_eq!(parsed.as_uri().to_string(), expected, "{endpoint:?}");
         }
         // An explicit scheme is preserved.
         assert_eq!(
@@ -784,37 +776,9 @@ mod tests {
     }
 
     #[test]
-    fn http_endpoint_defaults_missing_scheme_to_http() {
-        for endpoint in [
-            "example.com",
-            "example.com:8080",
-            "localhost:8080/path",
-            "[::1]:8080",
-        ] {
-            let endpoint = HttpEndpoint::parse_default_http(endpoint)
-                .expect("should default a missing scheme to http");
-            assert_eq!(endpoint.as_uri().scheme_str(), Some("http"));
-            assert!(
-                endpoint
-                    .as_uri()
-                    .host()
-                    .is_some_and(|host| !host.is_empty())
-            );
-        }
-        // An explicit scheme is preserved.
-        assert_eq!(
-            HttpEndpoint::parse_default_http("https://example.com")
-                .unwrap()
-                .as_uri()
-                .scheme_str(),
-            Some("https")
-        );
-    }
-
-    #[test]
     fn http_endpoint_rejects_non_absolute_http_urls() {
         for endpoint in [
-            // No scheme and no host: `http::Uri` parses these as a path.
+            // No scheme and no host: `Uri` parses these as a path.
             "/services/collector",
             "",
             // Absolute, but not a scheme `HttpClient` can dial.
@@ -822,7 +786,7 @@ mod tests {
             "unix:///var/run/vector.sock",
             // Scheme but no authority.
             "http:///path",
-            // Authority with a port but an empty host: `http::Uri` parses this
+            // Authority with a port but an empty host: `Uri` parses this
             // with `authority() == Some` and `host() == Some("")`.
             "http://:8080",
             "http://:8080/path",

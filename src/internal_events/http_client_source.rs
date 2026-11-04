@@ -1,20 +1,27 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{CounterName, InternalEvent, error_stage, error_type},
-    json_size::JsonSize,
 };
 
 use super::prelude::http_error_code;
 
+#[cfg(any(
+    feature = "sources-http_client",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-okta"
+))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientEventsReceived {
-    pub byte_size: JsonSize,
+    pub byte_size: vector_lib::json_size::JsonSize,
     pub count: usize,
     pub url: String,
 }
 
+#[cfg(any(
+    feature = "sources-http_client",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-okta"
+))]
 impl InternalEvent for HttpClientEventsReceived {
     fn emit(self) {
         trace!(
@@ -38,7 +45,7 @@ impl InternalEvent for HttpClientEventsReceived {
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpResponseError {
-    pub code: hyper::StatusCode,
+    pub code: http::StatusCode,
     pub url: String,
 }
 

@@ -3,20 +3,23 @@ pub mod metrics;
 
 use std::collections::HashMap;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http::{StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Deserializer, de::Error as _};
-use tower::Service;
+use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     event::{KeyString, MetricTags},
     sensitive_string::SensitiveString,
 };
 
-use crate::http::HttpClient;
-use crate::sinks::util::HttpEndpoint;
+use crate::{
+    http::HttpClient,
+    sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
+};
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -219,25 +222,47 @@ fn influxdb_settings(settings: InfluxDbSettings) -> Box<dyn InfluxDbConnection> 
 fn healthcheck(
     endpoint: HttpEndpoint,
     settings: InfluxDbSettings,
-    mut client: HttpClient,
+    client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(settings);
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = Request::get(uri).body(empty_body())?;
 
     Ok(async move {
-        client
-            .call(request)
-            .await
-            .map_err(Into::into)
-            .and_then(|response| match response.status() {
-                StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
-                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-            })
+        let response = client.send(request).await?;
+        match response.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            other => Err(super::HealthcheckError::unexpected_status(other).into()),
+        }
     }
     .boxed())
+}
+
+/// Builds the write requests of the logs and metrics sinks.
+#[derive(Clone)]
+struct InfluxDbWriteRequest {
+    uri: Uri,
+    authorization: String,
+}
+
+impl InfluxDbWriteRequest {
+    fn new(uri: Uri, token: &SensitiveString) -> Self {
+        Self {
+            uri,
+            authorization: format!("Token {}", token.inner()),
+        }
+    }
+
+    fn request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
+        Request::post(self.uri.clone())
+            .header("Content-Type", "text/plain")
+            .header("Authorization", self.authorization.as_str())
+            .body(body)
+            .context(HTTPV1RequestBuilderSnafu)
+            .map_err(Into::into)
+    }
 }
 
 // https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/
@@ -462,24 +487,26 @@ pub mod test_util {
         (measurement, tags, fields.to_string(), ts)
     }
 
-    fn client() -> reqwest::Client {
+    fn client() -> reqwest_13::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
 
-        reqwest::Client::builder()
+        reqwest_13::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .unwrap()
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest_13::Response {
         client()
-            .get(format!("{endpoint}/query"))
-            .query(&[("q", query)])
+            .get(
+                reqwest_13::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                    .unwrap(),
+            )
             .send()
             .await
             .unwrap()
@@ -533,7 +560,7 @@ pub mod test_util {
         body.insert("bucket", BUCKET);
         body.insert("token", TOKEN);
 
-        let client = reqwest::Client::builder()
+        let client = reqwest_13::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
@@ -549,7 +576,7 @@ pub mod test_util {
         let status = res.status();
 
         assert!(
-            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
+            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
             "UnexpectedStatus: {status}"
         );
     }
@@ -876,6 +903,7 @@ mod integration_tests {
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
         sinks::util::HttpEndpoint,
+        tls::MaybeTlsSettings,
     };
 
     #[tokio::test]
@@ -890,7 +918,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -910,7 +938,7 @@ mod integration_tests {
             token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -930,7 +958,7 @@ mod integration_tests {
             password: None,
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
@@ -950,7 +978,7 @@ mod integration_tests {
             password: None,
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy).unwrap();
 
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()

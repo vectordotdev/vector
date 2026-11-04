@@ -64,13 +64,10 @@ impl<'de> Deserialize<'de> for Transformer {
 impl Transformer {
     /// Creates a new `Transformer`.
     ///
-    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
-    /// exclusive.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    /// # Errors
+    ///
+    /// Returns an error if `only_fields` and `except_fields` are not mutually exclusive, i.e. they
+    /// share at least one field path.
     pub fn new(
         only_fields: Option<Vec<ConfigValuePath>>,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -240,14 +237,11 @@ impl Transformer {
 
     /// Set the `except_fields` value.
     ///
-    /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
-    /// with `only_fields`.
+    /// # Errors
+    ///
+    /// Returns an error if the new `except_fields` are not mutually exclusive with `only_fields`,
+    /// i.e. they share at least one field path.
     #[cfg(any(test, feature = "test"))]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     pub fn set_except_fields(
         &mut self,
         except_fields: Option<Vec<ConfigValuePath>>,
