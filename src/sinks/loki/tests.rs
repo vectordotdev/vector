@@ -10,7 +10,7 @@ use vrl::event_path;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{

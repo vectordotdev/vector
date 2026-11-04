@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     config::{SinkContext, ValidatedSink},
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},

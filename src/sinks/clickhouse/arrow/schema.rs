@@ -11,7 +11,7 @@ use url::form_urlencoded;
 use vector_http::empty_body;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{Auth, client_v1::HttpClient};
+use crate::http::{Auth, HttpClient};
 
 use super::parser::ClickHouseType;
 

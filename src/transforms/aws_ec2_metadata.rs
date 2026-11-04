@@ -9,13 +9,14 @@ use std::{
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use http_0::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::Body;
+use http::{Request, StatusCode, Uri, uri::PathAndQuery};
+use http_body_util::BodyExt as _;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
+use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     cpu_time::spawn_timed,
@@ -35,6 +36,7 @@ use crate::{
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
+    tls::MaybeTlsSettings,
     transforms::{TaskTransform, Transform},
 };
 
@@ -215,7 +217,7 @@ impl TransformConfig for Ec2Metadata {
         let required = self.required;
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
-        let http_client = HttpClient::new(None, &proxy)?;
+        let http_client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)?;
 
         let mut client = MetadataClient::new(
             http_client,
@@ -341,7 +343,7 @@ impl Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: HttpClient<Body>,
+    client: HttpClient,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -369,7 +371,7 @@ struct IdentityDocument {
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        client: HttpClient<Body>,
+        client: HttpClient,
         host: Uri,
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
@@ -422,7 +424,7 @@ impl MetadataClient {
 
         let req = Request::put(uri)
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -435,9 +437,7 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = http_body_0::Body::collect(res.into_body())
-            .await?
-            .to_bytes();
+        let token = res.into_body().collect().await?.to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
@@ -610,7 +610,7 @@ impl MetadataClient {
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -624,9 +624,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = http_body_0::Body::collect(res.into_body())
-                    .await?
-                    .to_bytes();
+                let body = res.into_body().collect().await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -695,7 +693,7 @@ impl Keys {
 
 #[derive(Debug)]
 struct UnexpectedHttpStatusError {
-    status: http_0::StatusCode,
+    status: StatusCode,
 }
 
 impl fmt::Display for UnexpectedHttpStatusError {
@@ -715,7 +713,7 @@ enum Ec2MetadataError {
     #[snafu(display("Unable to parse metadata path {}, {}.", value, source))]
     ParsePath {
         value: String,
-        source: http_0::uri::InvalidUri,
+        source: http::uri::InvalidUri,
     },
 }
 

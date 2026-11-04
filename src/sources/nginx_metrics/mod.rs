@@ -6,13 +6,13 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
-use http_0::{Request, StatusCode};
-use http_body_0::Collected;
-use hyper::{Body, Uri};
+use http::{Request, StatusCode, Uri};
+use http_body_util::{BodyExt as _, Collected};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::empty_body;
 use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
@@ -61,7 +61,7 @@ macro_rules! gauge {
 #[derive(Debug, Snafu)]
 enum NginxBuildError {
     #[snafu(display("Failed to parse endpoint: {}", source))]
-    HostInvalidUri { source: http_0::uri::InvalidUri },
+    HostInvalidUri { source: http::uri::InvalidUri },
 }
 
 #[derive(Debug, Snafu)]
@@ -118,7 +118,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let http_client = HttpClient::new(tls, &cx.proxy)?;
+        let http_client = HttpClient::new(tls.into(), &cx.proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let mut sources = Vec::with_capacity(self.endpoints.len());
@@ -255,18 +255,15 @@ impl NginxMetrics {
     }
 
     async fn get_nginx_response(&self) -> crate::Result<Bytes> {
-        let mut request = Request::get(&self.endpoint).body(Body::empty())?;
+        let mut request = Request::get(&self.endpoint).body(empty_body())?;
         if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
+            auth.apply_v1(&mut request);
         }
 
         let response = self.http_client.send(request).await?;
         let (parts, body) = response.into_parts();
         match parts.status {
-            StatusCode::OK => http_body_0::Body::collect(body)
-                .err_into()
-                .await
-                .map(Collected::to_bytes),
+            StatusCode::OK => body.collect().err_into().await.map(Collected::to_bytes),
             status => Err(Box::new(NginxError::InvalidResponseStatus { status })),
         }
     }

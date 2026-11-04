@@ -4,7 +4,7 @@ use vector_http::empty_body;
 use super::append_loki_path;
 
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::util::{HttpEndpoint, UriSerde},
 };
 
