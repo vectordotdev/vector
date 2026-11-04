@@ -15,7 +15,7 @@ use super::{
     service::{HttpRequestBuilder, MetadataFields},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
         self,

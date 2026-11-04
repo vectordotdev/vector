@@ -113,6 +113,7 @@ pub struct ChannelMetricMetadata {
 }
 
 impl ChannelMetricMetadata {
+    #[must_use]
     pub fn new(kind: BufferChannelKind, output: Option<String>) -> Self {
         Self { kind, output }
     }
@@ -342,6 +343,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     }
 
     /// Gets the number of items that this channel could accept.
+    #[must_use]
     pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
     }
@@ -431,6 +433,7 @@ pub struct LimitedReceiver<T> {
 
 impl<T: Send + 'static> LimitedReceiver<T> {
     /// Gets the number of items that this channel could accept.
+    #[must_use]
     pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
     }
@@ -460,6 +463,7 @@ impl<T: Send + 'static> LimitedReceiver<T> {
         }
     }
 
+    #[must_use]
     pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
         let mut receiver = self;
         Box::pin(stream! {
@@ -479,6 +483,7 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
+#[must_use]
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
     metric_metadata: Option<ChannelMetricMetadata>,

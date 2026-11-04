@@ -36,7 +36,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::{LargeEventDroppedError, SinkRequestBuildError},
     schema,
     sinks::{

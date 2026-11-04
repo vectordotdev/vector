@@ -27,7 +27,7 @@ use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{

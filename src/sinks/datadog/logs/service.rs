@@ -20,7 +20,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         datadog::DatadogApiError,
         util::{Compression, http::validate_headers, retries::RetryLogic},

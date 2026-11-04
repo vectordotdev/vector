@@ -24,7 +24,7 @@ use crate::{
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{client_v1::HttpClient, get_http_scheme_from_uri},
+    http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
         Healthcheck, VectorSink,
