@@ -98,9 +98,9 @@
       </div>
       {{ end }}
 
-      {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-invert max-w-none">
-        {{ . | markdownify }}
+      {{ with partial "releases/description.html" (dict "page" . "listing" false) }}
+      <div class="release-description mt-8 prose dark:prose-invert max-w-none">
+        {{ . }}
       </div>
       {{ end }}
 

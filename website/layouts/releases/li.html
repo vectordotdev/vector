@@ -3,6 +3,7 @@
 {{ $isLatest := eq $version $latest }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $description := partial "releases/description.html" (dict "page" . "listing" true) }}
 <a href="{{ .RelPermalink }}">
   <div
     class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
@@ -28,11 +29,11 @@
   </div>
 </a>
 
-{{ if or $release.description $highlights }}
+{{ if or $description $highlights }}
 <div class="border-l border-gray-100 dark:border-gray-800 pl-8 flex flex-col space-y-4 py-2">
-  {{ with $release.description }}
-  <div class="prose dark:prose-invert max-w-none">
-    {{ . | markdownify }}
+  {{ with $description }}
+  <div class="release-description prose dark:prose-invert max-w-none">
+    {{ . }}
   </div>
   {{ end }}
 
