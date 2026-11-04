@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         HTTPV1RequestBuilderSnafu,
         prelude::*,
-        util::{auth::Auth, http_v1::HttpResponse},
+        util::{auth::Auth, http::HttpResponse},
     },
 };
 

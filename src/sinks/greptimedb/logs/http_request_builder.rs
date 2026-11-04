@@ -17,7 +17,10 @@ use crate::{
     sinks::{
         HTTPV1RequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 

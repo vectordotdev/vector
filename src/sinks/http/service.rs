@@ -14,7 +14,10 @@ use crate::{
     http::{Auth, MaybeAuth},
     sinks::{
         HTTPV1RequestBuilderSnafu,
-        util::{UriSerde, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        util::{
+            UriSerde,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 

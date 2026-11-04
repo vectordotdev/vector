@@ -21,8 +21,7 @@ use crate::{
         self,
         util::{
             SinkBatchSettings,
-            http::HttpRequest,
-            http_v1::{HttpService, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpService, HttpServiceRequestBuilder},
         },
     },
     template::ConfinedTemplate,

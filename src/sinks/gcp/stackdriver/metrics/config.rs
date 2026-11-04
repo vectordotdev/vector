@@ -16,8 +16,10 @@ use crate::{
         prelude::*,
         util::{
             HttpEndpoint,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             service::TowerRequestConfigDefaults,
         },
     },

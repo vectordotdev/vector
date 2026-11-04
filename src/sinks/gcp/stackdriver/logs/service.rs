@@ -8,7 +8,10 @@ use crate::{
     gcp::GcpAuthenticator,
     sinks::{
         HTTPV1RequestBuilderSnafu,
-        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 

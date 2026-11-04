@@ -7,8 +7,9 @@ use super::config::HTTP_HEADER_HONEYCOMB;
 use crate::sinks::{
     HTTPV1RequestBuilderSnafu,
     util::{
-        HttpEndpoint, buffer::compression::Compression, http::HttpRequest,
-        http_v1::HttpServiceRequestBuilder,
+        HttpEndpoint,
+        buffer::compression::Compression,
+        http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
 #[derive(Clone, derive_more::Debug)]

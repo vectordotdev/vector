@@ -19,8 +19,7 @@ use crate::{
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpResponse, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpResponse, HttpServiceRequestBuilder, RetryStrategy},
             retries::RetryAction,
         },
     },

@@ -8,7 +8,7 @@ use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
     HTTPV1RequestBuilderSnafu,
-    util::{http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+    util::http::{HttpRequest, HttpServiceRequestBuilder},
 };
 
 #[derive(Clone)]

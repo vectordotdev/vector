@@ -32,8 +32,7 @@ use crate::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
-            http::{RequestConfig, RetryStrategy},
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RequestConfig, RetryStrategy, http_response_retry_logic},
         },
     },
     template::{ConfinementConfig, UriTemplate},

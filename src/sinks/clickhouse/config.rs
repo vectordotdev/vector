@@ -23,7 +23,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };

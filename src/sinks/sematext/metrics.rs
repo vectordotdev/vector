@@ -32,9 +32,9 @@ use crate::{
             BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
             TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{
-                HttpResponse, HttpService, HttpServiceRequestBuilder, http_response_retry_logic,
+            http::{
+                HttpRequest, HttpResponse, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
             },
         },
     },
