@@ -76,7 +76,7 @@ async fn kinesis_put_records_with_partition_key() {
     let mut output_lines = records
         .into_iter()
         .inspect(|e| {
-            assert_eq!(partition_value, e.partition_key());
+            assert_eq!(Some(partition_value), e.partition_key());
         })
         .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();

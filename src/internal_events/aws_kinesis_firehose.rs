@@ -30,7 +30,7 @@ pub struct AwsKinesisFirehoseRequestError<'a> {
 }
 
 impl<'a> AwsKinesisFirehoseRequestError<'a> {
-    pub fn new(code: hyper::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
+    pub fn new(code: http::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
         Self {
             error_code: http_error_code(code.as_u16()),
             error,
