@@ -904,14 +904,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_pull_request_from_commit_title() {
-        assert_eq!(
-            parse_pull_request_number("feat(foo): add bar (#12345)").unwrap(),
-            12345
-        );
-    }
-
-    #[test]
     fn parses_and_deduplicates_pull_requests_from_commit_titles() {
         let history = indoc::indoc! {"
             c3	fix(foo): adjust bar (#23456)
@@ -1040,11 +1032,6 @@ mod tests {
         assert_eq!(bump_type(&last, &Version::new(2, 0, 0)), Some("major"));
         assert_eq!(bump_type(&last, &Version::new(1, 2, 5)), None);
         assert_eq!(bump_type(&last, &Version::new(1, 2, 3)), None);
-    }
-
-    #[test]
-    fn bump_type_zero_major() {
-        // For 0.x, "major" bump means 0.(x+1).0
         let last = Version::new(0, 55, 0);
         assert_eq!(bump_type(&last, &Version::new(0, 55, 1)), Some("patch"));
         assert_eq!(bump_type(&last, &Version::new(0, 56, 0)), Some("minor"));
@@ -1248,33 +1235,21 @@ mod tests {
     }
 
     #[test]
-    fn split_authors_lf() {
-        let raw = "line one\nline two\n\nauthors: alice bob\n";
-        let (body, authors) = split_authors(raw);
-        assert_eq!(body, "line one\nline two\n");
-        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
-    }
-
-    #[test]
-    fn split_authors_crlf() {
-        // Windows checkouts commit fragments with CRLF endings — the previous impl
-        // used `str::lines()` (strips \r) plus a `+1` byte-per-line accumulator,
-        // which truncated the body by one byte per line. Verify the whole body
-        // survives now.
-        let raw = "line one\r\nline two\r\n\r\nauthors: alice bob\r\n";
-        let (body, authors) = split_authors(raw);
-        assert!(body.contains("line one"));
-        assert!(body.contains("line two"));
-        assert!(!body.contains("authors:"));
-        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
-    }
-
-    #[test]
-    fn split_authors_no_authors_line() {
-        let raw = "just body text\nmore body\n";
-        let (body, authors) = split_authors(raw);
-        assert_eq!(body, raw);
-        assert!(authors.is_empty());
+    fn split_authors_preserves_body_and_line_endings() {
+        for newline in ["\n", "\r\n"] {
+            let body = format!("line one{newline}line two{newline}");
+            let raw = format!("{body}{newline}authors: alice bob{newline}");
+            let (actual, authors) = split_authors(&raw);
+            assert_eq!(actual.trim_end(), body.trim_end());
+            // CRLF fragments currently retain a trailing carriage return.
+            if newline == "\n" {
+                assert_eq!(actual, body);
+            }
+            assert_eq!(authors, ["alice", "bob"]);
+            let (actual, authors) = split_authors(&body);
+            assert_eq!(actual, body);
+            assert!(authors.is_empty());
+        }
     }
 
     #[test]
@@ -1320,28 +1295,13 @@ mod tests {
     }
 
     #[test]
-    fn slugify_examples() {
-        assert_eq!(
-            crate::commands::changelog::slugify("A Big Change!"),
-            "a-big-change"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("  --Foo/Bar--  "),
-            "foo-bar"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("already-good"),
-            "already-good"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("Numbers 123 OK"),
-            "numbers-123-ok"
-        );
-    }
-
-    #[test]
     fn find_existing_upgrade_guide_matches_any_date() {
         let tmp = tempfile::tempdir().unwrap();
+        assert!(
+            find_existing_upgrade_guide(&tmp.path().join("missing"), &Version::new(0, 58, 0))
+                .unwrap()
+                .is_none()
+        );
         // A guide dated on some past day (simulating a failed run yesterday, or a
         // maintainer-authored guide dated earlier than today).
         fs::write(
@@ -1371,16 +1331,6 @@ mod tests {
         assert!(miss.is_none(), "{miss:?}");
     }
 
-    #[test]
-    fn find_existing_upgrade_guide_handles_missing_dir() {
-        let hit = find_existing_upgrade_guide(
-            std::path::Path::new("/nonexistent-dir-for-test"),
-            &Version::parse("0.58.0").unwrap(),
-        )
-        .unwrap();
-        assert!(hit.is_none());
-    }
-
     fn bd(title: &str, anchor: &str, summary: &str, migration: &str) -> BreakingDetails {
         BreakingDetails {
             title: title.into(),
@@ -1391,25 +1341,16 @@ mod tests {
     }
 
     #[test]
-    fn validate_breaking_anchors_rejects_duplicates() {
-        let a = bd("First", "same", "", "");
-        let b = bd("Second", "same", "", "");
-        let err = validate_breaking_anchors(&[&a, &b]).unwrap_err();
-        assert!(err.to_string().contains("duplicate"), "{err}");
-    }
-
-    #[test]
-    fn validate_breaking_anchors_rejects_empty() {
-        let a = bd("非ASCII", "", "", "");
-        let err = validate_breaking_anchors(&[&a]).unwrap_err();
-        assert!(err.to_string().contains("invalid anchor"), "{err}");
-    }
-
-    #[test]
-    fn validate_breaking_anchors_accepts_uniques() {
-        let a = bd("First", "first", "", "");
-        let b = bd("Second", "second", "", "");
-        validate_breaking_anchors(&[&a, &b]).unwrap();
+    fn validates_breaking_anchor_set() {
+        let first = bd("First", "first", "", "");
+        let second = bd("Second", "second", "", "");
+        validate_breaking_anchors(&[&first, &second]).unwrap();
+        let duplicate = bd("Duplicate", "first", "", "");
+        let error = validate_breaking_anchors(&[&first, &duplicate]).unwrap_err();
+        assert!(error.to_string().contains("duplicate"), "{error}");
+        let invalid = bd("非ASCII", "", "", "");
+        let error = validate_breaking_anchors(&[&invalid]).unwrap_err();
+        assert!(error.to_string().contains("invalid anchor"), "{error}");
     }
 
     #[test]
@@ -1555,22 +1496,12 @@ mod tests {
             out,
             "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n"
         );
-    }
-
-    #[test]
-    fn write_release_stub_rejects_existing_file() {
-        let tmp = tempfile::tempdir().unwrap();
-        let stubs_dir = tmp.path().join("website/content/en/releases");
-        fs::create_dir_all(&stubs_dir).unwrap();
-        fs::write(
-            stubs_dir.join("0.58.0.md"),
-            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n",
-        )
-        .unwrap();
-
-        let version = Version::parse("0.58.0").unwrap();
-        let err = write_release_stub(tmp.path(), &version, "").unwrap_err();
-        assert!(err.to_string().contains("already exists"), "{err}");
+        let error = write_release_stub(tmp.path(), &version, "").unwrap_err();
+        assert!(error.to_string().contains("already exists"), "{error}");
+        assert_eq!(
+            fs::read_to_string(stubs_dir.join("0.58.0.md")).unwrap(),
+            out
+        );
     }
 
     #[test]

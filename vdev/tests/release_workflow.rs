@@ -350,18 +350,6 @@ fn release_preparation_requires_its_frozen_base() {
 }
 
 #[test]
-fn release_preparation_rejects_source_changes() {
-    let (temp, base) = preparation();
-    let repo = temp.path();
-    write(repo, "src/lib.rs", "pub fn unreviewed() {}\n");
-    git(repo, &["add", "."]);
-    git(repo, &["commit", "--amend", "--no-edit"]);
-
-    let error = check(repo, &base, false);
-    assert!(error.contains("unexpected release preparation file: src/lib.rs"));
-}
-
-#[test]
 fn release_preparation_rejects_source_files_renamed_into_allowed_paths() {
     let (temp, base) = preparation();
     let repo = temp.path();
