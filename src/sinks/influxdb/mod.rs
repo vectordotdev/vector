@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use snafu::ResultExt;
 use vector_http::empty_body;
@@ -17,7 +17,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
 };
 
@@ -405,7 +405,7 @@ pub(in crate::sinks) fn encode_uri(
     } else {
         format!("{path}?{query}")
     };
-    Ok(endpoint.append_path(&path_and_query)?.into_v1())
+    Ok(endpoint.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]
@@ -503,8 +503,10 @@ pub mod test_util {
 
     pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
-            .get(format!("{endpoint}/query"))
-            .query(&[("q", query)])
+            .get(
+                reqwest::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                    .unwrap(),
+            )
             .send()
             .await
             .unwrap()
@@ -895,7 +897,7 @@ mod tests {
 mod integration_tests {
     use crate::{
         config::ProxyConfig,
-        http::client_v1::HttpClient,
+        http::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},

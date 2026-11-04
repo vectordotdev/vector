@@ -14,7 +14,7 @@ use vector_lib::{configurable::configurable_component, event::EventStatus};
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
     config::AcknowledgementsConfig,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,

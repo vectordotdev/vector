@@ -51,7 +51,7 @@ use pin_project::pin_project;
 ///
 /// # Correctness for sync transforms
 ///
-/// This measurement is accurate for [`crate::transforms::SyncTransform`]
+/// This measurement is accurate for synchronous transforms
 /// because `transform_all` is synchronous and non-yielding: between the two
 /// measurement points the worker thread runs only transform code, with no
 /// `.await` points that could interleave other tokio tasks.
@@ -307,9 +307,9 @@ impl<F: Future> CpuTimedExt for F {}
 ///
 /// ```ignore
 /// // Some(counter):
-/// crate::spawn_in_current_span(future.cpu_timed(counter))
+/// spawn_in_current_span(future.cpu_timed(counter))
 /// // None:
-/// crate::spawn_in_current_span(future)
+/// spawn_in_current_span(future)
 /// ```
 ///
 /// Use this when spawning background tasks (e.g. a transform's housekeeping
@@ -354,7 +354,7 @@ where
 /// CPU cost from pipeline back-pressure.
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 pub fn register_counter() -> Counter {
-    vector_lib::counter!(vector_lib::internal_event::CounterName::ComponentCpuUsageNsTotal)
+    crate::counter!(crate::internal_event::CounterName::ComponentCpuUsageNsTotal)
 }
 
 /// Registers the `component_cpu_usage_ns_total` counter for the calling

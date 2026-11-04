@@ -90,7 +90,8 @@ test("VRL search accepts function prefixes and navigates to the function", async
   const result = page.locator(".aa-Panel").getByRole("link").filter({ hasText: "parse_json" }).first();
   await expect(result).toHaveAttribute("href", "/docs/reference/vrl/functions/#parse_json");
   await result.click();
-  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/functions\/#parse_json$/);
+  // The click resolves at commit; WebKit on CI can still be parsing this large page, so wait for load.
+  await page.waitForURL(/\/docs\/reference\/vrl\/functions\/#parse_json$/);
   await expect(page.getByRole("heading", { name: "parse_json", exact: true })).toBeInViewport();
 });
 
