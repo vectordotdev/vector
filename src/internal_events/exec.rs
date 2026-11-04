@@ -13,7 +13,7 @@ use vector_lib::{
 use super::prelude::io_error_code;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecEventsReceived<'a> {
+pub(crate) struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
     pub byte_size: JsonSize,
@@ -41,7 +41,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecFailedError<'a> {
+pub(crate) struct ExecFailedError<'a> {
     pub command: &'a str,
     pub error: std::io::Error,
 }
@@ -68,7 +68,7 @@ impl InternalEvent for ExecFailedError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecTimeoutError<'a> {
+pub(crate) struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
     pub error: Elapsed,
@@ -95,7 +95,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecCommandExecuted<'a> {
+pub(crate) struct ExecCommandExecuted<'a> {
     pub command: &'a str,
     pub exit_status: Option<i32>,
     pub exec_duration: Duration,
@@ -135,7 +135,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
     }
 }
 
-pub enum ExecFailedToSignalChild {
+pub(crate) enum ExecFailedToSignalChild {
     #[cfg(unix)]
     SignalError(nix::errno::Errno),
     #[cfg(unix)]
@@ -177,7 +177,7 @@ impl std::fmt::Display for ExecFailedToSignalChild {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct ExecFailedToSignalChildError<'a> {
+pub(crate) struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
     pub error: ExecFailedToSignalChild,
 }
@@ -203,7 +203,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct ExecChannelClosedError;
+pub(crate) struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
     fn emit(self) {
