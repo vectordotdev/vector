@@ -10,10 +10,7 @@ use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{
-        AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestV1Telemetry,
-        HttpResponseV1Telemetry,
-    },
+    internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
     tls::MaybeTlsSettings,
 };
 
@@ -83,12 +80,7 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
-            {
-                let telemetry = HttpRequestV1Telemetry::new(&request);
-                emit!(AboutToSendHttpRequest {
-                    request: &telemetry
-                });
-            }
+            emit!(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
@@ -96,9 +88,8 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    let telemetry = HttpResponseV1Telemetry::new(&response);
                     emit!(GotHttpResponse {
-                        response: &telemetry,
+                        response: &response,
                         roundtrip
                     });
                     Ok(response)
