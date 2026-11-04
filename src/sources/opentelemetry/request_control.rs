@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use hyper_1::body::Incoming;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{Layer, Service, ServiceExt, service_fn, util::BoxCloneService};
@@ -16,8 +17,8 @@ use vector_lib::{
     internal_event::{CounterName, GaugeName},
 };
 
-/// Request served by the legacy Warp HTTP listener.
-pub(crate) type HttpRequest = http_0::Request<hyper::Body>;
+/// Request served by the Warp HTTP listener.
+pub(crate) type HttpRequest<B = Incoming> = http::Request<B>;
 
 /// Request served by the native Tonic gRPC listener.
 pub(crate) type GrpcRequest = http::Request<tonic::body::BoxBody>;
@@ -39,7 +40,10 @@ impl RequestControl {
         }
     }
 
-    pub(crate) fn http_layer<R>(&self, error_response: R) -> RequestControlLayer<R, HttpRequest> {
+    pub(crate) fn http_layer<R, B>(
+        &self,
+        error_response: R,
+    ) -> RequestControlLayer<R, HttpRequest<B>> {
         self.layer(error_response, "http")
     }
 
@@ -167,12 +171,6 @@ impl<Resp> Clone for SharedPendingAcknowledgement<Resp> {
 /// Response that may carry a pending acknowledgement out of request processing.
 pub(crate) trait AcknowledgementResponse: Sized {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>>;
-}
-
-impl<B: 'static> AcknowledgementResponse for http_0::Response<B> {
-    fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
-        self.extensions_mut().remove()
-    }
 }
 
 impl<B: 'static> AcknowledgementResponse for http::Response<B> {
@@ -304,8 +302,8 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use http_0::StatusCode;
-    use hyper::{Body, body::HttpBody};
+    use http::StatusCode;
+    use http_body_util::BodyExt;
     use prost::Message;
     use tonic::body::{BoxBody, empty_body};
     use vector_lib::event::{BatchNotifier, Event, EventStatus, LogEvent};
@@ -316,11 +314,13 @@ mod tests {
         http::middleware_error_response as http_error_response, status::Status,
     };
 
-    type HttpResponse = http_0::Response<Body>;
+    // Request control never reads the request body.
+    type HttpRequest = super::HttpRequest<()>;
+    type HttpResponse = warp::reply::Response;
     type GrpcResponse = http::Response<BoxBody>;
 
     fn http_request() -> HttpRequest {
-        http_0::Request::new(Body::empty())
+        http::Request::new(())
     }
 
     fn grpc_request() -> GrpcRequest {
@@ -328,7 +328,7 @@ mod tests {
     }
 
     fn http_ok() -> HttpResponse {
-        http_0::Response::new(Body::empty())
+        HttpResponse::default()
     }
 
     fn grpc_ok() -> GrpcResponse {
