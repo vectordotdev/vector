@@ -1,0 +1,5 @@
+The `kafka` source can now authenticate with Microsoft Entra ID tokens through SASL/OAUTHBEARER, for example to read from Azure Event Hubs through its Kafka endpoint with a managed identity or workload identity instead of a shared access key. Set `sasl.azure.token_scope` (for Event Hubs, `https://<namespace>.servicebus.windows.net/.default`) and `sasl.azure.auth`, which takes the same `azure_credential_kind` options as the Azure sinks. Vector requests the tokens and refreshes them before they expire. `sasl.azure` enables SASL when `sasl.enabled` is not set (an explicit `sasl.enabled: false` still turns SASL off), and it requires `tls.enabled: true`. The `kafka` sink does not support `sasl.azure` yet.
+
+For existing configurations, the only change is for `sasl.mechanism: OAUTHBEARER` without `sasl.azure` and without librdkafka's built-in OIDC (`sasl.oauthbearer.method: oidc` in `librdkafka_options`): each token request now fails with an error that names these options, which librdkafka reports as an authentication error, where before the request was dropped without a message.
+
+authors: ckelner
