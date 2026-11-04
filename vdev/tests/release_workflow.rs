@@ -597,7 +597,7 @@ mod prepare {
             repo,
             "gh",
             r#"printf '%s\n' "$@" >> .git/gh-calls
-printf '## 0.28.0\n- Release fixture\n'"#,
+printf '## [0.28.0 (2026-11-03)](https://github.com/vectordotdev/vrl/releases/tag/v0.28.0)\n- Release fixture\n'"#,
         );
         stub(repo, "cue", "exit 0");
     }
@@ -859,6 +859,55 @@ printf '## 0.28.0\n- Release fixture\n'"#,
     #[test]
     fn cli_prepare_overrides_generate_release_files() {
         cli_dry_run(true);
+    }
+
+    #[test]
+    fn cli_prepare_inlines_vrl_timestamp_migration_without_vector_breaking_changes() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let release = include_str!("../../website/content/en/releases/0.61.0.md");
+        let (_, timestamp) = release
+            .split_once("## VRL: Fallible nanosecond timestamp conversion")
+            .unwrap();
+        let (_, body) = timestamp.split_once('\n').unwrap();
+        let body = body
+            .trim()
+            .replace("### Summary", "**Summary**")
+            .replace("### Migration", "**Migration**");
+        let indented = body
+            .lines()
+            .map(|line| format!("  {line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        stub(
+            repo,
+            "gh",
+            &format!(
+                "cat <<'VRL_NOTES'\n## [0.28.0 (2026-11-03)](tag)\n\n### Breaking Changes & Upgrade Guide\n\n- <a id=\"v0.28.0-timestamp-conversion\"></a> **Fallible nanosecond timestamp conversion**\n\n{indented}\nVRL_NOTES\n"
+            ),
+        );
+        prepare_cli(
+            repo,
+            &[
+                "--dry-run",
+                "--version",
+                "0.59.0",
+                "--vrl-version",
+                "0.28.0",
+            ],
+            None,
+        );
+        let guide = fs::read_to_string(repo.join("website/content/en/releases/0.59.0.md")).unwrap();
+        assert!(guide.contains("inline_upgrade_guide: true"));
+        assert!(guide.contains("{#v0.28.0-timestamp-conversion}"));
+        assert!(guide.contains(&body));
+        let cue =
+            fs::read_to_string(repo.join("website/cue/reference/releases/0.59.0.cue")).unwrap();
+        assert!(cue.contains("/releases/0.59.0/#v0.28.0-timestamp-conversion"));
+        assert!(cue.contains("suryakant-source"));
+        assert!(!cue.contains("to_unix_timestamp!"));
     }
 }
 

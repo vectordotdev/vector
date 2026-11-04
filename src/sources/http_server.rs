@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http_0::StatusCode;
+use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
@@ -477,8 +477,8 @@ mod tests {
         write::{GzEncoder, ZlibEncoder},
     };
     use futures::Stream;
-    use headers::{Authorization, authorization::Credentials};
-    use http_0::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
+    use headers_1::{Authorization, authorization::Credentials};
+    use http::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{
