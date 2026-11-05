@@ -224,8 +224,8 @@ components: transforms: tag_cardinality_limit: {
 				  tumbling window (everything resets at once every `ttl_secs`) with the
 				  same memory cost as no TTL. A clamp that reduces generations to 1
 				  because `ttl_secs` is too short still keeps the extra write shard.
-				  The `value_limit` cap is enforced against an
-				  upper-bound estimate of the union cardinality across shards. Under
+				  The `value_limit` cap is enforced against the summed shard counts,
+				  which approximate the union cardinality across shards. Under
 				  refresh-on-sighting, hot continuously-seen values may be counted in
 				  more than one shard, so the effective cap can be as low as
 				  `value_limit / (effective ttl_generations + 1)` for refresh-heavy
@@ -236,10 +236,15 @@ components: transforms: tag_cardinality_limit: {
 				**Reading `tag_cardinality_ttl_expirations_total`**: the counter reports
 				cache slots reclaimed, the same unit `value_limit` is enforced against.
 				In `exact` mode a slot is one distinct value, so the count is exact. In
-				`probabilistic` mode it counts slots reclaimed from the retired shard,
-				an upper bound on distinct values for the same refresh-on-sighting
-				reason described above — treat it as an eviction-pressure signal rather
-				than a precise count of values that left the window.
+				`probabilistic` mode it is an approximation of the distinct values that
+				aged out of the retired shard, not a bound. Refresh-on-sighting can
+				over-count: a hot value copied into a newer shard is still included
+				when the old shard rotates out. A bloom false positive can under-count:
+				`BloomFilterStorage::insert` leaves the shard count unchanged when the
+				filter already reports the value as present, so a distinct accepted
+				value can age out without being added to this counter. Treat it as an
+				eviction-pressure signal, not as how many distinct values left the
+				window.
 
 				**`ttl_secs` shorter than `ttl_generations`**: the effective number of
 				generations is silently capped to `ttl_secs` so the configured TTL

@@ -1039,9 +1039,10 @@ components: sources: internal_metrics: {
 				The total number of cache slots reclaimed by the `tag_cardinality_limit`
 				transform's TTL eviction, emitted only when `ttl_secs` is configured. In
 				`exact` mode a slot holds one distinct value. In `probabilistic` mode this
-				counts slots reclaimed from the oldest rolling-bloom shard, an upper bound
-				on distinct values, because continuously observed values are copied into
-				newer shards.
+				is an approximation of the distinct values that aged out of the oldest
+				rolling-bloom shard, not a bound: refresh-on-sighting can count a value
+				that is still retained in a newer shard, and a bloom false positive can
+				omit a distinct value whose insert did not increment the shard count.
 				"""
 			type:              "counter"
 			default_namespace: "vector"

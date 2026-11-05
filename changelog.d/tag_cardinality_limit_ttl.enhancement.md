@@ -7,7 +7,8 @@ TTL is supported in `exact` and `probabilistic` modes; combining it with
 last-accepted timestamps.
 A new internal counter `tag_cardinality_ttl_expirations_total` reports the
 number of cache slots reclaimed by TTL eviction — exact in `exact` mode, an
-upper bound in `probabilistic` mode. See the transform documentation for
+approximation in `probabilistic` mode (refresh-on-sighting can over-count, and
+bloom false positives can under-count). See the transform documentation for
 configuration details and mode-specific behavior.
 
 authors: kaarolch

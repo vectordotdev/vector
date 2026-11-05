@@ -111,9 +111,12 @@ impl InternalEvent for TagCardinalityTrackedKeys {
 /// The `count` is in cache *slots*, the unit `AcceptedTagValueSet::len`
 /// measures when enforcing `value_limit`. For the exact backend a slot holds
 /// one distinct value, so the count is exact. For the probabilistic backend it
-/// is the slots reclaimed from the retired rolling-bloom shard, an upper bound
-/// on distinct values: refresh-on-sighting copies hot values into newer shards,
-/// so a value counted here may still be retained in the window.
+/// is an approximation of the distinct values that aged out of the retired
+/// rolling-bloom shard, not a bound. Refresh-on-sighting can over-count,
+/// because a hot value copied into a newer shard is still included when the
+/// old shard rotates out. A bloom false positive can under-count, because
+/// `BloomFilterStorage::insert` leaves the shard count unchanged when the
+/// filter already reports the value as present.
 #[derive(NamedInternalEvent)]
 pub(crate) struct TagCardinalityTtlExpired {
     pub count: u64,

@@ -402,13 +402,15 @@ impl RollingBloomStorage {
         }
     }
 
-    /// Strict upper bound on the number of distinct values currently retained.
+    /// Approximate count of distinct values currently retained.
     ///
     /// Bloom shards are not enumerable, so the true union cardinality is not
-    /// directly computable. Summing per-shard counts never under-counts; the
-    /// alternative — `max` — could let distinct values spread across shards
-    /// silently exceed `value_limit`. See the `ttl` section of the transform
-    /// documentation for the over-rejection trade-off.
+    /// directly computable. Summing per-shard counts over-counts when
+    /// refresh-on-sighting copies a value into more than one shard, and
+    /// under-counts when a false-positive insert leaves that shard's count
+    /// unchanged. The sum is still what `value_limit` is enforced against;
+    /// using `max` instead could let distinct values spread across shards
+    /// exceed the cap. See the `ttl` section of the transform documentation.
     fn len(&mut self) -> usize {
         let now = Instant::now();
         self.rotate_if_needed(now);
