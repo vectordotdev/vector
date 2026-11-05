@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct MqttConnectionError {
+pub(crate) struct MqttConnectionError {
     pub error: ConnectionError,
 }
 

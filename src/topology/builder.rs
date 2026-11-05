@@ -31,12 +31,19 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuTimedExt, spawn_timed},
     enrichment::Table,
+    extra_context::ExtraContext,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -54,18 +61,11 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
-    extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -121,7 +121,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -177,6 +177,9 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        // Library callers may build topologies without going through CLI startup.
+        vector_lib::tls::install_default_crypto_provider();
+
         let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;
@@ -578,7 +581,7 @@ impl<'a> Builder<'a> {
             // `None` when `measure_cpu_usage` is false (the default): no counter
             // is registered and no per-poll `ThreadTime` measurement takes place.
             cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
+                Some(cpu_time::register_counter())
             } else {
                 None
             },
@@ -1254,7 +1257,7 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,

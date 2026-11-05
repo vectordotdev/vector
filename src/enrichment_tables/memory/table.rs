@@ -1,4 +1,7 @@
-#![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
+#![expect(
+    unsafe_op_in_unsafe_fn,
+    reason = "`#[derive(ShallowCopy)]` from evmap-derive 0.2 calls unsafe functions without an `unsafe` block"
+)]
 
 use std::{
     num::NonZeroU64,
@@ -117,8 +120,9 @@ pub struct Memory {
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
-    #[allow(dead_code)]
-    expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
+    /// Never read. Holding a receiver keeps the channel open, so `expired_items_sender.send`
+    /// does not fail when no memory source is subscribed.
+    _expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
     expired_items_sender: Sender<Vec<MemoryEntryPair>>,
 }
 
@@ -140,7 +144,7 @@ impl Memory {
                 metadata: MemoryMetadata::default(),
             })),
             expired_items_sender: expired_tx,
-            expired_items_receiver: expired_rx,
+            _expired_items_receiver: expired_rx,
         }
     }
 
@@ -153,11 +157,7 @@ impl Memory {
         if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
             Self {
                 config,
-                read_handle_factory: prev_memory.read_handle_factory,
-                read_handle: prev_memory.read_handle,
-                write_handle: prev_memory.write_handle,
-                expired_items_sender: prev_memory.expired_items_sender,
-                expired_items_receiver: prev_memory.expired_items_receiver,
+                ..*prev_memory
             }
         } else {
             Self::new(config)
@@ -337,7 +337,7 @@ impl Clone for Memory {
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
             expired_items_sender: self.expired_items_sender.clone(),
-            expired_items_receiver: self.expired_items_sender.subscribe(),
+            _expired_items_receiver: self.expired_items_sender.subscribe(),
         }
     }
 }

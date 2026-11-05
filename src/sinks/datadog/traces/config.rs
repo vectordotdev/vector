@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
@@ -17,7 +17,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{
@@ -69,6 +69,14 @@ pub struct DatadogTracesConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// Do not compute APM stats from the received traces.
+    ///
+    /// Enable this when APM stats are forwarded separately, for example stats computed by the
+    /// Datadog Agent, to avoid counting them twice.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub disable_apm_stats: bool,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -122,8 +130,8 @@ impl DatadogTracesConfig {
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
         Ok(DatadogTracesEndpointConfiguration {
-            traces_endpoint: traces_endpoint.into_v1(),
-            stats_endpoint: stats_endpoint.into_v1(),
+            traces_endpoint: traces_endpoint.into_uri(),
+            stats_endpoint: stats_endpoint.into_uri(),
         })
     }
 
@@ -158,6 +166,7 @@ impl DatadogTracesConfig {
             compression,
             PAYLOAD_LIMIT,
             Arc::clone(&apm_stats_aggregator),
+            self.disable_apm_stats,
         );
 
         // shutdown= Sender that the sink signals when input stream is exhausted.

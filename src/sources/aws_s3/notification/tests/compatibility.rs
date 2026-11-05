@@ -20,6 +20,11 @@ async fn s3_sns_and_test_notifications_use_the_default_adapter() {
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
     assert_eq!(events.len(), 4);
+    assert!(
+        events
+            .iter()
+            .all(|event| event.as_log()["source_type"] == AwsS3Config::NAME.into())
+    );
     assert_eq!(
         fixture.downloads().await,
         [

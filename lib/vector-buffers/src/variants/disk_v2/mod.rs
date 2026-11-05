@@ -179,7 +179,7 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use tracing::debug;
+use tracing::{debug, info};
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
@@ -212,6 +212,15 @@ use crate::{
     },
 };
 
+/// An approximate view of unacknowledged records in a disk buffer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DiskBufferUsageSnapshot {
+    /// Number of events that have not been acknowledged.
+    pub event_count: u64,
+    /// Encoded size of records that have not been acknowledged.
+    pub byte_size: u64,
+}
+
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
 pub enum BufferError<T>
@@ -231,6 +240,12 @@ where
     WriterSeekFailed { source: WriterError<T> },
 }
 
+/// The writer and reader halves of a disk buffer.
+type BufferParts<T, FS> = (BufferWriter<T, FS>, BufferReader<T, FS>);
+
+/// The writer and reader halves of a disk buffer, plus the ledger they share.
+type BufferPartsWithLedger<T, FS> = (BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>);
+
 /// Helper type for creating a disk buffer.
 pub struct Buffer<T> {
     _t: PhantomData<T>,
@@ -244,7 +259,7 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<BufferPartsWithLedger<T, FS>, BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -326,7 +341,7 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>), BufferError<T>>
+    ) -> Result<BufferParts<T, FS>, BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -396,7 +411,8 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    let builder =
+        DiskBufferConfigBuilder::from_path(buffer_path.clone()).max_buffer_size(max_size.get());
     // Shrink the data-file size (and the matching record size) so files fill and
     // rotate constantly. That is what reaches the rare recovery paths the bug hides
     // in: reopening a file whose last write was cut short, and reusing a file number
@@ -412,9 +428,21 @@ where
         None => builder,
     };
     let config = builder.build()?;
-    Buffer::from_config(config, usage_handle)
+    let (writer, reader) = Buffer::from_config(config, usage_handle)
         .await
-        .map_err(Into::into)
+        .map_err(Box::<dyn Error + Send + Sync>::from)?;
+    let usage = writer.usage_snapshot();
+    if usage.event_count > 0 || usage.byte_size > 0 {
+        info!(
+            buffer_id = id,
+            buffer_dir = buffer_path.to_string_lossy().as_ref(),
+            buffered_events = usage.event_count,
+            buffered_bytes = usage.byte_size,
+            message = "Opened disk buffer containing buffered bytes.",
+        );
+    }
+
+    Ok((writer, reader))
 }
 
 pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
