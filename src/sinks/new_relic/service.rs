@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
@@ -12,7 +12,7 @@ use tracing::Instrument;
 use vector_http::full_body;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{http::client_v1::HttpClient, sinks::prelude::*};
+use crate::{http::HttpClient, sinks::prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {

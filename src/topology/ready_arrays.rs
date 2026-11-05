@@ -13,7 +13,7 @@ const ARRAY_BUFFER_DEFAULT_SIZE: usize = 16;
 ///
 /// This is similar in spirit to `StreamExt::ready_chunks`, but built specifically `EventArray`.
 /// The more general `FoldReady` is left as an exercise to the reader.
-pub struct ReadyArrays<T> {
+pub(super) struct ReadyArrays<T> {
     inner: T,
     /// Storage for ready `EventArray` instances. The size of `enqueued` is
     /// distinct from the `enqueued_size` field. While that field is in units of
@@ -37,7 +37,7 @@ where
     /// The specified capacity is on the total number of `Event` instances
     /// enqueued here at one time. This is a soft limit. Chunks may be returned
     /// that contain more than that number of items.
-    pub fn with_capacity(inner: T, capacity: NonZeroUsize) -> Self {
+    pub(super) fn with_capacity(inner: T, capacity: NonZeroUsize) -> Self {
         Self {
             inner,
             enqueued: Vec::with_capacity(ARRAY_BUFFER_DEFAULT_SIZE),

@@ -62,8 +62,11 @@ impl fmt::Display for Format {
 
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns `path` unchanged if its extension is missing or is not `toml`, `yaml`, `yml`, or
+    /// `json`.
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, T> {
         match path.as_ref().extension().and_then(|ext| ext.to_str()) {
             Some("toml") => Ok(Format::Toml),
@@ -75,8 +78,11 @@ impl Format {
 }
 
 /// Parse the string represented in the specified format.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+///
+/// # Errors
+///
+/// Returns a single parser error message if `content` is not valid `format` syntax, YAML merge
+/// keys cannot be applied, or the parsed value cannot be deserialized into `T`.
 pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
@@ -94,8 +100,11 @@ where
 }
 
 /// Serialize the specified `value` into a string.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+///
+/// # Errors
+///
+/// Returns the serializer's error message if `value` cannot be represented in `format`, such
+/// as a TOML document whose root is not a table.
 pub fn serialize<T>(value: &T, format: Format) -> Result<String, String>
 where
     T: serde::ser::Serialize,

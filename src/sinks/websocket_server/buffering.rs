@@ -251,7 +251,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             .ack_decoding
             .build()
             .expect("Invalid `ack_decoding` config.")
-            .parse(request.into_data().into(), LogNamespace::default())
+            .parse(request.into_data(), LogNamespace::default())
             .inspect_err(|err| {
                 debug!(message = "Parsing ACK request failed.", %err);
             })
