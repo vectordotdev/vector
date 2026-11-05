@@ -17,6 +17,7 @@ use crate::{
     internal_events::SinkRequestBuildError,
 };
 use vector_core::config::telemetry;
+use vector_http::full_body;
 use bytes::Bytes;
 ```
 
@@ -60,8 +61,8 @@ struct BasicSink {
 
 impl BasicSink {
     pub fn new(config: &BasicConfig) -> Self {
-        let tls = TlsSettings::from_options(&None).unwrap();
-        let client = HttpClient::new(tls, &Default::default()).unwrap();
+        let tls = TlsSettings::from_options(None).unwrap();
+        let client = HttpClient::new(tls.into(), &Default::default()).unwrap();
         let endpoint = config.endpoint.clone();
 
         Self { client, endpoint }
@@ -346,16 +347,16 @@ that will be invoked to send the actual data.
 ```rust
     fn call(&mut self, request: BasicRequest) -> Self::Future {
         let byte_size = request.payload.len();
-        let body = hyper::Body::from(request.payload);
+        let body = full_body(request.payload);
         let req = http::Request::post(&self.endpoint)
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            match client.call(req).await {
+            match client.send(req).await {
                 Ok(response) => {
                     if response.status().is_success() {
                         Ok(BasicResponse {
@@ -548,7 +549,7 @@ BODY:
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
 [poll_ready]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.poll_ready
 [call]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.call
-[http_client]: ../../../src/http.rs
+[http_client]: ../../../src/http/client.rs
 [encoder]: ../../../src/sinks/util/encoding.rs
 [event]: ../../../lib/vector-core/src/event/mod.rs
 [encoder_encode_input]: ../../../src/sinks/util/encoding.rs

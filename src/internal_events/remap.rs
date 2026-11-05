@@ -5,7 +5,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct RemapMappingError {
+pub(crate) struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
     /// mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
@@ -36,7 +36,7 @@ impl InternalEvent for RemapMappingError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct RemapMappingAbort {
+pub(crate) struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
     /// during mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,

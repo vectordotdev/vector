@@ -18,6 +18,6 @@ pub const ZLIB_FRAME_OVERHEAD: usize = 6;
 /// See: <https://github.com/facebook/zstd/blob/dev/lib/zstd.h> (`ZSTD_compressBound`)
 pub const ZSTD_SMALL_INPUT_THRESHOLD: usize = 128 << 10;
 
-/// HTTP/2 header list limit for gRPC clients and servers. It keeps the 16 MiB default of the
-/// legacy `h2` stack; Hyper 1 defaults to 16 KiB.
-pub const GRPC_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
+/// HTTP/2 header list limit for Vector's HTTP and gRPC clients and servers. It keeps the 16 MiB
+/// default of the legacy `h2` stack; Hyper 1 defaults to 16 KiB.
+pub const HTTP2_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;

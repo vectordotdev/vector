@@ -1,12 +1,14 @@
 use futures::StreamExt;
 use indoc::indoc;
-use vector_lib::finalization::{BatchNotifier, BatchStatus};
+use vector_lib::{
+    extra_context::ExtraContext,
+    finalization::{BatchNotifier, BatchStatus},
+};
 
 use super::config::DatadogMetricsConfig;
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
-    extra_context::ExtraContext,
     sinks::{
         datadog::test_utils::{ApiStatus, test_server},
         util::test::load_sink_with_context,
