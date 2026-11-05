@@ -16,6 +16,16 @@ fn write(repo: &Path, path: &str, contents: &str) {
     fs::write(path, contents).unwrap();
 }
 
+fn version(repo: &Path, version: &str) {
+    write(
+        repo,
+        "Cargo.toml",
+        &format!(
+            "[package]\nname = \"changelog-fixture\"\nversion = \"{version}\"\n\n[features]\n"
+        ),
+    );
+}
+
 // These commits are disposable fixture data; no repository signing configuration is changed.
 fn commit(root: &Path) -> git2::Oid {
     let repo = Repository::open(root).unwrap();
@@ -45,6 +55,7 @@ fn fixture() -> TempDir {
         .unwrap()
         .set_bool("core.fsmonitor", false)
         .unwrap();
+    version(temp.path(), "0.62.0-dev");
     write(
         temp.path(),
         "changelog.d/README.md",
@@ -55,7 +66,11 @@ fn fixture() -> TempDir {
         "deprecation.d/README.md",
         "Deprecation notices.\n",
     );
-    write(temp.path(), "deprecation.d/existing.md", NOTICE);
+    write(
+        temp.path(),
+        "deprecation.d/existing.md",
+        &NOTICE.replace("0.62.0", "0.61.0"),
+    );
     write(
         temp.path(),
         "changelog.d/existing.fix.md",
@@ -101,6 +116,45 @@ fn new_deprecation_announcement_satisfies_the_changelog_requirement() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn announcements_must_match_the_exact_target_release() {
+    for (current, since, accepted) in [
+        ("0.62.0-dev", "0.61.0", false),
+        ("0.62.0-dev", "0.62.1", false),
+        ("0.62.0-dev", "0.63.0", false),
+        ("0.62.0-dev", "0.62", true),
+        ("0.62.0-dev", "0.62.0", true),
+        ("0.62.0-rc.1+build.2", "0.62.0", true),
+        ("0.62.0", "0.62.0", true),
+        ("0.62.1-dev", "0.62", false),
+        ("0.62.1-dev", "0.62.0", false),
+        ("0.62.1-dev", "0.62.1", true),
+    ] {
+        let temp = fixture();
+        version(temp.path(), current);
+        write(
+            temp.path(),
+            "deprecation.d/new-option.md",
+            &NOTICE
+                .replace("Legacy option", "Another legacy option")
+                .replace("0.62.0", since),
+        );
+        commit(temp.path());
+        let output = check(temp.path());
+        assert_eq!(
+            output.status.success(),
+            accepted,
+            "{current} with deprecated_since {since}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        if !accepted {
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("No changelog fragments detected")
+            );
+        }
+    }
 }
 
 #[test]
@@ -171,9 +225,9 @@ fn an_announcement_does_not_waive_the_changelog_for_removals() {
             write(
                 temp.path(),
                 "website/content/en/deprecations/enacted/existing.md",
-                &NOTICE.replace(
+                &NOTICE.replace("0.62.0", "0.61.0").replace(
                     "deprecated_since:",
-                    "removed_in: \"0.63.0\"\ndeprecated_since:",
+                    "removed_in: \"0.62.0\"\ndeprecated_since:",
                 ),
             );
         }

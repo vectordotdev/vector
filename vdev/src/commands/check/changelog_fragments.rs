@@ -5,12 +5,13 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use semver::Version;
 
 use crate::commands::changelog::{
     FRAGMENT_TYPES, FragmentType, is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections,
     slugify,
 };
-use crate::utils::{deprecation, git, paths};
+use crate::utils::{cargo::CargoToml, deprecation, git, paths};
 
 const CHANGELOG_DIR: &str = "changelog.d";
 const DEFAULT_MAX_FRAGMENTS: usize = 1000;
@@ -109,8 +110,13 @@ fn has_added_deprecation_announcement(repo_root: &Path, merge_base: &str) -> Res
     }
 
     let notices = deprecation::read_all(repo_root)?;
+    let current = CargoToml::load_from(&repo_root.join("Cargo.toml"))?;
+    let current = Version::parse(&current.package.version)?;
+    // Release pages match the full version, with development suffixes removed.
+    let release = Version::new(current.major, current.minor, current.patch);
     let has_announcement = notices.active.iter().any(|notice| {
-        added.contains(&Path::new(deprecation::DEPRECATION_DIR).join(&notice.filename))
+        notice.deprecated_since.0 == release
+            && added.contains(&Path::new(deprecation::DEPRECATION_DIR).join(&notice.filename))
     });
     if !has_announcement {
         return Ok(false);
