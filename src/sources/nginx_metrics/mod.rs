@@ -18,7 +18,7 @@ use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_componen
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
@@ -257,7 +257,7 @@ impl NginxMetrics {
     async fn get_nginx_response(&self) -> crate::Result<Bytes> {
         let mut request = Request::get(&self.endpoint).body(empty_body())?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         let response = self.http_client.send(request).await?;

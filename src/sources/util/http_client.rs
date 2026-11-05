@@ -30,7 +30,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    http::{Auth, QueryParameterValue, QueryParameters, client_v1::HttpClient},
+    http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,
@@ -253,7 +253,7 @@ pub(crate) async fn call<
             let mut request = builder.body(body).expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
-                auth.apply_v1(&mut request);
+                auth.apply(&mut request);
             }
 
             let send = async move { client.send(request).await };

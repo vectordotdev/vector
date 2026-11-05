@@ -13,11 +13,14 @@ use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{
-        HTTPV1RequestBuilderSnafu, HealthcheckError,
+        HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 
@@ -186,10 +189,10 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 
         let mut request = builder
             .body(payload)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)
@@ -256,7 +259,7 @@ pub(super) async fn http_healthcheck(
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

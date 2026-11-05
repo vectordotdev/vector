@@ -369,6 +369,8 @@ One consequence not derivable from the rules above:
 `AutoReject` (wire `0`). Omitting `0` as a proto3 default would make an explicit reject
 indistinguishable from a missing priority after an OTLP hop, and Datadog egress of a
 missing priority is `AutoKeep`, so the round trip would invert the sampling decision.
+`datadog.chunk.sampling_mechanism` is likewise emitted whenever the typed value is
+`Some`, including `0`, so mechanism `0` is not lost after an OTLP hop.
 
 The reserved key names, their per-member `AnyValue` types, and the presence rules for
 optional and default-valued members are implementation choices that satisfy this

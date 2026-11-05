@@ -27,13 +27,12 @@ use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
-            http::{RequestConfig, RetryStrategy},
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RequestConfig, RetryStrategy, http_response_retry_logic},
         },
     },
     template::{ConfinementConfig, UriTemplate},
@@ -186,7 +185,7 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
     let mut request = Request::head(uri.uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

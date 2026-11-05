@@ -11,12 +11,14 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
-            HttpEndpoint, auth::Auth, http::RetryStrategy, http_v1::http_response_retry_logic,
+            HttpEndpoint,
+            auth::Auth,
+            http::{RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },

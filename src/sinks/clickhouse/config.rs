@@ -20,10 +20,10 @@ use super::{
 };
 use crate::{
     config::{SinkContext, ValidatedSink},
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -468,7 +468,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

@@ -8,7 +8,7 @@ use futures::future::BoxFuture;
 use http::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
-use tower_http_1::decompression::Decompression;
+use tower_http::decompression::Decompression;
 use vector_http::full_body;
 use vector_lib::{
     ByteSizeOf,
@@ -20,7 +20,7 @@ use vector_lib::{
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
@@ -72,7 +72,7 @@ impl MetaDescriptive for ElasticsearchRequest {
 /// Sends bulk requests through the shared native HTTP client.
 ///
 /// Bulk requests may need asynchronous AWS signing with a service-specific payload hash, so
-/// this service builds requests itself instead of using the generic `http_v1::HttpService`.
+/// this service builds requests itself instead of using the generic `http::HttpService`.
 /// It requests and decodes compressed responses.
 #[derive(Clone)]
 pub struct ElasticsearchService {
@@ -157,7 +157,7 @@ impl HttpRequestBuilder {
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(auth) => {
-                    auth.apply_v1(&mut request);
+                    auth.apply(&mut request);
                 }
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {

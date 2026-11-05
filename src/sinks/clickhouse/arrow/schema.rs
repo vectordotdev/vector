@@ -11,7 +11,7 @@ use url::form_urlencoded;
 use vector_http::empty_body;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{Auth, client_v1::HttpClient};
+use crate::http::{Auth, HttpClient};
 
 use super::parser::ClickHouseType;
 
@@ -70,7 +70,7 @@ pub async fn fetch_table_schema(
         .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

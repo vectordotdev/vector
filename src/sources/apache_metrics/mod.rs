@@ -14,7 +14,7 @@ use crate::{
     SourceSender,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsParseError, EndpointBytesReceived,
         HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,

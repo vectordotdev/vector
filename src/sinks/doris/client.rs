@@ -1,5 +1,5 @@
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::EndpointBytesSent,
     sinks::util::Compression,
 };
@@ -201,7 +201,7 @@ impl DorisSinkClient {
         })?;
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         debug!(
@@ -364,7 +364,7 @@ impl DorisSinkClient {
             .map_err(|source| HealthCheckError::HealthCheckBuildRequest { source })?;
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         let response = self.http_client.send(request).await?;
@@ -498,7 +498,7 @@ pub enum StreamLoadError {
     BuildRequest { source: http::Error },
 
     #[snafu(display("Failed to read response body: {}", source))]
-    ReadResponseBody { source: hyper_1::Error },
+    ReadResponseBody { source: hyper::Error },
 
     #[snafu(display("Failed to parse response JSON: {}", source))]
     ParseResponseJson { source: serde_json::Error },
@@ -514,7 +514,7 @@ pub enum HealthCheckError {
     HealthCheckBuildRequest { source: http::Error },
 
     #[snafu(display("Failed to read health check response body: {}", source))]
-    HealthCheckReadResponseBody { source: hyper_1::Error },
+    HealthCheckReadResponseBody { source: hyper::Error },
 
     #[snafu(display("Failed to parse health check response: {}", source))]
     HealthCheckParseResponse { source: serde_json::Error },
@@ -528,7 +528,7 @@ mod tests {
     use std::sync::Mutex;
 
     use http_body_util::{BodyExt as _, Full};
-    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,

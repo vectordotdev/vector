@@ -7,7 +7,7 @@ use tracing::Instrument;
 use vector_http::full_body;
 
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{prelude::*, util::HttpEndpoint},
 };
 
@@ -131,7 +131,7 @@ impl Service<LokiRequest> for LokiService {
         let mut req = req.body(request.payload).unwrap();
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut req);
+            auth.apply(&mut req);
         }
 
         let client = self.client.clone();

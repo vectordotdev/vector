@@ -19,7 +19,7 @@ use tokio::sync::watch;
 use vector_http::{HttpError, empty_body};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::{config::ProxyConfig, http::client_v1::HttpClient, tls::MaybeTlsSettings};
+use crate::{config::ProxyConfig, http::HttpClient, tls::MaybeTlsSettings};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -51,7 +51,7 @@ pub enum GcpError {
     #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text: {}", source))]
-    GetTokenBytes { source: hyper_1::Error },
+    GetTokenBytes { source: hyper::Error },
     #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
     #[snafu(display("Failed to parse OAuth token JSON: {}", source))]

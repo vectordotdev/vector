@@ -11,7 +11,7 @@ use http::{
     uri::Scheme,
 };
 use http_body_util::BodyExt as _;
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use tokio::sync::Mutex;
@@ -35,7 +35,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     config::{SourceConfig, SourceContext},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,

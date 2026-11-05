@@ -4,7 +4,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsCloudwatchLogsMessageSizeError {
+pub(crate) struct AwsCloudwatchLogsMessageSizeError {
     pub size: usize,
     pub max_size: usize,
 }
