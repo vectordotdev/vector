@@ -229,8 +229,6 @@ impl KafkaSinkConfig {
             client_config.set(key.as_str(), value.as_str());
         }
 
-        self.auth.enforce_protocol_version_bounds(&client_config)?;
-
         Ok(client_config)
     }
 

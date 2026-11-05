@@ -168,11 +168,16 @@ impl KafkaAuthConfig {
         if tls.options.min_version.is_none() && tls.options.max_version.is_none() {
             return Ok(());
         }
-        // `@SECLEVEL=0` in librdkafka's cipher list lifts the level's ban on TLS v1.0 and v1.1.
+        // librdkafka applies `ssl.cipher.suites` itself, and its last `@SECLEVEL=n` sets the level.
         let security_level = client
             .get("ssl.cipher.suites")
-            .is_some_and(|ciphers| ciphers.contains("@SECLEVEL=0"))
-            .then_some(0);
+            .and_then(|ciphers| ciphers.rsplit_once("@SECLEVEL="))
+            .and_then(|(_, rest)| {
+                let digits = rest
+                    .find(|c: char| !c.is_ascii_digit())
+                    .unwrap_or(rest.len());
+                rest.get(..digits)?.parse().ok()
+            });
         // librdkafka has no protocol version settings, so only host policy can enforce a bound.
         vector_lib::tls::enforce_protocol_version_bounds(
             tls.options.min_version,
@@ -253,5 +258,15 @@ mod tests {
         client_config.set("ssl.cipher.suites", "DEFAULT:@SECLEVEL=0");
         auth.enforce_protocol_version_bounds(&client_config)
             .expect_err("SECLEVEL=0 lets librdkafka negotiate TLS v1.0 again");
+    }
+
+    #[test]
+    fn the_last_librdkafka_security_level_override_wins() {
+        let auth = auth_with_min_version(TlsVersion::Tls12);
+        let mut client_config = ClientConfig::new();
+        auth.apply(&mut client_config).unwrap();
+        client_config.set("ssl.cipher.suites", "DEFAULT:@SECLEVEL=0:@SECLEVEL=2");
+        auth.enforce_protocol_version_bounds(&client_config)
+            .expect("level 2 refuses TLS v1.0 and v1.1 again");
     }
 }
