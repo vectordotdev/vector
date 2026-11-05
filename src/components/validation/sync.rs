@@ -17,7 +17,7 @@ impl WaitGroupState {
     }
 }
 /// A synchronization primitive for waiting for an arbitrary number of processes to rendezvous.
-pub struct WaitGroup {
+pub(super) struct WaitGroup {
     locked: bool,
     state: Arc<WaitGroupState>,
 }
@@ -29,7 +29,7 @@ pub struct WaitGroupChild {
 
 impl WaitGroup {
     /// Creates a new `WaitGroup`.
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             locked: false,
             state: Arc::new(WaitGroupState {
@@ -46,7 +46,7 @@ impl WaitGroup {
     ///
     /// If the caller attempts to add a child after calling `wait_for_children` at least once, this
     /// method will panic.
-    pub fn add_child(&self) -> WaitGroupChild {
+    pub(super) fn add_child(&self) -> WaitGroupChild {
         assert!(!self.locked, "tried to add child after wait group locked");
 
         WaitGroupChild::from_state(&self.state)
@@ -56,7 +56,7 @@ impl WaitGroup {
     ///
     /// If no children were added to the wait group, or all of them have already completed, this
     /// function returns immediately.
-    pub async fn wait_for_children(&mut self) {
+    pub(super) async fn wait_for_children(&mut self) {
         // We "lock" ourselves because, if we did not, then _technically_ we can't be sure that caller
         // hasn't called this method multiple times, after a new child being added in between...
         // which messes up the invariant that once we start waiting, nothing else should be added.
@@ -107,7 +107,7 @@ impl Drop for WaitGroupChild {
     }
 }
 
-pub struct WaitTrigger {
+pub(super) struct WaitTrigger {
     tx: oneshot::Sender<()>,
 }
 
@@ -117,7 +117,7 @@ pub struct WaitHandle {
 
 impl WaitTrigger {
     /// Creates a new waiter pair.
-    pub fn new() -> (Self, WaitHandle) {
+    pub(super) fn new() -> (Self, WaitHandle) {
         let (tx, rx) = oneshot::channel();
 
         let trigger = Self { tx };
@@ -127,7 +127,7 @@ impl WaitTrigger {
     }
 
     /// Triggers the wait handle to wake up.
-    pub fn trigger(self) {
+    pub(super) fn trigger(self) {
         // We don't care if our trigger is actually received, because the receiver side may
         // intentionally not be used i.e. if the code is generic in a way where only some codepaths
         // wait to be triggered and others don't, but the trigger must always be called regardless.
