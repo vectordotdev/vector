@@ -14,6 +14,7 @@ mod sink;
 
 #[allow(
     warnings,
+    unreachable_pub,
     clippy::pedantic,
     clippy::nursery,
     clippy::clone_on_ref_ptr,

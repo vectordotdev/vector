@@ -12,7 +12,7 @@ use crate::sinks::prelude::SinkRequestBuildError;
 use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::service::Svc;
 
-pub struct BigquerySink {
+pub(super) struct BigquerySink {
     pub service: RetriesExhaustedAsErrored<Svc<BigqueryService, BigqueryRetryLogic>>,
     pub batcher_settings: BatcherSettings,
     pub request_builder: BigqueryRequestBuilder,

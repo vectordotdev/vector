@@ -69,7 +69,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
-pub struct TracesSink<S> {
+pub(super) struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
@@ -84,7 +84,7 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,

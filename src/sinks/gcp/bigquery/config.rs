@@ -2,7 +2,7 @@ use crate::codecs::encoding::ProtobufSerializerConfig;
 use futures::FutureExt;
 use indoc::indoc;
 
-use http_1::uri::Scheme;
+use http::uri::Scheme;
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
@@ -133,7 +133,7 @@ impl GenerateConfig for BigqueryConfig {
 /// Create a future that calls `GetWriteStream` to verify connectivity and auth.
 async fn healthcheck_future(
     transport: Transport,
-    origin: http_1::Uri,
+    origin: http::Uri,
     auth: GcpAuthenticator,
     write_stream: String,
 ) -> crate::Result<()> {
@@ -163,7 +163,7 @@ impl SinkConfig for BigqueryConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedBigquery {
-    endpoint: http_1::Uri,
+    endpoint: http::Uri,
     write_stream: String,
     batcher_settings: BatcherSettings,
 }
@@ -173,7 +173,7 @@ impl ValidatedSink for BigqueryConfig {
     type Validated = ValidatedBigquery;
 
     fn validate(&self) -> crate::Result<ValidatedBigquery> {
-        let endpoint: http_1::Uri = self.endpoint.parse()?;
+        let endpoint: http::Uri = self.endpoint.parse()?;
         let scheme = endpoint.scheme();
         if scheme != Some(&Scheme::HTTP) && scheme != Some(&Scheme::HTTPS) {
             return Err(format!(
@@ -224,7 +224,7 @@ impl ValidatedSink for BigqueryConfig {
 
         let tls = TlsSettings::from_options(Some(&tls_config))?.with_system_roots();
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
         let transport = GrpcTransport(Http2Client::new(tls.into(), &cx.proxy, builder)?);
 
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {

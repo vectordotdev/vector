@@ -1,4 +1,4 @@
-pub mod request_limiter;
+pub(super) mod request_limiter;
 
 use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
@@ -178,7 +178,7 @@ where
             let shutdown_clone = cx.shutdown.clone();
 
             let request_limiter =
-                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, vector_lib::num_threads());
 
             listener
                 .accept_stream_limited(max_connections)

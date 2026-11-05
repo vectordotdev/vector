@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use http_1::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use vector_http::empty_body;
 use vector_lib::codecs::{
     CharacterDelimitedEncoderConfig, LengthDelimitedEncoderConfig,
@@ -27,13 +27,12 @@ use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
-            http::{RequestConfig, RetryStrategy},
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RequestConfig, RetryStrategy, http_response_retry_logic},
         },
     },
     template::{ConfinementConfig, UriTemplate},
@@ -183,10 +182,10 @@ impl GenerateConfig for HttpSinkConfig {
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
-    let mut request = Request::head(uri.uri_v1()?).body(empty_body())?;
+    let mut request = Request::head(uri.uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

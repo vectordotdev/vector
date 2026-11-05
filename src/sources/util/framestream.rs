@@ -1026,7 +1026,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
-        pub fn new(
+        fn new(
             addr: SocketAddr,
             content_type: String,
             multithreaded: bool,
@@ -1049,7 +1049,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockUnixFrameHandler<F> {
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
                 socket_path: tempfile::tempdir().unwrap().keep().join("unix_test"),
@@ -1065,7 +1065,7 @@ mod test {
             clippy::cast_possible_truncation,
             reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
         )]
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,

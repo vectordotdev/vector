@@ -9,7 +9,7 @@ use vector_lib::{
 ///
 /// The events are finalized as `Errored` so acknowledging sources can redeliver them.
 #[derive(NamedInternalEvent)]
-pub struct GcpBigqueryRetriesExhaustedError {
+pub(crate) struct GcpBigqueryRetriesExhaustedError {
     pub reason: String,
     pub count: usize,
 }

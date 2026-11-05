@@ -14,9 +14,11 @@ use crate::{
     sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 use async_trait::async_trait;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
+use tokio_tungstenite::tungstenite::{
+    Utf8Bytes, error::Error as TungsteniteError, protocol::Message,
+};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -27,7 +29,7 @@ use vector_lib::{
     },
 };
 
-pub struct WebSocketSink {
+pub(super) struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,
@@ -87,13 +89,13 @@ impl WebSocketSink {
         WS: Stream<Item = Result<Message, TungsteniteError>> + Unpin,
         O: Sink<Message, Error = TungsteniteError> + Unpin,
     {
-        const PING: &[u8] = b"PING";
+        const PING: Bytes = Bytes::from_static(b"PING");
 
         // tokio::time::Interval panics if the period arg is zero. Since the struct members are
         // using NonZeroU64 that is not something we need to account for.
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
-        if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
+        if let Err(error) = ws_sink.send(Message::Ping(PING)).await {
             emit!(WebSocketConnectionError { error });
             return Err(());
         }
@@ -107,7 +109,7 @@ impl WebSocketSink {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await,
+                        Ok(()) => ws_sink.send(Message::Ping(PING)).await,
                         Err(e) => Err(e)
                     }
                 },
@@ -142,7 +144,12 @@ impl WebSocketSink {
                         let message = if encode_as_binary {
                             Message::binary(bytes)
                         } else {
-                            Message::text(String::from_utf8_lossy(&bytes))
+                            let bytes = bytes.freeze();
+                            let text = match Utf8Bytes::try_from(bytes.clone()) {
+                                Ok(text) => text,
+                                Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                            };
+                            Message::Text(text)
                         };
                         let message_len = message.len();
 
@@ -257,7 +264,6 @@ mod tests {
         let auth = Some(Auth::Bearer {
             token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
-        let auth_clone = auth.clone();
         let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
@@ -265,14 +271,14 @@ mod tests {
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
-                auth: None,
+                auth: auth.clone(),
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        send_events_and_assert(addr, config, tls, auth_clone).await;
+        send_events_and_assert(addr, config, tls, auth).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -401,24 +407,21 @@ mod tests {
                             Some(a) => {
                                 let auth_callback = |req: &Request, res: Response| {
                                     let hdr = req.headers().get("Authorization");
-                                    if let Some(h) = hdr {
-                                        match a {
-                                            Auth::Bearer { token }
-                                                if format!("Bearer {}", token.inner()) != h.to_str().unwrap() =>
-                                            {
-                                                return Err(
-                                                    http::Response::<Option<String>>::new(None),
-                                                );
-                                            }
-                                            Auth::Bearer { .. } => {}
-                                            Auth::Basic {
-                                                user: _user,
-                                                password: _password,
-                                            } => { /* Not needed for tests at the moment */ }
-                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
-                                            #[cfg(feature = "aws-core")]
-                                            _ => {}
+                                    match a {
+                                        Auth::Bearer { token }
+                                            if hdr.and_then(|h| h.to_str().ok())
+                                                != Some(format!("Bearer {}", token.inner()).as_str()) =>
+                                        {
+                                            return Err(http::Response::<Option<String>>::new(None));
                                         }
+                                        Auth::Bearer { .. } => {}
+                                        Auth::Basic {
+                                            user: _user,
+                                            password: _password,
+                                        } => { /* Not needed for tests at the moment */ }
+                                        Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
+                                        #[cfg(feature = "aws-core")]
+                                        _ => {}
                                     }
                                     Ok(res)
                                 };
@@ -434,7 +437,7 @@ mod tests {
                                 .filter_map(|msg| {
                                     future::ready(match msg {
                                         Ok(msg) if msg.is_text() => {
-                                            Some(Ok(msg.into_text().unwrap()))
+                                            Some(Ok(msg.into_text().unwrap().to_string()))
                                         }
                                         Err(TungsteniteError::Protocol(
                                             ProtocolError::ResetWithoutClosingHandshake,

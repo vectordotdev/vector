@@ -28,19 +28,25 @@ const REQUEST_PARAMS_ESCAPE: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'~');
 
 #[derive(Clone)]
-pub struct RequestAuth {
+pub(super) struct RequestAuth {
     auth: GcpAuthenticator,
     request_params: MetadataValue<Ascii>,
 }
 
 impl RequestAuth {
     /// Metadata for `AppendRows`, which routes on the `write_stream` field.
-    pub fn for_append_rows(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
+    pub(super) fn for_append_rows(
+        auth: GcpAuthenticator,
+        write_stream: &str,
+    ) -> crate::Result<Self> {
         Self::new(auth, "write_stream", write_stream)
     }
 
     /// Metadata for `GetWriteStream`, which routes on the `name` field.
-    pub fn for_get_write_stream(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
+    pub(super) fn for_get_write_stream(
+        auth: GcpAuthenticator,
+        write_stream: &str,
+    ) -> crate::Result<Self> {
         Self::new(auth, "name", write_stream)
     }
 
@@ -60,7 +66,7 @@ impl RequestAuth {
     }
 
     /// Wraps `message` in a request carrying the current token and the routing metadata.
-    pub fn request<T>(&self, message: T) -> Result<Request<T>, Status> {
+    pub(super) fn request<T>(&self, message: T) -> Result<Request<T>, Status> {
         let mut request = Request::new(message);
         if let Some(token) = self.auth.make_token() {
             let value: MetadataValue<_> = token
@@ -76,7 +82,7 @@ impl RequestAuth {
 }
 
 #[derive(Clone)]
-pub struct BigqueryRequest {
+pub(super) struct BigqueryRequest {
     pub request: proto::AppendRowsRequest,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
@@ -100,7 +106,7 @@ impl MetaDescriptive for BigqueryRequest {
 }
 
 #[derive(Debug)]
-pub struct BigqueryResponse {
+pub(super) struct BigqueryResponse {
     /// `None` when the request failed with a transient error.
     body: Option<proto::AppendRowsResponse>,
     request_byte_size: GroupedCountByteSize,
@@ -197,7 +203,7 @@ impl DriverResponse for BigqueryResponse {
 }
 
 #[derive(Debug, Snafu)]
-pub enum BigqueryServiceError {
+pub(super) enum BigqueryServiceError {
     #[snafu(display("BigQuery request failure: {}", status))]
     Request { status: tonic::Status },
     #[snafu(display("BigQuery response stream closed"))]
@@ -206,7 +212,7 @@ pub enum BigqueryServiceError {
 
 impl BigqueryServiceError {
     /// Whether this error should be retried.
-    pub fn is_retryable(&self) -> bool {
+    pub(super) fn is_retryable(&self) -> bool {
         match self {
             Self::ResponseStreamClosed => true,
             Self::Request { status } if is_transport_failure(status) => true,
@@ -238,12 +244,12 @@ impl From<tonic::Status> for BigqueryServiceError {
     }
 }
 
-pub type Transport = GrpcTransport<tonic::body::BoxBody>;
+pub(super) type Transport = GrpcTransport<tonic::body::Body>;
 
-pub type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<Transport>;
+pub(super) type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<Transport>;
 
 #[derive(Clone)]
-pub struct BigqueryService {
+pub(super) struct BigqueryService {
     service: BigQueryWriteClient,
     auth: RequestAuth,
 }
@@ -257,7 +263,7 @@ fn is_transport_failure(status: &tonic::Status) -> bool {
             return error.is_retriable();
         }
         // Failures reading the response body, such as a connection reset mid-stream.
-        if error.is::<std::io::Error>() || error.is::<hyper_1::Error>() {
+        if error.is::<std::io::Error>() || error.is::<hyper::Error>() {
             return true;
         }
         source = error.source();
@@ -266,7 +272,7 @@ fn is_transport_failure(status: &tonic::Status) -> bool {
 }
 
 #[derive(Clone, Debug)]
-pub struct BigqueryRetryLogic;
+pub(super) struct BigqueryRetryLogic;
 
 impl RetryLogic for BigqueryRetryLogic {
     type Error = BigqueryServiceError;
@@ -304,9 +310,9 @@ impl RetryLogic for BigqueryRetryLogic {
 }
 
 impl BigqueryService {
-    pub fn new(
+    pub(super) fn new(
         transport: Transport,
-        origin: http_1::Uri,
+        origin: http::Uri,
         auth: GcpAuthenticator,
         write_stream: &str,
     ) -> crate::Result<Self> {
@@ -366,7 +372,7 @@ impl Service<BigqueryRequest> for BigqueryService {
 /// `EventStatus::Rejected`, which would drop transient-but-exhausted failures
 /// as if they were permanent.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RetriesExhaustedAsErroredLayer;
+pub(super) struct RetriesExhaustedAsErroredLayer;
 
 impl<S> tower::Layer<S> for RetriesExhaustedAsErroredLayer {
     type Service = RetriesExhaustedAsErrored<S>;
@@ -377,7 +383,7 @@ impl<S> tower::Layer<S> for RetriesExhaustedAsErroredLayer {
 }
 
 #[derive(Clone, Debug)]
-pub struct RetriesExhaustedAsErrored<S> {
+pub(super) struct RetriesExhaustedAsErrored<S> {
     inner: S,
 }
 
@@ -550,7 +556,7 @@ mod test {
     }
 
     /// Create a `TcpListener` on some arbitrary local address and a plaintext transport and origin for it
-    async fn create_tcp_listener() -> (tokio::net::TcpListener, Transport, http_1::Uri) {
+    async fn create_tcp_listener() -> (tokio::net::TcpListener, Transport, http::Uri) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let origin = format!("http://{addr}").parse().unwrap();
@@ -571,7 +577,7 @@ mod test {
     /// A running fake `BigqueryServer`.
     struct TestServer {
         transport: Transport,
-        origin: http_1::Uri,
+        origin: http::Uri,
         receiver: RequestReceiver,
         append_rows_calls: Arc<AtomicUsize>,
         shutdown: tokio::sync::oneshot::Sender<()>,

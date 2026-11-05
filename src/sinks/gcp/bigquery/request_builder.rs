@@ -17,7 +17,7 @@ use crate::sinks::util::metadata::RequestMetadataBuilder;
 
 // 10MB maximum request size:
 // https://cloud.google.com/bigquery/docs/reference/storage/rpc/google.cloud.bigquery.storage.v1#appendrowsrequest
-pub const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
+pub(super) const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
 // This buffer is subtracted from the row length budget to account for varint growth in nested message
 // length prefixes. As rows fill up to 10MB, the size of the varint required to encode the length
@@ -25,7 +25,7 @@ pub const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 const LENGTH_PREFIX_BUFFER: usize = 6;
 
 #[derive(Debug, snafu::Snafu)]
-pub enum BigqueryRequestBuilderError {
+pub(super) enum BigqueryRequestBuilderError {
     #[snafu(display("Encoding protobuf failed: {}", message))]
     ProtobufEncoding { message: String },
     #[snafu(display(
@@ -68,12 +68,12 @@ impl From<vector_common::Error> for BigqueryRequestBuilderError {
 }
 
 #[derive(Default)]
-pub struct BigqueryRequestMetadata {
+pub(super) struct BigqueryRequestMetadata {
     request_metadata: RequestMetadata,
     finalizers: EventFinalizers,
 }
 
-pub struct BigqueryRequestBuilder {
+pub(super) struct BigqueryRequestBuilder {
     protobuf_serializer: ProtobufSerializer,
     write_stream: String,
     // Cached schema for inclusion in every AppendRowsRequest.
@@ -83,7 +83,7 @@ pub struct BigqueryRequestBuilder {
 }
 
 impl BigqueryRequestBuilder {
-    pub fn new(
+    pub(super) fn new(
         protobuf_serializer: ProtobufSerializer,
         write_stream: String,
     ) -> Result<Self, BigqueryRequestBuilderError> {
