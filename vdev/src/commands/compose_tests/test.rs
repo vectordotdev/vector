@@ -10,6 +10,36 @@ use crate::testing::{
 
 use super::active_projects::find_active_environment_for_integration;
 
+/// RAII guard that triggers test environment cleanup.
+///
+/// Cleanup is skipped if the environment was already running prior to the test execution
+/// (preserving caller-owned environments and fast repeated runs).
+struct DespawnGuard<'a> {
+    local_config: ComposeTestLocalConfig,
+    integration: &'a str,
+    should_despawn: bool,
+}
+
+impl DespawnGuard<'_> {
+    pub fn disarm_and_stop(mut self) -> Result<()> {
+        if self.should_despawn {
+            self.should_despawn = false;
+            super::stop::exec(self.local_config, self.integration)?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for DespawnGuard<'_> {
+    fn drop(&mut self) {
+        if self.should_despawn
+            && let Err(e) = super::stop::exec(self.local_config, self.integration)
+        {
+            warn!("Failed to stop environment (cleanup): {e}");
+        }
+    }
+}
+
 pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
@@ -39,7 +69,14 @@ pub fn exec(
     }
 
     let mut ran_environments = Vec::new();
+    let is_running = active.is_some();
     for environment in environments {
+        let despawn_guard = DespawnGuard {
+            local_config,
+            integration,
+            should_despawn: !is_running,
+        };
+
         run_environment(
             local_config,
             integration,
@@ -51,6 +88,7 @@ pub fn exec(
         if coverage {
             ran_environments.push(environment.clone());
         }
+        despawn_guard.disarm_and_stop()?;
     }
 
     if coverage {

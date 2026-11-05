@@ -6,7 +6,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionEstablished {
+pub(crate) struct WebSocketListenerConnectionEstablished {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -27,7 +27,7 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionFailedError {
+pub(crate) struct WebSocketListenerConnectionFailedError {
     pub error: Box<dyn Error>,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -57,7 +57,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionShutdown {
+pub(crate) struct WebSocketListenerConnectionShutdown {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -78,7 +78,7 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerSendError {
+pub(crate) struct WebSocketListenerSendError {
     pub error: Box<dyn Error>,
 }
 
@@ -102,7 +102,7 @@ impl InternalEvent for WebSocketListenerSendError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerMessageSent {
+pub(crate) struct WebSocketListenerMessageSent {
     pub message_size: usize,
     pub extra_tags: Vec<(String, String)>,
 }

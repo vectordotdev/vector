@@ -6,7 +6,7 @@ use vector_lib::{
 use super::prelude::io_error_code;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HerokuLogplexRequestReceived<'a> {
+pub(crate) struct HerokuLogplexRequestReceived<'a> {
     pub msg_count: usize,
     pub frame_id: &'a str,
     pub drain_token: &'a str,
@@ -24,7 +24,7 @@ impl InternalEvent for HerokuLogplexRequestReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HerokuLogplexRequestReadError {
+pub(crate) struct HerokuLogplexRequestReadError {
     pub error: std::io::Error,
 }
 

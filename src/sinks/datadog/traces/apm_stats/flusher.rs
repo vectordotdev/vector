@@ -15,10 +15,10 @@ use super::{
     build_request,
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::{Compression, Compressor},
     },
 };
@@ -131,7 +131,7 @@ impl ApmStatsSender {
 
         let http_request = trace_api_request
             .into_http_request()
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
         self.client.send(http_request.map(full_body)).await?;
 

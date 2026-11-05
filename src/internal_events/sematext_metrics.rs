@@ -8,7 +8,7 @@ use vector_lib::{
 use crate::event::metric::Metric;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SematextMetricsInvalidMetricError<'a> {
+pub(crate) struct SematextMetricsInvalidMetricError<'a> {
     pub metric: &'a Metric,
 }
 
@@ -36,7 +36,7 @@ impl InternalEvent for SematextMetricsInvalidMetricError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SematextMetricsEncodeEventError<E> {
+pub(crate) struct SematextMetricsEncodeEventError<E> {
     pub error: E,
 }
 
