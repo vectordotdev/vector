@@ -17,6 +17,8 @@ mod span;
 #[cfg(test)]
 mod tests;
 
+use std::sync::Arc;
+
 pub use attributes::{AttrMap, AttrValue, Attributes};
 pub use conversion::{IdField, TraceConversionIssue, TraceConversionReporter};
 #[cfg(any(test, feature = "test"))]
@@ -50,11 +52,15 @@ use crate::config::telemetry;
 
 /// Trace-homogeneous typed event: one [`TraceId`], one [`Resource`], one [`Scope`],
 /// Datadog-native context, and the spans belonging to that grouping.
+///
+/// Resource and scope are reference-counted. A clone shares those allocations until
+/// [`Self::resource_mut`] or [`Self::scope_mut`] writes, so partitioning one OTLP
+/// resource across many trace IDs does not copy its attributes once per trace.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraceEvent {
     trace_id: TraceId,
-    resource: Resource,
-    scope: Scope,
+    resource: Arc<Resource>,
+    scope: Arc<Scope>,
     datadog: DatadogEventContext,
     spans: Vec<Span>,
     metadata: EventMetadata,
@@ -66,8 +72,8 @@ impl TraceEvent {
     pub fn new_with_metadata(trace_id: TraceId, metadata: EventMetadata) -> Self {
         Self {
             trace_id,
-            resource: Resource::default(),
-            scope: Scope::default(),
+            resource: Arc::new(Resource::default()),
+            scope: Arc::new(Scope::default()),
             datadog: DatadogEventContext::default(),
             spans: Vec::new(),
             metadata,
@@ -83,11 +89,13 @@ impl TraceEvent {
     }
 
     /// Creates an event directly from its components.
+    ///
+    /// `resource` and `scope` may be shared with other events; mutation copies first.
     #[must_use]
     pub const fn from_parts(
         trace_id: TraceId,
-        resource: Resource,
-        scope: Scope,
+        resource: Arc<Resource>,
+        scope: Arc<Scope>,
         datadog: DatadogEventContext,
         spans: Vec<Span>,
         metadata: EventMetadata,
@@ -108,8 +116,8 @@ impl TraceEvent {
         self,
     ) -> (
         TraceId,
-        Resource,
-        Scope,
+        Arc<Resource>,
+        Arc<Scope>,
         DatadogEventContext,
         Vec<Span>,
         EventMetadata,
@@ -137,24 +145,28 @@ impl TraceEvent {
 
     /// Resource attached to this event.
     #[must_use]
-    pub const fn resource(&self) -> &Resource {
+    pub fn resource(&self) -> &Resource {
         &self.resource
     }
 
     /// Mutable resource.
-    pub const fn resource_mut(&mut self) -> &mut Resource {
-        &mut self.resource
+    ///
+    /// Copies the resource first when another event still shares it.
+    pub fn resource_mut(&mut self) -> &mut Resource {
+        Arc::make_mut(&mut self.resource)
     }
 
     /// Instrumentation scope attached to this event.
     #[must_use]
-    pub const fn scope(&self) -> &Scope {
+    pub fn scope(&self) -> &Scope {
         &self.scope
     }
 
     /// Mutable instrumentation scope.
-    pub const fn scope_mut(&mut self) -> &mut Scope {
-        &mut self.scope
+    ///
+    /// Copies the scope first when another event still shares it.
+    pub fn scope_mut(&mut self) -> &mut Scope {
+        Arc::make_mut(&mut self.scope)
     }
 
     /// Datadog-native event context. Default means none is present.
@@ -212,8 +224,12 @@ impl TraceEvent {
 
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
-        self.resource.allocated_bytes()
-            + self.scope.allocated_bytes()
+        // Resource and scope live in `Arc`s, so their struct size is not inline.
+        // Charge that size plus their heap on every event. Clones share the allocation,
+        // and charging each holder keeps a buffer limit from admitting more than it
+        // would when every event owned a copy.
+        Resource::size_of(&self.resource)
+            + Scope::size_of(&self.scope)
             + self.datadog.allocated_bytes()
             + self.spans.allocated_bytes()
             + self.metadata.allocated_bytes()

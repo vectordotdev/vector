@@ -1,5 +1,7 @@
 //! Typed [`TraceEvent`] -> OTLP `ExportTraceServiceRequest` encoding.
 
+use std::sync::Arc;
+
 use vector_core::event::EventFinalizers;
 use vector_core::event::typed_trace::{
     DatadogAgentEnvelope, DatadogChunkContext, DatadogTracerContext, Resource, Scope, Span,
@@ -70,9 +72,9 @@ impl ExportTraceServiceRequest {
 }
 
 struct ResourceGroup {
-    resource: Resource,
-    agent: Option<DatadogAgentEnvelope>,
-    tracer: DatadogTracerContext,
+    resource: Arc<Resource>,
+    agent: Option<Arc<DatadogAgentEnvelope>>,
+    tracer: Arc<DatadogTracerContext>,
     scope_groups: Vec<ScopeGroup>,
     last_scope: Option<usize>,
 }
@@ -92,17 +94,21 @@ fn recent_match<T>(
 
 enum ScopeGroup {
     Coalesced {
-        scope: Scope,
+        scope: Arc<Scope>,
         chunk: Option<DatadogChunkContext>,
         spans: Vec<(TraceId, Span)>,
     },
     Empty {
-        scope: Scope,
+        scope: Arc<Scope>,
     },
 }
 
 impl ScopeGroup {
-    fn coalesces(&self, event_scope: &Scope, event_chunk: Option<&DatadogChunkContext>) -> bool {
+    fn coalesces(
+        &self,
+        event_scope: &Arc<Scope>,
+        event_chunk: Option<&DatadogChunkContext>,
+    ) -> bool {
         matches!(
             self,
             Self::Coalesced { scope, chunk, .. }
@@ -114,10 +120,12 @@ impl ScopeGroup {
 impl ResourceGroup {
     fn matches(
         &self,
-        resource: &Resource,
-        agent: Option<&DatadogAgentEnvelope>,
-        tracer: &DatadogTracerContext,
+        resource: &Arc<Resource>,
+        agent: Option<&Arc<DatadogAgentEnvelope>>,
+        tracer: &Arc<DatadogTracerContext>,
     ) -> bool {
+        // `Arc`'s equality checks pointer identity before the value, so partitions that
+        // still share a decode allocation do not walk a large attribute map.
         self.resource == *resource && self.agent.as_ref() == agent && self.tracer == *tracer
     }
 
@@ -126,7 +134,7 @@ impl ResourceGroup {
     fn push(
         &mut self,
         trace_id: TraceId,
-        scope: Scope,
+        scope: Arc<Scope>,
         chunk: Option<DatadogChunkContext>,
         spans: Vec<Span>,
         reporter: &mut impl TraceConversionReporter,
@@ -143,7 +151,7 @@ impl ResourceGroup {
     fn push_spans(
         &mut self,
         trace_id: TraceId,
-        scope: Scope,
+        scope: Arc<Scope>,
         chunk: Option<DatadogChunkContext>,
         spans: Vec<Span>,
         reporter: &mut impl TraceConversionReporter,
@@ -182,8 +190,12 @@ impl ResourceGroup {
 
 impl ResourceSpans {
     fn from_group(group: ResourceGroup, reporter: &mut impl TraceConversionReporter) -> Self {
-        let (resource, schema_url) =
-            PbResource::from_typed(group.resource, group.agent, group.tracer, reporter);
+        let (resource, schema_url) = PbResource::from_typed(
+            Arc::unwrap_or_clone(group.resource),
+            group.agent.map(Arc::unwrap_or_clone),
+            Arc::unwrap_or_clone(group.tracer),
+            reporter,
+        );
         Self {
             resource: Some(resource),
             scope_spans: group
@@ -214,7 +226,7 @@ impl ScopeSpans {
                 (scope, spans)
             }
         };
-        let (scope, schema_url) = InstrumentationScope::from_typed(scope);
+        let (scope, schema_url) = InstrumentationScope::from_typed(Arc::unwrap_or_clone(scope));
         Self {
             scope: Some(scope),
             spans,
