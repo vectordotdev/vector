@@ -953,42 +953,42 @@
     "@babel/helper-string-parser" "^8.0.8"
     "@babel/helper-validator-identifier" "^8.0.6"
 
-"@datadog/browser-core@7.16.1":
-  version "7.16.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-7.16.1.tgz#63fc75b8f224e38728a018c0afaccf73e62a9c25"
-  integrity sha512-a/ShIFh9OvdznEL6tM0AIzqj5ZkIUPb8jPPpkChT6AUF4GKbPQMtK0M8yeXsluHlzXlcoTImyYYWxmSTa8aa1A==
+"@datadog/browser-core@7.16.2":
+  version "7.16.2"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-7.16.2.tgz#9b17d662749a88d0e37286127b150d6e449a7c1a"
+  integrity sha512-ZceGmLCSbNosSflsXObgPvSUPD6wtyjb1CD4+aWh5pm0Q32bxOUw222cuJi+0c7VDL3JjGKbEt9O3eTT3hvYmg==
   dependencies:
-    "@datadog/js-core" "0.0.18"
+    "@datadog/js-core" "0.0.19"
 
-"@datadog/browser-logs@^7.16.1":
-  version "7.16.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-7.16.1.tgz#4c82946a2d83e453568f8548e95444aee0f4614b"
-  integrity sha512-DdfrfwG08OeFW8QaoNsTt8XzrMTMOBiJJ0p9laGNwX6Ljl+8IXZk05SroujlARyTTy+J5e6qf7daqCJ8CBIflg==
+"@datadog/browser-logs@^7.16.2":
+  version "7.16.2"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-7.16.2.tgz#bb0de2b3a8ca2d41fa734ba1ae9f428bb920f820"
+  integrity sha512-rlAav6wNOw02E2bw6brkDV2Lmy1YTvm08UPJ7klAYkSSxtXlPHvW1CcmGvCkXKknLXfehHuP5zbcu9JYA9D6eA==
   dependencies:
-    "@datadog/browser-core" "7.16.1"
-    "@datadog/js-core" "0.0.18"
+    "@datadog/browser-core" "7.16.2"
+    "@datadog/js-core" "0.0.19"
 
-"@datadog/browser-rum-core@7.16.1":
-  version "7.16.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-rum-core/-/browser-rum-core-7.16.1.tgz#cf34d96cd59df171bc2df2b40b6e9c270963308e"
-  integrity sha512-ammzIkfu3xfyrDTqkpB+Rq3icCcNCqC4zw1KZPVNKAyqgeifF4IRpyYXJ7ntLmsdnAl6BBgUOu2BwVsfoH35CA==
+"@datadog/browser-rum-core@7.16.2":
+  version "7.16.2"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum-core/-/browser-rum-core-7.16.2.tgz#a75dcee77372cd46f2f19b1905edcf991095f2a3"
+  integrity sha512-A1/G5bo0k6dlnxHcucZy3/pfN5/P4CZuxDPdlbgbVr1uYhxvD+t06BIOoKehQLDW0dIq5Wgevv84LyegXnjxvA==
   dependencies:
-    "@datadog/browser-core" "7.16.1"
-    "@datadog/js-core" "0.0.18"
+    "@datadog/browser-core" "7.16.2"
+    "@datadog/js-core" "0.0.19"
 
-"@datadog/browser-rum@^7.16.1":
-  version "7.16.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-rum/-/browser-rum-7.16.1.tgz#992ef707c8c1455f9edee4b7cdc405c04ac03094"
-  integrity sha512-S5I3CsRdz1bzOdUR5EV4tMym4A0CoSjbgv5WYc88WuD9Tr6ghv1ej4FEK+X8LEKyioGmtTjzgT7DWToYKKAbDA==
+"@datadog/browser-rum@^7.16.2":
+  version "7.16.2"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum/-/browser-rum-7.16.2.tgz#bb636e27be7cf9bbde914d00591ea01d29c17272"
+  integrity sha512-Qc+KAfmaWaGdE0sj350Bmhzf824gLgnisrLoP9HcCOn3b/OSj9Pi19QUQWf+x24ioJfdAfBwUUH9YTZi7Q0QHg==
   dependencies:
-    "@datadog/browser-core" "7.16.1"
-    "@datadog/browser-rum-core" "7.16.1"
-    "@datadog/js-core" "0.0.18"
+    "@datadog/browser-core" "7.16.2"
+    "@datadog/browser-rum-core" "7.16.2"
+    "@datadog/js-core" "0.0.19"
 
-"@datadog/js-core@0.0.18":
-  version "0.0.18"
-  resolved "https://registry.yarnpkg.com/@datadog/js-core/-/js-core-0.0.18.tgz#5eda2ed20508c26d95aac4ac2b0574f6ae32c856"
-  integrity sha512-aGriDAfBGmKtsoDY7/OUr3wieTagV8QWJNcY8ogp7NQKFlFGwJ7uj0jXxjnbysgDDWlVmgEuk9+nuqxDQS6NQg==
+"@datadog/js-core@0.0.19":
+  version "0.0.19"
+  resolved "https://registry.yarnpkg.com/@datadog/js-core/-/js-core-0.0.19.tgz#6f84d1c6a8cc02d7006b8f8071697459d8adf0f2"
+  integrity sha512-JbkQso/GoWDuifMF8Fik39dXHO/K0kh7gLOKXlfIEdMqobwZO6APx+JqGJIos0lDQoOAUgoLq3QnAH+FUqy7XA==
 
 "@emnapi/core@^1.11.1":
   version "1.11.3"
@@ -1356,10 +1356,10 @@
   resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.178.tgz"
   integrity sha512-0d5Wd09ItQWH1qFbEyQ7oTQ3GZrMfth5JkbN3EvTKLXcHLRDSXeLnlvlOn0wvxVIwK5o2M8JzP/OWz7T3NRsbw==
 
-"@types/node@^26.6.5":
-  version "26.6.5"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.6.5.tgz#cb35209e7767c503551b5fa42a48231c7441d979"
-  integrity sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==
+"@types/node@^26.6.6":
+  version "26.6.6"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.6.6.tgz#9ed7b5817e728ed9216ef7c5b7d373fe3b777104"
+  integrity sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==
   dependencies:
     undici-types "~8.9.0"
 
@@ -2279,10 +2279,10 @@ postcss-selector-parser@6.0.10:
     cssesc "^3.0.0"
     util-deprecate "^1.0.2"
 
-postcss@^8.5.16, postcss@^8.5.31:
-  version "8.5.31"
-  resolved "https://registry.yarnpkg.com/postcss/-/postcss-8.5.31.tgz#d44731fa02f8ae8371629ec7220e2ae0dbdf23ec"
-  integrity sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==
+postcss@^8.5.16, postcss@^8.5.32:
+  version "8.5.32"
+  resolved "https://registry.yarnpkg.com/postcss/-/postcss-8.5.32.tgz#fbccef8388a0c77508c713bfd37728d646595803"
+  integrity sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==
   dependencies:
     nanoid "^3.3.20"
     picocolors "^1.1.1"
