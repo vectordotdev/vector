@@ -13,8 +13,10 @@ pub(crate) struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
+    )]
     fn emit(self) {
         gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }

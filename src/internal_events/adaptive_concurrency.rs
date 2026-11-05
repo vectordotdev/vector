@@ -25,10 +25,9 @@ registered_event! {
     }
 
     fn emit(&self, data: AdaptiveConcurrencyLimitData) {
-        // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
+        #[expect(
             clippy::cast_precision_loss,
-            reason = "Metrics use f64"
+            reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
         )]
         self.limit.record(data.concurrency as f64);
         let reached_limit = if data.reached_limit { 1.0 } else { Default::default() };
@@ -46,10 +45,9 @@ registered_event! {
     }
 
     fn emit(&self, in_flight: u64) {
-        // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
+        #[expect(
             clippy::cast_precision_loss,
-            reason = "Metrics use f64"
+            reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
         )]
         self.in_flight.record(in_flight as f64);
     }
