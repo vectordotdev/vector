@@ -6,7 +6,7 @@ use crate::sinks::{
     util::http::HttpRequest,
 };
 
-pub struct LogsSinkSetting {
+pub(super) struct LogsSinkSetting {
     pub dbname: ConfinedTemplate,
     pub table: ConfinedTemplate,
     pub pipeline_name: ConfinedTemplate,
@@ -14,7 +14,7 @@ pub struct LogsSinkSetting {
 }
 
 /// A sink that ingests logs into GreptimeDB.
-pub struct GreptimeDBLogsHttpSink<S> {
+pub(super) struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
@@ -28,7 +28,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         batcher_settings: BatcherSettings,
         service: S,
         request_builder: GreptimeDBLogsHttpRequestBuilder,

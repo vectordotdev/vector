@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
 
-pub struct MqttSink {
+pub(super) struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
@@ -26,7 +26,7 @@ pub(super) struct MqttEvent {
 }
 
 impl MqttSink {
-    pub fn new(
+    pub(super) fn new(
         config: &MqttSinkConfig,
         topic: ConfinedTemplate,
         connector: MqttConnector,
@@ -158,13 +158,13 @@ mod tests {
         net::{TcpListener, TcpStream},
     };
     use tokio_util::sync::CancellationToken;
+    use vector_lib::extra_context::ExtraContext;
 
     use super::drive_event_loop;
     use crate::{
         common::mqtt::MqttCommonConfig,
         config::{ComponentKey, Config, SinkConfig, SinkContext},
         event::{Event, LogEvent},
-        extra_context::ExtraContext,
         sinks::{
             VectorSink,
             mqtt::{MqttSinkConfig, config::MqttQoS},

@@ -11,7 +11,7 @@ use crate::{
     sources::{Source, util::build_unix_stream_source},
 };
 
-pub fn statsd_unix(
+pub(super) fn statsd_unix(
     config: UnixConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,

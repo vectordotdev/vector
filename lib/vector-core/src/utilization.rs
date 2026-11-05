@@ -20,7 +20,7 @@ use tokio::{
     time::interval,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal, stats};
+use vector_common::{id::ComponentKey, shutdown::ShutdownSignal, stats};
 
 const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 
@@ -30,7 +30,7 @@ const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 ///
 ///
 #[pin_project]
-pub(crate) struct Utilization<S> {
+pub struct Utilization<S> {
     intervals: IntervalStream,
     timer_tx: UtilizationComponentSender,
     component_key: ComponentKey,
@@ -42,7 +42,8 @@ impl<S> Utilization<S> {
     ///
     /// Measures the time after the wrapped stream yields an item until downstream
     /// polls it again.
-    pub(crate) fn new(
+    #[must_use]
+    pub fn new(
         timer_tx: UtilizationComponentSender,
         component_key: ComponentKey,
         inner: S,
@@ -59,7 +60,8 @@ impl<S> Utilization<S> {
     ///
     /// This can't be constant because destructors can't be run in a const context, and we're
     /// discarding `IntervalStream`/`Timer` when we call this.
-    pub(crate) fn into_inner(self) -> S {
+    #[must_use]
+    pub fn into_inner(self) -> S {
         self.inner
     }
 }
@@ -182,13 +184,16 @@ enum UtilizationTimerMessage {
 }
 
 #[derive(Clone)]
-pub(crate) struct UtilizationComponentSender {
+pub struct UtilizationComponentSender {
     component_key: ComponentKey,
     timer_tx: Sender<UtilizationTimerMessage>,
 }
 
 impl UtilizationComponentSender {
-    pub(crate) fn try_send_start_wait(&self) {
+    /// Records that this component has started waiting.
+    ///
+    /// If the channel is full or closed, the message is dropped and logged at debug level.
+    pub fn try_send_start_wait(&self) {
         if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StartWait(
             self.component_key.clone(),
             Instant::now(),
@@ -197,7 +202,10 @@ impl UtilizationComponentSender {
         }
     }
 
-    pub(crate) fn try_send_stop_wait(&self) {
+    /// Records that this component has stopped waiting.
+    ///
+    /// If the channel is full or closed, the message is dropped and logged at debug level.
+    pub fn try_send_stop_wait(&self) {
         if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StopWait(
             self.component_key.clone(),
             Instant::now(),
@@ -217,14 +225,15 @@ pub struct UtilizationRegistry {
 }
 
 impl UtilizationRegistry {
-    /// Adds a new component to this utilization metric emitter
+    /// Adds a new component to this utilization metric emitter.
     ///
-    /// Returns a sender which can be used to send utilization information back to the emitter
-    pub(crate) fn add_component(
-        &self,
-        key: ComponentKey,
-        gauge: Gauge,
-    ) -> UtilizationComponentSender {
+    /// Returns a sender which can be used to send utilization information back to the emitter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timer mutex is poisoned.
+    #[must_use]
+    pub fn add_component(&self, key: ComponentKey, gauge: Gauge) -> UtilizationComponentSender {
         self.timers.lock().expect("mutex poisoned").insert(
             key.clone(),
             Timer::new(
@@ -239,19 +248,25 @@ impl UtilizationRegistry {
         }
     }
 
-    /// Removes a component from this utilization metric emitter
-    pub(crate) fn remove_component(&self, key: &ComponentKey) {
+    /// Removes a component from this utilization metric emitter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timer mutex is poisoned.
+    pub fn remove_component(&self, key: &ComponentKey) {
         self.timers.lock().expect("mutex poisoned").remove(key);
     }
 }
 
-pub(crate) struct UtilizationEmitter {
+pub struct UtilizationEmitter {
     timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
     timer_rx: Receiver<UtilizationTimerMessage>,
 }
 
 impl UtilizationEmitter {
-    pub(crate) fn new() -> (Self, UtilizationRegistry) {
+    /// Creates an emitter and the registry components use to report wait spans.
+    #[must_use]
+    pub fn new() -> (Self, UtilizationRegistry) {
         let (timer_tx, timer_rx) = channel(4096);
         let timers = Arc::new(Mutex::new(HashMap::default()));
         (
@@ -263,7 +278,12 @@ impl UtilizationEmitter {
         )
     }
 
-    pub(crate) async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
+    /// Drives utilization updates until `shutdown` resolves or the timer channel closes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timer mutex is poisoned.
+    pub async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
         let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
         loop {
             tokio::select! {
@@ -305,9 +325,9 @@ impl UtilizationEmitter {
 /// While [`Utilization`] measures idle time as "waiting for upstream input",
 /// this wrapper measures the complementary case: after yielding an item, the
 /// time until the consumer polls again is counted as downstream wait (idle).
-/// Both wrappers share a single [`Timer`] per component, and the idempotent
+/// Both wrappers share a single timer per component, and the idempotent
 /// `start_wait`/`stop_wait` transitions ensure no double-counting.
-pub(crate) struct OutputUtilization<S> {
+pub struct OutputUtilization<S> {
     timer_tx: UtilizationComponentSender,
     inner: S,
 }
@@ -334,7 +354,8 @@ impl<S> OutputUtilization<S> {
     /// to consume items. This is the output-side counterpart to
     /// [`Utilization::new`], designed for use with task transforms where the
     /// framework cannot otherwise detect downstream backpressure.
-    pub(crate) const fn new(timer_tx: UtilizationComponentSender, inner: S) -> Self {
+    #[must_use]
+    pub const fn new(timer_tx: UtilizationComponentSender, inner: S) -> Self {
         Self { timer_tx, inner }
     }
 }
@@ -344,10 +365,13 @@ mod tests {
     use mock_instant::global::MockClock;
     use serial_test::serial;
     use strum::IntoEnumIterator;
-    use vector_lib::gauge;
-    use vector_lib::internal_event::GaugeName;
+    use vector_common::{gauge, internal_event::GaugeName};
 
     use super::*;
+    use crate::{
+        event::{EventArray, LogEvent},
+        transform::TaskTransform,
+    };
 
     /// Helper function to reset mock clock and create a timer at T=100
     fn setup_timer() -> Timer {
@@ -481,9 +505,6 @@ mod tests {
         processing_time: Duration,
     }
 
-    use crate::event::EventArray;
-    use crate::transforms::TaskTransform;
-
     impl TaskTransform<EventArray> for MockTaskTransform {
         fn transform(
             self: Box<Self>,
@@ -514,8 +535,6 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_task_transform_utilization_end_to_end() {
-        use crate::event::{EventArray, LogEvent};
-        use crate::transforms::TaskTransform;
         use futures::SinkExt;
         use futures::channel::mpsc as futures_mpsc;
 

@@ -318,7 +318,6 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
 mod test {
     use crate::config::ProxyConfig;
     use crate::config::schema::Options;
-    use crate::extra_context::ExtraContext;
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
@@ -329,6 +328,7 @@ mod test {
         },
         thread,
     };
+    use vector_lib::extra_context::ExtraContext;
     use vector_lib::{codecs::Transformer, enrichment::TableRegistry};
     use vector_vrl_metrics::MetricsStorage;
 
@@ -395,7 +395,7 @@ mod test {
         drop(guard); // Now we're sure the socket was bound by the server and we can release the guard
     }
 
-    pub fn bind_unused_udp() -> UdpSocket {
+    fn bind_unused_udp() -> UdpSocket {
         // Bind to port 0 to let the OS assign an available port
         UdpSocket::bind((IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
             .expect("Failed to bind UDP socket to OS-assigned port")
@@ -404,7 +404,7 @@ mod test {
     /// Bind a UDP socket suitable for sending multicast packets through the loopback interface.
     /// Sets `IP_MULTICAST_IF` to loopback so packets route through `lo` regardless of the
     /// system's default multicast route, necessary for reliable local testing on macOS.
-    pub fn bind_unused_udp_multicast() -> UdpSocket {
+    fn bind_unused_udp_multicast() -> UdpSocket {
         let socket = UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
             .expect("Failed to bind UDP socket to OS-assigned port");
         socket2::SockRef::from(&socket)

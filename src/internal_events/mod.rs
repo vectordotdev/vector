@@ -217,6 +217,12 @@ pub use self::expansion::*;
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
+pub use self::file::FileInternalMetricsConfig;
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
 pub(crate) use self::file::*;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 pub(crate) use self::file_descriptor::*;

@@ -8,7 +8,7 @@ use super::{
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub struct RedisService {
+pub(super) struct RedisService {
     pub(super) conn: RedisConnection,
     pub(super) data_type: super::DataType,
 }
@@ -96,7 +96,7 @@ impl Service<RedisRequest> for RedisService {
     }
 }
 
-pub struct RedisResponse {
+pub(super) struct RedisResponse {
     pub event_status: Vec<bool>,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,

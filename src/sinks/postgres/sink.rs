@@ -1,13 +1,13 @@
 use super::service::{PostgresRequest, PostgresRetryLogic, PostgresService};
 use crate::sinks::prelude::*;
 
-pub struct PostgresSink {
+pub(super) struct PostgresSink {
     service: Svc<PostgresService, PostgresRetryLogic>,
     batch_settings: BatcherSettings,
 }
 
 impl PostgresSink {
-    pub const fn new(
+    pub(super) const fn new(
         service: Svc<PostgresService, PostgresRetryLogic>,
         batch_settings: BatcherSettings,
     ) -> Self {

@@ -354,7 +354,7 @@ impl Ingestor {
             max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
-                .map_or_else(crate::num_threads, NonZeroUsize::get),
+                .map_or_else(vector_lib::num_threads, NonZeroUsize::get),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
@@ -775,7 +775,7 @@ impl IngestorProcess {
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context, _lastline_context)| line),
+                .map(|aggregated| aggregated.line),
             ),
             None => lines,
         };
@@ -1246,7 +1246,7 @@ pub struct S3Object {
 mod urlencoded_string {
     use percent_encoding::{percent_decode, utf8_percent_encode};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -1269,7 +1269,7 @@ mod urlencoded_string {
         })
     }
 
-    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

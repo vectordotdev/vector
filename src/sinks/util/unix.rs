@@ -191,7 +191,11 @@ impl<E> UnixSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
-    pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
+    pub(crate) const fn new(
+        connector: UnixConnector,
+        transformer: Transformer,
+        encoder: E,
+    ) -> Self {
         Self {
             connector,
             transformer,

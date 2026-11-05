@@ -6,17 +6,17 @@ use vector_lib::config::telemetry;
 
 use crate::sinks::{prelude::*, util::encoding::Encoder};
 
-pub type Labels = Vec<(String, String)>;
-pub type StructuredMetadata = Vec<(String, String)>;
+pub(super) type Labels = Vec<(String, String)>;
+pub(super) type StructuredMetadata = Vec<(String, String)>;
 
 #[derive(Clone)]
-pub enum LokiBatchEncoding {
+pub(super) enum LokiBatchEncoding {
     Json,
     Protobuf,
 }
 
 #[derive(Clone)]
-pub struct LokiBatchEncoder(pub LokiBatchEncoding);
+pub(super) struct LokiBatchEncoder(pub LokiBatchEncoding);
 
 impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
     fn encode_input(
@@ -66,14 +66,14 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
 }
 
 #[derive(Debug, Default, Serialize)]
-pub struct LokiBatch {
+pub(super) struct LokiBatch {
     stream_by_labels: HashMap<String, LokiStream>,
     #[serde(skip)]
     finalizers: EventFinalizers,
 }
 
 #[derive(Debug, Default, Serialize)]
-pub struct LokiStream {
+pub(super) struct LokiStream {
     stream: HashMap<String, String>,
     values: Vec<LokiEvent>,
 }
@@ -130,7 +130,7 @@ impl From<Vec<LokiRecord>> for LokiBatch {
 }
 
 #[derive(Clone, Debug)]
-pub struct LokiEvent {
+pub(super) struct LokiEvent {
     pub timestamp: i64,
     pub event: Bytes,
     pub structured_metadata: StructuredMetadata,
@@ -168,7 +168,7 @@ impl Serialize for LokiEvent {
 }
 
 #[derive(Clone, Debug)]
-pub struct LokiRecord {
+pub(super) struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
@@ -213,7 +213,7 @@ impl GetEventCountTags for LokiRecord {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct PartitionKey {
+pub(super) struct PartitionKey {
     pub tenant_id: Option<String>,
 }
 

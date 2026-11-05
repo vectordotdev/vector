@@ -123,7 +123,7 @@ pub struct VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct VectorKeepaliveConfig {
+pub(super) struct VectorKeepaliveConfig {
     /// How often, in seconds, to send a keepalive PING on idle connections.
     ///
     /// Shorter intervals detect dead connections faster at the cost of additional traffic.
@@ -192,7 +192,7 @@ struct RoutingConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
-    pub fn from_address(addr: &http_1::Uri) -> Self {
+    pub fn from_address(addr: &Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
     }
@@ -244,7 +244,7 @@ impl ValidatedSink for VectorConfig {
     fn validate(&self) -> crate::Result<ValidatedVector> {
         // Endpoint options and endpoint syntax are validated here, and the
         // parsed endpoints are retained so `build` does not re-parse the
-        // original strings. Re-parsing is unsafe: `http::Uri` reads the host
+        // original strings. Re-parsing is unsafe: `Uri` reads the host
         // of a scheme-less `host:port[/path]` endpoint as a scheme, producing
         // a URI that validation accepted but the sink cannot use.
         let endpoints = self.validate_endpoint_options()?;
@@ -361,7 +361,7 @@ impl ValidatedSink for VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum EndpointStrategy {
+pub(super) enum EndpointStrategy {
     /// Distribute requests across healthy endpoints using Vector's existing
     /// Tower distributed service. Endpoint health is tracked using
     /// `routing.health`, and unhealthy endpoints are backed off and probed
@@ -828,7 +828,7 @@ fn new_client(
     keepalive: Option<VectorKeepaliveConfig>,
 ) -> crate::Result<Http2Client<BoxBody>> {
     let mut builder = Builder::new(TokioExecutor::new());
-    builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+    builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.

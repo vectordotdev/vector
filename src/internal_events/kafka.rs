@@ -4,12 +4,12 @@ use vector_lib::{
 };
 
 #[cfg(feature = "sinks-kafka")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(feature = "sources-kafka")]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KafkaStatisticsReceived<'a> {
+pub(crate) struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
 }
@@ -56,7 +56,7 @@ mod sink {
     use vrl::path::OwnedTargetPath;
 
     #[derive(NamedInternalEvent)]
-    pub struct KafkaHeaderExtractionError<'a> {
+    pub(crate) struct KafkaHeaderExtractionError<'a> {
         pub header_field: &'a OwnedTargetPath,
     }
 
@@ -89,7 +89,7 @@ mod source {
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaBytesReceived<'a> {
+    pub(crate) struct KafkaBytesReceived<'a> {
         pub byte_size: usize,
         pub protocol: &'static str,
         pub topic: &'a str,
@@ -116,7 +116,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaEventsReceived<'a> {
+    pub(crate) struct KafkaEventsReceived<'a> {
         pub byte_size: JsonSize,
         pub count: usize,
         pub topic: &'a str,
@@ -148,7 +148,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaOffsetUpdateError {
+    pub(crate) struct KafkaOffsetUpdateError {
         pub error: rdkafka::error::KafkaError,
     }
 
@@ -172,7 +172,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaReadError {
+    pub(crate) struct KafkaReadError {
         pub error: rdkafka::error::KafkaError,
     }
 
@@ -196,7 +196,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaPayloadDecompressionError<'a> {
+    pub(crate) struct KafkaPayloadDecompressionError<'a> {
         pub error: &'a std::io::Error,
         pub topic: &'a str,
         pub partition: i32,

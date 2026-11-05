@@ -12,10 +12,10 @@ const I64_BYTE_SIZE: usize = 8;
 
 /// `GreptimeDBBatchSizer` is a batch sizer for metrics.
 #[derive(Default)]
-pub struct GreptimeDBBatchSizer;
+pub(super) struct GreptimeDBBatchSizer;
 
 impl GreptimeDBBatchSizer {
-    pub fn estimated_size_of(item: &Metric) -> usize {
+    pub(super) fn estimated_size_of(item: &Metric) -> usize {
         // Metric name.
         item.series().name().name().len()
         // Metric namespace, with an additional 1 to account for the namespace separator.
