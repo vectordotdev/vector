@@ -163,18 +163,11 @@ pub enum TlsError {
     ))]
     InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
     #[snafu(display(
-        "No TLS protocol version is usable between {} and {}: the host's OpenSSL configuration \
-         sets a conflicting bound or disables every version left by `min_version`/\
-         `max_version`.",
-        min,
-        max
+        "No TLS protocol version is usable: the host's OpenSSL configuration allows none within \
+         `min_version`/`max_version`. OpenSSL security levels above 0 also disable TLS v1.0 and \
+         v1.1."
     ))]
-    EmptyTlsVersionWindow { min: TlsVersion, max: TlsVersion },
-    #[snafu(display(
-        "No TLS protocol version is usable: the host's OpenSSL configuration sets a maximum \
-         below TLS v1.0."
-    ))]
-    HostMaxTlsVersionBelowTls10,
+    EmptyTlsVersionWindow,
     #[snafu(display("{}", message))]
     ProtocolVersionUnenforceable { message: String },
     #[snafu(display("Error setting SNI: {}", source))]

@@ -198,20 +198,32 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn apply_rejects_a_minimum_the_host_policy_cannot_guarantee() {
-        let auth = KafkaAuthConfig {
+    fn auth_with_min_version(min_version: TlsVersion) -> KafkaAuthConfig {
+        KafkaAuthConfig {
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    min_version: Some(TlsVersion::Tls13),
+                    min_version: Some(min_version),
                     ..Default::default()
                 },
             }),
             ..Default::default()
-        };
+        }
+    }
+
+    #[test]
+    fn apply_rejects_a_minimum_the_host_policy_cannot_guarantee() {
         let mut client_config = ClientConfig::new();
-        auth.apply(&mut client_config)
+        auth_with_min_version(TlsVersion::Tls13)
+            .apply(&mut client_config)
             .expect_err("librdkafka cannot enforce a TLS v1.3 minimum beyond host policy");
+    }
+
+    #[test]
+    fn apply_accepts_a_minimum_the_host_policy_already_guarantees() {
+        let mut client_config = ClientConfig::new();
+        auth_with_min_version(TlsVersion::Tls12)
+            .apply(&mut client_config)
+            .expect("the default security level already refuses TLS v1.0 and v1.1");
     }
 }

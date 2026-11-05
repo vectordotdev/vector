@@ -454,13 +454,9 @@ impl TlsSettings {
             context.clear_options(SslOptions::NO_TLSV1_3);
         }
 
-        let (min, max) = context_protocol_version_range(context)?;
-        let options = context.options();
         // OpenSSL accepts a context with no usable version and only fails at handshake time.
-        if !TlsVersion::ALL.into_iter().any(|version| {
-            (min..=max).contains(&version) && !options.contains(version.disable_option())
-        }) {
-            return Err(TlsError::EmptyTlsVersionWindow { min, max });
+        if negotiable_range(context)?.is_none() {
+            return Err(TlsError::EmptyTlsVersionWindow);
         }
 
         Ok(())
@@ -617,38 +613,47 @@ impl TlsSettings {
     }
 }
 
-/// Whether the host's OpenSSL configuration disables TLS v1.3 for newly created contexts.
-fn host_disables_tls13() -> Result<bool> {
-    let context = SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)?;
-    Ok(context.options().contains(SslOptions::NO_TLSV1_3))
+fn host_context() -> Result<SslContextBuilder> {
+    SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)
 }
 
-/// Reads the minimum and maximum protocol versions `context` would currently negotiate.
-///
-/// A `None` bound from OpenSSL means "whatever the library allows": `TlsVersion::Tls10` at the
-/// bottom, since `SSLv3` is disabled by default, and `TlsVersion::Tls13` at the top.
-fn context_protocol_version_range(
-    context: &mut SslContextBuilder,
-) -> Result<(TlsVersion, TlsVersion)> {
+/// Whether the host's OpenSSL configuration disables TLS v1.3 for newly created contexts.
+fn host_disables_tls13() -> Result<bool> {
+    Ok(host_context()?.options().contains(SslOptions::NO_TLSV1_3))
+}
+
+/// The lowest and highest TLS versions `context` can still negotiate, or `None` if none is left.
+fn negotiable_range(context: &mut SslContextBuilder) -> Result<Option<(TlsVersion, TlsVersion)>> {
     let min = context
         .min_proto_version()
         .and_then(TlsVersion::from_ssl_version)
         .unwrap_or(TlsVersion::Tls10);
-    // The only maximum `TlsVersion` cannot model is SSLv3, which is below every usable version.
-    let Some(max) = context
-        .max_proto_version()
-        .map_or(Some(TlsVersion::Tls13), TlsVersion::from_ssl_version)
-    else {
-        return Err(TlsError::HostMaxTlsVersionBelowTls10);
+    let max = match context.max_proto_version() {
+        None => TlsVersion::Tls13,
+        Some(max) => match TlsVersion::from_ssl_version(max) {
+            Some(max) => max,
+            // The only maximum `TlsVersion` cannot model is SSLv3, below every TLS version.
+            None => return Ok(None),
+        },
     };
-    Ok((min, max))
+    // Security levels above 0 refuse TLS v1.0/v1.1; Vector never sets one, so read the host's.
+    let floor = if host_context()?.build().security_level() > 0 {
+        TlsVersion::Tls12
+    } else {
+        TlsVersion::Tls10
+    };
+    let options = context.options();
+    let mut usable = TlsVersion::ALL.into_iter().filter(|&version| {
+        version >= min.max(floor) && version <= max && !options.contains(version.disable_option())
+    });
+    Ok(usable
+        .next()
+        .map(|lowest| (lowest, usable.next_back().unwrap_or(lowest))))
 }
 
-/// The protocol version range a fresh OpenSSL client context may negotiate under the host's
-/// policy, i.e. what librdkafka's `TLS_client_method` context would see.
+/// The versions a fresh client context, like librdkafka's, may negotiate under the host's policy.
 pub fn host_protocol_version_range() -> Result<(TlsVersion, TlsVersion)> {
-    let mut context = SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)?;
-    context_protocol_version_range(&mut context)
+    negotiable_range(&mut host_context()?)?.ok_or(TlsError::EmptyTlsVersionWindow)
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
@@ -1437,13 +1442,26 @@ mod test {
             .apply_context(&mut builder)
             .expect_err("a minimum above the maximum must be rejected");
         assert!(
-            matches!(
-                error,
-                TlsError::EmptyTlsVersionWindow {
-                    min: TlsVersion::Tls13,
-                    max: TlsVersion::Tls12
-                }
-            ),
+            matches!(error, TlsError::EmptyTlsVersionWindow),
+            "unexpected error: {error}"
+        );
+    }
+
+    // The bundled OpenSSL defaults to security level 2, which refuses TLS v1.0 and v1.1.
+    #[test]
+    fn security_level_counts_against_the_window() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_version: Some(TlsVersion::Tls11),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        let error = settings
+            .apply_context(&mut builder)
+            .expect_err("TLS v1.0 and v1.1 are unusable at the default security level");
+        assert!(
+            matches!(error, TlsError::EmptyTlsVersionWindow),
             "unexpected error: {error}"
         );
     }
