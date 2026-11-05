@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-pub struct KafkaRequestBuilder {
+pub(crate) struct KafkaRequestBuilder {
     pub key_field: Option<OwnedTargetPath>,
     pub headers_key: Option<OwnedTargetPath>,
     pub encoder: (Transformer, Encoder<()>),

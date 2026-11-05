@@ -7,6 +7,10 @@ use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
+use vector_core_proto_013::{
+    event_array_decodes as previous_array_decodes,
+    event_wrapper_decodes as previous_wrapper_decodes,
+};
 use vrl::event_path;
 
 use crate::event::ser::{
@@ -100,6 +104,7 @@ mod histogram_sum {
     /// Payloads that do not set `sum_missing` carry a reported sum -- including a zero, which proto3
     /// implicit presence does not even write to the wire. Versions 1 and 2 cannot set it at all.
     #[test]
+    #[allow(deprecated)] // These variants are deliberately decoded for backwards compatibility.
     fn unmarked_payloads_decode_as_a_reported_sum() {
         let v3 = proto::MetricValue::AggregatedHistogram3(proto::AggregatedHistogram3 {
             buckets: vec![proto::HistogramBucket3 {
@@ -242,7 +247,9 @@ fn type_serialization() {
 // Nesting validation tests
 // ---------------------------------------------------------------------------
 //
-// Prost enforces a decode recursion limit of 100 (no limit on encode). Each nesting
+// Older receivers using Prost 0.13 enforce a decode recursion limit of 100 (no limit
+// on encode). A test-only decoder retains that behavior independently of SDKs enabling
+// `prost/no-recursion-limit` for the production Prost version. Each nesting
 // level consumes a path-dependent number of prost recursion frames:
 //
 //   - `Value::Object` level: Value + ValueMap + map_entry = 3 frames
@@ -380,6 +387,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
+        assert!(previous_array_decodes(&buf));
         assert!(
             proto::EventArray::decode(buf.freeze()).is_ok(),
             "EventArray decode FAILED for {name} at the common Value budget.",
@@ -390,6 +398,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
         let wrapper = proto::EventWrapper::from(event);
         let mut buf = BytesMut::with_capacity(65536);
         wrapper.encode(&mut buf).unwrap();
+        assert!(previous_wrapper_decodes(&buf));
         assert!(
             proto::EventWrapper::decode(buf.freeze()).is_ok(),
             "EventWrapper decode FAILED for {name} at the common Value budget.",
@@ -402,7 +411,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
             let proto_array = proto::EventArray::from(array);
             let mut buf = BytesMut::with_capacity(65536);
             proto_array.encode(&mut buf).unwrap();
-            proto::EventArray::decode(buf.freeze()).is_err()
+            !previous_array_decodes(&buf)
         });
     assert!(
         any_fails,
@@ -453,7 +462,7 @@ fn per_path_boundaries() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     let roundtrip_metadata = |value: Value| -> bool {
@@ -463,7 +472,7 @@ fn per_path_boundaries() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     // `Log.fields` accepts 33 object levels (cost 99), one more than the common limit.
@@ -522,7 +531,7 @@ fn value_budget_matches_tightest_wire_path() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     assert!(
@@ -641,7 +650,7 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
     let roundtrip_metadata = |value: Value| -> bool {
         let mut event = LogEvent::from("flat");
@@ -650,7 +659,7 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     // `Log.fields` can carry 33 object levels (cost 99), but a Timestamp leaf raises

@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
 
-pub struct MqttSink {
+pub(super) struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
@@ -26,7 +26,7 @@ pub(super) struct MqttEvent {
 }
 
 impl MqttSink {
-    pub fn new(
+    pub(super) fn new(
         config: &MqttSinkConfig,
         topic: ConfinedTemplate,
         connector: MqttConnector,

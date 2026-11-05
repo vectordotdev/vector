@@ -6,7 +6,7 @@ use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
 
 #[derive(Debug, Clone)]
-pub struct DorisRequestBuilder {
+pub(super) struct DorisRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoder: (Transformer, Encoder<Framer>),
 }

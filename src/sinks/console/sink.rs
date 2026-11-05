@@ -18,7 +18,7 @@ use crate::{
     sinks::util::StreamSink,
 };
 
-pub struct WriterSink<T> {
+pub(super) struct WriterSink<T> {
     pub output: T,
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,

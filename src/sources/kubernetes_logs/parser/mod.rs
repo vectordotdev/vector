@@ -24,13 +24,13 @@ enum ParserState {
 }
 
 #[derive(Clone, Debug)]
-pub struct Parser {
+pub(super) struct Parser {
     state: ParserState,
     log_namespace: LogNamespace,
 }
 
 impl Parser {
-    pub const fn new(log_namespace: LogNamespace) -> Self {
+    pub(super) const fn new(log_namespace: LogNamespace) -> Self {
         Self {
             state: ParserState::Uninitialized,
             log_namespace,

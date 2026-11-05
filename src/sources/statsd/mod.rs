@@ -285,7 +285,7 @@ pub(crate) struct StatsdDeserializer {
 }
 
 impl StatsdDeserializer {
-    pub fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
             // The other modes emit a different `EventsReceived`.
@@ -294,7 +294,7 @@ impl StatsdDeserializer {
         }
     }
 
-    pub const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: None,
             events_received: None,
@@ -303,7 +303,7 @@ impl StatsdDeserializer {
     }
 
     #[cfg(unix)]
-    pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
             events_received: None,

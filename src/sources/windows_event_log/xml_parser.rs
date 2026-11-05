@@ -22,67 +22,67 @@ pub(crate) fn truncate_utf8(s: &mut String, max_bytes: usize) {
 
 /// System fields extracted from Windows Event Log XML via single-pass parsing.
 #[derive(Debug, Clone, Default)]
-pub struct SystemFields {
-    pub event_id: u32,
-    pub level: u8,
-    pub task: u16,
-    pub opcode: u8,
-    pub keywords: u64,
-    pub version: Option<u8>,
-    pub qualifiers: Option<u16>,
-    pub record_id: u64,
-    pub activity_id: Option<String>,
-    pub related_activity_id: Option<String>,
-    pub process_id: u32,
-    pub thread_id: u32,
-    pub channel: String,
-    pub computer: String,
-    pub user_id: Option<String>,
-    pub provider_name: String,
-    pub provider_guid: Option<String>,
+pub(super) struct SystemFields {
+    pub(super) event_id: u32,
+    pub(super) level: u8,
+    pub(super) task: u16,
+    pub(super) opcode: u8,
+    pub(super) keywords: u64,
+    pub(super) version: Option<u8>,
+    pub(super) qualifiers: Option<u16>,
+    pub(super) record_id: u64,
+    pub(super) activity_id: Option<String>,
+    pub(super) related_activity_id: Option<String>,
+    pub(super) process_id: u32,
+    pub(super) thread_id: u32,
+    pub(super) channel: String,
+    pub(super) computer: String,
+    pub(super) user_id: Option<String>,
+    pub(super) provider_name: String,
+    pub(super) provider_guid: Option<String>,
     /// Raw timestamp string from TimeCreated/@SystemTime.
-    pub system_time: Option<String>,
+    pub(super) system_time: Option<String>,
 }
 
 /// Result from `EventData` parsing (supports both named and positional formats).
 #[derive(Debug, Clone)]
-pub struct EventDataResult {
-    pub structured_data: HashMap<String, String>,
-    pub string_inserts: Vec<String>,
-    pub user_data: HashMap<String, String>,
+pub(super) struct EventDataResult {
+    pub(super) structured_data: HashMap<String, String>,
+    pub(super) string_inserts: Vec<String>,
+    pub(super) user_data: HashMap<String, String>,
 }
 
 /// Represents a Windows Event Log event.
 #[derive(Debug, Clone)]
-pub struct WindowsEvent {
-    pub record_id: u64,
-    pub event_id: u32,
-    pub level: u8,
-    pub task: u16,
-    pub opcode: u8,
-    pub keywords: u64,
-    pub time_created: DateTime<Utc>,
-    pub provider_name: String,
-    pub provider_guid: Option<String>,
-    pub channel: String,
-    pub computer: String,
-    pub user_id: Option<String>,
-    pub process_id: u32,
-    pub thread_id: u32,
-    pub activity_id: Option<String>,
-    pub related_activity_id: Option<String>,
-    pub raw_xml: String,
-    pub rendered_message: Option<String>,
-    pub event_data: HashMap<String, String>,
-    pub user_data: HashMap<String, String>,
-    pub task_name: Option<String>,
-    pub opcode_name: Option<String>,
-    pub keyword_names: Vec<String>,
+pub(super) struct WindowsEvent {
+    pub(super) record_id: u64,
+    pub(super) event_id: u32,
+    pub(super) level: u8,
+    pub(super) task: u16,
+    pub(super) opcode: u8,
+    pub(super) keywords: u64,
+    pub(super) time_created: DateTime<Utc>,
+    pub(super) provider_name: String,
+    pub(super) provider_guid: Option<String>,
+    pub(super) channel: String,
+    pub(super) computer: String,
+    pub(super) user_id: Option<String>,
+    pub(super) process_id: u32,
+    pub(super) thread_id: u32,
+    pub(super) activity_id: Option<String>,
+    pub(super) related_activity_id: Option<String>,
+    pub(super) raw_xml: String,
+    pub(super) rendered_message: Option<String>,
+    pub(super) event_data: HashMap<String, String>,
+    pub(super) user_data: HashMap<String, String>,
+    pub(super) task_name: Option<String>,
+    pub(super) opcode_name: Option<String>,
+    pub(super) keyword_names: Vec<String>,
     /// Resolved account name from `user_id` SID (e.g. "NT AUTHORITY\SYSTEM").
-    pub user_name: Option<String>,
-    pub version: Option<u8>,
-    pub qualifiers: Option<u16>,
-    pub string_inserts: Vec<String>,
+    pub(super) user_name: Option<String>,
+    pub(super) version: Option<u8>,
+    pub(super) qualifiers: Option<u16>,
+    pub(super) string_inserts: Vec<String>,
 }
 
 impl WindowsEvent {
@@ -91,7 +91,7 @@ impl WindowsEvent {
     /// Level 0 maps to "Information" per standard convention. Windows uses
     /// Level=0 for "`LogAlways`" and for all Security audit events. Mapping it to
     /// "Information" prevents SOC analysts from seeing "Unknown" on every logon event.
-    pub const fn level_name(&self) -> &'static str {
+    pub(super) const fn level_name(&self) -> &'static str {
         match self.level {
             1 => "Critical",
             2 => "Error",
@@ -122,7 +122,7 @@ enum TextTarget {
 ///
 /// Replaces ~28 individual `extract_xml_value`/`extract_xml_attribute`/
 /// `extract_provider_name` calls with one `quick_xml::Reader` traversal.
-pub fn parse_system_section(xml: &str) -> SystemFields {
+pub(super) fn parse_system_section(xml: &str) -> SystemFields {
     const MAX_ITERATIONS: usize = 2000;
 
     let mut fields = SystemFields::default();
@@ -319,7 +319,7 @@ fn extract_security_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut Sy
     clippy::cast_possible_wrap,
     reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
 )]
-pub fn build_event(
+pub(super) fn build_event(
     xml: String,
     channel: &str,
     config: &WindowsEventLogConfig,
@@ -433,7 +433,7 @@ pub fn build_event(
 
 /// Convenience wrapper: parse System section + build event in one call.
 #[cfg(test)]
-pub fn parse_event_xml(
+pub(super) fn parse_event_xml(
     xml: String,
     channel: &str,
     config: &WindowsEventLogConfig,
@@ -444,7 +444,7 @@ pub fn parse_event_xml(
 }
 
 /// Extract `EventData` and `UserData` sections from event XML.
-pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
+pub(super) fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
     let mut structured_data = HashMap::new();
     let mut string_inserts = Vec::new();
     let mut user_data = HashMap::new();
@@ -554,7 +554,7 @@ fn parse_section(
 }
 
 /// Check if bookmark XML is valid (contains an actual bookmark position).
-pub fn is_valid_bookmark_xml(xml: &str) -> bool {
+pub(super) fn is_valid_bookmark_xml(xml: &str) -> bool {
     !xml.is_empty() && xml.contains("<Bookmark") && xml.contains("RecordId")
 }
 
@@ -563,7 +563,7 @@ pub fn is_valid_bookmark_xml(xml: &str) -> bool {
 /// Prefer `parse_system_section` for bulk System field extraction (single pass).
 /// This function is retained for one-off lookups outside the hot path.
 #[cfg(test)]
-pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
+pub(super) fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
     const MAX_ITERATIONS: usize = 5000;
 
     let mut reader = Reader::from_str(xml);
@@ -623,7 +623,7 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
 /// Prefer `parse_system_section` for bulk System field extraction (single pass).
 /// This function is retained for one-off lookups outside the hot path.
 #[cfg(test)]
-pub fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
+pub(super) fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
     let needle = format!("{attr_name}='");
     if let Some(start) = xml.find(&needle) {
         let value_start = start + needle.len();

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "require_existing_repository": true,
+  "repository": "vectordotdev/vector",
+  "repository_id": 146327667,
+  "workflow": ".github/workflows/release.yml",
+  "account": "486234852809",
+  "bucket": "dd-cose-releases",
+  "region": "us-east-1",
+  "live_prefix": "vector/repositories/",
+  "archive_prefix": "package-repositories/snapshots/",
+  "bundle_prefix": "package-repositories/prepared/",
+  "control_key": "package-repositories/control.json",
+  "public_key": "vector-packages.asc",
+  "primary_fingerprint": "FBC83025C7F26E39DBCCDCD9ED518768DAA61968",
+  "signing_fingerprint": "E49714E41E4A57313AACFC333C9F4A9B1ACBAD72",
+  "apt_url": "https://apt.vector.dev/",
+  "yum_url": "https://yum.vector.dev/"
+}
