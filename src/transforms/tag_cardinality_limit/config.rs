@@ -402,6 +402,20 @@ pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
     ttl_secs.filter(|secs| *secs > 0).map(Duration::from_secs)
 }
 
+impl Config {
+    /// Whether the global config or any per-metric override enables a TTL.
+    ///
+    /// Without a TTL nothing can empty a bucket (apart from intentional
+    /// `value_limit: 0` ones), so reclaiming empty buckets can be skipped.
+    pub(crate) fn any_ttl_enabled(&self) -> bool {
+        ttl_duration(self.global.ttl_secs).is_some()
+            || self
+                .per_metric_limits
+                .values()
+                .any(|per_metric| ttl_duration(per_metric.config.ttl_secs).is_some())
+    }
+}
+
 // =============================================================================
 // Transform plumbing
 // =============================================================================

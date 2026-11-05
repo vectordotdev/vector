@@ -99,15 +99,16 @@ impl BloomFilterStorage {
 
     /// Inserts `value` and returns whether this shard's cardinality increased.
     fn insert(&mut self, value: &TagValueSet) -> bool {
-        // Write bits unconditionally so the rolling-bloom refresh path can
-        // not leave a value riding on another value's false-positive bits.
-        // Count tracks distinct first sightings only.
-        let was_already_present = self.inner.contains(value);
-        self.inner.insert(value);
-        if !was_already_present {
-            self.count += 1;
+        // `contains` is true only when every bit `insert` would set is already
+        // set, so writing again is a no-op. A bloom filter never clears bits
+        // within a shard's lifetime, so a value "present" through other values'
+        // bits stays present until the shard itself rotates out.
+        if self.inner.contains(value) {
+            return false;
         }
-        !was_already_present
+        self.inner.insert(value);
+        self.count += 1;
+        true
     }
 
     fn contains(&self, value: &TagValueSet) -> bool {
@@ -957,11 +958,11 @@ mod tests {
 
     #[test]
     fn rolling_bloom_hot_value_survives_rotation_after_contains_refresh() {
-        // If refresh skipped insert when the newest shard already matched via
-        // false positive, the value could vanish once the older shard rotated
-        // out. Pollute the newest shard heavily so FP hits are likely, then
-        // verify a front-shard-only value survives rotation after `contains()`
-        // refresh.
+        // Pollute the newest shard heavily so false-positive hits are likely,
+        // then verify a front-shard-only value survives rotation after
+        // `contains()` refresh. When the newest shard already matches the value
+        // its bits are all set, so skipping the redundant write still keeps the
+        // value alive after the original shard rotates out.
         const TINY: usize = 128;
         let mut s = RollingBloomStorage::new(TINY, 2, Duration::from_mins(2));
         let hot = v("hot-value-survivor");
@@ -982,7 +983,7 @@ mod tests {
         assert!(s.contains(&hot), "must hit the front shard and refresh");
         assert!(
             s.shards.back().unwrap().contains(&hot),
-            "refresh must unconditionally seed the newest shard"
+            "refresh must leave the newest shard matching the value"
         );
         s.rotate_if_needed(t0 + Duration::from_secs(62));
         assert!(

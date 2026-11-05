@@ -1638,11 +1638,12 @@ fn max_tracked_keys_reclaims_empty_buckets() {
 
     let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
     config.max_tracked_keys = Some(1);
+    config.global.ttl_secs = Some(60);
     let mut transform = TagCardinalityLimit::new(config);
 
     // Pre-seed an empty bucket so the transform sees its slot as used.
     let metric_key: Option<MetricId> = None;
-    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations());
+    let stale_set = AcceptedTagValueSet::new(&Mode::Exact, Some(60), default_ttl_generations());
     let mut inner = hashbrown::HashMap::new();
     inner.insert("stale_tag".to_string(), stale_set);
     transform.accepted_tags.insert(metric_key.clone(), inner);
@@ -1679,6 +1680,7 @@ fn max_tracked_keys_reclaims_empty_buckets() {
 fn reclaim_full_purge_is_rate_limited() {
     let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
     config.max_tracked_keys = Some(1);
+    config.global.ttl_secs = Some(60);
     let mut transform = TagCardinalityLimit::new(config);
 
     transform.reclaim_empty_buckets();
@@ -1692,6 +1694,64 @@ fn reclaim_full_purge_is_rate_limited() {
         Some(first),
         "immediate second reclaim must not force another full purge"
     );
+}
+
+/// Without any TTL nothing can empty a bucket, so a full `max_tracked_keys`
+/// must not scan the buckets at all.
+#[test]
+fn reclaim_is_skipped_without_ttl() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
+    let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    // An empty bucket that a scan *would* reclaim; it stays only if the scan is skipped.
+    let metric_key: Option<MetricId> = None;
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert(
+        "empty_tag".to_string(),
+        AcceptedTagValueSet::new(&Mode::Exact, None, default_ttl_generations()),
+    );
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
+
+    let value = TagValueSet::from(["v".to_string()]);
+    assert_eq!(
+        transform.try_accept_tag(metric_key.as_ref(), "fresh_tag", &value),
+        AcceptResult::Untracked,
+        "full cap without TTL must pass the new key through untracked"
+    );
+    assert!(
+        transform.last_full_reclaim.is_none(),
+        "no bucket scan may run when TTL is disabled"
+    );
+    assert!(
+        transform
+            .accepted_tags
+            .get(&metric_key)
+            .unwrap()
+            .contains_key("empty_tag"),
+        "bucket must be untouched without TTL"
+    );
+}
+
+/// A TTL configured only on a per-metric override must still enable reclaim.
+#[test]
+fn any_ttl_enabled_covers_per_metric_override() {
+    let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
+    assert!(!config.any_ttl_enabled());
+
+    let mut per_metric = make_per_metric(10, LimitExceededAction::DropTag, HashMap::new());
+    per_metric.config.ttl_secs = Some(0);
+    config
+        .per_metric_limits
+        .insert("m".to_string(), per_metric.clone());
+    assert!(!config.any_ttl_enabled(), "ttl_secs: 0 means no TTL");
+
+    per_metric.config.ttl_secs = Some(60);
+    config.per_metric_limits.insert("m".to_string(), per_metric);
+    assert!(config.any_ttl_enabled());
 }
 
 /// With `value_limit: 0` + `max_tracked_keys` at cap, an intentionally empty

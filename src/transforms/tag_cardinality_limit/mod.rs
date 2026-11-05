@@ -73,6 +73,10 @@ pub struct TagCardinalityLimit {
     /// Total count of currently-tracked (`metric_bucket`, `tag_key`) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
+    /// Whether any configured scope enables a TTL. Computed once; when false,
+    /// `reclaim_empty_buckets` is a no-op so a full `max_tracked_keys` stays O(1)
+    /// per miss, as it was before TTL support.
+    ttl_enabled: bool,
     /// Last time `reclaim_empty_buckets` ran a full exact-TTL purge across all
     /// buckets. Used to amortize O(total cached values) scans under sustained
     /// `max_tracked_keys` pressure.
@@ -83,6 +87,7 @@ impl TagCardinalityLimit {
     #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
+            ttl_enabled: config.any_ttl_enabled(),
             config,
             accepted_tags: HashMap::new(),
             tracked_keys_count: 0,
@@ -122,6 +127,11 @@ impl TagCardinalityLimit {
     /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
     /// every value for that tag is rejected without storing state.
     fn reclaim_empty_buckets(&mut self) {
+        // Only TTL eviction can leave a bucket empty (and `value_limit: 0`
+        // buckets are kept anyway), so skip the scan entirely without a TTL.
+        if !self.ttl_enabled {
+            return;
+        }
         let now = Instant::now();
         let full_purge = match self.last_full_reclaim {
             Some(last) if now.duration_since(last) < RECLAIM_FULL_PURGE_INTERVAL => false,
