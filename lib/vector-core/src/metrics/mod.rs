@@ -229,7 +229,6 @@ mod tests {
 
             let metrics = controller.capture_metrics();
             assert_eq!(metrics.len(), cardinality + 1);
-            // The deprecated counter was removed in 0.62.0.
             assert!(
                 !metrics
                     .iter()
