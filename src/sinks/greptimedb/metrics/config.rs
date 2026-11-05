@@ -137,6 +137,12 @@ impl ValidatedSink for GreptimeDBMetricsConfig {
 
         if let Some(tls) = &self.tls {
             validate_tls_all_or_none(tls)?;
+            vector_lib::tls::enforce_protocol_version_bounds(
+                tls.min_version,
+                tls.max_version,
+                "greptimedb-ingester",
+                vector_lib::tls::TLS12_TO_TLS13,
+            )?;
         }
 
         Ok(ValidatedGreptimeDBMetrics {

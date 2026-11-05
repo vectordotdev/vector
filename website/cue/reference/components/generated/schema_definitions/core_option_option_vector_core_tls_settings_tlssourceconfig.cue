@@ -70,11 +70,11 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsSourceC
 			Maximum TLS protocol version to negotiate.
 
 			Rarely needed: use it for peers that advertise a version they cannot actually negotiate.
-			When unset, the host's OpenSSL configuration decides.
+			When unset, the component's TLS library decides.
 			"""
 		required: false
 		type: string: enum: {
-			TLSv1: "TLS v1.0, deprecated by RFC 8996."
+			TLSv1:     "TLS v1.0, deprecated by RFC 8996."
 			"TLSv1.1": "TLS v1.1, deprecated by RFC 8996."
 			"TLSv1.2": "TLS v1.2."
 			"TLSv1.3": "TLS v1.3."
@@ -85,7 +85,7 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsSourceC
 			Minimum TLS protocol version to negotiate.
 
 			Peers that cannot negotiate at least this version are rejected during the handshake. When
-			unset, the host's OpenSSL configuration decides.
+			unset, the component's TLS library decides.
 
 			Components that accept connections do not offer TLS v1.3 by default. Setting either this
 			option or `max_version` enables every version within the resulting window, so
@@ -93,7 +93,7 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsSourceC
 			"""
 		required: false
 		type: string: enum: {
-			TLSv1: "TLS v1.0, deprecated by RFC 8996."
+			TLSv1:     "TLS v1.0, deprecated by RFC 8996."
 			"TLSv1.1": "TLS v1.1, deprecated by RFC 8996."
 			"TLSv1.2": "TLS v1.2."
 			"TLSv1.3": "TLS v1.3."

@@ -8,7 +8,7 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 use crate::{
     internal_events::KafkaStatisticsReceived,
-    tls::{PEM_START_MARKER, TlsEnableableConfig},
+    tls::{PEM_START_MARKER, TlsEnableableConfig, TlsVersion},
 };
 
 #[derive(Debug, Snafu)]
@@ -108,16 +108,6 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
-            // librdkafka has no protocol version settings, so only host policy can enforce a bound.
-            if tls.options.min_version.is_some() || tls.options.max_version.is_some() {
-                vector_lib::tls::enforce_protocol_version_bounds(
-                    tls.options.min_version,
-                    tls.options.max_version,
-                    "librdkafka",
-                    vector_lib::tls::host_protocol_version_range()?,
-                )?;
-            }
-
             if let Some(verify_certificate) = &tls.options.verify_certificate {
                 client.set(
                     "enable.ssl.certificate.verification",
@@ -164,6 +154,37 @@ impl KafkaAuthConfig {
             }
         }
 
+        Ok(())
+    }
+
+    /// Fails unless librdkafka, configured as `client`, can only negotiate within the TLS bounds.
+    pub(crate) fn enforce_protocol_version_bounds(
+        &self,
+        client: &ClientConfig,
+    ) -> crate::Result<()> {
+        let Some(tls) = self.tls.as_ref().filter(|tls| tls.enabled.unwrap_or(false)) else {
+            return Ok(());
+        };
+        if tls.options.min_version.is_none() && tls.options.max_version.is_none() {
+            return Ok(());
+        }
+        // librdkafka has no protocol version settings, so only host policy can enforce a bound.
+        let (lowest, highest) = vector_lib::tls::host_protocol_version_range()?;
+        // `@SECLEVEL=0` in librdkafka's cipher list lifts the level's ban on TLS v1.0 and v1.1.
+        let lowest = if client
+            .get("ssl.cipher.suites")
+            .is_some_and(|ciphers| ciphers.contains("@SECLEVEL=0"))
+        {
+            TlsVersion::Tls10
+        } else {
+            lowest
+        };
+        vector_lib::tls::enforce_protocol_version_bounds(
+            tls.options.min_version,
+            tls.options.max_version,
+            "librdkafka",
+            (lowest, highest),
+        )?;
         Ok(())
     }
 }
@@ -214,16 +235,28 @@ mod tests {
     #[test]
     fn apply_rejects_a_minimum_the_host_policy_cannot_guarantee() {
         let mut client_config = ClientConfig::new();
-        auth_with_min_version(TlsVersion::Tls13)
-            .apply(&mut client_config)
+        let auth = auth_with_min_version(TlsVersion::Tls13);
+        auth.apply(&mut client_config).unwrap();
+        auth.enforce_protocol_version_bounds(&client_config)
             .expect_err("librdkafka cannot enforce a TLS v1.3 minimum beyond host policy");
     }
 
     #[test]
     fn apply_accepts_a_minimum_the_host_policy_already_guarantees() {
         let mut client_config = ClientConfig::new();
-        auth_with_min_version(TlsVersion::Tls12)
-            .apply(&mut client_config)
+        let auth = auth_with_min_version(TlsVersion::Tls12);
+        auth.apply(&mut client_config).unwrap();
+        auth.enforce_protocol_version_bounds(&client_config)
             .expect("the default security level already refuses TLS v1.0 and v1.1");
+    }
+
+    #[test]
+    fn a_librdkafka_security_level_override_voids_the_host_guarantee() {
+        let auth = auth_with_min_version(TlsVersion::Tls12);
+        let mut client_config = ClientConfig::new();
+        auth.apply(&mut client_config).unwrap();
+        client_config.set("ssl.cipher.suites", "DEFAULT:@SECLEVEL=0");
+        auth.enforce_protocol_version_bounds(&client_config)
+            .expect_err("SECLEVEL=0 lets librdkafka negotiate TLS v1.0 again");
     }
 }

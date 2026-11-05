@@ -228,7 +228,7 @@ pub struct TlsConfig {
     /// Minimum TLS protocol version to negotiate.
     ///
     /// Peers that cannot negotiate at least this version are rejected during the handshake. When
-    /// unset, the host's OpenSSL configuration decides.
+    /// unset, the component's TLS library decides.
     ///
     /// Components that accept connections do not offer TLS v1.3 by default. Setting either this
     /// option or `max_version` enables every version within the resulting window, so
@@ -239,7 +239,7 @@ pub struct TlsConfig {
     /// Maximum TLS protocol version to negotiate.
     ///
     /// Rarely needed: use it for peers that advertise a version they cannot actually negotiate.
-    /// When unset, the host's OpenSSL configuration decides.
+    /// When unset, the component's TLS library decides.
     #[configurable(metadata(docs::human_name = "Maximum TLS Version"))]
     pub max_version: Option<TlsVersion>,
 }

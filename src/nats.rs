@@ -156,6 +156,21 @@ pub(crate) fn validate_tls_cert_key_pair(
     }
 }
 
+pub(crate) fn validate_tls_protocol_versions(
+    tls_config: &TlsEnableableConfig,
+) -> Result<(), NatsConfigError> {
+    if !tls_config.enabled.unwrap_or(false) {
+        return Ok(());
+    }
+    vector_lib::tls::enforce_protocol_version_bounds(
+        tls_config.options.min_version,
+        tls_config.options.max_version,
+        "async-nats",
+        vector_lib::tls::TLS12_TO_TLS13,
+    )
+    .context(ProtocolVersionSnafu)
+}
+
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: Option<&NatsAuthConfig>,
@@ -179,13 +194,7 @@ pub(crate) fn from_tls_auth_config(
 
             validate_tls_cert_key_pair(tls_config)?;
 
-            vector_lib::tls::enforce_protocol_version_bounds(
-                tls_config.options.min_version,
-                tls_config.options.max_version,
-                "async-nats",
-                vector_lib::tls::TLS12_TO_TLS13,
-            )
-            .context(ProtocolVersionSnafu)?;
+            validate_tls_protocol_versions(tls_config)?;
 
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
