@@ -1508,6 +1508,84 @@ allowed_lateness_ms = 600000
     assert_eq!(count, 1, "open event-time bucket must drain on input close");
 }
 
+#[tokio::test]
+async fn transform_late_events_forward() {
+    let agg = serde_yaml::from_str::<AggregateConfig>(indoc! {"
+        interval_ms: 10000
+        event_time:
+          late_events:
+            strategy: forward
+            metric_types:
+              - distribution
+    "})
+    .unwrap()
+    .build(&TransformContext::default())
+    .await
+    .unwrap()
+    .into_task();
+
+    // Far in the past, so these are always past their bucket's cutoff.
+    let late_ts = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
+    let late_distribution = make_metric_with_timestamp(
+        "late_distribution",
+        MetricKind::Incremental,
+        MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 1],
+            statistic: StatisticKind::Histogram,
+        },
+        late_ts,
+    );
+    let inputs = vec![
+        late_distribution.clone(),
+        // Listed type but absolute: dropped.
+        make_metric_with_timestamp(
+            "late_absolute_distribution",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            late_ts,
+        ),
+        // Unlisted type: dropped.
+        make_metric_with_timestamp(
+            "late_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            late_ts,
+        ),
+        // On time: aggregated and emitted by the final flush.
+        make_metric_with_timestamp(
+            "on_time_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+            Utc::now(),
+        ),
+        make_metric_with_timestamp(
+            "on_time_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 3.0 },
+            Utc::now(),
+        ),
+    ];
+
+    let out: Vec<Event> = agg
+        .transform_events(Box::pin(stream::iter(inputs)))
+        .collect()
+        .await;
+
+    assert_eq!(2, out.len(), "unexpected output: {out:?}");
+    assert_eq!(
+        late_distribution, out[0],
+        "late distribution must be forwarded unchanged"
+    );
+    assert_eq!(
+        out[1].as_metric().series().name.name.as_str(),
+        "on_time_counter"
+    );
+    assert_counter(&out[1], 5.0);
+}
+
 /// Future skew uses saturating millis math: events beyond `max_future_ms` drop,
 /// and `max_future_ms = i64::MAX` must not panic at record time.
 #[test]
