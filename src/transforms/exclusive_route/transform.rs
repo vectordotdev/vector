@@ -11,18 +11,21 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ResolvedRoute {
+pub(crate) struct ResolvedRoute {
     name: String,
     condition: Condition,
 }
 
 #[derive(Clone)]
-pub struct ExclusiveRoute {
+pub(crate) struct ExclusiveRoute {
     routes: Vec<ResolvedRoute>,
 }
 
 impl ExclusiveRoute {
-    pub fn new(config: &ExclusiveRouteConfig, context: &TransformContext) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: &ExclusiveRouteConfig,
+        context: &TransformContext,
+    ) -> crate::Result<Self> {
         let resolved_routes = config
             .routes
             .iter()

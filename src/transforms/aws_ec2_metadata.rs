@@ -370,7 +370,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         client: HttpClient,
         host: Uri,
         keys: Keys,
@@ -408,7 +408,7 @@ impl MetadataClient {
         }
     }
 
-    pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
+    pub(crate) async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
         if let Some((token, next_refresh)) = self.token.clone() {
             // If the next refresh is greater (in the future) than
             // the current time we can return the token since its still valid
@@ -445,7 +445,7 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+    pub(crate) async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         self.get_metadata(&DYNAMIC_DOCUMENT)
             .await?
             .map(|body| {
@@ -460,7 +460,7 @@ impl MetadataClient {
         clippy::too_many_lines,
         reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+    pub(crate) async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
@@ -669,7 +669,7 @@ fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
 }
 
 impl Keys {
-    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+    pub(crate) fn new(namespace: Option<OptionalTargetPath>) -> Self {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {
