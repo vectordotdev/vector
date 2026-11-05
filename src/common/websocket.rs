@@ -218,7 +218,7 @@ impl PingInterval {
         std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
 
-    pub(crate) async fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         if let Some(interval) = self.interval.as_mut() {
             interval.reset();
         }

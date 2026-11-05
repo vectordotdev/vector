@@ -763,7 +763,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("first message".to_string()))
+                .send(Message::text("first message".to_string()))
                 .await
                 .unwrap();
             // Wait for first message
@@ -772,7 +772,7 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(600)).await;
             let close_frame = CloseFrame {
                 code: CloseCode::Error,
-                reason: Cow::from("Reconnect please"),
+                reason: "Reconnect please".into(),
             };
             websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
 
@@ -784,12 +784,12 @@ mod tests {
             // Wait a bit before sending back pong
             tokio::time::sleep(Duration::from_millis(600)).await;
             websocket
-                .send(Message::Text("pong".to_string()))
+                .send(Message::text("pong".to_string()))
                 .await
                 .unwrap();
             // And only then send the second message
             websocket
-                .send(Message::Text("second message".to_string()))
+                .send(Message::text("second message".to_string()))
                 .await
                 .unwrap();
         });
