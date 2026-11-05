@@ -8,7 +8,7 @@ use std::{
 
 use vector_lib::{
     NamedInternalEvent, gauge,
-    internal_event::{GaugeName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent, LossyF64},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -17,12 +17,8 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
-        gauge!(GaugeName::OpenConnections).set(self.count as f64);
+        gauge!(GaugeName::OpenConnections).set(LossyF64(self.count));
     }
 }
 
@@ -32,12 +28,8 @@ pub struct EndpointsActive {
 }
 
 impl InternalEvent for EndpointsActive {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
-        gauge!(GaugeName::ActiveEndpoints).set(self.count as f64);
+        gauge!(GaugeName::ActiveEndpoints).set(LossyF64(self.count));
     }
 }
 

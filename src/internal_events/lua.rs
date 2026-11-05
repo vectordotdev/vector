@@ -1,7 +1,7 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-    error_type,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, LossyF64, UNINTENTIONAL,
+    error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
 
@@ -13,12 +13,8 @@ pub(crate) struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
-        gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
+        gauge!(GaugeName::LuaMemoryUsedBytes).set(LossyF64(self.used_memory));
     }
 }
 

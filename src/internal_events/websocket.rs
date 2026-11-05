@@ -105,7 +105,7 @@ mod source {
     };
     use vector_lib::{
         NamedInternalEvent, counter, histogram,
-        internal_event::{CounterName, HistogramName, InternalEvent},
+        internal_event::{CounterName, HistogramName, InternalEvent, LossyF64},
     };
 
     use super::PROTOCOL;
@@ -159,10 +159,6 @@ mod source {
     }
 
     impl InternalEvent for WebSocketMessageReceived<'_> {
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-        )]
         fn emit(self) {
             trace!(
                 message = "Events received.",
@@ -174,7 +170,7 @@ mod source {
             );
 
             let histogram = histogram!(HistogramName::ComponentReceivedEventsCount);
-            histogram.record(self.count as f64);
+            histogram.record(LossyF64(self.count));
             let counter = counter!(
                 CounterName::ComponentReceivedEventsTotal,
                 "uri" => self.url.to_string(),

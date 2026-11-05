@@ -2,7 +2,7 @@ use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
     gauge,
-    internal_event::{GaugeName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent, LossyF64},
 };
 
 #[cfg(feature = "sources-file")]
@@ -31,12 +31,8 @@ pub(crate) struct FileOpen {
 }
 
 impl InternalEvent for FileOpen {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
-        gauge!(GaugeName::OpenFiles).set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(LossyF64(self.count));
     }
 }
 

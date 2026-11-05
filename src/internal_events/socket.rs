@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, LossyF64, UNINTENTIONAL,
         error_stage, error_type,
     },
     json_size::JsonSize,
@@ -34,10 +34,6 @@ pub struct SocketBytesReceived {
 }
 
 impl InternalEvent for SocketBytesReceived {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
         let protocol = self.mode.as_str();
         trace!(
@@ -50,7 +46,7 @@ impl InternalEvent for SocketBytesReceived {
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
-        histogram!(HistogramName::ComponentReceivedBytes).record(self.byte_size as f64);
+        histogram!(HistogramName::ComponentReceivedBytes).record(LossyF64(self.byte_size));
     }
 }
 
@@ -62,10 +58,6 @@ pub struct SocketEventsReceived {
 }
 
 impl InternalEvent for SocketEventsReceived {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Metric values are `f64`; precision loss above 2^53 is acceptable"
-    )]
     fn emit(self) {
         let mode = self.mode.as_str();
         trace!(
@@ -79,7 +71,7 @@ impl InternalEvent for SocketEventsReceived {
         counter!(CounterName::ComponentReceivedEventBytesTotal, "mode" => mode)
             .increment(self.byte_size.get() as u64);
         histogram!(HistogramName::ComponentReceivedBytes, "mode" => mode)
-            .record(self.byte_size.get() as f64);
+            .record(LossyF64(self.byte_size.get()));
     }
 }
 
