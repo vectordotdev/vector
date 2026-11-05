@@ -23,10 +23,10 @@ impl ItemBatchSize<Event> for HttpBatchSizer {
             }
             vector_lib::codecs::encoding::Serializer::NativeJson(_) => {
                 let mut encoder = self.encoder.clone();
-                let mut encoded = BytesMut::new();
+                let mut buffer = BytesMut::new();
 
-                match encoder.encode(item.clone(), &mut encoded) {
-                    Ok(()) => encoded.len(),
+                match encoder.encode(item.clone(), &mut buffer) {
+                    Ok(()) => buffer.len(),
                     // The request builder will report the encoding error later. Keep batching
                     // infallible here because `ItemBatchSize` cannot propagate it.
                     Err(_) => item.size_of(),
@@ -60,12 +60,12 @@ mod tests {
 
         let batch_size = sizer.size(&event);
         let ordinary_json_size = event.estimated_json_encoded_size_of().get();
-        let mut encoded = BytesMut::new();
+        let mut buffer = BytesMut::new();
         encoder
-            .encode(event, &mut encoded)
+            .encode(event, &mut buffer)
             .expect("native JSON event should encode");
 
-        assert_eq!(batch_size, encoded.len());
+        assert_eq!(batch_size, buffer.len());
         assert!(batch_size >= ordinary_json_size + 4096);
     }
 }
