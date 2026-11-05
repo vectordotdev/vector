@@ -5,7 +5,7 @@ use vector_lib::codecs::decoding::NewlineDelimitedDecoderConfig;
 use vector_lib::codecs::decoding::framing::OversizedAction;
 use vector_lib::config::proxy::NoProxy;
 
-use http::{Method, Uri, header};
+use http::Uri;
 use tokio::time::Duration;
 use vector_lib::{
     codecs::{
@@ -858,7 +858,7 @@ async fn requests_through_authenticated_proxy() {
     }
 
     let observation = proxy.next_request().await;
-    assert_eq!(observation.method, Method::GET);
+    assert_eq!(observation.method, http::Method::GET);
     assert_eq!(
         observation.uri.to_string(),
         format!("http://{in_addr}/endpoint")
@@ -866,6 +866,6 @@ async fn requests_through_authenticated_proxy() {
     assert!(
         observation
             .headers
-            .contains_key(header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
 }

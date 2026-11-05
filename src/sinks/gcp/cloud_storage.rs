@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http_1::header::{HeaderName, HeaderValue};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -24,7 +24,7 @@ use crate::{
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{client_v1::HttpClient, get_http_scheme_from_uri},
+    http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
         Healthcheck, VectorSink,
@@ -585,14 +585,14 @@ mod tests {
             .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::new(mock_endpoint.clone()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+                HttpEndpoint::new(mock_endpoint).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 &context,
                 &validated,

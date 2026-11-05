@@ -8,7 +8,7 @@ use vector_lib::{counter, gauge};
 use crate::transforms::lua::v2::BuildError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaGcTriggered {
+pub(crate) struct LuaGcTriggered {
     pub used_memory: usize,
 }
 
@@ -21,7 +21,7 @@ impl InternalEvent for LuaGcTriggered {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaScriptError {
+pub(crate) struct LuaScriptError {
     pub error: mlua::Error,
 }
 
@@ -49,7 +49,7 @@ impl InternalEvent for LuaScriptError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaBuildError {
+pub(crate) struct LuaBuildError {
     pub error: BuildError,
 }
 

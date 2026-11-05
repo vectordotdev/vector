@@ -16,17 +16,19 @@ use std::{collections::HashMap, future::ready, io, sync::Arc, time::Duration};
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{
-    HeaderMap, StatusCode, Uri,
+    HeaderMap, Request, StatusCode, Uri,
     header::{HeaderName, HeaderValue, LOCATION},
     response::Parts,
 };
-use hyper::{Body, Request};
+use http_body_util::BodyExt as _;
+use hyper::body::Incoming;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::{RequestBody, empty_body, full_body};
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, configurable::configurable_component,
-    event::Event, json_size::JsonSize, shutdown::ShutdownSignal,
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, event::Event,
+    json_size::JsonSize, shutdown::ShutdownSignal,
 };
 
 use crate::{
@@ -37,7 +39,6 @@ use crate::{
         HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::TlsSettings,
 };
 
 /// Contains the inputs generic to any http client.
@@ -55,8 +56,8 @@ pub(crate) struct GenericHttpClientInputs {
     /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
-    pub tls: TlsSettings,
-    pub proxy: ProxyConfig,
+    /// Client that sends every request of the source.
+    pub client: HttpClient,
     pub shutdown: ShutdownSignal,
 }
 
@@ -309,7 +310,7 @@ fn build_request_for_url(
     body: Option<&Bytes>,
     cross_origin: bool,
     body_dropped: bool,
-) -> Result<Request<Body>, http::Error> {
+) -> Result<Request<RequestBody>, http::Error> {
     let mut builder = match http_method {
         HttpMethod::Head => Request::head(url),
         HttpMethod::Get => Request::get(url),
@@ -347,9 +348,9 @@ fn build_request_for_url(
             if !inputs.headers.contains_key(http::header::CONTENT_TYPE) {
                 builder = builder.header(http::header::CONTENT_TYPE, "application/json");
             }
-            Body::from(body.to_vec())
+            full_body(body.clone())
         }
-        None => Body::empty(),
+        None => empty_body(),
     };
 
     let mut request = builder.body(body)?;
@@ -414,8 +415,9 @@ async fn send_http_request(
     url: &Uri,
     cross_origin: bool,
     body_dropped: bool,
-) -> Result<http::Response<Body>, Error> {
-    let request = build_request_for_url(url, http_method, inputs, body, cross_origin, body_dropped)?;
+) -> Result<http::Response<Incoming>, Error> {
+    let request =
+        build_request_for_url(url, http_method, inputs, body, cross_origin, body_dropped)?;
     client.send(request).await.map_err(Error::from)
 }
 
@@ -430,7 +432,7 @@ async fn send_request_with_redirects(
     http_method: HttpMethod,
     body: Option<Bytes>,
     initial_url: Uri,
-) -> Result<http::Response<Body>, Error> {
+) -> Result<http::Response<Incoming>, Error> {
     if !inputs.redirects.follow {
         let response = tokio::time::timeout(
             inputs.timeout,
@@ -549,10 +551,7 @@ pub(crate) async fn call<
     mut out: SourceSender,
     http_method: HttpMethod,
 ) -> vector_lib::source_sender::SendResult {
-    // Building the HttpClient should not fail as it is just setting up the client with the
-    // proxy and tls settings.
-    let client =
-        HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("Building HTTP client failed");
+    let client = inputs.client.clone();
     let urls = inputs.urls.clone();
     let interval = inputs.interval;
     let shutdown = inputs.shutdown.clone();
@@ -565,7 +564,7 @@ pub(crate) async fn call<
         .map(move |base_url| {
             let client = client.clone();
             let endpoint = base_url.to_string();
-            let inputs = inputs.clone();
+            let inputs = Arc::clone(&inputs);
 
             let context_builder = context_builder.clone();
             let mut context = context_builder.build(&base_url);
@@ -584,7 +583,7 @@ pub(crate) async fn call<
                 let endpoint = endpoint.clone();
                 async move {
                     let (header, body) = response.into_parts();
-                    let body = http_body::Body::collect(body).await?.to_bytes();
+                    let body = body.collect().await?.to_bytes();
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
@@ -596,7 +595,7 @@ pub(crate) async fn call<
             .into_stream()
             .filter_map(move |response| {
                 ready(match response {
-                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                    Ok((header, body)) if header.status == StatusCode::OK => {
                         context
                             .on_response(&request_url, &header, &body)
                             .map(|mut events| {
@@ -666,10 +665,14 @@ pub(crate) async fn call<
 #[cfg(test)]
 mod tests {
     use http::header::COOKIE;
+    use vector_lib::config::proxy::ProxyConfig;
     use warp::{Filter, Reply};
 
     use super::*;
-    use crate::test_util::{next_addr, wait_for_tcp};
+    use crate::{
+        test_util::{next_addr, wait_for_tcp},
+        tls::MaybeTlsSettings,
+    };
 
     #[test]
     fn headers_are_normalized_and_sensitive() {
@@ -724,8 +727,8 @@ mod tests {
                 .expect("valid redirect configuration"),
             content_type: "text/plain".to_owned(),
             auth,
-            tls: TlsSettings::from_options(None).expect("valid TLS settings"),
-            proxy: ProxyConfig::default(),
+            client: HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default())
+                .expect("valid HTTP client"),
             shutdown: ShutdownSignal::noop(),
         }
     }
@@ -764,10 +767,8 @@ mod tests {
         body: Option<&str>,
         inputs: &GenericHttpClientInputs,
     ) -> Result<(StatusCode, String), Error> {
-        let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("valid HTTP client");
-
         let response = send_request_with_redirects(
-            client,
+            inputs.client.clone(),
             inputs,
             method,
             body.map(|body| Bytes::copy_from_slice(body.as_bytes())),
@@ -776,9 +777,7 @@ mod tests {
         .await?;
 
         let status = response.status();
-        let body = http_body::Body::collect(response.into_body())
-            .await?
-            .to_bytes();
+        let body = response.into_body().collect().await?.to_bytes();
 
         Ok((status, String::from_utf8_lossy(&body).into_owned()))
     }
@@ -804,29 +803,43 @@ mod tests {
     fn body_framing_headers_are_only_dropped_after_method_rewrite() {
         let mut headers = HeaderMap::new();
         headers.insert(http::header::CONTENT_LENGTH, HeaderValue::from_static("7"));
-        headers.insert(http::header::TRANSFER_ENCODING, HeaderValue::from_static("chunked"));
-        headers.insert(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+        headers.insert(
+            http::header::TRANSFER_ENCODING,
+            HeaderValue::from_static("chunked"),
+        );
+        headers.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("text/plain"),
+        );
         let inputs = test_inputs(Redirects::default(), headers, None);
         let url = "http://example.com/target".parse::<Uri>().unwrap();
         let body = Bytes::from_static(b"payload");
 
-        let initial = build_request_for_url(
-            &url,
-            HttpMethod::Post,
-            &inputs,
-            Some(&body),
-            false,
-            false,
-        )
-        .unwrap();
+        let initial =
+            build_request_for_url(&url, HttpMethod::Post, &inputs, Some(&body), false, false)
+                .unwrap();
         assert_eq!(initial.headers()[http::header::CONTENT_LENGTH], "7");
-        assert_eq!(initial.headers()[http::header::TRANSFER_ENCODING], "chunked");
+        assert_eq!(
+            initial.headers()[http::header::TRANSFER_ENCODING],
+            "chunked"
+        );
 
-        let redirected = build_request_for_url(&url, HttpMethod::Get, &inputs, None, false, true)
-            .unwrap();
-        assert!(!redirected.headers().contains_key(http::header::CONTENT_LENGTH));
-        assert!(!redirected.headers().contains_key(http::header::TRANSFER_ENCODING));
-        assert_eq!(redirected.headers()[http::header::CONTENT_TYPE], "text/plain");
+        let redirected =
+            build_request_for_url(&url, HttpMethod::Get, &inputs, None, false, true).unwrap();
+        assert!(
+            !redirected
+                .headers()
+                .contains_key(http::header::CONTENT_LENGTH)
+        );
+        assert!(
+            !redirected
+                .headers()
+                .contains_key(http::header::TRANSFER_ENCODING)
+        );
+        assert_eq!(
+            redirected.headers()[http::header::CONTENT_TYPE],
+            "text/plain"
+        );
     }
 
     #[tokio::test]
@@ -865,7 +878,10 @@ mod tests {
         .expect("redirected request should succeed");
 
         assert_eq!(status, StatusCode::OK);
-        assert!(body == "GET|" || body == "GET|0", "unexpected request: {body}");
+        assert!(
+            body == "GET|" || body == "GET|0",
+            "unexpected request: {body}"
+        );
     }
 
     #[tokio::test]
@@ -1156,7 +1172,10 @@ mod tests {
         wait_for_tcp(addr).await;
 
         let mut headers = HeaderMap::new();
-        headers.insert(http::header::HOST, HeaderValue::from_static("original.example"));
+        headers.insert(
+            http::header::HOST,
+            HeaderValue::from_static("original.example"),
+        );
         let inputs = test_inputs(
             Redirects {
                 follow: Some(true),
@@ -1194,7 +1213,10 @@ mod tests {
         wait_for_tcp(addr).await;
 
         let mut headers = HeaderMap::new();
-        headers.insert(http::header::HOST, HeaderValue::from_static("original.example"));
+        headers.insert(
+            http::header::HOST,
+            HeaderValue::from_static("original.example"),
+        );
         let inputs = test_inputs(
             Redirects {
                 follow: Some(true),

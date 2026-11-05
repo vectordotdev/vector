@@ -38,7 +38,7 @@ impl Record for KinesisStreamRecord {
 
         // data is base64 encoded
         let data_len = self.record.data.as_ref().len();
-        let key_len = self.record.partition_key.len();
+        let key_len = self.record.partition_key.as_ref().map_or(0, String::len);
 
         data_len.div_ceil(3) * 4 + hash_key_size + key_len + 10
     }

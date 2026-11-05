@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
-use http_1::Request;
+use http::Request;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
@@ -19,11 +19,15 @@ use super::{
     acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{Compression, http::HttpRequest, http_v1::HttpResponse, sink::Response},
+        util::{
+            Compression,
+            http::{HttpRequest, HttpResponse},
+            sink::Response,
+        },
     },
 };
 
@@ -328,7 +332,7 @@ mod tests {
             request::HecRequest,
             service::{HecAckResponseBody, HecService, HttpRequestBuilder, MetadataFields},
         },
-        util::{Compression, http_v1::HttpService, metadata::RequestMetadataBuilder},
+        util::{Compression, http::HttpService, metadata::RequestMetadataBuilder},
     };
 
     const TOKEN: &str = "token";
