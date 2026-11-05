@@ -26,7 +26,7 @@ const MAX_EVENT_SIZE: usize = 1024 * 1024;
 const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD - BATCH_SIZE_OVERHEAD;
 
 #[derive(Clone)]
-pub struct CloudwatchRequest {
+pub(super) struct CloudwatchRequest {
     pub key: CloudwatchKey,
     pub(super) message: String,
     pub timestamp: i64,
@@ -50,7 +50,7 @@ impl MetaDescriptive for CloudwatchRequest {
     }
 }
 
-pub struct CloudwatchRequestBuilder {
+pub(super) struct CloudwatchRequestBuilder {
     pub group_template: ConfinedTemplate,
     pub stream_template: UnconfinedTemplate,
     pub transformer: Transformer,
@@ -58,7 +58,7 @@ pub struct CloudwatchRequestBuilder {
 }
 
 impl CloudwatchRequestBuilder {
-    pub fn build(&mut self, mut event: Event) -> Option<CloudwatchRequest> {
+    pub(super) fn build(&mut self, mut event: Event) -> Option<CloudwatchRequest> {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {

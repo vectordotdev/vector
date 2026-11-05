@@ -5,7 +5,6 @@ use std::{
 };
 
 use glob::Pattern;
-use http::Uri;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
@@ -514,28 +513,25 @@ pub struct SubscribeHandles {
     pub poll_handle: JoinHandle<()>,
 }
 
-/// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
-/// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
-/// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
+/// Subscribe to each metrics stream, all sharing the connection of `client`.
+/// HTTP/2 multiplexes the concurrent streams — cloning a `Client` is cheap (clones share
+/// one connection pool) and avoids redundant TCP/HTTP2 handshakes.
 ///
-/// # Errors
-/// Returns an error if the API connection cannot be established.
+/// Pass the client that [`init_components`] used, so the streams reuse the connection that its
+/// RPCs opened. A stream that fails, for example because the API is unreachable, ends its task.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Keep the concrete set type used by the component polling task."
 )]
-pub async fn subscribe(
-    uri: Uri,
+pub fn subscribe(
+    client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
     initial_components: HashSet<String>,
-) -> Result<SubscribeHandles, vector_api_client::Error> {
+) -> SubscribeHandles {
     let components_patterns = Arc::from(components_patterns);
-
-    let mut client = Client::new(uri);
-    client.connect().await?;
 
     let poll_handle = tokio::spawn(poll_components(
         client.clone(),
@@ -612,24 +608,24 @@ pub async fn subscribe(
         Arc::clone(&components_patterns),
     )));
 
-    Ok(SubscribeHandles {
+    SubscribeHandles {
         metric_handles,
         poll_handle,
-    })
+    }
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
 ///
+/// `client` must be connected. Its RPCs open the connection, so success means the API is
+/// reachable.
+///
 /// # Errors
 /// Returns an error if fetching the initial component list fails.
 pub async fn init_components(
-    uri: Uri,
+    client: &mut Client,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client = Client::new(uri);
-    client.connect().await?;
-
     // Get all components
     let response = client.get_components(0).await?;
 

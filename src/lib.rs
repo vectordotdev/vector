@@ -10,10 +10,6 @@
 #![allow(async_fn_in_trait)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::match_wild_err_arm)]
-#![allow(clippy::new_ret_no_self)]
-#![allow(clippy::type_complexity)]
-#![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
@@ -45,14 +41,11 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
         tikv_jemallocator::Jemalloc,
     );
 
-#[allow(unreachable_pub)]
 pub mod internal_telemetry;
 
 #[macro_use]
-#[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
-#[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
 pub mod dns;
@@ -62,40 +55,40 @@ pub mod expiring_hash_map;
 pub mod generate;
 pub mod generate_schema;
 #[macro_use]
-#[allow(unreachable_pub)]
 pub mod internal_events;
 #[cfg(feature = "lapin")]
 pub mod amqp;
 #[cfg(feature = "api")]
-#[allow(unreachable_pub)]
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
-pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
-pub mod extra_context;
 #[cfg(feature = "gcp")]
 pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
-#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
-#[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub mod nats;
 pub mod net;
-#[allow(unreachable_pub)]
+#[cfg_attr(
+    any(feature = "api", feature = "sources-vector", feature = "sinks-vector"),
+    expect(
+        unreachable_pub,
+        reason = "tonic-build generates `pub` items and has no option to narrow their visibility"
+    )
+)]
 pub(crate) mod proto;
 pub mod providers;
 pub mod secrets;
@@ -106,23 +99,18 @@ pub mod signal;
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
-#[allow(unreachable_pub)]
 pub mod sources;
 #[cfg(feature = "api-client")]
-#[allow(unreachable_pub)]
 pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "top")]
 pub mod top;
-#[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
-#[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
-pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
@@ -244,37 +232,3 @@ pub fn get_hostname() -> std::io::Result<String> {
 }
 
 pub(crate) use vector_lib::spawn_in_current_span;
-
-/// Spawn a task with the given name. The name is only used if
-/// built with [`tokio_unstable`][tokio_unstable].
-///
-/// [tokio_unstable]: https://docs.rs/tokio/latest/tokio/#unstable-features
-#[track_caller]
-pub(crate) fn spawn_named<T>(
-    task: impl std::future::Future<Output = T> + Send + 'static,
-    _name: &str,
-) -> tokio::task::JoinHandle<T>
-where
-    T: Send + 'static,
-{
-    #[cfg(tokio_unstable)]
-    return tokio::task::Builder::new()
-        .name(_name)
-        .spawn(task)
-        .expect("tokio task should spawn");
-
-    #[cfg(not(tokio_unstable))]
-    tokio::spawn(task)
-}
-
-/// Returns an estimate of the number of recommended threads that Vector should spawn.
-pub fn num_threads() -> usize {
-    let count = match std::thread::available_parallelism() {
-        Ok(count) => count,
-        Err(error) => {
-            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
-            std::num::NonZeroUsize::MIN
-        }
-    };
-    usize::from(count)
-}

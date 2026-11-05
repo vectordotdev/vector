@@ -6,6 +6,7 @@ use std::{
 use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
+use vector_http::full_body;
 use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
@@ -14,10 +15,10 @@ use super::{
     build_request,
 };
 use crate::{
-    http::client_v1::{HttpClient, full_body},
+    http::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::{Compression, Compressor},
     },
 };
@@ -33,7 +34,7 @@ use crate::{
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
-pub async fn flush_apm_stats_thread(
+pub(crate) async fn flush_apm_stats_thread(
     mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
     compression: Compression,
@@ -130,7 +131,7 @@ impl ApmStatsSender {
 
         let http_request = trace_api_request
             .into_http_request()
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
         self.client.send(http_request.map(full_body)).await?;
 

@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
         prelude::*,
@@ -343,6 +343,13 @@ impl ValidatedSink for LokiConfig {
 }
 
 #[must_use]
+#[cfg_attr(
+    not(feature = "loki-benches"),
+    expect(
+        unreachable_pub,
+        reason = "Re-exported for the Loki benchmarks only when `loki-benches` is enabled"
+    )
+)]
 pub fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
