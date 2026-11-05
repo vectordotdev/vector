@@ -224,13 +224,12 @@ impl ValidatedSink for DatabendConfig {
             transformer,
         } = validated;
 
-        if self
-            .tls
-            .as_ref()
-            .is_some_and(TlsConfig::has_protocol_version_bounds)
-        {
-            vector_lib::tls::warn_unenforceable_protocol_versions("databend-client");
-        }
+        vector_lib::tls::enforce_protocol_version_bounds(
+            self.tls.as_ref().and_then(|tls| tls.min_version),
+            self.tls.as_ref().and_then(|tls| tls.max_version),
+            "databend-client",
+            vector_lib::tls::TLS12_TO_TLS13,
+        )?;
 
         let ua = format!("vector/{}", vector_version());
         let health_client = DatabendAPIClient::new(endpoint, Some(ua.clone())).await?;

@@ -272,10 +272,6 @@ pub struct TlsConfig {
 
 impl TlsConfig {
     /// Whether an explicit TLS protocol version window was configured.
-    ///
-    /// Components that hand this configuration to a third-party TLS stack rather than applying it
-    /// to an OpenSSL context use this to warn instead of ignoring the bounds silently. See
-    /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
     pub fn has_protocol_version_bounds(&self) -> bool {
         self.min_version.is_some() || self.max_version.is_some()
     }
@@ -376,16 +372,6 @@ impl TlsSettings {
         self.verify_hostname
     }
 
-    /// Whether an explicit TLS protocol version window was configured.
-    ///
-    /// Components that hand the PEM material to a third-party TLS stack instead of applying
-    /// these settings to an OpenSSL context cannot honor `min_version`/`max_version`,
-    /// and use this to warn rather than ignore them silently. See
-    /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
-    pub fn has_protocol_version_bounds(&self) -> bool {
-        self.min_version.is_some() || self.max_version.is_some()
-    }
-
     /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
@@ -468,17 +454,7 @@ impl TlsSettings {
             context.clear_options(SslOptions::NO_TLSV1_3);
         }
 
-        let min = context
-            .min_proto_version()
-            .and_then(TlsVersion::from_ssl_version)
-            .unwrap_or(TlsVersion::Tls10);
-        // The only maximum `TlsVersion` cannot model is SSLv3, which is below every usable version.
-        let Some(max) = context
-            .max_proto_version()
-            .map_or(Some(TlsVersion::Tls13), TlsVersion::from_ssl_version)
-        else {
-            return Err(TlsError::HostMaxTlsVersionBelowTls10);
-        };
+        let (min, max) = context_protocol_version_range(context)?;
         let options = context.options();
         // OpenSSL accepts a context with no usable version and only fails at handshake time.
         if !TlsVersion::ALL.into_iter().any(|version| {
@@ -645,6 +621,34 @@ impl TlsSettings {
 fn host_disables_tls13() -> Result<bool> {
     let context = SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)?;
     Ok(context.options().contains(SslOptions::NO_TLSV1_3))
+}
+
+/// Reads the minimum and maximum protocol versions `context` would currently negotiate.
+///
+/// A `None` bound from OpenSSL means "whatever the library allows": `TlsVersion::Tls10` at the
+/// bottom, since `SSLv3` is disabled by default, and `TlsVersion::Tls13` at the top.
+fn context_protocol_version_range(
+    context: &mut SslContextBuilder,
+) -> Result<(TlsVersion, TlsVersion)> {
+    let min = context
+        .min_proto_version()
+        .and_then(TlsVersion::from_ssl_version)
+        .unwrap_or(TlsVersion::Tls10);
+    // The only maximum `TlsVersion` cannot model is SSLv3, which is below every usable version.
+    let Some(max) = context
+        .max_proto_version()
+        .map_or(Some(TlsVersion::Tls13), TlsVersion::from_ssl_version)
+    else {
+        return Err(TlsError::HostMaxTlsVersionBelowTls10);
+    };
+    Ok((min, max))
+}
+
+/// The protocol version range a fresh OpenSSL client context may negotiate under the host's
+/// policy, i.e. what librdkafka's `TLS_client_method` context would see.
+pub fn host_protocol_version_range() -> Result<(TlsVersion, TlsVersion)> {
+    let mut context = SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)?;
+    context_protocol_version_range(&mut context)
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.

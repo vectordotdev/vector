@@ -58,13 +58,18 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
             || alpn_protocols.is_some()
             || key_pass.is_some()
             || server_name.is_some()
-            || min_version.is_some()
-            || max_version.is_some()
         {
             warn!(
-                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass, server_name, min_version and max_version are not supported by greptimedb client at the moment."
+                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass and server_name are not supported by greptimedb client at the moment."
             );
         }
+
+        vector_lib::tls::enforce_protocol_version_bounds(
+            *min_version,
+            *max_version,
+            "greptimedb-ingester",
+            vector_lib::tls::TLS12_TO_TLS13,
+        )?;
 
         // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
         // key_file) to be set. Refuse a partial config rather than downgrading to plaintext.

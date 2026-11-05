@@ -58,14 +58,15 @@ pub(crate) async fn await_connection(connection: &AmqpConfig) {
 }
 
 impl AmqpConfig {
-    pub(crate) fn warn_unenforceable_protocol_versions(&self) {
-        if self
-            .tls
-            .as_ref()
-            .is_some_and(crate::tls::TlsConfig::has_protocol_version_bounds)
-        {
-            vector_lib::tls::warn_unenforceable_protocol_versions("lapin");
-        }
+    // native-tls pins TLS 1.2-1.3 itself (`set_min/max_proto_version`), overriding host policy.
+    pub(crate) fn enforce_protocol_version_bounds(&self) -> vector_lib::tls::Result<()> {
+        let tls = self.tls.as_ref();
+        vector_lib::tls::enforce_protocol_version_bounds(
+            tls.and_then(|tls| tls.min_version),
+            tls.and_then(|tls| tls.max_version),
+            "lapin",
+            vector_lib::tls::TLS12_TO_TLS13,
+        )
     }
 
     pub(crate) async fn connect(

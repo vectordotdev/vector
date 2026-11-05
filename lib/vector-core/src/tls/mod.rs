@@ -25,6 +25,7 @@ pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
     TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
     TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig, TlsVersion,
+    host_protocol_version_range,
 };
 
 /// Install Ring as the process-wide Rustls provider if none is already installed.
@@ -39,17 +40,46 @@ pub fn install_default_crypto_provider() {
 
 pub type Result<T> = std::result::Result<T, TlsError>;
 
-/// Warns that `tls_stack` cannot honor the configured TLS protocol version bounds.
+/// The protocol version range every rustls-based stack this crate talks to negotiates, and the
+/// range `native-tls` pins itself to regardless of host policy (see `amqp`'s caller).
+pub const TLS12_TO_TLS13: (TlsVersion, TlsVersion) = (TlsVersion::Tls12, TlsVersion::Tls13);
+
+/// Fails unless `tls_stack`'s negotiable range guarantees the configured `min`/`max` bounds.
 ///
-/// `min_version`/`max_version` are applied to the OpenSSL context built by
-/// [`TlsSettings::apply_context_base`]. Components that instead pass the configured certificates
-/// to a third-party TLS implementation never reach that code, so the bounds have no effect there.
-/// Because they are a security control, such components warn rather than ignore them silently.
-pub fn warn_unenforceable_protocol_versions(tls_stack: &str) {
-    warn!(
-        message = "`tls.min_version` and `tls.max_version` are not enforced by this component's TLS implementation and are ignored.",
-        tls_stack
-    );
+/// `min_version`/`max_version` are normally applied to the OpenSSL context built by
+/// [`TlsSettings::apply_context_base`]. Components that instead hand the configured certificates
+/// to a third-party TLS implementation never reach that code, so a bound only holds if
+/// `tls_stack` can never negotiate outside it on its own; `negotiable_range` is the
+/// `(lowest, highest)` version the stack may pick regardless of what Vector asks for.
+pub fn enforce_protocol_version_bounds(
+    min: Option<TlsVersion>,
+    max: Option<TlsVersion>,
+    tls_stack: &str,
+    negotiable_range: (TlsVersion, TlsVersion),
+) -> Result<()> {
+    let (lowest, highest) = negotiable_range;
+    let min = min.filter(|&min| min > lowest);
+    let max = max.filter(|&max| max < highest);
+    if min.is_none() && max.is_none() {
+        return Ok(());
+    }
+
+    let bound = match (min, max) {
+        (Some(min), Some(max)) => format!("`tls.min_version` {min} and `tls.max_version` {max}"),
+        (Some(min), None) => format!("`tls.min_version` {min}"),
+        (None, Some(max)) => format!("`tls.max_version` {max}"),
+        (None, None) => unreachable!("checked above"),
+    };
+    let plural = if min.is_some() && max.is_some() {
+        "s"
+    } else {
+        ""
+    };
+    Err(TlsError::ProtocolVersionUnenforceable {
+        message: format!(
+            "{bound} cannot be enforced by {tls_stack}, which may negotiate {lowest} to {highest}. Widen or remove the bound{plural}."
+        ),
+    })
 }
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
@@ -145,6 +175,8 @@ pub enum TlsError {
          below TLS v1.0."
     ))]
     HostMaxTlsVersionBelowTls10,
+    #[snafu(display("{}", message))]
+    ProtocolVersionUnenforceable { message: String },
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]
@@ -241,4 +273,93 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
             .context(SetSniSnafu)?;
     }
     Ok(configure)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn unset_bounds_are_always_enforceable() {
+        enforce_protocol_version_bounds(None, None, "rumqttc", TLS12_TO_TLS13).unwrap();
+    }
+
+    #[test]
+    fn a_minimum_within_the_negotiable_floor_is_enforceable() {
+        for min in [TlsVersion::Tls10, TlsVersion::Tls11, TlsVersion::Tls12] {
+            enforce_protocol_version_bounds(Some(min), None, "async-nats", TLS12_TO_TLS13)
+                .unwrap_or_else(|error| panic!("{min} should be enforceable: {error}"));
+        }
+    }
+
+    #[test]
+    fn a_minimum_above_the_negotiable_floor_is_unenforceable() {
+        let error = enforce_protocol_version_bounds(
+            Some(TlsVersion::Tls13),
+            None,
+            "async-nats",
+            TLS12_TO_TLS13,
+        )
+        .expect_err("a minimum the stack might not reach should be rejected");
+        assert!(
+            matches!(error, TlsError::ProtocolVersionUnenforceable { .. }),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("`tls.min_version` TLSv1.3"));
+    }
+
+    #[test]
+    fn a_maximum_at_the_negotiable_ceiling_is_enforceable() {
+        enforce_protocol_version_bounds(
+            None,
+            Some(TlsVersion::Tls13),
+            "async-nats",
+            TLS12_TO_TLS13,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_maximum_below_the_negotiable_ceiling_is_unenforceable() {
+        let error = enforce_protocol_version_bounds(
+            None,
+            Some(TlsVersion::Tls12),
+            "async-nats",
+            TLS12_TO_TLS13,
+        )
+        .expect_err("a maximum the stack might exceed should be rejected");
+        assert!(
+            matches!(error, TlsError::ProtocolVersionUnenforceable { .. }),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("`tls.max_version` TLSv1.2"));
+    }
+
+    // Stands in for librdkafka's negotiable range, which is the host's OpenSSL policy, not a constant.
+    #[test]
+    fn an_explicit_host_range_is_enforced_for_librdkafka() {
+        // A host `MinProtocol = TLSv1.2` already guarantees the configured minimum.
+        let host_floor_at_tls12 = (TlsVersion::Tls12, TlsVersion::Tls13);
+        enforce_protocol_version_bounds(
+            Some(TlsVersion::Tls12),
+            None,
+            "librdkafka",
+            host_floor_at_tls12,
+        )
+        .unwrap();
+
+        // An unrestricted host could still negotiate below the configured minimum.
+        let unrestricted_host = (TlsVersion::Tls10, TlsVersion::Tls13);
+        let error = enforce_protocol_version_bounds(
+            Some(TlsVersion::Tls13),
+            None,
+            "librdkafka",
+            unrestricted_host,
+        )
+        .expect_err("a host policy that cannot reach the configured minimum should be rejected");
+        assert!(matches!(
+            error,
+            TlsError::ProtocolVersionUnenforceable { .. }
+        ));
+    }
 }

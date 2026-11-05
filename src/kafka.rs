@@ -108,10 +108,14 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
-            // librdkafka owns the TLS handshake and exposes no minimum/maximum protocol version
-            // property, so the configured bounds cannot be forwarded.
+            // librdkafka exposes no protocol version knobs, so only the host's OpenSSL policy can guarantee a bound.
             if tls.options.has_protocol_version_bounds() {
-                vector_lib::tls::warn_unenforceable_protocol_versions("librdkafka");
+                vector_lib::tls::enforce_protocol_version_bounds(
+                    tls.options.min_version,
+                    tls.options.max_version,
+                    "librdkafka",
+                    vector_lib::tls::host_protocol_version_range()?,
+                )?;
             }
 
             if let Some(verify_certificate) = &tls.options.verify_certificate {
@@ -187,3 +191,27 @@ impl ClientContext for KafkaStatisticsContext {
 }
 
 impl ConsumerContext for KafkaStatisticsContext {}
+
+#[cfg(test)]
+mod tests {
+    use vector_lib::tls::{TlsConfig, TlsVersion};
+
+    use super::*;
+
+    #[test]
+    fn apply_rejects_a_minimum_the_host_policy_cannot_guarantee() {
+        let auth = KafkaAuthConfig {
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    min_version: Some(TlsVersion::Tls13),
+                    ..Default::default()
+                },
+            }),
+            ..Default::default()
+        };
+        let mut client_config = ClientConfig::new();
+        auth.apply(&mut client_config)
+            .expect_err("librdkafka cannot enforce a TLS v1.3 minimum beyond host policy");
+    }
+}
