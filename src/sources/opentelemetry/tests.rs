@@ -216,6 +216,50 @@ fn generate_config() {
     test_util::test_generate_config::<OpentelemetryConfig>();
 }
 
+#[tokio::test]
+async fn rejects_deeply_nested_protobuf() {
+    use vector_lib::opentelemetry::proto::common::v1::{ArrayValue, any_value};
+
+    for preserve_otlp in [false, true] {
+        let env = build_otlp_test_env_with(LOGS, None, preserve_otlp).await;
+        test_util::wait_for_tcp(env.config.http.address).await;
+        let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
+            .await
+            .unwrap();
+        let mut body = AnyValue {
+            value: Some(StringValue("nested".to_owned())),
+        };
+        // Each array adds two Protobuf message levels, exceeding the decode-depth
+        // budget with a small payload rather than relying on the message-size cap.
+        for _ in 0..64 {
+            body = AnyValue {
+                value: Some(any_value::Value::ArrayValue(ArrayValue {
+                    values: vec![body],
+                })),
+            };
+        }
+        let mut request = create_test_logs_request().into_inner();
+        request.resource_logs[0].scope_logs[0].log_records[0].body = Some(body);
+        let encoded = request.encode_to_vec();
+
+        let error = client.export(request).await.unwrap_err();
+        assert_eq!(error.code(), tonic::Code::Internal);
+        assert!(error.message().contains("recursion limit reached"));
+
+        let response = reqwest::Client::new()
+            .post(format!("http://{}/v1/logs", env.config.http.address))
+            .header("Content-Type", "application/x-protobuf")
+            .body(encoded)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+
+        client.export(create_test_logs_request()).await.unwrap();
+        assert_eq!(test_util::collect_ready(env.output).len(), 1);
+    }
+}
+
 #[test]
 fn admission_config_defaults_and_rejects_invalid_values() {
     let yaml = "grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n";
