@@ -111,7 +111,7 @@ impl WebSocketConnector {
             .context(CreateFailedSnafu)?;
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         let maybe_tls = self.tls_connect().await?;

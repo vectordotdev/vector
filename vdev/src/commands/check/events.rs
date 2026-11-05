@@ -1427,10 +1427,12 @@ mod tests {
 
     #[test]
     fn format_check_skips_non_literal_messages() {
-        // `error!(?err, "Plain text.")` — literal is fine, no report.
-        let src = r#"fn _f() { error!(?err, "Plain text."); }"#;
-        let reports = format_check_log_messages(src, "fixture.rs");
-        assert!(reports.is_empty(), "expected no reports, got: {reports:?}");
+        let source = r#"fn example() {
+            error!(message = reason, error_type = err);
+            warn!(reason);
+            info!(?err, "Plain text.");
+        }"#;
+        assert!(format_check_log_messages(source, "fixture.rs").is_empty());
     }
 
     #[test]
@@ -1454,49 +1456,29 @@ mod tests {
         assert!(p.parameters.contains(&"protocol".to_string()));
     }
 
-    fn check(message: &str) -> (bool, bool) {
-        // Replicates the gating in `format_check_log_messages` for a literal message.
-        let is_capitalized = message.starts_with('{')
-            || !message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_alphabetic())
-            || message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_uppercase());
-        let has_trailing_period = message.ends_with('}') || message.ends_with('.');
-        (is_capitalized, has_trailing_period)
-    }
-
     #[test]
-    fn message_format_capital_period_pass() {
-        assert_eq!(check("Hello there."), (true, true));
-    }
-
-    #[test]
-    fn message_format_lowercase_first_fails() {
-        let (cap, _) = check("hello there.");
-        assert!(!cap);
-    }
-
-    #[test]
-    fn message_format_no_period_fails() {
-        let (_, period) = check("Hello there");
-        assert!(!period);
-    }
-
-    #[test]
-    fn message_format_interpolation_passes() {
-        // `{...}` at start or end is fine — we can't see what it expands to.
-        assert_eq!(check("{count} dropped."), (true, true));
-        assert_eq!(check("Dropped {count}"), (true, true));
-    }
-
-    #[test]
-    fn message_format_non_alpha_first_passes() {
-        // E.g. starts with a number — no capitalisation requirement.
-        assert_eq!(check("42 things happened."), (true, true));
+    fn checks_literal_message_format() {
+        for (message, capital, period) in [
+            ("Hello there.", true, true),
+            ("hello there.", false, true),
+            ("Hello there", true, false),
+            ("hello there", false, false),
+            ("{count} dropped.", true, true),
+            ("Dropped {count}", true, true),
+            ("42 things happened.", true, true),
+        ] {
+            let source = format!("fn example() {{ info!({message:?}); }}");
+            let reports = format_check_log_messages(&source, "fixture.rs");
+            let mut expected = Vec::new();
+            if !capital {
+                expected
+                    .push("    Message must start with a capital. (`info` call on fixture.rs:1)");
+            }
+            if !period {
+                expected.push("    Message must end with a period. (`info` call on fixture.rs:1)");
+            }
+            assert_eq!(reports, expected, "{message}");
+        }
     }
 
     // ---- validate_event branch coverage --------------------------------

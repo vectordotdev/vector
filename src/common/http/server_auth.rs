@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
 use headers::{Authorization, authorization::Credentials};
-use http_0::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use serde::{
     Deserialize,
     de::{Error, MapAccess, Visitor},
@@ -371,44 +371,10 @@ impl HttpServerAuthMatcher {
         headers: &HeaderMap<HeaderValue>,
         path: &str,
     ) -> Result<Option<ObjectMap>, ErrorMessage> {
-        self.handle_auth_headers(
-            address,
-            headers.iter().map(|(k, v)| (k.as_str(), v.as_bytes())),
-            path,
-        )
-    }
-
-    /// Same as [`Self::handle_auth`], for `http` 1 headers.
-    ///
-    /// # Errors
-    ///
-    /// See [`Self::handle_auth`].
-    pub fn handle_auth_v1(
-        &self,
-        address: Option<&SocketAddr>,
-        headers: &http::HeaderMap,
-        path: &str,
-    ) -> Result<Option<ObjectMap>, ErrorMessage> {
-        self.handle_auth_headers(
-            address,
-            headers.iter().map(|(k, v)| (k.as_str(), v.as_bytes())),
-            path,
-        )
-    }
-
-    /// `headers` yields `(lowercase name, value)` pairs in `HeaderMap` iteration order.
-    fn handle_auth_headers<'a>(
-        &self,
-        address: Option<&SocketAddr>,
-        mut headers: impl Iterator<Item = (&'a str, &'a [u8])>,
-        path: &str,
-    ) -> Result<Option<ObjectMap>, ErrorMessage> {
         match self {
             HttpServerAuthMatcher::AuthHeader(expected, err_message) => {
-                // The first value of a name is what `HeaderMap::get` returns.
-                if let Some((_, header)) = headers.find(|(name, _)| *name == AUTHORIZATION.as_str())
-                {
-                    if expected.as_bytes() == header {
+                if let Some(header) = headers.get(AUTHORIZATION) {
+                    if expected == header {
                         Ok(None)
                     } else {
                         Err(ErrorMessage::new(
@@ -438,10 +404,10 @@ impl HttpServerAuthMatcher {
         clippy::unused_self,
         reason = "Preserve the existing method receiver and call sites during the lint rollout."
     )]
-    fn handle_vrl_auth<'a>(
+    fn handle_vrl_auth(
         &self,
         address: Option<&SocketAddr>,
-        headers: impl Iterator<Item = (&'a str, &'a [u8])>,
+        headers: &HeaderMap<HeaderValue>,
         path: &str,
         program: &Program,
     ) -> Result<Option<ObjectMap>, ErrorMessage> {
@@ -452,8 +418,12 @@ impl HttpServerAuthMatcher {
                         "headers".into(),
                         Value::Object(
                             headers
+                                .iter()
                                 .map(|(k, v)| {
-                                    (KeyString::from(k), Value::Bytes(Bytes::copy_from_slice(v)))
+                                    (
+                                        KeyString::from(k.to_string()),
+                                        Value::Bytes(Bytes::copy_from_slice(v.as_bytes())),
+                                    )
                                 })
                                 .collect::<ObjectMap>(),
                         ),

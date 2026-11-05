@@ -145,67 +145,45 @@ impl InternalEvent for GotHttpWarning<'_> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Adapts Hyper 1 request metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpRequestV1Telemetry<'a, T: Body> {
-    request: &'a Request<T>,
-}
-
-impl<'a, T: Body> HttpRequestV1Telemetry<'a, T> {
-    pub(crate) const fn new(request: &'a Request<T>) -> Self {
-        Self { request }
-    }
-}
-
-impl<T: Body> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
+impl<T: Body> HttpRequestTelemetry for Request<T> {
     fn method(&self) -> &str {
-        self.request.method().as_str()
+        self.method().as_str()
     }
 
     fn uri(&self) -> String {
-        self.request.uri().to_string()
+        self.uri().to_string()
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.request.headers().clone()
+        self.headers().clone()
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.request.body().size_hint();
+        let hint = self.body().size_hint();
         (hint.lower(), hint.upper())
     }
 
     fn version(&self) -> Option<Version> {
-        Some(self.request.version())
+        Some(self.version())
     }
 }
 
-/// Adapts Hyper 1 response metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpResponseV1Telemetry<'a, T: Body> {
-    response: &'a Response<T>,
-}
-
-impl<'a, T: Body> HttpResponseV1Telemetry<'a, T> {
-    pub(crate) const fn new(response: &'a Response<T>) -> Self {
-        Self { response }
-    }
-}
-
-impl<T: Body> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
+impl<T: Body> HttpResponseTelemetry for Response<T> {
     fn status_u16(&self) -> u16 {
-        self.response.status().as_u16()
+        self.status().as_u16()
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.response.headers().clone()
+        self.headers().clone()
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.response.body().size_hint();
+        let hint = self.body().size_hint();
         (hint.lower(), hint.upper())
     }
 
     fn version(&self) -> Option<Version> {
-        Some(self.response.version())
+        Some(self.version())
     }
 }
 
