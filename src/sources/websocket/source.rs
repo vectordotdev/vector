@@ -176,12 +176,12 @@ impl WebSocketSource {
     ) -> Result<(), WebSocketSourceError> {
         match msg {
             Message::Pong(_) => {
-                ping_manager.record_pong().await;
+                ping_manager.record_pong();
                 Ok(())
             }
             Message::Text(msg_txt) => {
                 if self.is_custom_pong(&msg_txt) {
-                    ping_manager.record_pong().await;
+                    ping_manager.record_pong();
                     debug!("Received custom pong response.");
                 } else {
                     self.process_message(&msg_txt, WebSocketKind::Text, out)
@@ -408,9 +408,9 @@ impl PingManager {
         }
     }
 
-    async fn record_pong(&mut self) {
+    fn record_pong(&mut self) {
         self.waiting_for_pong = false;
-        self.ping_timeout_interval.reset().await;
+        self.ping_timeout_interval.reset();
     }
 
     async fn tick(&mut self, ws_sink: &mut WebSocketSink) -> Result<(), WebSocketSourceError> {
@@ -428,7 +428,7 @@ impl PingManager {
         })?;
 
         if !self.waiting_for_pong {
-            self.ping_timeout_interval.reset().await;
+            self.ping_timeout_interval.reset();
         }
         self.waiting_for_pong = true;
         Ok(())
@@ -730,7 +730,7 @@ mod tests {
         pin!(source_timeout);
 
         tokio::select! {
-            _ = &mut source_timeout => {}
+            () = &mut source_timeout => {}
 
             _ = &mut source => {
                 panic!("Timeout should have occurred before source shut down")
@@ -767,7 +767,7 @@ mod tests {
                 .await
                 .unwrap();
             // Wait for first message
-            let _ = websocket.next().await.unwrap();
+            _ = websocket.next().await.unwrap();
             // Wait a bit and then close the connection to force a reconnect
             tokio::time::sleep(Duration::from_millis(600)).await;
             let close_frame = CloseFrame {
@@ -780,7 +780,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             // Wait for first message
-            let _ = websocket.next().await.unwrap();
+            _ = websocket.next().await.unwrap();
             // Wait a bit before sending back pong
             tokio::time::sleep(Duration::from_millis(600)).await;
             websocket
