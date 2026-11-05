@@ -103,7 +103,7 @@ fn simple_span(resource: String) -> ObjectMap {
     ])
 }
 
-pub fn simple_trace_event(resource: String) -> TraceEvent {
+pub(super) fn simple_trace_event(resource: String) -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert(event_path!("language"), "a_language");
     t.insert(event_path!("agent_version"), "1.23456");
