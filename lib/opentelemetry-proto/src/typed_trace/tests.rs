@@ -725,6 +725,73 @@ fn coalesces_compatible_partitions_and_keeps_one_scope_dropped_count() {
 }
 
 #[test]
+fn partitions_share_resource_and_scope() {
+    let mut resource_spans = ResourceSpans::from_parts(
+        vec![PbSpan::from_parts(1, 1, "a"), PbSpan::from_parts(2, 2, "b")],
+        vec![KeyValue::from_string("payload", "shared")],
+    );
+    resource_spans.scope_spans[0].scope = Some(InstrumentationScope {
+        name: "lib".into(),
+        ..InstrumentationScope::default()
+    });
+    resource_spans.scope_spans.push(ScopeSpans {
+        scope: Some(InstrumentationScope {
+            name: "other".into(),
+            ..InstrumentationScope::default()
+        }),
+        spans: vec![PbSpan::from_parts(3, 3, "c")],
+        schema_url: String::new(),
+    });
+    let events = resource_spans.convert();
+    assert_eq!(events.len(), 3);
+
+    assert!(std::ptr::eq(events[0].resource(), events[1].resource()));
+    assert!(std::ptr::eq(events[0].resource(), events[2].resource()));
+    assert!(std::ptr::eq(events[0].scope(), events[1].scope()));
+    assert!(!std::ptr::eq(events[0].scope(), events[2].scope()));
+    assert_eq!(
+        events[1].resource().attributes.get("payload"),
+        Some(&AttrValue::String("shared".into()))
+    );
+}
+
+#[test]
+fn partitions_share_resource_datadog_context() {
+    let events = ResourceSpans::from_parts(
+        vec![PbSpan::from_parts(1, 1, "a"), PbSpan::from_parts(2, 2, "b")],
+        vec![
+            KeyValue::from_parts(
+                "datadog.tracer.tags",
+                Some(AnyValue::from_kvlist(vec![KeyValue::from_string(
+                    "payload", "shared",
+                )])),
+            ),
+            KeyValue::from_parts(
+                "datadog.agent",
+                Some(AnyValue::from_kvlist(vec![KeyValue::from_string(
+                    "host_name",
+                    "agent-1",
+                )])),
+            ),
+        ],
+    )
+    .convert();
+    assert_eq!(events.len(), 2);
+    assert!(std::ptr::eq(
+        events[0].datadog().tracer.as_ref(),
+        events[1].datadog().tracer.as_ref()
+    ));
+    assert!(std::ptr::eq(
+        events[0].datadog().agent().unwrap(),
+        events[1].datadog().agent().unwrap()
+    ));
+    assert_eq!(
+        events[0].datadog().tracer.tags.get("payload"),
+        Some(&AttrValue::String("shared".into()))
+    );
+}
+
+#[test]
 fn nonadjacent_resources_and_scopes_still_coalesce() {
     let event = |trace, span, name: &str, service: &str, scope_name: &str| {
         let mut event = typed_event(trace, vec![typed_span(span, name)]);
@@ -811,9 +878,9 @@ fn incompatible_chunk_contexts_do_not_share_scope_spans() {
 #[test]
 fn incompatible_tracer_tags_do_not_share_resource_spans() {
     let mut one = typed_event(1, vec![typed_span(1, "a")]);
-    one.datadog_mut().tracer.tags = attrs([("env", AttrValue::String("one".into()))]);
+    one.datadog_mut().tracer_mut().tags = attrs([("env", AttrValue::String("one".into()))]);
     let mut two = typed_event(2, vec![typed_span(2, "b")]);
-    two.datadog_mut().tracer.tags = attrs([("env", AttrValue::String("two".into()))]);
+    two.datadog_mut().tracer_mut().tags = attrs([("env", AttrValue::String("two".into()))]);
     assert_eq!(
         encode(&[one.clone(), two.clone()]),
         [encode(&[one]), encode(&[two])].concat()

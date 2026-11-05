@@ -3,6 +3,8 @@
 //! Semantic-convention promotion and Datadog bridge lifting happen here, before a typed
 //! [`TraceEvent`] exists.
 
+use std::sync::Arc;
+
 use bytes::Bytes;
 use indexmap::IndexMap;
 use vector_core::event::{
@@ -52,6 +54,7 @@ impl ResourceSpans {
             .resource
             .unwrap_or_default()
             .into_typed(self.schema_url, reporter);
+        let resource = Arc::new(resource);
         if self.scope_spans.is_empty() {
             reporter.report(TraceConversionIssue::DiscardedGrouping);
         }
@@ -67,15 +70,16 @@ impl ResourceSpans {
 impl ScopeSpans {
     fn into_typed_events(
         self,
-        resource: &Resource,
+        resource: &Arc<Resource>,
         resource_datadog: &DatadogEventContext,
         metadata: &EventMetadata,
         reporter: &mut impl TraceConversionReporter,
     ) -> Vec<TraceEvent> {
-        let scope = self
-            .scope
-            .unwrap_or_default()
-            .into_typed(self.schema_url, reporter);
+        let scope = Arc::new(
+            self.scope
+                .unwrap_or_default()
+                .into_typed(self.schema_url, reporter),
+        );
         let mut partitions: IndexMap<TraceId, Vec<(Span, SpanChunkKeys)>> = IndexMap::new();
         for (trace_id, span, span_chunk) in self
             .spans
@@ -97,8 +101,8 @@ impl ScopeSpans {
                 trace_event_from_partition(
                     trace_id,
                     items,
-                    resource,
-                    &scope,
+                    Arc::clone(resource),
+                    Arc::clone(&scope),
                     resource_datadog,
                     metadata,
                     reporter,
@@ -111,8 +115,8 @@ impl ScopeSpans {
 fn trace_event_from_partition(
     trace_id: TraceId,
     items: Vec<(Span, SpanChunkKeys)>,
-    resource: &Resource,
-    scope: &Scope,
+    resource: Arc<Resource>,
+    scope: Arc<Scope>,
     resource_datadog: &DatadogEventContext,
     metadata: &EventMetadata,
     reporter: &mut impl TraceConversionReporter,
@@ -129,14 +133,7 @@ fn trace_event_from_partition(
     if !chunk.is_empty() {
         datadog.set_chunk(Some(chunk.into_context()));
     }
-    TraceEvent::from_parts(
-        trace_id,
-        resource.clone(),
-        scope.clone(),
-        datadog,
-        spans,
-        metadata.clone(),
-    )
+    TraceEvent::from_parts(trace_id, resource, scope, datadog, spans, metadata.clone())
 }
 
 fn nonempty_string(value: String) -> Option<String> {
@@ -204,9 +201,9 @@ fn lift_resource_datadog(
         dropped,
         reporter,
     ) {
-        datadog.tracer = DatadogTracerContext {
+        datadog.tracer = Arc::new(DatadogTracerContext {
             tags: Attributes::from(tags),
-        };
+        });
     }
     strip_reserved_map(attributes.as_map_mut(), dropped, reporter);
 }

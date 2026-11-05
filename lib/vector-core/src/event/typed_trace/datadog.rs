@@ -1,6 +1,7 @@
 //! Datadog-native event and span context.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use vector_common::byte_size_of::ByteSizeOf;
@@ -13,14 +14,19 @@ use super::{Attributes, SamplingPriority};
 /// The default value means no Datadog-native state is present. `agent` and `chunk`
 /// use `Option` so their wire envelopes can be absent independently of the always-present
 /// tracer projection.
+///
+/// `agent` and `tracer` are reference-counted. They come from the resource, so every
+/// trace partition of that resource shares them until [`Self::agent_mut`] or
+/// [`Self::tracer_mut`] writes. `chunk` stays owned: it differs per partition.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DatadogEventContext {
-    /// Agent-to-intake envelope. Boxed so OTLP-originated events do not pay the
-    /// inline size of an unused envelope.
-    agent: Option<Box<DatadogAgentEnvelope>>,
-    /// Tracer-payload tags. Always present; default is empty.
-    pub tracer: DatadogTracerContext,
-    /// Chunk-scoped sampling state. Boxed for the same reason as [`Self::agent`].
+    /// Agent-to-intake envelope. Shared across partitions of one resource. Absent costs
+    /// one pointer.
+    agent: Option<Arc<DatadogAgentEnvelope>>,
+    /// Tracer-payload tags. Always present; default is empty. Shared across partitions
+    /// of one resource.
+    pub tracer: Arc<DatadogTracerContext>,
+    /// Chunk-scoped sampling state. Owned by this event.
     chunk: Option<Box<DatadogChunkContext>>,
 }
 
@@ -32,18 +38,30 @@ impl DatadogEventContext {
     }
 
     /// Returns a mutable agent envelope if present.
+    ///
+    /// Copies the envelope first when another event still shares it.
     pub fn agent_mut(&mut self) -> Option<&mut DatadogAgentEnvelope> {
-        self.agent.as_deref_mut()
+        self.agent.as_mut().map(Arc::make_mut)
     }
 
     /// Replaces the agent envelope.
     pub fn set_agent(&mut self, agent: Option<DatadogAgentEnvelope>) {
-        self.agent = agent.map(Box::new);
+        self.agent = agent.map(Arc::new);
     }
 
-    /// Removes and returns the agent envelope.
-    pub fn take_agent(&mut self) -> Option<DatadogAgentEnvelope> {
-        self.agent.take().map(|agent| *agent)
+    /// Removes the agent envelope without copying it.
+    ///
+    /// The returned [`Arc`] stays shared with any clone that has not replaced its agent.
+    #[must_use]
+    pub fn take_agent(&mut self) -> Option<Arc<DatadogAgentEnvelope>> {
+        self.agent.take()
+    }
+
+    /// Returns a mutable tracer context.
+    ///
+    /// Copies the tracer first when another event still shares it.
+    pub fn tracer_mut(&mut self) -> &mut DatadogTracerContext {
+        Arc::make_mut(&mut self.tracer)
     }
 
     /// Returns the chunk context if present.
@@ -70,8 +88,10 @@ impl DatadogEventContext {
 
 impl ByteSizeOf for DatadogEventContext {
     fn allocated_bytes(&self) -> usize {
+        // Agent and tracer live in `Arc`s, so charge the struct as well as its heap.
+        // Each event is billed for the full value even when the allocation is shared.
         boxed_allocated(self.agent.as_deref())
-            + self.tracer.allocated_bytes()
+            + DatadogTracerContext::size_of(&self.tracer)
             + boxed_allocated(self.chunk.as_deref())
     }
 }
@@ -180,20 +200,20 @@ impl ByteSizeOf for DatadogSpanContext {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::size_of;
+    use std::{mem::size_of, sync::Arc};
 
     use similar_asserts::assert_eq;
 
     use super::{DatadogAgentEnvelope, DatadogChunkContext, DatadogEventContext};
 
     #[test]
-    fn optional_envelopes_are_boxed() {
+    fn optional_envelopes_are_pointer_sized() {
         // Unboxed `Option<DatadogAgentEnvelope>` cannot use a niche and is therefore
-        // much larger than a pointer. OTLP-originated events leave agent/chunk absent,
-        // so boxing those optional envelopes is the cheaper layout. Always-present
-        // `DatadogEventContext` / `DatadogSpanContext` stay unboxed.
+        // much larger than a pointer. OTLP-originated events leave agent and chunk
+        // absent, so those envelopes stay pointer-sized: `Arc` for the shared agent,
+        // `Box` for the per-event chunk.
         assert!(
-            size_of::<Option<Box<DatadogAgentEnvelope>>>()
+            size_of::<Option<Arc<DatadogAgentEnvelope>>>()
                 < size_of::<Option<DatadogAgentEnvelope>>()
         );
         assert!(
@@ -201,7 +221,7 @@ mod tests {
                 < size_of::<Option<DatadogChunkContext>>()
         );
         assert_eq!(
-            size_of::<Option<Box<DatadogAgentEnvelope>>>(),
+            size_of::<Option<Arc<DatadogAgentEnvelope>>>(),
             size_of::<usize>()
         );
 
