@@ -11,7 +11,8 @@ use vector_http::{GrpcTransport, Http2Client};
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use super::request_builder::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
 use super::service::{
-    BigQueryWriteClient, BigqueryRetryLogic, BigqueryService, RequestAuth, Transport,
+    BigQueryWriteClient, BigqueryRetryLogic, BigqueryService, RequestAuth,
+    RetriesExhaustedAsErroredLayer, Transport,
 };
 use super::sink::BigquerySink;
 use crate::config::{
@@ -240,6 +241,7 @@ impl ValidatedSink for BigqueryConfig {
 
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
+            .layer(RetriesExhaustedAsErroredLayer)
             .settings(request_settings, BigqueryRetryLogic)
             .service(BigqueryService::new(
                 transport,
