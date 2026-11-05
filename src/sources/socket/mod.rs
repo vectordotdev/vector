@@ -1114,7 +1114,7 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: ProxyConfig::default(),
-                acknowledgements: vec![Some(false).into()],
+                acknowledgements: Some(false).into(),
                 schema: Options::default(),
                 schema_definitions: HashMap::default(),
                 extra_context: ExtraContext::default(),

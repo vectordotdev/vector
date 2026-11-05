@@ -375,18 +375,6 @@ impl AcknowledgementsConfig {
         Self { enabled }
     }
 
-    #[must_use]
-    pub fn merge_defaults(&self, others: &Vec<Self>) -> Self {
-        let enabled = self.enabled.or(others
-            .into_iter()
-            .filter(|acknowledgments_config| acknowledgments_config.enabled.is_some())
-            .fold(None, |acc, acknowledgments_config| {
-                acc.or(Some(false))
-                    .map(|acc| acc | acknowledgments_config.enabled())
-            }));
-        Self { enabled }
-    }
-
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
     }
@@ -721,62 +709,5 @@ mod test {
         let definition = schema::Definition::any();
         let output = SourceOutput::new_maybe_logs(DataType::Log, definition.clone());
         assert_eq!(output.schema_definition(true), Some(definition));
-    }
-
-    #[test]
-    fn merge_defaults() {
-        let test_data = [
-            (None, (None, None), None),
-            (None, (None, Some(false)), Some(false)),
-            (None, (None, Some(true)), Some(true)),
-            (None, (Some(false), None), Some(false)),
-            (None, (Some(false), Some(false)), Some(false)),
-            (None, (Some(false), Some(true)), Some(true)),
-            (None, (Some(true), None), Some(true)),
-            (None, (Some(true), Some(false)), Some(true)),
-            (None, (Some(true), Some(true)), Some(true)),
-            (Some(false), (None, None), Some(false)),
-            (Some(false), (None, Some(false)), Some(false)),
-            (Some(false), (None, Some(true)), Some(false)),
-            (Some(false), (Some(false), None), Some(false)),
-            (Some(false), (Some(false), Some(false)), Some(false)),
-            (Some(false), (Some(false), Some(true)), Some(false)),
-            (Some(false), (Some(true), None), Some(false)),
-            (Some(false), (Some(true), Some(false)), Some(false)),
-            (Some(false), (Some(true), Some(true)), Some(false)),
-            (Some(true), (None, None), Some(true)),
-            (Some(true), (None, Some(false)), Some(true)),
-            (Some(true), (None, Some(true)), Some(true)),
-            (Some(true), (Some(false), None), Some(true)),
-            (Some(true), (Some(false), Some(false)), Some(true)),
-            (Some(true), (Some(false), Some(true)), Some(true)),
-            (Some(true), (Some(true), None), Some(true)),
-            (Some(true), (Some(true), Some(false)), Some(true)),
-            (Some(true), (Some(true), Some(true)), Some(true)),
-        ];
-
-        for test_data_set in test_data {
-            assert_eq!(
-                AcknowledgementsConfig {
-                    enabled: test_data_set.0
-                }
-                .merge_defaults(&vec![
-                    AcknowledgementsConfig {
-                        enabled: test_data_set.1.0,
-                    },
-                    AcknowledgementsConfig {
-                        enabled: test_data_set.1.1,
-                    }
-                ]),
-                AcknowledgementsConfig {
-                    enabled: test_data_set.2
-                },
-                "{:?}.merge_defaults([{:?}, {:?}]) should return {:?}",
-                test_data_set.0,
-                test_data_set.1.0,
-                test_data_set.1.1,
-                test_data_set.2
-            );
-        }
     }
 }
