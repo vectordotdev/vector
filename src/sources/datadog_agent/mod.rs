@@ -179,6 +179,22 @@ pub struct DatadogAgentConfig {
     /// and increment the `component_timed_out_events_total` internal metric instead.
     #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
     send_timeout_secs: Option<f64>,
+
+    /// The maximum number of bytes that indexed trace payloads in a single request can expand to
+    /// while being converted into trace events.
+    ///
+    /// Indexed trace payloads store each string once and reference it from any number of spans,
+    /// so the converted events can be much larger than the request body. Requests that would
+    /// exceed this limit are rejected with an HTTP 422 Unprocessable Entity response before the
+    /// excess data is copied.
+    #[serde(default = "default_max_trace_expansion_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::advanced))]
+    max_trace_expansion_bytes: usize,
+}
+
+const fn default_max_trace_expansion_bytes() -> usize {
+    100 * 1024 * 1024
 }
 
 /// Data types accepted by the `datadog_agent` source.
@@ -223,6 +239,7 @@ impl GenerateConfig for DatadogAgentConfig {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         })
         .unwrap()
     }
@@ -258,15 +275,18 @@ impl SourceConfig for DatadogAgentConfig {
                 .build()?;
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let source = DatadogAgentSource::new(
-            self.store_api_key,
-            decoder,
-            tls.http_protocol_name(),
-            logs_schema_definition,
-            log_namespace,
-            self.parse_ddtags,
-            self.split_metric_namespace,
-        );
+        let source = DatadogAgentSource {
+            max_trace_expansion_bytes: self.max_trace_expansion_bytes,
+            ..DatadogAgentSource::new(
+                self.store_api_key,
+                decoder,
+                tls.http_protocol_name(),
+                logs_schema_definition,
+                log_namespace,
+                self.parse_ddtags,
+                self.split_metric_namespace,
+            )
+        };
         let listener = tls
             .bind(&self.address)
             .await?
@@ -501,6 +521,7 @@ pub(crate) struct DatadogAgentSource {
     events_received: Registered<EventsReceived>,
     parse_ddtags: bool,
     split_metric_namespace: bool,
+    max_trace_expansion_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -562,6 +583,7 @@ impl DatadogAgentSource {
             events_received: register!(EventsReceived),
             parse_ddtags,
             split_metric_namespace,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         }
     }
 

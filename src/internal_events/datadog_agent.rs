@@ -47,3 +47,51 @@ impl InternalEvent for DatadogAgentUnsupportedTracePayloadError {
         .increment(1);
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct DatadogAgentInvalidIdxStringRefError {
+    pub index: u32,
+}
+
+impl InternalEvent for DatadogAgentInvalidIdxStringRefError {
+    fn emit(self) {
+        error!(
+            message = "Datadog Agent idx trace payload has an invalid string table ref.",
+            error_code = "idx_invalid_string_ref",
+            index = self.index,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => "idx_invalid_string_ref",
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct DatadogAgentIdxExpansionLimitError {
+    pub limit: usize,
+}
+
+impl InternalEvent for DatadogAgentIdxExpansionLimitError {
+    fn emit(self) {
+        error!(
+            message = "Datadog Agent idx trace payload expands beyond the configured limit.",
+            error_code = "idx_expansion_limit_exceeded",
+            limit = self.limit,
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => "idx_expansion_limit_exceeded",
+        )
+        .increment(1);
+    }
+}
