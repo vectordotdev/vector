@@ -93,6 +93,11 @@ You can escape environment variables by prefacing them with a `$` character. For
 example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
 environment variable example.
 
+## Variable name restrictions
+
+Environment variable names used in interpolation are restricted to letters, digits plus `_`  and `.` characters. 
+Names containing other characters (such as hyphens `-`) will not be interpolated.
+
 ## Security Restrictions
 
 Environment variable interpolation is disabled by default. Only enable it
