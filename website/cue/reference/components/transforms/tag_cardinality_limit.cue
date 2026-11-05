@@ -214,7 +214,14 @@ components: transforms: tag_cardinality_limit: {
 				  rolling shards: the effective `ttl_generations` covering the window
 				  plus one currently being written, so memory cost rises to
 				  `(effective ttl_generations + 1) * cache_size_per_key` per (metric,
-				  tag-key) pair. The extra shard is what guarantees a value is retained
+				  tag-key) pair. Lookup cost grows the same way: a cache miss, or a
+				  hit that lives only in an older shard, checks every shard and hashes
+				  the tag value each time. The effective generation count is therefore
+				  limited to 16 in this mode. A higher `ttl_generations` is rejected
+				  when `ttl_secs` is long enough to honor it; a shorter `ttl_secs`
+				  clamps the count first (slices are at least 1s) and the limit
+				  applies to the clamped count. `exact` mode is not capped. The extra
+				  shard is what guarantees a value is retained
 				  for at least `ttl_secs`; without it a value inserted just before a
 				  rotation would expire a full slice early. Eviction therefore lands
 				  in `[ttl_secs, ttl_secs + ttl_secs / effective ttl_generations)` —

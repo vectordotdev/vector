@@ -122,15 +122,22 @@ pub struct Inner {
     ///
     /// In `probabilistic` mode, higher values smooth eviction (closer to a true
     /// sliding window) at the cost of `(effective ttl_generations + 1) *
-    /// cache_size_per_key` memory per (metric, tag-key) pair. The extra shard is
-    /// the one currently being written: it covers only part of a slice, so
-    /// retiring without it would expire values after `ttl_secs - (ttl_secs /
+    /// cache_size_per_key` memory per (metric, tag-key) pair. The same factor
+    /// applies to CPU. A cache miss, or a hit that lives only in an older shard,
+    /// checks every shard, and each check hashes the tag value, so lookup cost
+    /// grows linearly with the shard count. The effective generation count in
+    /// this mode is limited to 16; a higher request is rejected when `ttl_secs`
+    /// is long enough to honor it. A shorter `ttl_secs` still clamps the count
+    /// first (slices are at least 1s), and the limit applies to that clamped
+    /// count, so a request above 16 is accepted when the clamp brings it back
+    /// to 16 or below. The extra shard on top of the effective count is the one
+    /// currently being written: it covers only part of a slice, so retiring
+    /// without it would expire values after `ttl_secs - (ttl_secs /
     /// ttl_generations)` instead of the full TTL. Explicitly setting `1`
     /// produces a one-shard tumbling window: all tracked values are dropped at
-    /// once every `ttl_secs`, using
-    /// `cache_size_per_key` memory. When `ttl_secs` is shorter than the requested
-    /// generation count (slices are capped at ≥1s), generations are clamped but
-    /// the extra shard is still kept so short TTLs do not silently tumble.
+    /// once every `ttl_secs`, using `cache_size_per_key` memory. When `ttl_secs`
+    /// is shorter than the requested generation count, generations are clamped
+    /// but the extra shard is still kept so short TTLs do not silently tumble.
     ///
     /// In `exact` mode this does not change eviction precision (each value still
     /// carries its own last-accepted timestamp). It only sets how often the
@@ -139,8 +146,9 @@ pub struct Inner {
     /// it has no benefit for correctness and can increase CPU on large
     /// `value_limit` buckets.
     ///
-    /// Must be at least `1` when `ttl_secs` is set. Ignored when `ttl_secs` is
-    /// unset.
+    /// Must be at least `1` when `ttl_secs` is set, and at most 16 effective
+    /// generations in `probabilistic` mode. Ignored when `ttl_secs` is unset.
+    /// `exact` mode has no generation cap.
     #[serde(default = "default_ttl_generations")]
     #[configurable(metadata(docs::human_name = "TTL Generations"))]
     pub ttl_generations: u8,
@@ -403,12 +411,44 @@ pub(crate) const fn default_ttl_generations() -> u8 {
     4
 }
 
+/// Largest effective generation count `probabilistic` mode will build.
+///
+/// A cache miss, and a hit that lives only in an older shard, runs a bloom
+/// membership test per shard, and each test hashes the tag value. Sliding
+/// windows keep one extra shard, so this allows at most 17 probes. That is
+/// four times the default and still splits the TTL into slices of about 6%.
+/// `exact` mode does not probe shards and is not limited by this.
+///
+/// The number is also written out in the `ttl_generations` field docs and the
+/// transform's TTL section; keep those in step with this constant.
+pub(crate) const MAX_TTL_GENERATIONS: u8 = 16;
+
 /// Resolve `ttl_secs` to a window, treating both `None` and `0` as "no expiry".
 ///
 /// Backend selection and config validation both go through this so they can
 /// never disagree about whether a config has TTL enabled.
 pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
     ttl_secs.filter(|secs| *secs > 0).map(Duration::from_secs)
+}
+
+/// Compute time-slice count and duration so `slice * generations == ttl` exactly.
+///
+/// Caps `generations` to at most one slice per second of TTL (so each slice is
+/// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
+/// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
+/// still sum to the configured window. The per-second cap saturates at
+/// `u8::MAX` rather than wrapping, so a TTL of `>= 2^8` seconds never clamps
+/// the requested generation count.
+///
+/// This is the generation count the storage backends build, so validation
+/// applies [`MAX_TTL_GENERATIONS`] to this result rather than to the raw
+/// request: a request of 255 with `ttl_secs: 10` builds 10 generations.
+pub(crate) fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u8, Duration) {
+    let requested = ttl_generations.max(1);
+    let max_for_ttl = u8::try_from(ttl.as_secs().max(1)).unwrap_or(u8::MAX);
+    let generations = requested.min(max_for_ttl);
+    let slice = ttl / u32::from(generations);
+    (generations, slice)
 }
 
 impl Config {
@@ -469,6 +509,18 @@ pub enum BuildError {
          or a higher value for a sliding window."
     ))]
     ZeroTtlGenerations { scope: String },
+
+    #[snafu(display(
+        "ttl_generations resolves to {effective} on {scope} in probabilistic mode, above the \
+         limit of {limit}. A cache miss checks every bloom shard and hashes the tag value each \
+         time, so lower ttl_generations (16 keeps slices of about ttl/16) or use `exact` mode, \
+         which is not capped."
+    ))]
+    TtlGenerationsTooHigh {
+        scope: String,
+        effective: u8,
+        limit: u8,
+    },
 }
 
 #[async_trait::async_trait]
@@ -556,6 +608,14 @@ impl TransformConfig for Config {
             );
         }
 
+        push_probabilistic_generation_limit(
+            &mut errors,
+            "the global configuration",
+            matches!(self.global.mode, Mode::Probabilistic(_)),
+            self.global.ttl_secs,
+            self.global.ttl_generations,
+        );
+
         for (metric_name, per_metric) in &self.per_metric_limits {
             let ttl_enabled = per_metric.config.ttl_active();
             if ttl_enabled && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint) {
@@ -574,6 +634,13 @@ impl TransformConfig for Config {
                     .to_string(),
                 );
             }
+            push_probabilistic_generation_limit(
+                &mut errors,
+                &format!("`per_metric_limits.{metric_name}`"),
+                matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)),
+                per_metric.config.ttl_secs,
+                per_metric.config.ttl_generations,
+            );
         }
 
         if errors.is_empty() {
@@ -581,5 +648,36 @@ impl TransformConfig for Config {
         } else {
             Err(errors)
         }
+    }
+}
+
+/// Reject probabilistic configs whose built shard count would make every cache
+/// miss hash the tag value once per shard. Uses [`compute_ttl_slices`], the
+/// same count the backend builds, so a request that a short TTL clamps under
+/// the limit is allowed. `mode: excluded` never reaches here with
+/// `probabilistic == true`.
+fn push_probabilistic_generation_limit(
+    errors: &mut Vec<String>,
+    scope: &str,
+    probabilistic: bool,
+    ttl_secs: Option<u64>,
+    ttl_generations: u8,
+) {
+    if !probabilistic {
+        return;
+    }
+    let Some(ttl) = ttl_duration(ttl_secs) else {
+        return;
+    };
+    let (effective, _) = compute_ttl_slices(ttl, ttl_generations);
+    if effective > MAX_TTL_GENERATIONS {
+        errors.push(
+            BuildError::TtlGenerationsTooHigh {
+                scope: scope.to_string(),
+                effective,
+                limit: MAX_TTL_GENERATIONS,
+            }
+            .to_string(),
+        );
     }
 }

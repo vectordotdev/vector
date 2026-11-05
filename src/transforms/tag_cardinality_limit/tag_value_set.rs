@@ -27,7 +27,7 @@ use hash_hasher::HashedSet;
 use crate::{
     event::metric::TagValueSet,
     internal_events::TagCardinalityTtlExpired,
-    transforms::tag_cardinality_limit::config::{Mode, ttl_duration},
+    transforms::tag_cardinality_limit::config::{Mode, compute_ttl_slices, ttl_duration},
 };
 
 /// `Instant + Duration` panics outside the platform's representable range.
@@ -47,22 +47,6 @@ fn saturating_add(instant: Instant, duration: Duration) -> Instant {
         fallback = Duration::from_secs(fallback.as_secs() / 2);
     }
     instant
-}
-
-/// Compute time-slice count and duration so `slice * generations == ttl` exactly.
-///
-/// Caps `generations` to at most one slice per second of TTL (so each slice is
-/// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
-/// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
-/// still sum to the configured window. The per-second cap saturates at
-/// `u8::MAX` rather than wrapping, so a TTL of `>= 2^8` seconds never clamps
-/// the requested generation count.
-fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u8, Duration) {
-    let requested = ttl_generations.max(1);
-    let max_for_ttl = u8::try_from(ttl.as_secs().max(1)).unwrap_or(u8::MAX);
-    let generations = requested.min(max_for_ttl);
-    let slice = ttl / u32::from(generations);
-    (generations, slice)
 }
 
 /// Container for storing the set of accepted values for a given tag key.

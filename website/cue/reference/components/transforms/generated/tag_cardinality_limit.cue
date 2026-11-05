@@ -206,15 +206,22 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 
 			In `probabilistic` mode, higher values smooth eviction (closer to a true
 			sliding window) at the cost of `(effective ttl_generations + 1) *
-			cache_size_per_key` memory per (metric, tag-key) pair. The extra shard is
-			the one currently being written: it covers only part of a slice, so
-			retiring without it would expire values after `ttl_secs - (ttl_secs /
+			cache_size_per_key` memory per (metric, tag-key) pair. The same factor
+			applies to CPU. A cache miss, or a hit that lives only in an older shard,
+			checks every shard, and each check hashes the tag value, so lookup cost
+			grows linearly with the shard count. The effective generation count in
+			this mode is limited to 16; a higher request is rejected when `ttl_secs`
+			is long enough to honor it. A shorter `ttl_secs` still clamps the count
+			first (slices are at least 1s), and the limit applies to that clamped
+			count, so a request above 16 is accepted when the clamp brings it back
+			to 16 or below. The extra shard on top of the effective count is the one
+			currently being written: it covers only part of a slice, so retiring
+			without it would expire values after `ttl_secs - (ttl_secs /
 			ttl_generations)` instead of the full TTL. Explicitly setting `1`
 			produces a one-shard tumbling window: all tracked values are dropped at
-			once every `ttl_secs`, using
-			`cache_size_per_key` memory. When `ttl_secs` is shorter than the requested
-			generation count (slices are capped at ≥1s), generations are clamped but
-			the extra shard is still kept so short TTLs do not silently tumble.
+			once every `ttl_secs`, using `cache_size_per_key` memory. When `ttl_secs`
+			is shorter than the requested generation count, generations are clamped
+			but the extra shard is still kept so short TTLs do not silently tumble.
 
 			In `exact` mode this does not change eviction precision (each value still
 			carries its own last-accepted timestamp). It only sets how often the
@@ -223,8 +230,9 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			it has no benefit for correctness and can increase CPU on large
 			`value_limit` buckets.
 
-			Must be at least `1` when `ttl_secs` is set. Ignored when `ttl_secs` is
-			unset.
+			Must be at least `1` when `ttl_secs` is set, and at most 16 effective
+			generations in `probabilistic` mode. Ignored when `ttl_secs` is unset.
+			`exact` mode has no generation cap.
 			"""
 		required: false
 		type: uint: default: 4

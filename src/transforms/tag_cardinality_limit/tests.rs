@@ -17,8 +17,8 @@ use crate::{
     test_util::components::assert_transform_compliance,
     transforms::{
         tag_cardinality_limit::config::{
-            BloomFilterConfig, InternalMetricsConfig, Mode, default_cache_size,
-            default_ttl_generations,
+            BloomFilterConfig, InternalMetricsConfig, MAX_TTL_GENERATIONS, Mode,
+            default_cache_size, default_ttl_generations,
         },
         test::create_topology,
     },
@@ -2286,6 +2286,85 @@ fn validation_ignores_ttl_on_excluded_metric_override() {
     assert!(
         config.validate_structure().is_ok(),
         "excluded override with a stale TTL must still build"
+    );
+}
+
+/// Probabilistic mode probes every bloom shard on a cache miss, so the
+/// effective generation count is capped. The cap is applied after the
+/// short-TTL clamp, and it does not apply to `exact` mode or to
+/// `mode: excluded`.
+#[test]
+fn validation_caps_probabilistic_ttl_generations() {
+    let mut config = make_transform_bloom(500, LimitExceededAction::DropTag);
+    config.global.ttl_secs = Some(3600);
+    config.global.ttl_generations = MAX_TTL_GENERATIONS;
+    assert!(
+        config.validate_structure().is_ok(),
+        "the limit itself must build"
+    );
+
+    config.global.ttl_generations = MAX_TTL_GENERATIONS + 1;
+    let errors = config
+        .validate_structure()
+        .expect_err("one past the limit must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("above the limit of 16")),
+        "got: {errors:?}"
+    );
+
+    // `ttl_secs` equal to the limit clamps u8::MAX down to exactly the limit.
+    config.global.ttl_secs = Some(u64::from(MAX_TTL_GENERATIONS));
+    config.global.ttl_generations = u8::MAX;
+    assert!(
+        config.validate_structure().is_ok(),
+        "a request above the limit is accepted when the short-TTL clamp brings it back"
+    );
+
+    config.global.ttl_secs = Some(u64::from(MAX_TTL_GENERATIONS) + 1);
+    let errors = config
+        .validate_structure()
+        .expect_err("clamp result of 17 must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("resolves to 17")),
+        "got: {errors:?}"
+    );
+
+    // `exact` mode sweeps a map; it does not probe a shard per generation.
+    let mut exact = make_transform_hashset(500, LimitExceededAction::DropTag);
+    exact.global.ttl_secs = Some(3600);
+    exact.global.ttl_generations = u8::MAX;
+    assert!(exact.validate_structure().is_ok());
+
+    let mut per_metric = make_per_metric(10, LimitExceededAction::DropTag, HashMap::new());
+    per_metric.config.mode = OverrideMode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    });
+    per_metric.config.ttl_secs = Some(3600);
+    per_metric.config.ttl_generations = u8::MAX;
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([("metricA".to_string(), per_metric)]),
+    );
+    let errors = config
+        .validate_structure()
+        .expect_err("per-metric probabilistic override is capped on its own");
+    assert!(
+        errors.iter().any(|e| e.contains("metricA")),
+        "got: {errors:?}"
+    );
+
+    let mut excluded = make_per_metric_excluded(HashMap::new());
+    excluded.config.ttl_secs = Some(3600);
+    excluded.config.ttl_generations = u8::MAX;
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([("metricA".to_string(), excluded)]),
+    );
+    assert!(
+        config.validate_structure().is_ok(),
+        "excluded overrides ignore ttl_generations"
     );
 }
 
