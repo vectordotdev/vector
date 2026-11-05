@@ -101,17 +101,14 @@ impl Fanout {
         let Some(output) = self.senders.get_mut(id) else {
             panic!("Replacing unknown sink from fanout: {id}");
         };
-        // The output must already be empty, either because it was paused or because an in-flight
-        // send owns its sender. Replacing an idle output would drop the sender that still holds
-        // the current batch.
+        // Only a paused output can be replaced. An in-flight send still owns the previous sender,
+        // and finishing that send would write it back over a sender installed here.
         assert!(
-            output.sender.is_none(),
+            matches!(output.phase, Phase::Paused) && output.sender.is_none(),
             "Replacing existing sink is not valid: {id}"
         );
+        output.phase = Phase::Idle;
         output.sender = Some(Sender::new(sink));
-        if matches!(output.phase, Phase::Paused) {
-            output.phase = Phase::Idle;
-        }
     }
 
     fn pause(&mut self, id: &ComponentKey) {
@@ -273,10 +270,18 @@ impl Fanout {
             return Ok(());
         }
 
-        // Finish a send that was dropped while a downstream buffer was still pending, before
+        // Resume a send that was dropped while a downstream buffer was still pending, before
         // waiting on a reload. The future stays in the output entry, so this resumes it instead of
-        // holding the batch until an unrelated pause is replaced.
-        self.drive().await?;
+        // holding the batch until an unrelated pause is replaced. Skip this when nothing is in
+        // flight: `try_recv` already drained the control channel, and `drive` would only select
+        // on it again.
+        if self
+            .senders
+            .values()
+            .any(|output| matches!(output.phase, Phase::InFlight))
+        {
+            self.drive().await?;
+        }
         self.wait_for_replacements().await;
 
         // Nothing to send if we have no sender. A dropped send cannot have left an in-flight
@@ -765,6 +770,25 @@ mod tests {
 
         assert_next(&mut receivers[0], &events[2]).await;
         assert_next(&mut receivers[1], &events[2]).await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Replacing existing sink is not valid")]
+    async fn fanout_panics_on_replace_while_in_flight() {
+        let (mut fanout, control, _receivers, events) = drop_blocked_fanout_send().await;
+        let (replacement, _replacement_receiver) = build_sender_pair(1);
+
+        control
+            .send(ControlMessage::Replace(
+                ComponentKey::from("0"),
+                replacement,
+            ))
+            .expect("sending control message should not fail");
+
+        fanout
+            .send(events[2].clone().into(), None)
+            .await
+            .expect("should not fail");
     }
 
     #[tokio::test]
