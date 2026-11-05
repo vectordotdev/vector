@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, task::Poll, time::Instant};
+use std::{fmt, mem, task::Poll, time::Instant};
 
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
@@ -46,7 +46,7 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    senders: IndexMap<ComponentKey, Option<Sender>>,
+    senders: IndexMap<ComponentKey, Output>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
     upstream_component: ComponentKey,
 }
@@ -74,42 +74,63 @@ impl Fanout {
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders.insert(id, Some(Sender::new(sink)));
-    }
 
-    fn remove(&mut self, id: &ComponentKey) {
-        assert!(
-            self.senders.shift_remove(id).is_some(),
-            "Removing nonexistent sink from fanout: {id}"
+        // A sink added during an in-flight send is idle until the next batch. This send does not
+        // have the batch to give it.
+        self.senders.insert(
+            id,
+            Output {
+                phase: Phase::Idle,
+                sender: Some(Sender::new(sink)),
+                send: vacant_send(),
+            },
         );
     }
 
+    fn remove(&mut self, id: &ComponentKey) {
+        // Detach before dropping the entry so an in-flight send keeps its `Sender` and can finish.
+        let Some(mut output) = self.senders.shift_remove(id) else {
+            panic!("Removing nonexistent sink from fanout: {id}");
+        };
+        if matches!(output.phase, Phase::InFlight) {
+            spawn_inflight(&mut output);
+        }
+    }
+
     fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
-        match self.senders.get_mut(id) {
-            Some(sender) => {
-                // While a sink must be _known_ to be replaced, it must also be empty (previously
-                // paused or consumed when the `SendGroup` was created), otherwise an invalid
-                // sequence of control operations has been applied.
-                assert!(
-                    sender.replace(Sender::new(sink)).is_none(),
-                    "Replacing existing sink is not valid: {id}"
-                );
-            }
-            None => panic!("Replacing unknown sink from fanout: {id}"),
+        let Some(output) = self.senders.get_mut(id) else {
+            panic!("Replacing unknown sink from fanout: {id}");
+        };
+        // The output must already be empty, either because it was paused or because an in-flight
+        // send owns its sender. Replacing an idle output would drop the sender that still holds
+        // the current batch.
+        assert!(
+            output.sender.is_none(),
+            "Replacing existing sink is not valid: {id}"
+        );
+        output.sender = Some(Sender::new(sink));
+        if matches!(output.phase, Phase::Paused) {
+            output.phase = Phase::Idle;
         }
     }
 
     fn pause(&mut self, id: &ComponentKey) {
-        match self.senders.get_mut(id) {
-            Some(sender) => {
-                // A sink must be known and present to be replaced, otherwise an invalid sequence of
-                // control operations has been applied.
+        let Some(output) = self.senders.get_mut(id) else {
+            panic!("Pausing unknown sink from fanout: {id}");
+        };
+        match output.phase {
+            Phase::Paused => panic!("Pausing already-paused sink is invalid: {id}"),
+            Phase::Idle => {
                 assert!(
-                    sender.take().is_some(),
+                    output.sender.take().is_some(),
                     "Pausing nonexistent sink is not valid: {id}"
                 );
+                output.phase = Phase::Paused;
             }
-            None => panic!("Pausing unknown sink from fanout: {id}"),
+            Phase::InFlight => {
+                output.phase = Phase::Paused;
+                spawn_inflight(output);
+            }
         }
     }
 
@@ -128,10 +149,8 @@ impl Fanout {
     }
 
     /// Apply a control message directly against this instance.
-    ///
-    /// This method should not be used if there is an active `SendGroup` being processed.
     fn apply_control_message(&mut self, message: ControlMessage) {
-        trace!("Processing control message outside of send: {message:?}");
+        trace!(?message, "Processing control message");
 
         match message {
             ControlMessage::Add(id, sink) => self.add(id, sink),
@@ -146,7 +165,11 @@ impl Fanout {
     /// Control messages are processed until all senders have been replaced, so it is guaranteed
     /// that when this method returns, all senders are ready for the next send to be triggered.
     async fn wait_for_replacements(&mut self) {
-        while self.senders.values().any(Option::is_none) {
+        while self
+            .senders
+            .values()
+            .any(|output| matches!(output.phase, Phase::Paused))
+        {
             if let Some(msg) = self.control_channel.recv().await {
                 self.apply_control_message(msg);
             } else {
@@ -212,6 +235,13 @@ impl Fanout {
     ///
     /// If an error occurs while sending events to any of the connected sinks, an error variant will be
     /// returned detailing the cause.
+    ///
+    /// # Cancellation
+    ///
+    /// If this future is dropped while a downstream buffer is still pending, the batch stays in the
+    /// fanout and is delivered by the next call to `send`. `recv_control_message` does not drive
+    /// it. Removing or pausing an output while that batch is still in flight detaches the send onto
+    /// a background task so the batch is not dropped.
     pub async fn send(
         &mut self,
         events: EventArray,
@@ -221,9 +251,6 @@ impl Fanout {
         while let Ok(message) = self.control_channel.try_recv() {
             self.apply_control_message(message);
         }
-
-        // Wait for any senders that are paused to be replaced first before continuing with the send.
-        self.wait_for_replacements().await;
 
         // Drop empty event batches before they reach any downstream buffer, this is technically
         // programmer error. In debug/test builds the `debug_assert!` makes the underlying bug fail
@@ -246,12 +273,56 @@ impl Fanout {
             return Ok(());
         }
 
-        // Nothing to send if we have no sender.
+        // Finish a send that was dropped while a downstream buffer was still pending, before
+        // waiting on a reload. The future stays in the output entry, so this resumes it instead of
+        // holding the batch until an unrelated pause is replaced.
+        self.drive().await?;
+        self.wait_for_replacements().await;
+
+        // Nothing to send if we have no sender. A dropped send cannot have left an in-flight
+        // future behind either: removing the last output detaches that future.
         if self.senders.is_empty() {
             trace!("No senders present.");
             return Ok(());
         }
 
+        self.arm_sends(events, send_reference);
+        self.drive().await?;
+        trace!("Sent item to fanout.");
+        Ok(())
+    }
+
+    fn arm_sends(&mut self, events: EventArray, send_reference: Option<Instant>) {
+        debug_assert!(
+            self.senders
+                .values()
+                .all(|output| matches!(output.phase, Phase::Idle) && output.sender.is_some())
+        );
+
+        let last_sender_idx = self.senders.len().saturating_sub(1);
+        let mut events = Some(events);
+        for (i, output) in self.senders.values_mut().enumerate() {
+            // `send` finishes in-flight work and waits until nothing is paused before calling this.
+            // Idle is the only phase left, and that phase holds the sender.
+            let Some(mut sender) = output.sender.take() else {
+                unreachable!("sender must be idle to arm a fanout send");
+            };
+            output.phase = Phase::InFlight;
+            if i == last_sender_idx {
+                sender.input = events.take();
+            } else {
+                sender.input.clone_from(&events);
+            }
+            sender.send_reference = send_reference;
+            output.send.set(async move {
+                sender.flush().await?;
+                Ok(sender)
+            });
+        }
+    }
+
+    /// Drive in-flight sends to completion, applying control messages first.
+    async fn drive(&mut self) -> crate::Result<()> {
         // Keep track of whether the control channel has returned `Ready(None)`, and stop polling
         // it once it has. If we don't do this check, it will continue to return `Ready(None)` any
         // time it is polled, which can lead to a busy loop below.
@@ -259,10 +330,6 @@ impl Fanout {
         // In real life this is likely a non-issue, but it can lead to strange behavior in tests if
         // left unhandled.
         let mut control_channel_open = true;
-
-        // Create our send group which arms all senders to send the given events, and handles
-        // adding/removing/replacing senders while the send is in-flight.
-        let mut send_group = SendGroup::new(&mut self.senders, events, send_reference);
 
         loop {
             tokio::select! {
@@ -272,206 +339,98 @@ impl Fanout {
                 biased;
 
                 maybe_msg = self.control_channel.recv(), if control_channel_open => {
-                    trace!("Processing control message inside of send: {maybe_msg:?}");
-
-                    // During a send operation, control messages must be applied via the
-                    // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
-                        Some(ControlMessage::Add(id, sink)) => {
-                            send_group.add(&id, sink);
-                        },
-                        Some(ControlMessage::Remove(id)) => {
-                            send_group.remove(&id);
-                        },
-                        Some(ControlMessage::Pause(id)) => {
-                            send_group.pause(&id);
-                        },
-                        Some(ControlMessage::Replace(id, sink)) => {
-                            send_group.replace(&id, Sender::new(sink));
-                        },
-                        None => {
-                            // Control channel is closed, which means Vector is shutting down.
-                            control_channel_open = false;
-                        }
+                        Some(message) => self.apply_control_message(message),
+                        // Control channel is closed, which means Vector is shutting down.
+                        None => control_channel_open = false,
                     }
                 }
 
-                result = send_group.send() => match result {
-                    Ok(()) => {
-                        trace!("Sent item to fanout.");
-                        break;
-                    },
-                    Err(e) => return Err(e),
-                }
+                // `poll_inflight` returns as soon as nothing is in flight, which ends the drive.
+                result = poll_inflight(&mut self.senders) => return result,
             }
         }
-
-        Ok(())
     }
 }
 
-struct SendGroup<'a> {
-    senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-    sends: HashMap<ComponentKey, ReusableBoxFuture<'static, crate::Result<Sender>>>,
+/// Per-output state stored directly in the fanout map.
+///
+/// The boxed send future lives for the life of the output and is reused across batches. In-flight
+/// sends are not tracked by index: `IndexMap::shift_remove` renumbers later entries.
+struct Output {
+    phase: Phase,
+    /// Present only while `phase` is [`Phase::Idle`]. Stored beside the phase so `Phase` is not a
+    /// large enum: `Sender` is hundreds of bytes, and `clippy::large_enum_variant` rejects
+    /// `Phase::Idle(Sender)`. Boxing the sender would allocate on every completed send.
+    sender: Option<Sender>,
+    send: ReusableBoxFuture<'static, crate::Result<Sender>>,
 }
 
-impl<'a> SendGroup<'a> {
-    fn new(
-        senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-        events: EventArray,
-        send_reference: Option<Instant>,
-    ) -> Self {
-        // If we don't have a valid `Sender` for all sinks, then something went wrong in our logic
-        // to ensure we were starting with all valid/idle senders prior to initiating the send.
-        debug_assert!(senders.values().all(Option::is_some));
+enum Phase {
+    /// Waiting for the next batch. `sender` owns the [`Sender`].
+    Idle,
+    /// `send` owns the `Sender` and the batch it is flushing.
+    InFlight,
+    /// Waiting for [`ControlMessage::Replace`]. Any in-flight send was detached.
+    Paused,
+}
 
-        let last_sender_idx = senders.len().saturating_sub(1);
-        let mut events = Some(events);
+fn vacant_send() -> ReusableBoxFuture<'static, crate::Result<Sender>> {
+    // Polled only while an output is in flight. Arming installs the real future before that phase
+    // is observable, and detach installs this placeholder only after the output is paused or removed.
+    ReusableBoxFuture::new(async { unreachable!("polled a fanout send that was not armed") })
+}
 
-        // We generate a send future for each sender we have, which arms them with the events to
-        // send but also takes ownership of the sender itself, which we give back when the sender completes.
-        let mut sends = HashMap::new();
-        for (i, (key, sender)) in senders.iter_mut().enumerate() {
-            let mut sender = sender
-                .take()
-                .expect("sender must be present to initialize SendGroup");
-
-            // First, arm each sender with the item to actually send.
-            if i == last_sender_idx {
-                sender.input = events.take();
-            } else {
-                sender.input.clone_from(&events);
-            }
-            sender.send_reference = send_reference;
-
-            // Now generate a send for that sender which we'll drive to completion.
-            let send = async move {
-                sender.flush().await?;
-                Ok(sender)
-            };
-
-            sends.insert(key.clone(), ReusableBoxFuture::new(send));
+/// Hand an in-flight send to the runtime so pause or removal does not drop its batch.
+///
+/// The future owns the `Sender`, so it stays `'static` after the output entry lets go of it. The
+/// replacement box is allocated only on this path.
+fn spawn_inflight(output: &mut Output) {
+    // Deliberately not instrumented with the current span: this drains a send to a sink that has
+    // just been detached from the topology, so it is unrelated to the upstream component that owns
+    // this fanout. Attaching the current span would mis-tag this task's logs with the upstream
+    // component's identity rather than the detached sink's.
+    let send = mem::replace(&mut output.send, vacant_send());
+    tokio::spawn(async move {
+        if let Err(cause) = send.await {
+            warn!(
+                %cause,
+                message = "Encountered error writing to component after detaching from topology.",
+            );
         }
+    });
+}
 
-        Self { senders, sends }
-    }
-
-    fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
-        if let Some(send) = self.sends.remove(id) {
-            // Deliberately not instrumented with the current span: this drains a send to a sink
-            // that has just been detached from the topology, so it is unrelated to the upstream
-            // component that owns this fanout. Attaching the current span would mis-tag this
-            // task's logs with the upstream component's identity rather than the detached sink's.
-            tokio::spawn(async move {
-                if let Err(e) = send.await {
-                    warn!(
-                        cause = %e,
-                        message = "Encountered error writing to component after detaching from topology.",
-                    );
+// Free function so `drive` can borrow `senders` while `select!` also borrows `control_channel`.
+async fn poll_inflight(senders: &mut IndexMap<ComponentKey, Output>) -> crate::Result<()> {
+    // Poll each in-flight send once, then yield, so control messages are observed while a buffer
+    // is pending. `FuturesUnordered` would wake only the futures that become ready, but each
+    // future has to stay in its map entry: pause, remove, and replace look that entry up and may
+    // detach the send. Moving the futures into another collection would split them from that state.
+    loop {
+        let mut waiting = false;
+        for output in senders.values_mut() {
+            if !matches!(output.phase, Phase::InFlight) {
+                continue;
+            }
+            match poll!(output.send.get_pin()) {
+                Poll::Ready(Ok(sender)) => {
+                    output.sender = Some(sender);
+                    output.phase = Phase::Idle;
                 }
-            });
-            true
-        } else {
-            false
-        }
-    }
-
-    fn add(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
-        // When we're in the middle of a send, we can only keep track of the new sink, but can't
-        // actually send to it, as we don't have the item to send... so only add it to `senders`.
-        assert!(
-            self.senders
-                .insert(id.clone(), Some(Sender::new(sink)))
-                .is_none(),
-            "Adding duplicate output id to fanout: {id}"
-        );
-    }
-
-    fn remove(&mut self, id: &ComponentKey) {
-        // We may or may not be removing a sender that we're try to drive a send against, so we have
-        // to also detach the send future for the sender if it exists, otherwise we'd be hanging
-        // around still trying to send to it.
-        assert!(
-            self.senders.shift_remove(id).is_some(),
-            "Removing nonexistent sink from fanout: {id}"
-        );
-
-        // Now try and detach the in-flight send, if it exists.
-        //
-        // We don't ensure that a send was or wasn't detached because this could be called either
-        // during an in-flight send _or_ after the send has completed.
-        self.try_detach_send(id);
-    }
-
-    fn replace(&mut self, id: &ComponentKey, sink: Sender) {
-        match self.senders.get_mut(id) {
-            Some(sender) => {
-                // While a sink must be _known_ to be replaced, it must also be empty (previously
-                // paused or consumed when the `SendGroup` was created), otherwise an invalid
-                // sequence of control operations has been applied.
-                assert!(
-                    sender.replace(sink).is_none(),
-                    "Replacing existing sink is not valid: {id}"
-                );
-            }
-            None => panic!("Replacing unknown sink from fanout: {id}"),
-        }
-    }
-
-    fn pause(&mut self, id: &ComponentKey) {
-        match self.senders.get_mut(id) {
-            Some(sender) => {
-                // If we don't currently own the `Sender` for the given component, that implies
-                // there is an in-flight send: a `SendGroup` cannot be created without all
-                // participating components having a send operation triggered.
-                //
-                // As such, `try_detach_send` should always succeed here, as pausing only occurs
-                // when a component is being _replaced_, and should not be called multiple times.
-                if sender.take().is_none() {
-                    assert!(
-                        self.try_detach_send(id),
-                        "Pausing already-paused sink is invalid: {id}"
-                    );
+                // The future dropped the `Sender` on its way out. Leave the output paused so the
+                // next send cannot arm a sender that no longer exists.
+                Poll::Ready(Err(error)) => {
+                    output.phase = Phase::Paused;
+                    return Err(error);
                 }
-            }
-            None => panic!("Pausing unknown sink from fanout: {id}"),
-        }
-    }
-
-    async fn send(&mut self) -> crate::Result<()> {
-        // Right now, we do a linear scan of all sends, polling each send once in order to avoid
-        // waiting forever, such that we can let our control messages get picked up while sends are
-        // waiting.
-        loop {
-            if self.sends.is_empty() {
-                break;
-            }
-
-            let mut done = Vec::new();
-            for (key, send) in &mut self.sends {
-                if let Poll::Ready(result) = poll!(send.get_pin()) {
-                    let sender = result?;
-
-                    // The send completed, so we restore the sender and mark ourselves so that this
-                    // future gets dropped.
-                    done.push((key.clone(), sender));
-                }
-            }
-
-            for (key, sender) in done {
-                self.sends.remove(&key);
-                self.replace(&key, sender);
-            }
-
-            if !self.sends.is_empty() {
-                // We manually yield ourselves because we've polled all of the sends at this point,
-                // so if any are left, then we're scheduled for a wake-up... this is a really poor
-                // approximation of what `FuturesUnordered` is doing.
-                pending!();
+                Poll::Pending => waiting = true,
             }
         }
-
-        Ok(())
+        if !waiting {
+            return Ok(());
+        }
+        pending!();
     }
 }
 
@@ -505,7 +464,7 @@ impl Sender {
 mod tests {
     use std::{mem, num::NonZeroUsize};
 
-    use futures::poll;
+    use futures_util::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
@@ -701,6 +660,111 @@ mod tests {
         for receiver in &mut receivers {
             assert_eq!(Some(events[1].clone().into()), receiver.next().await);
         }
+    }
+
+    /// Two capacity-1 outputs. Event 0 is buffered, and event 1 is left in flight by a dropped send.
+    async fn drop_blocked_fanout_send() -> (
+        Fanout,
+        UnboundedSender<ControlMessage>,
+        Vec<BufferReceiver<EventArray>>,
+        Vec<Event>,
+    ) {
+        let (mut fanout, control, receivers) = fanout_from_senders(&[1, 1]);
+        let events = make_events(3);
+
+        fanout
+            .send(events[0].clone().into(), None)
+            .await
+            .expect("should not fail");
+
+        let mut blocked = spawn(fanout.send(events[1].clone().into(), None));
+        assert_pending!(blocked.poll());
+        drop(blocked);
+
+        (fanout, control, receivers, events)
+    }
+
+    async fn assert_next(receiver: &mut BufferReceiver<EventArray>, expected: &Event) {
+        assert_eq!(Some(expected.clone().into()), receiver.next().await);
+    }
+
+    /// The event is already buffered, so this must complete without waiting.
+    fn assert_next_ready(receiver: &mut BufferReceiver<EventArray>, expected: &Event) {
+        let mut next = spawn(receiver.next());
+        assert_eq!(assert_ready!(next.poll()), Some(expected.clone().into()));
+    }
+
+    #[tokio::test]
+    async fn fanout_resumes_send_dropped_while_pending() {
+        // Dropping `Fanout::send` while a sender is blocked must leave that send in the fanout.
+        // The next send resumes it instead of dropping the event or the sender.
+        let (mut fanout, _, mut receivers, events) = drop_blocked_fanout_send().await;
+
+        for receiver in &mut receivers {
+            assert_next(receiver, &events[0]).await;
+        }
+
+        // The resumed send flushes the dropped batch first. That fills the
+        // one-slot buffers again, so the new batch stays pending until it is read.
+        let mut resumed = spawn(fanout.send(events[2].clone().into(), None));
+        assert_pending!(resumed.poll());
+
+        for receiver in &mut receivers {
+            assert_next_ready(receiver, &events[1]);
+        }
+
+        assert_ready!(resumed.poll()).expect("should not fail");
+        drop(resumed);
+
+        for receiver in &mut receivers {
+            assert_next_ready(receiver, &events[2]);
+        }
+    }
+
+    #[tokio::test]
+    async fn fanout_detaches_dropped_send_on_remove() {
+        // A control message applied at the start of the next send, outside `drive`, must detach a
+        // batch left behind by a dropped send. Dropping that future instead would lose the batch.
+        let (mut fanout, control, mut receivers, events) = drop_blocked_fanout_send().await;
+
+        remove_sender_from_fanout(&control, 0);
+        for receiver in &mut receivers {
+            assert_next(receiver, &events[0]).await;
+        }
+
+        let mut resumed = spawn(fanout.send(events[2].clone().into(), None));
+        assert_pending!(resumed.poll());
+        assert_next(&mut receivers[1], &events[1]).await;
+        assert_ready!(resumed.poll()).expect("should not fail");
+        drop(resumed);
+        assert_next(&mut receivers[1], &events[2]).await;
+
+        // The detached task still delivers the dropped batch to the removed output.
+        assert_next(&mut receivers[0], &events[1]).await;
+        assert_eq!(None, receivers[0].next().await);
+    }
+
+    #[tokio::test]
+    async fn fanout_detaches_dropped_send_on_pause() {
+        let (mut fanout, control, mut receivers, events) = drop_blocked_fanout_send().await;
+
+        let (mut old_receiver, new_sender) = start_sender_replace(&control, &mut receivers, 0, 1);
+        assert_next(&mut old_receiver, &events[0]).await;
+        assert_next(&mut receivers[1], &events[0]).await;
+
+        // Pause detaches output 0, then the send waits until that output is replaced.
+        let mut resumed = spawn(fanout.send(events[2].clone().into(), None));
+        assert_pending!(resumed.poll());
+        assert_next(&mut old_receiver, &events[1]).await;
+
+        finish_sender_resume(&control, 0, new_sender);
+        assert_pending!(resumed.poll());
+        assert_next(&mut receivers[1], &events[1]).await;
+        assert_ready!(resumed.poll()).expect("should not fail");
+        drop(resumed);
+
+        assert_next(&mut receivers[0], &events[2]).await;
+        assert_next(&mut receivers[1], &events[2]).await;
     }
 
     #[tokio::test]

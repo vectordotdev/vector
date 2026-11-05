@@ -1,11 +1,11 @@
 use std::{
+    future::Future,
     mem,
     pin::Pin,
     task::{Context, Poll, ready},
 };
 
-use async_recursion::async_recursion;
-use futures::Stream;
+use futures::{Stream, future::Either};
 use tokio::select;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_common::internal_event::emit;
@@ -18,14 +18,16 @@ use crate::{
 };
 
 /// Adapter for papering over various receiver backends.
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum ReceiverAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
     InMemory(LimitedReceiver<T>),
 
     /// The disk v2 buffer.
-    DiskV2(disk_v2::BufferReader<T, ProductionFilesystem>),
+    ///
+    /// Boxed so a memory-only receiver does not carry the disk reader's layout. The reader is
+    /// several hundred bytes and would otherwise be copied with every `BufferReceiver`.
+    DiskV2(Box<disk_v2::BufferReader<T, ProductionFilesystem>>),
 }
 
 impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
@@ -36,7 +38,7 @@ impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
 
 impl<T: Bufferable> From<disk_v2::BufferReader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
     fn from(v: disk_v2::BufferReader<T, ProductionFilesystem>) -> Self {
-        Self::DiskV2(v)
+        Self::DiskV2(Box::new(v))
     }
 }
 
@@ -44,22 +46,25 @@ impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn next(&mut self) -> Option<T> {
+    pub(crate) fn next(&mut self) -> impl Future<Output = Option<T>> + Send + '_ {
         match self {
-            ReceiverAdapter::InMemory(rx) => rx.next().await,
-            ReceiverAdapter::DiskV2(reader) => loop {
-                match reader.next().await {
-                    Ok(result) => break result,
-                    Err(e) => match e.as_recoverable_error() {
-                        Some(re) => {
-                            // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
-                            // keep trying to read the next available record.
-                            emit(re);
-                        }
-                        None => panic!("Reader encountered unrecoverable error: {e:?}"),
-                    },
+            Self::InMemory(rx) => Either::Left(rx.next()),
+            // Boxed so the memory receive future does not include the disk reader's state.
+            Self::DiskV2(reader) => Either::Right(Box::pin(async move {
+                loop {
+                    match reader.next().await {
+                        Ok(result) => break result,
+                        Err(e) => match e.as_recoverable_error() {
+                            Some(re) => {
+                                // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
+                                // keep trying to read the next available record.
+                                emit(re);
+                            }
+                            None => panic!("Reader encountered unrecoverable error: {e:?}"),
+                        },
+                    }
                 }
-            },
+            })),
         }
     }
 }
@@ -81,6 +86,7 @@ pub struct BufferReceiver<T: Bufferable> {
 
 impl<T: Bufferable> BufferReceiver<T> {
     /// Creates a new [`BufferReceiver`] wrapping the given channel receiver.
+    #[must_use]
     pub fn new(base: ReceiverAdapter<T>) -> Self {
         Self {
             base,
@@ -90,6 +96,7 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 
     /// Creates a new [`BufferReceiver`] wrapping the given channel receiver and overflow receiver.
+    #[must_use]
     pub fn with_overflow(base: ReceiverAdapter<T>, overflow: BufferReceiver<T>) -> Self {
         Self {
             base,
@@ -112,7 +119,6 @@ impl<T: Bufferable> BufferReceiver<T> {
         self.instrumentation = Some(handle);
     }
 
-    #[async_recursion]
     pub async fn next(&mut self) -> Option<T> {
         // We want to poll both our base and overflow receivers without waiting for one or the
         // other to entirely drain before checking the other.  This ensures that we're fairly
@@ -122,16 +128,18 @@ impl<T: Bufferable> BufferReceiver<T> {
         // occurred, and is over, and items are flowing through the base receiver.  If we waited to
         // entirely drain the overflow receiver, we might cause another small stall of the pipeline
         // attached to the base receiver.
-        let overflow = self.overflow.as_mut().map(Pin::new);
-
-        let (item, from_base) = match overflow {
+        //
+        // Only the overflow call is boxed, so a receiver without an overflow stage does not
+        // allocate here.
+        let (item, from_base) = match self.overflow.as_mut() {
             None => match self.base.next().await {
                 Some(item) => (item, true),
                 None => return None,
             },
-            Some(mut overflow) => {
+            Some(overflow) => {
+                let overflow_next = Box::pin(overflow.next());
                 select! {
-                    Some(item) = overflow.next() => (item, false),
+                    Some(item) = overflow_next => (item, false),
                     Some(item) = self.base.next() => (item, true),
                     else => return None,
                 }
@@ -152,12 +160,12 @@ impl<T: Bufferable> BufferReceiver<T> {
         Some(item)
     }
 
+    #[must_use]
     pub fn into_stream(self) -> BufferReceiverStream<T> {
         BufferReceiverStream::new(self)
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,
@@ -170,6 +178,8 @@ pub struct BufferReceiverStream<T: Bufferable> {
 }
 
 impl<T: Bufferable> BufferReceiverStream<T> {
+    /// Creates a stream that yields items from `receiver`.
+    #[must_use]
     pub fn new(receiver: BufferReceiver<T>) -> Self {
         Self {
             state: StreamState::Idle(receiver),
@@ -215,5 +225,47 @@ async fn make_recv_future<T: Bufferable>(
             let result = receiver.next().await;
             (result, receiver)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{mem, num::NonZeroUsize};
+
+    use tracing::Span;
+
+    use crate::{WhenFull, test::SizedRecord, topology::builder::TopologyBuilder};
+
+    #[test]
+    fn memory_receiver_does_not_store_disk_reader_inline() {
+        let (_sender, receiver) = TopologyBuilder::<SizedRecord>::standalone_memory(
+            NonZeroUsize::new(1).expect("capacity"),
+            WhenFull::Block,
+            &Span::none(),
+            None,
+            None,
+        );
+        let size = mem::size_of_val(&receiver);
+        assert!(
+            size < 256,
+            "memory BufferReceiver is {size} bytes; the disk reader should be boxed"
+        );
+    }
+
+    #[tokio::test]
+    async fn memory_recv_future_omits_disk_state() {
+        let (_sender, mut receiver) = TopologyBuilder::<SizedRecord>::standalone_memory(
+            NonZeroUsize::new(1).expect("capacity"),
+            WhenFull::Block,
+            &Span::none(),
+            None,
+            None,
+        );
+        let fut = receiver.next();
+        let size = mem::size_of_val(&fut);
+        assert!(
+            size < 512,
+            "memory BufferReceiver::next future is {size} bytes; the disk arm should be boxed"
+        );
     }
 }
