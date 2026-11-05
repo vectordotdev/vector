@@ -87,15 +87,15 @@ enum HttpServerAuthRepr {
         #[configurable(metadata(docs::examples = "my-secret-token"))]
         token: SensitiveString,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         username: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         password: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         source: String,
     },
@@ -106,15 +106,15 @@ enum HttpServerAuthRepr {
         /// The VRL boolean expression.
         source: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         username: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         password: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         token: String,
     },
@@ -138,11 +138,11 @@ enum HttpServerAuthRepr {
         #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         token: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         source: String,
     },
@@ -270,11 +270,11 @@ impl HttpServerAuthConfig {
     /// Builds an auth matcher based on provided configuration.
     /// Used to validate configuration if needed, before passing it to the
     /// actual component for usage.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bearer token is not a valid `Authorization` header value, or if
+    /// the custom VRL program fails to compile or does not return a boolean.
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -329,11 +329,11 @@ impl HttpServerAuthConfig {
     /// Validates the auth configuration against the given enrichment tables,
     /// compiling any custom VRL program so `vector validate --no-environment`
     /// catches syntax/type errors while resolving enrichment table names.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bearer token is not a valid `Authorization` header value, or if
+    /// the custom VRL program fails to compile or does not return a boolean.
     pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
         self.build(enrichment_tables, &MetricsStorage::default())
             .map(|_| ())
@@ -359,11 +359,12 @@ pub enum HttpServerAuthMatcher {
 impl HttpServerAuthMatcher {
     /// Validates the request. Returns `Ok(Some(enrichment))` when auth passes and the VRL program
     /// wrote `%field` values; returns `Ok(None)` when auth passes with no metadata enrichment.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`ErrorMessage`] with status `401 Unauthorized` if an `AuthHeader` matcher finds
+    /// the `Authorization` header missing or not matching, or if a `Vrl` matcher's program fails at
+    /// runtime, returns `false`, or returns a non-boolean value.
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,

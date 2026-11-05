@@ -22,8 +22,9 @@ use vector_lib::{
 };
 use vector_vrl_metrics::MetricsStorage;
 
+use vector_lib::extra_context::ExtraContext;
+
 use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
-use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
 
@@ -156,7 +157,7 @@ pub struct TransformContext {
     /// Counter handle for `component_cpu_usage_ns_total`, pre-tagged with this transform's
     /// component identity. `Some` only when `measure_cpu_usage` is enabled on the
     /// `TransformOuter`. Transforms that spawn helper tokio tasks at construction time
-    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`crate::cpu_time::spawn_timed`] so
+    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`vector_lib::cpu_time::spawn_timed`] so
     /// their CPU is attributed to the component alongside the main transform task.
     pub cpu_ns: Option<Counter>,
 }

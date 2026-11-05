@@ -1,4 +1,4 @@
-pub mod config;
+pub(super) mod config;
 #[cfg(test)]
 mod tests;
-pub mod transform;
+pub(super) mod transform;

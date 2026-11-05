@@ -5,7 +5,11 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http::{Uri, response::Parts};
+use http::{
+    Uri,
+    response::Parts,
+    uri::{Authority, Scheme},
+};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_util::codec::Decoder as _;
@@ -30,7 +34,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     format_vrl_diagnostics,
-    http::{Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
+    http::{Auth, HttpClient, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
@@ -376,8 +380,7 @@ impl SourceConfig for HttpClientConfig {
             headers,
             content_type,
             auth: self.auth.clone(),
-            tls,
-            proxy: cx.proxy.clone(),
+            client: HttpClient::new(tls.into(), &cx.proxy)?,
             shutdown: cx.shutdown,
         };
 
@@ -549,15 +552,11 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         // Build base URI and add query parameters
         let base_uri = Uri::builder()
-            .scheme(
-                url.scheme()
-                    .cloned()
-                    .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
-            )
+            .scheme(url.scheme().cloned().unwrap_or(Scheme::HTTP))
             .authority(
                 url.authority()
                     .cloned()
-                    .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
+                    .unwrap_or_else(|| Authority::from_static("localhost")),
             )
             .path_and_query(url.path().to_string())
             .build()
