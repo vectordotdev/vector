@@ -456,6 +456,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_deeply_nested_protobuf() {
+        use vector_lib::event::proto::{
+            EventWrapper, Log, Value, ValueArray, ValueMap, event_wrapper, value,
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source: VectorConfig = serde_yaml::from_str(&format!("address: \"{addr}\"\n")).unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let server = tokio::spawn(
+            source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap(),
+        );
+        test_util::wait_for_tcp(addr).await;
+        let mut client = proto::Client::connect(format!("http://{addr}"))
+            .await
+            .unwrap();
+
+        let request = |depth| {
+            let mut nested = Value {
+                kind: Some(value::Kind::Integer(1)),
+            };
+            for _ in 0..depth {
+                nested = Value {
+                    kind: Some(value::Kind::Array(ValueArray {
+                        items: vec![nested],
+                    })),
+                };
+            }
+            proto::PushEventsRequest {
+                events: vec![EventWrapper {
+                    event: Some(event_wrapper::Event::Log(Log {
+                        value: Some(Value {
+                            kind: Some(value::Kind::Map(ValueMap {
+                                fields: [("nested".to_owned(), nested)].into(),
+                            })),
+                        }),
+                        ..Default::default()
+                    })),
+                }],
+            }
+        };
+
+        // Each array adds two Protobuf message levels. This exceeds Prost's depth
+        // budget while remaining well below the request-size limit.
+        let error = client.push_events(request(64)).await.unwrap_err();
+        assert_eq!(error.code(), tonic::Code::Internal);
+        assert!(error.message().contains("recursion limit reached"));
+
+        client.push_events(request(1)).await.unwrap();
+        assert_eq!(test_util::collect_ready(rx).len(), 1);
+        server.abort();
+    }
+
+    #[tokio::test]
     async fn custom_health_check_works() {
         use tonic::transport::Channel;
 
