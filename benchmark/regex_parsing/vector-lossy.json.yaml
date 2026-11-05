@@ -1,0 +1,17 @@
+data_dir: /tmp/vector-regex-bench-data
+
+sources:
+  logs:
+    type: http_server
+    address: "0.0.0.0:8282"
+    decoding:
+      codec: json
+      lossy: true
+
+sinks:
+  out:
+    type: http
+    inputs: [logs]
+    uri: "http://localhost:8080"
+    encoding:
+      codec: json
