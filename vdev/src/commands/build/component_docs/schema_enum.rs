@@ -486,35 +486,21 @@ mod tests {
     }
 
     #[test]
-    fn optional_null_branch_unwraps_to_inner_schema() {
-        let schema = json!({
-            "oneOf": [
-                { "type": "null" },
-                { "type": "string" }
-            ],
-            "_metadata": { "docs::optional": true }
-        });
-        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
-        assert_eq!(
-            resolved,
-            json!({ "_resolved": { "type": { "string": {} } } })
-        );
-    }
-
-    #[test]
-    fn optional_absence_sentinel_unwraps_to_inner_schema() {
-        let schema = json!({
-            "oneOf": [
-                { "not": { "required": ["type"] } },
-                { "type": "string" }
-            ],
-            "_metadata": { "docs::optional": true }
-        });
-        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
-        assert_eq!(
-            resolved,
-            json!({ "_resolved": { "type": { "string": {} } } })
-        );
+    fn optional_absence_branches_unwrap_to_inner_schema() {
+        for absent in [
+            json!({ "type": "null" }),
+            json!({ "not": { "required": ["type"] } }),
+        ] {
+            let schema = json!({
+                "oneOf": [absent, { "type": "string" }],
+                "_metadata": { "docs::optional": true }
+            });
+            let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+            assert_eq!(
+                resolved,
+                json!({ "_resolved": { "type": { "string": {} } } })
+            );
+        }
     }
 
     #[test]

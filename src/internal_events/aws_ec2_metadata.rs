@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEc2MetadataRefreshSuccessful;
+pub(crate) struct AwsEc2MetadataRefreshSuccessful;
 
 impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
     fn emit(self) {
@@ -14,7 +14,7 @@ impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEc2MetadataRefreshError {
+pub(crate) struct AwsEc2MetadataRefreshError {
     pub error: crate::Error,
 }
 

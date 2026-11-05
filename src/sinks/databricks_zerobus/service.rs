@@ -2,7 +2,7 @@
 
 use crate::config::ProxyConfig;
 use crate::event::Event;
-use crate::http::client_v1::HttpClient;
+use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
 use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{
@@ -438,8 +438,8 @@ impl ZerobusService {
             let (client_id, client_secret) = self.config.auth.credentials();
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
-            // We override only the two timeouts that `stream_options` exposes and
-            // otherwise accept the SDK's Arrow-stream defaults — notably
+            // We override only the timeouts and compression that `stream_options`
+            // exposes and otherwise accept the SDK's Arrow-stream defaults — notably
             // `recovery = true`, so the SDK transparently reconnects and replays
             // in-flight batches on transient stream errors. That layers under
             // Vector's own retry: the SDK absorbs brief blips, and only surfaces a
@@ -455,7 +455,7 @@ impl ZerobusService {
                 .arrow(Arc::clone(&schema.arrow_schema))
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
-                .ipc_compression(stream_options.compression.into());
+                .compression(stream_options.compression.into());
             let stream = builder
                 .build_arrow()
                 .await

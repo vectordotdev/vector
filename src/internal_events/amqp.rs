@@ -1,12 +1,12 @@
 #[cfg(feature = "sources-amqp")]
-pub mod source {
+pub(crate) mod source {
     use vector_lib::{
         NamedInternalEvent, counter,
         internal_event::{CounterName, InternalEvent, error_stage, error_type},
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct AmqpBytesReceived {
+    pub(crate) struct AmqpBytesReceived {
         pub byte_size: usize,
         pub protocol: &'static str,
     }
@@ -27,7 +27,7 @@ pub mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct AmqpEventError<'a> {
+    pub(crate) struct AmqpEventError<'a> {
         pub error: &'a lapin::Error,
     }
 
@@ -48,7 +48,7 @@ pub mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct AmqpAckError {
+    pub(crate) struct AmqpAckError {
         pub error: lapin::Error,
     }
 
@@ -69,7 +69,7 @@ pub mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct AmqpRejectError {
+    pub(crate) struct AmqpRejectError {
         pub error: lapin::Error,
     }
 

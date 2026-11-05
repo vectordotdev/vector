@@ -266,7 +266,7 @@
 
 .dark .release-page .prose pre,
 .dark .release-page .prose .chroma,
-.dark .release-page .has-copy-button {
+.dark .release-page .has-code-controls {
   background-color: var(--color-neutral-900);
 }
 

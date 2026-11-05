@@ -36,24 +36,50 @@ generated: components: sources: datadog_agent: configuration: {
 		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
 	}
 	disable_llmobs: {
-		description: "If this is set to `true`, LLM Observability events are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, LLM Observability events are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_logs: {
-		description: "If this is set to `true`, logs are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, logs are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_metrics: {
-		description: "If this is set to `true`, metrics (beta) are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, metrics (beta) are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_traces: {
-		description: "If this is set to `true`, traces (alpha) are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, traces (alpha) are not accepted by the component."
+		required:           false
+		type: bool: {}
+	}
+	enabled_data_types: {
+		description: """
+			The data types accepted by the component. Defaults to all data types.
+
+			When `multiple_outputs` is enabled, each data type is sent to its own output.
+			Data types disabled by the deprecated `disable_*` options are removed from this list.
+			"""
+		required: false
+		type: array: items: type: string: {
+			enum: {
+				llmobs:  "LLM Observability events."
+				logs:    "Logs."
+				metrics: "Metrics (beta)."
+				traces:  "Traces (alpha)."
+			}
+			examples: ["logs", "metrics", "traces"]
+		}
 	}
 	framing: {
 		description: """

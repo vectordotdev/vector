@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SampleEventDiscarded {
+pub(crate) struct SampleEventDiscarded {
     pub group: Option<String>,
     pub include_group_tag: bool,
 }

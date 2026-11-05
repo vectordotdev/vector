@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    convert::Infallible,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -9,15 +8,12 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::FutureExt;
-use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
     Deserializer, Value as JsonValue,
     de::{Read as JsonRead, StrRead},
 };
 use snafu::Snafu;
-use tokio::net::TcpStream;
 use tokio_util::codec::Decoder as _;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -40,7 +36,6 @@ use vector_lib::{
     schema::meaning,
     sensitive_string::SensitiveString,
     source_sender::SendError,
-    tls::MaybeTlsIncomingStream,
 };
 use vrl::{
     path::{OwnedTargetPath, PathPrefix, ValuePath as _},
@@ -49,7 +44,10 @@ use vrl::{
 use warp::{
     Filter, Reply,
     filters::BoxedFilter,
-    http::header::{CONTENT_TYPE, HeaderValue},
+    http::{
+        StatusCode,
+        header::{CONTENT_TYPE, HeaderValue},
+    },
     path,
     reject::Rejection,
     reply::Response,
@@ -68,7 +66,7 @@ use crate::{
     common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
@@ -279,25 +277,24 @@ impl SplunkConfig {
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            conn.peer_addr(),
-                        )
-                    }))
-                    .service(warp::service(services.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
-
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(shutdown.map(|_| ()))
-                .await
-                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
+            serve(
+                listener.accept_stream(),
+                shutdown.map(|_| ()),
+                move |conn| {
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                conn.peer_addr(),
+                            )
+                        }))
+                        .service(warp::service(services.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -795,10 +792,11 @@ impl SplunkSource {
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
             .map(move |_| {
-                http::Response::builder()
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
-                    .expect("static response")
+                let mut response = Response::new(r#"{"text":"HEC is healthy","code":17}"#.into());
+                response
+                    .headers_mut()
+                    .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                response
             })
             .boxed()
     }
@@ -2000,7 +1998,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 fn response_plain(code: StatusCode, msg: &'static str) -> Response {
     warp::reply::with_status(
-        warp::reply::with_header(msg, http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        warp::reply::with_header(msg, CONTENT_TYPE, "text/plain; charset=utf-8"),
         code,
     )
     .into_response()

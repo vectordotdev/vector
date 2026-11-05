@@ -6,7 +6,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldInvalidRecordError {
+pub(crate) struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
 }
@@ -30,7 +30,7 @@ impl InternalEvent for JournaldInvalidRecordError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldStartJournalctlError {
+pub(crate) struct JournaldStartJournalctlError {
     pub error: crate::Error,
 }
 
@@ -52,7 +52,7 @@ impl InternalEvent for JournaldStartJournalctlError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldReadError {
+pub(crate) struct JournaldReadError {
     pub error: BoxedFramingError,
 }
 
@@ -74,7 +74,7 @@ impl InternalEvent for JournaldReadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldCheckpointSetError {
+pub(crate) struct JournaldCheckpointSetError {
     pub error: std::io::Error,
     pub filename: String,
 }
@@ -98,7 +98,7 @@ impl InternalEvent for JournaldCheckpointSetError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldCheckpointFileOpenError<'a> {
+pub(crate) struct JournaldCheckpointFileOpenError<'a> {
     pub error: &'a std::io::Error,
     pub path: String,
 }
