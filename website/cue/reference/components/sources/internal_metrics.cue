@@ -581,12 +581,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: {}
 		}
-		internal_metrics_cardinality_total: {
-			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              internal_metrics_cardinality.tags
-		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
 			type:              "gauge"
