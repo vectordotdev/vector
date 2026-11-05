@@ -3,7 +3,8 @@ mod event_time;
 mod transform;
 
 pub use config::{
-    AggregateConfig, AggregationMode, EventTimeConfig, LateEvents, MetricType, MissingTimestamp,
+    AggregateConfig, AggregationMode, EventTimeConfig, LateEvents, LateEventsStrategy, MetricType,
+    MissingTimestamp,
 };
 pub use transform::Aggregate;
 

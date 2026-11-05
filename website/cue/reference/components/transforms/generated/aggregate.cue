@@ -50,14 +50,16 @@ generated: components: transforms: aggregate: configuration: {
 						description: """
 																Metric types that may be forwarded.
 
-																When set, a late event is forwarded only if its type is listed and it is
-																incremental; all other late events are dropped and counted via
-																`component_discarded_events_total`. Absolute events, including absolute gauges, are
-																always dropped because sinks that convert absolute metrics to deltas would treat an
-																older sample as a reset. When unset, every late event is forwarded.
+																When set, a late event is forwarded only if its type is listed and it is incremental; all
+																other late events are dropped and counted via `component_discarded_events_total`.
+																Requiring incremental events keeps late absolute counters and histograms from resetting
+																the baseline of sinks that convert absolute metrics to deltas. The rule applies to every
+																type, so absolute gauges are dropped too; gauges are usually absolute, so listing `gauge`
+																rarely forwards anything. When unset, every late event is forwarded.
+
+																Only valid when `strategy` is `forward`.
 																"""
-						relevant_when: "strategy = \"forward\""
-						required:      false
+						required: false
 						type: array: items: type: string: {
 							enum: {
 								aggregated_histogram: "An `aggregated_histogram` metric."

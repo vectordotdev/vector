@@ -7,7 +7,7 @@ use vector_lib::event::{
 };
 
 use super::AggregationMode;
-use super::config::{EventTimeConfig, LateEvents, MetricType, MissingTimestamp};
+use super::config::{EventTimeConfig, LateEventsStrategy, MetricType, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
 use crate::{
     event::{Event, EventMetadata},
@@ -112,9 +112,10 @@ impl Aggregate {
     /// listed type qualify: sinks that convert absolute metrics to deltas would
     /// treat an older absolute sample as a reset and inflate the next delta.
     fn should_forward_late(&self, data: &MetricData) -> bool {
-        match &self.event_time().late_events {
-            LateEvents::Drop => false,
-            LateEvents::Forward { metric_types } => metric_types.as_ref().is_none_or(|types| {
+        let late_events = &self.event_time().late_events;
+        match late_events.strategy {
+            LateEventsStrategy::Drop => false,
+            LateEventsStrategy::Forward => late_events.metric_types.as_ref().is_none_or(|types| {
                 data.kind == MetricKind::Incremental
                     && types.contains(&MetricType::of(data.value()))
             }),

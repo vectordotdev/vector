@@ -1,4 +1,4 @@
-use super::{AggregateConfig, AggregationMode};
+use super::{AggregateConfig, AggregationMode, LateEventsStrategy};
 
 use std::{
     collections::{BTreeMap, HashMap, hash_map::Entry},
@@ -131,6 +131,14 @@ impl Aggregate {
                     "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
                     event_time.allowed_lateness_ms)
                 .into());
+            }
+            if event_time.late_events.metric_types.is_some()
+                && event_time.late_events.strategy != LateEventsStrategy::Forward
+            {
+                return Err(
+                    "`event_time.late_events.metric_types` requires `event_time.late_events.strategy` to be `forward`"
+                        .into(),
+                );
             }
         }
 

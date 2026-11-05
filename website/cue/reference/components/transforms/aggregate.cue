@@ -227,11 +227,12 @@ components: transforms: aggregate: {
 
 						Set `event_time.late_events.metric_types` to forward only late events of the
 						listed types, for example `["distribution", "aggregated_histogram", "sketch"]`.
-						With a list, only incremental events are forwarded; absolute events of a listed
-						type, including absolute gauges, are dropped so they cannot reset a sink's delta
-						baseline. Forwarding only the types the Datadog Metrics sink sends as
-						distributions also avoids overwriting the bucket's aggregate, because
-						distributions are merged rather than overwritten.
+						With a list, only incremental events are forwarded, which keeps late absolute
+						counters and histograms from resetting a sink's delta baseline. The rule applies
+						to every type, so absolute gauges are dropped too; gauges are usually absolute,
+						so listing `gauge` rarely forwards anything. Forwarding only the types the
+						Datadog Metrics sink sends as distributions also avoids overwriting the bucket's
+						aggregate, because distributions are merged rather than overwritten.
 
 						Metrics the configured `mode` does not aggregate (for example an `incremental`
 						event in `mean` mode, or an `absolute` event in `sum` mode) pass through

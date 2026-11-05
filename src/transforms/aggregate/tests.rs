@@ -12,8 +12,8 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use super::{
-    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, LateEvents, MetricType,
-    MissingTimestamp, config::default_max_future_ms,
+    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, LateEvents, LateEventsStrategy,
+    MetricType, MissingTimestamp, config::default_max_future_ms,
 };
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
@@ -1194,7 +1194,12 @@ fn event_time_late_events_forward_passes_through_unchanged() {
     let mut agg = Aggregate::new(&event_time_config_with(
         interval_ms,
         AggregationMode::Auto,
-        |et| et.late_events = LateEvents::Forward { metric_types: None },
+        |et| {
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
+                metric_types: None,
+            };
+        },
     ))
     .unwrap();
     let now_ms = Utc::now().timestamp_millis();
@@ -1223,7 +1228,10 @@ fn event_time_late_events_forward_passes_through_unchanged() {
         |et| {
             et.allowed_lateness_ms = 10_000;
             et.max_future_ms = 600_000;
-            et.late_events = LateEvents::Forward { metric_types: None };
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
+                metric_types: None,
+            };
         },
     ))
     .unwrap();
@@ -1265,7 +1273,8 @@ fn event_time_late_events_forward_metric_types() {
         interval_ms,
         AggregationMode::Auto,
         |et| {
-            et.late_events = LateEvents::Forward {
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
                 metric_types: Some(vec![
                     MetricType::Gauge,
                     MetricType::Distribution,
@@ -1413,7 +1422,7 @@ fn event_time_block_parses_documented_literals() {
     );
     assert_eq!(event_time.allowed_lateness_ms, 5000);
     assert_eq!(event_time.max_future_ms, 60000);
-    assert_eq!(event_time.late_events, LateEvents::Drop);
+    assert_eq!(event_time.late_events, LateEvents::default());
 
     let cfg: AggregateConfig = toml::from_str(
         r#"
@@ -1427,7 +1436,10 @@ fn event_time_block_parses_documented_literals() {
     assert_eq!(event_time.missing_timestamp, MissingTimestamp::Drop);
     assert_eq!(
         event_time.late_events,
-        LateEvents::Forward { metric_types: None }
+        LateEvents {
+            strategy: LateEventsStrategy::Forward,
+            metric_types: None,
+        }
     );
 
     let cfg: AggregateConfig = toml::from_str(
@@ -1440,7 +1452,8 @@ fn event_time_block_parses_documented_literals() {
     .unwrap();
     assert_eq!(
         cfg.event_time.unwrap().late_events,
-        LateEvents::Forward {
+        LateEvents {
+            strategy: LateEventsStrategy::Forward,
             metric_types: Some(vec![
                 MetricType::Distribution,
                 MetricType::AggregatedHistogram,
@@ -1456,18 +1469,27 @@ fn event_time_block_parses_documented_literals() {
     "#,
     )
     .unwrap();
-    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::Drop);
+    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::default());
 
-    // Like other internally tagged unit variants, `drop` ignores stray fields.
+    // An empty block falls back to the default `drop` strategy.
+    let cfg: AggregateConfig = toml::from_str(
+        r"
+        [event_time.late_events]
+    ",
+    )
+    .unwrap();
+    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::default());
+
+    // `metric_types` only applies to `forward`; pairing it with `drop` is a build error.
     let cfg: AggregateConfig = toml::from_str(
         r#"
         [event_time.late_events]
-        strategy = "drop"
         metric_types = ["distribution"]
     "#,
     )
     .unwrap();
-    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::Drop);
+    let err = Aggregate::new(&cfg).expect_err("`metric_types` requires the `forward` strategy");
+    assert!(err.to_string().contains("metric_types"), "{err}");
 }
 
 #[tokio::test]
@@ -1510,9 +1532,12 @@ allowed_lateness_ms = 600000
 
 #[tokio::test]
 async fn transform_late_events_forward() {
+    // Generous lateness keeps the on-time samples recordable even if the test
+    // runs across a bucket boundary; the 2020 samples are still far too late.
     let agg = serde_yaml::from_str::<AggregateConfig>(indoc! {"
         interval_ms: 10000
         event_time:
+          allowed_lateness_ms: 60000
           late_events:
             strategy: forward
             metric_types:
@@ -1524,6 +1549,8 @@ async fn transform_late_events_forward() {
     .unwrap()
     .into_task();
 
+    // One shared timestamp so both on-time samples land in the same bucket.
+    let on_time_ts = Utc::now();
     // Far in the past, so these are always past their bucket's cutoff.
     let late_ts = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
     let late_distribution = make_metric_with_timestamp(
@@ -1559,13 +1586,13 @@ async fn transform_late_events_forward() {
             "on_time_counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 2.0 },
-            Utc::now(),
+            on_time_ts,
         ),
         make_metric_with_timestamp(
             "on_time_counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 3.0 },
-            Utc::now(),
+            on_time_ts,
         ),
     ];
 

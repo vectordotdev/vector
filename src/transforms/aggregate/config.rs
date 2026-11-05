@@ -98,7 +98,7 @@ impl Default for EventTimeConfig {
     fn default() -> Self {
         Self {
             allowed_lateness_ms: 0,
-            late_events: LateEvents::Drop,
+            late_events: LateEvents::default(),
             missing_timestamp: MissingTimestamp::Drop,
             max_future_ms: default_max_future_ms(),
         }
@@ -119,30 +119,42 @@ pub enum MissingTimestamp {
     UseSystemTime,
 }
 
-/// Behavior for metrics that arrive after their bucket's cutoff in event-time mode.
+/// Settings for metrics that arrive after their bucket's cutoff in event-time mode.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-#[serde(tag = "strategy", rename_all = "snake_case", deny_unknown_fields)]
-#[configurable(description = "How to handle metrics that arrive after their bucket's cutoff.")]
-#[configurable(metadata(docs::enum_tag_description = "The late event handling strategy to use."))]
-pub enum LateEvents {
+#[serde(deny_unknown_fields)]
+pub struct LateEvents {
+    /// The late event handling strategy to use.
+    #[serde(default)]
+    pub strategy: LateEventsStrategy,
+
+    /// Metric types that may be forwarded.
+    ///
+    /// When set, a late event is forwarded only if its type is listed and it is incremental; all
+    /// other late events are dropped and counted via `component_discarded_events_total`.
+    /// Requiring incremental events keeps late absolute counters and histograms from resetting
+    /// the baseline of sinks that convert absolute metrics to deltas. The rule applies to every
+    /// type, so absolute gauges are dropped too; gauges are usually absolute, so listing `gauge`
+    /// rarely forwards anything. When unset, every late event is forwarded.
+    ///
+    /// Only valid when `strategy` is `forward`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(docs::examples = "distribution", docs::examples = "sketch"))]
+    pub metric_types: Option<Vec<MetricType>>,
+}
+
+/// Strategy for metrics that arrive after their bucket's cutoff in event-time mode.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[configurable(description = "The late event handling strategy to use.")]
+#[serde(rename_all = "snake_case")]
+pub enum LateEventsStrategy {
     /// Drop the event and count it via `component_discarded_events_total`.
     #[default]
     Drop,
 
     /// Skip aggregation and forward the event downstream unchanged.
-    Forward {
-        /// Metric types that may be forwarded.
-        ///
-        /// When set, a late event is forwarded only if its type is listed and it is
-        /// incremental; all other late events are dropped and counted via
-        /// `component_discarded_events_total`. Absolute events, including absolute gauges, are
-        /// always dropped because sinks that convert absolute metrics to deltas would treat an
-        /// older sample as a reset. When unset, every late event is forwarded.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[configurable(metadata(docs::examples = "distribution", docs::examples = "sketch"))]
-        metric_types: Option<Vec<MetricType>>,
-    },
+    Forward,
 }
 
 /// A metric value type, used to select which late events are forwarded.
