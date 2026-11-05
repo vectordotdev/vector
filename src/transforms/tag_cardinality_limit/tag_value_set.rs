@@ -1,6 +1,6 @@
 //! Storage backends for accepted tag values.
 //!
-//! Four variants, picked at construction time from `(Mode, ttl_secs)`:
+//! Five variants, picked at construction time from `(Mode, ttl_secs)`:
 //!
 //! - `Set` — `HashSet`, no TTL. Original exact-mode behavior.
 //! - `Fingerprint` — `HashedSet<u64>`, no TTL. `ExactFingerprint` mode.
@@ -67,7 +67,7 @@ fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u8, Duration) {
 
 /// Container for storing the set of accepted values for a given tag key.
 #[derive(Debug)]
-pub struct AcceptedTagValueSet {
+pub(super) struct AcceptedTagValueSet {
     storage: TagValueSetStorage,
 }
 
@@ -442,7 +442,7 @@ impl AcceptedTagValueSet {
     /// When `ttl_secs` is `None` or `0`, this is identical to the pre-TTL
     /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic —
     /// so existing configs see zero behavioral change.
-    pub fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
+    pub(super) fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
         let ttl = ttl_duration(ttl_secs);
 
         let storage = match (mode, ttl) {
@@ -467,7 +467,7 @@ impl AcceptedTagValueSet {
 
     /// Test helper for refreshing membership checks across all backends.
     #[cfg(test)]
-    pub fn contains(&mut self, value: &TagValueSet) -> bool {
+    pub(super) fn contains(&mut self, value: &TagValueSet) -> bool {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
@@ -510,7 +510,7 @@ impl AcceptedTagValueSet {
     /// later tag does not silently extend the leases of earlier-checked values.
     /// The semantic of TTL eviction is "what's been *accepted* in the last N
     /// seconds", not "what's been *seen* in the last N seconds".
-    pub fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
+    pub(super) fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
@@ -527,7 +527,7 @@ impl AcceptedTagValueSet {
     /// [`Self::purge_expired`] when a capacity decision needs a hard live
     /// count. Probabilistic TTL still rotates shards here (O(1) per due
     /// rotation).
-    pub fn len(&mut self) -> usize {
+    pub(super) fn len(&mut self) -> usize {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.len(),
             TagValueSetStorage::Bloom(bloom) => bloom.count(),
@@ -540,7 +540,7 @@ impl AcceptedTagValueSet {
     /// Force expiry of lapsed exact-TTL entries (and rotate probabilistic
     /// shards). Used on capacity-recovery paths: after an ordinary `len`
     /// reports full, and when reclaiming empty `max_tracked_keys` buckets.
-    pub fn purge_expired(&mut self) {
+    pub(super) fn purge_expired(&mut self) {
         match &mut self.storage {
             TagValueSetStorage::TtlSet(s) => s.purge_expired(),
             // `len` already drives rotation; calling it keeps reclaim consistent.
@@ -555,12 +555,12 @@ impl AcceptedTagValueSet {
 
     /// Live cardinality after forcing expiry. Prefer [`Self::len`] on the
     /// hot path; use this only when deciding whether to reject at capacity.
-    pub fn len_reclaiming(&mut self) -> usize {
+    pub(super) fn len_reclaiming(&mut self) -> usize {
         self.purge_expired();
         self.len()
     }
 
-    pub fn insert(&mut self, value: TagValueSet) {
+    pub(super) fn insert(&mut self, value: TagValueSet) {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => {
                 set.insert(value);

@@ -40,14 +40,16 @@ use crate::{
     internal_events::{LargeEventDroppedError, SinkRequestBuildError},
     schema,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::{
             BatchConfig, Compression, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             RequestBuilder, ServiceBuilderExt, SinkBuilderExt, TowerRequestConfig,
             TowerRequestSettings,
             encoding::{Encoder as SinkEncoder, write_all},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             metadata::RequestMetadataBuilder,
             request_builder::{EncodeResult, default_request_builder_concurrency_limit},
         },
@@ -570,9 +572,9 @@ impl HttpServiceRequestBuilder<PartitionKey> for MezmoServiceRequestBuilder {
         let mut http_request = Request::post(uri)
             .header("Content-Type", "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
-        self.auth.apply_v1(&mut http_request);
+        self.auth.apply(&mut http_request);
 
         Ok(http_request)
     }

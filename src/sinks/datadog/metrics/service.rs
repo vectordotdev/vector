@@ -20,7 +20,7 @@ use vector_lib::{
 
 use crate::{
     http::HttpClient,
-    sinks::{HTTPV1RequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
+    sinks::{HTTPRequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -165,7 +165,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
             let request = request
                 .into_http_request(api_key)
-                .context(HTTPV1RequestBuilderSnafu)
+                .context(HTTPRequestBuilderSnafu)
                 .map_err(|error| DatadogApiError::HttpError {
                     error: HttpError::from(crate::Error::from(error)),
                 })?;

@@ -1,9 +1,7 @@
-use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
-use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
@@ -27,12 +25,12 @@ use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -263,25 +261,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let remote_addr = conn.peer_addr();
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            remote_addr,
-                        )
-                    }))
-                    .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
-
-                        request
-                    })
-                    .service(warp::service(routes.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
 
             info!(message = "Building HTTP server.", address = %address);
 
@@ -291,11 +270,30 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .inspect_err(|err| error!("An error occurred: {err:?}."))?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
 
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
-                .await
-                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
+            serve(
+                listener.accept_stream(),
+                cx.shutdown.map(|_| ()),
+                move |conn| {
+                    let remote_addr = conn.peer_addr();
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                remote_addr,
+                            )
+                        }))
+                        .map_request(move |mut request: http::Request<_>| {
+                            request.extensions_mut().insert(PeerAddr::new(remote_addr));
+
+                            request
+                        })
+                        .service(warp::service(routes.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))

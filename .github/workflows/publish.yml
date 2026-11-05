@@ -367,9 +367,11 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - run: |
-          yum update -y
-          yum install -y \
+      - name: Update system packages
+        run: yum -v update -y
+      - name: Install test dependencies
+        run: |
+          yum -v install -y \
           ca-certificates \
           git \
           systemd \
@@ -378,7 +380,7 @@ jobs:
           # conflicts with curl-minimal on some distros and --allowerased is not
           # supported on some distros
           if ! command -v curl &> /dev/null ; then
-            yum install -y curl
+            yum -v install -y curl
           fi
       - name: Install dd-pkg for linting
         run: |

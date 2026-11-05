@@ -97,7 +97,7 @@ impl ElasticsearchCommon {
         let mut request = builder.body(Bytes::new())?;
         if let Some(auth) = &self.auth {
             match auth {
-                Auth::Basic(http_auth) => http_auth.apply_v1(&mut request),
+                Auth::Basic(http_auth) => http_auth.apply(&mut request),
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,
@@ -761,15 +761,15 @@ async fn run_insert_tests(
     Box::pin(run_insert_tests_with_config(&config, test_type, status)).await;
 }
 
-fn create_http_client() -> reqwest_13::Client {
+fn create_http_client() -> reqwest::Client {
     let mut test_ca = Vec::<u8>::new();
     File::open(tls::TEST_PEM_CA_PATH)
         .unwrap()
         .read_to_end(&mut test_ca)
         .unwrap();
-    let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
+    let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-    reqwest_13::Client::builder()
+    reqwest::Client::builder()
         .add_root_certificate(test_ca)
         .danger_accept_invalid_certs(true)
         .build()

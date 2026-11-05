@@ -11,13 +11,13 @@ use std::{
 
 use async_trait::async_trait;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
+use bytes::Bytes;
 use futures::{FutureExt, Stream, StreamExt, future, stream::BoxStream};
-use hyper::{
-    Body, Method, Request, Response, Server, StatusCode,
-    body::HttpBody,
-    header::HeaderValue,
-    service::{make_service_fn, service_fn},
+use http::{
+    Method, Request, Response, StatusCode,
+    header::{self, HeaderValue},
 };
+use http_body_util::Full;
 use indexmap::{IndexMap, map::Entry};
 use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
@@ -45,7 +45,7 @@ use crate::{
         Event, EventStatus, Finalizable,
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
     },
-    http::{Auth, build_http_trace_layer},
+    http::{Auth, build_http_trace_layer, serve},
     internal_events::PrometheusInvalidMetricError,
     sinks::{
         Healthcheck, VectorSink,
@@ -338,10 +338,10 @@ impl Hash for MetricRef {
     }
 }
 
-fn authorized<T: HttpBody>(req: &Request<T>, auth: Option<&Auth>) -> bool {
+fn authorized<T>(req: &Request<T>, auth: Option<&Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
-        if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
+        if let Some(auth_header) = headers.get(header::AUTHORIZATION) {
             let encoded_credentials = match auth {
                 Auth::Basic { user, password } => Some(HeaderValue::from_str(
                     format!(
@@ -382,12 +382,12 @@ struct Handler {
 }
 
 impl Handler {
-    fn handle<T: HttpBody>(
+    fn handle<T>(
         &self,
         req: &Request<T>,
         metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
-    ) -> Response<Body> {
-        let mut response = Response::new(Body::empty());
+    ) -> Response<Full<Bytes>> {
+        let mut response = Response::new(Full::default());
 
         match (
             authorized(req, self.auth.as_ref()),
@@ -397,7 +397,7 @@ impl Handler {
             (false, _, _) => {
                 *response.status_mut() = StatusCode::UNAUTHORIZED;
                 response.headers_mut().insert(
-                    http_0::header::WWW_AUTHENTICATE,
+                    header::WWW_AUTHENTICATE,
                     HeaderValue::from_static("Basic, Bearer"),
                 );
             }
@@ -473,24 +473,20 @@ impl PrometheusExporter {
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
 
-        let new_service = make_service_fn(move |_| {
+        let make_service = move |_: &_| {
             let span = Span::current();
             let metrics = Arc::clone(&metrics);
             let handler = handler.clone();
 
-            let inner = service_fn(move |req| {
-                let response = handler.handle(&req, &metrics);
-
-                future::ok::<_, Infallible>(response)
-            });
-
-            let service = ServiceBuilder::new()
+            ServiceBuilder::new()
                 .layer(build_http_trace_layer(span))
                 .layer(CompressionLayer::new())
-                .service(inner);
+                .service_fn(move |req| {
+                    let response = handler.handle(&req, &metrics);
 
-            async move { Ok::<_, Infallible>(service) }
-        });
+                    future::ok::<_, Infallible>(response)
+                })
+        };
 
         let (trigger, tripwire) = Tripwire::new();
 
@@ -510,11 +506,13 @@ impl PrometheusExporter {
         crate::spawn_in_current_span(async move {
             info!(message = "Building HTTP server.", address = %address);
 
-            if let Err(error) = Server::builder(hyper::server::accept::from_stream(incoming))
-                .serve(new_service)
-                .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-                .instrument(span)
-                .await
+            if let Err(error) = serve(
+                incoming,
+                tripwire.then(crate::shutdown::tripwire_handler),
+                make_service,
+            )
+            .instrument(span)
+            .await
             {
                 error!("Server error: {error}.");
             }
@@ -1159,7 +1157,7 @@ mod tests {
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply_v1(&mut request);
+            client_auth_config.apply(&mut request);
         }
 
         let proxy = ProxyConfig::default();

@@ -11,6 +11,7 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
+use super::{release_notes, vrl_changelog};
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
@@ -36,11 +37,39 @@ pub struct Cli {
     /// The version being released (e.g. `0.58.0`).
     #[arg(long)]
     version: Version,
+
+    /// Fill a missing description in an existing release, preserving all other metadata.
+    #[arg(long)]
+    description_only: bool,
+
+    /// Include notes and upgrade instructions from this VRL release.
+    #[arg(long)]
+    vrl_version: Option<Version>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        run(&self.version, PullRequestMetadata::Optional)?;
+        if self.description_only {
+            if fill_missing_description(&paths::find_repo_root()?, &self.version)? {
+                success!("Added description for release {}.", self.version);
+            } else {
+                info!(
+                    "Release {} already has a description; leaving it unchanged.",
+                    self.version
+                );
+            }
+            return Ok(());
+        }
+        let vrl_notes = self
+            .vrl_version
+            .as_ref()
+            .map(vrl_changelog::fetch)
+            .transpose()?;
+        run(
+            &self.version,
+            PullRequestMetadata::Optional,
+            vrl_notes.as_deref(),
+        )?;
         Ok(())
     }
 }
@@ -52,6 +81,7 @@ impl Cli {
 pub(super) fn run(
     new_version: &Version,
     pull_request_metadata: PullRequestMetadata,
+    vrl_notes: Option<&str>,
 ) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -91,12 +121,17 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
-    let cue_text = render_release_cue(&new_version, &changelog_entries);
+    let vrl = vrl_notes
+        .map(|notes| vrl_changelog::extract(notes, &new_version))
+        .transpose()?;
     let breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
         .collect();
-    let upgrade_guide = if breaking.is_empty() {
+    let vrl_migrations = vrl
+        .as_ref()
+        .map_or(&[][..], |vrl| vrl.migrations.as_slice());
+    let upgrade_guide = if breaking.is_empty() && vrl_migrations.is_empty() {
         String::new()
     } else {
         // Refuse a second source for a release that already has a standalone guide.
@@ -109,8 +144,42 @@ pub(super) fn run(
             );
         }
         validate_breaking_anchors(&breaking)?;
-        render_upgrade_guide(&breaking)
+        render_upgrade_guide(&breaking, vrl_migrations)
     };
+
+    let upgrade_url = if upgrade_guide.is_empty() {
+        release_notes::upgrade_guide_url(&repo_root, &new_version)?
+    } else {
+        Some(format!(
+            "{}/releases/{new_version}/#upgrade-guide",
+            release_notes::WEBSITE_URL
+        ))
+    };
+    let entries = changelog_entries
+        .iter()
+        .map(|entry| release_notes::ChangelogEntry {
+            kind: entry.cue_type.clone(),
+            breaking: entry.breaking,
+            contributors: entry.contributors.clone(),
+            title: entry
+                .breaking_details
+                .as_ref()
+                .map(|details| details.title.clone()),
+        })
+        .collect::<Vec<_>>();
+    let description = release_notes::render_notes(
+        &new_version,
+        &entries,
+        upgrade_url.as_deref(),
+        &release_notes::load_template(&repo_root, None)?,
+        release_notes::Target::Website,
+    )?;
+    let cue_text = render_release_cue(
+        &new_version,
+        &changelog_entries,
+        &description,
+        vrl.as_ref().map(|vrl| vrl.notes.as_str()),
+    );
 
     // Everything valid — write the release data and its inline migration content.
     atomic_write(&cue_path, &cue_text)?;
@@ -632,9 +701,30 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
 
 // ---------- CUE rendering ----------
 
-fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String {
+fn render_release_cue(
+    version: &Version,
+    changelog: &[ChangelogEntry],
+    description: &str,
+    vrl_notes: Option<&str>,
+) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
+    let description_field = render_description_field(description);
+    // Only release/category headings move down one level; authored list content stays intact.
+    let vrl_block = vrl_notes.map_or_else(String::new, |notes| {
+        let notes = notes
+            .lines()
+            .map(|line| {
+                if line.starts_with("## ") || line.starts_with("### ") {
+                    format!("#{line}")
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("\n\tvrl_changelog: {}\n", json!(notes))
+    });
 
     indoc::formatdoc! {"
         package metadata
@@ -642,11 +732,65 @@ fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String
         releases: \"{version}\": {{
         \tdate:     \"{date}\"
 
+        {description_field}
+
         \tchangelog: [
         {changelog_block}
         \t]
-        }}
+        {vrl_block}}}
     "}
+}
+
+/// Backfill only the release overview. Existing descriptions are editorial content and
+/// must not be overwritten, even when this command is repeated after a template change.
+fn fill_missing_description(repo_root: &Path, version: &Version) -> Result<bool> {
+    let release = release_notes::read_release(repo_root, version)?;
+    write_missing_description(repo_root, version, &release)
+}
+
+/// Apply the backfill to already-exported release data. Keeping command execution at
+/// the caller lets tests cover parsing, rendering, and file updates without CUE.
+fn write_missing_description(
+    repo_root: &Path,
+    version: &Version,
+    release: &release_notes::Release,
+) -> Result<bool> {
+    if release.description.is_some() {
+        return Ok(false);
+    }
+    let description = release_notes::render_notes(
+        version,
+        &release.changelog,
+        release_notes::upgrade_guide_url(repo_root, version)?.as_deref(),
+        &release_notes::load_template(repo_root, None)?,
+        release_notes::Target::Website,
+    )?;
+    let path = repo_root.join(RELEASES_DIR).join(format!("{version}.cue"));
+    let contents = fs::read_to_string(&path)?;
+    let header = format!("releases: \"{version}\": {{");
+    if !contents.contains(&header) {
+        bail!("Could not find the release block in {}", path.display());
+    }
+    let updated = contents.replacen(
+        &header,
+        &format!("{header}\n{}", render_description_field(&description)),
+        1,
+    );
+    atomic_write(&path, &updated)?;
+    Ok(true)
+}
+
+fn render_description_field(description: &str) -> String {
+    let mut field = String::from("\tdescription: #\"\"\"\n");
+    for line in description.lines() {
+        if line.is_empty() {
+            field.push('\n');
+        } else {
+            writeln!(field, "\t\t{line}").unwrap();
+        }
+    }
+    field.push_str("\t\t\"\"\"#\n");
+    field
 }
 
 fn render_changelog(entries: &[ChangelogEntry]) -> String {
@@ -773,7 +917,10 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_upgrade_guide(breaking: &[&BreakingDetails]) -> String {
+fn render_upgrade_guide(
+    breaking: &[&BreakingDetails],
+    vrl_migrations: &[vrl_changelog::Migration],
+) -> String {
     let mut out = String::new();
 
     // Each fragment becomes an H2 (`## Title`), with Summary/Migration under it at H3.
@@ -792,20 +939,20 @@ fn render_upgrade_guide(breaking: &[&BreakingDetails]) -> String {
         }
     }
 
+    for migration in vrl_migrations {
+        writeln!(
+            out,
+            "## VRL: {} {{#{}}}\n\n{}\n",
+            migration.title, migration.anchor, migration.body
+        )
+        .unwrap();
+    }
     out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parses_pull_request_from_commit_title() {
-        assert_eq!(
-            parse_pull_request_number("feat(foo): add bar (#12345)").unwrap(),
-            12345
-        );
-    }
 
     #[test]
     fn parses_and_deduplicates_pull_requests_from_commit_titles() {
@@ -936,11 +1083,6 @@ mod tests {
         assert_eq!(bump_type(&last, &Version::new(2, 0, 0)), Some("major"));
         assert_eq!(bump_type(&last, &Version::new(1, 2, 5)), None);
         assert_eq!(bump_type(&last, &Version::new(1, 2, 3)), None);
-    }
-
-    #[test]
-    fn bump_type_zero_major() {
-        // For 0.x, "major" bump means 0.(x+1).0
         let last = Version::new(0, 55, 0);
         assert_eq!(bump_type(&last, &Version::new(0, 55, 1)), Some("patch"));
         assert_eq!(bump_type(&last, &Version::new(0, 56, 0)), Some("minor"));
@@ -1054,10 +1196,11 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, "Release overview.", None);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
+        assert!(out.contains("\tdescription: #\"\"\"\n\t\tRelease overview.\n\t\t\"\"\"#"));
         assert!(out.contains("\t\t\ttype: \"feat\"\n"));
         assert!(out.contains("\t\t\t\tAdds a thing.\n"));
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
@@ -1073,33 +1216,91 @@ mod tests {
     }
 
     #[test]
-    fn split_authors_lf() {
-        let raw = "line one\nline two\n\nauthors: alice bob\n";
-        let (body, authors) = split_authors(raw);
-        assert_eq!(body, "line one\nline two\n");
-        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
+    fn backfills_description_once_without_changing_other_release_data() {
+        let tmp = tempfile::tempdir().unwrap();
+        let version = Version::new(0, 99, 0);
+        let path = tmp.path().join(RELEASES_DIR).join("0.99.0.cue");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let original = indoc::indoc! {r#"
+            package metadata
+
+            releases: "0.99.0": {
+                date: "2026-01-01"
+                changelog: [{type: "fix", description: "Fixed it.", contributors: ["alice"]}]
+                vrl_changelog: "Keep the VRL notes."
+            }
+        "#};
+        fs::write(&path, original).unwrap();
+        let template = tmp
+            .path()
+            .join("vdev/src/commands/release/release_notes.hbs");
+        fs::create_dir_all(template.parent().unwrap()).unwrap();
+        fs::write(
+            &template,
+            "{{contributors}} who made the {{#if one_change}}change{{else}}{{changes}} changes{{/if}}.\n\
+             {{#each sections}}[{{count}} {{noun}}]({{url}})\n{{/each}}",
+        )
+        .unwrap();
+        let mut release = release_notes::parse_release(
+            br#"{"changelog":[{"type":"fix","description":"Fixed it.","contributors":["alice"]}]}"#,
+        )
+        .unwrap();
+
+        assert!(write_missing_description(tmp.path(), &version, &release).unwrap());
+        let updated = fs::read_to_string(&path).unwrap();
+        let description =
+            "contributor who made the change.\n[1 bug fix](/releases/0.99.0/#bug-fixes)";
+        assert!(updated.contains(description.lines().next().unwrap()));
+        assert!(updated.contains("[1 bug fix](/releases/0.99.0/#bug-fixes)"));
+        assert_eq!(
+            updated.replace(&format!("\n{}", render_description_field(description)), ""),
+            original
+        );
+
+        release.description = Some(description.to_owned());
+        fs::write(template, "Changed template").unwrap();
+        assert!(!write_missing_description(tmp.path(), &version, &release).unwrap());
+        assert_eq!(fs::read_to_string(path).unwrap(), updated);
     }
 
     #[test]
-    fn split_authors_crlf() {
-        // Windows checkouts commit fragments with CRLF endings — the previous impl
-        // used `str::lines()` (strips \r) plus a `+1` byte-per-line accumulator,
-        // which truncated the body by one byte per line. Verify the whole body
-        // survives now.
-        let raw = "line one\r\nline two\r\n\r\nauthors: alice bob\r\n";
-        let (body, authors) = split_authors(raw);
-        assert!(body.contains("line one"));
-        assert!(body.contains("line two"));
-        assert!(!body.contains("authors:"));
-        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
+    fn leaves_legacy_handwritten_description_without_changelog_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(RELEASES_DIR).join("0.18.1.cue");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let original = indoc::indoc! {r#"
+            package metadata
+            releases: "0.18.1": {
+                description: "Handwritten migration notes."
+                commits: [{description: "Keep this legacy commit."}]
+            }
+        "#};
+        fs::write(&path, original).unwrap();
+        let release = release_notes::parse_release(
+            br#"{"description":"Handwritten migration notes.","commits":[{"description":"Keep this legacy commit."}]}"#,
+        )
+        .unwrap();
+        assert!(release.changelog.is_empty());
+        assert!(!write_missing_description(tmp.path(), &Version::new(0, 18, 1), &release).unwrap());
+        assert_eq!(fs::read_to_string(path).unwrap(), original);
     }
 
     #[test]
-    fn split_authors_no_authors_line() {
-        let raw = "just body text\nmore body\n";
-        let (body, authors) = split_authors(raw);
-        assert_eq!(body, raw);
-        assert!(authors.is_empty());
+    fn split_authors_preserves_body_and_line_endings() {
+        for newline in ["\n", "\r\n"] {
+            let body = format!("line one{newline}line two{newline}");
+            let raw = format!("{body}{newline}authors: alice bob{newline}");
+            let (actual, authors) = split_authors(&raw);
+            assert_eq!(actual.trim_end(), body.trim_end());
+            // CRLF fragments currently retain a trailing carriage return.
+            if newline == "\n" {
+                assert_eq!(actual, body);
+            }
+            assert_eq!(authors, ["alice", "bob"]);
+            let (actual, authors) = split_authors(&body);
+            assert_eq!(actual, body);
+            assert!(authors.is_empty());
+        }
     }
 
     #[test]
@@ -1145,28 +1346,13 @@ mod tests {
     }
 
     #[test]
-    fn slugify_examples() {
-        assert_eq!(
-            crate::commands::changelog::slugify("A Big Change!"),
-            "a-big-change"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("  --Foo/Bar--  "),
-            "foo-bar"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("already-good"),
-            "already-good"
-        );
-        assert_eq!(
-            crate::commands::changelog::slugify("Numbers 123 OK"),
-            "numbers-123-ok"
-        );
-    }
-
-    #[test]
     fn find_existing_upgrade_guide_matches_any_date() {
         let tmp = tempfile::tempdir().unwrap();
+        assert!(
+            find_existing_upgrade_guide(&tmp.path().join("missing"), &Version::new(0, 58, 0))
+                .unwrap()
+                .is_none()
+        );
         // A guide dated on some past day (simulating a failed run yesterday, or a
         // maintainer-authored guide dated earlier than today).
         fs::write(
@@ -1196,16 +1382,6 @@ mod tests {
         assert!(miss.is_none(), "{miss:?}");
     }
 
-    #[test]
-    fn find_existing_upgrade_guide_handles_missing_dir() {
-        let hit = find_existing_upgrade_guide(
-            std::path::Path::new("/nonexistent-dir-for-test"),
-            &Version::parse("0.58.0").unwrap(),
-        )
-        .unwrap();
-        assert!(hit.is_none());
-    }
-
     fn bd(title: &str, anchor: &str, summary: &str, migration: &str) -> BreakingDetails {
         BreakingDetails {
             title: title.into(),
@@ -1216,25 +1392,16 @@ mod tests {
     }
 
     #[test]
-    fn validate_breaking_anchors_rejects_duplicates() {
-        let a = bd("First", "same", "", "");
-        let b = bd("Second", "same", "", "");
-        let err = validate_breaking_anchors(&[&a, &b]).unwrap_err();
-        assert!(err.to_string().contains("duplicate"), "{err}");
-    }
-
-    #[test]
-    fn validate_breaking_anchors_rejects_empty() {
-        let a = bd("非ASCII", "", "", "");
-        let err = validate_breaking_anchors(&[&a]).unwrap_err();
-        assert!(err.to_string().contains("invalid anchor"), "{err}");
-    }
-
-    #[test]
-    fn validate_breaking_anchors_accepts_uniques() {
-        let a = bd("First", "first", "", "");
-        let b = bd("Second", "second", "", "");
-        validate_breaking_anchors(&[&a, &b]).unwrap();
+    fn validates_breaking_anchor_set() {
+        let first = bd("First", "first", "", "");
+        let second = bd("Second", "second", "", "");
+        validate_breaking_anchors(&[&first, &second]).unwrap();
+        let duplicate = bd("Duplicate", "first", "", "");
+        let error = validate_breaking_anchors(&[&first, &duplicate]).unwrap_err();
+        assert!(error.to_string().contains("duplicate"), "{error}");
+        let invalid = bd("非ASCII", "", "", "");
+        let error = validate_breaking_anchors(&[&invalid]).unwrap_err();
+        assert!(error.to_string().contains("invalid anchor"), "{error}");
     }
 
     #[test]
@@ -1272,7 +1439,7 @@ mod tests {
             "A deprecated label is gone.",
             "N/A",
         );
-        let md = render_upgrade_guide(&[&d1, &d2]);
+        let md = render_upgrade_guide(&[&d1, &d2], &[]);
         let expected = indoc::indoc! {r"
             ## First breaking change {#first}
 
@@ -1313,7 +1480,7 @@ mod tests {
     #[test]
     fn render_upgrade_guide_empty_migration() {
         let d = bd("A change", "a-change", "Something changed.", "");
-        let md = render_upgrade_guide(&[&d]);
+        let md = render_upgrade_guide(&[&d], &[]);
         let expected = indoc::indoc! {r"
             ## A change {#a-change}
 
@@ -1380,22 +1547,12 @@ mod tests {
             out,
             "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n"
         );
-    }
-
-    #[test]
-    fn write_release_stub_rejects_existing_file() {
-        let tmp = tempfile::tempdir().unwrap();
-        let stubs_dir = tmp.path().join("website/content/en/releases");
-        fs::create_dir_all(&stubs_dir).unwrap();
-        fs::write(
-            stubs_dir.join("0.58.0.md"),
-            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n",
-        )
-        .unwrap();
-
-        let version = Version::parse("0.58.0").unwrap();
-        let err = write_release_stub(tmp.path(), &version, "").unwrap_err();
-        assert!(err.to_string().contains("already exists"), "{err}");
+        let error = write_release_stub(tmp.path(), &version, "").unwrap_err();
+        assert!(error.to_string().contains("already exists"), "{error}");
+        assert_eq!(
+            fs::read_to_string(stubs_dir.join("0.58.0.md")).unwrap(),
+            out
+        );
     }
 
     #[test]

@@ -6,7 +6,7 @@ use http::{
     Request,
     header::{HeaderName, HeaderValue},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tower::Service;
 use vector_http::{HttpError, full_body};
 use vector_lib::{
