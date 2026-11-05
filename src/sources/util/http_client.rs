@@ -1039,13 +1039,6 @@ mod tests {
 
     #[tokio::test]
     async fn preserves_get_body_on_temporary_redirect() {
-        let routes = warp::path("start")
-            .and(redirect_to(StatusCode::FOUND, "/target"))
-            .or(warp::path("target").and(echo_request()));
-        let (_guard, addr) = next_addr();
-        tokio::spawn(warp::serve(routes).run(addr));
-        wait_for_tcp(addr).await;
-
         let inputs = test_inputs(
             Redirects {
                 follow: Some(true),
@@ -1055,17 +1048,33 @@ mod tests {
             None,
         );
 
-        let (status, body) = send(
-            &format!("http://{addr}/start"),
-            HttpMethod::Get,
-            Some("search query"),
-            &inputs,
-        )
-        .await
-        .expect("redirected request should succeed");
+        for redirect_status in [
+            StatusCode::MOVED_PERMANENTLY,
+            StatusCode::FOUND,
+            StatusCode::SEE_OTHER,
+        ] {
+            let routes = warp::path("start")
+                .and(redirect_to(redirect_status, "/target"))
+                .or(warp::path("target").and(echo_request()));
+            let (_guard, addr) = next_addr();
+            tokio::spawn(warp::serve(routes).run(addr));
+            wait_for_tcp(addr).await;
 
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(body, "GET|search query||");
+            let (status, body) = send(
+                &format!("http://{addr}/start"),
+                HttpMethod::Get,
+                Some("search query"),
+                &inputs,
+            )
+            .await
+            .expect("redirected request should succeed");
+
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                body, "GET|search query||",
+                "redirect status: {redirect_status}"
+            );
+        }
     }
 
     #[tokio::test]
