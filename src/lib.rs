@@ -97,7 +97,6 @@ pub mod serde;
 pub mod service;
 pub mod signal;
 pub(crate) mod sink_ext;
-#[allow(unreachable_pub)]
 pub mod sinks;
 pub mod sources;
 #[cfg(feature = "api-client")]
