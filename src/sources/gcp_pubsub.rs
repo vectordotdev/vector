@@ -68,7 +68,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
-#[allow(warnings, clippy::clone_on_ref_ptr)]
+#[allow(warnings, unreachable_pub, clippy::clone_on_ref_ptr)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 

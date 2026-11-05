@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{Layer, Service, ServiceExt, service_fn, util::BoxCloneService};

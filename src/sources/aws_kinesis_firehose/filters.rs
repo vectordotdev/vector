@@ -28,7 +28,7 @@ use crate::{
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 #[allow(clippy::too_many_arguments)]
-pub fn firehose(
+pub(super) fn firehose(
     access_keys: Vec<String>,
     store_access_key: bool,
     record_compression: Compression,

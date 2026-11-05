@@ -7,7 +7,7 @@ use std::{
 use bytes::Bytes;
 use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
 use http_body_util::{Either, Full};
-use hyper_1::{body::Incoming, client::conn, service::service_fn};
+use hyper::{body::Incoming, client::conn, service::service_fn};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto,

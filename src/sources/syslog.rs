@@ -1623,7 +1623,7 @@ mod test {
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
-    pub enum Severity {
+    pub(super) enum Severity {
         #[serde(rename(deserialize = "emergency"))]
         LOG_EMERG,
         #[serde(rename(deserialize = "alert"))]
@@ -1667,7 +1667,7 @@ mod test {
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Debug)]
-    pub enum Facility {
+    pub(super) enum Facility {
         #[serde(rename(deserialize = "kernel"))]
         LOG_KERN = 0 << 3,
         #[serde(rename(deserialize = "user"))]

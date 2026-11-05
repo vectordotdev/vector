@@ -97,7 +97,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 }
 
-pub struct NewRelicSink<S> {
+pub(super) struct NewRelicSink<S> {
     pub service: S,
     pub encoder: NewRelicEncoder,
     pub credentials: Arc<NewRelicCredentials>,

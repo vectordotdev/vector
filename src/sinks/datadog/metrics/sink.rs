@@ -77,7 +77,7 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         series_batch_settings: BatcherSettings,

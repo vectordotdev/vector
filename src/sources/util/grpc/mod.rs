@@ -26,7 +26,7 @@ use tonic::{
     transport::server::{Connected, Server},
 };
 use tower::{Layer, Service};
-use tower_http_1::{
+use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };

@@ -11,7 +11,7 @@ use http::{
     uri::Scheme,
 };
 use http_body_util::BodyExt as _;
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use tokio::sync::Mutex;

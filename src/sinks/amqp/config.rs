@@ -14,7 +14,7 @@ use crate::{
 #[configurable_component]
 #[configurable(title = "Configure the AMQP message properties.")]
 #[derive(Clone, Debug, Default)]
-pub struct AmqpPropertiesConfig {
+pub(crate) struct AmqpPropertiesConfig {
     /// Content-Type for the AMQP messages.
     pub(crate) content_type: Option<String>,
 
@@ -225,7 +225,7 @@ mod tests {
     use vrl::event_path;
 
     #[test]
-    pub fn generate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
     }
 
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    pub fn parse_config_priority_static() {
+    fn parse_config_priority_static() {
         for (format, config) in [
             (
                 Format::Yaml,
@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    pub fn parse_config_priority_templated() {
+    fn parse_config_priority_templated() {
         for (format, config) in [
             (
                 Format::Yaml,
