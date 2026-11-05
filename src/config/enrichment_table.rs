@@ -104,7 +104,7 @@ where
                 key,
                 SourceOuter {
                     graph: self.graph.clone(),
-                    sink_acknowledgements: Default::default(),
+                    sink_acknowledgements: None,
                     proxy: Default::default(),
                     inner: source,
                 },
