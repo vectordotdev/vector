@@ -7,7 +7,7 @@ use vector_lib::event::{
 };
 
 use super::AggregationMode;
-use super::config::{EventTimeConfig, LateEvents, MissingTimestamp};
+use super::config::{EventTimeConfig, LateEvents, MetricType, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
 use crate::{
     event::{Event, EventMetadata},
@@ -43,7 +43,9 @@ impl Aggregate {
             return None;
         }
 
-        let event_time = *self.event_time();
+        let event_time = self.event_time();
+        let (missing_timestamp, max_future_ms) =
+            (event_time.missing_timestamp, event_time.max_future_ms);
 
         // Capture one wall-clock instant for fallback synthesis and all subsequent
         // skew/cutoff checks so a missing timestamp cannot be assigned to bucket B
@@ -53,7 +55,7 @@ impl Aggregate {
 
         let ts = match timestamp {
             Some(ts) => ts,
-            None => match event_time.missing_timestamp {
+            None => match missing_timestamp {
                 MissingTimestamp::UseSystemTime => now,
                 MissingTimestamp::Drop => {
                     emit!(AggregateEventDropped {
@@ -67,8 +69,8 @@ impl Aggregate {
         // event-time "latest" selection can compare timestamps reliably.
         data.time.timestamp = Some(ts);
 
-        if event_time.max_future_ms > 0 {
-            let max_future_ms = i64::try_from(event_time.max_future_ms)
+        if max_future_ms > 0 {
+            let max_future_ms = i64::try_from(max_future_ms)
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
             let drift_ms = ts.timestamp_millis().saturating_sub(now_ms);
             if drift_ms > max_future_ms {
@@ -89,12 +91,7 @@ impl Aggregate {
             None
         };
         if let Some(reason) = late_reason {
-            let keep = match event_time.late_events {
-                LateEvents::Forward => true,
-                LateEvents::ForwardDistribution => Self::is_distribution_like(&data),
-                LateEvents::Drop => false,
-            };
-            if keep {
+            if self.should_forward_late(&data) {
                 return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
             emit!(AggregateEventDropped { reason });
@@ -110,15 +107,18 @@ impl Aggregate {
         None
     }
 
-    /// Returns `true` for value types that the Datadog Metrics sink sends as
-    /// distributions (merged server-side), used by `LateEvents::ForwardDistribution`.
-    fn is_distribution_like(data: &MetricData) -> bool {
-        matches!(
-            data.value(),
-            MetricValue::Distribution { .. }
-                | MetricValue::AggregatedHistogram { .. }
-                | MetricValue::Sketch { .. }
-        )
+    /// Returns `true` when a late event should be forwarded downstream unchanged
+    /// rather than dropped. With `metric_types` set, only incremental events of a
+    /// listed type qualify: sinks that convert absolute metrics to deltas would
+    /// treat an older absolute sample as a reset and inflate the next delta.
+    fn should_forward_late(&self, data: &MetricData) -> bool {
+        match &self.event_time().late_events {
+            LateEvents::Drop => false,
+            LateEvents::Forward { metric_types } => metric_types.as_ref().is_none_or(|types| {
+                data.kind == MetricKind::Incremental
+                    && types.contains(&MetricType::of(data.value()))
+            }),
+        }
     }
 
     /// Start of the half-open window `[bucket_key, bucket_key + interval_ms)` containing

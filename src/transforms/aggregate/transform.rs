@@ -142,7 +142,7 @@ impl Aggregate {
             event_time_prev_buckets: BTreeMap::default(),
             event_time_multi_buckets: BTreeMap::default(),
             watermark: None,
-            config: *config,
+            config: config.clone(),
         })
     }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, event::MetricValue};
 
 use super::Aggregate;
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -37,7 +37,7 @@ pub struct AggregateConfig {
 
 /// Settings for event-time aggregation windows.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct EventTimeConfig {
     /// Grace period for late-arriving events, in milliseconds.
@@ -56,15 +56,16 @@ pub struct EventTimeConfig {
     /// How to handle events that arrive after their bucket's cutoff.
     ///
     /// - `drop` (default) discards the event and increments `component_discarded_events_total`
-    /// - `forward` skips aggregation and forwards the event downstream unchanged
-    /// - `forward_distribution` forwards distribution-like events (`distribution`,
-    ///   `aggregated_histogram`, and `sketch`) downstream unchanged and drops all others
+    /// - `forward` skips aggregation and forwards the event downstream unchanged, optionally
+    ///   restricted to `metric_types`
     ///
     /// Forwarded events keep their original timestamp, so they can share a timestamp with the
     /// aggregate emitted for their bucket. Sinks that overwrite values for an identical timestamp,
     /// such as the Datadog Metrics sink, may then replace the aggregate with the late value.
-    /// Forwarded events also carry their raw value, not a count or delta, in `count` and `diff`
-    /// modes.
+    /// Sinks that convert absolute metrics to deltas, such as the Datadog Metrics sink, treat a
+    /// late absolute counter or histogram as a reset and reset their baseline, inflating the
+    /// next delta. Forwarded events also carry their raw value, not a count or delta, in `count`
+    /// and `diff` modes.
     #[serde(default)]
     pub late_events: LateEvents,
 
@@ -120,24 +121,71 @@ pub enum MissingTimestamp {
 
 /// Behavior for metrics that arrive after their bucket's cutoff in event-time mode.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[serde(tag = "strategy", rename_all = "snake_case", deny_unknown_fields)]
 #[configurable(description = "How to handle metrics that arrive after their bucket's cutoff.")]
-#[serde(rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The late event handling strategy to use."))]
 pub enum LateEvents {
     /// Drop the event and count it via `component_discarded_events_total`.
     #[default]
     Drop,
 
     /// Skip aggregation and forward the event downstream unchanged.
-    Forward,
+    Forward {
+        /// Metric types that may be forwarded.
+        ///
+        /// When set, a late event is forwarded only if its type is listed and it is
+        /// incremental; all other late events are dropped and counted via
+        /// `component_discarded_events_total`. Absolute events, including absolute gauges, are
+        /// always dropped because sinks that convert absolute metrics to deltas would treat an
+        /// older sample as a reset. When unset, every late event is forwarded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[configurable(metadata(docs::examples = "distribution", docs::examples = "sketch"))]
+        metric_types: Option<Vec<MetricType>>,
+    },
+}
 
-    /// Forward distribution-like events (`distribution`, `aggregated_histogram`, and `sketch`)
-    /// downstream unchanged; drop all others and count them via
-    /// `component_discarded_events_total`.
-    ///
-    /// These are the types the Datadog Metrics sink sends as distributions, which are merged
-    /// rather than overwritten, so a late value does not replace the bucket's aggregate.
-    ForwardDistribution,
+/// A metric value type, used to select which late events are forwarded.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[configurable(description = "A metric value type.")]
+#[serde(rename_all = "snake_case")]
+pub enum MetricType {
+    /// A `counter` metric.
+    Counter,
+
+    /// A `gauge` metric.
+    Gauge,
+
+    /// A `set` metric.
+    Set,
+
+    /// A `distribution` metric.
+    Distribution,
+
+    /// An `aggregated_histogram` metric.
+    AggregatedHistogram,
+
+    /// An `aggregated_summary` metric.
+    AggregatedSummary,
+
+    /// A `sketch` metric.
+    Sketch,
+}
+
+impl MetricType {
+    /// Returns the type of the given metric value.
+    pub(crate) const fn of(value: &MetricValue) -> Self {
+        match value {
+            MetricValue::Counter { .. } => Self::Counter,
+            MetricValue::Gauge { .. } => Self::Gauge,
+            MetricValue::Set { .. } => Self::Set,
+            MetricValue::Distribution { .. } => Self::Distribution,
+            MetricValue::AggregatedHistogram { .. } => Self::AggregatedHistogram,
+            MetricValue::AggregatedSummary { .. } => Self::AggregatedSummary,
+            MetricValue::Sketch { .. } => Self::Sketch,
+        }
+    }
 }
 
 pub(crate) const fn default_max_future_ms() -> u64 {

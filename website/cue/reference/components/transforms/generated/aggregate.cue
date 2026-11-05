@@ -33,30 +33,54 @@ generated: components: transforms: aggregate: configuration: {
 					How to handle events that arrive after their bucket's cutoff.
 
 					- `drop` (default) discards the event and increments `component_discarded_events_total`
-					- `forward` skips aggregation and forwards the event downstream unchanged
-					- `forward_distribution` forwards distribution-like events (`distribution`,
-					  `aggregated_histogram`, and `sketch`) downstream unchanged and drops all others
+					- `forward` skips aggregation and forwards the event downstream unchanged, optionally
+					  restricted to `metric_types`
 
 					Forwarded events keep their original timestamp, so they can share a timestamp with the
 					aggregate emitted for their bucket. Sinks that overwrite values for an identical timestamp,
 					such as the Datadog Metrics sink, may then replace the aggregate with the late value.
-					Forwarded events also carry their raw value, not a count or delta, in `count` and `diff`
-					modes.
+					Sinks that convert absolute metrics to deltas, such as the Datadog Metrics sink, treat a
+					late absolute counter or histogram as a reset and reset their baseline, inflating the
+					next delta. Forwarded events also carry their raw value, not a count or delta, in `count`
+					and `diff` modes.
 					"""
 				required: false
-				type: string: {
-					default: "drop"
-					enum: {
-						drop:    "Drop the event and count it via `component_discarded_events_total`."
-						forward: "Skip aggregation and forward the event downstream unchanged."
-						forward_distribution: """
-															Forward distribution-like events (`distribution`, `aggregated_histogram`, and `sketch`)
-															downstream unchanged; drop all others and count them via
-															`component_discarded_events_total`.
+				type: object: options: {
+					metric_types: {
+						description: """
+																Metric types that may be forwarded.
 
-															These are the types the Datadog Metrics sink sends as distributions, which are merged
-															rather than overwritten, so a late value does not replace the bucket's aggregate.
-															"""
+																When set, a late event is forwarded only if its type is listed and it is
+																incremental; all other late events are dropped and counted via
+																`component_discarded_events_total`. Absolute events, including absolute gauges, are
+																always dropped because sinks that convert absolute metrics to deltas would treat an
+																older sample as a reset. When unset, every late event is forwarded.
+																"""
+						relevant_when: "strategy = \"forward\""
+						required:      false
+						type: array: items: type: string: {
+							enum: {
+								aggregated_histogram: "An `aggregated_histogram` metric."
+								aggregated_summary:   "An `aggregated_summary` metric."
+								counter:              "A `counter` metric."
+								distribution:         "A `distribution` metric."
+								gauge:                "A `gauge` metric."
+								set:                  "A `set` metric."
+								sketch:               "A `sketch` metric."
+							}
+							examples: ["distribution", "sketch"]
+						}
+					}
+					strategy: {
+						description: "The late event handling strategy to use."
+						required:    false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop:    "Drop the event and count it via `component_discarded_events_total`."
+								forward: "Skip aggregation and forward the event downstream unchanged."
+							}
+						}
 					}
 				}
 			}
