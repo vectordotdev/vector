@@ -22,9 +22,9 @@ use super::super::{
     keys::{
         AGENT_ENV, AGENT_ERROR_TPS, AGENT_HOST_NAME, AGENT_RARE_SAMPLER, AGENT_TAGS,
         AGENT_TARGET_TPS, AGENT_VERSION, DATADOG_AGENT, DATADOG_CHUNK_DROPPED,
-        DATADOG_CHUNK_ORIGIN, DATADOG_CHUNK_PRIORITY, DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT,
-        DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE, DATADOG_TRACER_TAGS, ENVIRONMENT_LEGACY,
-        ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME,
+        DATADOG_CHUNK_ORIGIN, DATADOG_CHUNK_PRIORITY, DATADOG_CHUNK_SAMPLING_MECHANISM,
+        DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT, DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE,
+        DATADOG_TRACER_TAGS, ENVIRONMENT_LEGACY, ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME,
     },
     timestamps::{duration_from_otlp, otlp_nanos_to_datetime},
 };
@@ -268,6 +268,13 @@ fn lift_span_datadog(
         &mut dropped,
         reporter,
     );
+    chunk.sampling_mechanism = lift_attr(
+        &mut attributes,
+        DATADOG_CHUNK_SAMPLING_MECHANISM,
+        |value| value.into_integer().and_then(|v| u32::try_from(v).ok()),
+        &mut dropped,
+        reporter,
+    );
     chunk.tags = lift_attr(
         &mut attributes,
         DATADOG_CHUNK_TAGS,
@@ -300,6 +307,7 @@ struct SpanChunkKeys {
     priority: Option<SamplingPriority>,
     origin: Option<String>,
     dropped: Option<bool>,
+    sampling_mechanism: Option<u32>,
     tags: Option<Attributes>,
 }
 
@@ -308,6 +316,7 @@ impl SpanChunkKeys {
         self.priority.is_none()
             && self.origin.is_none()
             && self.dropped.is_none()
+            && self.sampling_mechanism.is_none()
             && self.tags.is_none()
     }
 
@@ -331,6 +340,12 @@ impl SpanChunkKeys {
             DATADOG_CHUNK_DROPPED,
             reporter,
         );
+        merge_first(
+            keys.sampling_mechanism,
+            &mut self.sampling_mechanism,
+            DATADOG_CHUNK_SAMPLING_MECHANISM,
+            reporter,
+        );
         merge_first(keys.tags, &mut self.tags, DATADOG_CHUNK_TAGS, reporter);
     }
 
@@ -339,6 +354,7 @@ impl SpanChunkKeys {
             priority: self.priority,
             origin: self.origin,
             dropped: self.dropped.unwrap_or_default(),
+            sampling_mechanism: self.sampling_mechanism,
             tags: self.tags.unwrap_or_default(),
         }
     }

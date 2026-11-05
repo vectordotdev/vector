@@ -10,6 +10,7 @@ pub const DATADOG_TRACER_TAGS: &str = "datadog.tracer.tags";
 pub const DATADOG_CHUNK_PRIORITY: &str = "datadog.chunk.priority";
 pub const DATADOG_CHUNK_ORIGIN: &str = "datadog.chunk.origin";
 pub const DATADOG_CHUNK_DROPPED: &str = "datadog.chunk.dropped";
+pub const DATADOG_CHUNK_SAMPLING_MECHANISM: &str = "datadog.chunk.sampling_mechanism";
 pub const DATADOG_CHUNK_TAGS: &str = "datadog.chunk.tags";
 pub const DATADOG_SPAN_RESOURCE: &str = "datadog.span.resource";
 pub const DATADOG_SPAN_TYPE: &str = "datadog.span.type";
@@ -33,6 +34,7 @@ pub fn is_reserved_datadog_key(key: &str) -> bool {
             | DATADOG_CHUNK_PRIORITY
             | DATADOG_CHUNK_ORIGIN
             | DATADOG_CHUNK_DROPPED
+            | DATADOG_CHUNK_SAMPLING_MECHANISM
             | DATADOG_CHUNK_TAGS
             | DATADOG_SPAN_RESOURCE
             | DATADOG_SPAN_TYPE

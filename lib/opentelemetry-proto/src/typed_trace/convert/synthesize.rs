@@ -13,9 +13,9 @@ use super::super::{
     keys::{
         AGENT_ENV, AGENT_ERROR_TPS, AGENT_HOST_NAME, AGENT_RARE_SAMPLER, AGENT_TAGS,
         AGENT_TARGET_TPS, AGENT_VERSION, DATADOG_AGENT, DATADOG_CHUNK_DROPPED,
-        DATADOG_CHUNK_ORIGIN, DATADOG_CHUNK_PRIORITY, DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT,
-        DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE, DATADOG_TRACER_TAGS, ENVIRONMENT_NAME, HOST_NAME,
-        SERVICE_NAME,
+        DATADOG_CHUNK_ORIGIN, DATADOG_CHUNK_PRIORITY, DATADOG_CHUNK_SAMPLING_MECHANISM,
+        DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT, DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE,
+        DATADOG_TRACER_TAGS, ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME,
     },
     timestamps::{datetime_to_otlp_nanos, reconstruct_end_time},
 };
@@ -242,6 +242,12 @@ fn synthesize_chunk_datadog(map: &mut AttrMap, chunk: &DatadogChunkContext) {
     }
     if chunk.dropped {
         map.insert(DATADOG_CHUNK_DROPPED.into(), AttrValue::Bool(true));
+    }
+    if let Some(mechanism) = chunk.sampling_mechanism {
+        map.insert(
+            DATADOG_CHUNK_SAMPLING_MECHANISM.into(),
+            AttrValue::Integer(i64::from(mechanism)),
+        );
     }
     if !chunk.tags.is_empty() {
         map.insert(

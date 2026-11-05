@@ -15,9 +15,9 @@ use vector_core::event::{
 
 use super::{
     DATADOG_AGENT, DATADOG_CHUNK_DROPPED, DATADOG_CHUNK_ORIGIN, DATADOG_CHUNK_PRIORITY,
-    DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT, DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE,
-    DATADOG_TRACER_TAGS, ENVIRONMENT_LEGACY, ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME,
-    keys::is_reserved_datadog_key,
+    DATADOG_CHUNK_SAMPLING_MECHANISM, DATADOG_CHUNK_TAGS, DATADOG_SPAN_META_STRUCT,
+    DATADOG_SPAN_RESOURCE, DATADOG_SPAN_TYPE, DATADOG_TRACER_TAGS, ENVIRONMENT_LEGACY,
+    ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME, keys::is_reserved_datadog_key,
 };
 use crate::proto::{
     collector::trace::v1::ExportTraceServiceRequest,
@@ -530,6 +530,7 @@ fn datadog_bridge_keys_lift_and_resynthesize() {
             KeyValue::from_string("datadog.span.resource", "GET /"),
             KeyValue::from_string("datadog.span.type", "web"),
             KeyValue::from_int("datadog.chunk.priority", 0),
+            KeyValue::from_int("datadog.chunk.sampling_mechanism", 0),
         ],
         ..PbSpan::from_parts(1, 1, "s")
     };
@@ -562,6 +563,7 @@ fn datadog_bridge_keys_lift_and_resynthesize() {
     }));
     expected.datadog_mut().set_chunk(Some(DatadogChunkContext {
         priority: Some(SamplingPriority::AutoReject),
+        sampling_mechanism: Some(0),
         ..DatadogChunkContext::default()
     }));
     assert_eq!(events, vec![expected]);
@@ -581,6 +583,7 @@ fn datadog_bridge_keys_lift_and_resynthesize() {
             vec![PbSpan {
                 attributes: vec![
                     KeyValue::from_int("datadog.chunk.priority", 0),
+                    KeyValue::from_int("datadog.chunk.sampling_mechanism", 0),
                     KeyValue::from_string("datadog.span.resource", "GET /"),
                     KeyValue::from_string("datadog.span.type", "web"),
                 ],
@@ -596,6 +599,9 @@ fn malformed_bridge_keys_are_stripped() {
     for attribute in [
         KeyValue::from_string("datadog.chunk.priority", "nope"),
         KeyValue::from_int("datadog.chunk.priority", i64::from(i32::MAX) + 1),
+        KeyValue::from_string("datadog.chunk.sampling_mechanism", "nope"),
+        KeyValue::from_int("datadog.chunk.sampling_mechanism", -1),
+        KeyValue::from_int("datadog.chunk.sampling_mechanism", i64::from(u32::MAX) + 1),
         KeyValue::from_string("datadog.tracer.tags", "resource-scope key on a span"),
     ] {
         let span = PbSpan {
@@ -1314,6 +1320,7 @@ const RESERVED_KEYS: &[&str] = &[
     DATADOG_CHUNK_PRIORITY,
     DATADOG_CHUNK_ORIGIN,
     DATADOG_CHUNK_DROPPED,
+    DATADOG_CHUNK_SAMPLING_MECHANISM,
     DATADOG_CHUNK_TAGS,
     DATADOG_SPAN_RESOURCE,
     DATADOG_SPAN_TYPE,
@@ -1378,6 +1385,9 @@ fn keyed_value(key: &str) -> BoxedStrategy<AnyValue> {
         | DATADOG_SPAN_RESOURCE
         | DATADOG_SPAN_TYPE => "[a-z]{0,4}".prop_map(AnyValue::from_string).boxed(),
         DATADOG_CHUNK_PRIORITY => prop_oneof![-3_i64..4, any::<i64>()]
+            .prop_map(AnyValue::from_int)
+            .boxed(),
+        DATADOG_CHUNK_SAMPLING_MECHANISM => prop_oneof![0_i64..8, any::<i64>()]
             .prop_map(AnyValue::from_int)
             .boxed(),
         DATADOG_CHUNK_DROPPED => any::<bool>().prop_map(AnyValue::from_bool).boxed(),
