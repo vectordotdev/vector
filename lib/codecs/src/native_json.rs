@@ -77,7 +77,7 @@ fn fits_json_depth(value: &serde_json::Value, remaining_depth: usize) -> bool {
     }
 }
 
-pub(crate) fn from_dynamic_message(message: DynamicMessage) -> vector_common::Result<Event> {
+pub(crate) fn from_dynamic_message(message: &DynamicMessage) -> vector_common::Result<Event> {
     let event_field = NATIVE_JSON_DESCRIPTOR
         .get_field_by_name("event")
         .unwrap_or_else(|| panic!("event.NativeJsonEnvelope must contain an event field"));

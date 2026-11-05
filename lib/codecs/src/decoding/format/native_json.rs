@@ -118,7 +118,7 @@ impl Deserializer for NativeJsonDeserializer {
                 )
                 .map_err(|error| error.to_string())
                 .and_then(|message| {
-                    from_dynamic_message(message).map_err(|error| error.to_string())
+                    from_dynamic_message(&message).map_err(|error| error.to_string())
                 })
                 .map_err(Into::into)
             } else {
