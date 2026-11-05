@@ -176,7 +176,6 @@ aws-smithy-runtime-api = { version = "1.19.2", default-features = false }
 aws-smithy-types = { version = "1.9.1", default-features = false }
 axum = { version = "0.8.9", default-features = false }
 base64 = { version = "0.23.0", default-features = false, features = ["std"] }
-bitflags = { version = "2.13.2", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
