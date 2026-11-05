@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(NamedInternalEvent)]
-pub struct TagCardinalityLimitRejectingEvent<'a> {
+pub(crate) struct TagCardinalityLimitRejectingEvent<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
@@ -38,7 +38,7 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct TagCardinalityLimitRejectingTag<'a> {
+pub(crate) struct TagCardinalityLimitRejectingTag<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
@@ -67,7 +67,7 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct TagCardinalityValueLimitReached<'a> {
+pub(crate) struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }
 
@@ -82,7 +82,7 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct TagCardinalityLimitUntracked;
+pub(crate) struct TagCardinalityLimitUntracked;
 
 impl InternalEvent for TagCardinalityLimitUntracked {
     fn emit(self) {
@@ -94,7 +94,7 @@ impl InternalEvent for TagCardinalityLimitUntracked {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct TagCardinalityTrackedKeys {
+pub(crate) struct TagCardinalityTrackedKeys {
     pub count: usize,
 }
 

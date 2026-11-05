@@ -19,7 +19,7 @@ impl ErrorMessage {
     /// Create a new `ErrorMessage` from HTTP status code and a message
     #[allow(unused)] // triggered by check-component-features
     #[must_use]
-    pub fn new(code: http::StatusCode, message: String) -> Self {
+    pub const fn new(code: http::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
             message,

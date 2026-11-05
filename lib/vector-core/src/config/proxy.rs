@@ -1,7 +1,3 @@
-use headers::{Authorization, authorization::Credentials};
-use http::{header::PROXY_AUTHORIZATION, uri::InvalidUri};
-use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
-use url::Url;
 use vector_config::configurable_component;
 
 use crate::serde::is_default;
@@ -15,30 +11,6 @@ fn from_env(key: &str) -> Option<String> {
     std::env::var(key.to_lowercase())
         .ok()
         .or_else(|| std::env::var(key.to_uppercase()).ok())
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq, Eq)]
-pub struct NoProxyInterceptor(NoProxy);
-
-impl NoProxyInterceptor {
-    fn intercept(self, expected_scheme: &'static str) -> Intercept {
-        Intercept::Custom(Custom::from(
-            move |scheme: Option<&str>, host: Option<&str>, port: Option<u16>| {
-                if scheme.is_some() && scheme != Some(expected_scheme) {
-                    return false;
-                }
-                let matches = host.is_some_and(|host| {
-                    self.0.matches(host)
-                        || port.is_some_and(|port| {
-                            let url = format!("{host}:{port}");
-                            self.0.matches(&url)
-                        })
-                });
-                // only intercept those that don't match
-                !matches
-            },
-        ))
-    }
 }
 
 /// Proxy configuration.
@@ -129,10 +101,6 @@ impl ProxyConfig {
         Self::from_env().merge(&global.merge(component))
     }
 
-    fn interceptor(&self) -> NoProxyInterceptor {
-        NoProxyInterceptor(self.no_proxy.clone())
-    }
-
     // overrides current proxy configuration with other configuration
     // if `self` is the global config and `other` the component config,
     // if both have the `http` proxy set, the one from `other` should be kept
@@ -151,66 +119,11 @@ impl ProxyConfig {
             no_proxy,
         }
     }
-
-    fn build_proxy(
-        &self,
-        proxy_scheme: &'static str,
-        proxy_url: Option<&String>,
-    ) -> Result<Option<Proxy>, InvalidUri> {
-        proxy_url
-            .as_ref()
-            .map(|url| {
-                url.parse().map(|parsed| {
-                    let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
-                    if let Ok(authority) = Url::parse(url)
-                        && let Some(password) = authority.password()
-                    {
-                        let decoded_user = urlencoding::decode(authority.username())
-                            .expect("username must be valid UTF-8.");
-                        let decoded_pw =
-                            urlencoding::decode(password).expect("Password must be valid UTF-8.");
-                        let mut authorization =
-                            Authorization::basic(&decoded_user, &decoded_pw).0.encode();
-                        authorization.set_sensitive(true);
-                        proxy.set_header(PROXY_AUTHORIZATION, authorization);
-                    }
-                    proxy
-                })
-            })
-            .transpose()
-    }
-
-    fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("http", self.http.as_ref())
-    }
-
-    fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("https", self.https.as_ref())
-    }
-
-    /// Install the [`ProxyConnector<C>`] for this `ProxyConfig`
-    ///
-    /// # Errors
-    ///
-    /// Function will error if passed `ProxyConnector` has a faulty URI.
-    pub fn configure<C>(&self, connector: &mut ProxyConnector<C>) -> Result<(), InvalidUri> {
-        if self.enabled {
-            if let Some(proxy) = self.http_proxy()? {
-                connector.add_proxy(proxy);
-            }
-            if let Some(proxy) = self.https_proxy()? {
-                connector.add_proxy(proxy);
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use base64::prelude::{BASE64_STANDARD, Engine as _};
     use env_test_util::TempEnvVar;
-    use http::{HeaderValue, Uri, header::AUTHORIZATION};
     use proptest::prelude::*;
 
     use super::*;
@@ -231,7 +144,7 @@ mod tests {
                     https,
                     // TODO: Neither NoProxy nor IpCidr contained with in it supports proptest. Once
                     // they support proptest, add another any here.
-                    no_proxy: Default::default(),
+                    no_proxy: NoProxy::default(),
                 })
                 .boxed()
         }
@@ -333,91 +246,5 @@ mod tests {
         assert!(!result.enabled);
         assert_eq!(result.http, Some("http://remote.proxy".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
-    }
-
-    #[test]
-    fn build_proxy() {
-        let config = ProxyConfig {
-            http: Some("http://1.2.3.4:5678".into()),
-            https: Some("https://2.3.4.5:9876".into()),
-            ..Default::default()
-        };
-        let first = config
-            .http_proxy()
-            .expect("should not be an error")
-            .expect("should not be None");
-        let second = config
-            .https_proxy()
-            .expect("should not be an error")
-            .expect("should not be None");
-
-        assert_eq!(
-            Some(first.uri()),
-            Uri::try_from("http://1.2.3.4:5678").as_ref().ok()
-        );
-        assert_eq!(
-            Some(second.uri()),
-            Uri::try_from("https://2.3.4.5:9876").as_ref().ok()
-        );
-    }
-
-    #[test]
-    fn build_proxy_with_basic_authorization() {
-        let config = ProxyConfig {
-            http: Some("http://user:pass@1.2.3.4:5678".into()),
-            https: Some("https://user:pass@2.3.4.5:9876".into()),
-            ..Default::default()
-        };
-        let first = config
-            .http_proxy()
-            .expect("should not be an error")
-            .expect("should not be None");
-        let second = config
-            .https_proxy()
-            .expect("should not be an error")
-            .expect("should not be None");
-        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:pass"));
-        let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
-
-        assert_eq!(
-            Some(first.uri()),
-            Uri::try_from("http://user:pass@1.2.3.4:5678").as_ref().ok()
-        );
-        assert_eq!(
-            first.headers().get(PROXY_AUTHORIZATION),
-            expected_header_value.as_ref().ok()
-        );
-        assert!(!first.headers().contains_key(AUTHORIZATION));
-        assert_eq!(
-            Some(second.uri()),
-            Uri::try_from("https://user:pass@2.3.4.5:9876")
-                .as_ref()
-                .ok()
-        );
-        assert_eq!(
-            second.headers().get(PROXY_AUTHORIZATION),
-            expected_header_value.as_ref().ok()
-        );
-        assert!(!second.headers().contains_key(AUTHORIZATION));
-    }
-
-    #[test]
-    fn build_proxy_with_special_chars_url_encoded() {
-        let config = ProxyConfig {
-            http: Some("http://user:P%40ssw0rd@1.2.3.4:5678".into()),
-            https: Some("https://user:P%40ssw0rd@2.3.4.5:9876".into()),
-            ..Default::default()
-        };
-        let first = config
-            .http_proxy()
-            .expect("should not be an error")
-            .expect("should not be None");
-        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:P@ssw0rd"));
-        let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
-        assert_eq!(
-            first.headers().get(PROXY_AUTHORIZATION),
-            expected_header_value.as_ref().ok()
-        );
-        assert!(!first.headers().contains_key(AUTHORIZATION));
     }
 }
