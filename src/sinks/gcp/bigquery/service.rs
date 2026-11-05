@@ -17,6 +17,7 @@ use crate::sinks::util::retries::{RetryAction, RetryLogic};
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use crate::event::{EventFinalizers, Finalizable};
 use crate::gcp::GcpAuthenticator;
+use crate::internal_events::GcpBigqueryRetriesExhaustedError;
 
 /// Characters left unescaped in the `x-goog-request-params` header.
 const REQUEST_PARAMS_ESCAPE: &AsciiSet = &NON_ALPHANUMERIC
@@ -208,8 +209,10 @@ impl BigqueryServiceError {
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::ResponseStreamClosed => true,
+            Self::Request { status } if is_transport_failure(status) => true,
             // Allow transient gRPC status codes to be retried.
-            Self::Request { status } => match status.code() {
+            Self::Request { status } => matches!(
+                status.code(),
                 tonic::Code::Unavailable
                 | tonic::Code::ResourceExhausted
                 | tonic::Code::DeadlineExceeded
@@ -220,11 +223,11 @@ impl BigqueryServiceError {
                 | tonic::Code::Unauthenticated
                 // Aborted is returned when the server closes the stream (e.g. on restart) and advises
                 // clients to reconnect.
-                | tonic::Code::Aborted => true,
-                // tonic reports connection failures mid-request (e.g. a connection reset) as Unknown.
-                tonic::Code::Unknown => is_transport_failure(status),
-                _ => false,
-            },
+                | tonic::Code::Aborted
+                // Unknown also covers HTTP errors without a gRPC status.
+                | tonic::Code::Unknown
+                | tonic::Code::Cancelled
+            ),
         }
     }
 }
@@ -245,7 +248,8 @@ pub struct BigqueryService {
     auth: RequestAuth,
 }
 
-/// Whether the status was caused by a connection-level failure rather than an error returned by BigQuery.
+/// Whether the status was caused by a retriable connection-level failure rather than an error
+/// returned by BigQuery.
 fn is_transport_failure(status: &tonic::Status) -> bool {
     let mut source = std::error::Error::source(status);
     while let Some(error) = source {
@@ -391,23 +395,37 @@ where
     }
 
     fn call(&mut self, request: BigqueryRequest) -> Self::Future {
+        let count = request.get_metadata().event_count();
         let future = self.inner.call(request);
         Box::pin(async move {
-            future.await.or_else(|error| {
-                // Anything that isn't a `BigqueryServiceError` (eg request timeout) is retried, so it's transient.
-                let retriable = error
-                    .downcast_ref::<BigqueryServiceError>()
-                    .is_none_or(BigqueryServiceError::is_retryable);
-                if retriable {
-                    warn!(
-                        message = "BigQuery request failed after exhausting retries.",
-                        %error,
-                    );
-                    Ok(BigqueryResponse::retries_exhausted())
-                } else {
-                    Err(error)
+            match future.await {
+                Ok(response) => {
+                    // The retry layer only returns an `Errored` response once a transient error in the
+                    // response body has exhausted its retries.
+                    if response.event_status() == EventStatus::Errored {
+                        emit!(GcpBigqueryRetriesExhaustedError {
+                            reason: response.error_summary(),
+                            count,
+                        });
+                    }
+                    Ok(response)
                 }
-            })
+                Err(error) => {
+                    // Anything that isn't a `BigqueryServiceError` (eg request timeout) is retried, so it's transient.
+                    let retriable = error
+                        .downcast_ref::<BigqueryServiceError>()
+                        .is_none_or(BigqueryServiceError::is_retryable);
+                    if retriable {
+                        emit!(GcpBigqueryRetriesExhaustedError {
+                            reason: error.to_string(),
+                            count,
+                        });
+                        Ok(BigqueryResponse::retries_exhausted())
+                    } else {
+                        Err(error)
+                    }
+                }
+            }
         })
     }
 }
@@ -434,10 +452,19 @@ mod test {
     use crate::sinks::gcp::bigquery::BigqueryConfig;
     use crate::test_util::generate_events_with_stream;
 
+    /// How the fake server handles `AppendRows` calls.
+    enum AppendRows {
+        /// Forward each request to the test, which sends the response.
+        Forward,
+        /// Fail every call with this status.
+        Fail(Status),
+        /// Panic on the first call, then forward.
+        PanicOnFirstCall,
+    }
+
     /// A dumb `BigQueryWrite` server that can be used to test the `BigqueryService`.
     struct BigqueryServer {
-        /// If set, every `AppendRows` call fails with this status.
-        error: Option<Status>,
+        behavior: AppendRows,
         append_rows_calls: Arc<AtomicUsize>,
         append_rows_request_sender: UnboundedSender<(
             proto::AppendRowsRequest,
@@ -461,9 +488,13 @@ mod test {
             &self,
             request: Request<tonic::Streaming<proto::AppendRowsRequest>>,
         ) -> std::result::Result<Response<Self::AppendRowsStream>, Status> {
-            self.append_rows_calls.fetch_add(1, Ordering::SeqCst);
-            if let Some(error) = &self.error {
-                return Err(error.clone());
+            let call = self.append_rows_calls.fetch_add(1, Ordering::SeqCst);
+            match &self.behavior {
+                AppendRows::Fail(status) => return Err(status.clone()),
+                AppendRows::PanicOnFirstCall if call == 0 => {
+                    panic!("fake BigQuery server panicked on purpose")
+                }
+                AppendRows::Forward | AppendRows::PanicOnFirstCall => {}
             }
 
             let mut streaming = request.into_inner();
@@ -547,11 +578,11 @@ mod test {
         join_handle: tokio::task::JoinHandle<()>,
     }
 
-    async fn start_server(error: Option<Status>) -> TestServer {
+    async fn start_server(behavior: AppendRows) -> TestServer {
         let (sender, receiver) = unbounded_channel();
         let append_rows_calls = Arc::new(AtomicUsize::new(0));
         let bigquery_server = BigqueryServer {
-            error,
+            behavior,
             append_rows_calls: Arc::clone(&append_rows_calls),
             append_rows_request_sender: sender,
         };
@@ -585,7 +616,7 @@ mod test {
         tokio::sync::oneshot::Sender<()>,
         tokio::task::JoinHandle<()>,
     ) {
-        let server = start_server(None).await;
+        let server = start_server(AppendRows::Forward).await;
         let service = BigqueryService::new(
             server.transport,
             server.origin,
@@ -601,11 +632,18 @@ mod test {
         )
     }
 
-    async fn run_sink_against_failing_server(
-        error: Status,
-        retry_attempts: usize,
-    ) -> (BatchStatus, usize) {
-        let server = start_server(Some(error)).await;
+    async fn run_sink(append_rows: AppendRows, retry_attempts: usize) -> (BatchStatus, usize) {
+        let mut server = start_server(append_rows).await;
+        let responder = tokio::spawn(async move {
+            while let Some((_request, respond)) = server.receiver.recv().await {
+                _ = respond.send(Ok(proto::AppendRowsResponse {
+                    response: Some(proto::append_rows_response::Response::AppendResult(
+                        proto::append_rows_response::AppendResult { offset: None },
+                    )),
+                    ..Default::default()
+                }));
+            }
+        });
         let desc_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("lib/codecs/tests/data/protobuf/integration.desc");
         let config = format!(
@@ -643,6 +681,7 @@ mod test {
         let status = receiver.await;
 
         let calls = server.append_rows_calls.load(Ordering::SeqCst);
+        responder.abort();
         server.shutdown.send(()).unwrap();
         server.join_handle.await.unwrap();
         (status, calls)
@@ -651,18 +690,25 @@ mod test {
     #[tokio::test]
     async fn permanent_rpc_error_is_rejected_without_retry() {
         let (status, calls) =
-            run_sink_against_failing_server(Status::invalid_argument("bad rows"), 3).await;
+            run_sink(AppendRows::Fail(Status::invalid_argument("bad rows")), 3).await;
         assert_eq!(status, BatchStatus::Rejected);
         assert_eq!(calls, 1);
     }
 
     #[tokio::test]
     async fn transient_rpc_error_is_errored_after_retries() {
-        let (status, calls) =
-            run_sink_against_failing_server(Status::unavailable("try again"), 1).await;
+        let (status, calls) = run_sink(AppendRows::Fail(Status::unavailable("try again")), 1).await;
         // Exhausted retries should not be reported as rejected so acknowledging sources can
         // redeliver the events.
         assert_eq!(status, BatchStatus::Errored);
+        assert_eq!(calls, 2);
+    }
+
+    /// A server-side stream reset is retried like other transport failures.
+    #[tokio::test]
+    async fn server_stream_reset_then_success_is_delivered() {
+        let (status, calls) = run_sink(AppendRows::PanicOnFirstCall, 2).await;
+        assert_eq!(status, BatchStatus::Delivered);
         assert_eq!(calls, 2);
     }
 
