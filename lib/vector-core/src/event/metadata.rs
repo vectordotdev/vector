@@ -8,6 +8,8 @@ use std::{
     time::Instant,
 };
 
+use chrono::{DateTime, Utc};
+
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
@@ -137,6 +139,12 @@ pub(super) struct Inner {
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
+
+    /// The wall-clock timestamp captured when the event batch first entered the source output
+    /// channel. Invariant across all fan-out copies of an event; set once at source send time
+    /// before any fan-out occurs.
+    #[serde(default, skip)]
+    pub(crate) reference_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -362,6 +370,19 @@ impl EventMetadata {
     pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
         self.last_transform_timestamp = Some(timestamp);
     }
+
+    /// Returns the UTC timestamp captured when this event's batch entered the source output
+    /// channel, if available.
+    #[must_use]
+    pub fn reference_timestamp(&self) -> Option<DateTime<Utc>> {
+        self.inner.reference_timestamp
+    }
+
+    /// Sets the reference timestamp. Should be called once per event at source send time,
+    /// before fan-out. All fan-out copies will share this value via the shared `Arc<Inner>`.
+    pub fn set_reference_timestamp(&mut self, timestamp: DateTime<Utc>) {
+        self.get_mut().reference_timestamp = Some(timestamp);
+    }
 }
 
 impl Default for Inner {
@@ -379,6 +400,7 @@ impl Default for Inner {
             datadog_metric_unit: None,
             trace_layout: None,
             source_event_id: Some(Uuid::new_v4()),
+            reference_timestamp: None,
         }
     }
 }
