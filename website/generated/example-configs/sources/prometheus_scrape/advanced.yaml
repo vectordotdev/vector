@@ -12,5 +12,7 @@ sources:
       match[]:
         - '{job="somejob"}'
         - '{__name__=~"job:.*"}'
+    redirects:
+      follow: true
     scrape_interval_secs: 15
     scrape_timeout_secs: 5.0

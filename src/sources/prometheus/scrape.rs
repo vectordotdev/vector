@@ -144,6 +144,7 @@ pub struct PrometheusScrapeConfig {
     ///
     /// Redirects are followed by default, which matches the behavior of Prometheus.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "redirects_example()"))]
     redirects: Redirects,
 
     tls: Option<TlsConfig>,
@@ -181,6 +182,12 @@ fn static_target_example() -> serde_json::Value {
 fn headers_example() -> serde_json::Value {
     serde_json::json!({
         "X-My-Header": ["value1", "value2"]
+    })
+}
+
+fn redirects_example() -> serde_json::Value {
+    serde_json::json!({
+        "follow": true
     })
 }
 
@@ -859,6 +866,7 @@ mod test {
             honor_labels: false,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };

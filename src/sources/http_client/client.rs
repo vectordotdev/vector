@@ -127,6 +127,7 @@ pub struct HttpClientConfig {
     ///
     /// Redirects are not followed by default.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "redirects_example()"))]
     pub redirects: Redirects,
 
     /// TLS configuration.
@@ -185,6 +186,12 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
             ],
         ),
     ])
+}
+
+fn redirects_example() -> serde_json::Value {
+    serde_json::json!({
+        "follow": true
+    })
 }
 
 /// Helper function to compile a VRL parameter value into a Program

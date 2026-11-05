@@ -470,11 +470,11 @@ async fn send_request_with_redirects(
         return Ok(response);
     }
 
-    let initial_url = parse_absolute_url(&initial_url)?;
-    let initial_origin = initial_url.origin();
+    let mut request_uri = initial_url;
+    let mut url = parse_absolute_url(&request_uri)?;
+    let initial_origin = url.origin();
     let deadline = Instant::now() + inputs.timeout;
 
-    let mut url = initial_url;
     let mut http_method = http_method;
     let mut body = body;
     let mut redirects = 0;
@@ -486,7 +486,6 @@ async fn send_request_with_redirects(
             return Err(timeout_error(inputs.timeout));
         }
 
-        let request_uri = url.as_str().parse::<Uri>()?;
         let cross_origin = url.origin() != initial_origin;
 
         let response = tokio::time::timeout(
@@ -548,6 +547,7 @@ async fn send_request_with_redirects(
         );
 
         url = resolve_redirect(&url, &location)?;
+        request_uri = url.as_str().parse::<Uri>()?;
         redirects += 1;
     }
 }
@@ -1042,6 +1042,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preserves_configured_uri_on_initial_request() {
+        let route = warp::path::full()
+            .map(|path: warp::path::FullPath| path.as_str().to_owned());
+        let (_guard, addr) = next_addr();
+        tokio::spawn(warp::serve(route).run(addr));
+        wait_for_tcp(addr).await;
+
+        let inputs = test_inputs(
+            Redirects {
+                follow: Some(true),
+                ..Default::default()
+            },
+            HeaderMap::new(),
+            None,
+        );
+
+        let (status, body) = send(
+            &format!("http://{addr}/a/../b"),
+            HttpMethod::Get,
+            None,
+            &inputs,
+        )
+        .await
+        .expect("request should succeed");
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "/a/../b");
+    }
+
+    #[tokio::test]
     async fn preserves_get_body_on_temporary_redirect() {
         let inputs = test_inputs(
             Redirects {
@@ -1229,6 +1259,15 @@ mod tests {
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "GET|||");
+    }
+
+    #[test]
+    fn redirect_location_fragment_is_removed_but_query_is_preserved() {
+        let base = url::Url::parse("http://example.com/start").unwrap();
+        let target = resolve_redirect(&base, "/metrics?format=text#section").unwrap();
+
+        assert_eq!(target.as_str(), "http://example.com/metrics?format=text");
+        assert_eq!(target.fragment(), None);
     }
 
     #[tokio::test]

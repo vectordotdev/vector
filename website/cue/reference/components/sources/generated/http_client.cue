@@ -105,6 +105,36 @@ generated: components: sources: http_client: configuration: {
 			}
 		}
 	}
+	redirects: {
+		description: "HTTP redirect configuration. Redirects are not followed by default."
+		required:    false
+		type: object: {
+			examples: [{follow: true}]
+			options: {
+				cross_origin: {
+					description: "The behavior to apply to redirects that point to a different origin."
+					required:    false
+					type: object: options: {
+						not_forward_headers: {
+							description: "The names of the headers that are not forwarded to a different origin."
+							required:    false
+							type: array: items: type: string: {}
+						}
+					}
+				}
+				follow: {
+					description: "Whether to follow HTTP redirects."
+					required:    false
+					type:        bool: {}
+				}
+				max: {
+					description: "The maximum number of redirects to follow. This only applies when redirects are followed."
+					required:    false
+					type:        uint: default: 5
+				}
+			}
+		}
+	}
 	scrape_interval_secs: {
 		description: """
 			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
