@@ -108,8 +108,8 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
-            // librdkafka exposes no protocol version knobs, so only the host's OpenSSL policy can guarantee a bound.
-            if tls.options.has_protocol_version_bounds() {
+            // librdkafka has no protocol version settings, so only host policy can enforce a bound.
+            if tls.options.min_version.is_some() || tls.options.max_version.is_some() {
                 vector_lib::tls::enforce_protocol_version_bounds(
                     tls.options.min_version,
                     tls.options.max_version,
