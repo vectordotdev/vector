@@ -3,6 +3,8 @@
 //! Semantic-convention promotion and Datadog bridge lifting happen here, before a typed
 //! [`TraceEvent`] exists.
 
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use indexmap::IndexMap;
 use vector_core::event::{
@@ -30,7 +32,7 @@ use super::super::{
 };
 use super::{malformed_bridge, strip_reserved_map};
 use crate::proto::{
-    common::v1::InstrumentationScope,
+    common::v1::{InstrumentationScope, KeyValue},
     resource::v1::Resource as PbResource,
     trace::v1::{
         ResourceSpans, ScopeSpans, Span as PbSpan, Status as PbStatus,
@@ -143,162 +145,192 @@ fn nonempty_string(value: String) -> Option<String> {
     if value.is_empty() { None } else { Some(value) }
 }
 
-fn promote_resource_slots(resource: &mut Resource, reporter: &mut impl TraceConversionReporter) {
-    promote_string_slot(
-        &mut resource.attributes,
-        SERVICE_NAME,
-        &mut resource.service,
-    );
-
-    let has_stable = matches!(
-        resource.attributes.get(ENVIRONMENT_NAME),
-        Some(AttrValue::String(value)) if !value.is_empty()
-    );
-    if has_stable && resource.attributes.remove(ENVIRONMENT_LEGACY).is_some() {
-        resource.dropped_attributes_count.increment(1);
-        reporter.report(TraceConversionIssue::AttributeCollision {
-            key: ENVIRONMENT_LEGACY,
-        });
-    }
-    let environment_key = if has_stable {
-        ENVIRONMENT_NAME
-    } else {
-        ENVIRONMENT_LEGACY
-    };
-    promote_string_slot(
-        &mut resource.attributes,
-        environment_key,
-        &mut resource.environment,
-    );
-
-    promote_string_slot(&mut resource.attributes, HOST_NAME, &mut resource.host);
+/// One item's attributes while they are decoded, with the dropped count that every duplicate,
+/// malformed bridge key, and promotion collision on that item is charged to.
+struct AttributeDecoder<'a, R> {
+    attributes: Attributes,
+    dropped: DroppedCount,
+    reporter: &'a mut R,
 }
 
-fn promote_string_slot(attributes: &mut Attributes, key: &str, slot: &mut Option<String>) {
-    if matches!(attributes.get(key), Some(AttrValue::String(s)) if !s.is_empty())
-        && let Some(AttrValue::String(s)) = attributes.remove(key)
-    {
-        *slot = Some(s);
+impl<'a, R: TraceConversionReporter> AttributeDecoder<'a, R> {
+    fn new(key_values: Vec<KeyValue>, dropped_attributes_count: u32, reporter: &'a mut R) -> Self {
+        let mut dropped = DroppedCount::new(dropped_attributes_count);
+        let attributes = key_values_to_attributes(key_values, &mut dropped, reporter);
+        Self {
+            attributes,
+            dropped,
+            reporter,
+        }
     }
-}
 
-fn lift_resource_datadog(
-    attributes: &mut Attributes,
-    dropped: &mut DroppedCount,
-    datadog: &mut DatadogEventContext,
-    reporter: &mut impl TraceConversionReporter,
-) {
-    if let Some(map) = lift_attr(
-        attributes,
-        DATADOG_AGENT,
-        AttrValue::into_map,
-        dropped,
-        reporter,
-    ) {
-        datadog.set_agent(Some(lift_agent(map, dropped, reporter)));
+    fn finish(self) -> (Attributes, DroppedCount) {
+        (self.attributes, self.dropped)
     }
-    if let Some(tags) = lift_attr(
-        attributes,
-        DATADOG_TRACER_TAGS,
-        AttrValue::into_map,
-        dropped,
-        reporter,
-    ) {
-        datadog.tracer = DatadogTracerContext {
-            tags: Attributes::from(tags),
+
+    fn lift_resource_datadog(&mut self) -> DatadogEventContext {
+        let mut datadog = DatadogEventContext::default();
+        if let Some(map) = self.lift(DATADOG_AGENT, AttrValue::into_map) {
+            let agent = self.lift_agent(map);
+            datadog.set_agent(Some(agent));
+        }
+        if let Some(tags) = self.lift(DATADOG_TRACER_TAGS, AttrValue::into_map) {
+            datadog.tracer = DatadogTracerContext {
+                tags: Attributes::from(tags),
+            };
+        }
+        self.strip_reserved();
+        datadog
+    }
+
+    fn lift_span_datadog(&mut self) -> (DatadogSpanContext, SpanChunkKeys) {
+        let resource_name = self.lift(DATADOG_SPAN_RESOURCE, AttrValue::into_string);
+        let span_type = self.lift(DATADOG_SPAN_TYPE, AttrValue::into_string);
+        let meta_struct = self
+            .lift(DATADOG_SPAN_META_STRUCT, AttrValue::into_map)
+            .map(|map| self.lift_meta_struct(map))
+            .unwrap_or_default();
+        let chunk = SpanChunkKeys {
+            priority: self
+                .lift(DATADOG_CHUNK_PRIORITY, |value| {
+                    value.into_integer().and_then(|v| i32::try_from(v).ok())
+                })
+                .map(SamplingPriority::from_i32),
+            origin: self.lift(DATADOG_CHUNK_ORIGIN, AttrValue::into_string),
+            dropped: self.lift(DATADOG_CHUNK_DROPPED, AttrValue::into_bool),
+            sampling_mechanism: self.lift(DATADOG_CHUNK_SAMPLING_MECHANISM, |value| {
+                value.into_integer().and_then(|v| u32::try_from(v).ok())
+            }),
+            tags: self
+                .lift(DATADOG_CHUNK_TAGS, AttrValue::into_map)
+                .map(Attributes::from),
         };
+        self.strip_reserved();
+        let span = DatadogSpanContext {
+            resource_name,
+            span_type,
+            meta_struct,
+        };
+        (span, chunk)
     }
-    strip_reserved_map(attributes.as_map_mut(), dropped, reporter);
-}
 
-fn lift_span_datadog(
-    mut attributes: Attributes,
-    mut dropped: DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) -> (Attributes, DroppedCount, DatadogSpanContext, SpanChunkKeys) {
-    let mut span = DatadogSpanContext::default();
-    let mut chunk = SpanChunkKeys::default();
+    /// Removes the bridge key `key` and parses it, charging a malformed value to this item.
+    fn lift<T>(&mut self, key: &str, parse: fn(AttrValue) -> Option<T>) -> Option<T> {
+        let value = self.attributes.remove(key)?;
+        self.require(key, parse(value))
+    }
 
-    if let Some(s) = lift_attr(
-        &mut attributes,
-        DATADOG_SPAN_RESOURCE,
-        AttrValue::into_string,
-        &mut dropped,
-        reporter,
-    ) {
-        span.resource_name = Some(s);
+    /// Charges a `None` parse of the bridge key `key` to this item as malformed.
+    fn require<T>(&mut self, key: &str, parsed: Option<T>) -> Option<T> {
+        if parsed.is_none() {
+            self.malformed(key);
+        }
+        parsed
     }
-    if let Some(s) = lift_attr(
-        &mut attributes,
-        DATADOG_SPAN_TYPE,
-        AttrValue::into_string,
-        &mut dropped,
-        reporter,
-    ) {
-        span.span_type = Some(s);
-    }
-    if let Some(map) = lift_attr(
-        &mut attributes,
-        DATADOG_SPAN_META_STRUCT,
-        AttrValue::into_map,
-        &mut dropped,
-        reporter,
-    ) {
-        span.meta_struct = lift_meta_struct(map, &mut dropped, reporter);
-    }
-    chunk.priority = lift_attr(
-        &mut attributes,
-        DATADOG_CHUNK_PRIORITY,
-        |value| value.into_integer().and_then(|v| i32::try_from(v).ok()),
-        &mut dropped,
-        reporter,
-    )
-    .map(SamplingPriority::from_i32);
-    chunk.origin = lift_attr(
-        &mut attributes,
-        DATADOG_CHUNK_ORIGIN,
-        AttrValue::into_string,
-        &mut dropped,
-        reporter,
-    );
-    chunk.dropped = lift_attr(
-        &mut attributes,
-        DATADOG_CHUNK_DROPPED,
-        AttrValue::into_bool,
-        &mut dropped,
-        reporter,
-    );
-    chunk.sampling_mechanism = lift_attr(
-        &mut attributes,
-        DATADOG_CHUNK_SAMPLING_MECHANISM,
-        |value| value.into_integer().and_then(|v| u32::try_from(v).ok()),
-        &mut dropped,
-        reporter,
-    );
-    chunk.tags = lift_attr(
-        &mut attributes,
-        DATADOG_CHUNK_TAGS,
-        AttrValue::into_map,
-        &mut dropped,
-        reporter,
-    )
-    .map(Attributes::from);
-    strip_reserved_map(attributes.as_map_mut(), &mut dropped, reporter);
-    (attributes, dropped, span, chunk)
-}
 
-fn lift_attr<T>(
-    attributes: &mut Attributes,
-    key: &str,
-    parse: fn(AttrValue) -> Option<T>,
-    dropped: &mut DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) -> Option<T> {
-    let parsed = parse(attributes.remove(key)?);
-    if parsed.is_none() {
-        malformed_bridge(dropped, key, reporter);
+    fn lift_agent(&mut self, map: AttrMap) -> DatadogAgentEnvelope {
+        let mut envelope = DatadogAgentEnvelope::default();
+        for (key, member) in map {
+            self.lift_agent_field(&mut envelope, key.as_ref(), member);
+        }
+        envelope
     }
-    parsed
+
+    fn lift_agent_field(
+        &mut self,
+        envelope: &mut DatadogAgentEnvelope,
+        key: &str,
+        member: AttrValue,
+    ) {
+        match key {
+            AGENT_HOST_NAME => {
+                if let Some(s) = self.require(DATADOG_AGENT, member.into_string()) {
+                    envelope.host_name = s;
+                }
+            }
+            AGENT_ENV => {
+                if let Some(s) = self.require(DATADOG_AGENT, member.into_string()) {
+                    envelope.env = s;
+                }
+            }
+            AGENT_VERSION => {
+                if let Some(s) = self.require(DATADOG_AGENT, member.into_string()) {
+                    envelope.agent_version = s;
+                }
+            }
+            AGENT_TARGET_TPS => {
+                if let Some(v) = self.require(DATADOG_AGENT, member.into_float()) {
+                    envelope.target_tps = v;
+                }
+            }
+            AGENT_ERROR_TPS => {
+                if let Some(v) = self.require(DATADOG_AGENT, member.into_float()) {
+                    envelope.error_tps = v;
+                }
+            }
+            AGENT_RARE_SAMPLER => {
+                if let Some(v) = self.require(DATADOG_AGENT, member.into_bool()) {
+                    envelope.rare_sampler_enabled = v;
+                }
+            }
+            AGENT_TAGS => {
+                if let Some(tags) = self.require(DATADOG_AGENT, member.into_map()) {
+                    envelope.tags = Attributes::from(tags);
+                }
+            }
+            _ => self.malformed(DATADOG_AGENT),
+        }
+    }
+
+    fn lift_meta_struct(&mut self, map: AttrMap) -> BTreeMap<KeyString, Bytes> {
+        map.into_iter()
+            .filter_map(|(key, value)| {
+                if let AttrValue::Bytes(bytes) = value {
+                    Some((key, bytes))
+                } else {
+                    self.malformed(DATADOG_SPAN_META_STRUCT);
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn malformed(&mut self, key: &str) {
+        malformed_bridge(&mut self.dropped, key, self.reporter);
+    }
+
+    fn strip_reserved(&mut self) {
+        strip_reserved_map(
+            self.attributes.as_map_mut(),
+            &mut self.dropped,
+            self.reporter,
+        );
+    }
+
+    /// Removes and returns a non-empty string at `key`. Any other value stays in place.
+    fn promote(&mut self, key: &str) -> Option<String> {
+        if matches!(self.attributes.get(key), Some(AttrValue::String(s)) if !s.is_empty())
+            && let Some(AttrValue::String(s)) = self.attributes.remove(key)
+        {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    /// Promotes the stable environment key, or the deprecated one when the stable value is
+    /// not a non-empty string. A promoted stable value drops the deprecated key.
+    fn promote_environment(&mut self) -> Option<String> {
+        let stable = self.promote(ENVIRONMENT_NAME);
+        if stable.is_some() && self.attributes.remove(ENVIRONMENT_LEGACY).is_some() {
+            self.dropped.increment(1);
+            self.reporter
+                .report(TraceConversionIssue::AttributeCollision {
+                    key: ENVIRONMENT_LEGACY,
+                });
+        }
+        stable.or_else(|| self.promote(ENVIRONMENT_LEGACY))
+    }
 }
 
 /// Chunk-scoped bridge values lifted from one span, or merged across a partition's spans.
@@ -369,131 +401,42 @@ fn merge_first<T: PartialEq>(
     }
 }
 
-fn lift_agent(
-    map: AttrMap,
-    dropped: &mut DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) -> DatadogAgentEnvelope {
-    let mut envelope = DatadogAgentEnvelope::default();
-    for (key, member) in map {
-        lift_agent_field(&mut envelope, key.as_ref(), member, dropped, reporter);
-    }
-    envelope
-}
-
-fn lift_agent_field(
-    envelope: &mut DatadogAgentEnvelope,
-    key: &str,
-    member: AttrValue,
-    dropped: &mut DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) {
-    match key {
-        AGENT_HOST_NAME => {
-            if let Some(s) = require_bridge_attr(AttrValue::into_string(member), dropped, reporter)
-            {
-                envelope.host_name = s;
-            }
-        }
-        AGENT_ENV => {
-            if let Some(s) = require_bridge_attr(AttrValue::into_string(member), dropped, reporter)
-            {
-                envelope.env = s;
-            }
-        }
-        AGENT_VERSION => {
-            if let Some(s) = require_bridge_attr(AttrValue::into_string(member), dropped, reporter)
-            {
-                envelope.agent_version = s;
-            }
-        }
-        AGENT_TARGET_TPS => {
-            if let Some(v) = require_bridge_attr(AttrValue::into_float(member), dropped, reporter) {
-                envelope.target_tps = v;
-            }
-        }
-        AGENT_ERROR_TPS => {
-            if let Some(v) = require_bridge_attr(AttrValue::into_float(member), dropped, reporter) {
-                envelope.error_tps = v;
-            }
-        }
-        AGENT_RARE_SAMPLER => {
-            if let Some(v) = require_bridge_attr(AttrValue::into_bool(member), dropped, reporter) {
-                envelope.rare_sampler_enabled = v;
-            }
-        }
-        AGENT_TAGS => {
-            if let Some(tags) = require_bridge_attr(AttrValue::into_map(member), dropped, reporter)
-            {
-                envelope.tags = Attributes::from(tags);
-            }
-        }
-        _ => malformed_bridge(dropped, DATADOG_AGENT, reporter),
-    }
-}
-
-fn require_bridge_attr<T>(
-    parsed: Option<T>,
-    dropped: &mut DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) -> Option<T> {
-    parsed.or_else(|| {
-        malformed_bridge(dropped, DATADOG_AGENT, reporter);
-        None
-    })
-}
-
-fn lift_meta_struct(
-    map: AttrMap,
-    dropped: &mut DroppedCount,
-    reporter: &mut impl TraceConversionReporter,
-) -> std::collections::BTreeMap<KeyString, Bytes> {
-    map.into_iter()
-        .filter_map(|(key, value)| {
-            if let AttrValue::Bytes(bytes) = value {
-                Some((key, bytes))
-            } else {
-                malformed_bridge(dropped, DATADOG_SPAN_META_STRUCT, reporter);
-                None
-            }
-        })
-        .collect()
-}
-
 impl PbResource {
     fn into_typed(
         self,
         schema_url: String,
         reporter: &mut impl TraceConversionReporter,
     ) -> (Resource, DatadogEventContext) {
-        let mut dropped = DroppedCount::new(self.dropped_attributes_count);
-        let mut attributes = key_values_to_attributes(self.attributes, &mut dropped, reporter);
-        let mut datadog = DatadogEventContext::default();
-        lift_resource_datadog(&mut attributes, &mut dropped, &mut datadog, reporter);
-
-        let mut resource = Resource {
-            service: None,
-            environment: None,
-            host: None,
+        let mut decoder =
+            AttributeDecoder::new(self.attributes, self.dropped_attributes_count, reporter);
+        let datadog = decoder.lift_resource_datadog();
+        let service = decoder.promote(SERVICE_NAME);
+        let environment = decoder.promote_environment();
+        let host = decoder.promote(HOST_NAME);
+        let (attributes, dropped_attributes_count) = decoder.finish();
+        let resource = Resource {
+            service,
+            environment,
+            host,
             attributes,
             schema_url: nonempty_string(schema_url),
-            dropped_attributes_count: dropped,
+            dropped_attributes_count,
         };
-        promote_resource_slots(&mut resource, reporter);
         (resource, datadog)
     }
 }
 
 impl InstrumentationScope {
     fn into_typed(self, schema_url: String, reporter: &mut impl TraceConversionReporter) -> Scope {
-        let mut dropped = DroppedCount::new(self.dropped_attributes_count);
-        let attributes = key_values_to_attributes(self.attributes, &mut dropped, reporter);
+        let (attributes, dropped_attributes_count) =
+            AttributeDecoder::new(self.attributes, self.dropped_attributes_count, reporter)
+                .finish();
         Scope {
             name: nonempty_string(self.name),
             version: nonempty_string(self.version),
             attributes,
             schema_url: nonempty_string(schema_url),
-            dropped_attributes_count: dropped,
+            dropped_attributes_count,
         }
     }
 }
@@ -529,11 +472,10 @@ impl PbSpan {
             })
             .ok()?;
 
-        let mut dropped_attributes = DroppedCount::new(self.dropped_attributes_count);
-        let attributes =
-            key_values_to_attributes(self.attributes, &mut dropped_attributes, reporter);
-        let (attributes, dropped_attributes, span_datadog, chunk_keys) =
-            lift_span_datadog(attributes, dropped_attributes, reporter);
+        let mut decoder =
+            AttributeDecoder::new(self.attributes, self.dropped_attributes_count, reporter);
+        let (span_datadog, chunk_keys) = decoder.lift_span_datadog();
+        let (attributes, dropped_attributes_count) = decoder.finish();
 
         let events = self
             .events
@@ -573,7 +515,7 @@ impl PbSpan {
             attributes,
             events,
             links,
-            dropped_attributes_count: dropped_attributes,
+            dropped_attributes_count,
             dropped_events_count: DroppedCount::new(self.dropped_events_count),
             dropped_links_count,
         };
@@ -583,12 +525,14 @@ impl PbSpan {
 
 impl PbEvent {
     fn into_typed(self, reporter: &mut impl TraceConversionReporter) -> SpanEvent {
-        let mut dropped = DroppedCount::new(self.dropped_attributes_count);
+        let (attributes, dropped_attributes_count) =
+            AttributeDecoder::new(self.attributes, self.dropped_attributes_count, reporter)
+                .finish();
         SpanEvent {
             name: self.name,
             time: otlp_nanos_to_datetime(self.time_unix_nano),
-            attributes: key_values_to_attributes(self.attributes, &mut dropped, reporter),
-            dropped_attributes_count: dropped,
+            attributes,
+            dropped_attributes_count,
         }
     }
 }
@@ -608,14 +552,16 @@ impl PbLink {
                 reporter.report(TraceConversionIssue::DroppedLink { field, error });
             })
             .ok()?;
-        let mut dropped = DroppedCount::new(self.dropped_attributes_count);
+        let (attributes, dropped_attributes_count) =
+            AttributeDecoder::new(self.attributes, self.dropped_attributes_count, reporter)
+                .finish();
         Some(SpanLink {
             trace_id,
             span_id,
             trace_state: TraceState::from_raw(self.trace_state),
             flags: OtlpSpanFlags::from(self.flags),
-            attributes: key_values_to_attributes(self.attributes, &mut dropped, reporter),
-            dropped_attributes_count: dropped,
+            attributes,
+            dropped_attributes_count,
         })
     }
 }
