@@ -1752,6 +1752,17 @@ fn any_ttl_enabled_covers_per_metric_override() {
     per_metric.config.ttl_secs = Some(60);
     config.per_metric_limits.insert("m".to_string(), per_metric);
     assert!(config.any_ttl_enabled());
+
+    // `mode: excluded` ignores `ttl_secs` and allocates no bucket, so it must
+    // not turn the reclaim scan back on by itself.
+    let mut excluded = make_per_metric_excluded(HashMap::new());
+    excluded.config.ttl_secs = Some(60);
+    config.per_metric_limits.clear();
+    config.per_metric_limits.insert("m".to_string(), excluded);
+    assert!(
+        !config.any_ttl_enabled(),
+        "ttl_secs on an excluded metric is ignored"
+    );
 }
 
 /// With `value_limit: 0` + `max_tracked_keys` at cap, an intentionally empty

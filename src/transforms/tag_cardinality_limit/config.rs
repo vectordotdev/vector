@@ -403,16 +403,19 @@ pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
 }
 
 impl Config {
-    /// Whether the global config or any per-metric override enables a TTL.
+    /// Whether the global config or any tracked per-metric override enables a TTL.
     ///
-    /// Without a TTL nothing can empty a bucket (apart from intentional
-    /// `value_limit: 0` ones), so reclaiming empty buckets can be skipped.
+    /// `mode: excluded` ignores its other fields and never allocates a bucket,
+    /// so a `ttl_secs` there does not count. Without a TTL nothing can empty a
+    /// bucket (apart from intentional `value_limit: 0` ones), so reclaiming
+    /// empty buckets can be skipped.
     pub(crate) fn any_ttl_enabled(&self) -> bool {
         ttl_duration(self.global.ttl_secs).is_some()
-            || self
-                .per_metric_limits
-                .values()
-                .any(|per_metric| ttl_duration(per_metric.config.ttl_secs).is_some())
+            || self.per_metric_limits.values().any(|per_metric| {
+                // `as_mode()` is `None` exactly for `mode: excluded`.
+                per_metric.config.mode.as_mode().is_some()
+                    && ttl_duration(per_metric.config.ttl_secs).is_some()
+            })
     }
 }
 
