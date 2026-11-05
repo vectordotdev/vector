@@ -6,11 +6,11 @@ use vector_lib::{
 };
 
 #[cfg(feature = "sources-file")]
-pub use self::file_source::*;
+pub(crate) use self::file_source::*;
 #[cfg(feature = "sinks-file")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -26,7 +26,7 @@ pub struct FileInternalMetricsConfig {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct FileOpen {
+pub(crate) struct FileOpen {
     pub count: usize,
 }
 
@@ -53,7 +53,7 @@ mod sink {
     use crate::sinks::util::path_confinement::ConfineError;
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileBytesSent<'a> {
+    pub(crate) struct FileBytesSent<'a> {
         pub byte_size: usize,
         pub file: Cow<'a, str>,
         pub include_file_metric_tag: bool,
@@ -84,7 +84,7 @@ mod sink {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileIoError<'a, P> {
+    pub(crate) struct FileIoError<'a, P> {
         pub error: std::io::Error,
         pub code: &'static str,
         pub message: &'static str,
@@ -120,7 +120,7 @@ mod sink {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FilePathOutsideBaseDirError<'a> {
+    pub(crate) struct FilePathOutsideBaseDirError<'a> {
         pub path: &'a std::path::Path,
         pub base_dir: &'a std::path::Path,
         pub error: ConfineError,
@@ -159,7 +159,7 @@ mod file_source {
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileBytesReceived<'a> {
+    pub(crate) struct FileBytesReceived<'a> {
         pub byte_size: usize,
         pub file: &'a str,
         pub include_file_metric_tag: bool,
@@ -190,7 +190,7 @@ mod file_source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileEventsReceived<'a> {
+    pub(crate) struct FileEventsReceived<'a> {
         pub count: usize,
         pub file: &'a str,
         pub byte_size: JsonSize,
@@ -241,7 +241,7 @@ mod source {
     use super::{FileOpen, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileChecksumFailed<'a> {
+    pub(crate) struct FileChecksumFailed<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
     }
@@ -265,7 +265,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileFingerprintReadError<'a> {
+    pub(crate) struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
         pub error: Error,
         pub include_file_metric_tag: bool,
@@ -304,7 +304,7 @@ mod source {
     const DELETION_FAILED: &str = "deletion_failed";
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileDeleteError<'a> {
+    pub(crate) struct FileDeleteError<'a> {
         pub file: &'a Path,
         pub error: Error,
         pub include_file_metric_tag: bool,
@@ -341,7 +341,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileDeleted<'a> {
+    pub(crate) struct FileDeleted<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
     }
@@ -365,7 +365,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileUnwatched<'a> {
+    pub(crate) struct FileUnwatched<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
         pub reached_eof: bool,
@@ -466,7 +466,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileResumed<'a> {
+    pub(crate) struct FileResumed<'a> {
         pub file: &'a Path,
         pub file_position: u64,
         pub include_file_metric_tag: bool,
@@ -492,7 +492,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileAdded<'a> {
+    pub(crate) struct FileAdded<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
     }
@@ -516,7 +516,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileCheckpointed {
+    pub(crate) struct FileCheckpointed {
         pub count: usize,
         pub duration: Duration,
     }
@@ -538,7 +538,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileCheckpointWriteError {
+    pub(crate) struct FileCheckpointWriteError {
         pub error: Error,
     }
 
@@ -562,7 +562,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct PathGlobbingError<'a> {
+    pub(crate) struct PathGlobbingError<'a> {
         pub path: &'a Path,
         pub error: &'a Error,
     }
@@ -588,7 +588,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct FileLineTooBigError<'a> {
+    pub(crate) struct FileLineTooBigError<'a> {
         pub truncated_bytes: &'a BytesMut,
         pub configured_limit: usize,
         pub encountered_size_so_far: usize,
@@ -619,7 +619,7 @@ mod source {
     }
 
     #[derive(Clone)]
-    pub struct FileSourceInternalEventsEmitter {
+    pub(crate) struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
     }
 

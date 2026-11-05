@@ -369,7 +369,7 @@ impl Default for Inner {
         Self {
             value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
             schema_definition: None,
             source_id: None,
             source_type: None,

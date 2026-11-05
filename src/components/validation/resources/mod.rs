@@ -75,9 +75,13 @@ impl ResourceCodec {
     ///
     /// The encoder is generated as an inverse to the input codec: if a decoding configuration was
     /// given, we generate an encoder that satisfies that decoding configuration, and vice versa.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the serializer fails to build, or if the decoding configuration uses a
+    /// deserializer (`influxdb`, `vrl`) or framing (`octet_counting`, `chunked_gelf`) that has no
+    /// encoding equivalent.
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
@@ -109,8 +113,16 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the deserializer cannot be built, such as when a Protobuf descriptor
+    /// file cannot be loaded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the encoding configuration uses a serializer that has no decoding equivalent
+    /// (`avro`, `cef`, `csv`, `logfmt`, `otlp`, or `syslog`).
     pub fn into_decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
@@ -397,8 +409,16 @@ impl ExternalResource {
     }
 
     /// Spawns this resource for use as an output for a sink.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder for the resource codec cannot be built.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an HTTP resource uses the `Pull` direction, which is not implemented, or if its
+    /// URI host is missing or not an IP address. Panics if the codec uses a serializer that has no
+    /// matching deserializer for validation.
     pub fn spawn_as_output(
         self,
         output_tx: mpsc::Sender<Vec<Event>>,

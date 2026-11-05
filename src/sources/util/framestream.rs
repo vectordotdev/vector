@@ -925,15 +925,12 @@ async fn spawn_event_handling_tasks(
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
     crate::spawn_in_current_span(async move {
-        future::ready({
-            if let Some(evt) = event_handler.handle_event(received_from, event_data)
-                && event_sink.send_event(evt).await.is_err()
-            {
-                error!("Encountered error while sending event.");
-            }
-            active_task_nums.fetch_sub(1, Ordering::AcqRel);
-        })
-        .await;
+        if let Some(evt) = event_handler.handle_event(received_from, event_data)
+            && event_sink.send_event(evt).await.is_err()
+        {
+            error!("Encountered error while sending event.");
+        }
+        active_task_nums.fetch_sub(1, Ordering::AcqRel);
     })
 }
 
@@ -1803,11 +1800,8 @@ mod test {
         let total_events = max_frame_handling_tasks * 10;
 
         join_handles.push(tokio::spawn(async move {
-            future::ready({
-                let events = collect_n(rx, total_events).await;
-                assert_eq!(total_events, events.len(), "Missed events");
-            })
-            .await;
+            let events = collect_n(rx, total_events).await;
+            assert_eq!(total_events, events.len(), "Missed events");
         }));
 
         for i in 0..total_events {

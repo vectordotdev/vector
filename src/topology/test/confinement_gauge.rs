@@ -6,12 +6,11 @@
 //! reconciles it on every (re)load. These tests exercise the observable parts:
 //! per-sink identity (no cross-sink clobbering) and value updates on reload.
 
-use vector_lib::metrics::Controller;
+use vector_lib::{extra_context::ExtraContext, metrics::Controller};
 
 use crate::{
     config::Config,
     event::{Metric, MetricValue},
-    extra_context::ExtraContext,
     test_util::{
         mock::{basic_sink, basic_sink_with_data, basic_source},
         start_topology, trace_init,

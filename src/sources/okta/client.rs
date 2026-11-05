@@ -4,13 +4,20 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::StreamExt as _;
 use futures_util::{FutureExt, Stream, stream};
-use http::Uri;
-use hyper::{Body, Request};
+use http::{
+    Request, Response, StatusCode, Uri,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
+    response::Parts,
+    uri::Scheme,
+};
+use http_body_util::BodyExt as _;
+use hyper::body::Incoming;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use tokio::sync::Mutex;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::Decoder as _;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -28,7 +35,7 @@ use vector_lib::{
 use crate::{
     SourceSender,
     config::{SourceConfig, SourceContext},
-    http::{HttpClient, HttpError},
+    http::HttpClient,
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,
@@ -137,7 +144,7 @@ impl SourceConfig for OktaConfig {
 
         url_parts.path_and_query = Some(path_and_query.parse()?);
         if url_parts.scheme.is_none() {
-            url_parts.scheme = Some(http::uri::Scheme::HTTPS);
+            url_parts.scheme = Some(Scheme::HTTPS);
         }
 
         let url = Uri::from_parts(url_parts).map_err(|_| {
@@ -193,11 +200,9 @@ fn enrich_events(events: &mut Vec<Event>, log_namespace: LogNamespace) {
     }
 }
 
-type OktaRunResult =
-    Result<(http::response::Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
+type OktaRunResult = Result<(Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
 
-type OktaTimeoutResult =
-    Result<Result<http::Response<Body>, HttpError>, tokio::time::error::Elapsed>;
+type OktaTimeoutResult = Result<Result<Response<Incoming>, HttpError>, tokio::time::error::Elapsed>;
 
 async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> OktaRunResult {
     let mut next: Option<Uri> = None;
@@ -215,7 +220,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 next = Some(next_url);
             }
 
-            let body = http_body::Body::collect(body).await?.to_bytes();
+            let body = body.collect().await?.to_bytes();
 
             emit!(EndpointBytesReceived {
                 byte_size: body.len(),
@@ -236,7 +241,7 @@ fn handle_response(
     url: String,
 ) -> Option<impl Stream<Item = Event> + Send + use<>> {
     match response {
-        Ok((header, body, _)) if header.status == hyper::StatusCode::OK => {
+        Ok((header, body, _)) if header.status == StatusCode::OK => {
             let mut buf = BytesMut::new();
             buf.extend_from_slice(&body);
             let mut events = decode_events(&mut buf, decoder);
@@ -304,8 +309,8 @@ async fn run(
         emit!(DecoderDeserializeError { error: e });
     })?;
 
-    let client = HttpClient::new(tls, &proxy).map_err(|e| {
-        let error = Arc::new(e);
+    let client = HttpClient::new(tls.into(), &proxy).map_err(|e| {
+        let error: Arc<dyn std::error::Error + Send + Sync> = Arc::from(e);
         emit!(HttpClientHttpError {
             error: Box::new(Arc::clone(&error)),
             url: url.to_string()
@@ -335,7 +340,7 @@ async fn run(
                             let mut url_lock = url_mutex.lock().await;
                             let url = url_lock.to_string();
 
-                            let mut request = match Request::get(&url).body(Body::empty()) {
+                            let mut request = match Request::get(&url).body(empty_body()) {
                                 Ok(request) => request,
                                 Err(e) => {
                                     emit!(HttpClientHttpError {
@@ -347,16 +352,9 @@ async fn run(
                             };
 
                             let headers = request.headers_mut();
-                            headers.insert(
-                                http::header::AUTHORIZATION,
-                                format!("SSWS {token}").parse().unwrap(),
-                            );
-                            headers
-                                .insert(http::header::ACCEPT, "application/json".parse().unwrap());
-                            headers.insert(
-                                http::header::CONTENT_TYPE,
-                                "application/json".parse().unwrap(),
-                            );
+                            headers.insert(AUTHORIZATION, format!("SSWS {token}").parse().unwrap());
+                            headers.insert(ACCEPT, "application/json".parse().unwrap());
+                            headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
 
                             let client = client.clone();
                             let response = tokio::time::timeout(timeout, client.send(request))
