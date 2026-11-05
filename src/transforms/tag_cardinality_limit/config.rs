@@ -259,6 +259,15 @@ pub enum OverrideMode {
     Excluded,
 }
 
+impl OverrideInner {
+    /// Whether this override actually applies a TTL. `mode: excluded` ignores
+    /// every other field and allocates no storage, so a leftover `ttl_secs`
+    /// there is not a TTL (and must not be validated or counted as one).
+    pub(crate) fn ttl_active(&self) -> bool {
+        self.mode.as_mode().is_some() && ttl_duration(self.ttl_secs).is_some()
+    }
+}
+
 impl OverrideMode {
     /// Returns the equivalent global `Mode` if this scope is tracked, or `None` if excluded.
     #[must_use]
@@ -405,17 +414,14 @@ pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
 impl Config {
     /// Whether the global config or any tracked per-metric override enables a TTL.
     ///
-    /// `mode: excluded` ignores its other fields and never allocates a bucket,
-    /// so a `ttl_secs` there does not count. Without a TTL nothing can empty a
-    /// bucket (apart from intentional `value_limit: 0` ones), so reclaiming
-    /// empty buckets can be skipped.
+    /// Without a TTL nothing can empty a bucket (apart from intentional
+    /// `value_limit: 0` ones), so reclaiming empty buckets can be skipped.
     pub(crate) fn any_ttl_enabled(&self) -> bool {
         ttl_duration(self.global.ttl_secs).is_some()
-            || self.per_metric_limits.values().any(|per_metric| {
-                // `as_mode()` is `None` exactly for `mode: excluded`.
-                per_metric.config.mode.as_mode().is_some()
-                    && ttl_duration(per_metric.config.ttl_secs).is_some()
-            })
+            || self
+                .per_metric_limits
+                .values()
+                .any(|per_metric| per_metric.config.ttl_active())
     }
 }
 
@@ -551,7 +557,7 @@ impl TransformConfig for Config {
         }
 
         for (metric_name, per_metric) in &self.per_metric_limits {
-            let ttl_enabled = ttl_duration(per_metric.config.ttl_secs).is_some();
+            let ttl_enabled = per_metric.config.ttl_active();
             if ttl_enabled && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint) {
                 errors.push(
                     BuildError::TtlUnsupportedInFingerprintMode {

@@ -30,10 +30,10 @@ use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
 
-/// Minimum gap between full exact-TTL purges during `max_tracked_keys` reclaim.
-/// Cap misses between windows still inspect bucket lengths via the cheap
-/// `maybe_sweep` path, so empty buckets can be freed without scanning every map.
-const RECLAIM_FULL_PURGE_INTERVAL: Duration = Duration::from_secs(1);
+/// Minimum gap between `max_tracked_keys` reclaim passes. A pass visits every
+/// bucket, so under sustained cap pressure it must not run on every miss.
+/// TTL eviction granularity is at least one second, so a pass this often loses nothing.
+const RECLAIM_SCAN_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Replaces the bloom filter size in a `Probabilistic` mode with the override. No-op when
 /// `override_size` is `None`.
@@ -73,14 +73,12 @@ pub struct TagCardinalityLimit {
     /// Total count of currently-tracked (`metric_bucket`, `tag_key`) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
-    /// Whether any configured scope enables a TTL. Computed once; when false,
-    /// `reclaim_empty_buckets` is a no-op so a full `max_tracked_keys` stays O(1)
-    /// per miss, as it was before TTL support.
+    /// Whether any tracked scope enables a TTL. Computed once; when false,
+    /// `reclaim_empty_buckets` returns immediately.
     ttl_enabled: bool,
-    /// Last time `reclaim_empty_buckets` ran a full exact-TTL purge across all
-    /// buckets. Used to amortize O(total cached values) scans under sustained
-    /// `max_tracked_keys` pressure.
-    last_full_reclaim: Option<Instant>,
+    /// Start of the last `reclaim_empty_buckets` pass; bounds passes to one per
+    /// `RECLAIM_SCAN_INTERVAL` under sustained `max_tracked_keys` pressure.
+    last_reclaim_scan: Option<Instant>,
 }
 
 impl TagCardinalityLimit {
@@ -91,7 +89,7 @@ impl TagCardinalityLimit {
             config,
             accepted_tags: HashMap::new(),
             tracked_keys_count: 0,
-            last_full_reclaim: None,
+            last_reclaim_scan: None,
         }
     }
 
@@ -118,28 +116,26 @@ impl TagCardinalityLimit {
     /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
     /// overhead is zero.
     ///
-    /// Full exact-TTL purges (`len_reclaiming`) are rate-limited: under
-    /// sustained key churn with no empty buckets, scanning every map on every
-    /// miss would be O(total cached values) repeatedly. Between full purges we
-    /// still consult ordinary `len()` (periodic `maybe_sweep`), which frees
-    /// buckets that the sweep has already emptied.
+    /// A pass visits every bucket, so it is skipped entirely when no tracked
+    /// scope has a TTL (nothing else can empty a bucket) and otherwise runs at
+    /// most once per `RECLAIM_SCAN_INTERVAL`, however many cap misses occur.
+    /// The cost is that a bucket emptied just after a pass keeps its slot, and
+    /// new keys stay untracked, for up to that interval.
     ///
     /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
     /// every value for that tag is rejected without storing state.
     fn reclaim_empty_buckets(&mut self) {
-        // Only TTL eviction can leave a bucket empty (and `value_limit: 0`
-        // buckets are kept anyway), so skip the scan entirely without a TTL.
         if !self.ttl_enabled {
             return;
         }
         let now = Instant::now();
-        let full_purge = match self.last_full_reclaim {
-            Some(last) if now.duration_since(last) < RECLAIM_FULL_PURGE_INTERVAL => false,
-            _ => {
-                self.last_full_reclaim = Some(now);
-                true
-            }
-        };
+        if self
+            .last_reclaim_scan
+            .is_some_and(|last| now.duration_since(last) < RECLAIM_SCAN_INTERVAL)
+        {
+            return;
+        }
+        self.last_reclaim_scan = Some(now);
 
         let mut reclaimed = 0usize;
         let empty_buckets: Vec<(Option<MetricId>, String)> = self
@@ -147,15 +143,7 @@ impl TagCardinalityLimit {
             .iter_mut()
             .flat_map(|(metric_key, inner)| {
                 inner.iter_mut().filter_map(|(tag_key, set)| {
-                    let live = if full_purge {
-                        set.len_reclaiming()
-                    } else {
-                        set.len()
-                    };
-                    if live != 0 {
-                        return None;
-                    }
-                    Some((metric_key.clone(), tag_key.clone()))
+                    (set.len_reclaiming() == 0).then(|| (metric_key.clone(), tag_key.clone()))
                 })
             })
             .collect();

@@ -1676,8 +1676,12 @@ fn max_tracked_keys_reclaims_empty_buckets() {
     );
 }
 
+/// A reclaim pass visits every bucket, so after one pass the next must be skipped
+/// until `RECLAIM_SCAN_INTERVAL` elapses, however many cap misses occur.
 #[test]
-fn reclaim_full_purge_is_rate_limited() {
+fn reclaim_pass_is_rate_limited() {
+    use super::tag_value_set::AcceptedTagValueSet;
+
     let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
     config.max_tracked_keys = Some(1);
     config.global.ttl_secs = Some(60);
@@ -1685,15 +1689,39 @@ fn reclaim_full_purge_is_rate_limited() {
 
     transform.reclaim_empty_buckets();
     let first = transform
-        .last_full_reclaim
-        .expect("first reclaim must record a full-purge timestamp");
+        .last_reclaim_scan
+        .expect("first reclaim must record a scan timestamp");
+
+    // An empty TTL bucket appears after the pass; a skipped pass leaves it in place.
+    let metric_key: Option<MetricId> = None;
+    let mut inner = hashbrown::HashMap::new();
+    inner.insert(
+        "stale_tag".to_string(),
+        AcceptedTagValueSet::new(&Mode::Exact, Some(60), default_ttl_generations()),
+    );
+    transform.accepted_tags.insert(metric_key.clone(), inner);
+    transform.tracked_keys_count = 1;
 
     transform.reclaim_empty_buckets();
     assert_eq!(
-        transform.last_full_reclaim,
+        transform.last_reclaim_scan,
         Some(first),
-        "immediate second reclaim must not force another full purge"
+        "an immediate second reclaim must not start another pass"
     );
+    assert!(
+        transform.accepted_tags.contains_key(&metric_key),
+        "bucket must survive while the pass is rate-limited"
+    );
+    assert_eq!(transform.tracked_keys_count, 1);
+
+    // With no recent pass on record (as after the interval elapses), the next pass reclaims it.
+    transform.last_reclaim_scan = None;
+    transform.reclaim_empty_buckets();
+    assert!(
+        !transform.accepted_tags.contains_key(&metric_key),
+        "bucket must be reclaimed by the next pass"
+    );
+    assert_eq!(transform.tracked_keys_count, 0);
 }
 
 /// Without any TTL nothing can empty a bucket, so a full `max_tracked_keys`
@@ -1723,7 +1751,7 @@ fn reclaim_is_skipped_without_ttl() {
         "full cap without TTL must pass the new key through untracked"
     );
     assert!(
-        transform.last_full_reclaim.is_none(),
+        transform.last_reclaim_scan.is_none(),
         "no bucket scan may run when TTL is disabled"
     );
     assert!(
@@ -2237,6 +2265,27 @@ fn validation_rejects_zero_ttl_generations_with_ttl() {
     assert!(
         errors.iter().any(|e| e.contains("metricA")),
         "error should name the offending metric, got: {errors:?}"
+    );
+}
+
+/// `mode: excluded` ignores every other field, so a leftover `ttl_secs` /
+/// `ttl_generations: 0` on an excluded entry must not fail validation or count
+/// as an active TTL.
+#[test]
+fn validation_ignores_ttl_on_excluded_metric_override() {
+    let mut per_metric = make_per_metric_excluded(HashMap::new());
+    per_metric.config.ttl_secs = Some(3600);
+    per_metric.config.ttl_generations = 0;
+    assert!(!per_metric.config.ttl_active());
+
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([("metricA".to_string(), per_metric)]),
+    );
+    assert!(
+        config.validate_structure().is_ok(),
+        "excluded override with a stale TTL must still build"
     );
 }
 
