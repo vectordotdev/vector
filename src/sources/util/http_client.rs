@@ -96,9 +96,10 @@ impl Default for Redirects {
 
 /// The behavior to apply to redirects that point to a different origin.
 ///
-/// An origin is the scheme, host, and port of a URL. Headers that carry credentials are not
-/// forwarded when a redirect leaves the origin of the original request, because the new origin is
-/// not necessarily trusted by whoever configured the source.
+/// An origin is the scheme, host, and port of a URL. When a redirect leaves the original origin,
+/// the configured `not_forward_headers` are removed because the new origin is not necessarily
+/// trusted by whoever configured the source. The defaults differ between sources; in particular,
+/// `prometheus_scrape` forwards `authorization` by default to match Prometheus.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct CrossOriginRedirects {
@@ -374,7 +375,7 @@ fn build_request_for_url(
     }
 
     if cross_origin {
-        // Credentials are not forwarded to origins that the source was not configured for.
+        // Remove the headers configured for cross-origin redirects, including source defaults.
         for header in &inputs.redirects.not_forward_headers {
             request.headers_mut().remove(header);
         }
