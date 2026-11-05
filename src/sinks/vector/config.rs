@@ -123,7 +123,7 @@ pub struct VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct VectorKeepaliveConfig {
+pub(super) struct VectorKeepaliveConfig {
     /// How often, in seconds, to send a keepalive PING on idle connections.
     ///
     /// Shorter intervals detect dead connections faster at the cost of additional traffic.
@@ -361,7 +361,7 @@ impl ValidatedSink for VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum EndpointStrategy {
+pub(super) enum EndpointStrategy {
     /// Distribute requests across healthy endpoints using Vector's existing
     /// Tower distributed service. Endpoint health is tracked using
     /// `routing.health`, and unhealthy endpoints are backed off and probed

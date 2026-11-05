@@ -3,7 +3,7 @@ use tracing::{debug, error};
 use vector_http::HttpError;
 
 #[derive(Clone)]
-pub struct DorisHealthLogic;
+pub(super) struct DorisHealthLogic;
 
 impl HealthLogic for DorisHealthLogic {
     type Error = crate::Error;
