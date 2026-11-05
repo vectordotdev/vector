@@ -1,8 +1,0 @@
-name: Install package repository tools
-description: Install native packaging tools and the checksum-pinned opt-in vdev binary.
-runs:
-  using: composite
-  steps:
-    # Install tools before the job acquires signing or AWS credentials.
-    - shell: bash
-      run: bash scripts/environment/prepare.sh --modules=package-repository-tools

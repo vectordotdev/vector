@@ -293,7 +293,7 @@ jobs:
               - "Cargo.toml"
               - "Cargo.lock"
               - "rust-toolchain.toml"
-              - ".github/actions/package-repository-tools/**"
+              - "scripts/environment/prepare.sh"
               - ".github/workflows/package-repositories*.yml"
               - ".github/workflows/vdev_publish.yml"
               - ".github/workflows/changes.yml"

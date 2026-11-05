@@ -76,7 +76,8 @@ jobs:
             recover-lock) test -n "$EXPECTED_VERSION" && test "$OWNER_STOPPED" = true ;;
             *) exit 1 ;;
           esac
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
@@ -133,7 +134,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-base
@@ -172,7 +174,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-signed
@@ -209,7 +212,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-signed

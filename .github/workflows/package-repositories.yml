@@ -59,7 +59,8 @@ jobs:
           persist-credentials: false
       - id: source
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - name: Freeze and verify release inputs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -90,7 +91,8 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-inputs
@@ -126,7 +128,8 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-base
@@ -167,7 +170,8 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-signed
@@ -195,7 +199,8 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/package-repository-tools
+      - name: Install package repository tools
+        run: bash scripts/environment/prepare.sh --modules=package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-signed
