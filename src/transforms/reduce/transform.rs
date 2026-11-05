@@ -1,12 +1,22 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
+    hash::{BuildHasher, RandomState},
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
 
-use futures::Stream;
+use async_stream::stream;
+use futures::{Stream, StreamExt, stream};
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use metrics::Counter;
+use tokio::{sync::mpsc, task::JoinSet};
+use tokio_stream::wrappers::ReceiverStream;
+use tracing::Instrument;
+use vector_lib::{
+    source_sender::chunk_size_events,
+    stream::expiration_map::{Emitter, map_with_expiration},
+};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     path::{OwnedSegment, OwnedTargetPath, parse_target_path},
@@ -15,6 +25,7 @@ use vrl::{
 
 use crate::{
     conditions::Condition,
+    cpu_time::SpawnTimedExt,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
@@ -343,6 +354,142 @@ where
             me.flush_all_into(emitter);
         },
     ))
+}
+
+// How many batches can wait in one shard's queue before the router has to wait
+// TODO: there might be a variable somewhere in vector to handle this kind of stuff
+const SHARD_QUEUE_BATCHES: usize = 4;
+
+// Batches the shared output queue can hold per shard. It only absorbs bursts.
+// TODO: It's an arbitraty value. Find what we use in vector in similar cases
+const OUTPUT_QUEUE_BATCHES_PER_SHARD: usize = 1;
+
+#[derive(Debug)]
+pub struct ShardedReduce {
+    reduce: Reduce,
+    shards: NonZeroUsize,
+    cpu_ns: Option<Counter>,
+}
+
+impl ShardedReduce {
+    pub const fn new(reduce: Reduce, shards: NonZeroUsize, cpu_ns: Option<Counter>) -> Self {
+        Self {
+            reduce,
+            shards,
+            cpu_ns,
+        }
+    }
+}
+
+impl TaskTransform<Event> for ShardedReduce {
+    fn transform(
+        self: Box<Self>,
+        input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        let mut tasks = JoinSet::new();
+
+        let (output_tx, output_rx) =
+            mpsc::channel(self.shards.get() * OUTPUT_QUEUE_BATCHES_PER_SHARD);
+        let shards_senders = (0..self.shards.get())
+            .map(|_| {
+                let (tx, rx) = mpsc::channel::<Vec<Event>>(SHARD_QUEUE_BATCHES);
+                tasks.spawn_timed(
+                    run_shard(Box::new(self.reduce.clone()), rx, output_tx.clone()),
+                    self.cpu_ns.clone(),
+                );
+                tx
+            })
+            .collect();
+
+        drop(output_tx);
+
+        tasks.spawn_timed(
+            route(self.reduce.group_by, shards_senders, input_rx).in_current_span(),
+            self.cpu_ns.clone(),
+        );
+
+        stream! {
+            let mut output = std::pin::pin!(ReceiverStream::new(output_rx));
+            while let Some(item) = output.next().await {
+                yield item;
+            }
+
+            // A task fails only by panicking or by being aborted. As we never abort a task ourselves,
+            // and tokio only aborts them when the `JoinSet` is dropped, an error is always a panic.
+            while let Some(result) = tasks.join_next().await {
+                match result {
+                    Ok(()) => {},
+                    Err(error) if error.is_panic() => std::panic::resume_unwind(error.into_panic()),
+                    Err(_) => {
+                        unreachable!("reduce task cancelled while its JoinSet is still owned")
+                    }
+                }
+            }
+        }
+        .flat_map(stream::iter)
+        .boxed()
+    }
+}
+
+async fn run_shard(
+    reduce: Box<Reduce>,
+    rx: mpsc::Receiver<Vec<Event>>,
+    sender: mpsc::Sender<Vec<Event>>,
+) {
+    let events = ReceiverStream::new(rx).flat_map(stream::iter).boxed();
+
+    // TODO: don't know/not sure about
+    // 1. if chunk_size_events() is really the function we should use for max ready_events at the
+    //    same time
+    // 2. code very similar to Output in vector-core; maybe we should rewrite this another way.
+    let mut reduced = reduce.transform(events).ready_chunks(chunk_size_events());
+
+    while let Some(batch) = reduced.next().await {
+        // TODO: This happens if the receiver is gone: so if the topology dropped this transform's
+        // output stream. In that case, we lose in-flight events. I don't know how we should handle
+        // this case/how is it handled everywhere else in Vector?
+        if sender.send(batch).await.is_err() {
+            return;
+        }
+    }
+}
+
+async fn route(
+    group_by: Vec<String>,
+    shard_senders: Vec<mpsc::Sender<Vec<Event>>>,
+    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+) {
+    let hasher = RandomState::new();
+
+    // TODO: same question as for `reduced` var in `run_shard()`
+    let mut input = input_rx.ready_chunks(chunk_size_events());
+
+    while let Some(events) = input.next().await {
+        let mut per_shard: Vec<Vec<Event>> = vec![Vec::new(); shard_senders.len()];
+
+        for event in events {
+            // TODO: we this, we compute the Discriminant two times: one here, and the second in the
+            // recursively called `Reduce::transform_one()`
+            let discriminant = Discriminant::from_log_event(event.as_log(), &group_by);
+
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "deterministic: the same hash always maps to the same shard, and the low bits stay uniform"
+            )]
+            let shard_number = (hasher.hash_one(&discriminant) as usize) % shard_senders.len();
+            per_shard[shard_number].push(event);
+        }
+
+        for (shard_tx, shard_batch) in shard_senders.iter().zip(per_shard) {
+            // TODO: same problem as in `run_shard()`
+            if !shard_batch.is_empty() && shard_tx.send(shard_batch).await.is_err() {
+                return;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
