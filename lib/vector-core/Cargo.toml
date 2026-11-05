@@ -73,6 +73,8 @@ schannel = "0.1.29"
 prost-build.workspace = true
 
 [dev-dependencies]
+# Test delivery to older Vector receivers independently of SDK Prost features.
+vector-core-proto-013 = { path = "../vector-core-proto-013" }
 strum.workspace = true
 chrono-tz.workspace = true
 criterion = { workspace = true, features = ["html_reports"] }
