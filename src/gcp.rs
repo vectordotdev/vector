@@ -51,7 +51,7 @@ pub enum GcpError {
     #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text: {}", source))]
-    GetTokenBytes { source: hyper_1::Error },
+    GetTokenBytes { source: hyper::Error },
     #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
     #[snafu(display("Failed to parse OAuth token JSON: {}", source))]

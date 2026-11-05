@@ -5,9 +5,9 @@ use std::{
 };
 
 use futures::{Stream, StreamExt, future::BoxFuture};
-use headers_1::{Authorization, HeaderMapExt};
+use headers::{Authorization, HeaderMapExt};
 use http::{Request, Response, Version};
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::{conn::auto::Builder as ConnectionBuilder, graceful::GracefulShutdown},
@@ -16,7 +16,7 @@ use hyper_util::{
 use serde_with::serde_as;
 use tokio::{net::TcpStream, time::Instant};
 use tower::{Layer, Service};
-use tower_http_1::{
+use tower_http::{
     classify::{ServerErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
@@ -111,11 +111,11 @@ impl MaybeAuth for Option<Auth> {
 }
 
 impl Auth {
-    pub fn apply_v1<B>(&self, request: &mut Request<B>) {
-        self.apply_headers_map_v1(request.headers_mut());
+    pub fn apply<B>(&self, request: &mut Request<B>) {
+        self.apply_headers_map(request.headers_mut());
     }
 
-    fn apply_headers_map_v1(&self, map: &mut http::HeaderMap) {
+    fn apply_headers_map(&self, map: &mut http::HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
                 let auth = Authorization::basic(user.as_str(), password.inner());
@@ -572,13 +572,13 @@ mod tests {
     use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
 
     #[test]
-    fn test_auth_apply_v1() {
+    fn test_auth_apply() {
         let mut basic = http::Request::get("http://example.com").body(()).unwrap();
         Auth::Basic {
             user: "user".to_owned(),
             password: SensitiveString::from("pass".to_owned()),
         }
-        .apply_v1(&mut basic);
+        .apply(&mut basic);
         assert_eq!(
             basic.headers().get(http::header::AUTHORIZATION),
             Some(&http::HeaderValue::from_static("Basic dXNlcjpwYXNz"))
@@ -588,7 +588,7 @@ mod tests {
         Auth::Bearer {
             token: SensitiveString::from("token".to_owned()),
         }
-        .apply_v1(&mut bearer);
+        .apply(&mut bearer);
         assert_eq!(
             bearer.headers().get(http::header::AUTHORIZATION),
             Some(&http::HeaderValue::from_static("Bearer token"))
@@ -598,7 +598,7 @@ mod tests {
         Auth::Custom {
             value: "SSWS token123".to_owned(),
         }
-        .apply_v1(&mut custom);
+        .apply(&mut custom);
         assert_eq!(
             custom.headers().get(http::header::AUTHORIZATION),
             Some(&http::HeaderValue::from_static("SSWS token123"))

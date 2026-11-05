@@ -2,7 +2,7 @@
 
 use futures_util::FutureExt;
 use http::{Request, Response, StatusCode, Uri};
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use snafu::Snafu;
 use vector_http::{HttpError, empty_body};
 use vector_lib::{

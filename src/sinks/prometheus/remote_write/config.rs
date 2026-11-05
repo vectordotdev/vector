@@ -16,7 +16,9 @@ use crate::{
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
-            HttpEndpoint, auth::Auth, http::RetryStrategy, http_v1::http_response_retry_logic,
+            HttpEndpoint,
+            auth::Auth,
+            http::{RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },

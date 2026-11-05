@@ -460,7 +460,7 @@ async fn retries_transport_errors() {
 
     use http::{Response, StatusCode};
     use http_body_util::{BodyExt as _, Full};
-    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,

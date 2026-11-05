@@ -232,7 +232,7 @@ fn classify(error: &HttpError) -> fn(BoxError) -> ConnectorError {
         return ConnectorError::timeout;
     }
 
-    if let Some(hyper_error) = find_source::<hyper_1::Error>(error) {
+    if let Some(hyper_error) = find_source::<hyper::Error>(error) {
         if hyper_error.is_timeout() {
             return ConnectorError::timeout;
         }

@@ -155,4 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
   tableOfContents();
   showCodeFilename();
   addCodeControls();
+
+  // Code controls change the layout after Firefox may have followed the URL fragment.
+  document.querySelector(":target")?.scrollIntoView();
 });
