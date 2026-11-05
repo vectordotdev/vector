@@ -69,7 +69,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	api_key: {
 		deprecated:         true
-		deprecated_message: "API keys are not supported by Google Cloud Storage, use `credentials_path` or default GCE credentials instead."
+		deprecated_message: "API keys are not supported by Google Cloud Storage; use `credentials_path` or default GCE credentials instead."
 		description: """
 			An [API key][gcp_api_key].
 

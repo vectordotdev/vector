@@ -202,7 +202,7 @@ pub struct GcsSinkConfig {
     ///
     /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
     #[configurable(
-        deprecated = "API keys are not supported by Google Cloud Storage, use `credentials_path` or default GCE credentials instead."
+        deprecated = "API keys are not supported by Google Cloud Storage; use `credentials_path` or default GCE credentials instead."
     )]
     api_key: Option<SensitiveString>,
 
