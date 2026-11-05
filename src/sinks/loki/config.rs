@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
         prelude::*,

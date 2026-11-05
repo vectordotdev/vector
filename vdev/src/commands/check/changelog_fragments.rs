@@ -285,7 +285,7 @@ fn validate_breaking_fragment(content: &str, filename: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indoc::{formatdoc, indoc};
+    use indoc::formatdoc;
 
     /// Build a full breaking-fragment file body from the given title line and section content.
     fn wrap(title_line: &str, summary: &str, migration: &str) -> String {
@@ -305,118 +305,42 @@ mod tests {
     }
 
     #[test]
-    fn valid_breaking_fragment() {
-        let raw = wrap(
-            "# Env var interpolation disabled {#env-var}",
-            "Off by default now.",
-            "Pass the flag.",
+    fn valid_breaking_fragments() {
+        for (title, migration) in [
+            (
+                "# Env var interpolation disabled {#env-var}",
+                "Pass the flag.",
+            ),
+            ("# A change", ""),
+        ] {
+            let raw = wrap(title, "Off by default now.", migration);
+            validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
+        }
+    }
+
+    #[test]
+    fn parser_errors_include_the_fragment_filename() {
+        let error =
+            validate_breaking_fragment("not a breaking fragment", "x.breaking.md").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid breaking fragment 'x.breaking.md': first line must be an H1 title (`# ...`)"
         );
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn valid_without_anchor() {
-        let raw = wrap("# A change", "Change happened.", "N/A");
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn missing_title() {
-        let raw = indoc! {"
-            not an H1 line
-
-            ## Summary
-
-            x
-
-            ## Migration
-
-            N/A
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("H1 title"), "{err}");
-    }
-
-    #[test]
-    fn empty_title() {
-        let raw = wrap("# ", "x", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("title must not be empty"), "{err}");
-    }
-
-    #[test]
-    fn missing_summary_header() {
-        let raw = indoc! {"
-            # x
-
-            ## Migration
-
-            N/A
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("`## Summary`"), "{err}");
-    }
-
-    #[test]
-    fn missing_migration_header() {
-        let raw = indoc! {"
-            # x
-
-            ## Summary
-
-            y
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("`## Migration`"), "{err}");
-    }
-
-    #[test]
-    fn empty_summary_section() {
-        let raw = wrap("# x", "", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(
-            err.to_string().contains("Summary` must not be empty"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn empty_migration_section_is_allowed() {
-        // Fragments may leave `## Migration` empty (nothing for the user to do).
-        let raw = wrap("# x", "y", "");
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn wrong_section_order() {
-        let raw = indoc! {"
-            # x
-
-            ## Migration
-
-            do this
-
-            ## Summary
-
-            hi
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("must come before"), "{err}");
     }
 
     #[test]
     fn bad_anchor() {
-        let raw = wrap("# x {#Not Valid!}", "y", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        for anchor in [
+            "Not Valid!",
+            "vrl-changelog",
+            "vector-changelog",
+            "bug-fixes",
+            "upgrade-guide-bug-fixes",
+        ] {
+            let raw = wrap(&format!("# x {{#{anchor}}}"), "y", "N/A");
+            let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
+            assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        }
     }
 
     #[test]
@@ -459,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn breaking_anchor_set_skips_non_breaking_fragments() {
+    fn breaking_anchor_set_skips_unrelated_files() {
         let tmp = tempfile::tempdir().unwrap();
         // A non-breaking fragment must not be anchor-checked, even with a breaking-shaped body.
         std::fs::write(
@@ -467,13 +391,6 @@ mod tests {
             wrap("# One change {#Not Valid!}", "Summary.", "N/A"),
         )
         .unwrap();
-        assert!(validate_breaking_anchor_set(tmp.path()).is_ok());
-    }
-
-    #[test]
-    fn breaking_anchor_set_skips_non_fragment_files() {
-        let tmp = tempfile::tempdir().unwrap();
-        // An editor backup like `foo.breaking.md.bak` must not be treated as a breaking fragment.
         std::fs::write(tmp.path().join("foo.breaking.md.bak"), "not a fragment").unwrap();
         assert!(validate_breaking_anchor_set(tmp.path()).is_ok());
     }

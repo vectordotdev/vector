@@ -1,11 +1,11 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_body_util::{BodyExt as _, Collected};
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
+use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
@@ -83,7 +83,7 @@ async fn http_request(
 ) -> Result<bytes::Bytes, &'static str> {
     let tls_settings = TlsSettings::from_options(tls_options).map_err(|_| "Invalid TLS options")?;
     let http_client =
-        HttpClient::<Body>::new(tls_settings, proxy).map_err(|_| "Invalid TLS settings")?;
+        HttpClient::new(tls_settings.into(), proxy).map_err(|_| "Invalid TLS settings")?;
 
     // Build HTTP request.
     let mut builder = http::request::Builder::new().uri(url.to_string());
@@ -95,7 +95,7 @@ async fn http_request(
     }
 
     let request = builder
-        .body(Body::empty())
+        .body(empty_body())
         .map_err(|_| "Couldn't create HTTP request")?;
 
     info!(
@@ -121,7 +121,7 @@ async fn http_request(
         .map(Collected::to_bytes)
         .map_err(|err| {
             let message = "Error interpreting response.";
-            let cause = err.into_cause();
+            let cause = std::error::Error::source(&err);
             error!(
                     message = ?message,
                     error = ?cause);

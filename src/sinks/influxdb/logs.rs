@@ -6,7 +6,7 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use futures::{StreamExt, future, stream::BoxStream};
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tower::{Service, ServiceBuilder};
 use vector_lib::{
@@ -35,7 +35,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{InfluxdbEncodingError, LargeEventDroppedError, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,
@@ -44,8 +44,10 @@ use crate::{
             TowerRequestConfig,
             builder::SinkBuilderExt,
             encoding::{Encoder as SinkEncoder, write_all},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             metadata::RequestMetadataBuilder,
             request_builder::{EncodeResult, default_request_builder_concurrency_limit},
             service::ServiceBuilderExt,
@@ -359,7 +361,7 @@ impl InfluxDbLogsEncoder {
 }
 
 impl HttpServiceRequestBuilder<()> for InfluxDbWriteRequest {
-    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http_1::Request<Bytes>> {
+    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http::Request<Bytes>> {
         self.request(request.take_payload())
     }
 }

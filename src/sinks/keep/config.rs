@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -14,13 +14,12 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,
@@ -174,7 +173,7 @@ async fn healthcheck(
     client: HttpClient,
 ) -> crate::Result<()> {
     let request =
-        Request::post(endpoint.into_v1()).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
+        Request::post(endpoint.into_uri()).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();

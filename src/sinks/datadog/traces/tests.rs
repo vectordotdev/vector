@@ -3,12 +3,15 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
-use vector_lib::event::{BatchNotifier, BatchStatus, Event};
+use vector_lib::{
+    event::{BatchNotifier, BatchStatus, Event},
+    extra_context::ExtraContext,
+};
 use vrl::event_path;
 
 use super::{DatadogTracesConfig, apm_stats::StatsPayload, dd_proto, ddsketch_full};
@@ -16,7 +19,6 @@ use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     event::{ObjectMap, TraceEvent, Value},
-    extra_context::ExtraContext,
     sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
         addr::next_addr,
