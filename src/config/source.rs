@@ -61,7 +61,7 @@ pub struct SourceOuter {
     pub graph: GraphConfig,
 
     #[serde(default, skip)]
-    pub sink_acknowledgements: HashMap<String, AcknowledgementsConfig>,
+    pub sink_acknowledgements: Vec<AcknowledgementsConfig>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -220,7 +220,7 @@ impl SourceContext {
         }
 
         config
-            .merge_defaults(&self.acknowledgements, &self.globals.acknowledgements)
+            .merge_defaults(&self.acknowledgements)
             .merge_default(&self.globals.acknowledgements)
             .enabled()
     }
