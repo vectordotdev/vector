@@ -27,7 +27,7 @@ pub(super) enum BuildError {
     KafkaCreateFailed { source: KafkaError },
 }
 
-pub struct KafkaSink {
+pub(crate) struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: RateLimit<KafkaService>,

@@ -25,7 +25,7 @@ use crate::{
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
-pub struct BlackholeSink {
+pub(super) struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
@@ -33,7 +33,7 @@ pub struct BlackholeSink {
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig) -> Self {
+    pub(super) fn new(config: BlackholeConfig) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),

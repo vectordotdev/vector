@@ -15,7 +15,7 @@ use super::{NewRelicCredentials, NewRelicSinkError};
 use crate::{http::HttpClient, sinks::prelude::*};
 
 #[derive(Debug, Clone)]
-pub struct NewRelicApiRequest {
+pub(super) struct NewRelicApiRequest {
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
@@ -40,7 +40,7 @@ impl MetaDescriptive for NewRelicApiRequest {
 }
 
 #[derive(Debug)]
-pub struct NewRelicApiResponse {
+pub(super) struct NewRelicApiResponse {
     event_status: EventStatus,
     metadata: RequestMetadata,
 }
@@ -60,7 +60,7 @@ impl DriverResponse for NewRelicApiResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewRelicApiService {
+pub(super) struct NewRelicApiService {
     pub client: HttpClient,
 }
 

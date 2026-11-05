@@ -29,7 +29,7 @@ use vector_lib::{
     },
 };
 
-pub struct WebSocketSink {
+pub(super) struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,

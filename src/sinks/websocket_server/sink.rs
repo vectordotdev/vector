@@ -54,7 +54,7 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
-pub struct WebSocketListenerSink {
+pub(super) struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -67,7 +67,10 @@ pub struct WebSocketListenerSink {
 
 impl WebSocketListenerSink {
     #[cfg(test)]
-    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: WebSocketListenerSinkConfig,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         Self::from_validated(config, &validated, tls, cx)

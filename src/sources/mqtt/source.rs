@@ -17,7 +17,7 @@ use crate::{
     sources::{SourceError, mqtt::MqttSourceConfig, util},
 };
 
-pub struct MqttSource {
+pub(super) struct MqttSource {
     connector: MqttConnector,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -29,7 +29,7 @@ impl MqttSource {
         clippy::unnecessary_wraps,
         reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn new(
+    pub(super) fn new(
         connector: MqttConnector,
         decoder: Decoder,
         log_namespace: LogNamespace,
@@ -43,7 +43,7 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(
+    pub(super) async fn run(
         self,
         mut out: SourceSender,
         shutdown: ShutdownSignal,

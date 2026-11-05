@@ -280,7 +280,7 @@ impl LogRequestBuilder {
         clippy::needless_pass_by_value,
         reason = "Retain ownership of the API key while building and returning its requests."
     )]
-    pub fn build_request(
+    fn build_request(
         &self,
         events: Vec<Event>,
         api_key: Arc<str>,

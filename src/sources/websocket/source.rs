@@ -94,7 +94,10 @@ enum WebsocketStateMessage {
 }
 
 impl WebSocketSource {
-    pub fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: WebSocketConfig,
+        params: WebSocketSourceParams,
+    ) -> crate::Result<Self> {
         let last_received_message_id = 'restore: {
             if let Some(path) = params
                 .data_dir
@@ -146,7 +149,7 @@ impl WebSocketSource {
         })
     }
 
-    pub async fn run(mut self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
+    pub(crate) async fn run(mut self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 
