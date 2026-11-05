@@ -159,12 +159,16 @@ pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, 
 }
 
 /// Replaces secret references in string leaves, preserving keys and value types.
+///
+/// # Errors
+///
+/// Returns an error message for each `SECRET[backend.key]` reference in a string leaf that has
+/// no matching entry in `secrets`.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_secrets(
     map: &ConfigMap,
     secrets: &HashMap<String, String>,
@@ -187,13 +191,20 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
     });
 }
 
+/// Replaces `SECRET[backend.key]` references in `input` with values from `secrets`.
+///
+/// # Errors
+///
+/// Returns an error message for each reference that has no matching entry in `secrets`.
+///
+/// # Panics
+///
+/// Panics if a regex match has no overall capture group, which cannot happen in practice.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR

@@ -156,6 +156,7 @@ impl<'de> Deserialize<'de> for BufferType {
 /// # Panics
 ///
 /// Never panics; the value 500 is non-zero.
+#[must_use]
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     NonZeroUsize::new(500).expect("500 is non-zero")
 }
@@ -170,6 +171,7 @@ pub struct DiskUsage {
 
 impl DiskUsage {
     /// Creates a new `DiskUsage` with the given usage configuration.
+    #[must_use]
     pub fn new(id: ComponentKey, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         Self {
             id,
@@ -179,16 +181,19 @@ impl DiskUsage {
     }
 
     /// Gets the component key for the component this buffer is attached to.
+    #[must_use]
     pub fn id(&self) -> &ComponentKey {
         &self.id
     }
 
     /// Gets the maximum size, in bytes, that this buffer can consume on disk.
+    #[must_use]
     pub fn max_size(&self) -> u64 {
         self.max_size.get()
     }
 
     /// Gets the data directory path that this buffer will store its files on disk.
+    #[must_use]
     pub fn data_dir(&self) -> &Path {
         self.data_dir.as_path()
     }
@@ -222,6 +227,8 @@ pub enum BufferType {
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
+    // BufferTypeVisitor defaults a missing type to memory.
+    #[configurable(metadata(serde::optional_tag = "type"))]
     Memory {
         /// The terms around how to express buffering limits, can be in size or `bytes_size`.
         #[serde(flatten)]
@@ -261,6 +268,7 @@ impl BufferType {
     /// such as maximum size and data directory path.
     ///
     /// Otherwise, `None` is returned.
+    #[must_use]
     pub fn disk_usage(
         &self,
         global_data_dir: Option<PathBuf>,
@@ -373,6 +381,7 @@ impl Default for BufferConfig {
 
 impl BufferConfig {
     /// Returns true if any stage in this buffer configuration uses disk-based storage.
+    #[must_use]
     pub fn has_disk_stage(&self) -> bool {
         self.stages()
             .iter()
@@ -380,6 +389,7 @@ impl BufferConfig {
     }
 
     /// Gets all of the configured stages for this buffer.
+    #[must_use]
     pub fn stages(&self) -> &[BufferType] {
         match self {
             Self::Single(stage) => slice::from_ref(stage),

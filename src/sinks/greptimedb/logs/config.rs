@@ -8,7 +8,7 @@ use vector_lib::{
 
 use crate::{
     config::ValidatedSink,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,
@@ -22,8 +22,7 @@ use crate::{
         prelude::*,
         util::{
             HttpEndpoint,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     template::ConfinementConfig,

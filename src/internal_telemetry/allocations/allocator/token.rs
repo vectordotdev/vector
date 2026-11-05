@@ -74,18 +74,18 @@ impl AllocationGroupId {
 }
 
 /// A token that allows controlling when an allocation group is active or inactive.
-pub struct AllocationGroupToken {
+pub(crate) struct AllocationGroupToken {
     id: AllocationGroupId,
 }
 
 impl AllocationGroupToken {
-    pub fn enter(&self) {
+    pub(crate) fn enter(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(clippy::unused_self, reason = "Pair with enter")]
-    pub fn exit(&self) {
+    pub(crate) fn exit(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
     }
 }

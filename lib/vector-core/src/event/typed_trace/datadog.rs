@@ -136,6 +136,9 @@ pub struct DatadogChunkContext {
     pub origin: Option<String>,
     /// Whether the chunk was dropped by a sampler.
     pub dropped: bool,
+    /// Sampler that made the chunk's decision (Datadog `_dd.p.dm`). `None` means no
+    /// source value.
+    pub sampling_mechanism: Option<u32>,
     /// Chunk tags.
     pub tags: Attributes,
 }

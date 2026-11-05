@@ -37,7 +37,7 @@ use crate::{
     },
 };
 
-pub(crate) fn middleware_error_response(error: MiddlewareError) -> http_1::Response<BoxBody> {
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> http::Response<BoxBody> {
     Status::unavailable(error.message()).into_http()
 }
 
@@ -186,7 +186,7 @@ fn response_with_acknowledgement<T>(
     let mut response = Response::new(message);
     if let Some(receiver) = receiver {
         // Request control looks this slot up by the native gRPC response type.
-        let pending = PendingAcknowledgement::<http_1::Response<BoxBody>>::new(
+        let pending = PendingAcknowledgement::<http::Response<BoxBody>>::new(
             receiver,
             acknowledgement_failure_response,
         );
@@ -197,7 +197,7 @@ fn response_with_acknowledgement<T>(
     response
 }
 
-fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http_1::Response<BoxBody> {
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<BoxBody> {
     match status {
         AcknowledgementFailure::Errored => Status::internal("Delivery error"),
         AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),
