@@ -8,7 +8,6 @@ Compatibility between versions before and after this change:
 | --- | --- |
 | Previous `native_json` → new decoder | Supported through the legacy reader. |
 | New `native_json` → previous decoder | Unsupported; previous versions cannot read the new `{"event": ...}` envelope. |
-| Binary `native` in either direction | Existing wire format and compatibility behavior are preserved. |
 
 Use binary `native` for mixed-version Vector pipelines that need compatibility in both directions.
 
