@@ -252,10 +252,10 @@ pub struct TlsConfig {
     /// includes the deprecated TLS v1.0 and v1.1. Set this to `TLSv1.2` to refuse them.
     ///
     /// Components that accept connections do not offer TLS v1.3 by default. Setting either this
-    /// option or `max_tls_version` enables every version within the resulting window, so
-    /// `min_tls_version: TLSv1.2` also makes TLS v1.3 available.
+    /// option or `max_version` enables every version within the resulting window, so
+    /// `min_version: TLSv1.2` also makes TLS v1.3 available.
     #[configurable(metadata(docs::human_name = "Minimum TLS Version"))]
-    pub min_tls_version: Option<TlsVersion>,
+    pub min_version: Option<TlsVersion>,
 
     /// Maximum TLS protocol version to negotiate.
     ///
@@ -265,9 +265,9 @@ pub struct TlsConfig {
     ///
     /// When unset, the maximum is whatever the underlying TLS library permits. Note that for
     /// components that accept connections, TLS v1.3 is disabled unless either this option or
-    /// `min_tls_version` is set.
+    /// `min_version` is set.
     #[configurable(metadata(docs::human_name = "Maximum TLS Version"))]
-    pub max_tls_version: Option<TlsVersion>,
+    pub max_version: Option<TlsVersion>,
 }
 
 impl TlsConfig {
@@ -277,7 +277,7 @@ impl TlsConfig {
     /// to an OpenSSL context use this to warn instead of ignoring the bounds silently. See
     /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
     pub fn has_protocol_version_bounds(&self) -> bool {
-        self.min_tls_version.is_some() || self.max_tls_version.is_some()
+        self.min_version.is_some() || self.max_version.is_some()
     }
 
     pub fn test_config() -> Self {
@@ -300,8 +300,8 @@ pub struct TlsSettings {
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
-    min_tls_version: Option<TlsVersion>,
-    max_tls_version: Option<TlsVersion>,
+    min_version: Option<TlsVersion>,
+    max_version: Option<TlsVersion>,
 }
 
 /// Identity store in PEM format
@@ -347,7 +347,7 @@ impl TlsSettings {
             }
         }
 
-        if let (Some(min), Some(max)) = (options.min_tls_version, options.max_tls_version)
+        if let (Some(min), Some(max)) = (options.min_version, options.max_version)
             && min > max
         {
             return Err(TlsError::InvalidTlsVersionRange { min, max });
@@ -361,8 +361,8 @@ impl TlsSettings {
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
-            min_tls_version: options.min_tls_version,
-            max_tls_version: options.max_tls_version,
+            min_version: options.min_version,
+            max_version: options.max_version,
         })
     }
 
@@ -379,11 +379,11 @@ impl TlsSettings {
     /// Whether an explicit TLS protocol version window was configured.
     ///
     /// Components that hand the PEM material to a third-party TLS stack instead of applying
-    /// these settings to an OpenSSL context cannot honor `min_tls_version`/`max_tls_version`,
+    /// these settings to an OpenSSL context cannot honor `min_version`/`max_version`,
     /// and use this to warn rather than ignore them silently. See
     /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
     pub fn has_protocol_version_bounds(&self) -> bool {
-        self.min_tls_version.is_some() || self.max_tls_version.is_some()
+        self.min_version.is_some() || self.max_version.is_some()
     }
 
     /// Returns the identity as PEM encoded byte arrays
@@ -429,7 +429,7 @@ impl TlsSettings {
         self.apply_context_base(context, false)
     }
 
-    /// Constrains `context` to the configured `[min_tls_version, max_tls_version]` window.
+    /// Constrains `context` to the configured `[min_version, max_version]` window.
     ///
     /// Does nothing unless at least one bound is configured, so the library defaults are left
     /// untouched for anyone who has not opted in. A configured bound only ever narrows one
@@ -439,12 +439,12 @@ impl TlsSettings {
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        if self.min_tls_version.is_none() && self.max_tls_version.is_none() {
+        if self.min_version.is_none() && self.max_version.is_none() {
             return Ok(());
         }
 
         // Setting a bound replaces the host's `MinProtocol`/`MaxProtocol`, so only ever tighten it.
-        if let Some(min) = self.min_tls_version
+        if let Some(min) = self.min_version
             && context
                 .min_proto_version()
                 .is_none_or(|host| TlsVersion::from_ssl_version(host).is_none_or(|host| min > host))
@@ -453,7 +453,7 @@ impl TlsSettings {
                 .set_min_proto_version(Some(min.as_ssl_version()))
                 .context(SetTlsVersionSnafu)?;
         }
-        if let Some(max) = self.max_tls_version
+        if let Some(max) = self.max_version
             && context.max_proto_version().is_none_or(|host| {
                 TlsVersion::from_ssl_version(host).is_some_and(|host| max < host)
             })
@@ -490,12 +490,12 @@ impl TlsSettings {
         Ok(())
     }
 
-    /// Whether `version` falls inside the configured `[min_tls_version, max_tls_version]` window.
+    /// Whether `version` falls inside the configured `[min_version, max_version]` window.
     ///
     /// An unset bound is unbounded on that side.
     fn window_contains(&self, version: TlsVersion) -> bool {
-        self.min_tls_version.is_none_or(|min| version >= min)
-            && self.max_tls_version.is_none_or(|max| version <= max)
+        self.min_version.is_none_or(|min| version >= min)
+            && self.max_version.is_none_or(|max| version <= max)
     }
 
     pub(super) fn apply_context_base(
@@ -1262,8 +1262,8 @@ mod test {
     #[test]
     fn tls_version_range_must_not_be_inverted() {
         let options = TlsConfig {
-            min_tls_version: Some(TlsVersion::Tls13),
-            max_tls_version: Some(TlsVersion::Tls12),
+            min_version: Some(TlsVersion::Tls13),
+            max_version: Some(TlsVersion::Tls12),
             ..Default::default()
         };
         let error = TlsSettings::from_options(Some(&options))
@@ -1283,8 +1283,8 @@ mod test {
     #[test]
     fn equal_tls_version_bounds_are_accepted() {
         let options = TlsConfig {
-            min_tls_version: Some(TlsVersion::Tls12),
-            max_tls_version: Some(TlsVersion::Tls12),
+            min_version: Some(TlsVersion::Tls12),
+            max_version: Some(TlsVersion::Tls12),
             ..Default::default()
         };
         TlsSettings::from_options(Some(&options))
@@ -1321,8 +1321,8 @@ mod test {
     #[test]
     fn configured_tls_versions_bound_the_context() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            min_tls_version: Some(TlsVersion::Tls12),
-            max_tls_version: Some(TlsVersion::Tls12),
+            min_version: Some(TlsVersion::Tls12),
+            max_version: Some(TlsVersion::Tls12),
             ..Default::default()
         }))
         .unwrap();
@@ -1337,12 +1337,12 @@ mod test {
     // `SSL_CTX_set_min_proto_version(0)` -- what `set_min_proto_version(None)` compiles to --
     // clears any bound already in force rather than leaving it alone. A host that sets
     // `MinProtocol = TLSv1.2` in `openssl.cnf` has that bound applied when the context is
-    // created, so configuring only `max_tls_version` must not wipe it and silently re-enable
+    // created, so configuring only `max_version` must not wipe it and silently re-enable
     // TLS v1.0/v1.1. The pre-set bound here stands in for that host policy.
     #[test]
     fn configuring_only_a_maximum_preserves_an_existing_minimum() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            max_tls_version: Some(TlsVersion::Tls13),
+            max_version: Some(TlsVersion::Tls13),
             ..Default::default()
         }))
         .unwrap();
@@ -1366,7 +1366,7 @@ mod test {
     #[test]
     fn configuring_only_a_minimum_preserves_an_existing_maximum() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            min_tls_version: Some(TlsVersion::Tls12),
+            min_version: Some(TlsVersion::Tls12),
             ..Default::default()
         }))
         .unwrap();
@@ -1390,7 +1390,7 @@ mod test {
     #[test]
     fn version_window_does_not_clear_restrictions_vector_did_not_set() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            min_tls_version: Some(TlsVersion::Tls10),
+            min_version: Some(TlsVersion::Tls10),
             ..Default::default()
         }))
         .unwrap();
@@ -1418,7 +1418,7 @@ mod test {
     #[test]
     fn empty_effective_version_window_is_rejected() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            max_tls_version: Some(TlsVersion::Tls12),
+            max_version: Some(TlsVersion::Tls12),
             ..Default::default()
         }))
         .unwrap();
@@ -1448,7 +1448,7 @@ mod test {
     #[test]
     fn compatible_host_bound_is_accepted() {
         let settings = TlsSettings::from_options(Some(&TlsConfig {
-            max_tls_version: Some(TlsVersion::Tls13),
+            max_version: Some(TlsVersion::Tls13),
             ..Default::default()
         }))
         .unwrap();
@@ -1470,7 +1470,7 @@ mod test {
             Some(&TlsConfig {
                 crt_file: Some(TEST_PEM_CRT_PATH.into()),
                 key_file: Some(TEST_PEM_KEY_PATH.into()),
-                max_tls_version: Some(TlsVersion::Tls12),
+                max_version: Some(TlsVersion::Tls12),
                 ..Default::default()
             }),
             true,
@@ -1493,7 +1493,7 @@ mod test {
             Some(&TlsConfig {
                 crt_file: Some(TEST_PEM_CRT_PATH.into()),
                 key_file: Some(TEST_PEM_KEY_PATH.into()),
-                min_tls_version: Some(TlsVersion::Tls12),
+                min_version: Some(TlsVersion::Tls12),
                 ..Default::default()
             }),
             true,
@@ -1520,7 +1520,7 @@ mod test {
     // pinned to TLS v1.2 must reject a client that only offers TLS v1.3, and accept one that
     // offers TLS v1.2.
     #[tokio::test]
-    async fn min_tls_version_is_enforced_during_the_handshake() {
+    async fn min_version_is_enforced_during_the_handshake() {
         use std::{net::SocketAddr, pin::Pin};
 
         async fn connect(
@@ -1555,8 +1555,8 @@ mod test {
                 options: TlsConfig {
                     crt_file: Some(TEST_PEM_CRT_PATH.into()),
                     key_file: Some(TEST_PEM_KEY_PATH.into()),
-                    min_tls_version: Some(TlsVersion::Tls12),
-                    max_tls_version: Some(TlsVersion::Tls12),
+                    min_version: Some(TlsVersion::Tls12),
+                    max_version: Some(TlsVersion::Tls12),
                     ..Default::default()
                 },
             }),
@@ -1586,7 +1586,7 @@ mod test {
         // A client that will only offer TLS v1.3 has no version in common with the server.
         let error = connect(
             &TlsConfig {
-                min_tls_version: Some(TlsVersion::Tls13),
+                min_version: Some(TlsVersion::Tls13),
                 ..client.clone()
             },
             local_addr,

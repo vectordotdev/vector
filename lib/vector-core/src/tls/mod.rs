@@ -41,13 +41,13 @@ pub type Result<T> = std::result::Result<T, TlsError>;
 
 /// Warns that `tls_stack` cannot honor the configured TLS protocol version bounds.
 ///
-/// `min_tls_version`/`max_tls_version` are applied to the OpenSSL context built by
+/// `min_version`/`max_version` are applied to the OpenSSL context built by
 /// [`TlsSettings::apply_context_base`]. Components that instead pass the configured certificates
 /// to a third-party TLS implementation never reach that code, so the bounds have no effect there.
 /// Because they are a security control, such components warn rather than ignore them silently.
 pub fn warn_unenforceable_protocol_versions(tls_stack: &str) {
     warn!(
-        message = "`tls.min_tls_version` and `tls.max_tls_version` are not enforced by this component's TLS implementation and are ignored.",
+        message = "`tls.min_version` and `tls.max_version` are not enforced by this component's TLS implementation and are ignored.",
         tls_stack
     );
 }
@@ -127,15 +127,15 @@ pub enum TlsError {
     #[snafu(display("Error setting the TLS protocol version: {}", source))]
     SetTlsVersion { source: ErrorStack },
     #[snafu(display(
-        "`min_tls_version` ({}) must not be greater than `max_tls_version` ({})",
+        "`min_version` ({}) must not be greater than `max_version` ({})",
         min,
         max
     ))]
     InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
     #[snafu(display(
         "No TLS protocol version is usable between {} and {}: the host's OpenSSL configuration \
-         sets a conflicting bound or disables every version left by `min_tls_version`/\
-         `max_tls_version`.",
+         sets a conflicting bound or disables every version left by `min_version`/\
+         `max_version`.",
         min,
         max
     ))]

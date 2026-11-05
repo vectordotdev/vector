@@ -60,7 +60,7 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsEnablea
 		required: false
 		type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 	}
-	max_tls_version: {
+	max_version: {
 		description: """
 			Maximum TLS protocol version to negotiate.
 
@@ -70,7 +70,7 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsEnablea
 
 			When unset, the maximum is whatever the underlying TLS library permits. Note that for
 			components that accept connections, TLS v1.3 is disabled unless either this option or
-			`min_tls_version` is set.
+			`min_version` is set.
 			"""
 		required: false
 		type: string: enum: {
@@ -94,7 +94,7 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsEnablea
 			"TLSv1.3": "TLS v1.3."
 		}
 	}
-	min_tls_version: {
+	min_version: {
 		description: """
 			Minimum TLS protocol version to negotiate.
 
@@ -104,8 +104,8 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsEnablea
 			includes the deprecated TLS v1.0 and v1.1. Set this to `TLSv1.2` to refuse them.
 
 			Components that accept connections do not offer TLS v1.3 by default. Setting either this
-			option or `max_tls_version` enables every version within the resulting window, so
-			`min_tls_version: TLSv1.2` also makes TLS v1.3 available.
+			option or `max_version` enables every version within the resulting window, so
+			`min_version: TLSv1.2` also makes TLS v1.3 available.
 			"""
 		required: false
 		type: string: enum: {
