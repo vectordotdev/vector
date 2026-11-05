@@ -1,4 +1,7 @@
-use std::{fs::remove_file, path::PathBuf};
+use std::{
+    fs::remove_file,
+    path::{Path, PathBuf},
+};
 
 use bytes::BytesMut;
 use futures::StreamExt;
@@ -21,7 +24,10 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         Source,
-        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+        util::{
+            change_socket_permissions,
+            unix::{UNNAMED_SOCKET_HOST, remove_stale_socket},
+        },
     },
 };
 
@@ -47,6 +53,10 @@ pub fn build_unix_datagram_source(
     out: SourceSender,
 ) -> crate::Result<Source> {
     Ok(Box::pin(async move {
+        remove_stale_socket(&listen_path, async |path: &Path| {
+            UnixDatagram::unbound()?.connect(path)
+        })
+        .await;
         let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 

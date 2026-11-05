@@ -1,4 +1,8 @@
-use std::{fs::remove_file, path::PathBuf, time::Duration};
+use std::{
+    fs::remove_file,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use futures::{FutureExt, StreamExt};
 use smallvec::SmallVec;
@@ -27,7 +31,10 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         Source,
-        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+        util::{
+            change_socket_permissions,
+            unix::{UNNAMED_SOCKET_HOST, remove_stale_socket},
+        },
     },
 };
 
@@ -57,6 +64,10 @@ where
     F: Into<SmallVec<[Event; 1]>> + Send,
 {
     Ok(Box::pin(async move {
+        remove_stale_socket(&listen_path, async |path: &Path| {
+            tokio::net::UnixStream::connect(path).await.map(drop)
+        })
+        .await;
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
                 "Failed to bind to listener socket at path: {}. Err: {e}",
