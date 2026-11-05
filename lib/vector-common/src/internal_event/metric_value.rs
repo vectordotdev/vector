@@ -3,8 +3,9 @@ use metrics::IntoF64;
 /// Wraps an integer metric value so it can be passed to gauges and histograms.
 ///
 /// `metrics` intentionally does not implement [`IntoF64`] for 64-bit and pointer-sized integers,
-/// because integers with a magnitude above 2^53 lose precision as `f64`. That loss is acceptable for
-/// metric values, so wrapping a value in `LossyF64` opts into the conversion explicitly.
+/// because integers with a magnitude above 2^53 may lose precision as `f64`. That loss is
+/// acceptable for metric values, so wrapping a value in `LossyF64` opts into the conversion
+/// explicitly.
 #[derive(Clone, Copy, Debug)]
 pub struct LossyF64<T>(pub T);
 
