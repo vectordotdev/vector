@@ -8,7 +8,7 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 use crate::{
     internal_events::KafkaStatisticsReceived,
-    tls::{PEM_START_MARKER, TlsEnableableConfig, TlsVersion},
+    tls::{PEM_START_MARKER, TlsEnableableConfig},
 };
 
 #[derive(Debug, Snafu)]
@@ -168,22 +168,17 @@ impl KafkaAuthConfig {
         if tls.options.min_version.is_none() && tls.options.max_version.is_none() {
             return Ok(());
         }
-        // librdkafka has no protocol version settings, so only host policy can enforce a bound.
-        let (lowest, highest) = vector_lib::tls::host_protocol_version_range()?;
         // `@SECLEVEL=0` in librdkafka's cipher list lifts the level's ban on TLS v1.0 and v1.1.
-        let lowest = if client
+        let security_level = client
             .get("ssl.cipher.suites")
             .is_some_and(|ciphers| ciphers.contains("@SECLEVEL=0"))
-        {
-            TlsVersion::Tls10
-        } else {
-            lowest
-        };
+            .then_some(0);
+        // librdkafka has no protocol version settings, so only host policy can enforce a bound.
         vector_lib::tls::enforce_protocol_version_bounds(
             tls.options.min_version,
             tls.options.max_version,
             "librdkafka",
-            (lowest, highest),
+            vector_lib::tls::host_protocol_version_range(security_level)?,
         )?;
         Ok(())
     }

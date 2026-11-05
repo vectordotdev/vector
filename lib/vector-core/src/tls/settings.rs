@@ -423,7 +423,7 @@ impl TlsSettings {
         }
 
         // OpenSSL accepts a context with no usable version and only fails at handshake time.
-        if negotiable_range(context)?.is_none() {
+        if negotiable_range(context, host_security_level()?).is_none() {
             return Err(TlsError::EmptyTlsVersionWindow);
         }
 
@@ -582,22 +582,27 @@ fn host_disables_tls13() -> Result<bool> {
     Ok(host_context()?.options().contains(SslOptions::NO_TLSV1_3))
 }
 
+/// The host's OpenSSL security level; the builder has no getter and Vector never sets one.
+fn host_security_level() -> Result<u32> {
+    Ok(host_context()?.build().security_level())
+}
+
 /// The lowest and highest TLS versions `context` can still negotiate, or `None` if none is left.
-fn negotiable_range(context: &mut SslContextBuilder) -> Result<Option<(TlsVersion, TlsVersion)>> {
+fn negotiable_range(
+    context: &mut SslContextBuilder,
+    security_level: u32,
+) -> Option<(TlsVersion, TlsVersion)> {
     let min = context
         .min_proto_version()
         .and_then(TlsVersion::from_ssl_version)
         .unwrap_or(TlsVersion::Tls10);
     let max = match context.max_proto_version() {
         None => TlsVersion::Tls13,
-        Some(max) => match TlsVersion::from_ssl_version(max) {
-            Some(max) => max,
-            // The only maximum `TlsVersion` cannot model is SSLv3, below every TLS version.
-            None => return Ok(None),
-        },
+        // The only maximum `TlsVersion` cannot model is SSLv3, below every TLS version.
+        Some(max) => TlsVersion::from_ssl_version(max)?,
     };
-    // Security levels above 0 refuse TLS v1.0/v1.1; Vector never sets one, so read the host's.
-    let floor = if host_context()?.build().security_level() > 0 {
+    // Security levels above 0 refuse TLS v1.0/v1.1.
+    let floor = if security_level > 0 {
         TlsVersion::Tls12
     } else {
         TlsVersion::Tls10
@@ -606,14 +611,18 @@ fn negotiable_range(context: &mut SslContextBuilder) -> Result<Option<(TlsVersio
     let mut usable = TlsVersion::ALL.into_iter().filter(|&version| {
         version >= min.max(floor) && version <= max && !options.contains(version.disable_option())
     });
-    Ok(usable
+    usable
         .next()
-        .map(|lowest| (lowest, usable.next_back().unwrap_or(lowest))))
+        .map(|lowest| (lowest, usable.next_back().unwrap_or(lowest)))
 }
 
-/// The versions a fresh client context, like librdkafka's, may negotiate under the host's policy.
-pub fn host_protocol_version_range() -> Result<(TlsVersion, TlsVersion)> {
-    negotiable_range(&mut host_context()?)?.ok_or(TlsError::EmptyTlsVersionWindow)
+/// The versions a fresh client context, like librdkafka's, may negotiate under the host's policy,
+/// at `security_level` when given and at the host's own level otherwise.
+pub fn host_protocol_version_range(
+    security_level: Option<u32>,
+) -> Result<(TlsVersion, TlsVersion)> {
+    let security_level = security_level.map_or_else(host_security_level, Ok)?;
+    negotiable_range(&mut host_context()?, security_level).ok_or(TlsError::EmptyTlsVersionWindow)
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
@@ -1397,6 +1406,23 @@ mod test {
         assert!(
             matches!(error, TlsError::EmptyTlsVersionWindow),
             "unexpected error: {error}"
+        );
+    }
+
+    // A lowered security level lifts only its own floor, never a protocol bound already in force.
+    #[test]
+    fn security_level_zero_keeps_an_existing_minimum() {
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        assert_eq!(
+            negotiable_range(&mut builder, 0),
+            Some((TlsVersion::Tls10, TlsVersion::Tls13))
+        );
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+        assert_eq!(
+            negotiable_range(&mut builder, 0),
+            Some((TlsVersion::Tls12, TlsVersion::Tls13))
         );
     }
 
