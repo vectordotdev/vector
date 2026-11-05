@@ -26,7 +26,7 @@ use crate::{
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
 //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
 //       empty string to a `None` path internally.
-pub struct HecLogsSink<S> {
+pub(super) struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
@@ -41,7 +41,7 @@ pub struct HecLogsSink<S> {
     pub auto_extract_timestamp: bool,
 }
 
-pub struct HecLogData<'a> {
+pub(super) struct HecLogData<'a> {
     pub sourcetype: Option<&'a ConfinedTemplate>,
     pub source: Option<&'a ConfinedTemplate>,
     pub index: Option<&'a ConfinedTemplate>,
@@ -301,7 +301,7 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 // determine the path for a field from one of the following use cases:
 // 1. user provided a path in the config settings
@@ -324,7 +324,7 @@ fn user_or_namespaced_path(
     }
 }
 
-pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
+pub(super) fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let mut log = event.into_log();
 
     let sourcetype = data

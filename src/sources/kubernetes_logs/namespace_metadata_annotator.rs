@@ -21,7 +21,7 @@ use crate::event::{Event, LogEvent};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(super) struct FieldsSpec {
     /// Event field for the Namespace's labels.
     ///
     /// Set to `""` to suppress this key.
@@ -57,7 +57,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with namespace metadata.
-pub struct NamespaceMetadataAnnotator {
+pub(super) struct NamespaceMetadataAnnotator {
     namespace_state_reader: Store<Namespace>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
@@ -65,7 +65,7 @@ pub struct NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Create a new [`NamespaceMetadataAnnotator`].
-    pub const fn new(
+    pub(super) const fn new(
         namespace_state_reader: Store<Namespace>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
@@ -80,7 +80,7 @@ impl NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Annotates an event with the information from the [`Namespace::metadata`].
-    pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
+    pub(super) fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Namespace>::new(pod_namespace);
         let resource = self.namespace_state_reader.get(&obj)?;

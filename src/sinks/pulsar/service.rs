@@ -22,7 +22,7 @@ pub(super) struct PulsarRequest {
     pub request_metadata: RequestMetadata,
 }
 
-pub struct PulsarResponse {
+pub(super) struct PulsarResponse {
     byte_size: usize,
     event_byte_size: GroupedCountByteSize,
 }
@@ -57,7 +57,7 @@ impl MetaDescriptive for PulsarRequest {
     }
 }
 
-pub struct PulsarService<Exe: Executor> {
+pub(super) struct PulsarService<Exe: Executor> {
     // NOTE: the reason for the Mutex here is because the `Producer` from the pulsar crate
     // needs to be `mut`, and the `Service::call()` returns a Future.
     producer: Arc<Mutex<MultiTopicProducer<Exe>>>,
