@@ -112,11 +112,21 @@ for path in "${candidates[@]}"; do
         fail "Additional Vector source found in $path; migrate it manually before running setup."
     fi
 done
+timber_repo_ids=
 if [[ "${CSM_MIGRATE:-false}" == true && -e "$timber_file" ]]; then
     regular_or_absent "$timber_file"
     regular_or_absent "$timber_file.pre-cose"
     [[ ! -e "$timber_file.pre-cose" ]] || fail "A timber source backup already exists; inspect it before retrying."
     grep -q 'repositories.timber.io' "$timber_file" || fail "Unrecognized timber source; leaving it unchanged."
+    if [[ "$family" == rpm ]]; then
+        timber_repo_ids=$(awk '
+            /^[[:space:]]*\[/ {
+                if ($0 !~ /^[[:space:]]*\[[A-Za-z0-9_.:-]+\][[:space:]]*$/) exit 1
+                sub(/^[[:space:]]*\[/, ""); sub(/\][[:space:]]*$/, "")
+                if ($0 == "main" || seen[$0]++) exit 1
+                print
+            }' "$timber_file") || fail "Ambiguous timber repository; migrate it manually."
+    fi
 fi
 
 work=$(mktemp -d)
@@ -263,6 +273,9 @@ if ! command -v curl >/dev/null || ! command -v gpg >/dev/null || [[ ! -s /etc/s
         if ! command -v curl >/dev/null; then prerequisites+=(curl); fi
         repo_options=()
         if "$existing"; then repo_options+=(--disablerepo=vector); fi
+        while IFS= read -r repo; do
+            if [[ -n "$repo" ]]; then repo_options+=("--disablerepo=$repo"); fi
+        done <<< "$timber_repo_ids"
         "${sudo_cmd[@]}" "$package_manager" -y "${repo_options[@]}" install "${prerequisites[@]}"
     fi
 fi
