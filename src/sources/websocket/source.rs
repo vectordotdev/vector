@@ -3,7 +3,7 @@ use std::{borrow::Cow, fs, path::PathBuf, pin::Pin};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tempfile::NamedTempFile;
 use tokio::{sync::mpsc::Sender, time};
 use tokio_tungstenite::tungstenite::{
@@ -88,6 +88,11 @@ pub enum WebSocketSourceError {
     Tungstenite { source: TungsteniteError },
 }
 
+enum WebsocketStateMessage {
+    Message(Message),
+    Ping,
+}
+
 impl WebSocketSource {
     pub fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> crate::Result<Self> {
         let last_received_message_id = 'restore: {
@@ -169,13 +174,16 @@ impl WebSocketSource {
                 }
 
                 // Split "fairly" between pings and incoming messages
-                res = self.handle_messages_and_pings(
+                res = self.new_message_or_ping(
                     &mut ws_source,
                     &mut ws_sink,
-                    &mut ping_manager,
-                    ack_tx.clone(),
-                    &mut out
-                ) => res
+                    &mut ping_manager) => {
+                    match res {
+                        Ok(WebsocketStateMessage::Message(msg)) => self.handle_message(msg, &mut ping_manager, ack_tx.clone(), &mut out).await,
+                        Ok(WebsocketStateMessage::Ping) => Ok(()),
+                        err => err.map(|_| ())
+                    }
+                }
             };
 
             if let Err(error) = result {
@@ -238,26 +246,19 @@ impl WebSocketSource {
         Ok(())
     }
 
-    async fn handle_messages_and_pings(
+    async fn new_message_or_ping(
         &mut self,
         ws_source: &mut WebSocketStream,
         ws_sink: &mut WebSocketSink,
         ping_manager: &mut PingManager,
-        ack_tx: Sender<String>,
-        out: &mut SourceSender,
-    ) -> Result<(), WebSocketSourceError> {
+    ) -> Result<WebsocketStateMessage, WebSocketSourceError> {
         tokio::select! {
-            Some(msg_result) = ws_source.next() => {
-                match msg_result {
-                    Ok(msg) => self.handle_message(msg, ping_manager, ack_tx, out).await,
-                    Err(error) => {
-                        emit!(WebSocketReceiveError { error: &error });
-                        Err(WebSocketSourceError::Tungstenite { source: error })
-                    }
-                }
-            }
+            Some(msg_result) = ws_source.next() =>
+                Ok(WebsocketStateMessage::Message(msg_result
+                        .inspect_err(|error| emit!(WebSocketReceiveError { error }))
+                        .context(TungsteniteSnafu)?)),
 
-            res = ping_manager.tick(ws_sink) => res,
+            res = ping_manager.tick(ws_sink) => res.map(|()| WebsocketStateMessage::Ping),
         }
     }
 
