@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{HashMap, HashSet, hash_map::Entry},
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
-    path::{OwnedSegment, OwnedTargetPath, parse_target_path},
+    path::{OwnedSegment, OwnedTargetPath, PathPrefix, parse_target_path},
     prelude::KeyString,
 };
 
@@ -35,18 +35,35 @@ struct ReduceState {
     metadata: EventMetadata,
 }
 
-fn is_covered_by_strategy(
-    path: &OwnedTargetPath,
-    strategies: &IndexMap<OwnedTargetPath, MergeStrategy>,
-) -> bool {
-    let mut current = OwnedTargetPath::event_root();
-    for component in &path.path.segments {
-        current = current.with_field_appended(&component.to_string());
-        if strategies.contains_key(&current) {
-            return true;
-        }
+/// The merge strategy paths, stored so that a field path can be checked against them without
+/// allocating.
+///
+/// A field is covered when its path, or any prefix of its path, is a merge strategy key. The
+/// strategy loop in [`ReduceState::add_event`] already merges covered fields, so the per-field
+/// loop must skip them.
+#[derive(Clone, Debug)]
+struct StrategyPrefixes {
+    keys: HashSet<Vec<OwnedSegment>>,
+    max_depth: usize,
+}
+
+impl StrategyPrefixes {
+    fn new(strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) -> Self {
+        // The per-field loop only visits event fields, so metadata strategies never cover them.
+        let keys: HashSet<Vec<OwnedSegment>> = strategies
+            .keys()
+            .filter(|path| path.prefix == PathPrefix::Event && !path.path.segments.is_empty())
+            .map(|path| path.path.segments.clone())
+            .collect();
+        let max_depth = keys.iter().map(Vec::len).max().unwrap_or(0);
+        Self { keys, max_depth }
     }
-    false
+
+    /// Returns true if `path` or one of its prefixes is a merge strategy key.
+    fn covers(&self, path: &OwnedTargetPath) -> bool {
+        let segments = &path.path.segments;
+        (1..=segments.len().min(self.max_depth)).any(|depth| self.keys.contains(&segments[..depth]))
+    }
 }
 
 impl ReduceState {
@@ -60,7 +77,12 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: &LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
+    fn add_event(
+        &mut self,
+        e: &LogEvent,
+        strategies: &IndexMap<OwnedTargetPath, MergeStrategy>,
+        strategy_prefixes: &StrategyPrefixes,
+    ) {
         self.metadata.merge(e.metadata().clone());
 
         for (path, strategy) in strategies {
@@ -93,7 +115,7 @@ impl ReduceState {
                         continue;
                     }
                 };
-                if is_covered_by_strategy(&parsed_path, strategies) {
+                if strategy_prefixes.covers(&parsed_path) {
                     continue;
                 }
 
@@ -146,6 +168,7 @@ pub struct Reduce {
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
     merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
+    strategy_prefixes: StrategyPrefixes,
     merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
@@ -200,25 +223,29 @@ impl Reduce {
 
         validate_merge_strategies(&config.merge_strategies)?;
 
+        let merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy> = config
+            .merge_strategies
+            .iter()
+            .filter_map(|(path, strategy)| {
+                // TODO Invalid paths are ignored to preserve backwards compatibility.
+                //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
+                //      which means an invalid path would result in an configuration error.
+                let parsed_path = parse_target_path(path).ok();
+                if parsed_path.is_none() {
+                    warn!(message = "Ignoring strategy with invalid path.", %path);
+                }
+                parsed_path.map(|path| (path, strategy.clone()))
+            })
+            .collect();
+        let strategy_prefixes = StrategyPrefixes::new(&merge_strategies);
+
         Ok(Reduce {
             expire_after: config.expire_after_ms,
             flush_period: config.flush_period_ms,
             end_every_period: config.end_every_period_ms,
             group_by,
-            merge_strategies: config
-                .merge_strategies
-                .iter()
-                .filter_map(|(path, strategy)| {
-                    // TODO Invalid paths are ignored to preserve backwards compatibility.
-                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
-                    //      which means an invalid path would result in an configuration error.
-                    let parsed_path = parse_target_path(path).ok();
-                    if parsed_path.is_none() {
-                        warn!(message = "Ignoring strategy with invalid path.", %path);
-                    }
-                    parsed_path.map(|path| (path, strategy.clone()))
-                })
-                .collect(),
+            merge_strategies,
+            strategy_prefixes,
             merge_states: HashMap::new(),
             ends_when,
             starts_when,
@@ -258,11 +285,13 @@ impl Reduce {
         match self.merge_states.entry(discriminant) {
             Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
-                state.add_event(event, &self.merge_strategies);
+                state.add_event(event, &self.merge_strategies, &self.strategy_prefixes);
                 entry.insert(state);
             }
             Entry::Occupied(mut entry) => {
-                entry.get_mut().add_event(event, &self.merge_strategies);
+                entry
+                    .get_mut()
+                    .add_event(event, &self.merge_strategies, &self.strategy_prefixes);
             }
         }
     }
@@ -301,11 +330,11 @@ impl Reduce {
         } else if ends_here {
             emitter.emit(
                 if let Some(mut state) = self.merge_states.remove(&discriminant) {
-                    state.add_event(&event, &self.merge_strategies);
+                    state.add_event(&event, &self.merge_strategies, &self.strategy_prefixes);
                     state.flush().into()
                 } else {
                     let mut state = ReduceState::new();
-                    state.add_event(&event, &self.merge_strategies);
+                    state.add_event(&event, &self.merge_strategies, &self.strategy_prefixes);
                     state.flush().into()
                 },
             );
@@ -1032,6 +1061,102 @@ mod test {
             let expected_value = Value::from(btreemap! {
                 "a b" => 3,
                 "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[test]
+    fn strategy_prefixes_cover_fields_under_strategy_paths() {
+        let strategies: IndexMap<OwnedTargetPath, MergeStrategy> =
+            [".a", ".x.y", "\"a-b\"", "parent.\"c-d\"", "%meta.field"]
+                .into_iter()
+                .map(|path| (parse_target_path(path).unwrap(), MergeStrategy::Discard))
+                .collect();
+        let prefixes = StrategyPrefixes::new(&strategies);
+
+        for (path, expected) in [
+            (".a", true),
+            (".a.b", true),
+            (".ab", false),
+            (".b", false),
+            (".x", false),
+            (".x.y", true),
+            (".x.y.z", true),
+            (".x.z", false),
+            // Field names that are quoted when a path is printed.
+            ("\"a-b\"", true),
+            ("\"a-b\".c", true),
+            ("parent", false),
+            ("parent.\"c-d\"", true),
+            ("parent.c", false),
+            // Metadata strategies do not cover event fields.
+            (".meta.field", false),
+        ] {
+            assert_eq!(
+                prefixes.covers(&parse_target_path(path).unwrap()),
+                expected,
+                "path: {path}"
+            );
+        }
+
+        let empty = StrategyPrefixes::new(&IndexMap::new());
+        assert!(!empty.covers(&parse_target_path(".a").unwrap()));
+    }
+
+    #[tokio::test]
+    async fn merge_strategies_on_field_names_that_need_quoting() {
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {r#"
+            group_by:
+              - id
+            merge_strategies:
+              plain: sum
+              '"a-b"': sum
+              'parent."c-d"': sum
+              '"e-f"': discard
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "#})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let e_1 = LogEvent::from(Value::from(btreemap! {
+                "id" => "x",
+                "plain" => 2,
+                "a-b" => 2,
+                "parent" => btreemap! { "c-d" => 2 },
+                "e-f" => btreemap! { "g" => 1 },
+            }));
+            tx.send(e_1.into()).await.unwrap();
+
+            let e_2 = LogEvent::from(Value::from(btreemap! {
+                "id" => "x",
+                "plain" => 3,
+                "a-b" => 3,
+                "parent" => btreemap! { "c-d" => 3 },
+                "e-f" => btreemap! { "g" => 2 },
+                "test_end" => "done",
+            }));
+            tx.send(e_2.into()).await.unwrap();
+
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "id" => "x",
+                "plain" => 5,
+                "a-b" => 5,
+                "parent" => btreemap! { "c-d" => 5 },
+                "e-f" => btreemap! { "g" => 1 },
+                "test_end" => "done",
             });
             assert_eq!(*output.value(), expected_value);
 
