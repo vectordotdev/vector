@@ -154,12 +154,18 @@ impl WebSocketSource {
                         );
                     }
                 }
-                if self
-                    .reconnect(&mut out, &mut ws_sink, &mut ws_source)
-                    .await
-                    .is_err()
-                {
-                    break;
+
+                tokio::select! {
+                    _ = cx.shutdown.clone() => {
+                        info!("Received shutdown signal.");
+                        break;
+                    },
+
+                    res = self.reconnect(&mut out, &mut ws_sink, &mut ws_source) => {
+                        if res.is_err() {
+                            break;
+                        }
+                    }
                 }
 
                 ping_manager = PingManager::new(&self.config);
