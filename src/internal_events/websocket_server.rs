@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Debug};
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, GaugeName, InternalEvent, ToF64Lossy, error_stage, error_type},
+    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -12,6 +12,8 @@ pub struct WebSocketListenerConnectionEstablished {
 }
 
 impl InternalEvent for WebSocketListenerConnectionEstablished {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         debug!(
             message = format!(
@@ -20,7 +22,7 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
             )
         );
         counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
-        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count.to_f64_lossy());
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 
@@ -61,6 +63,8 @@ pub struct WebSocketListenerConnectionShutdown {
 }
 
 impl InternalEvent for WebSocketListenerConnectionShutdown {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         info!(
             message = format!(
@@ -69,7 +73,7 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
             )
         );
         counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
-        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count.to_f64_lossy());
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
     }
 }
 

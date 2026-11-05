@@ -8,7 +8,7 @@ use std::{
 
 use vector_lib::{
     NamedInternalEvent, gauge,
-    internal_event::{GaugeName, InternalEvent, ToF64Lossy},
+    internal_event::{GaugeName, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -17,8 +17,10 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!(GaugeName::OpenConnections).set(self.count.to_f64_lossy());
+        gauge!(GaugeName::OpenConnections).set(self.count as f64);
     }
 }
 
@@ -28,8 +30,10 @@ pub struct EndpointsActive {
 }
 
 impl InternalEvent for EndpointsActive {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!(GaugeName::ActiveEndpoints).set(self.count.to_f64_lossy());
+        gauge!(GaugeName::ActiveEndpoints).set(self.count as f64);
     }
 }
 
@@ -83,6 +87,9 @@ impl<E: Fn(usize)> Drop for OpenToken<E> {
 /// If reporting gauges from multiple threads, they can end up in a wrong order
 /// resulting in having wrong value for a prolonged period of time.
 /// This function performs a synchronization procedure that corrects that.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_possible_wrap, reason = "Preserve gauge arithmetic")]
+#[allow(clippy::cast_sign_loss, reason = "Preserve gauge arithmetic")]
 fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // The goal of this function is to properly sequence calls to `emitter` from
     // multiple threads. It is possible that `emitter` will be called multiple
@@ -102,7 +109,7 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // `emitter`.
     let mut value = gauge.load(Ordering::Acquire);
     loop {
-        let new_value = value.wrapping_add_signed(add);
+        let new_value = (value as isize + add) as usize;
         emitter(new_value);
         // Try to update gauge to new value and releasing writes to gauge metric
         // in the process.  Otherwise acquire new writes to gauge metric.
