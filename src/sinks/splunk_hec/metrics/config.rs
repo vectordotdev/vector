@@ -24,7 +24,7 @@ use crate::{
         },
         util::{
             BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, TowerRequestConfig,
-            http::RetryStrategy, http_v1::http_response_retry_logic,
+            http::{RetryStrategy, http_response_retry_logic},
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},

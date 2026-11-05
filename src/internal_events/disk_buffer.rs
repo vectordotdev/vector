@@ -9,7 +9,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct TopologyDiskBufferRemoved<'a> {
+pub(crate) struct TopologyDiskBufferRemoved<'a> {
     pub component_id: &'a ComponentKey,
     pub buffer_dirs: &'a [PathBuf],
     pub usage: Option<DiskBufferUsageSnapshot>,
@@ -59,7 +59,7 @@ impl InternalEvent for TopologyDiskBufferRemoved<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct TopologyDiskBufferReplacementUnreferenced<'a> {
+pub(crate) struct TopologyDiskBufferReplacementUnreferenced<'a> {
     pub component_id: &'a ComponentKey,
     pub buffer_dirs: &'a [PathBuf],
     pub new_buffer_dirs: &'a [PathBuf],
@@ -102,7 +102,7 @@ impl InternalEvent for TopologyDiskBufferReplacementUnreferenced<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct TopologyDiskBufferUnreferenced<'a> {
+pub(crate) struct TopologyDiskBufferUnreferenced<'a> {
     pub buffer_id: &'a Path,
     pub buffer_dir: &'a Path,
 }

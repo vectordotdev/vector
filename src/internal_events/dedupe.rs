@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DedupeEventsDropped {
+pub(crate) struct DedupeEventsDropped {
     pub count: usize,
 }
 

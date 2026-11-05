@@ -405,78 +405,33 @@ mod tests {
     }
 
     #[test]
-    fn skips_readme() {
+    fn partitions_notices_by_release_ignoring_patch() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join("README.md"), "# ignored").unwrap();
+        for (name, since) in [("new", "0.56"), ("old", "0.53.0"), ("future", "0.99")] {
+            fs::write(
+                tmp.path().join(format!("{name}.md")),
+                format!("---\nwhat: {name}\ndeprecated_since: \"{since}\"\n---\n"),
+            )
+            .unwrap();
+        }
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        assert!(entries.is_empty());
-    }
-
-    #[test]
-    fn parse_two_part_version() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("short.md"),
-            "---\nwhat: Short version\ndeprecated_since: \"0.56\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
+        let new = entries.iter().find(|entry| entry.what == "new").unwrap();
         assert_eq!(
-            entries[0].deprecated_since,
+            new.deprecated_since,
             DeprecationVersion(Version::new(0, 56, 0))
         );
-    }
-
-    #[test]
-    fn matches_release_ignores_patch() {
-        let v = DeprecationVersion(Version::new(0, 56, 0));
-        assert!(v.matches_release(&Version::new(0, 56, 0)));
-        assert!(v.matches_release(&Version::new(0, 56, 1)));
-        assert!(!v.matches_release(&Version::new(0, 57, 0)));
-    }
-
-    #[test]
-    fn partition_two_buckets() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("new.md"),
-            "---\nwhat: New announcement\ndeprecated_since: \"0.56\"\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            tmp.path().join("old.md"),
-            "---\nwhat: Previously announced\ndeprecated_since: \"0.53\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        let p = partition_by_release(entries, &Version::new(0, 56, 0));
-        assert_eq!(p.announcing.len(), 1);
-        assert_eq!(p.announcing[0].what, "New announcement");
-        assert_eq!(p.planned.len(), 1);
-        assert_eq!(p.planned[0].what, "Previously announced");
-        assert!(p.future.is_empty());
-    }
-
-    #[test]
-    fn partition_separates_future_from_planned() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("future.md"),
-            "---\nwhat: Future plan\ndeprecated_since: \"0.99\"\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            tmp.path().join("old.md"),
-            "---\nwhat: Old plan\ndeprecated_since: \"0.10\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        let p = partition_by_release(entries, &Version::new(0, 56, 0));
-        assert!(p.announcing.is_empty());
-        assert_eq!(p.planned.len(), 1);
-        assert_eq!(p.planned[0].what, "Old plan");
-        assert_eq!(p.future.len(), 1);
-        assert_eq!(p.future[0].what, "Future plan");
+        for patch in [0, 1] {
+            let partition = partition_by_release(entries.clone(), &Version::new(0, 56, patch));
+            for (entries, expected) in [
+                (partition.announcing, "new"),
+                (partition.planned, "old"),
+                (partition.future, "future"),
+            ] {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].what, expected);
+            }
+        }
     }
 
     #[test]

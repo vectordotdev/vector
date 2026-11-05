@@ -6,7 +6,7 @@ use vector_lib::internal_event::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsKinesisStreamNoPartitionKeyError<'a> {
+pub(crate) struct AwsKinesisStreamNoPartitionKeyError<'a> {
     pub partition_key_field: &'a str,
 }
 

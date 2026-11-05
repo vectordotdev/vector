@@ -19,7 +19,7 @@ use vector_lib::{
 use crate::{
     http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::retries::{RetryAction, RetryLogic},
     },
 };
@@ -163,7 +163,7 @@ impl Service<TraceApiRequest> for TraceApiService {
             let uncompressed_size = request.uncompressed_size;
             let http_request = request
                 .into_http_request()
-                .context(HTTPV1RequestBuilderSnafu)
+                .context(HTTPRequestBuilderSnafu)
                 .map_err(crate::Error::from)?;
 
             let response = client.send(http_request.map(full_body)).await?;

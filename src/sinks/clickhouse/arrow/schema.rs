@@ -70,7 +70,7 @@ pub async fn fetch_table_schema(
         .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

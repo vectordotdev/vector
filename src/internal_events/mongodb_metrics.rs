@@ -6,7 +6,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct MongoDbMetricsEventsReceived<'a> {
+pub(crate) struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
     pub endpoint: &'a str,
@@ -35,7 +35,7 @@ impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct MongoDbMetricsRequestError<'a> {
+pub(crate) struct MongoDbMetricsRequestError<'a> {
     pub error: MongoError,
     pub endpoint: &'a str,
 }
@@ -59,7 +59,7 @@ impl InternalEvent for MongoDbMetricsRequestError<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct MongoDbMetricsBsonParseError<'a> {
+pub(crate) struct MongoDbMetricsBsonParseError<'a> {
     pub error: bson::de::Error,
     pub endpoint: &'a str,
 }

@@ -16,8 +16,7 @@ use crate::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
             HttpEndpoint, ServiceBuilderExt, TowerRequestConfig, TowerRequestSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,

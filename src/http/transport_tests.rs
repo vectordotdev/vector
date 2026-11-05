@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
 use http_body_util::{BodyExt as _, Full};
-use hyper_1::{body::Incoming, client::conn, service::service_fn};
+use hyper::{body::Incoming, client::conn, service::service_fn};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto,
@@ -393,7 +393,7 @@ async fn proxy_request(
             return empty_response(StatusCode::BAD_GATEWAY);
         };
         tokio::spawn(async move {
-            let Ok(upgraded) = hyper_1::upgrade::on(&mut request).await else {
+            let Ok(upgraded) = hyper::upgrade::on(&mut request).await else {
                 return;
             };
             let Ok(mut upstream) = TcpStream::connect(authority.as_str()).await else {
