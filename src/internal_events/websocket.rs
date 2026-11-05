@@ -7,14 +7,14 @@ use vector_lib::{
 };
 
 #[cfg(feature = "sinks-websocket")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(feature = "sources-websocket")]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
-pub const PROTOCOL: &str = "websocket";
+pub(crate) const PROTOCOL: &str = "websocket";
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketConnectionEstablished;
+pub(crate) struct WebSocketConnectionEstablished;
 
 impl InternalEvent for WebSocketConnectionEstablished {
     fn emit(self) {
@@ -24,7 +24,7 @@ impl InternalEvent for WebSocketConnectionEstablished {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketConnectionFailedError {
+pub(crate) struct WebSocketConnectionFailedError {
     pub error: Box<dyn Error>,
 }
 
@@ -49,7 +49,7 @@ impl InternalEvent for WebSocketConnectionFailedError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketConnectionShutdown;
+pub(crate) struct WebSocketConnectionShutdown;
 
 impl InternalEvent for WebSocketConnectionShutdown {
     fn emit(self) {
@@ -69,7 +69,7 @@ mod sink {
     use super::PROTOCOL;
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct WebSocketConnectionError {
+    pub(crate) struct WebSocketConnectionError {
         pub error: tokio_tungstenite::tungstenite::Error,
     }
 
@@ -111,7 +111,7 @@ mod source {
     use super::PROTOCOL;
 
     #[derive(Debug, Copy, Clone)]
-    pub enum WebSocketKind {
+    pub(crate) enum WebSocketKind {
         Text,
         Binary,
     }
@@ -123,7 +123,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct WebSocketBytesReceived<'a> {
+    pub(crate) struct WebSocketBytesReceived<'a> {
         pub byte_size: usize,
         pub url: &'a str,
         pub protocol: &'static str,
@@ -150,7 +150,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct WebSocketMessageReceived<'a> {
+    pub(crate) struct WebSocketMessageReceived<'a> {
         pub count: usize,
         pub byte_size: JsonSize,
         pub url: &'a str,
@@ -191,7 +191,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct WebSocketReceiveError<'a> {
+    pub(crate) struct WebSocketReceiveError<'a> {
         pub error: &'a TungsteniteError,
     }
 
@@ -216,7 +216,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct WebSocketSendError<'a> {
+    pub(crate) struct WebSocketSendError<'a> {
         pub error: &'a TungsteniteError,
     }
 
