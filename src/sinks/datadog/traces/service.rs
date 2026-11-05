@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tower::Service;
@@ -17,9 +17,9 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::retries::{RetryAction, RetryLogic},
     },
 };
@@ -74,7 +74,7 @@ impl TraceApiRequest {
     /// # Errors
     ///
     /// Returns an error if a header name or value is invalid.
-    pub fn into_http_request(self) -> http_1::Result<Request<Bytes>> {
+    pub fn into_http_request(self) -> http::Result<Request<Bytes>> {
         let mut request = Request::post(self.uri);
         for (k, v) in &self.headers {
             request = request.header(k, v);
@@ -163,7 +163,7 @@ impl Service<TraceApiRequest> for TraceApiService {
             let uncompressed_size = request.uncompressed_size;
             let http_request = request
                 .into_http_request()
-                .context(HTTPV1RequestBuilderSnafu)
+                .context(HTTPRequestBuilderSnafu)
                 .map_err(crate::Error::from)?;
 
             let response = client.send(http_request.map(full_body)).await?;

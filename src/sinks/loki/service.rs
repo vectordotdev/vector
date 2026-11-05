@@ -1,13 +1,13 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use snafu::Snafu;
 use tracing::Instrument;
 use vector_http::full_body;
 
 use crate::{
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{prelude::*, util::HttpEndpoint},
 };
 
@@ -116,7 +116,7 @@ impl Service<LokiRequest> for LokiService {
             _ => "application/json",
         };
         let mut req =
-            Request::post(self.endpoint.clone().into_v1()).header("Content-Type", content_type);
+            Request::post(self.endpoint.as_uri().clone()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 
@@ -131,7 +131,7 @@ impl Service<LokiRequest> for LokiService {
         let mut req = req.body(request.payload).unwrap();
 
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut req);
+            auth.apply(&mut req);
         }
 
         let client = self.client.clone();

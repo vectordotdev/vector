@@ -4,7 +4,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct InfluxdbEncodingError {
+pub(crate) struct InfluxdbEncodingError {
     pub error_message: &'static str,
     pub count: usize,
 }

@@ -509,7 +509,11 @@ async fn run_command(
             v = receiver.recv() => {
                 match v {
                     None => break 'outer,
-                    Some(((mut events, byte_size), stream)) => {
+                    Some(ReaderMessage {
+                        mut events,
+                        byte_size,
+                        stream,
+                    }) => {
                         bytes_received.emit(ByteSize(byte_size));
 
                         let count = events.len();
@@ -718,11 +722,21 @@ fn handle_event(
     }
 }
 
+/// Events decoded from one frame of a command's output.
+struct ReaderMessage {
+    /// The decoded events.
+    events: SmallVec<[Event; 1]>,
+    /// The byte size of the frame.
+    byte_size: usize,
+    /// The stream the frame was read from, `stdout` or `stderr`.
+    stream: &'static str,
+}
+
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
     decoder: Decoder,
     origin: &'static str,
-    sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
+    sender: Sender<ReaderMessage>,
 ) {
     // Start the green background thread for collecting
     drop(crate::spawn_in_current_span(async move {
@@ -731,8 +745,13 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
         let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
-                Ok(next) => {
-                    if sender.send((next, origin)).await.is_err() {
+                Ok((events, byte_size)) => {
+                    let message = ReaderMessage {
+                        events,
+                        byte_size,
+                        stream: origin,
+                    };
+                    if sender.send(message).await.is_err() {
                         // If the receive half of the channel is closed, either due to close being
                         // called or the Receiver handle dropping, the function returns an error.
                         emit!(ExecChannelClosedError);

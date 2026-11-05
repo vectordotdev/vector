@@ -4,7 +4,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiEventUnlabeledError;
+pub(crate) struct LokiEventUnlabeledError;
 
 impl InternalEvent for LokiEventUnlabeledError {
     fn emit(self) {
@@ -26,7 +26,7 @@ impl InternalEvent for LokiEventUnlabeledError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiOutOfOrderEventDroppedError {
+pub(crate) struct LokiOutOfOrderEventDroppedError {
     pub count: usize,
 }
 
@@ -57,7 +57,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiOutOfOrderEventRewritten {
+pub(crate) struct LokiOutOfOrderEventRewritten {
     pub count: usize,
 }
 
@@ -73,7 +73,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiTimestampNonParsableEventsDropped;
+pub(crate) struct LokiTimestampNonParsableEventsDropped;
 
 impl InternalEvent for LokiTimestampNonParsableEventsDropped {
     fn emit(self) {
