@@ -1227,6 +1227,15 @@ mod tests {
         assert_eq!(body, "GET|||");
     }
 
+    #[test]
+    fn redirect_location_fragment_is_removed_but_query_is_preserved() {
+        let base = url::Url::parse("http://example.com/start").unwrap();
+        let target = resolve_redirect(&base, "/metrics?format=text#section").unwrap();
+
+        assert_eq!(target.as_str(), "http://example.com/metrics?format=text");
+        assert_eq!(target.fragment(), None);
+    }
+
     #[tokio::test]
     async fn rejects_redirects_to_unsupported_schemes() {
         let routes = warp::path("start")
