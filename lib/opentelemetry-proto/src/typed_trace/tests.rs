@@ -951,16 +951,23 @@ fn export_request_wraps_resource_spans() {
 #[test]
 fn chunk_conflict_keeps_first_value() {
     let a = PbSpan {
-        attributes: vec![KeyValue::from_int("datadog.chunk.priority", 1)],
+        attributes: vec![
+            KeyValue::from_int("datadog.chunk.priority", 1),
+            KeyValue::from_int("datadog.chunk.sampling_mechanism", 1),
+        ],
         ..PbSpan::from_parts(1, 1, "a")
     };
     let b = PbSpan {
-        attributes: vec![KeyValue::from_int("datadog.chunk.priority", 2)],
+        attributes: vec![
+            KeyValue::from_int("datadog.chunk.priority", 2),
+            KeyValue::from_int("datadog.chunk.sampling_mechanism", 2),
+        ],
         ..PbSpan::from_parts(1, 2, "b")
     };
     let mut expected = typed_event(1, vec![typed_span(1, "a"), typed_span(2, "b")]);
     expected.datadog_mut().set_chunk(Some(DatadogChunkContext {
         priority: Some(SamplingPriority::AutoKeep),
+        sampling_mechanism: Some(1),
         ..DatadogChunkContext::default()
     }));
     assert_eq!(
@@ -968,7 +975,7 @@ fn chunk_conflict_keeps_first_value() {
         (
             vec![expected],
             TraceConversionCounts {
-                conflicting_chunk_contexts: 1,
+                conflicting_chunk_contexts: 2,
                 ..TraceConversionCounts::default()
             },
         )
@@ -976,7 +983,40 @@ fn chunk_conflict_keeps_first_value() {
 }
 
 #[test]
-fn default_chunk_some_without_priority_does_not_survive_otlp() {
+fn sampling_mechanism_alone_materializes_chunk() {
+    let rs = ResourceSpans::from_spans(vec![PbSpan {
+        attributes: vec![KeyValue::from_int("datadog.chunk.sampling_mechanism", 0)],
+        ..PbSpan::from_parts(1, 1, "s")
+    }]);
+    let mut expected = typed_event(1, vec![typed_span(1, "s")]);
+    expected.datadog_mut().set_chunk(Some(DatadogChunkContext {
+        sampling_mechanism: Some(0),
+        ..DatadogChunkContext::default()
+    }));
+    let events = rs.clone().convert();
+    assert_eq!(events, vec![expected]);
+    assert_eq!(encode(&events), vec![rs]);
+}
+
+#[test]
+fn sampling_mechanism_max_lifts() {
+    let rs = ResourceSpans::from_spans(vec![PbSpan {
+        attributes: vec![KeyValue::from_int(
+            "datadog.chunk.sampling_mechanism",
+            i64::from(u32::MAX),
+        )],
+        ..PbSpan::from_parts(1, 1, "s")
+    }]);
+    let mut expected = typed_event(1, vec![typed_span(1, "s")]);
+    expected.datadog_mut().set_chunk(Some(DatadogChunkContext {
+        sampling_mechanism: Some(u32::MAX),
+        ..DatadogChunkContext::default()
+    }));
+    assert_eq!(rs.convert(), vec![expected]);
+}
+
+#[test]
+fn default_chunk_some_does_not_survive_otlp() {
     let mut event = typed_event(1, vec![Span::new(sid(1), "s")]);
     let expected = event.clone();
     event

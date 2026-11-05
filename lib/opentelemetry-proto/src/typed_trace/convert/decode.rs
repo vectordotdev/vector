@@ -302,7 +302,8 @@ fn lift_attr<T>(
 }
 
 /// Chunk-scoped bridge values lifted from one span, or merged across a partition's spans.
-#[derive(Debug, Default)]
+/// Every field is an `Option`, so the default value means no chunk key was lifted.
+#[derive(Debug, Default, PartialEq)]
 struct SpanChunkKeys {
     priority: Option<SamplingPriority>,
     origin: Option<String>,
@@ -313,40 +314,33 @@ struct SpanChunkKeys {
 
 impl SpanChunkKeys {
     fn is_empty(&self) -> bool {
-        self.priority.is_none()
-            && self.origin.is_none()
-            && self.dropped.is_none()
-            && self.sampling_mechanism.is_none()
-            && self.tags.is_none()
+        *self == Self::default()
     }
 
     /// Merges a later span's values; the first value seen for each key wins.
     fn merge(&mut self, keys: Self, reporter: &mut impl TraceConversionReporter) {
+        let Self {
+            priority,
+            origin,
+            dropped,
+            sampling_mechanism,
+            tags,
+        } = keys;
         merge_first(
-            keys.priority,
+            priority,
             &mut self.priority,
             DATADOG_CHUNK_PRIORITY,
             reporter,
         );
+        merge_first(origin, &mut self.origin, DATADOG_CHUNK_ORIGIN, reporter);
+        merge_first(dropped, &mut self.dropped, DATADOG_CHUNK_DROPPED, reporter);
         merge_first(
-            keys.origin,
-            &mut self.origin,
-            DATADOG_CHUNK_ORIGIN,
-            reporter,
-        );
-        merge_first(
-            keys.dropped,
-            &mut self.dropped,
-            DATADOG_CHUNK_DROPPED,
-            reporter,
-        );
-        merge_first(
-            keys.sampling_mechanism,
+            sampling_mechanism,
             &mut self.sampling_mechanism,
             DATADOG_CHUNK_SAMPLING_MECHANISM,
             reporter,
         );
-        merge_first(keys.tags, &mut self.tags, DATADOG_CHUNK_TAGS, reporter);
+        merge_first(tags, &mut self.tags, DATADOG_CHUNK_TAGS, reporter);
     }
 
     fn into_context(self) -> DatadogChunkContext {
