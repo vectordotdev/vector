@@ -108,7 +108,7 @@ fi
 for path in "${candidates[@]}"; do
     [[ -f "$path" && "$path" != "$source_file" ]] || continue
     if [[ "$path" == "$timber_file" && "${CSM_MIGRATE:-false}" == true ]]; then continue; fi
-    if awk '!/^[[:space:]]*[#;]/ && /vector-[0-9]+|^\[vector\]/ { found=1 } END { exit !found }' "$path"; then
+    if awk '!/^[[:space:]]*[#;]/ && /vector-[0-9]+|^[[:space:]]*\[vector\]/ { found=1 } END { exit !found }' "$path"; then
         fail "Additional Vector source found in $path; migrate it manually before running setup."
     fi
 done
@@ -261,7 +261,9 @@ if ! command -v curl >/dev/null || ! command -v gpg >/dev/null || [[ ! -s /etc/s
     else
         prerequisites=(ca-certificates gnupg2)
         if ! command -v curl >/dev/null; then prerequisites+=(curl); fi
-        "${sudo_cmd[@]}" "$package_manager" -y --disablerepo=vector install "${prerequisites[@]}"
+        repo_options=()
+        if "$existing"; then repo_options+=(--disablerepo=vector); fi
+        "${sudo_cmd[@]}" "$package_manager" -y "${repo_options[@]}" install "${prerequisites[@]}"
     fi
 fi
 
