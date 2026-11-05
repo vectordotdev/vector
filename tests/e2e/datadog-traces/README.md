@@ -54,11 +54,12 @@ flowchart TB
 
 Compose starts the tracers only after the Agent answers `/info`, and the client only
 after the frontend and both downstream services accept connections. When the client
-exits, [finalize.py](data/finalize.py) stops the services in order. Each tracer flushes
-on stop, then the Agent flushes to both endpoints, then Vector drains its sink. Any
-unclean exit fails the run, and so does Vector logging a graceful-shutdown timeout,
-because it exits 0 in that case. Rust then reads the still-running fakeintakes, so `vdev
-e2e test` can be rerun against the same captures.
+exits, vdev runs the `lifecycle` steps in [test.yaml](config/test.yaml): it stops the
+services in order. Each tracer flushes on stop, then the Agent flushes to both
+endpoints, then Vector drains its sink. Any unclean exit fails the run, and so does
+Vector logging a graceful-shutdown timeout, because it exits 0 in that case. Rust then
+reads the still-running fakeintakes, so `vdev e2e test` can be rerun against the same
+captures.
 
 ## Validations
 

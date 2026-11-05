@@ -15,6 +15,24 @@ runner:
 matrix:
   agent_version: ["7.84.6"]
 
+# Stop the pipeline in dependency order so both fakeintakes hold complete captures: each
+# tracer flushes on stop, then the Agent flushes to both endpoints, then Vector drains its sink.
+lifecycle:
+  before_validation:
+    - wait_for_success: {service: client, timeout_secs: 120}
+    - stop:
+        labels: [vector.datadog-traces.producer=true]
+        timeout_secs: 30
+    - stop:
+        services: [datadog-agent]
+        timeout_secs: 30
+    - stop:
+        services: [vector]
+        # Longer than Vector's default 60-second graceful shutdown limit.
+        timeout_secs: 90
+        # Vector exits 0 even when graceful shutdown times out.
+        reject_log_messages: ["Failed to gracefully shut down in time"]
+
 # changes to these files/paths will invoke the e2e test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:

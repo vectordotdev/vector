@@ -110,32 +110,6 @@ services:
       frontend:
         condition: service_healthy
 
-  finalize-captures:
-    build: ../workload/python
-    pull_policy: build
-    command: ["python", "/finalize.py"]
-    environment:
-      - VECTOR_NETWORK=${VECTOR_NETWORK}
-    depends_on:
-      prepare-output:
-        condition: service_completed_successfully
-      client:
-        condition: service_completed_successfully
-    volumes:
-      - ../data/finalize.py:/finalize.py:ro
-      - ${DOCKER_SOCKET}:/var/run/docker.sock
-      - datadog_traces_evidence:/output/datadog-traces
-
-  # Wait for finalized captures and stay running so vdev does not restart the workload.
-  traces-ready:
-    image: alpine:3.20
-    command: ["sh", "-c", "test -f /output/datadog-traces/capture-complete && exec sleep infinity"]
-    depends_on:
-      finalize-captures:
-        condition: service_completed_successfully
-    volumes:
-      - datadog_traces_evidence:/output/datadog-traces
-
 volumes:
   datadog_traces_evidence:
     external: true

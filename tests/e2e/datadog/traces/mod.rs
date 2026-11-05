@@ -262,9 +262,6 @@ fn validate_captures(
     input: &[AgentPayload],
     output: &[AgentPayload],
 ) -> Result<(), String> {
-    if !directory.join("capture-complete").exists() {
-        return Err("Captures were not finalized; run cargo vdev e2e run datadog-traces".into());
-    }
     write(directory, "input.txt", &format!("{input:#?}"))?;
     write(directory, "output.txt", &format!("{output:#?}"))?;
     let coverage = Coverage::new(input);
@@ -465,11 +462,9 @@ mod tests {
     }
 
     #[test]
-    fn finalized_captures_can_be_validated_repeatedly() {
+    fn captures_can_be_validated_repeatedly() {
         let directory = tempfile::tempdir().unwrap();
         let input = covered();
-        assert!(validate_captures(directory.path(), &input, &input).is_err());
-        fs::write(directory.path().join("capture-complete"), "").unwrap();
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
 
