@@ -1971,16 +1971,13 @@ async fn grpc_traces_preserve_otlp_true_sets_layout_marker() {
     assert_grpc_trace_layout_marker(true).await;
 }
 
-pub struct OTelTestEnv {
+pub(super) struct OTelTestEnv {
     pub grpc_addr: String,
     pub config: OpentelemetryConfig,
     pub output: Box<dyn Stream<Item = Event> + Unpin + Send>,
 }
 
-pub async fn build_otlp_test_env(
-    event_name: &'static str,
-    log_namespace: Option<bool>,
-) -> OTelTestEnv {
+async fn build_otlp_test_env(event_name: &'static str, log_namespace: Option<bool>) -> OTelTestEnv {
     build_otlp_test_env_with(event_name, log_namespace, false).await
 }
 

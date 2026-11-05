@@ -1,4 +1,4 @@
-pub mod request_limiter;
+pub(super) mod request_limiter;
 
 use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 

@@ -44,13 +44,13 @@ static DRAIN_STEP_HOOK: std::sync::Mutex<Option<std::sync::Arc<dyn Fn(HANDLE) + 
     std::sync::Mutex::new(None);
 
 /// Maximum number of entries in the `EvtFormatMessage` result cache.
-pub const FORMAT_CACHE_CAPACITY: usize = 10_000;
+pub(super) const FORMAT_CACHE_CAPACITY: usize = 10_000;
 /// Maximum number of cached publisher metadata handles.
 const PUBLISHER_CACHE_CAPACITY: usize = 256;
 
 /// RAII wrapper for `EvtOpenPublisherMetadata` handles.
 /// Calls `EvtClose` on drop to prevent handle leaks when evicted from LRU cache.
-pub struct PublisherHandle(pub isize);
+pub(super) struct PublisherHandle(pub isize);
 
 impl Drop for PublisherHandle {
     fn drop(&mut self) {
@@ -96,7 +96,7 @@ unsafe impl Send for ChannelSubscription {}
 unsafe impl Sync for ChannelSubscription {}
 
 /// Result of waiting for events across all channels.
-pub enum WaitResult {
+pub(super) enum WaitResult {
     /// At least one channel has events available.
     EventsAvailable,
     /// Timeout expired without any events.
@@ -115,7 +115,7 @@ pub enum WaitResult {
 ///
 /// This eliminates event drops under back pressure because we don't call
 /// `EvtNext` again until the pipeline has consumed the current batch.
-pub struct EventLogSubscription {
+pub(super) struct EventLogSubscription {
     config: Arc<WindowsEventLogConfig>,
     channels: Vec<ChannelSubscription>,
     checkpointer: Arc<Checkpointer>,
@@ -158,7 +158,7 @@ impl EventLogSubscription {
         clippy::too_many_lines,
         reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub async fn new(
+    pub(super) async fn new(
         config: &WindowsEventLogConfig,
         checkpointer: Arc<Checkpointer>,
         _acknowledgements: bool,
@@ -439,7 +439,7 @@ impl EventLogSubscription {
         clippy::cast_possible_truncation,
         reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
+    pub(super) fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
         // Build wait handle array: [shutdown_event, channel0_signal, channel1_signal, ...]
         let mut handles = Vec::with_capacity(self.channels.len() + 1);
         handles.push(self.shutdown_event);
@@ -477,7 +477,7 @@ impl EventLogSubscription {
     /// does not advance. On restart, those events will be re-read from the
     /// channel, resulting in duplicates. This is an intentional trade-off:
     /// at-least-once delivery is preferable to data loss.
-    pub fn pull_events(
+    pub(super) fn pull_events(
         &mut self,
         max_events: usize,
     ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
@@ -491,7 +491,7 @@ impl EventLogSubscription {
     /// Timeout pulls can run repeatedly while the host is idle, so skipping
     /// those metadata queries prevents steady `EvtOpenLog`/`EvtGetLogInfo`
     /// churn without changing event recovery behavior.
-    pub fn pull_events_speculative(
+    pub(super) fn pull_events_speculative(
         &mut self,
         max_events: usize,
     ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
@@ -916,7 +916,7 @@ impl EventLogSubscription {
     /// safely copied and used from another thread to call `SetEvent` because Windows
     /// kernel objects are reference-counted and remain valid as long as at least one
     /// handle is open (which this subscription maintains until Drop).
-    pub const fn shutdown_event_raw(&self) -> *mut std::ffi::c_void {
+    pub(super) const fn shutdown_event_raw(&self) -> *mut std::ffi::c_void {
         self.shutdown_event.0
     }
 
@@ -930,14 +930,14 @@ impl EventLogSubscription {
     }
 
     /// Returns a reference to the rate limiter, if configured.
-    pub const fn rate_limiter(
+    pub(super) const fn rate_limiter(
         &self,
     ) -> Option<&RateLimiter<NotKeyed, InMemoryState, DefaultClock>> {
         self.rate_limiter.as_ref()
     }
 
     /// Returns (`total_channels`, `active_channels`) for health reporting.
-    pub fn channel_health_summary(&self) -> (usize, usize) {
+    pub(super) fn channel_health_summary(&self) -> (usize, usize) {
         let total = self.channels.len();
         // A channel is considered active if its subscription handle is non-null
         let active = self
@@ -951,7 +951,7 @@ impl EventLogSubscription {
     /// Flush all bookmarks to checkpoint storage.
     ///
     /// Call this before shutdown to ensure no events are lost.
-    pub async fn flush_bookmarks(&mut self) -> Result<(), WindowsEventLogError> {
+    pub(super) async fn flush_bookmarks(&mut self) -> Result<(), WindowsEventLogError> {
         debug!(message = "Flushing bookmarks to checkpoint storage.");
 
         let bookmark_xmls: Vec<(String, String)> = self
@@ -987,7 +987,7 @@ impl EventLogSubscription {
     ///
     /// Used for acknowledgment-based checkpointing where the bookmark
     /// state needs to be captured when events are read (not when they're acknowledged).
-    pub fn get_bookmark_xml(&self, channel: &str) -> Option<String> {
+    pub(super) fn get_bookmark_xml(&self, channel: &str) -> Option<String> {
         self.channels
             .iter()
             .find(|sub| sub.channel == channel)
