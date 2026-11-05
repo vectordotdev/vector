@@ -68,6 +68,9 @@ const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
 const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
+const METADATA: &str = "metadata";
+const TIMESTAMP: &str = "timestamp";
+const HOST: &str = "host";
 
 static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 
@@ -283,23 +286,23 @@ impl JournaldConfig {
             .with_source_metadata(
                 JournaldConfig::NAME,
                 None,
-                &owned_value_path!("metadata"),
+                &owned_value_path!(METADATA),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
                 log_schema().host_key().cloned().map(LegacyKey::Overwrite),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             );
 
         // for metadata that is added to the events dynamically through the Record
@@ -852,10 +855,10 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(host) = log
-                .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+                .get(metadata_path!(JournaldConfig::NAME, METADATA))
                 .and_then(|meta| meta.get(path!(HOSTNAME)))
             {
-                log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
+                log.insert(metadata_path!(JournaldConfig::NAME, HOST), host.clone());
             }
         }
         LogNamespace::Legacy => {
@@ -864,7 +867,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
                     JournaldConfig::NAME,
                     log,
                     log_schema().host_key().map(LegacyKey::Overwrite),
-                    path!("host"),
+                    path!(HOST),
                     host,
                 );
             }
@@ -874,7 +877,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Create a Utc timestamp from an existing log field if present.
     let timestamp_value = match log_namespace {
         LogNamespace::Vector => log
-            .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+            .get(metadata_path!(JournaldConfig::NAME, METADATA))
             .and_then(|meta| {
                 meta.get(path!(SOURCE_TIMESTAMP))
                     .or_else(|| meta.get(path!(RECEIVED_TIMESTAMP)))
@@ -900,7 +903,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
 
             if let Some(ts) = timestamp {
-                log.insert(metadata_path!(JournaldConfig::NAME, "timestamp"), ts);
+                log.insert(metadata_path!(JournaldConfig::NAME, TIMESTAMP), ts);
             }
         }
         LogNamespace::Legacy => {
@@ -938,7 +941,7 @@ fn create_log_event_from_record(
             for (key, value) in &record {
                 log.metadata_mut()
                     .value_mut()
-                    .insert(path!(JournaldConfig::NAME, "metadata", key), value.as_str());
+                    .insert(path!(JournaldConfig::NAME, METADATA, key), value.as_str());
             }
 
             log
@@ -1773,19 +1776,19 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "metadata"),
+                    &owned_value_path!(JournaldConfig::NAME, METADATA),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+                    &owned_value_path!(JournaldConfig::NAME, TIMESTAMP),
                     Kind::timestamp().or_undefined(),
-                    Some("timestamp"),
+                    Some(TIMESTAMP),
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "host"),
+                    &owned_value_path!(JournaldConfig::NAME, HOST),
                     Kind::bytes().or_undefined(),
-                    Some("host"),
+                    Some(HOST),
                 );
 
         assert_eq!(definitions, Some(expected_definition));
