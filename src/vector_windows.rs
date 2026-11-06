@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 use std::{ffi::OsString, time::Duration};
-use vector_lib::internal_event::emit;
 
 use windows_service::{
     Result, define_windows_service,
@@ -24,6 +23,7 @@ const ERROR: u32 = 121;
 
 pub mod service_control {
     use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
+    use vector_lib::internal_event::emit;
 
     use snafu::ResultExt;
     use windows_service::{
