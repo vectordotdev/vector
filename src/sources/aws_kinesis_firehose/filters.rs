@@ -2,13 +2,15 @@ use std::{collections::HashMap, convert::Infallible};
 
 use bytes::{Buf, Bytes};
 use chrono::Utc;
-use http::header::HeaderValue;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace,
     internal_event::{BytesReceived, Protocol},
 };
-use warp::{Filter, http::StatusCode};
+use warp::{
+    Filter,
+    http::{HeaderValue, StatusCode},
+};
 
 use super::{
     Compression,
@@ -26,7 +28,7 @@ use crate::{
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 #[allow(clippy::too_many_arguments)]
-pub fn firehose(
+pub(super) fn firehose(
     access_keys: Vec<String>,
     store_access_key: bool,
     record_compression: Compression,
@@ -199,7 +201,7 @@ fn authenticate(
         .untuple_one()
 }
 
-/// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
+/// Maps `RequestError` and warp errors to AWS Kinesis Firehose response structure
 async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Reply, Infallible> {
     let request_id: Option<&str>;
     let message: String;

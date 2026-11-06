@@ -10,14 +10,16 @@ use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::Body;
+use http_body_util::BodyExt as _;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
+use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
+    cpu_time::spawn_timed,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -30,11 +32,11 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
-    cpu_time::spawn_timed,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
+    tls::MaybeTlsSettings,
     transforms::{TaskTransform, Transform},
 };
 
@@ -157,7 +159,7 @@ const fn default_refresh_timeout_secs() -> Duration {
 fn default_fields() -> Vec<String> {
     DEFAULT_FIELD_ALLOWLIST
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 
@@ -182,20 +184,20 @@ struct MetadataKey {
 
 #[derive(Debug)]
 struct Keys {
-    account_id_key: MetadataKey,
-    ami_id_key: MetadataKey,
-    availability_zone_key: MetadataKey,
-    instance_id_key: MetadataKey,
-    instance_type_key: MetadataKey,
-    local_hostname_key: MetadataKey,
-    local_ipv4_key: MetadataKey,
-    public_hostname_key: MetadataKey,
-    public_ipv4_key: MetadataKey,
-    region_key: MetadataKey,
-    subnet_id_key: MetadataKey,
-    vpc_id_key: MetadataKey,
-    role_name_key: MetadataKey,
-    tags_key: MetadataKey,
+    account_id: MetadataKey,
+    ami_id: MetadataKey,
+    availability_zone: MetadataKey,
+    instance_id: MetadataKey,
+    instance_type: MetadataKey,
+    local_hostname: MetadataKey,
+    local_ipv4: MetadataKey,
+    public_hostname: MetadataKey,
+    public_ipv4: MetadataKey,
+    region: MetadataKey,
+    subnet_id: MetadataKey,
+    vpc_id: MetadataKey,
+    role_name: MetadataKey,
+    tags: MetadataKey,
 }
 
 impl_generate_config_from_default!(Ec2Metadata);
@@ -215,7 +217,7 @@ impl TransformConfig for Ec2Metadata {
         let required = self.required;
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
-        let http_client = HttpClient::new(None, &proxy)?;
+        let http_client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)?;
 
         let mut client = MetadataClient::new(
             http_client,
@@ -232,9 +234,8 @@ impl TransformConfig for Ec2Metadata {
         if let Err(error) = client.refresh_metadata().await {
             if required {
                 return Err(error);
-            } else {
-                emit!(AwsEc2MetadataRefreshError { error });
             }
+            emit!(AwsEc2MetadataRefreshError { error });
         }
 
         // The metadata-refresh loop runs as its own tokio task, so the main
@@ -265,20 +266,20 @@ impl TransformConfig for Ec2Metadata {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
-            &added_keys.account_id_key.log_path,
-            &added_keys.ami_id_key.log_path,
-            &added_keys.availability_zone_key.log_path,
-            &added_keys.instance_id_key.log_path,
-            &added_keys.instance_type_key.log_path,
-            &added_keys.local_hostname_key.log_path,
-            &added_keys.local_ipv4_key.log_path,
-            &added_keys.public_hostname_key.log_path,
-            &added_keys.public_ipv4_key.log_path,
-            &added_keys.region_key.log_path,
-            &added_keys.subnet_id_key.log_path,
-            &added_keys.vpc_id_key.log_path,
-            &added_keys.role_name_key.log_path,
-            &added_keys.tags_key.log_path,
+            &added_keys.account_id.log_path,
+            &added_keys.ami_id.log_path,
+            &added_keys.availability_zone.log_path,
+            &added_keys.instance_id.log_path,
+            &added_keys.instance_type.log_path,
+            &added_keys.local_hostname.log_path,
+            &added_keys.local_ipv4.log_path,
+            &added_keys.public_hostname.log_path,
+            &added_keys.public_ipv4.log_path,
+            &added_keys.region.log_path,
+            &added_keys.subnet_id.log_path,
+            &added_keys.vpc_id.log_path,
+            &added_keys.role_name.log_path,
+            &added_keys.tags.log_path,
         ];
 
         let schema_definition = input_definitions
@@ -342,7 +343,7 @@ impl Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: HttpClient<Body>,
+    client: HttpClient,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -369,8 +370,8 @@ struct IdentityDocument {
 
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        client: HttpClient<Body>,
+    pub(crate) fn new(
+        client: HttpClient,
         host: Uri,
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
@@ -395,7 +396,7 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             match self.refresh_metadata().await {
-                Ok(_) => {
+                Ok(()) => {
                     emit!(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
@@ -407,7 +408,7 @@ impl MetadataClient {
         }
     }
 
-    pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
+    pub(crate) async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
         if let Some((token, next_refresh)) = self.token.clone() {
             // If the next refresh is greater (in the future) than
             // the current time we can return the token since its still valid
@@ -423,7 +424,7 @@ impl MetadataClient {
 
         let req = Request::put(uri)
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -436,15 +437,15 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
+        let token = res.into_body().collect().await?.to_bytes();
 
-        let next_refresh = Instant::now() + Duration::from_secs(21600);
+        let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
 
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+    pub(crate) async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         self.get_metadata(&DYNAMIC_DOCUMENT)
             .await?
             .map(|body| {
@@ -455,65 +456,66 @@ impl MetadataClient {
             .transpose()
     }
 
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    pub(crate) async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
         if let Some(document) = self.get_document().await? {
             if self.fields.contains(ACCOUNT_ID_KEY) {
-                new_state.push((self.keys.account_id_key.clone(), document.account_id.into()));
+                new_state.push((self.keys.account_id.clone(), document.account_id.into()));
             }
 
             if self.fields.contains(AMI_ID_KEY) {
-                new_state.push((self.keys.ami_id_key.clone(), document.image_id.into()));
+                new_state.push((self.keys.ami_id.clone(), document.image_id.into()));
             }
 
             if self.fields.contains(INSTANCE_ID_KEY) {
-                new_state.push((
-                    self.keys.instance_id_key.clone(),
-                    document.instance_id.into(),
-                ));
+                new_state.push((self.keys.instance_id.clone(), document.instance_id.into()));
             }
 
             if self.fields.contains(INSTANCE_TYPE_KEY) {
                 new_state.push((
-                    self.keys.instance_type_key.clone(),
+                    self.keys.instance_type.clone(),
                     document.instance_type.into(),
                 ));
             }
 
             if self.fields.contains(REGION_KEY) {
-                new_state.push((self.keys.region_key.clone(), document.region.into()));
+                new_state.push((self.keys.region.clone(), document.region.into()));
             }
 
             if self.fields.contains(AVAILABILITY_ZONE_KEY)
                 && let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await?
             {
-                new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
+                new_state.push((self.keys.availability_zone.clone(), availability_zone));
             }
 
             if self.fields.contains(LOCAL_HOSTNAME_KEY)
                 && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await?
             {
-                new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
+                new_state.push((self.keys.local_hostname.clone(), local_hostname));
             }
 
             if self.fields.contains(LOCAL_IPV4_KEY)
                 && let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await?
             {
-                new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
+                new_state.push((self.keys.local_ipv4.clone(), local_ipv4));
             }
 
             if self.fields.contains(PUBLIC_HOSTNAME_KEY)
                 && let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await?
             {
-                new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
+                new_state.push((self.keys.public_hostname.clone(), public_hostname));
             }
 
             if self.fields.contains(PUBLIC_IPV4_KEY)
                 && let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await?
             {
-                new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
+                new_state.push((self.keys.public_ipv4.clone(), public_ipv4));
             }
 
             if (self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY))
@@ -530,7 +532,7 @@ impl MetadataClient {
                     })?;
 
                     if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                        new_state.push((self.keys.subnet_id_key.clone(), subnet_id));
+                        new_state.push((self.keys.subnet_id.clone(), subnet_id));
                     }
                 }
 
@@ -543,7 +545,7 @@ impl MetadataClient {
                     })?;
 
                     if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                        new_state.push((self.keys.vpc_id_key.clone(), vpc_id));
+                        new_state.push((self.keys.vpc_id.clone(), vpc_id));
                     }
                 }
             }
@@ -558,10 +560,10 @@ impl MetadataClient {
                         MetadataKey {
                             log_path: self
                                 .keys
-                                .role_name_key
+                                .role_name
                                 .log_path
-                                .with_index_appended(i as isize),
-                            metric_tag: format!("{}[{i}]", self.keys.role_name_key.metric_tag),
+                                .with_index_appended(i.cast_signed()),
+                            metric_tag: format!("{}[{i}]", self.keys.role_name.metric_tag),
                         },
                         role_name.to_string().into(),
                     ));
@@ -578,8 +580,8 @@ impl MetadataClient {
                 if let Some(tag_content) = self.get_metadata(&tag_path).await? {
                     new_state.push((
                         MetadataKey {
-                            log_path: self.keys.tags_key.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags_key.metric_tag, &tag),
+                            log_path: self.keys.tags.log_path.with_field_appended(&tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
                         },
                         tag_content,
                     ));
@@ -608,7 +610,7 @@ impl MetadataClient {
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -622,7 +624,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
+                let body = res.into_body().collect().await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -652,7 +654,7 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
     output
 }
 
-fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
+fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
             log_path: namespace.with_field_appended(key),
@@ -667,31 +669,31 @@ fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
 }
 
 impl Keys {
-    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+    pub(crate) fn new(namespace: Option<OptionalTargetPath>) -> Self {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {
-            account_id_key: create_key(&namespace, ACCOUNT_ID_KEY),
-            ami_id_key: create_key(&namespace, AMI_ID_KEY),
-            availability_zone_key: create_key(&namespace, AVAILABILITY_ZONE_KEY),
-            instance_id_key: create_key(&namespace, INSTANCE_ID_KEY),
-            instance_type_key: create_key(&namespace, INSTANCE_TYPE_KEY),
-            local_hostname_key: create_key(&namespace, LOCAL_HOSTNAME_KEY),
-            local_ipv4_key: create_key(&namespace, LOCAL_IPV4_KEY),
-            public_hostname_key: create_key(&namespace, PUBLIC_HOSTNAME_KEY),
-            public_ipv4_key: create_key(&namespace, PUBLIC_IPV4_KEY),
-            region_key: create_key(&namespace, REGION_KEY),
-            subnet_id_key: create_key(&namespace, SUBNET_ID_KEY),
-            vpc_id_key: create_key(&namespace, VPC_ID_KEY),
-            role_name_key: create_key(&namespace, ROLE_NAME_KEY),
-            tags_key: create_key(&namespace, TAGS_KEY),
+            account_id: create_key(namespace.as_ref(), ACCOUNT_ID_KEY),
+            ami_id: create_key(namespace.as_ref(), AMI_ID_KEY),
+            availability_zone: create_key(namespace.as_ref(), AVAILABILITY_ZONE_KEY),
+            instance_id: create_key(namespace.as_ref(), INSTANCE_ID_KEY),
+            instance_type: create_key(namespace.as_ref(), INSTANCE_TYPE_KEY),
+            local_hostname: create_key(namespace.as_ref(), LOCAL_HOSTNAME_KEY),
+            local_ipv4: create_key(namespace.as_ref(), LOCAL_IPV4_KEY),
+            public_hostname: create_key(namespace.as_ref(), PUBLIC_HOSTNAME_KEY),
+            public_ipv4: create_key(namespace.as_ref(), PUBLIC_IPV4_KEY),
+            region: create_key(namespace.as_ref(), REGION_KEY),
+            subnet_id: create_key(namespace.as_ref(), SUBNET_ID_KEY),
+            vpc_id: create_key(namespace.as_ref(), VPC_ID_KEY),
+            role_name: create_key(namespace.as_ref(), ROLE_NAME_KEY),
+            tags: create_key(namespace.as_ref(), TAGS_KEY),
         }
     }
 }
 
 #[derive(Debug)]
 struct UnexpectedHttpStatusError {
-    status: http::StatusCode,
+    status: StatusCode,
 }
 
 impl fmt::Display for UnexpectedHttpStatusError {
@@ -721,7 +723,7 @@ mod test {
     use vrl::{owned_value_path, value::Kind};
 
     use crate::{
-        config::{LogNamespace, OutputId, TransformConfig, schema::Definition},
+        config::{LogNamespace, OutputId, TransformConfig, TransformContext, schema::Definition},
         transforms::aws_ec2_metadata::Ec2Metadata,
     };
 
@@ -736,7 +738,7 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), input_definition)],
         );
         assert_eq!(outputs.len(), 1);
@@ -863,7 +865,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_log() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
@@ -901,22 +903,22 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        let (_guard, addr) = next_addr();
-
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
             Ok("I waited 3 seconds!")
         }
 
+        let (_guard, addr) = next_addr();
+
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
@@ -938,16 +940,16 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        let (_guard, addr) = next_addr();
-
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
             Ok("I waited 3 seconds!")
         }
 
+        let (_guard, addr) = next_addr();
+
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
@@ -964,7 +966,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_metric() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
@@ -990,7 +992,7 @@ mod integration_tests {
 
             let metric = make_metric();
             let mut expected_metric = metric.clone();
-            for (k, v) in expected_metric_fields().iter() {
+            for (k, v) in &expected_metric_fields() {
                 expected_metric.replace_tag(k.to_string(), v.to_string());
             }
 
@@ -1002,13 +1004,13 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn fields_log() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
@@ -1053,13 +1055,13 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn fields_metric() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
@@ -1096,14 +1098,14 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn namespace_log() {
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
                     namespace: Some(
@@ -1135,12 +1137,12 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
 
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
@@ -1168,7 +1170,7 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
     }
@@ -1176,7 +1178,7 @@ mod integration_tests {
     #[tokio::test]
     async fn namespace_metric() {
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
                     namespace: Some(
@@ -1207,12 +1209,12 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
 
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
@@ -1240,7 +1242,7 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
     }

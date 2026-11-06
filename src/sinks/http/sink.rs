@@ -90,7 +90,7 @@ where
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Hash)]
-pub struct PartitionKey {
+pub(super) struct PartitionKey {
     pub uri: String,
     pub headers: BTreeMap<String, String>,
 }

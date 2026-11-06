@@ -1,12 +1,12 @@
-use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use smallvec::SmallVec;
+use std::{net::SocketAddr, time::Duration};
+use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
+use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
-use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
-use tokio::net::TcpStream;
 use tower::{Layer, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
@@ -22,10 +22,13 @@ use vector_lib::{
         metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
         trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     },
-    tls::MaybeTlsIncomingStream,
 };
 use warp::{
-    Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
+    Filter, Reply,
+    filters::BoxedFilter,
+    http::{HeaderMap, StatusCode},
+    reject::Rejection,
+    reply::Response,
 };
 
 use super::{reply::protobuf, status::Status};
@@ -33,7 +36,7 @@ use crate::{
     SourceSender,
     common::http::ErrorMessage,
     event::Event,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{EventsReceived, HttpBadRequest, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::{
@@ -41,8 +44,8 @@ use crate::{
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
             request_control::{
-                AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
-                RequestControlLayer,
+                AcknowledgementFailure, HttpRequest, MiddlewareError, PendingAcknowledgement,
+                RequestControlLayer, SharedPendingAcknowledgement,
             },
         },
         util::{add_headers, decompress_body, http::capped_body},
@@ -80,6 +83,7 @@ pub(crate) async fn run_http_server(
     keepalive_settings: KeepaliveConfig,
     request_control: RequestControlLayer<
         impl Fn(MiddlewareError) -> Response + Clone + Send + 'static,
+        HttpRequest,
     >,
 ) -> crate::Result<()> {
     let listener = tls_settings
@@ -93,25 +97,23 @@ pub(crate) async fn run_http_server(
     let span = Span::current();
     // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
     let admitted = request_control.layer(warp::service(routes));
-    let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-        let svc = ServiceBuilder::new()
-            .layer(build_http_trace_layer(span.clone()))
-            .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                MaxConnectionAgeLayer::new(
-                    Duration::from_secs(secs),
-                    keepalive_settings.max_connection_age_jitter_factor,
-                    conn.peer_addr(),
-                )
-            }))
-            .service(admitted.clone());
-        futures_util::future::ok::<_, Infallible>(svc)
-    });
-
-    Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-        .serve(make_svc)
-        .with_graceful_shutdown(shutdown.map(|_| ()))
-        .await?;
-
+    serve(
+        listener.accept_stream(),
+        shutdown.map(|_| ()),
+        move |conn| {
+            ServiceBuilder::new()
+                .layer(build_http_trace_layer(span.clone()))
+                .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                    MaxConnectionAgeLayer::new(
+                        Duration::from_secs(secs),
+                        keepalive_settings.max_connection_age_jitter_factor,
+                        conn.peer_addr(),
+                    )
+                }))
+                .service(admitted.clone())
+        },
+    )
+    .await?;
     Ok(())
 }
 
@@ -193,7 +195,7 @@ fn parse_with_deserializer(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let events = deserializer
         .parse(body, log_namespace)
-        .map(|r| r.into_vec())
+        .map(SmallVec::into_vec)
         .map_err(emit_decode_error)?;
 
     // Count individual items within OTLP batches for consistency with other sources
@@ -386,7 +388,7 @@ fn decode_trace_body(
     let events: Vec<Event> = request
         .resource_spans
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceSpans::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -427,7 +429,7 @@ fn decode_metrics_body(
     let events: Vec<Event> = request
         .resource_metrics
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceMetrics::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -458,9 +460,8 @@ async fn handle_request(
             if let Some(receiver) = receiver {
                 response
                     .extensions_mut()
-                    .insert(PendingAcknowledgement::new(
-                        receiver,
-                        acknowledgement_failure_response,
+                    .insert(SharedPendingAcknowledgement::new(
+                        PendingAcknowledgement::new(receiver, acknowledgement_failure_response),
                     ));
             }
             Ok(response)

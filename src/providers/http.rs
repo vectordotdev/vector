@@ -1,11 +1,11 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_body_util::{BodyExt as _, Collected};
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
+use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
@@ -67,7 +67,7 @@ impl Default for HttpConfig {
             request: RequestConfig::default(),
             poll_interval_secs: 30,
             tls_options: None,
-            proxy: Default::default(),
+            proxy: ProxyConfig::default(),
             config_format: Format::default(),
             interpolate_env: false,
         }
@@ -83,19 +83,19 @@ async fn http_request(
 ) -> Result<bytes::Bytes, &'static str> {
     let tls_settings = TlsSettings::from_options(tls_options).map_err(|_| "Invalid TLS options")?;
     let http_client =
-        HttpClient::<Body>::new(tls_settings, proxy).map_err(|_| "Invalid TLS settings")?;
+        HttpClient::new(tls_settings.into(), proxy).map_err(|_| "Invalid TLS settings")?;
 
     // Build HTTP request.
     let mut builder = http::request::Builder::new().uri(url.to_string());
 
     // Augment with headers. These may be required e.g. for authentication to
     // private endpoints.
-    for (header, value) in headers.iter() {
+    for (header, value) in headers {
         builder = builder.header(header.as_str(), value.as_str());
     }
 
     let request = builder
-        .body(Body::empty())
+        .body(empty_body())
         .map_err(|_| "Couldn't create HTTP request")?;
 
     info!(
@@ -121,7 +121,7 @@ async fn http_request(
         .map(Collected::to_bytes)
         .map_err(|err| {
             let message = "Error interpreting response.";
-            let cause = err.into_cause();
+            let cause = std::error::Error::source(&err);
             error!(
                     message = ?message,
                     error = ?cause);
@@ -144,7 +144,7 @@ async fn http_request_to_config_builder(
         .map_err(|e| vec![e.to_owned()])?;
 
     if !interpolate_env {
-        return config::load(config_str.chunk(), *config_format);
+        return config::loading::load_builder(config_str.chunk(), *config_format);
     }
 
     let env_vars = std::env::vars_os()
@@ -161,7 +161,7 @@ async fn http_request_to_config_builder(
         &env_vars,
     )?;
 
-    config::load(config_str.as_bytes().chunk(), *config_format)
+    config::loading::load_builder(config_str.as_bytes().chunk(), *config_format)
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -184,7 +184,7 @@ fn poll_http(
             match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy, &config_format, interpolate_env).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
                 Err(_) => {},
-            };
+            }
 
             info!(
                 message = "HTTP provider is waiting.",
@@ -233,3 +233,6 @@ impl ProviderConfig for HttpConfig {
 }
 
 impl_generate_config_from_default!(HttpConfig);
+
+#[cfg(all(test, feature = "sources-http_server", feature = "sinks-http"))]
+mod tests;

@@ -16,6 +16,7 @@ pub struct ChroniclePartitioner {
 }
 
 impl ChroniclePartitioner {
+    #[must_use]
     pub const fn new(
         log_type: UnconfinedTemplate,
         fallback_log_type: Option<String>,
@@ -46,11 +47,12 @@ impl Partitioner for ChroniclePartitioner {
                     });
                     Ok(fallback_log_type.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("log_type"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(())
                 }
             })
             .ok()?;

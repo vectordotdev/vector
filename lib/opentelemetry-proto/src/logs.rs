@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
     config::{LegacyKey, LogNamespace, log_schema},
@@ -26,6 +25,7 @@ pub const SEVERITY_NUMBER_KEY: &str = "severity_number";
 pub const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
 pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const FLAGS_KEY: &str = "flags";
+pub const EVENT_NAME_KEY: &str = "event_name";
 
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
@@ -121,6 +121,15 @@ impl ResourceLog {
         }
 
         // Optional fields
+        if !self.log_record.event_name.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(EVENT_NAME_KEY))),
+                path!(EVENT_NAME_KEY),
+                self.log_record.event_name,
+            );
+        }
         if let Some(resource) = self.resource
             && !resource.attributes.is_empty()
         {
@@ -147,7 +156,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(TRACE_ID_KEY))),
                 path!(TRACE_ID_KEY),
-                Bytes::from(to_hex(&self.log_record.trace_id)),
+                Value::from(to_hex(&self.log_record.trace_id)),
             );
         }
         if !self.log_record.span_id.is_empty() {
@@ -156,7 +165,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(SPAN_ID_KEY))),
                 path!(SPAN_ID_KEY),
-                Bytes::from(to_hex(&self.log_record.span_id)),
+                Value::from(to_hex(&self.log_record.span_id)),
             );
         }
         if !self.log_record.severity_text.is_empty() {
@@ -240,7 +249,7 @@ impl ResourceLog {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(SOURCE_NAME.as_bytes()),
+            Value::from_static_str(SOURCE_NAME),
         );
         if log_namespace == LogNamespace::Vector {
             log.metadata_mut()
@@ -249,5 +258,58 @@ impl ResourceLog {
         }
 
         log.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use prost::Message;
+    use vrl::event_path;
+
+    use super::*;
+
+    #[test]
+    fn decodes_native_event_name_in_both_namespaces() {
+        // OTLP LogRecord field 12, independently encoded so the test checks the wire tag.
+        let encoded = b"\x62\x0ebuild.finished";
+        for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let event = ResourceLog {
+                resource: None,
+                scope: None,
+                log_record: LogRecord::decode(encoded.as_slice()).unwrap(),
+            }
+            .into_event(log_namespace, Utc::now());
+            let log = event.as_log();
+            let event_name = match log_namespace {
+                LogNamespace::Legacy => log.get(event_path!(EVENT_NAME_KEY)),
+                LogNamespace::Vector => log
+                    .metadata()
+                    .value()
+                    .get(path!(SOURCE_NAME, EVENT_NAME_KEY)),
+            };
+            assert_eq!(event_name, Some(&Value::from("build.finished")));
+        }
+    }
+
+    #[test]
+    fn omits_absent_or_empty_event_name() {
+        for encoded in [b"".as_slice(), b"\x62\x00".as_slice()] {
+            for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+                let event = ResourceLog {
+                    resource: None,
+                    scope: None,
+                    log_record: LogRecord::decode(encoded).unwrap(),
+                }
+                .into_event(log_namespace, Utc::now());
+                let log = event.as_log();
+                assert!(log.get(event_path!(EVENT_NAME_KEY)).is_none());
+                assert!(
+                    log.metadata()
+                        .value()
+                        .get(path!(SOURCE_NAME, EVENT_NAME_KEY))
+                        .is_none()
+                );
+            }
+        }
     }
 }

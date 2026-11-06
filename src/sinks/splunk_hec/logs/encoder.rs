@@ -41,6 +41,7 @@ pub struct HecData<'a> {
 }
 
 impl<'a> HecData<'a> {
+    #[must_use]
     pub const fn new(event: HecEvent<'a>, fields: LogEvent, time: Option<f64>) -> Self {
         Self {
             event,

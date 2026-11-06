@@ -190,7 +190,7 @@ impl<'a> Variant<'a> {
 
 impl ToTokens for Variant<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.original.to_tokens(tokens)
+        self.original.to_tokens(tokens);
     }
 }
 
@@ -207,6 +207,11 @@ struct Attributes {
 }
 
 impl Attributes {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "retain the fallible finalization interface used by the AST parsing pipeline"
+    )]
     fn finalize(
         mut self,
         variant: &serde_ast::Variant<'_>,

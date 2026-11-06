@@ -3,7 +3,7 @@
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
-pub struct ClickhouseSink<S> {
+pub(super) struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     database: ConfinedTemplate,
@@ -19,7 +19,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         batch_settings: BatcherSettings,
         service: S,
         database: ConfinedTemplate,
@@ -82,15 +82,15 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct PartitionKey {
+pub(crate) struct PartitionKey {
     pub database: String,
     pub table: String,
     pub format: Format,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct KeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,

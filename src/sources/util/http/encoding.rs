@@ -41,11 +41,15 @@ pub(crate) fn capped_body() -> BoxedFilter<(Bytes,)> {
         .boxed()
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the content encoding is unsupported or decompression fails.
 /// Decompresses the body based on the Content-Encoding header.
 ///
 /// Supports gzip, deflate, snappy, zstd, and identity (no compression).
 ///
-/// Caps the decompressed output at 100 MiB to mitigate decompression-bomb DoS attacks.
+/// Caps the decompressed output at 100 MiB to mitigate decompression-bomb `DoS` attacks.
 pub fn decompress_body(header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
     decompress_body_with_limit(header, body, max_decompressed_size_bytes())
 }
@@ -204,6 +208,10 @@ fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
     )
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "The decompression error callback receives ownership of the I/O error."
+)]
 /// Maps a decompression failure to a response. If `error` is a [`DecompressedSizeLimitExceeded`]
 /// (the decompressed output exceeded the configured size cap), it becomes a `413 Payload Too
 /// Large` reporting `max_decompressed_size` (the cap that was actually enforced), matching the
@@ -214,6 +222,7 @@ fn decompressed_too_large_error(encoding: &str, max: usize) -> ErrorMessage {
 /// [`std::io::Error::other`].
 ///
 /// [`DecompressedSizeLimitExceeded`]: crate::sources::util::decompression::DecompressedSizeLimitExceeded
+#[must_use]
 pub fn emit_decompress_error(
     encoding: &str,
     error: std::io::Error,

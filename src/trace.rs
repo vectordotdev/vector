@@ -15,7 +15,7 @@ use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
@@ -26,8 +26,11 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use vector_lib::SpanField;
-use vector_lib::lookup::event_path;
+use vector_lib::{
+    SpanField,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    lookup::event_path,
+};
 use vrl::value::Value;
 
 use crate::event::LogEvent;
@@ -40,7 +43,7 @@ use crate::event::LogEvent;
 /// when it has started doing, or waiting, for input.
 static BUFFER: Mutex<Option<Vec<LogEvent>>> = Mutex::new(Some(Vec::new()));
 
-/// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
+/// `SHOULD_BUFFER` controls whether or not internal log events should be buffered or sent directly to the trace broadcast
 /// channel.
 static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
 
@@ -57,6 +60,8 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
+/// # Panics
+/// Panics if `levels` contains invalid logging targets or levels.
 pub fn init(
     color: bool,
     json: bool,
@@ -142,6 +147,7 @@ pub fn init(
 }
 
 #[cfg(test)]
+#[expect(clippy::must_use_candidate, reason = "Previous contents are optional")]
 pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
     get_early_buffer().replace(Vec::new())
 }
@@ -278,6 +284,7 @@ pub struct TraceSubscription {
 
 impl TraceSubscription {
     /// Registers a subscription to the internal log event stream.
+    #[must_use]
     pub fn subscribe() -> TraceSubscription {
         let buffered_events_rx = try_register_for_early_events();
         let trace_rx = get_trace_receiver();
@@ -303,10 +310,34 @@ impl TraceSubscription {
     }
 
     /// Converts this subscription into a raw stream of log events.
+    ///
+    /// Events dropped because the underlying broadcast receiver lagged are reported via
+    /// `ComponentEventsDropped` when the next event is received, not when the lag is detected.
+    /// After a lag, the receiver points at the oldest slot of a full buffer, so any log emitted
+    /// before the next receive (including the `ComponentEventsDropped` error itself) overwrites
+    /// that slot and lags the receiver again, indefinitely. Once an event has been received, that
+    /// slot is consumed and the drop can be logged safely.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
-        // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actually do about that so there's no reason to force callers to even deal with it.
-        BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
+        BroadcastStream::new(self.trace_rx)
+            .scan(0u64, |dropped, event| {
+                ready(Some(match event {
+                    Ok(log) => {
+                        let count = std::mem::take(dropped);
+                        if count > 0 {
+                            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                                count: usize::try_from(count).unwrap_or(usize::MAX),
+                                reason: "Internal logs broadcast receiver lagged.",
+                            });
+                        }
+                        Some(log)
+                    }
+                    Err(BroadcastStreamRecvError::Lagged(n)) => {
+                        *dropped += n;
+                        None
+                    }
+                }))
+            })
+            .filter_map(ready)
     }
 }
 
@@ -440,6 +471,8 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn broadcast_rate_limits_repeated_messages() {
+        const EXPECTED: usize = 4;
+
         let trace_sub = TraceSubscription::subscribe();
         // Disable early buffering so events flow directly to the broadcast channel
         // rather than being held in the startup buffer.
@@ -475,7 +508,6 @@ mod tests {
         //
         // Limitation: the "suppressed N times" summary fires on the *next* arriving
         // event after the window expires, not at window expiry itself.
-        const EXPECTED: usize = 4;
         let mut stream = trace_sub.into_stream();
         let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
             let mut collected = Vec::with_capacity(EXPECTED);

@@ -4,17 +4,21 @@ set -euo pipefail
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
 # Tool versions. Keep pins here so CI and local setup use the same versions.
-CARGO_DEB_VERSION="2.9.3"
+CARGO_DEB_VERSION="3.6.2"
 CROSS_VERSION="0.2.5"
 CARGO_NEXTEST_VERSION="0.9.95"
-CARGO_DENY_VERSION="0.19.0"
+CARGO_DENY_VERSION="0.20.2"
 CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
-DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
+DD_RUST_LICENSE_TOOL_VERSION="1.0.7"
 CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.15.0"
 CUE_VERSION="0.17.1"
 MOLD_VERSION="2.40.4"
+# Update the publisher version and archive SHA-256 together, independently of developer vdev.
+# Published by https://github.com/vectordotdev/vector/actions/runs/40552518149.
+PACKAGE_REPOSITORY_VDEV_VERSION="0.3.37"
+PACKAGE_REPOSITORY_VDEV_SHA256="43ec4b112782a51af7cefec6a28e0248dc8b8b6b8b51cca4e4d0a3c2e05e8990"
 
 # The no-argument default remains workstation-safe. CI requests system-level
 # dependencies explicitly through .github/actions/setup/action.yml.
@@ -41,6 +45,7 @@ SYSTEM_MODULES=(
   libsasl2
   cmark-gfm
   cross-binutils
+  package-repository-tools
   rpm
   lcov
   bc
@@ -316,6 +321,27 @@ install_mold() {
   add_to_path "$install_dir"
 }
 
+# Repository publishing uses a separate opt-in binary, not the developer vdev.
+install_package_repository_tools() {
+  contains_module package-repository-tools || return 0
+
+  local archive="vdev-package-repositories-x86_64-unknown-linux-gnu-v${PACKAGE_REPOSITORY_VDEV_VERSION}"
+  local tools="${RUNNER_TEMP:-${HOME}/.local/share/vector}/package-repository-tools"
+  mkdir -p "$tools"
+  curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 3 \
+    "https://install.datadoghq.com/vector/vdev/${PACKAGE_REPOSITORY_VDEV_VERSION}/${archive}.tgz" \
+    --output "$tools/$archive.tgz"
+  echo "$PACKAGE_REPOSITORY_VDEV_SHA256  $tools/$archive.tgz" | sha256sum --check --strict
+  tar -xzf "$tools/$archive.tgz" -C "$tools" --strip-components=1 "$archive/vdev"
+  test "$("$tools/vdev" --version)" = "vdev $PACKAGE_REPOSITORY_VDEV_VERSION"
+  "$tools/vdev" release repositories --help >/dev/null
+  export VDEV="$tools/vdev"
+  if [[ -n "${GITHUB_ENV:-}" ]]; then
+    echo "VDEV=$VDEV" >> "$GITHUB_ENV"
+  fi
+  echo "Package repository tools installed; VDEV=$VDEV"
+}
+
 # System packages
 
 run_privileged_with_timeout() {
@@ -335,12 +361,20 @@ install_system_packages() {
   local os
   os=$(uname -s)
 
+  if contains_module package-repository-tools && [[ "$os/$(uname -m)" != Linux/x86_64 ]]; then
+    echo "The package-repository-tools module requires x86_64 Linux." >&2
+    return 1
+  fi
+
   case "$os" in
     Linux)
       local packages=()
       contains_module libsasl2 && packages+=(libsasl2-dev)
       contains_module cmark-gfm && packages+=(cmark-gfm)
       contains_module cross-binutils && packages+=(binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu)
+      if contains_module package-repository-tools; then
+        packages+=(apt-utils ca-certificates createrepo-c curl dpkg-dev gnupg rpm libssl3t64)
+      fi
       contains_module rpm && packages+=(rpm)
       contains_module lcov && packages+=(lcov)
       contains_module bc && packages+=(bc)
@@ -533,6 +567,7 @@ main() {
   fi
 
   install_system_packages
+  install_package_repository_tools
   install_mold
   install_cue
   prepare_rust_installer

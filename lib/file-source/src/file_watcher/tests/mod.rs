@@ -2,11 +2,12 @@ mod bytes_unread;
 mod experiment;
 mod experiment_no_truncations;
 
-use std::{path::PathBuf, str, thread};
+use std::{fs, path::PathBuf, str, thread};
 
+use async_compression::tokio::bufread::GzipEncoder;
 use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
-use tokio::time::Instant;
+use tokio::{io::AsyncReadExt as _, time::Instant};
 
 use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
 
@@ -137,10 +138,10 @@ impl FileWatcherFile {
         // newline character. Well, that'll happen when truncations
         // cause trimmed reads and the only remaining character in the
         // line is the newline. Womp womp
-        if !ret.is_empty() {
-            Some(ret.to_string())
-        } else {
+        if ret.is_empty() {
             None
+        } else {
+            Some(ret.to_string())
         }
     }
 }
@@ -178,18 +179,14 @@ impl Arbitrary for FileWatcherAction {
 
 #[tokio::test]
 async fn gzip_multi_stream_reads_all_members() {
-    use async_compression::tokio::bufread::GzipEncoder;
-    use std::fs;
-    use tokio::io::AsyncReadExt as _;
-
-    let dir = tempfile::TempDir::new().expect("could not create tempdir");
-    let path = dir.path().join("multi.gz");
-
     async fn encode(data: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
         out
     }
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("multi.gz");
 
     // Write two separate gzip members into one file — the bug dropped the second.
     let mut bytes = encode(b"first\n").await;
@@ -325,7 +322,7 @@ async fn updating_path_resets_eof_backoff() {
 
 #[inline]
 pub fn delay(attempts: u32) {
-    let delay = match attempts {
+    let delay: u64 = match attempts {
         0 => return,
         1 => 1,
         2 => 4,
@@ -337,6 +334,6 @@ pub fn delay(attempts: u32) {
         8 => 256,
         _ => 512,
     };
-    let sleep_time = std::time::Duration::from_millis(delay as u64);
+    let sleep_time = std::time::Duration::from_millis(delay);
     std::thread::sleep(sleep_time);
 }

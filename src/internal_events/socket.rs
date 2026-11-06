@@ -3,14 +3,13 @@ use std::net::Ipv4Addr;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, LossyF64, UNINTENTIONAL,
         error_stage, error_type,
     },
     json_size::JsonSize,
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[allow(dead_code)] // some features only use some variants
 pub enum SocketMode {
     Tcp,
     Udp,
@@ -18,6 +17,7 @@ pub enum SocketMode {
 }
 
 impl SocketMode {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
@@ -46,7 +46,7 @@ impl InternalEvent for SocketBytesReceived {
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
-        histogram!(HistogramName::ComponentReceivedBytes).record(self.byte_size as f64);
+        histogram!(HistogramName::ComponentReceivedBytes).record(LossyF64(self.byte_size));
     }
 }
 
@@ -71,7 +71,7 @@ impl InternalEvent for SocketEventsReceived {
         counter!(CounterName::ComponentReceivedEventBytesTotal, "mode" => mode)
             .increment(self.byte_size.get() as u64);
         histogram!(HistogramName::ComponentReceivedBytes, "mode" => mode)
-            .record(self.byte_size.get() as f64);
+            .record(LossyF64(self.byte_size.get()));
     }
 }
 

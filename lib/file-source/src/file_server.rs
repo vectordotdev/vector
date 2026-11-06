@@ -78,11 +78,24 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    // The first `shutdown_data` signal here is to stop this file
-    // server from outputting new data; the second
-    // `shutdown_checkpointer` is for finishing the background
-    // checkpoint writer task, which has to wait for all
-    // acknowledgements to be completed.
+    /// Read watched files until shutdown, forwarding their lines to the output sink.
+    ///
+    /// `shutdown_data` stops output; `shutdown_checkpointer` stops the background
+    /// checkpoint writer after all acknowledgements have completed.
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    /// Creating a watcher can also panic as described by [`FileWatcher::new`].
+    /// Requires a Tokio runtime with timers enabled.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing polling and shutdown flow together during the lint rollout."
+    )]
     pub async fn run<C, S1, S2>(
         mut self,
         mut chans: C,
@@ -96,7 +109,7 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
-        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
+        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = IndexMap::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
@@ -106,7 +119,7 @@ where
         let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().into_iter() {
+        for path in self.paths_provider.paths() {
             if let Some(file_id) = self
                 .fingerprinter
                 .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
@@ -125,8 +138,7 @@ where
 
         let created = metadata.into_iter().map(|m| {
             m.and_then(|m| m.created())
-                .map(DateTime::<Utc>::from)
-                .unwrap_or_else(|_| Utc::now())
+                .map_or_else(|_| Utc::now(), DateTime::<Utc>::from)
         });
 
         let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
@@ -185,7 +197,7 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+                for path in self.paths_provider.paths() {
                     if let Some(file_id) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
@@ -295,13 +307,13 @@ where
                     discarded_for_size_and_truncated,
                 }) = watcher.read_line().await
                 {
-                    discarded_for_size_and_truncated.iter().for_each(|buf| {
+                    for buf in &discarded_for_size_and_truncated {
                         self.emitter.emit_file_line_too_long(
                             &buf.clone(),
                             self.max_line_bytes,
                             buf.len(),
-                        )
-                    });
+                        );
+                    }
 
                     let sz = line.bytes.len();
                     trace!(
@@ -435,7 +447,7 @@ where
                     // _shutdown_token is dropped here, after checkpoints are written,
                     // which signals shutdown_done to the caller.
                 }
-                Either::Right((_, future)) => shutdown_data = future,
+                Either::Right(((), future)) => shutdown_data = future,
             }
             stats.record("sleeping", start.elapsed());
         }
@@ -466,13 +478,12 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        let read_from = if self.ignore_checkpoints {
+            fallback
+        } else {
             checkpoints
                 .get(file_id)
-                .map(ReadFrom::Checkpoint)
-                .unwrap_or(fallback)
-        } else {
-            fallback
+                .map_or(fallback, ReadFrom::Checkpoint)
         };
 
         match FileWatcher::new(
@@ -494,7 +505,7 @@ where
                 fp_map.insert(file_id, watcher);
             }
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
-        };
+        }
     }
 }
 
@@ -509,7 +520,7 @@ async fn checkpoint_writer(
         let sleep = sleep(sleep_duration);
         tokio::select! {
             _ = &mut shutdown => break,
-            _ = sleep => {},
+            () = sleep => {},
         }
 
         let emitter = emitter.clone();
@@ -518,11 +529,17 @@ async fn checkpoint_writer(
         match checkpointer.write_checkpoints().await {
             Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
             Err(error) => emitter.emit_file_checkpoint_write_error(error),
-        };
+        }
     }
     checkpointer
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing duration conversion until overflow handling is audited."
+)]
 pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
     ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
 }
@@ -578,6 +595,11 @@ impl TimingStats {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing floating-point precision of diagnostic throughput formatting."
+)]
 fn scale(bytes: u64) -> String {
     let units = ["", "k", "m", "g"];
     let mut bytes = bytes as f32;
@@ -593,7 +615,7 @@ impl Default for TimingStats {
     fn default() -> Self {
         Self {
             started_at: time::Instant::now(),
-            segments: Default::default(),
+            segments: BTreeMap::default(),
             events: Default::default(),
             bytes: Default::default(),
         }

@@ -11,21 +11,25 @@ pub struct RawMessageSerializerConfig;
 
 impl RawMessageSerializerConfig {
     /// Creates a new `RawMessageSerializerConfig`.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
     /// Build the `RawMessageSerializer` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> RawMessageSerializer {
         RawMessageSerializer
     }
 
     /// The data type of events that are accepted by `RawMessageSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         get_serializer_schema_requirement()
     }
@@ -40,7 +44,7 @@ impl Encoder<Event> for RawMessageSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.as_log();
-        if let Some(bytes) = log.get_message().map(|value| value.coerce_to_bytes()) {
+        if let Some(bytes) = log.get_message().map(vrl::value::Value::coerce_to_bytes) {
             buffer.put(bytes);
         }
         Ok(())

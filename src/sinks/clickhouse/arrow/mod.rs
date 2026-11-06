@@ -1,6 +1,6 @@
 //! Schema fetching and Arrow type mapping for ClickHouse tables.
 
-pub mod parser;
-pub mod schema;
+pub(super) mod parser;
+pub(super) mod schema;
 
-pub use schema::ClickHouseSchemaProvider;
+pub(super) use schema::ClickHouseSchemaProvider;

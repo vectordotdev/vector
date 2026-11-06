@@ -25,7 +25,7 @@ generated: components: sinks: configuration: {
 	healthcheck: {
 		description: "Healthcheck configuration."
 		required:    false
-		type:        _schemaDefinitions["derived::d1a2a37da28b48074a6aa38c"]
+		type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
 	}
 	inputs: {
 		description: """

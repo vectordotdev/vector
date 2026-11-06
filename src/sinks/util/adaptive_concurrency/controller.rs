@@ -13,7 +13,6 @@ use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemap
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
-    http::HttpError,
     internal_events::{
         AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
         AdaptiveConcurrencyLimitData, AdaptiveConcurrencyObservedRtt,
@@ -80,7 +79,7 @@ impl<L> Controller<L> {
                 in_flight: 0,
                 past_rtt: EwmaVar::new(settings.ewma_alpha),
                 next_update: instant_now(),
-                current_rtt: Default::default(),
+                current_rtt: Mean::default(),
                 had_back_pressure: false,
                 reached_limit: false,
             })),
@@ -96,6 +95,10 @@ impl<L> Controller<L> {
     /// An estimate of current load on service managed by this controller.
     ///
     /// 0.0 is no load, while 1.0 is max load.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Request counts are approximate. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(super) fn load(&self) -> f64 {
         let inner = self.inner.lock().expect("Controller mutex is poisoned");
         if inner.current_limit > 0 {
@@ -172,7 +175,7 @@ impl<L> Controller<L> {
         // calculated deviance. Rounding these values forces the
         // differences to zero.
         #[cfg(test)]
-        let current_rtt = current_rtt.map(|c| (c * 1000000.0).round() / 1000000.0);
+        let current_rtt = current_rtt.map(|c| (c * 1_000_000.0).round() / 1_000_000.0);
 
         match inner.past_rtt.state() {
             None => {
@@ -207,7 +210,7 @@ impl<L> Controller<L> {
                         past_rtt = inner.past_rtt.update(current_rtt);
                     }
                     inner.next_update = now + Duration::from_secs_f64(past_rtt.mean);
-                    inner.current_rtt = Default::default();
+                    inner.current_rtt = Mean::default();
                     inner.had_back_pressure = false;
                     inner.reached_limit = false;
                 }
@@ -247,6 +250,12 @@ impl<L> Controller<L> {
             // Decrease (multiplicative) the current concurrency limit. The floor rounding in the
             // `usize` conversion guarantees the new limit is smaller than the current limit, and
             // the `.max` ensures the new limit is above zero.
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Preserve multiplicative decrease rounding. https://github.com/vectordotdev/vector/issues/23659"
+            )]
             let new_limit =
                 ((inner.current_limit as f64 * self.settings.decrease_ratio) as usize).max(1);
             self.semaphore
@@ -286,9 +295,6 @@ where
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
-                } else if error.downcast_ref::<HttpError>().is_some() {
-                    // HTTP protocol-level errors are not backpressure
-                    false
                 } else {
                     warn!(
                         message = "Unhandled error response.",
@@ -300,6 +306,6 @@ where
         };
         // Only adjust to the RTT when the request was successfully processed.
         let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
-        self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
+        self.adjust_to_response_inner(start, is_back_pressure, use_rtt);
     }
 }

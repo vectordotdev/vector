@@ -25,7 +25,7 @@ use crate::{
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
-pub struct BlackholeSink {
+pub(super) struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
@@ -33,7 +33,7 @@ pub struct BlackholeSink {
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig) -> Self {
+    pub(super) fn new(config: BlackholeConfig) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
@@ -84,8 +84,9 @@ impl StreamSink<EventArray> for BlackholeSink {
 
         while let Some(mut events) = input.next().await {
             if let Some(rate) = self.config.rate {
-                let factor: f32 = 1.0 / rate as f32;
-                let secs: f32 = factor * (events.len() as f32);
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_precision_loss, reason = "Preserve rate-limit rounding")]
+                let secs = (1.0 / rate as f32) * events.len() as f32;
                 let until = self.last.unwrap_or_else(Instant::now) + Duration::from_secs_f32(secs);
                 sleep_until(until.into()).await;
                 self.last = Some(until);

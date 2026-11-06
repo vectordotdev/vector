@@ -72,7 +72,17 @@ with this [issue filter][vrl-wasm-unsupported-filter].
 
 ### macOS Troubleshooting
 
-If you are getting compilation errors on macOS here are some things to check:
+If compilation fails because the selected C compiler does not support the
+`wasm32-unknown-unknown` target, try a compiler with WebAssembly support, such
+as Homebrew LLVM. The following command explicitly selects that toolchain.
+
+```shell
+CC_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/clang" \
+AR_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/llvm-ar" \
+wasm-pack build --target web --out-dir public/pkg
+```
+
+If you are getting other compilation errors on macOS here are some things to check:
 
 ```shell
 xcode-select -p
@@ -182,4 +192,4 @@ init().then(() => {
 [mozilla-wasm-rust-docs]: https://developer.mozilla.org/en-US/docs/WebAssembly/Rust_to_wasm
 [rust-book-wasm]: https://rustwasm.github.io/docs/book/
 [vrl-repl]: https://github.com/vectordotdev/vector/tree/master/lib/vector-vrl/cli
-[vrl-wasm-unsupported-filter]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3A+playground%22+wasm+compatible
+[vrl-wasm-unsupported-filter]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3Aplayground%22+wasm+compatible

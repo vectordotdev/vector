@@ -445,6 +445,10 @@ pub(super) fn namespaces(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::used_underscore_binding,
+    reason = "Tests inspect the watch lifetime guard retained by subscriptions."
+)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -721,7 +725,7 @@ mod tests {
                 .and(query_param("watch", "true"))
                 // Hold the watch request open so the test measures concurrent
                 // subscriptions rather than reconnects of completed responses.
-                .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(60)))
+                .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_mins(1)))
                 .with_priority(1)
                 .expect(1)
                 .mount(&server)
@@ -758,9 +762,9 @@ mod tests {
             node_key.fields = "metadata.name=test-node".into();
             node_key.labels.clear();
             subscriptions.push((
-                pods(client.clone(), pod_key, Duration::from_secs(60)),
-                namespaces(client.clone(), ns_key, Duration::from_secs(60)),
-                nodes(client.clone(), node_key, Duration::from_secs(60)),
+                pods(client.clone(), pod_key, Duration::from_mins(1)),
+                namespaces(client.clone(), ns_key, Duration::from_mins(1)),
+                nodes(client.clone(), node_key, Duration::from_mins(1)),
             ));
         }
         tokio::time::timeout(Duration::from_secs(10), async {

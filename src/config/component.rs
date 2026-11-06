@@ -64,6 +64,7 @@ impl<'a, T> Component<'a, T>
 where
     T: Configurable + Serialize + ToValue + Clone + 'static,
 {
+    #[must_use]
     pub fn kind(&self) -> ComponentKind {
         self.into()
     }
@@ -72,6 +73,7 @@ where
     ///
     /// Enrichment table inputs belong to the table's derived sink. A derived
     /// source is a separate component, whose key may differ from the table key.
+    #[must_use]
     pub fn inputs(&self) -> Option<&'a [T]> {
         match self {
             Self::Source(_) => None,

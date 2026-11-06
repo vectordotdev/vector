@@ -118,6 +118,11 @@ fn git_path(path: &str) -> std::io::Result<String> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
@@ -149,7 +154,7 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_with_config(
                 prost_build,

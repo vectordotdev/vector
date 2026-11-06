@@ -774,16 +774,6 @@ cli: {
 				unit:    "bytes"
 			}
 		}
-		VECTOR_STRICT_ENV_VARS: {
-			description: """
-				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing
-				environment variable in configuration files will cause an error instead of a warning, which will
-				result in a failure to load any such configuration file. This option is deprecated and will be
-				removed in a future version to remove the ability to downgrade missing environment variables to
-				warnings.
-				"""
-			type: bool: default: true
-		}
 		VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION: {
 			description: """
 				Allow interpolation of environment variables in configuration files. Environment variable

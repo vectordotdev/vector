@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-pub struct HecMetricsSink<S> {
+pub(super) struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
@@ -128,8 +128,7 @@ impl HecMetricsProcessedEventMetadata {
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
-            MetricValue::Counter { value } => Some(value),
-            MetricValue::Gauge { value } => Some(value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
                 emit!(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
@@ -142,9 +141,9 @@ impl HecMetricsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
 
-pub fn process_metric(
+pub(super) fn process_metric(
     metric: Metric,
     event_byte_size: usize,
     sourcetype: Option<&ConfinedTemplate>,

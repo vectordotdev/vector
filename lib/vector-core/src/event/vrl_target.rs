@@ -302,6 +302,7 @@ fn set_metric_tag_values(
                 Value::Bytes(bytes) => {
                     Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
                 }
+                Value::String(string) => Some(TagValue::Value(string.to_string())),
                 Value::Null => Some(TagValue::Bare),
                 _ => None,
             })
@@ -551,14 +552,8 @@ fn target_get_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["type"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "type" | "namespace" | "timestamp" | "interval_ms" | "tags"]
+        | ["tags", _] => Ok(value),
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_GET,
@@ -582,13 +577,9 @@ fn target_get_mut_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "namespace" | "timestamp" | "interval_ms" | "tags"] | ["tags", _] => {
+            Ok(value)
+        }
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_SET,

@@ -1,7 +1,10 @@
 use std::mem::discriminant;
 
 use serde_json::Value;
-use vector_config_common::schema::*;
+use vector_config_common::schema::{
+    ArrayValidation, InstanceType, Map, Metadata, NumberValidation, ObjectValidation, Schema,
+    SchemaObject, SingleOrVec, StringValidation, SubschemaValidation,
+};
 
 /// A type that can be merged with itself.
 pub trait Mergeable {
@@ -47,11 +50,10 @@ impl Mergeable for Value {
         //
         // We _may_ need to relax this in practice/in the future, but it's a solid invariant to
         // enforce for the time being.
-        if discriminant(self) != discriminant(other) {
-            panic!(
-                "Tried to merge two `Value` types together with differing types!\n\nSelf: {self:?}\n\nOther: {other:?}"
-            );
-        }
+        assert!(
+            discriminant(self) == discriminant(other),
+            "Tried to merge two `Value` types together with differing types!\n\nSelf: {self:?}\n\nOther: {other:?}"
+        );
 
         match (self, other) {
             // Maps get merged recursively.
@@ -128,7 +130,7 @@ fn merge_schema_instance_type(
     source: Option<&SingleOrVec<InstanceType>>,
 ) {
     merge_optional_with(destination, source, |existing, new| {
-        let mut deduped = existing.into_iter().chain(new).cloned().collect::<Vec<_>>();
+        let mut deduped = existing.into_iter().chain(new).copied().collect::<Vec<_>>();
         deduped.dedup();
 
         *existing = deduped.into();

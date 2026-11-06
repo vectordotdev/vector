@@ -164,8 +164,9 @@ impl<'a> TapRunner<'a> {
 
     /// # Errors
     ///
-    /// Returns an error if the URL is invalid, connecting or starting the stream fails,
-    /// or the stream reports an error or ends unexpectedly.
+    /// Returns an error if the URL is invalid, setting up the client or starting the stream
+    /// fails, or the stream reports an error or ends unexpectedly. The client opens its
+    /// connection with the stream RPC, so an unreachable API fails that RPC.
     pub async fn run_tap(
         &self,
         interval: i64,
@@ -179,18 +180,18 @@ impl<'a> TapRunner<'a> {
             .parse()
             .map_err(|e| TapExecutorError::Fatal(format!("Invalid URL: {e}")))?;
         let mut client = Client::new(uri);
-        client.connect().await?;
+        client.connect()?;
         self.run_tap_with_client(client, interval, limit, duration_ms, quiet)
             .await
     }
 
-    /// Run tap using a pre-connected client (avoids an extra connection round-trip when the
-    /// caller has already connected and health-checked the client).
+    /// Run tap using a connected client (reuses the connection when the caller has already
+    /// health-checked the client).
     ///
     /// # Errors
     ///
-    /// Returns an error if starting the stream fails, or the stream reports an error
-    /// or ends unexpectedly.
+    /// Returns an error if the client is not connected, starting the stream fails, or the
+    /// stream reports an error or ends unexpectedly.
     pub async fn run_tap_with_client(
         &self,
         mut client: Client,
@@ -275,10 +276,10 @@ impl<'a> TapRunner<'a> {
         format: TapEncodingFormat,
     ) -> Result<String, String> {
         // INTENTIONAL round-trip through protobuf bytes: `vector_api_client` compiles
-        // `event.proto` independently to avoid taking a dependency on `vector_core` (a large
-        // crate with many features). Both types share the same proto schema, so encoding one
-        // and decoding the other is always safe. If the schemas ever diverge this will surface
-        // as a runtime decode error.
+        // `event.proto` itself, so its `EventWrapper` is a different Rust type from the
+        // `vector_core` one. Both types share the same proto schema, so encoding one and
+        // decoding the other is always safe. If the schemas ever diverge this will surface as a
+        // runtime decode error.
         let bytes = event_wrapper.encode_to_vec();
 
         let core_event_wrapper =

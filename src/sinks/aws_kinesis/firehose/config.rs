@@ -38,7 +38,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-pub struct KinesisFirehoseClientBuilder;
+pub(super) struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
     type Client = KinesisClient;
@@ -50,8 +50,8 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
-pub const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
-pub const MAX_PAYLOAD_EVENTS: usize = 500;
+pub(super) const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
+pub(super) const MAX_PAYLOAD_EVENTS: usize = 500;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KinesisFirehoseDefaultBatchSettings;
@@ -104,6 +104,10 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
+    /// Creates the AWS client.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
@@ -182,9 +186,9 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"stream_name: my-stream
+            r"stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -225,6 +229,7 @@ impl RetryLogic for KinesisRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
 
     #[test]
     fn validate_produces_batch_settings() {
@@ -238,11 +243,11 @@ mod tests {
                 ),
                 encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
                 compression: crate::sinks::util::Compression::None,
-                request: Default::default(),
+                request: TowerRequestConfig::default(),
                 tls: None,
-                auth: Default::default(),
+                auth: AwsAuthentication::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

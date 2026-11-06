@@ -6,7 +6,7 @@ updates:
       interval: "monthly"
       time: "04:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain:deps"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
@@ -19,6 +19,12 @@ updates:
         patterns:
           - "bytecheck"
           - "rkyv"
+
+      kube:
+        applies-to: version-updates
+        patterns:
+          - "kube"
+          - "k8s-openapi"
 
       patches:
         applies-to: version-updates
@@ -221,7 +227,7 @@ updates:
       interval: "monthly"
       time: "04:00" # UTC
     labels:
-      - "domain: releasing"
+      - "domain:releasing"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
@@ -235,7 +241,7 @@ updates:
     schedule:
       interval: "monthly"
     labels:
-      - "domain: ci"
+      - "domain:ci"
       - "no-changelog"
     commit-message:
       prefix: "chore(ci)"
@@ -250,7 +256,7 @@ updates:
       time: "05:00" # UTC
     labels:
       - "dependencies"
-      - "javascript"
+      - "domain:website"
       - "no-changelog"
     commit-message:
       prefix: "chore(website deps)"
@@ -265,7 +271,7 @@ updates:
       interval: "monthly"
       time: "05:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain:deps"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"

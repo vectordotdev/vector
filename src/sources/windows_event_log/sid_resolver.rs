@@ -13,12 +13,12 @@ const SID_CACHE_CAPACITY: usize = 4096;
 /// names (e.g. "NT AUTHORITY\SYSTEM") using the Windows `LookupAccountSidW` API.
 ///
 /// Results are cached in an LRU cache to avoid repeated lookups for the same SID.
-pub struct SidResolver {
+pub(super) struct SidResolver {
     cache: LruCache<String, Option<String>>,
 }
 
 impl SidResolver {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             cache: LruCache::new(NonZeroUsize::new(SID_CACHE_CAPACITY).unwrap()),
         }
@@ -27,7 +27,7 @@ impl SidResolver {
     /// Resolve a SID string to "DOMAIN\Username" format.
     /// Returns `None` if the SID cannot be resolved (unknown account, invalid SID, etc.).
     /// Caches both successful and failed lookups.
-    pub fn resolve(&mut self, sid_string: &str) -> Option<String> {
+    pub(super) fn resolve(&mut self, sid_string: &str) -> Option<String> {
         if let Some(cached) = self.cache.get(sid_string) {
             return cached.clone();
         }
@@ -38,14 +38,14 @@ impl SidResolver {
     }
 }
 
-/// Convert a SID string to a PSID via ConvertStringSidToSidW, then call
-/// LookupAccountSidW to get the account name.
+/// Convert a SID string to a PSID via `ConvertStringSidToSidW`, then call
+/// `LookupAccountSidW` to get the account name.
 fn lookup_sid(sid_string: &str) -> Option<String> {
-    let sid_hstring = HSTRING::from(sid_string);
+    let encoded_identifier = HSTRING::from(sid_string);
 
     // Convert string SID to binary PSID
     let mut psid = PSID::default();
-    let convert_result = unsafe { ConvertStringSidToSidW(&sid_hstring, &mut psid) };
+    let convert_result = unsafe { ConvertStringSidToSidW(&encoded_identifier, &mut psid) };
     if convert_result.is_err() {
         return None;
     }
