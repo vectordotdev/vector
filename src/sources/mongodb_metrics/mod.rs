@@ -586,19 +586,20 @@ impl MongoDbMetrics {
         ));
 
         // mongod_metrics_repl_buffer_*
+        let repl_buffer = status.metrics.repl.buffer.totals();
         metrics.push(self.create_metric(
             "mongod_metrics_repl_buffer_count",
-            counter!(status.metrics.repl.buffer.count),
+            counter!(repl_buffer.count),
             tags!(self.tags),
         ));
         metrics.push(self.create_metric(
             "mongod_metrics_repl_buffer_max_size_bytes_total",
-            counter!(status.metrics.repl.buffer.max_size_bytes),
+            counter!(repl_buffer.max_size_bytes),
             tags!(self.tags),
         ));
         metrics.push(self.create_metric(
             "mongod_metrics_repl_buffer_size_bytes",
-            counter!(status.metrics.repl.buffer.size_bytes),
+            counter!(repl_buffer.size_bytes),
             tags!(self.tags),
         ));
 
@@ -687,7 +688,9 @@ impl MongoDbMetrics {
         ));
 
         // mongod_wiredtiger_*
-        if let Some(stat) = status.wired_tiger {
+        if let Some(wired_tiger) = &status.wired_tiger {
+            let stat = wired_tiger.common();
+
             // mongod_wiredtiger_blockmanager_blocks_total
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_blockmanager_blocks_total",
@@ -812,36 +815,38 @@ impl MongoDbMetrics {
             ));
 
             // mongod_wiredtiger_concurrent_transactions_*
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_available_tickets",
-                gauge!(stat.concurrent_transactions.read.available),
-                tags!(self.tags, "type" => "read"),
-            ));
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_available_tickets",
-                gauge!(stat.concurrent_transactions.write.available),
-                tags!(self.tags, "type" => "write"),
-            ));
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_out_tickets",
-                gauge!(stat.concurrent_transactions.read.out),
-                tags!(self.tags, "type" => "read"),
-            ));
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_out_tickets",
-                gauge!(stat.concurrent_transactions.write.out),
-                tags!(self.tags, "type" => "write"),
-            ));
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_total_tickets",
-                gauge!(stat.concurrent_transactions.read.total_tickets),
-                tags!(self.tags, "type" => "read"),
-            ));
-            metrics.push(self.create_metric(
-                "mongod_wiredtiger_concurrent_transactions_total_tickets",
-                gauge!(stat.concurrent_transactions.write.total_tickets),
-                tags!(self.tags, "type" => "write"),
-            ));
+            if let Some(tickets) = wired_tiger.tickets(status.queues.as_ref()) {
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_available_tickets",
+                    gauge!(tickets.read.available),
+                    tags!(self.tags, "type" => "read"),
+                ));
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_available_tickets",
+                    gauge!(tickets.write.available),
+                    tags!(self.tags, "type" => "write"),
+                ));
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_out_tickets",
+                    gauge!(tickets.read.out),
+                    tags!(self.tags, "type" => "read"),
+                ));
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_out_tickets",
+                    gauge!(tickets.write.out),
+                    tags!(self.tags, "type" => "write"),
+                ));
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_total_tickets",
+                    gauge!(tickets.read.total_tickets),
+                    tags!(self.tags, "type" => "read"),
+                ));
+                metrics.push(self.create_metric(
+                    "mongod_wiredtiger_concurrent_transactions_total_tickets",
+                    gauge!(tickets.write.total_tickets),
+                    tags!(self.tags, "type" => "write"),
+                ));
+            }
 
             // mongod_wiredtiger_log_*
             metrics.push(self.create_metric(
@@ -908,44 +913,46 @@ impl MongoDbMetrics {
             ));
 
             // mongod_wiredtiger_transactions_*
+            let checkpoint = wired_tiger.checkpoint();
+            let transaction = wired_tiger.transaction();
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_checkpoint_seconds",
-                gauge!(stat.transaction.checkpoint_min_ms / 1000),
+                gauge!(checkpoint.min_ms / 1000),
                 tags!(self.tags, "type" => "min"),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_checkpoint_seconds",
-                gauge!(stat.transaction.checkpoint_max_ms / 1000),
+                gauge!(checkpoint.max_ms / 1000),
                 tags!(self.tags, "type" => "max"),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_checkpoint_seconds_total",
-                counter!(stat.transaction.checkpoint_total_ms / 1000),
+                counter!(checkpoint.total_ms / 1000),
                 tags!(self.tags),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_running_checkpoints",
-                gauge!(stat.transaction.checkpoints_running),
+                gauge!(checkpoint.running),
                 tags!(self.tags),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_total",
-                counter!(stat.transaction.begins),
+                counter!(transaction.begins),
                 tags!(self.tags, "type" => "begins"),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_total",
-                counter!(stat.transaction.checkpoints),
+                counter!(checkpoint.started),
                 tags!(self.tags, "type" => "checkpoints"),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_total",
-                counter!(stat.transaction.committed),
+                counter!(transaction.committed),
                 tags!(self.tags, "type" => "committed"),
             ));
             metrics.push(self.create_metric(
                 "mongod_wiredtiger_transactions_total",
-                counter!(stat.transaction.rolled_back),
+                counter!(transaction.rolled_back),
                 tags!(self.tags, "type" => "rolledback"),
             ));
         }
