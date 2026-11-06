@@ -85,6 +85,7 @@ sources:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
     access_key: "${FIREHOSE_ACCESS_KEY}" # this will also be set when configuring Firehose
+    store_access_key: false
 
 transforms:
   parse:
@@ -97,8 +98,8 @@ transforms:
       . = map_values(.) -> |value| {
          event = del(value.log_events)
          value |= event
-         message = del(.message)
-         . |= object!(parse_json!(message))
+         message = del(value.message)
+         value |= object!(parse_json!(message))
       }
 
 # you may want to add more transforms here
@@ -131,7 +132,9 @@ See their guide for more examples.
 ## Deploying Vector
 
 First, deploy vector with the [`aws_kinesis_firehose`][aws_kinesis_firehose] source. See example
-configuration above.
+configuration above. The configuration reads the access key from `${FIREHOSE_ACCESS_KEY}`, and
+[environment variable interpolation][env_vars] is disabled by default, so start Vector with
+`--dangerously-allow-env-var-interpolation`.
 
 {{< info >}}
 Remember that the port must be publicly accessible and the endpoint must be
@@ -309,7 +312,6 @@ $ aws iam create-role \
 }
 EOF
 )
-`
 ```
 
 Now we will attach a policy to our role to let it publish to the Firehose
@@ -342,7 +344,7 @@ $ aws logs put-subscription-filter \
   --filter-name "Destination" \
   --filter-pattern "" \
   --destination-arn "arn:aws:firehose:${AWS_REGION}:${AWS_ACCOUNT_ID}:deliverystream/${FIREHOSE_DELIVERY_STREAM}" \
-  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole
+  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole"
 ```
 
 {{< info >}}
@@ -383,7 +385,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --config config.yaml
+flog -f json | vector --dangerously-allow-env-var-interpolation --config config.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -462,6 +464,7 @@ sources:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set in the Firehose config
     access_key: "my secret key" # this will also be set in the Firehose config
+    store_access_key: false
 ```
 
 will accept this request, decode the record (which is gzip'ed and then base64 encoded), to produce an event that looks like:
@@ -498,8 +501,8 @@ transforms:
       . = map_values(.) -> |value| {
          event = del(value.log_events)
          value |= event
-         message = del(.message)
-         . |= object!(parse_json!(message))
+         message = del(value.message)
+         value |= object!(parse_json!(message))
       }
 ```
 
@@ -593,8 +596,8 @@ iteration to finish up our processing.
 . = map_values(.) -> |value| {
    event = del(value.log_events)
    value |= event
-   message = del(.message)
-   . |= object!(parse_json!(message))
+   message = del(value.message)
+   value |= object!(parse_json!(message))
 }
 ```
 
@@ -664,6 +667,7 @@ Here are original events with all of the additional context!
 [aws_kinesis_firehose]: /docs/reference/configuration/sources/aws_kinesis_firehose/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
+[env_vars]: /docs/reference/environment_variables/
 [flog]: https://github.com/mingrammer/flog
 [parse_aws_cloudwatch_log_subscription_message]: /docs/reference/vrl/functions/#parse_json
 [parse_json]: /docs/reference/vrl/functions/#parse_json
