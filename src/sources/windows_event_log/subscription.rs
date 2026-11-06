@@ -19,7 +19,7 @@ use windows::Win32::System::EventLog::{
     EvtSubscribeToFutureEvents,
 };
 use windows::Win32::System::Threading::{
-    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects,
+    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects, WaitForSingleObject,
 };
 use windows::core::HSTRING;
 
@@ -63,14 +63,145 @@ impl Drop for PublisherHandle {
 }
 
 // Win32 error codes extracted from the lower 16 bits of HRESULT.
-// Using named constants instead of magic numbers for maintainability.
+//
+// Values verified against winerror.h / "System Error Codes (12000-15999)". Four of the
+// six previously defined here were wrong, which silently disabled error recovery:
+//
+//   ERROR_EVT_QUERY_RESULT_STALE            was 4317  -> 4317 is ERROR_INVALID_OPERATION
+//   ERROR_EVT_QUERY_RESULT_INVALID_POSITION was 16953 -> not a Win32 error code at all
+//   ERROR_EVT_CHANNEL_NOT_FOUND             was 15009 -> 15009 is SUBSCRIPTION_TO_DIRECT_CHANNEL
+//   ERROR_EVT_INVALID_QUERY                 was 15007 -> 15007 is CHANNEL_NOT_FOUND
+//
+// Keep these in sync with winerror.h if the list grows.
 const ERROR_FILE_NOT_FOUND: u32 = 2;
 const ERROR_ACCESS_DENIED: u32 = 5;
 const ERROR_NO_MORE_ITEMS: u32 = 259;
-const ERROR_EVT_QUERY_RESULT_STALE: u32 = 4317;
-const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 0x3AA1; // 15009
-const ERROR_EVT_INVALID_QUERY: u32 = 15_007;
-const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 0x4239; // 16953
+const ERROR_INVALID_OPERATION: u32 = 4317; // 0x10DD
+/// Returned by `EvtNext` on every pull once the Windows Event Log service (wevtsvc) has been
+/// restarted: all subscription handles of the old service instance are dead for good. Bookmark
+/// handles survive the restart, so rebuilding the subscription from the bookmark resumes without
+/// gap or duplicate (verified on Windows 11 by restarting the `EventLog` service between `EvtNext`
+/// calls). Before this was handled, a source went silent until Vector itself was restarted.
+const ERROR_INVALID_HANDLE: u32 = 6;
+const ERROR_EVT_INVALID_QUERY: u32 = 15_001; // 0x3A99
+/// Returned by `EvtSubscribe` for a channel that does not exist, and by `EvtNext` once a channel
+/// that existed at subscription time has been unregistered. The latter happens for a few seconds
+/// during every Microsoft Defender platform update, which unregisters and re-registers
+/// `Microsoft-Windows-Windows Defender/Operational`. The old handle never recovers, so it is
+/// rebuilt from the bookmark once the channel is back (vectordotdev/vector#26888).
+const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15_007; // 0x3A9F
+// Returned by `EvtSubscribe` for direct (analytic/debug) channels, which cannot be
+// subscribed to. Named explicitly because 15009 used to be held by the misnamed
+// `ERROR_EVT_CHANNEL_NOT_FOUND`, so such a channel was skipped by accident. Correcting
+// that constant without this one would turn a skipped channel into a hard startup
+// failure for every config that lists one alongside valid channels.
+const ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL: u32 = 15_009; // 0x3AA1
+const ERROR_EVT_QUERY_RESULT_STALE: u32 = 15_011; // 0x3AA3
+const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15_012; // 0x3AA4
+
+/// Backoff for rebuilding a subscription whose handle keeps reporting itself unusable
+/// while the channel delivers nothing (5 s, doubling, capped at 10 min).
+///
+/// A disabled or empty channel (observed: `Microsoft-Windows-Dhcp-Client/Operational`
+/// disabled, `.../Admin` empty on a domain controller) can return a stale result on every
+/// pull. Each successful rebuild counted as a healthy cycle, so the speculative pull every
+/// `event_timeout_ms` rebuilt it again: ~10 000 rebuilds and warnings per day per host.
+/// The backoff is skipped as soon as Windows signals the channel, so a real event is never
+/// held back by it.
+const RESUBSCRIBE_BACKOFF_BASE: std::time::Duration = std::time::Duration::from_secs(5);
+const RESUBSCRIBE_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_mins(10);
+
+/// Wait before rebuild number `attempt` (1-based) of an idle channel.
+fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
+    let shift = attempt.saturating_sub(1).min(16);
+    RESUBSCRIBE_BACKOFF_BASE
+        .saturating_mul(1u32 << shift)
+        .min(RESUBSCRIBE_BACKOFF_MAX)
+}
+
+/// Wait time for `WaitForMultipleObjects`: the configured timeout, shortened to the nearest
+/// pending re-subscription deadline that still lies in the future.
+///
+/// A retained handle of a stopped Event Log service never signals, so without this a retry
+/// scheduled after `RESUBSCRIBE_BACKOFF_BASE` would only run once a longer configured
+/// `event_timeout_ms` expires. Deadlines already passed are ignored: they are handled by the
+/// next pull, and counting them would turn the wait into a busy loop. Rounded up so the loop
+/// does not wake just before the deadline.
+fn effective_wait_ms(
+    timeout_ms: u32,
+    now: std::time::Instant,
+    deadlines: impl IntoIterator<Item = Option<std::time::Instant>>,
+) -> u32 {
+    deadlines
+        .into_iter()
+        .flatten()
+        .filter(|at| *at > now)
+        .map(|at| {
+            let ms = (at - now).as_nanos().div_ceil(1_000_000);
+            u32::try_from(ms).unwrap_or(u32::MAX).max(1)
+        })
+        .fold(timeout_ms, u32::min)
+}
+
+/// Whether `EvtNext` returning `code` means the handle can definitely never deliver again.
+///
+/// `ERROR_INVALID_OPERATION` is excluded: it also appears on a healthy but idle (disabled or
+/// empty) channel, which must keep counting as active.
+const fn handle_is_dead(code: u32) -> bool {
+    code == ERROR_EVT_QUERY_RESULT_STALE
+        || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
+        || code == ERROR_INVALID_HANDLE
+        || code == ERROR_EVT_CHANNEL_NOT_FOUND
+}
+
+/// Whether a failed `EvtSubscribe` reports that the channel is not registered.
+const fn is_channel_not_found(error: &windows::core::Error) -> bool {
+    error.code().0.cast_unsigned() & 0xFFFF == ERROR_EVT_CHANNEL_NOT_FOUND
+}
+
+/// Whether `EvtNext` returning `code` routes into the re-subscription branch of the pull loop.
+///
+/// `ERROR_INVALID_OPERATION` is included but handled specially there: on a disabled or empty
+/// channel it only means there is nothing to read.
+const fn triggers_resubscribe(code: u32) -> bool {
+    handle_is_dead(code) || code == ERROR_INVALID_OPERATION
+}
+
+/// Whether the handle stopped working because of something outside the channel's data
+/// (the Event Log service restarted, or the channel was unregistered), so a rebuild must
+/// not wait for an idle-channel backoff set earlier.
+const fn handle_lost_externally(code: u32) -> bool {
+    code == ERROR_INVALID_HANDLE || code == ERROR_EVT_CHANNEL_NOT_FOUND
+}
+
+/// Cap a pending re-subscription deadline at the base interval from `now`.
+///
+/// Used for `ERROR_INVALID_HANDLE` and `ERROR_EVT_CHANNEL_NOT_FOUND`: the handle's service
+/// instance or channel registration is gone and it can never signal, so an idle-channel
+/// deadline set before must not hold back its replacement. Without a deadline, the rebuild
+/// happens right away.
+fn cap_deadline_for_lost_handle(
+    deadline: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> Option<std::time::Instant> {
+    deadline.map(|at| at.min(now + RESUBSCRIBE_BACKOFF_BASE))
+}
+
+/// Wait before the next rebuild attempt after rebuild number `attempt` (1-based).
+///
+/// The doubling backoff is meant for a channel whose rebuilt subscription works but still
+/// delivers nothing. A rebuild that *failed* (for example because the Event Log service is
+/// still restarting) leaves the old handle in place, and a handle of a stopped service never
+/// signals again. Backing that off exponentially would delay recovery by up to
+/// `RESUBSCRIBE_BACKOFF_MAX` once the service is back, so a failed rebuild is retried on the
+/// base interval instead.
+fn resubscribe_retry_after(attempt: u32, rebuild_failed: bool) -> std::time::Duration {
+    if rebuild_failed {
+        RESUBSCRIBE_BACKOFF_BASE
+    } else {
+        resubscribe_backoff(attempt)
+    }
+}
 
 /// Per-channel subscription state for pull model.
 struct ChannelSubscription {
@@ -78,6 +209,13 @@ struct ChannelSubscription {
     subscription_handle: EVT_HANDLE,
     signal_event: HANDLE,
     bookmark: BookmarkManager,
+    /// Whether `subscription_handle` can currently serve results.
+    ///
+    /// Not derivable from the handle: when re-subscription fails the old handle is
+    /// deliberately retained, so that the next pull reproduces the error and retries.
+    /// A non-null handle therefore no longer implies a working one, and health reporting
+    /// must read this flag rather than infer activity from handle nullness.
+    subscription_active: bool,
     /// Pre-registered counter for events read on this channel.
     events_read_counter: Counter,
     /// Pre-registered counter for render errors on this channel.
@@ -89,11 +227,30 @@ struct ChannelSubscription {
     /// Gauge tracking total record count in the channel log.
     /// SOC teams use `rate(events_read_total)` vs this gauge to detect ingestion lag.
     channel_records_gauge: Gauge,
+    /// Rebuilds since this channel last delivered an event (see `RESUBSCRIBE_BACKOFF_BASE`).
+    idle_resubscribes: u32,
+    /// Earliest time for the next rebuild while `idle_resubscribes > 0`.
+    next_resubscribe_at: Option<std::time::Instant>,
 }
 
 // SAFETY: Same rationale as EventLogSubscription - Windows kernel handles are thread-safe.
 unsafe impl Send for ChannelSubscription {}
 unsafe impl Sync for ChannelSubscription {}
+
+impl ChannelSubscription {
+    /// Report the subscription as active again once its handle has evidently answered a pull.
+    ///
+    /// A failed rebuild keeps the old handle and reports the channel inactive. That handle may
+    /// still work: delivering events, answering `ERROR_NO_MORE_ITEMS`, returning an empty batch,
+    /// or `ERROR_INVALID_OPERATION` on a disabled or empty channel all show it does. Restoring the
+    /// state only on delivery would leave an idle channel reported as down indefinitely.
+    fn report_active(&mut self) {
+        if !self.subscription_active {
+            self.subscription_active = true;
+            self.subscription_active_gauge.set(1.0);
+        }
+    }
+}
 
 /// Result of waiting for events across all channels.
 pub(super) enum WaitResult {
@@ -336,6 +493,7 @@ impl EventLogSubscription {
 
                     channel_subscriptions.push(ChannelSubscription {
                         channel: channel.clone(),
+                        subscription_active: true,
                         events_read_counter: counter!(
                             "windows_event_log_events_read_total",
                             "channel" => channel.clone()
@@ -356,15 +514,18 @@ impl EventLogSubscription {
                         subscription_handle,
                         signal_event,
                         bookmark,
+                        idle_resubscribes: 0,
+                        next_resubscribe_at: None,
                     });
                 }
                 Err(e) => {
                     let error_code = e.code().0.cast_unsigned() & 0xFFFF;
                     if error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
+                        || error_code == ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL
                     {
                         warn!(
-                            message = "Skipping channel (not found or invalid query).",
+                            message = "Skipping channel (not found, invalid query, or direct channel).",
                             channel = %channel,
                             error_code = error_code
                         );
@@ -445,6 +606,11 @@ impl EventLogSubscription {
         handles.push(self.shutdown_event);
         handles.extend(self.channels.iter().map(|c| c.signal_event));
 
+        let timeout_ms = effective_wait_ms(
+            timeout_ms,
+            std::time::Instant::now(),
+            self.channels.iter().map(|c| c.next_resubscribe_at),
+        );
         let result = unsafe { WaitForMultipleObjects(&handles, false, timeout_ms) };
 
         match result {
@@ -530,6 +696,14 @@ impl EventLogSubscription {
             let mut bookmark_failed = false;
             let mut channel_count = 0usize;
 
+            // Whether Windows signalled new matching events since the last pull. Read
+            // before the reset below; a signalled channel bypasses the re-subscribe
+            // backoff so a real event is never delayed by it.
+            // SAFETY: `signal_event` is a valid event handle owned by this subscription; a zero
+            // timeout only polls its state.
+            let signalled =
+                unsafe { WaitForSingleObject(channel_sub.signal_event, 0) } == WAIT_OBJECT_0;
+
             // Reset the signal BEFORE draining to avoid a lost-wakeup race
             // (see vectordotdev/vector#25194). The Windows Event Log service
             // signals this manual-reset event via SetEvent each time a new
@@ -582,30 +756,126 @@ impl EventLogSubscription {
                 if let Err(err) = result {
                     let code = err.code().0.cast_unsigned() & 0xFFFF;
                     if code == ERROR_NO_MORE_ITEMS {
+                        channel_sub.report_active();
                         channel_drained = true;
                         break;
                     }
-                    if code == ERROR_EVT_QUERY_RESULT_STALE {
-                        debug!(
-                            message = "Channel subscription ended.",
-                            channel = %channel_sub.channel
+                    // These errors can mean the subscription handle no longer serves results
+                    // and must be rebuilt (ERROR_INVALID_OPERATION can also mean a healthy but
+                    // idle channel, handled below); continuing to pull from it yields nothing.
+                    //
+                    // `ERROR_INVALID_OPERATION` is observed in practice on a freshly created
+                    // `EvtSubscribeToFutureEvents` pull subscription: `EvtNext` returns it
+                    // repeatedly on a perfectly healthy channel. Previously it was mistaken
+                    // for a stale result (the constant held 4317) and swallowed at debug
+                    // level, so the source went silent for good while still looking healthy.
+                    if triggers_resubscribe(code) {
+                        let now = std::time::Instant::now();
+                        // An invalid handle belongs to an Event Log service instance that is
+                        // gone; it can never signal again. An idle-channel deadline inherited
+                        // from before the service stopped (up to RESUBSCRIBE_BACKOFF_MAX) must
+                        // not delay its replacement, so cap it at the base interval. The same
+                        // holds for a channel that was unregistered (Defender platform update):
+                        // it is usually back within seconds. While it is still missing, the
+                        // rebuild fails and is retried on the base interval below.
+                        if handle_lost_externally(code) {
+                            channel_sub.next_resubscribe_at =
+                                cap_deadline_for_lost_handle(channel_sub.next_resubscribe_at, now);
+                        }
+                        let backed_off = channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
+                        if !signalled && backed_off {
+                            // Still unusable, nothing new signalled, backoff not over: leave
+                            // the handle as it is. The speculative pull in mod.rs brings us
+                            // back here; a signal ends the wait immediately.
+                            // A definitely dead handle must not be reported as active while
+                            // it waits; a successful re-subscription sets it active again.
+                            if handle_is_dead(code) && channel_sub.subscription_active {
+                                channel_sub.subscription_active = false;
+                                channel_sub.subscription_active_gauge.set(0.0);
+                            }
+                            debug!(
+                                message = "Re-subscription backed off, channel idle.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                            channel_drained = true;
+                            break;
+                        }
+                        channel_sub.idle_resubscribes =
+                            channel_sub.idle_resubscribes.saturating_add(1);
+                        channel_sub.next_resubscribe_at = Some(
+                            now + resubscribe_retry_after(channel_sub.idle_resubscribes, false),
                         );
-                        channel_drained = true;
-                        // Speculative pull on timeout in mod.rs is a safety net if the
-                        // re-subscribed channel does not immediately re-signal.
-                        break;
-                    }
-                    if code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION {
-                        warn!(
-                            message = "Event log channel was cleared or query position invalidated, attempting re-subscription.",
-                            channel = %channel_sub.channel
-                        );
-                        match Self::resubscribe_channel(channel_sub, &self.config) {
+
+                        // Root cause of the idle-channel loop: on a disabled or empty channel
+                        // `EvtNext` answers ERROR_INVALID_OPERATION simply because there is
+                        // nothing to read, and a rebuilt subscription answers the same. Only a
+                        // channel that has records needs the rebuild (the case this branch was
+                        // written for: a healthy channel going silent). The metadata check runs
+                        // at most once per backoff step, so idle hosts see no steady
+                        // EvtOpenLog/EvtGetLogInfo churn.
+                        if code == ERROR_INVALID_OPERATION && !signalled {
+                            let channel = &channel_sub.channel;
+                            let disabled = super::render::channel_enabled(channel) == Some(false);
+                            let empty = !disabled
+                                && super::render::channel_record_count(channel) == Some(0);
+                            let idle_reason = if disabled {
+                                Some("disabled")
+                            } else if empty {
+                                Some("empty")
+                            } else {
+                                None
+                            };
+                            if let Some(reason) = idle_reason {
+                                // Treated as idle, not broken (see `handle_is_dead`), so it counts
+                                // as active like any other idle channel.
+                                channel_sub.report_active();
+                                if channel_sub.idle_resubscribes == 1 {
+                                    info!(
+                                        message = "Channel has nothing to read, keeping the subscription instead of rebuilding it.",
+                                        channel = %channel_sub.channel,
+                                        reason = reason
+                                    );
+                                } else {
+                                    debug!(
+                                        message = "Channel still has nothing to read.",
+                                        channel = %channel_sub.channel,
+                                        reason = reason,
+                                        idle_resubscribes = channel_sub.idle_resubscribes
+                                    );
+                                }
+                                channel_drained = true;
+                                break;
+                            }
+                        }
+
+                        // Loud on the first rebuild and then on powers of two, so a channel
+                        // that never recovers stays visible without flooding the log.
+                        let loud = channel_sub.idle_resubscribes.is_power_of_two();
+                        if loud {
+                            warn!(
+                                message = "Subscription handle no longer usable (stale result, invalidated position, invalid operation, invalid handle, or channel not found), attempting re-subscription.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                        } else {
+                            debug!(
+                                message = "Subscription handle no longer usable, attempting re-subscription.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                        }
+                        match Self::resubscribe_channel(channel_sub, &self.config, loud) {
                             Ok(()) => {
-                                info!(
-                                    message = "Re-subscription succeeded after stale query.",
-                                    channel = %channel_sub.channel
-                                );
+                                if loud {
+                                    info!(
+                                        message = "Re-subscription succeeded.",
+                                        channel = %channel_sub.channel
+                                    );
+                                }
                                 // Retry from fresh subscription — the signal will fire again.
                                 // Speculative pull on timeout in mod.rs is a safety net if
                                 // the new subscription does not immediately re-signal.
@@ -613,11 +883,31 @@ impl EventLogSubscription {
                                 break;
                             }
                             Err(e) => {
-                                warn!(
-                                    message = "Re-subscription failed, will retry next cycle.",
-                                    channel = %channel_sub.channel,
-                                    error = %e
+                                // The old handle stays in place; if its Event Log service instance
+                                // is gone it can never signal again, so retry on the base
+                                // interval rather than the idle-channel backoff.
+                                channel_sub.next_resubscribe_at = Some(
+                                    now + resubscribe_retry_after(
+                                        channel_sub.idle_resubscribes,
+                                        true,
+                                    ),
                                 );
+                                if loud {
+                                    warn!(
+                                        message = "Re-subscription failed, will retry.",
+                                        channel = %channel_sub.channel,
+                                        idle_resubscribes = channel_sub.idle_resubscribes,
+                                        error = %e
+                                    );
+                                } else {
+                                    debug!(
+                                        message = "Re-subscription failed, will retry.",
+                                        channel = %channel_sub.channel,
+                                        idle_resubscribes = channel_sub.idle_resubscribes,
+                                        error = %e
+                                    );
+                                }
+                                channel_sub.subscription_active = false;
                                 channel_sub.subscription_active_gauge.set(0.0);
                                 channel_drained = true;
                                 // Speculative pull on timeout in mod.rs is a safety net if
@@ -644,9 +934,17 @@ impl EventLogSubscription {
                 }
 
                 if returned == 0 {
+                    channel_sub.report_active();
                     channel_drained = true;
                     break;
                 }
+
+                // The channel delivers again: the next unusable handle is rebuilt at once.
+                channel_sub.idle_resubscribes = 0;
+                channel_sub.next_resubscribe_at = None;
+                // A handle retained after a failed rebuild (or reported inactive while backed
+                // off) is evidently working: report it active again.
+                channel_sub.report_active();
 
                 channel_sub
                     .events_read_counter
@@ -816,17 +1114,29 @@ impl EventLogSubscription {
         Ok(all_events)
     }
 
-    /// Re-subscribe a channel after its query position becomes invalid
-    /// (e.g., an admin cleared the event log). Closes the old subscription
-    /// handle and creates a new one using the current bookmark.
+    /// Re-subscribe a channel whose subscription handle can no longer serve results (stale or
+    /// invalidated query position, e.g. after an admin cleared the event log; a restarted Event
+    /// Log service; or a channel that was unregistered and registered again). Creates a new
+    /// handle from the current bookmark and only then closes the old one.
+    ///
+    /// `loud` is the caller's log sampling (first attempt and powers of two): a rebuild that keeps
+    /// failing, e.g. while the Event Log service is down, is retried every few seconds, so the
+    /// warning about the strict bookmark failure follows the same sampling instead of firing on
+    /// every retry.
     fn resubscribe_channel(
         channel_sub: &mut ChannelSubscription,
         config: &WindowsEventLogConfig,
+        loud: bool,
     ) -> Result<(), WindowsEventLogError> {
-        // Close the stale subscription handle
-        unsafe {
-            let _ = EvtClose(channel_sub.subscription_handle);
-        }
+        // The old handle is deliberately kept open until the replacement exists.
+        //
+        // Closing it first would leave a closed handle in `channel_sub` whenever
+        // `EvtSubscribe` fails transiently, and `EvtClose` on it later would act on a
+        // handle value that may already be reused. Keeping the stale handle means the
+        // next pull reproduces the original error code and routes back into here — that
+        // *is* the retry path. (ERROR_INVALID_HANDLE itself is now a recovery branch: it is
+        // what every pull returns after the Event Log service restarted.)
+        let old_handle = channel_sub.subscription_handle;
 
         let channel_hstring = HSTRING::from(channel_sub.channel.as_str());
         let query = Self::build_xpath_query(config)?;
@@ -864,13 +1174,27 @@ impl EventLogSubscription {
                 );
                 match strict_result {
                     Ok(handle) => Ok(handle),
+                    // The channel is not registered (yet). That says nothing about the bookmark,
+                    // so keep it and let the caller retry, rather than falling back to a
+                    // subscription without it, which would replay or skip records if the
+                    // channel came back between the two calls.
+                    Err(e) if is_channel_not_found(&e) => Err(e),
                     Err(e) => {
-                        warn!(
-                            message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
-                            channel = %channel_sub.channel,
-                            error = %e,
-                            fallback_flags = format!("{fallback_flags:#x}")
-                        );
+                        if loud {
+                            warn!(
+                                message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                                channel = %channel_sub.channel,
+                                error = %e,
+                                fallback_flags = format!("{fallback_flags:#x}")
+                            );
+                        } else {
+                            debug!(
+                                message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                                channel = %channel_sub.channel,
+                                error = %e,
+                                fallback_flags = format!("{fallback_flags:#x}")
+                            );
+                        }
                         EvtSubscribe(
                             None,
                             channel_sub.signal_event,
@@ -898,7 +1222,15 @@ impl EventLogSubscription {
         }
         .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
 
+        // Replacement is in place — only now is the stale handle safe to release.
+        // SAFETY: `old_handle` is the previous subscription handle; it is no longer stored
+        // anywhere and is not used after this call.
+        if let Err(error) = unsafe { EvtClose(old_handle) } {
+            debug!(message = "Failed to close replaced subscription handle.", %error);
+        }
+
         channel_sub.subscription_handle = new_handle;
+        channel_sub.subscription_active = true;
         channel_sub.subscription_active_gauge.set(1.0);
 
         counter!(
@@ -939,11 +1271,13 @@ impl EventLogSubscription {
     /// Returns (`total_channels`, `active_channels`) for health reporting.
     pub(super) fn channel_health_summary(&self) -> (usize, usize) {
         let total = self.channels.len();
-        // A channel is considered active if its subscription handle is non-null
+        // Read the tracked state, not the handle. A failed re-subscription deliberately
+        // keeps the old, unusable handle so the next pull retries — inferring activity
+        // from handle nullness would report "healthy" during exactly that outage.
         let active = self
             .channels
             .iter()
-            .filter(|c| c.subscription_handle.0 != 0)
+            .filter(|c| c.subscription_active)
             .count();
         (total, active)
     }
@@ -1130,6 +1464,131 @@ mod tests {
     }
 
     #[test]
+    fn test_resubscribe_backoff_doubles_and_caps() {
+        use std::time::Duration;
+        assert_eq!(resubscribe_backoff(1), Duration::from_secs(5));
+        assert_eq!(resubscribe_backoff(2), Duration::from_secs(10));
+        assert_eq!(resubscribe_backoff(3), Duration::from_secs(20));
+        assert_eq!(resubscribe_backoff(7), Duration::from_secs(320));
+        assert_eq!(resubscribe_backoff(8), Duration::from_secs(600));
+        assert_eq!(resubscribe_backoff(u32::MAX), Duration::from_secs(600));
+        // Defensive: 0 is never passed (the counter is incremented first), but must not panic.
+        assert_eq!(resubscribe_backoff(0), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn test_invalid_handle_caps_inherited_idle_deadline() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        // A healthy but idle subscription had backed off to the 10-minute cap when the
+        // Event Log service stopped: the dead handle must be rebuilt within the base interval.
+        let inherited = Some(now + Duration::from_secs(600));
+        assert_eq!(
+            cap_deadline_for_lost_handle(inherited, now),
+            Some(now + Duration::from_secs(5))
+        );
+        // A shorter deadline is kept, and no deadline means rebuild immediately.
+        let short = Some(now + Duration::from_secs(2));
+        assert_eq!(cap_deadline_for_lost_handle(short, now), short);
+        assert_eq!(cap_deadline_for_lost_handle(None, now), None);
+    }
+
+    #[test]
+    fn test_wait_is_shortened_to_the_nearest_future_deadline() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        // No deadline: the configured timeout.
+        assert_eq!(effective_wait_ms(60_000, now, [None, None]), 60_000);
+        // A failed rebuild due in 5 s wakes the loop then, not after 60 s.
+        assert_eq!(
+            effective_wait_ms(60_000, now, [None, Some(now + Duration::from_secs(5))]),
+            5_000
+        );
+        // The nearest of several deadlines wins; a later one never lengthens the wait.
+        assert_eq!(
+            effective_wait_ms(
+                60_000,
+                now,
+                [
+                    Some(now + Duration::from_secs(600)),
+                    Some(now + Duration::from_millis(1500))
+                ]
+            ),
+            1_500
+        );
+        assert_eq!(
+            effective_wait_ms(5_000, now, [Some(now + Duration::from_secs(600))]),
+            5_000
+        );
+        // Sub-millisecond remainders round up, so the loop does not wake just before.
+        assert_eq!(
+            effective_wait_ms(60_000, now, [Some(now + Duration::from_micros(2_500))]),
+            3
+        );
+        // A deadline already passed is ignored instead of producing a busy loop.
+        assert_eq!(effective_wait_ms(60_000, now, [Some(now)]), 60_000);
+    }
+
+    #[test]
+    fn test_dead_handle_codes_exclude_idle_invalid_operation() {
+        // Definitely dead: reported inactive while waiting for the re-subscription.
+        assert!(handle_is_dead(ERROR_INVALID_HANDLE));
+        assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_STALE));
+        assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_INVALID_POSITION));
+        // Channel unregistered while subscribed (Defender platform update, #26888).
+        assert!(handle_is_dead(ERROR_EVT_CHANNEL_NOT_FOUND));
+        // Also returned by a healthy but idle channel, so it must not flip the active state.
+        assert!(!handle_is_dead(ERROR_INVALID_OPERATION));
+        assert!(!handle_is_dead(ERROR_NO_MORE_ITEMS));
+    }
+
+    #[test]
+    fn test_externally_lost_handles_skip_idle_backoff() {
+        // Service restart and unregistered channel: an idle-channel deadline must not delay
+        // the rebuild.
+        assert!(handle_lost_externally(ERROR_INVALID_HANDLE));
+        assert!(handle_lost_externally(ERROR_EVT_CHANNEL_NOT_FOUND));
+        // Stale results and idle channels keep their backoff.
+        assert!(!handle_lost_externally(ERROR_EVT_QUERY_RESULT_STALE));
+        assert!(!handle_lost_externally(
+            ERROR_EVT_QUERY_RESULT_INVALID_POSITION
+        ));
+        assert!(!handle_lost_externally(ERROR_INVALID_OPERATION));
+        // Every one of these is handled by the pull loop's re-subscription branch.
+        for code in [
+            ERROR_EVT_QUERY_RESULT_STALE,
+            ERROR_EVT_QUERY_RESULT_INVALID_POSITION,
+            ERROR_INVALID_OPERATION,
+            ERROR_INVALID_HANDLE,
+            ERROR_EVT_CHANNEL_NOT_FOUND,
+        ] {
+            assert!(
+                triggers_resubscribe(code),
+                "{code} must trigger a re-subscription"
+            );
+        }
+        assert!(!triggers_resubscribe(ERROR_NO_MORE_ITEMS));
+        assert!(!triggers_resubscribe(ERROR_ACCESS_DENIED));
+        // 0x80073A9F as reported in #26888, reduced the same way as in `pull_events_inner`.
+        assert_eq!(0x8007_3A9F_u32 & 0xFFFF, ERROR_EVT_CHANNEL_NOT_FOUND);
+    }
+
+    #[test]
+    fn test_failed_rebuild_is_retried_on_base_interval() {
+        use std::time::Duration;
+        // A rebuild that worked but delivers nothing backs off exponentially ...
+        assert_eq!(resubscribe_retry_after(8, false), Duration::from_secs(600));
+        // ... a failed rebuild (old handle of a stopped Event Log service, which never signals
+        // again) is retried on the base interval, however often it failed before.
+        for attempt in [1, 2, 8, 100, u32::MAX] {
+            assert_eq!(
+                resubscribe_retry_after(attempt, true),
+                Duration::from_secs(5)
+            );
+        }
+    }
+
+    #[test]
     fn test_rate_limiter_configuration() {
         let mut config = WindowsEventLogConfig::default();
         assert_eq!(config.events_per_second, 0);
@@ -1168,6 +1627,68 @@ mod tests {
             sub.channels.len(),
             1,
             "Should have one channel subscription"
+        );
+    }
+
+    /// A handle retained after a failed rebuild is reported inactive; once it answers a pull
+    /// without delivering anything (`ERROR_NO_MORE_ITEMS` or an empty batch), it is evidently
+    /// usable and must be reported active again instead of staying down on an idle channel.
+    #[tokio::test]
+    async fn test_empty_pull_reports_retained_handle_active() {
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true;
+        config.event_timeout_ms = 100;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Drain the channel so the next pull answers `ERROR_NO_MORE_ITEMS` instead of
+        // delivering (delivery would restore the state on its own).
+        let mut drained = false;
+        for _ in 0..500 {
+            match subscription.pull_events(1000) {
+                Ok(events) if events.is_empty() => {
+                    drained = true;
+                    break;
+                }
+                Ok(_) => {}
+                Err(e) => panic!("pull failed while draining: {e}"),
+            }
+        }
+        assert!(drained, "Application channel did not drain");
+
+        // Simulate the state left by a failed rebuild that kept the old handle, then pull once.
+        // Only an empty pull exercises the path under test: a delivered event restores the
+        // state on its own. Application is a live log, so another process may write between
+        // the drain and the pull; in that case clear the state again and retry.
+        let mut checked = false;
+        for _ in 0..20 {
+            for channel in &mut subscription.channels {
+                channel.subscription_active = false;
+            }
+            let events = subscription
+                .pull_events(100)
+                .expect("pull on a drained channel should succeed");
+            if !events.is_empty() {
+                continue;
+            }
+
+            let (total, active) = subscription.channel_health_summary();
+            assert_eq!(total, 1);
+            assert_eq!(
+                active, 1,
+                "an answering handle must be reported active again"
+            );
+            checked = true;
+            break;
+        }
+        assert!(
+            checked,
+            "no empty pull observed; the channel kept delivering"
         );
     }
 
@@ -1341,8 +1862,13 @@ mod tests {
         assert_eq!(sub2.channels[0].channel, "System");
     }
 
-    /// Test `read_existing_events=false` only receives future events
+    /// Test that `read_existing_events = false` still delivers events that arrive
+    /// *after* subscribing — and only those.
+    ///
+    /// Regression test for #26117. `#[serial]` because it seeds the Application log,
+    /// which other tests in this module also read.
     #[tokio::test]
+    #[serial]
     async fn test_read_existing_events_false_only_receives_future_events() {
         use chrono::Utc;
 
@@ -1358,10 +1884,117 @@ mod tests {
             .await
             .expect("Subscription creation should succeed");
 
-        // Brief wait then pull
-        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        // Seed AFTER subscribing. With `read_existing_events = false` the subscription
+        // must deliver records written from this point on, so the seed has to come
+        // second to prove anything.
+        //
+        // This ordering is the whole point of the test: it previously seeded nothing and
+        // only asserted a property of the events it happened to receive, so it passed
+        // with zero events — which is exactly the failure mode of #26117, where the
+        // source subscribes successfully and then stays silent forever.
+        // Named once: the assertions below identify the seeded records by this provider,
+        // so the writer and the reader must not drift apart.
+        const SEED_PROVIDER: &str = "VectorTestFutureEventsSeed";
 
-        let events = subscription.pull_events(100).unwrap_or_default();
+        fn seed(id: &str, note: &str) {
+            let out = std::process::Command::new("eventcreate")
+                .args([
+                    "/T",
+                    "INFORMATION",
+                    "/ID",
+                    id,
+                    "/L",
+                    "APPLICATION",
+                    "/SO",
+                    SEED_PROVIDER,
+                    "/D",
+                    note,
+                ])
+                .output()
+                .expect("failed to spawn eventcreate — required for deterministic seeding");
+            assert!(
+                out.status.success(),
+                "eventcreate failed to seed Application log (exit={:?}): stdout={:?} stderr={:?}. \
+                 This test requires a seeded event to be deterministic; a locked-down runner \
+                 without the privilege to write to Application cannot run this test reliably.",
+                out.status.code(),
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            );
+        }
+
+        /// Pull until at least one event arrives or the deadline passes.
+        async fn pull_until_nonempty(
+            subscription: &mut EventLogSubscription,
+        ) -> Vec<xml_parser::WindowsEvent> {
+            let mut events = Vec::new();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while std::time::Instant::now() < deadline {
+                events.extend(subscription.pull_events(100).unwrap_or_default());
+                if !events.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            events
+        }
+
+        seed("101", "first seed for #26117 future-events regression test");
+
+        // Poll rather than sleeping once: the service needs a moment to persist the
+        // record, and a single fixed wait makes this flaky on slow runners.
+        let mut events = pull_until_nonempty(&mut subscription).await;
+
+        assert!(
+            !events.is_empty(),
+            "No events delivered within 30s although a record was written to the \
+             Application log after subscribing. With read_existing_events=false the \
+             subscription must still deliver newly arriving records (see #26117)."
+        );
+
+        // The first batch alone does not prove the fix. `pull_events_inner` keeps events
+        // it has already accumulated when a later `EvtNext` fails, so an unpatched build
+        // can return this first seed, swallow the error that kills the handle, and go
+        // permanently silent — while still satisfying the assertion above. Only a second
+        // event, written after the first pull completed, shows that delivery survives.
+        //
+        // It has to be *this* event, not merely a non-empty second batch: on a busy
+        // Application log the first pull can exhaust its 100-event budget before reaching
+        // the failing `EvtNext`, so the backlog alone would satisfy a non-empty check
+        // while event 102 never arrives.
+        seed(
+            "102",
+            "second seed for #26117 — must arrive after the first pull",
+        );
+
+        let mut later_events = Vec::new();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while std::time::Instant::now() < deadline {
+            later_events.extend(subscription.pull_events(100).unwrap_or_default());
+            if later_events
+                .iter()
+                .any(|e| e.event_id == 102 && e.provider_name == SEED_PROVIDER)
+            {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+
+        assert!(
+            later_events
+                .iter()
+                .any(|e| e.event_id == 102 && e.provider_name == SEED_PROVIDER),
+            "The record seeded *after* the first pull (event ID 102, provider {SEED_PROVIDER}) \
+             was never delivered within 30s. This is the #26117 failure mode: the handle \
+             stops serving results and is never rebuilt, so the source looks healthy while \
+             being silent. Received {} event(s) in the second phase: {:?}",
+            later_events.len(),
+            later_events
+                .iter()
+                .map(|e| (e.event_id, e.provider_name.as_str()))
+                .collect::<Vec<_>>(),
+        );
+        events.extend(later_events);
 
         let tolerance = chrono::Duration::seconds(5);
         let earliest_allowed = subscription_start_time - tolerance;
