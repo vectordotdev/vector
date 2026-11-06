@@ -166,6 +166,83 @@ pub struct ComposeTestConfig {
     pub test_filter: Option<String>,
 
     pub paths: Option<Vec<String>>,
+
+    /// Steps vdev runs after the environment starts, before any test runs.
+    #[serde(default)]
+    pub lifecycle: LifecycleConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LifecycleConfig {
+    /// Run in order once per `start`, so tests read complete captures and can be rerun.
+    #[serde(default, with = "serde_yaml::with::singleton_map_recursive")]
+    pub before_validation: Vec<LifecycleStep>,
+}
+
+/// One `before_validation` step, written as a single-key map such as `- stop: {...}`.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum LifecycleStep {
+    /// Wait for a one-shot compose service to exit successfully.
+    WaitForSuccess(WaitForSuccess),
+    /// Pause, for consumers that have no observable completion signal.
+    SleepSecs(u64),
+    /// Stop a group of containers together.
+    Stop(StopGroup),
+    /// Run a compose service, usually kept out of `up` with a profile, to completion.
+    Run(RunService),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WaitForSuccess {
+    pub service: String,
+    pub timeout_secs: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StopGroup {
+    /// Compose service names.
+    #[serde(default)]
+    pub services: Vec<String>,
+    /// Container labels (`key=value`), for groups too large to list by service.
+    #[serde(default)]
+    pub labels: Vec<String>,
+    /// Docker's stop grace period before it kills a container.
+    pub timeout_secs: u64,
+    /// Fail if a container exited non-zero or was OOM-killed.
+    #[serde(default = "default_true")]
+    pub require_success: bool,
+    /// Fail if any of these strings appear in a container's logs.
+    #[serde(default)]
+    pub reject_log_messages: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RunService {
+    pub service: String,
+    pub timeout_secs: u64,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+impl LifecycleConfig {
+    fn validate(&self) -> Result<()> {
+        for step in &self.before_validation {
+            if let LifecycleStep::Stop(group) = step
+                && group.services.is_empty()
+                && group.labels.is_empty()
+            {
+                bail!("a `stop` step must list `services` or `labels`");
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -193,6 +270,10 @@ impl ComposeTestConfig {
                 config_file.display()
             )
         })?;
+        config
+            .lifecycle
+            .validate()
+            .with_context(|| format!("invalid lifecycle in {}", config_file.display()))?;
 
         Ok(config)
     }
@@ -283,6 +364,89 @@ impl ComposeTestConfig {
         } else {
             let missing = missing.into_iter().join(", ");
             bail!("Required environment variables are not set: {missing}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lifecycle(yaml: &str) -> Result<LifecycleConfig> {
+        let config: LifecycleConfig = serde_yaml::from_str(yaml)?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    #[test]
+    fn parses_lifecycle_steps_in_order() {
+        let config = lifecycle(indoc::indoc! {"
+            before_validation:
+              - wait_for_success: {service: client, timeout_secs: 60}
+              - sleep_secs: 5
+              - stop:
+                  labels: [producer=true]
+                  timeout_secs: 30
+                  require_success: false
+              - stop:
+                  services: [vector]
+                  timeout_secs: 90
+                  reject_log_messages: [Failed to gracefully shut down in time]
+              - run: {service: drain-check, timeout_secs: 180}
+        "})
+        .unwrap();
+        assert_eq!(
+            config.before_validation,
+            [
+                LifecycleStep::WaitForSuccess(WaitForSuccess {
+                    service: "client".into(),
+                    timeout_secs: 60,
+                }),
+                LifecycleStep::SleepSecs(5),
+                LifecycleStep::Stop(StopGroup {
+                    services: vec![],
+                    labels: vec!["producer=true".into()],
+                    timeout_secs: 30,
+                    require_success: false,
+                    reject_log_messages: vec![],
+                }),
+                LifecycleStep::Stop(StopGroup {
+                    services: vec!["vector".into()],
+                    labels: vec![],
+                    timeout_secs: 90,
+                    require_success: true,
+                    reject_log_messages: vec!["Failed to gracefully shut down in time".into()],
+                }),
+                LifecycleStep::Run(RunService {
+                    service: "drain-check".into(),
+                    timeout_secs: 180,
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_lifecycle_steps() {
+        for (yaml, expected) in [
+            (
+                "before_validation: [{stop: {timeout_secs: 30}}]",
+                "must list",
+            ),
+            (
+                "before_validation: [{stop: {services: [a]}}]",
+                "timeout_secs",
+            ),
+            (
+                "before_validation: [{wait: {service: a, timeout_secs: 1}}]",
+                "unknown variant",
+            ),
+            (
+                "before_validation: [{run: {service: a, timeout_secs: 1, extra: 1}}]",
+                "unknown field",
+            ),
+        ] {
+            let error = format!("{:#}", lifecycle(yaml).unwrap_err());
+            assert!(error.contains(expected), "{yaml}: {error}");
         }
     }
 }

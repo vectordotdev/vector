@@ -13,5 +13,30 @@ matrix:
   collector_version: ["0.159.0"]
   ingress_exporter: ["otlphttp", "otlp"] # HTTP and gRPC into Vector, respectively.
 
+# Freeze both Collector captures before Rust validation starts.
+lifecycle:
+  before_validation:
+    # The scenario exits after three shopping rounds; Locust's --run-time is the safety limit.
+    - wait_for_success: {service: load-generator, timeout_secs: 960}
+    # Allow asynchronous Kafka consumers to process the final checkout.
+    - sleep_secs: 5
+    - stop:
+        labels: [vector.otel-traces-multiservice.producer=true]
+        timeout_secs: 30
+        # Demo services do not all exit 0 on SIGTERM.
+        require_success: false
+    - stop:
+        services: [otel-collector]
+        timeout_secs: 30
+    # Keep the destination alive until Vector has flushed and exited, including any late
+    # duplicate batches that the Rust comparison must be able to detect.
+    - stop:
+        services: [vector]
+        # Longer than Vector's default 60-second graceful shutdown limit.
+        timeout_secs: 120
+    - run: {service: drain-check, timeout_secs: 180}
+    - stop:
+        services: [otel-collector-sink]
+        timeout_secs: 30
 
 # Intentionally absent from the automatic CI matrices and changed-file filters.

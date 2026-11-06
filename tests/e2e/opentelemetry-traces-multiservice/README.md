@@ -46,11 +46,11 @@ flowchart TB
 ```
 
 The test runs twice: once with HTTP ingress and once with gRPC ingress.
-Before Rust validation, [finalize.py](data/finalize.py) allows Kafka consumers to finish,
-stops the producers and input Collector, then gracefully stops Vector while the
-output Collector still accepts traces. It waits up to 120 seconds for the expected
-span count before stopping the output Collector. An unclean Vector exit fails the
-run. Compose waits for capture finalization to finish.
+Before Rust validation, vdev runs the `lifecycle` steps in [test.yaml](config/test.yaml).
+They allow Kafka consumers to finish, stop the producers and input Collector, then
+gracefully stop Vector while the output Collector still accepts traces.
+[drain_check.py](data/drain_check.py) then waits up to 120 seconds for the expected
+span count before the output Collector stops. An unclean Vector exit fails the run.
 Rust reads the finalized files, so retries do not need a fresh environment.
 The idle `demo-ready` container keeps the environment active until harness cleanup.
 
@@ -86,8 +86,9 @@ writes `output.jsonl`.
 
 The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
-- Completion: requires a clean Vector shutdown and finalized captures. Fails if
-  the output capture does not reach the expected span count within 120 seconds.
+- Completion: fails if the output capture does not reach the expected span count
+  within 120 seconds. vdev's lifecycle fails the run before validation on an unclean
+  Vector shutdown.
 - Service coverage: requires spans from 14 services exercised by the workload.
 - Trace shapes: requires roots, multi-span traces, children with captured
   parents, cross-service parent relationships, and error spans.

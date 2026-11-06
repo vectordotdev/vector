@@ -24,6 +24,8 @@ use crate::{
     utils::environment::{Environment, extract_present, rename_environment_keys},
 };
 
+mod lifecycle;
+
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 /// Where the committed E2E image keeps Vector.
@@ -318,6 +320,13 @@ impl ComposeTest {
 
         if !was_running {
             self.start()?;
+        } else if !self.config.lifecycle.before_validation.is_empty()
+            && !lifecycle::completion_marker(&self.project_name()).exists()
+        {
+            bail!(
+                "The lifecycle of {} did not complete; stop and start the environment again",
+                self.test_name
+            );
         }
 
         let mut env_vars = self.config.env.clone();
@@ -482,7 +491,14 @@ impl ComposeTest {
             }
 
             let project_name = self.project_name();
+            remove_completion_marker(&project_name)?;
             compose.start(&self.env_config, &project_name)?;
+            lifecycle::run(
+                compose,
+                &self.env_config,
+                &project_name,
+                &self.config.lifecycle.before_validation,
+            )?;
         }
         Ok(())
     }
@@ -495,6 +511,7 @@ impl ComposeTest {
 
             let project_name = self.project_name();
             compose.stop(&self.env_config, &project_name)?;
+            remove_completion_marker(&project_name)?;
         }
 
         self.runner.remove()?;
@@ -510,6 +527,16 @@ impl ComposeTest {
         compose
             .logs(&self.env_config, &self.project_name())
             .map(Some)
+    }
+}
+
+fn remove_completion_marker(project_name: &str) -> Result<()> {
+    let marker = lifecycle::completion_marker(project_name);
+    match std::fs::remove_file(&marker) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+            Err(error).with_context(|| format!("failed to remove {}", marker.display()))
+        }
+        _ => Ok(()),
     }
 }
 
