@@ -208,7 +208,7 @@ impl StreamSink<Event> for WebSocketSink {
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use futures::{FutureExt, StreamExt, future};
     use serde_json::Value as JsonValue;
@@ -244,6 +244,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: HashMap::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
@@ -268,6 +269,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: HashMap::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
@@ -292,6 +294,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("wss://{addr}"),
+                headers: HashMap::default(),
                 tls: Some(TlsEnableableConfig {
                     enabled: Some(true),
                     options: TlsConfig {
@@ -320,6 +323,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: HashMap::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
