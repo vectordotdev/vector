@@ -426,7 +426,7 @@ Finally, we need to update the `run_inner` method of our `BasicSink` trait.
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

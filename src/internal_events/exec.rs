@@ -4,7 +4,7 @@ use tokio::time::error::Elapsed;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, emit,
         error_stage, error_type,
     },
     json_size::JsonSize,
@@ -219,9 +219,9 @@ impl InternalEvent for ExecChannelClosedError {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            reason: exec_reason
+            reason: exec_reason,
         });
     }
 }

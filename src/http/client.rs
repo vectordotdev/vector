@@ -1,4 +1,5 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use http::{
     HeaderValue, Request, Response,
@@ -80,7 +81,7 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
-            emit!(AboutToSendHttpRequest { request: &request });
+            emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
@@ -88,16 +89,16 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    emit!(GotHttpResponse {
+                    emit(GotHttpResponse {
                         response: &response,
-                        roundtrip
+                        roundtrip,
                     });
                     Ok(response)
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning {
+                    emit(GotHttpWarning {
                         error: &error,
-                        roundtrip
+                        roundtrip,
                     });
                     Err(error)
                 }

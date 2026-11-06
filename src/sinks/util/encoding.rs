@@ -7,6 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
     config::telemetry,
+    internal_event::emit,
     request_metadata::GroupedCountByteSize,
 };
 
@@ -132,7 +133,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
                 // events before encoding, but that only happens if a sink is
                 // misconfigured to send non-log events into a log-only encoder,
                 // so the overcount is not a practical concern.
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                emit(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: n_events,
                     reason: "Failed to batch encode events.",
                 });
@@ -181,7 +182,7 @@ pub fn write_all(
     buf: &[u8],
 ) -> io::Result<()> {
     writer.write_all(buf).inspect_err(|error| {
-        emit!(EncoderWriteError {
+        emit(EncoderWriteError {
             error,
             count: n_events_pending,
         });

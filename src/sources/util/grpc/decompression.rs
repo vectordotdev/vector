@@ -7,6 +7,7 @@ use std::{
     sync::LazyLock,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::write::GzDecoder;
@@ -588,12 +589,12 @@ where
             bytes_received.emit(ByteSize(body_bytes_received));
         }
         Ok(res) => {
-            emit!(GrpcError {
-                error: format!("Received {}", res.status())
+            emit(GrpcError {
+                error: format!("Received {}", res.status()),
             });
         }
         Err(error) => {
-            emit!(GrpcError { error: &error });
+            emit(GrpcError { error: &error });
         }
     }
 
@@ -636,7 +637,7 @@ where
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
             Err(status) => {
-                emit!(GrpcInvalidCompressionSchemeError { status: &status });
+                emit(GrpcInvalidCompressionSchemeError { status: &status });
                 Box::pin(async move { Ok(status.into_http()) })
             }
 
@@ -700,7 +701,7 @@ impl<S> Layer<S> for DecompressionAndMetricsLayer {
     fn layer(&self, inner: S) -> Self::Service {
         DecompressionAndMetrics {
             inner,
-            bytes_received: register!(BytesReceived::from(Protocol::from("grpc"))),
+            bytes_received: register(BytesReceived::from(Protocol::from("grpc"))),
         }
     }
 }
@@ -1109,7 +1110,7 @@ mod tests {
             source,
             destination,
             inner,
-            register!(BytesReceived::from(Protocol::from("grpc"))),
+            register(BytesReceived::from(Protocol::from("grpc"))),
             None,
         ));
 

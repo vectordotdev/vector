@@ -3,6 +3,7 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     sync::Arc,
 };
+use vector_lib::internal_event::emit;
 
 use lru::LruCache;
 
@@ -752,7 +753,7 @@ impl EventLogSubscription {
                                 }
 
                                 if let Err(e) = channel_sub.bookmark.update(event_handle) {
-                                    emit!(WindowsEventLogBookmarkError {
+                                    emit(WindowsEventLogBookmarkError {
                                         channel: channel_sub.channel.clone(),
                                         error: e.to_string(),
                                     });
@@ -964,7 +965,7 @@ impl EventLogSubscription {
                     }
                     Ok(_) => None,
                     Err(e) => {
-                        emit!(WindowsEventLogBookmarkError {
+                        emit(WindowsEventLogBookmarkError {
                             channel: sub.channel.clone(),
                             error: e.to_string(),
                         });

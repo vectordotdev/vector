@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use procfs::net::{TcpNetEntry, TcpState};
-use vector_lib::{event::MetricTags, internal_event::GaugeName};
+use vector_lib::{event::MetricTags, internal_event::GaugeName, internal_event::emit};
 
 use super::HostMetrics;
 use crate::sources::host_metrics::HostMetricsScrapeDetailError;
@@ -45,7 +45,7 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load tcp connection info.",
                     error,
                 });

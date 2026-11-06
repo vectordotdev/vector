@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 use std::{ffi::OsString, time::Duration};
+use vector_lib::internal_event::emit;
 
 use windows_service::{
     Result, define_windows_service,
@@ -152,12 +153,12 @@ pub mod service_control {
             && service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString]).context(ServiceSnafu)?;
-            emit!(WindowsServiceStart {
+            emit(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: false,
             });
         } else {
-            emit!(WindowsServiceStart {
+            emit(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: true,
             });
@@ -186,7 +187,7 @@ pub mod service_control {
             handle_service_exit_code(service_status.exit_code);
         }
 
-        emit!(WindowsServiceStop {
+        emit(WindowsServiceStop {
             name: &*service_def.name.to_string_lossy(),
             already_stopped,
         });
@@ -218,8 +219,8 @@ pub mod service_control {
         handle_service_exit_code(service_status.exit_code);
 
         service.start(&[] as &[OsString]).context(ServiceSnafu)?;
-        emit!(WindowsServiceRestart {
-            name: &*service_def.name.to_string_lossy()
+        emit(WindowsServiceRestart {
+            name: &*service_def.name.to_string_lossy(),
         });
         Ok(())
     }
@@ -246,7 +247,7 @@ pub mod service_control {
             .create_service(&service_info, ServiceAccess::empty())
             .context(ServiceSnafu)?;
 
-        emit!(WindowsServiceInstall {
+        emit(WindowsServiceInstall {
             name: &*service_def.name.to_string_lossy(),
         });
 
@@ -269,7 +270,7 @@ pub mod service_control {
         let service_status = service.query_status().context(ServiceSnafu)?;
         if service_status.current_state != ServiceState::Stopped {
             service.stop().context(ServiceSnafu)?;
-            emit!(WindowsServiceStop {
+            emit(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
             });
@@ -285,7 +286,7 @@ pub mod service_control {
 
         service.delete().context(ServiceSnafu)?;
 
-        emit!(WindowsServiceUninstall {
+        emit(WindowsServiceUninstall {
             name: &*service_def.name.to_string_lossy(),
         });
         Ok(())
@@ -302,7 +303,7 @@ pub mod service_control {
         let service = service_manager
             .open_service(&service_def.name, access)
             .map_err(|e| {
-                emit!(WindowsServiceDoesNotExistError {
+                emit(WindowsServiceDoesNotExistError {
                     name: &*service_def.name.to_string_lossy(),
                 });
                 e

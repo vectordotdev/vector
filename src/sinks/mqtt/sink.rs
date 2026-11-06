@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
 use rumqttc::{ConnectionError, EventLoop};
 use tokio_util::sync::CancellationToken;
+use vector_lib::internal_event::emit;
 
 use super::{
     MqttSinkConfig,
@@ -50,7 +51,7 @@ impl MqttSink {
             .topic
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("topic"),
                     drop_event: true,
@@ -130,7 +131,7 @@ async fn drive_event_loop(
             Ok(_) => {}
             Err(ConnectionError::RequestsDone) => return Ok(()),
             Err(error) => {
-                emit!(MqttConnectionError { error });
+                emit(MqttConnectionError { error });
                 if input_done.is_cancelled() {
                     return Ok(());
                 }

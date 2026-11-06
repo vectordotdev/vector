@@ -4,6 +4,7 @@ use crate::{
     sinks::util::Compression,
 };
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+use vector_lib::internal_event::emit;
 
 /// Percent-encoding set for URL path segments (RFC 3986 unreserved chars are left unencoded).
 const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
@@ -297,7 +298,7 @@ impl DorisSinkClient {
         }
 
         // Log endpoint bytes sent metric
-        emit!(EndpointBytesSent {
+        emit(EndpointBytesSent {
             byte_size,
             protocol,
             endpoint: endpoint.as_str(),

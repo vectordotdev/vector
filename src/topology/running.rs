@@ -18,6 +18,7 @@ use vector_lib::{
     extra_context::ExtraContext,
     gauge,
     internal_event::GaugeName,
+    internal_event::emit,
     shutdown::ShutdownSignal,
     spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
@@ -672,7 +673,7 @@ impl RunningTopology {
                 let drain_in_background = !wait_for_sinks.contains(*key);
                 match usage {
                     Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
-                        emit!(TopologyDiskBufferRemoved {
+                        emit(TopologyDiskBufferRemoved {
                             component_id: key,
                             buffer_dirs: &buffer_dirs,
                             usage: Some(usage),
@@ -680,7 +681,7 @@ impl RunningTopology {
                         });
                     }
                     None => {
-                        emit!(TopologyDiskBufferRemoved {
+                        emit(TopologyDiskBufferRemoved {
                             component_id: key,
                             buffer_dirs: &buffer_dirs,
                             usage: None,
@@ -729,7 +730,7 @@ impl RunningTopology {
                         .iter()
                         .any(|path| new_buffer_dirs.contains(path))
                 {
-                    emit!(TopologyDiskBufferReplacementUnreferenced {
+                    emit(TopologyDiskBufferReplacementUnreferenced {
                         component_id: key,
                         buffer_dirs: &buffer_dirs,
                         new_buffer_dirs: &new_buffer_dirs,

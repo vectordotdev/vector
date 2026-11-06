@@ -11,6 +11,7 @@ use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     finalization::{EventFinalizers, EventStatus},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
@@ -482,7 +483,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(InfluxdbEncodingError {
+            emit(InfluxdbEncodingError {
                 error_message,
                 count,
             });
