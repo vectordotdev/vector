@@ -50,6 +50,8 @@ pub struct CommandServerStatus {
     pub op_latencies: HashMap<String, CommandServerStatusOpLatenciesStat>,
     pub storage_engine: CommandServerStatusStorageEngine,
     pub wired_tiger: Option<CommandServerStatusWiredTiger>,
+    /// Added in MongoDB 8.0.
+    pub queues: Option<CommandServerStatusQueues>,
     pub network: CommandServerStatusNetwork,
     pub opcounters: HashMap<String, i64>,
     pub opcounters_repl: HashMap<String, i64>,
@@ -224,9 +226,39 @@ pub struct CommandServerStatusMetricsReplApplyBatches {
     pub total_millis: i64,
 }
 
+/// The layout of `metrics.repl.buffer` changed in MongoDB 8.0.
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum CommandServerStatusMetricsReplBuffer {
+    /// MongoDB 8.0 and later: separate buffers to write and to apply oplog entries.
+    V8(CommandServerStatusMetricsReplBufferV8),
+    /// MongoDB 7.0 and earlier: one buffer.
+    Legacy(CommandServerStatusMetricsReplBufferStats),
+}
+
+impl CommandServerStatusMetricsReplBuffer {
+    /// Totals for all oplog entries that the node fetched but did not apply yet.
+    pub const fn totals(&self) -> CommandServerStatusMetricsReplBufferStats {
+        match self {
+            Self::V8(buffer) => CommandServerStatusMetricsReplBufferStats {
+                count: buffer.write.count + buffer.apply.count,
+                max_size_bytes: buffer.write.max_size_bytes + buffer.apply.max_size_bytes,
+                size_bytes: buffer.write.size_bytes + buffer.apply.size_bytes,
+            },
+            Self::Legacy(buffer) => *buffer,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusMetricsReplBufferV8 {
+    pub write: CommandServerStatusMetricsReplBufferStats,
+    pub apply: CommandServerStatusMetricsReplBufferStats,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplBuffer {
+pub struct CommandServerStatusMetricsReplBufferStats {
     pub count: i64,
     pub max_size_bytes: i64,
     pub size_bytes: i64,
@@ -289,16 +321,100 @@ pub struct CommandServerStatusStorageEngine {
     pub name: String,
 }
 
+/// The layout of `wiredTiger` changed in MongoDB 8.0.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum CommandServerStatusWiredTiger {
+    /// MongoDB 8.0 and later.
+    V8(CommandServerStatusWiredTigerV8),
+    /// MongoDB 7.0 and earlier.
+    Legacy(CommandServerStatusWiredTigerLegacy),
+}
+
+impl CommandServerStatusWiredTiger {
+    pub const fn common(&self) -> &CommandServerStatusWiredTigerCommon {
+        match self {
+            Self::V8(stat) => &stat.common,
+            Self::Legacy(stat) => &stat.common,
+        }
+    }
+
+    pub const fn transaction(&self) -> &CommandServerStatusWiredTigerTransaction {
+        match self {
+            Self::V8(stat) => &stat.transaction,
+            Self::Legacy(stat) => &stat.transaction.common,
+        }
+    }
+
+    /// Execution tickets. MongoDB 8.0 moved them to the top-level `queues.execution`.
+    pub const fn tickets<'a>(
+        &'a self,
+        queues: Option<&'a CommandServerStatusQueues>,
+    ) -> Option<&'a CommandServerStatusTickets> {
+        match self {
+            Self::V8(_) => match queues {
+                Some(queues) => Some(&queues.execution),
+                None => None,
+            },
+            Self::Legacy(stat) => Some(&stat.concurrent_transactions),
+        }
+    }
+
+    pub fn checkpoint(&self) -> WiredTigerCheckpointStats {
+        match self {
+            Self::V8(stat) => WiredTigerCheckpointStats {
+                started: stat.checkpoint.started_by_api + stat.checkpoint.started_by_compaction,
+                running: i64::from(stat.checkpoint.progress_state != 0),
+                max_ms: stat.checkpoint.max_ms,
+                min_ms: stat.checkpoint.min_ms,
+                total_ms: stat.checkpoint.total_ms,
+            },
+            Self::Legacy(stat) => WiredTigerCheckpointStats {
+                started: stat.transaction.checkpoints,
+                running: stat.transaction.checkpoints_running,
+                max_ms: stat.transaction.checkpoint_max_ms,
+                min_ms: stat.transaction.checkpoint_min_ms,
+                total_ms: stat.transaction.checkpoint_total_ms,
+            },
+        }
+    }
+}
+
+/// Checkpoint statistics for all `wiredTiger` layouts.
+pub struct WiredTigerCheckpointStats {
+    pub started: i64,
+    pub running: i64,
+    pub max_ms: i64,
+    pub min_ms: i64,
+    pub total_ms: i64,
+}
+
+/// MongoDB 8.0 moved the checkpoint statistics from `transaction` to `checkpoint`, and the
+/// execution tickets from `concurrentTransactions` to the top-level `queues.execution`.
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusWiredTigerV8 {
+    #[serde(flatten)]
+    pub common: CommandServerStatusWiredTigerCommon,
+    pub checkpoint: CommandServerStatusWiredTigerCheckpoint,
+    pub transaction: CommandServerStatusWiredTigerTransaction,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusWiredTiger {
+pub struct CommandServerStatusWiredTigerLegacy {
+    #[serde(flatten)]
+    pub common: CommandServerStatusWiredTigerCommon,
+    pub concurrent_transactions: CommandServerStatusTickets,
+    pub transaction: CommandServerStatusWiredTigerTransactionLegacy,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusWiredTigerCommon {
     #[serde(rename = "block-manager")]
     pub block_manager: CommandServerStatusWiredTigerBlockManager,
     pub cache: CommandServerStatusWiredTigerCache,
-    pub concurrent_transactions: CommandServerStatusWiredTigerConcurrentTransactions,
     pub log: CommandServerStatusWiredTigerLog,
     pub session: CommandServerStatusWiredTigerSession,
-    pub transaction: CommandServerStatusWiredTigerTransaction,
 }
 
 #[derive(Debug, Deserialize)]
@@ -347,15 +463,21 @@ pub struct CommandServerStatusWiredTigerCache {
     pub evicted_unmodified: i64,
 }
 
+/// <https://www.mongodb.com/docs/manual/reference/command/serverStatus/#queues>
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerConcurrentTransactions {
-    pub write: CommandServerStatusWiredTigerConcurrentTransactionsStats,
-    pub read: CommandServerStatusWiredTigerConcurrentTransactionsStats,
+pub struct CommandServerStatusQueues {
+    pub execution: CommandServerStatusTickets,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusTickets {
+    pub write: CommandServerStatusTicketsStats,
+    pub read: CommandServerStatusTicketsStats,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusWiredTigerConcurrentTransactionsStats {
+pub struct CommandServerStatusTicketsStats {
     pub out: i64,
     pub available: i64,
     pub total_tickets: i64,
@@ -397,6 +519,16 @@ pub struct CommandServerStatusWiredTigerSession {
 pub struct CommandServerStatusWiredTigerTransaction {
     #[serde(rename = "transaction begins")]
     pub begins: i64,
+    #[serde(rename = "transactions committed")]
+    pub committed: i64,
+    #[serde(rename = "transactions rolled back")]
+    pub rolled_back: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusWiredTigerTransactionLegacy {
+    #[serde(flatten)]
+    pub common: CommandServerStatusWiredTigerTransaction,
     #[serde(rename = "transaction checkpoints")]
     pub checkpoints: i64,
     #[serde(rename = "transaction checkpoint currently running")]
@@ -407,10 +539,24 @@ pub struct CommandServerStatusWiredTigerTransaction {
     pub checkpoint_min_ms: i64,
     #[serde(rename = "transaction checkpoint total time (msecs)")]
     pub checkpoint_total_ms: i64,
-    #[serde(rename = "transactions committed")]
-    pub committed: i64,
-    #[serde(rename = "transactions rolled back")]
-    pub rolled_back: i64,
+}
+
+/// Added in MongoDB 8.0.
+#[derive(Debug, Deserialize)]
+pub struct CommandServerStatusWiredTigerCheckpoint {
+    #[serde(rename = "number of checkpoints started by api")]
+    pub started_by_api: i64,
+    #[serde(rename = "number of checkpoints started by compaction")]
+    pub started_by_compaction: i64,
+    /// `0` when no checkpoint runs.
+    #[serde(rename = "progress state")]
+    pub progress_state: i64,
+    #[serde(rename = "max time (msecs)")]
+    pub max_ms: i64,
+    #[serde(rename = "min time (msecs)")]
+    pub min_ms: i64,
+    #[serde(rename = "total time (msecs)")]
+    pub total_ms: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -419,4 +565,166 @@ pub struct CommandServerStatusNetwork {
     pub bytes_in: i64,
     pub bytes_out: i64,
     pub num_requests: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use mongodb::bson::{Document, doc, from_document};
+
+    use super::*;
+
+    fn wired_tiger_common() -> Document {
+        doc! {
+            "block-manager": {
+                "blocks pre-loaded": 1, "blocks read": 1, "blocks written": 1, "bytes read": 1,
+                "bytes written": 1, "mapped blocks read": 1, "mapped bytes read": 1,
+            },
+            "cache": {
+                "bytes currently in the cache": 1, "maximum bytes configured": 1.0,
+                "modified pages evicted": 1, "pages currently held in the cache": 1,
+                "pages read into cache": 1, "pages written from cache": 1, "percentage overhead": 1,
+                "tracked bytes belonging to internal pages in the cache": 1,
+                "tracked bytes belonging to leaf pages in the cache": 1,
+                "tracked dirty bytes in the cache": 1, "tracked dirty pages in the cache": 1,
+                "unmodified pages evicted": 1,
+            },
+            "log": {
+                "log bytes of payload data": 1, "log bytes written": 1, "log flush operations": 1,
+                "log records compressed": 1, "log records not compressed": 1,
+                "log scan operations": 1, "log scan records requiring two reads": 1,
+                "log sync operations": 1, "log sync_dir operations": 1, "log write operations": 1,
+                "records processed by log scan": 1,
+            },
+            "session": { "open session count": 1 },
+        }
+    }
+
+    fn tickets(available: i32) -> Document {
+        doc! {
+            "read": { "out": 0, "available": available, "totalTickets": available },
+            "write": { "out": 0, "available": available, "totalTickets": available },
+        }
+    }
+
+    #[test]
+    fn wired_tiger_legacy_layout() {
+        let mut wired_tiger = wired_tiger_common();
+        wired_tiger.insert("concurrentTransactions", tickets(128));
+        wired_tiger.insert(
+            "transaction",
+            doc! {
+                "transaction begins": 10, "transactions committed": 4,
+                "transactions rolled back": 6, "transaction checkpoints": 3_i64,
+                "transaction checkpoint currently running": 1,
+                "transaction checkpoint max time (msecs)": 30,
+                "transaction checkpoint min time (msecs)": 10,
+                "transaction checkpoint total time (msecs)": 60,
+            },
+        );
+        let wired_tiger: CommandServerStatusWiredTiger = from_document(wired_tiger).unwrap();
+        assert!(matches!(
+            wired_tiger,
+            CommandServerStatusWiredTiger::Legacy(_)
+        ));
+
+        let checkpoint = wired_tiger.checkpoint();
+        assert_eq!(checkpoint.started, 3);
+        assert_eq!(checkpoint.running, 1);
+        assert_eq!(
+            (checkpoint.min_ms, checkpoint.max_ms, checkpoint.total_ms),
+            (10, 30, 60)
+        );
+        assert_eq!(wired_tiger.transaction().committed, 4);
+
+        // `queues.execution` only exists on MongoDB 8.0 and later.
+        let queues: CommandServerStatusQueues =
+            from_document(doc! { "execution": tickets(8) }).unwrap();
+        let tickets = wired_tiger.tickets(Some(&queues)).unwrap();
+        assert_eq!(tickets.read.available, 128);
+    }
+
+    #[test]
+    fn wired_tiger_v8_layout() {
+        let mut wired_tiger = wired_tiger_common();
+        wired_tiger.insert(
+            "checkpoint",
+            doc! {
+                "number of checkpoints started by api": 2,
+                "number of checkpoints started by compaction": 1,
+                "progress state": 17, "max time (msecs)": 30, "min time (msecs)": 10,
+                "total time (msecs)": 60,
+            },
+        );
+        wired_tiger.insert(
+            "transaction",
+            doc! {
+                "transaction begins": 10, "transactions committed": 4,
+                "transactions rolled back": 6,
+            },
+        );
+        let wired_tiger: CommandServerStatusWiredTiger = from_document(wired_tiger).unwrap();
+        assert!(matches!(wired_tiger, CommandServerStatusWiredTiger::V8(_)));
+
+        let checkpoint = wired_tiger.checkpoint();
+        assert_eq!(checkpoint.started, 3);
+        assert_eq!(checkpoint.running, 1);
+        assert_eq!(
+            (checkpoint.min_ms, checkpoint.max_ms, checkpoint.total_ms),
+            (10, 30, 60)
+        );
+        assert_eq!(wired_tiger.transaction().rolled_back, 6);
+
+        let queues: CommandServerStatusQueues =
+            from_document(doc! { "execution": tickets(8) }).unwrap();
+        assert_eq!(
+            wired_tiger.tickets(Some(&queues)).unwrap().write.available,
+            8
+        );
+        assert!(wired_tiger.tickets(None).is_none());
+    }
+
+    #[test]
+    fn wired_tiger_v8_checkpoint_not_running() {
+        let mut wired_tiger = wired_tiger_common();
+        wired_tiger.insert(
+            "checkpoint",
+            doc! {
+                "number of checkpoints started by api": 0,
+                "number of checkpoints started by compaction": 0,
+                "progress state": 0, "max time (msecs)": 0, "min time (msecs)": 0,
+                "total time (msecs)": 0,
+            },
+        );
+        wired_tiger.insert(
+            "transaction",
+            doc! {
+                "transaction begins": 0, "transactions committed": 0,
+                "transactions rolled back": 0,
+            },
+        );
+        let wired_tiger: CommandServerStatusWiredTiger = from_document(wired_tiger).unwrap();
+        assert_eq!(wired_tiger.checkpoint().running, 0);
+    }
+
+    #[test]
+    fn repl_buffer_layouts() {
+        let legacy: CommandServerStatusMetricsReplBuffer =
+            from_document(doc! { "count": 1, "maxSizeBytes": 100_i64, "sizeBytes": 10 }).unwrap();
+        let totals = legacy.totals();
+        assert_eq!(
+            (totals.count, totals.max_size_bytes, totals.size_bytes),
+            (1, 100, 10)
+        );
+
+        let v8: CommandServerStatusMetricsReplBuffer = from_document(doc! {
+            "write": { "count": 1, "maxSizeBytes": 100_i64, "sizeBytes": 10 },
+            "apply": { "count": 2, "maxSizeBytes": 200_i64, "sizeBytes": 20, "maxCount": 5 },
+        })
+        .unwrap();
+        let totals = v8.totals();
+        assert_eq!(
+            (totals.count, totals.max_size_bytes, totals.size_bytes),
+            (3, 300, 30)
+        );
+    }
 }
