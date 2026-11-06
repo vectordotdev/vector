@@ -83,6 +83,28 @@ generated: components: sinks: datadog_metrics: configuration: {
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
+	expire_metrics_secs: {
+		description: """
+			The amount of time, in seconds, that a metric's internal normalization cache entry
+			is retained after the metric was last seen before being evicted.
+
+			Vector must track per-series state in order to convert absolute metrics into
+			incremental ones (and vice versa) for the Datadog metrics API. Without a limit on
+			how long that state is retained, series that stop being emitted (for example, due to
+			tags that include ephemeral identifiers like container or task IDs) will never have
+			their cached state removed, causing unbounded memory growth over time.
+
+			If unset, sending metrics with unbounded series cardinality to this sink can cause
+			indefinite memory growth.
+			"""
+		required: false
+		type: float: {
+			examples: [
+				3600.0
+			]
+			unit: "seconds"
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.

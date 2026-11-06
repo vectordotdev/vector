@@ -67,6 +67,7 @@ pub(crate) struct DatadogMetricsSink<S> {
     sketches_batch_settings: BatcherSettings,
     protocol: String,
     series_api_version: SeriesApiVersion,
+    expire_metrics_secs: Option<f64>,
 }
 
 impl<S> DatadogMetricsSink<S>
@@ -84,6 +85,7 @@ where
         sketches_batch_settings: BatcherSettings,
         protocol: String,
         series_api_version: SeriesApiVersion,
+        expire_metrics_secs: Option<f64>,
     ) -> Self {
         DatadogMetricsSink {
             service,
@@ -92,6 +94,7 @@ where
             sketches_batch_settings,
             protocol,
             series_api_version,
+            expire_metrics_secs,
         }
     }
 
@@ -104,6 +107,7 @@ where
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
         let series_batch_settings = self.series_batch_settings;
         let sketches_batch_settings = self.sketches_batch_settings;
+        let expire_metrics_secs = self.expire_metrics_secs;
         let partitioner = DatadogMetricsTypePartitioner {
             series_api_version: self.series_api_version,
         };
@@ -118,7 +122,11 @@ where
             // Converts "absolute" metrics to "incremental", and converts distributions and aggregated histograms into
             // sketches so that we can send them in a more DD-native format and thus avoid needing to directly specify
             // what quantiles to generate, etc.
-            .normalized_with_default::<DatadogMetricsNormalizer>()
+            //
+            // When `expire_metrics_secs` is configured, series that have not been updated within
+            // that window are evicted from the normalization cache, preventing unbounded memory
+            // growth from series churn (e.g. tags containing ephemeral identifiers).
+            .normalized_with_ttl::<DatadogMetricsNormalizer>(expire_metrics_secs)
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches. Each endpoint uses its own byte size
             // limit: 5 MiB for Series v2 and 60 MiB for Sketches.
