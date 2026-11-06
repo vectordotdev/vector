@@ -1219,9 +1219,15 @@ where
         };
         self.track_read(record_id, record_bytes, record_events);
 
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-        record.add_batch_notifier(batch);
-        self.finalizer.add(record_events.get(), receiver);
+        // Records replayed by `seek_to_next_record` were acknowledged before the restart and are
+        // dropped there, never delivered. Attaching a notifier would turn each of them into an
+        // acknowledgement without a marker, and those unclaimed acknowledgements would later be
+        // credited to records that were read but not yet delivered.
+        if self.ready_to_read {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            record.add_batch_notifier(batch);
+            self.finalizer.add(record_events.get(), receiver);
+        }
 
         if self.ready_to_read {
             trace!(
