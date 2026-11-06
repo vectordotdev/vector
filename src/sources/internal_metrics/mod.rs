@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::{emit, register};
 
 use futures::StreamExt;
 use serde_with::serde_as;
@@ -187,8 +188,8 @@ struct InternalMetrics<'a> {
 
 impl InternalMetrics<'_> {
     async fn run(mut self) -> vector_lib::source_sender::SendResult {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -226,7 +227,7 @@ impl InternalMetrics<'_> {
             });
 
             if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(error);
             }
         }

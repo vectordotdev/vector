@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::DateTime;
 use derivative::Derivative;
@@ -313,8 +314,8 @@ impl SourceConfig for PubsubConfig {
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(protocol)),
+            events_received: register(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| {
@@ -478,7 +479,7 @@ impl PubsubSource {
         let mut request = Request::new(self.request_stream(ack_ids_receiver));
         if let Some(token) = self.auth.make_token() {
             let Ok(authorization) = MetadataValue::try_from(&token) else {
-                emit!(GcpPubsubStreamingPullError {
+                emit(GcpPubsubStreamingPullError {
                     error: Status::new(
                         Code::FailedPrecondition,
                         "Invalid token text returned by GCP",
@@ -498,9 +499,9 @@ impl PubsubSource {
                 Err(error) => {
                     // The pooled transport connects on the first request, not at construction.
                     if is_connect_error(&error) {
-                        emit!(GcpPubsubConnectError { error });
+                        emit(GcpPubsubConnectError { error });
                     } else {
-                        emit!(GcpPubsubStreamingPullError { error });
+                        emit(GcpPubsubStreamingPullError { error });
                     }
                     return State::RetryDelay;
                 }
@@ -634,7 +635,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -739,7 +740,7 @@ fn translate_error(error: tonic::Status) -> State {
         debug!("Stream reset by server.");
         State::RetryNow
     } else {
-        emit!(GcpPubsubReceiveError { error });
+        emit(GcpPubsubReceiveError { error });
         State::RetryDelay
     }
 }

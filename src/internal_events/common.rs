@@ -4,7 +4,7 @@ use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
     ComponentEventsDropped, CounterName, HistogramName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
-    error_stage, error_type,
+    emit, error_stage, error_type,
 };
 use vector_lib::{counter, histogram};
 
@@ -35,7 +35,7 @@ impl InternalEvent for KeyOutsideBasePrefixError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Rendered key outside base prefix.",
         });
@@ -136,7 +136,7 @@ impl InternalEvent for StreamClosedError {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: "Downstream is closed.",
         });
