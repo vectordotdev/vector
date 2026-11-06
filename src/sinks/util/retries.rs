@@ -14,6 +14,8 @@ use vector_lib::configurable::configurable_component;
 
 use crate::Error;
 
+const ERROR_LOG_RETRY_ATTEMPT_INTERVAL: usize = 10;
+
 pub enum RetryAction<Request = ()> {
     /// Indicate that this request should be retried with a reason
     Retry(Cow<'static, str>),
@@ -77,6 +79,7 @@ pub enum JitterMode {
 #[derive(Debug, Clone)]
 pub struct FibonacciRetryPolicy<L> {
     remaining_attempts: usize,
+    retry_attempt: usize,
     previous_duration: Duration,
     current_duration: Duration,
     jitter_mode: JitterMode,
@@ -99,6 +102,7 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     ) -> Self {
         FibonacciRetryPolicy {
             remaining_attempts,
+            retry_attempt: 0,
             previous_duration: Duration::from_secs(0),
             current_duration: initial_backoff,
             jitter_mode,
@@ -133,6 +137,7 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
             .unwrap_or(Duration::MAX);
         let next_duration = cmp::min(sum, self.max_duration);
         self.remaining_attempts = self.remaining_attempts.saturating_sub(1);
+        self.retry_attempt = self.next_retry_attempt();
         self.previous_duration = self.current_duration;
         self.current_duration = next_duration;
         self.current_jitter_duration = Self::add_full_jitter(next_duration);
@@ -142,8 +147,65 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
         self.advance();
         let delay = Box::pin(sleep(self.backoff()));
 
-        debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
+        debug!(
+            message = "Retrying request.",
+            retry_attempt = self.retry_attempt,
+            delay_ms = %self.backoff().as_millis(),
+        );
         RetryPolicyFuture { delay }
+    }
+
+    const fn next_retry_attempt(&self) -> usize {
+        self.retry_attempt.saturating_add(1)
+    }
+
+    const fn should_emit_sustained_failure(&self) -> bool {
+        self.next_retry_attempt()
+            .is_multiple_of(ERROR_LOG_RETRY_ATTEMPT_INTERVAL)
+    }
+
+    fn log_sustained_failure(&self, failure_type: &'static str) {
+        if self.should_emit_sustained_failure() {
+            error!(
+                message = "Sustained request failures.",
+                retry_attempt = self.next_retry_attempt(),
+                failure_type,
+            );
+        }
+    }
+
+    fn log_response_retry(&self, reason: &str) {
+        let retry_attempt = self.next_retry_attempt();
+        warn!(message = "Retrying after response.", reason, retry_attempt,);
+        self.log_sustained_failure("response");
+    }
+
+    fn log_partial_response_retry(&self) {
+        let retry_attempt = self.next_retry_attempt();
+        warn!(
+            message = "OK/retrying partial after response.",
+            retry_attempt,
+        );
+        self.log_sustained_failure("partial_response");
+    }
+
+    fn log_error_retry(&self, error: &L::Error) {
+        let retry_attempt = self.next_retry_attempt();
+        warn!(
+            message = "Retrying after error.",
+            %error,
+            retry_attempt,
+        );
+        self.log_sustained_failure("transport");
+    }
+
+    fn log_timeout_retry(&self) {
+        let retry_attempt = self.next_retry_attempt();
+        warn!(
+            message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.",
+            retry_attempt,
+        );
+        self.log_sustained_failure("timeout");
     }
 }
 
@@ -164,11 +226,12 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
+                            retry_attempt = self.retry_attempt,
                         );
                         return None;
                     }
 
-                    warn!(message = "Retrying after response.", reason = %reason);
+                    self.log_response_retry(&reason);
                     Some(self.build_retry())
                 }
                 RetryAction::RetryPartial(modify_request) => {
@@ -176,11 +239,12 @@ where
                         error!(
                             message =
                                 "OK/retry response but retries exhausted; dropping the request.",
+                            retry_attempt = self.retry_attempt,
                         );
                         return None;
                     }
                     *req = modify_request(req.clone());
-                    warn!("OK/retrying partial after response.");
+                    self.log_partial_response_retry();
                     Some(self.build_retry())
                 }
                 RetryAction::DontRetry(reason) => {
@@ -192,14 +256,18 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error);
+                    error!(
+                        message = "Retries exhausted; dropping the request.",
+                        %error,
+                        retry_attempt = self.retry_attempt,
+                    );
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
                         self.logic.on_retriable_error(expected);
-                        warn!(message = "Retrying after error.", error = %expected);
+                        self.log_error_retry(expected);
                         Some(self.build_retry())
                     } else {
                         error!(
@@ -210,9 +278,7 @@ where
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     if self.logic.is_retriable_timeout() {
-                        warn!(
-                            "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
-                        );
+                        self.log_timeout_retry();
                         Some(self.build_retry())
                     } else {
                         error!(
@@ -269,7 +335,11 @@ impl<Request> RetryAction<Request> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt, time::Duration};
+    use std::{
+        fmt,
+        io::{Read, Seek, SeekFrom},
+        time::Duration,
+    };
 
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
@@ -382,6 +452,171 @@ mod tests {
         assert_ready_err!(fut.poll());
     }
 
+    #[tokio::test]
+    async fn response_retry_logs_attempt_number() {
+        let events = response_retry_log_events(2);
+        let events = events_with_message(&events, "Retrying after response.");
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["fields"]["retry_attempt"], 1);
+        assert_eq!(events[1]["fields"]["retry_attempt"], 2);
+    }
+
+    #[tokio::test]
+    async fn sustained_response_retries_emit_safe_periodic_errors() {
+        let events = response_retry_log_events(20);
+        let retry_events = events_with_message(&events, "Retrying after response.");
+        let sustained_failure_events = events_with_message(&events, "Sustained request failures.");
+
+        assert_eq!(retry_events.len(), 20);
+        assert!(retry_events.iter().all(|event| event["level"] == "WARN"));
+        assert_eq!(sustained_failure_events.len(), 2);
+        assert_eq!(sustained_failure_events[0]["level"], "ERROR");
+        assert_eq!(sustained_failure_events[0]["fields"]["retry_attempt"], 10);
+        assert!(sustained_failure_events[0]["fields"]["reason"].is_null());
+        assert_eq!(sustained_failure_events[1]["level"], "ERROR");
+        assert_eq!(sustained_failure_events[1]["fields"]["retry_attempt"], 20);
+        assert!(sustained_failure_events[1]["fields"]["reason"].is_null());
+    }
+
+    #[tokio::test]
+    async fn sustained_failure_errors_are_safe_for_every_retry_type() {
+        let cases = [
+            (
+                response_retry_log_events(10),
+                "response",
+                "response retries",
+            ),
+            (
+                partial_response_retry_log_events(10),
+                "partial_response",
+                "partial response retries",
+            ),
+            (
+                error_retry_log_events(10),
+                "transport",
+                "transport error retries",
+            ),
+            (timeout_retry_log_events(10), "timeout", "timeout retries"),
+        ];
+
+        for (events, failure_type, case) in cases {
+            let sustained_failure_events =
+                events_with_message(&events, "Sustained request failures.");
+            assert_eq!(sustained_failure_events.len(), 1, "{case}");
+
+            let event = sustained_failure_events[0];
+            assert_eq!(event["level"], "ERROR", "{case}");
+            assert_eq!(event["fields"]["retry_attempt"], 10, "{case}");
+            assert_eq!(event["fields"]["failure_type"], failure_type, "{case}");
+
+            let mut field_names = event["fields"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            field_names.sort_unstable();
+            assert_eq!(
+                field_names,
+                ["failure_type", "message", "retry_attempt"],
+                "{case}",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn exhaustion_errors_include_retry_count() {
+        let cases = [
+            (
+                response_retry_log_events(3),
+                "OK/retry response but retries exhausted; dropping the request.",
+                "response retries",
+            ),
+            (
+                partial_response_retry_log_events(3),
+                "OK/retry response but retries exhausted; dropping the request.",
+                "partial response retries",
+            ),
+            (
+                error_retry_log_events(3),
+                "Retries exhausted; dropping the request.",
+                "transport error retries",
+            ),
+        ];
+
+        for (events, message, case) in cases {
+            let exhaustion_events = events_with_message(&events, message);
+            assert_eq!(exhaustion_events.len(), 1, "{case}");
+            assert_eq!(exhaustion_events[0]["fields"]["retry_attempt"], 3, "{case}");
+        }
+    }
+
+    fn response_retry_log_events(retries: usize) -> Vec<serde_json::Value> {
+        retry_log_events(retries, ResponseRetryLogic, || Ok("world"))
+    }
+
+    fn partial_response_retry_log_events(retries: usize) -> Vec<serde_json::Value> {
+        retry_log_events(retries, PartialResponseRetryLogic, || Ok("world"))
+    }
+
+    fn error_retry_log_events(retries: usize) -> Vec<serde_json::Value> {
+        retry_log_events(retries, SvcRetryLogic, || Err(Error(true).into()))
+    }
+
+    fn timeout_retry_log_events(retries: usize) -> Vec<serde_json::Value> {
+        retry_log_events(retries, SvcRetryLogic, || Err(Elapsed::new().into()))
+    }
+
+    fn retry_log_events<L, F>(retries: usize, logic: L, mut result: F) -> Vec<serde_json::Value>
+    where
+        L: RetryLogic<Request = &'static str, Response = &'static str>,
+        F: FnMut() -> Result<&'static str, crate::Error>,
+    {
+        let mut logs = tempfile::tempfile().unwrap();
+        let subscriber = tracing::Dispatch::new(
+            tracing_subscriber::fmt()
+                .json()
+                .with_max_level(tracing::Level::WARN)
+                .with_writer(logs.try_clone().unwrap())
+                .finish(),
+        );
+        let mut policy = FibonacciRetryPolicy::new(
+            retries,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            logic,
+            JitterMode::None,
+        );
+
+        tracing::dispatcher::with_default(&subscriber, || {
+            for attempt in 0..=retries {
+                let mut request = "hello";
+                let mut response = result();
+                let retry = policy.retry(&mut request, &mut response);
+                assert_eq!(retry.is_some(), attempt < retries);
+            }
+        });
+
+        logs.seek(SeekFrom::Start(0)).unwrap();
+        let mut output = String::new();
+        logs.read_to_string(&mut output).unwrap();
+        output
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    fn events_with_message<'a>(
+        events: &'a [serde_json::Value],
+        message: &str,
+    ) -> Vec<&'a serde_json::Value> {
+        events
+            .iter()
+            .filter(|event| event["fields"]["message"] == message)
+            .collect()
+    }
+
     #[test]
     fn backoff_grows_to_max() {
         let mut policy = FibonacciRetryPolicy::new(
@@ -481,6 +716,40 @@ mod tests {
 
         fn is_retriable_timeout(&self) -> bool {
             false
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct ResponseRetryLogic;
+
+    impl RetryLogic for ResponseRetryLogic {
+        type Error = Error;
+        type Request = &'static str;
+        type Response = &'static str;
+
+        fn is_retriable_error(&self, error: &Self::Error) -> bool {
+            error.0
+        }
+
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
+            RetryAction::Retry("test response".into())
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct PartialResponseRetryLogic;
+
+    impl RetryLogic for PartialResponseRetryLogic {
+        type Error = Error;
+        type Request = &'static str;
+        type Response = &'static str;
+
+        fn is_retriable_error(&self, error: &Self::Error) -> bool {
+            error.0
+        }
+
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
+            RetryAction::RetryPartial(Box::new(|request| request))
         }
     }
 
