@@ -1,8 +1,8 @@
 use super::parsing::{parse_template, render_metric_field, render_timestamp};
 use super::{
     ConfigurableNumber, ConfigurableString, Cow, EventRef, FixedOffset, Hash, NumberClass, Part,
-    TemplateParseError, TemplateRenderingError, TryFrom, UnsignedIntTemplate, Value,
-    configurable_component, fmt,
+    TemplateParseError, TemplateRenderingError, TemplateTimeZone, TryFrom, UnsignedIntTemplate,
+    Value, configurable_component, fmt,
 };
 
 /// The source of a `uint` template. May be a constant numeric value or a template string.
@@ -180,7 +180,11 @@ impl UnsignedIntTemplate {
                     );
                 }
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset));
+                    out.push_str(&render_timestamp(
+                        items,
+                        event,
+                        TemplateTimeZone::from_offset(self.tz_offset),
+                    ));
                 }
             }
         }
