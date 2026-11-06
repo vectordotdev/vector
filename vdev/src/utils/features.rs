@@ -65,6 +65,9 @@ const KAFKA_GSSAPI_KEYS: &[&str] = &["sasl.mechanism", "sasl.mechanisms"];
 const KAFKA_GSSAPI_VALUE: &str = "GSSAPI";
 const GSSAPI_FEATURE: &str = "gssapi";
 const GSSAPI_VENDORED_FEATURE: &str = "gssapi-vendored";
+const KAFKA_SASL_KEY: &str = "sasl";
+const KAFKA_SASL_AZURE_KEY: &str = "azure";
+const AZURE_CORE_FEATURE: &str = "azure-core";
 const AUTH_KEY: &str = "auth";
 const STRATEGY_KEY: &str = "strategy";
 const CUSTOM_STRATEGY: &str = "custom";
@@ -280,6 +283,9 @@ fn get_nested_features(
                     .any(|mechanism| mechanism.eq_ignore_ascii_case(KAFKA_GSSAPI_VALUE))
             {
                 features.insert(kafka_gssapi_feature().into());
+            }
+            if parent_key == Some(KAFKA_SASL_KEY) && object.contains_key(KAFKA_SASL_AZURE_KEY) {
+                features.insert(AZURE_CORE_FEATURE.into());
             }
             if object.contains_key(CONDITION_KEY)
                 || VRL_DISCRIMINATORS
@@ -548,6 +554,21 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn enables_azure_core_for_kafka_sasl_azure() {
+        let config = indoc! {"
+            sources:
+              kafka:
+                type: kafka
+                sasl:
+                  azure:
+                    token_scope: https://mynamespace.servicebus.windows.net/.default
+                    auth:
+                      azure_credential_kind: workload_identity
+        "};
+        assert_eq!(features(config), ["azure-core", "sources-kafka"]);
     }
 
     #[test]

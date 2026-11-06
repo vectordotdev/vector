@@ -16,6 +16,7 @@ use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
     ClientConfig, ClientContext, Statistics, TopicPartitionList,
+    client::OAuthToken,
     consumer::{
         BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer,
         stream_consumer::StreamPartitionQueue,
@@ -348,9 +349,24 @@ impl SourceConfig for KafkaSourceConfig {
             );
         }
 
-        let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
+        let (oauth_provider, oauth_refresh) = self
+            .auth
+            .oauth_token_provider(self.librdkafka_options.as_ref())?
+            .unzip();
+        let (consumer, callback_rx) = create_consumer(self, acknowledgements, oauth_provider)?;
 
-        Ok(Box::pin(kafka_source(
+        // Wait for the first SASL/OAUTHBEARER token before the first poll of the consumer. This
+        // returns `false` if the source shuts down first.
+        let start_oauth_refresh = oauth_refresh.map(|refresh| {
+            let shutdown = cx.shutdown.clone();
+            async move {
+                tokio::select! {
+                    () = refresh.start() => true,
+                    _ = shutdown => false,
+                }
+            }
+        });
+        let source = kafka_source(
             self.clone(),
             consumer,
             callback_rx,
@@ -360,7 +376,17 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             false,
             log_namespace,
-        )))
+        );
+        Ok(Box::pin(async move {
+            // The token refresh starts with the source, not in `build`. If the source shuts down
+            // first, it stops without subscribing.
+            if let Some(start_oauth_refresh) = start_oauth_refresh
+                && !start_oauth_refresh.await
+            {
+                return Ok(());
+            }
+            source.await
+        }))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -1238,6 +1264,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn create_consumer(
     config: &KafkaSourceConfig,
     acknowledgements: bool,
+    oauth: Option<kafka::oauth::SharedOAuthTokenProvider>,
 ) -> crate::Result<(
     StreamConsumer<KafkaSourceContext>,
     UnboundedReceiver<KafkaCallback>,
@@ -1284,6 +1311,7 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
+            oauth,
         ))
         .context(CreateSnafu)?;
 
@@ -1311,6 +1339,9 @@ struct KafkaSourceContext {
     acknowledgements: bool,
     stats: kafka::KafkaStatisticsContext,
 
+    /// Supplies SASL/OAUTHBEARER tokens when Vector, not librdkafka, gets them.
+    oauth: Option<kafka::oauth::SharedOAuthTokenProvider>,
+
     /// A callback channel used to coordinate between the main consumer task and the acknowledgement task
     callbacks: UnboundedSender<KafkaCallback>,
 
@@ -1324,6 +1355,7 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
+        oauth: Option<kafka::oauth::SharedOAuthTokenProvider>,
     ) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext {
@@ -1331,6 +1363,7 @@ impl KafkaSourceContext {
                 span,
             },
             acknowledgements,
+            oauth,
             consumer: OnceLock::default(),
             callbacks,
         }
@@ -1414,8 +1447,20 @@ impl KafkaSourceContext {
 }
 
 impl ClientContext for KafkaSourceContext {
+    // librdkafka asks for a token only when `sasl.mechanism` is `OAUTHBEARER` and
+    // `sasl.oauthbearer.method` is not `oidc`. With `oidc`, librdkafka refreshes the token on its
+    // own background thread and never calls `generate_oauth_token`.
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics);
+    }
+
+    fn generate_oauth_token(
+        &self,
+        _oauthbearer_config: Option<&str>,
+    ) -> Result<OAuthToken, Box<dyn std::error::Error>> {
+        kafka::oauth::generate_oauth_token(self.oauth.as_deref())
     }
 }
 
@@ -1438,6 +1483,11 @@ impl ConsumerContext for KafkaSourceContext {
 
 #[cfg(test)]
 mod test {
+    use std::{
+        sync::Mutex,
+        time::{Instant, SystemTime, UNIX_EPOCH},
+    };
+
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
@@ -1611,7 +1661,7 @@ mod test {
     #[tokio::test]
     async fn consumer_create_ok() {
         let config = make_config("topic", "group", LogNamespace::Legacy, None);
-        assert!(create_consumer(&config, true).is_ok());
+        assert!(create_consumer(&config, true, None).is_ok());
     }
 
     #[tokio::test]
@@ -1620,7 +1670,313 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
-        assert!(create_consumer(&config, true).is_err());
+        assert!(create_consumer(&config, true, None).is_err());
+    }
+
+    #[tokio::test]
+    async fn build_checks_sasl_azure_before_it_creates_the_consumer() {
+        let config: KafkaSourceConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "127.0.0.1:1"
+            group_id: group
+            topics: [topic]
+            sasl:
+              azure:
+                token_scope: "https://mynamespace.servicebus.windows.net/.default"
+                auth:
+                  azure_credential_kind: managed_identity
+            "#,
+        )
+        .unwrap();
+        let error = config
+            .build(SourceContext::new_test(SourceSender::new_test().0, None))
+            .await
+            .err()
+            .expect("`sasl.azure` without TLS should fail the build")
+            .to_string();
+        assert_eq!(
+            error,
+            "`sasl.azure` sends a bearer token, so it requires `tls.enabled: true`"
+        );
+    }
+
+    /// Records whether each token request that reaches it gets a token, and forwards the requests
+    /// to `inner` if it is set.
+    #[derive(Default)]
+    struct RecordingTokenProvider {
+        inner: Option<kafka::oauth::SharedOAuthTokenProvider>,
+        answers: Mutex<Vec<bool>>,
+    }
+
+    impl RecordingTokenProvider {
+        fn answers(&self) -> Vec<bool> {
+            self.answers.lock().unwrap().clone()
+        }
+    }
+
+    impl kafka::oauth::OAuthTokenProvider for RecordingTokenProvider {
+        fn token(&self) -> Result<OAuthToken, Box<dyn std::error::Error>> {
+            let token = match &self.inner {
+                Some(inner) => inner.token(),
+                None => Err("no token in this test".into()),
+            };
+            self.answers.lock().unwrap().push(token.is_ok());
+            token
+        }
+    }
+
+    struct StaticTokenProvider;
+
+    impl kafka::oauth::OAuthTokenProvider for StaticTokenProvider {
+        fn token(&self) -> Result<OAuthToken, Box<dyn std::error::Error>> {
+            let expires = SystemTime::now() + Duration::from_hours(1);
+            Ok(OAuthToken {
+                token: "test-token".to_owned(),
+                principal_name: "test-principal".to_owned(),
+                lifetime_ms: i64::try_from(expires.duration_since(UNIX_EPOCH)?.as_millis())?,
+            })
+        }
+    }
+
+    #[test]
+    fn source_context_asks_its_provider_for_oauth_tokens() {
+        const { assert!(<KafkaSourceContext as ClientContext>::ENABLE_REFRESH_OAUTH_TOKEN) };
+
+        let (callbacks, _callback_rx) = mpsc::unbounded_channel();
+        let context = KafkaSourceContext::new(false, false, callbacks.clone(), Span::none(), None);
+        let error = context
+            .generate_oauth_token(None)
+            .err()
+            .expect("a token request without a provider should fail")
+            .to_string();
+        assert!(error.contains("`sasl.azure`"), "{error}");
+        assert!(error.contains("`sasl.oauthbearer.method`"), "{error}");
+
+        let context = KafkaSourceContext::new(
+            false,
+            false,
+            callbacks,
+            Span::none(),
+            Some(Arc::new(StaticTokenProvider)),
+        );
+        let token = context.generate_oauth_token(None).unwrap();
+        assert_eq!(token.token, "test-token");
+        assert_eq!(token.principal_name, "test-principal");
+    }
+
+    fn librdkafka_has_feature(feature: &str) -> bool {
+        ClientConfig::new()
+            .create_native_config()
+            .and_then(|config| config.get("builtin.features"))
+            .is_ok_and(|features| features.split(',').any(|name| name == feature))
+    }
+
+    /// Creates a consumer that uses SASL/OAUTHBEARER with `options`, and whose source context gets
+    /// its tokens from `provider`. Nothing listens on its bootstrap server.
+    fn oauth_consumer(
+        options: &[(&str, &str)],
+        provider: &Arc<RecordingTokenProvider>,
+    ) -> BaseConsumer<KafkaSourceContext> {
+        let (callbacks, _callback_rx) = mpsc::unbounded_channel();
+        let mut client_config = ClientConfig::new();
+        client_config
+            .set("bootstrap.servers", "127.0.0.1:1")
+            .set("group.id", "oauth-test")
+            .set("security.protocol", "sasl_plaintext")
+            .set("sasl.mechanism", "OAUTHBEARER");
+        for (key, value) in options {
+            client_config.set(*key, *value);
+        }
+        client_config
+            .create_with_context(KafkaSourceContext::new(
+                false,
+                false,
+                callbacks,
+                Span::none(),
+                Some(Arc::clone(provider) as _),
+            ))
+            .unwrap()
+    }
+
+    /// Polls `consumer` until `provider` gets a token request or `timeout` passes, then for one
+    /// more second, and returns the errors that the polls returned.
+    fn poll_for_token_request(
+        consumer: &BaseConsumer<KafkaSourceContext>,
+        provider: &RecordingTokenProvider,
+        timeout: Duration,
+    ) -> Vec<KafkaError> {
+        let mut errors = Vec::new();
+        let mut deadline = Instant::now() + timeout;
+        let mut requested = false;
+        while Instant::now() < deadline {
+            if let Some(Err(error)) = consumer.poll(Duration::from_millis(100)) {
+                errors.push(error);
+            }
+            if !requested && !provider.answers().is_empty() {
+                requested = true;
+                deadline = Instant::now() + Duration::from_secs(1);
+            }
+        }
+        errors
+    }
+
+    fn is_authentication_error(error: &KafkaError) -> bool {
+        error.rdkafka_error_code() == Some(RDKafkaErrorCode::Authentication)
+    }
+
+    // librdkafka runs its built-in OIDC flow on its own background thread and never asks the
+    // client context for a token, so `ENABLE_REFRESH_OAUTH_TOKEN` does not affect it. This test
+    // catches a librdkafka update that changes that.
+    #[test]
+    fn builtin_oidc_never_asks_the_source_context_for_a_token() {
+        if !librdkafka_has_feature("oidc") {
+            #[expect(clippy::print_stderr, reason = "Report why the test is skipped.")]
+            {
+                eprintln!(
+                    "skipped: librdkafka was built without libcurl, so it has no built-in OIDC flow"
+                );
+            }
+            return;
+        }
+
+        // Control: without the built-in OIDC flow, librdkafka asks the source context for the
+        // first token at once, and reports the error that it gets.
+        let provider = Arc::new(RecordingTokenProvider::default());
+        let consumer = oauth_consumer(&[], &provider);
+        let errors = poll_for_token_request(&consumer, &provider, Duration::from_secs(10));
+        assert_eq!(provider.answers(), [false]);
+        assert!(errors.iter().any(is_authentication_error), "{errors:?}");
+
+        let provider = Arc::new(RecordingTokenProvider::default());
+        let consumer = oauth_consumer(
+            &[
+                ("sasl.oauthbearer.method", "oidc"),
+                ("sasl.oauthbearer.client.id", "vector"),
+                ("sasl.oauthbearer.client.secret", "unused"),
+                (
+                    "sasl.oauthbearer.token.endpoint.url",
+                    "http://127.0.0.1:1/token",
+                ),
+            ],
+            &provider,
+        );
+        poll_for_token_request(&consumer, &provider, Duration::from_secs(3));
+        assert!(provider.answers().is_empty());
+    }
+
+    #[cfg(feature = "azure-core")]
+    mod azure {
+        use vector_lib::event_test_util;
+
+        use super::*;
+        use crate::{
+            sinks::azure_common::config::{AzureAuthentication, SpecificAzureCredential},
+            tls::TlsEnableableConfig,
+        };
+
+        /// Creates a source config that uses `sasl.azure` with `auth`, with TLS on and
+        /// `sasl.enabled` not set. Nothing listens on its bootstrap server.
+        fn azure_source_config(auth: AzureAuthentication) -> KafkaSourceConfig {
+            let mut config = make_config("topic", "group", LogNamespace::Legacy, None);
+            config.bootstrap_servers = "127.0.0.1:1".to_owned();
+            config.auth = kafka::KafkaAuthConfig {
+                sasl: Some(kafka::KafkaSaslConfig {
+                    azure: Some(kafka::KafkaSaslAzureConfig {
+                        token_scope: "https://mynamespace.servicebus.windows.net/.default"
+                            .to_owned(),
+                        auth,
+                    }),
+                    ..Default::default()
+                }),
+                tls: Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    ..Default::default()
+                }),
+            };
+            config
+        }
+
+        #[tokio::test]
+        async fn source_has_the_first_token_before_its_first_poll() {
+            // Control: polled before the refresh starts, the source context has no token, and
+            // librdkafka reports an authentication error. It would ask again only 10 seconds later.
+            let auth = azure_source_config(AzureAuthentication::MockCredential).auth;
+            let (provider, _refresh) = auth.oauth_token_provider(None).unwrap().unwrap();
+            let provider = Arc::new(RecordingTokenProvider {
+                inner: Some(provider),
+                ..Default::default()
+            });
+            let consumer = oauth_consumer(&[], &provider);
+            let errors = tokio::task::spawn_blocking({
+                let provider = Arc::clone(&provider);
+                move || poll_for_token_request(&consumer, &provider, Duration::from_secs(10))
+            })
+            .await
+            .unwrap();
+            assert_eq!(provider.answers(), [false]);
+            assert!(errors.iter().any(is_authentication_error), "{errors:?}");
+
+            // The source starts the refresh before its first poll, so the first token request gets
+            // a token, and librdkafka reports no authentication error.
+            let (provider, refresh) = auth.oauth_token_provider(None).unwrap().unwrap();
+            let provider = Arc::new(RecordingTokenProvider {
+                inner: Some(provider),
+                ..Default::default()
+            });
+            let consumer = oauth_consumer(&[], &provider);
+            refresh.start().await;
+            let errors = tokio::task::spawn_blocking({
+                let provider = Arc::clone(&provider);
+                move || poll_for_token_request(&consumer, &provider, Duration::from_secs(10))
+            })
+            .await
+            .unwrap();
+            assert_eq!(provider.answers(), [true]);
+            assert!(!errors.iter().any(is_authentication_error), "{errors:?}");
+        }
+
+        #[tokio::test]
+        async fn source_runs_when_the_azure_credential_cannot_be_created() {
+            event_test_util::clear_recorded_events();
+            let config = azure_source_config(AzureAuthentication::Specific(
+                SpecificAzureCredential::WorkloadIdentity {
+                    tenant_id: Some("00000000-0000-0000-0000-000000000000".to_owned()),
+                    client_id: Some("00000000-0000-0000-0000-000000000000".to_owned()),
+                    token_file_path: Some("/nonexistent/azure-identity-token".into()),
+                },
+            ));
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let mut cx = SourceContext::new_test(SourceSender::new_test().0, None);
+            cx.shutdown = shutdown;
+
+            // `build` neither creates the credential nor waits for a token, so the missing token
+            // file does not fail or delay it.
+            let source = tokio::time::timeout(Duration::from_secs(5), config.build(cx))
+                .await
+                .expect("`build` should not wait for a token")
+                .expect("`build` should succeed");
+            let source = tokio::spawn(source);
+
+            // The refresh task cannot create the credential and reports it, while the source waits
+            // for the first token.
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while event_test_util::contains_name_once("KafkaOAuthTokenRefreshError").is_err() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .expect("the refresh task should report that it cannot create the credential");
+            assert!(!source.is_finished());
+
+            // The source stops waiting for the first token when it shuts down, and stops.
+            drop(trigger_shutdown);
+            tokio::time::timeout(Duration::from_secs(5), source)
+                .await
+                .expect("the source should shut down")
+                .unwrap()
+                .unwrap();
+            shutdown_done.await;
+        }
     }
 }
 
@@ -2080,7 +2436,7 @@ mod integration_test {
             .transpose()
             .unwrap();
 
-        let (consumer, callback_rx) = create_consumer(&config, acknowledgements).unwrap();
+        let (consumer, callback_rx) = create_consumer(&config, acknowledgements, None).unwrap();
 
         tokio::spawn(kafka_source(
             config,
