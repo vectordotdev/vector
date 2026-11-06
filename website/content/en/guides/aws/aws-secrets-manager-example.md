@@ -21,6 +21,7 @@ In this example, Vector is set up to:
 
 - An AWS account with appropriate permissions
 - AWS CLI configured
+- An SQS queue that receives S3 event notifications from your logs bucket, which the [`aws_s3` source](/docs/reference/configuration/sources/aws_s3/) reads new objects from
 - Vector v0.38.0 or higher installed
 
 ## Step 1: Create secrets in AWS Secrets Manager
