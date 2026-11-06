@@ -212,7 +212,9 @@ struct State<K: Resource<DynamicType = ()> + Clone + 'static> {
     // The last complete upstream snapshot; a relist is staged atomically.
     current: HashMap<ObjectRef<K>, K>,
     initializing: Option<HashMap<ObjectRef<K>, K>>,
-    views: HashMap<ViewKey, Weak<Mutex<View<K>>>>,
+    // Views normally share both selector and store. During a deletion delay,
+    // however, a late subscriber needs a fresh store without the tombstone.
+    views: HashMap<ViewKey, Vec<Weak<Mutex<View<K>>>>>,
 }
 
 impl<K: Resource<DynamicType = ()> + Clone + 'static> Default for State<K> {
@@ -227,8 +229,18 @@ impl<K: Resource<DynamicType = ()> + Clone + 'static> Default for State<K> {
 
 impl<K: Resource<DynamicType = ()> + Clone + 'static> State<K> {
     fn subscribe(&mut self, key: ViewKey) -> Arc<Mutex<View<K>>> {
-        self.views.retain(|_, view| view.strong_count() > 0);
-        if let Some(view) = self.views.get(&key).and_then(Weak::upgrade) {
+        self.views.retain(|_, views| {
+            views.retain(|view| view.strong_count() > 0);
+            !views.is_empty()
+        });
+        if let Some(view) = self.views.get(&key).and_then(|views| {
+            views.iter().filter_map(Weak::upgrade).find(|view| {
+                view.lock()
+                    .expect("metadata view mutex poisoned")
+                    .pending
+                    .is_empty()
+            })
+        }) {
             return view;
         }
         let mut view = View {
@@ -236,21 +248,28 @@ impl<K: Resource<DynamicType = ()> + Clone + 'static> State<K> {
             writer: Writer::default(),
             pending: HashMap::new(),
         };
-        // New readers must not miss already-observed objects. Do not seed them
-        // with tombstones retained solely for an older reader's deletion delay.
+        // New readers must not miss already-observed objects. When every view
+        // for this key retains a tombstone, seed a separate view from `current`
+        // so the new reader cannot rediscover a deleted Pod.
         view.snapshot(&self.current);
         let view = Arc::new(Mutex::new(view));
-        self.views.insert(key, Arc::downgrade(&view));
+        self.views
+            .entry(key)
+            .or_default()
+            .push(Arc::downgrade(&view));
         view
     }
 
     fn for_each_view(&mut self, mut f: impl FnMut(&mut View<K>)) {
-        self.views.retain(|_, weak| {
-            let Some(view) = weak.upgrade() else {
-                return false;
-            };
-            f(&mut view.lock().expect("metadata view mutex poisoned"));
-            true
+        self.views.retain(|_, views| {
+            views.retain(|weak| {
+                let Some(view) = weak.upgrade() else {
+                    return false;
+                };
+                f(&mut view.lock().expect("metadata view mutex poisoned"));
+                true
+            });
+            !views.is_empty()
         });
     }
 
@@ -579,6 +598,25 @@ mod tests {
         assert_eq!(contents(&first), ["a", "b"]);
         let fresh = state.subscribe(view(None, 30));
         assert_eq!(contents(&fresh), ["b"]);
+    }
+
+    #[tokio::test]
+    async fn late_subscription_does_not_reuse_a_view_with_tombstones() {
+        let mut state = State::<Namespace>::default();
+        let first = state.subscribe(view(None, 60));
+        state.event(watcher::Event::Apply(namespace("a")));
+        state.event(watcher::Event::Delete(namespace("a")));
+
+        let late = state.subscribe(view(None, 60));
+        assert!(!Arc::ptr_eq(&first, &late));
+        assert_eq!(contents(&first), ["a"]);
+        assert!(contents(&late).is_empty());
+
+        // Both views remain subscribed to subsequent updates from the shared
+        // upstream watch.
+        state.event(watcher::Event::Apply(namespace("b")));
+        assert_eq!(contents(&first), ["a", "b"]);
+        assert_eq!(contents(&late), ["b"]);
     }
 
     #[tokio::test(start_paused = true)]
