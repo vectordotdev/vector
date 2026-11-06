@@ -249,7 +249,7 @@ gh issue list -R vectordotdev/vector --state open --label "<kind>:<name>" --limi
 gh search issues --repo vectordotdev/vector --state open --limit 100 --json number,title,body,labels "<name>"
 ```
 
-The name search also returns issues about other components that share the name (e.g. a source and a sink); decide relevance from each issue's content. If any relevant hit describes a major defect (same severity rules as above), do not promote: use `keep — unverified defect report #NNNNN`. Feature requests and unrelated mentions do not block.
+The name search also returns issues about other components that share the name (e.g. a source and a sink); decide relevance from each issue's content. If any relevant hit describes a major defect (same severity rules as above), do not promote: use `keep — unverified defect report #NNNNN`. Feature requests and unrelated mentions do not block. If either search fails or returns as many results as `--limit` (the results may be truncated), treat the check as incomplete and do not promote: use `keep — issue check incomplete`.
 
 Use judgment for borderline cases. A component with 2 bugs but a long stable history is different from one with 2 bugs filed in the last month.
 
