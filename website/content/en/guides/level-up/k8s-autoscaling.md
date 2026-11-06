@@ -10,12 +10,18 @@ tags: ["level up", "guides", "guide", "kubernetes", "load balancing", "nginx"]
 ---
 
 This guide is for engineers who already run a Vector pipeline on Kubernetes
-and need to scale a CPU-bound deployment beyond one pod. It walks through how
-to measure capacity, make additional replicas useful, and automate replica
-counts with the Kubernetes [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/).
+and need to scale a CPU-bound deployment beyond one pod. By the end of the
+walkthrough, you should be able to:
 
-We start by measuring a single pod and testing manual scaling to verify that
-additional pods increase throughput before handing replica management to the HPA.
+1. **Measure a single pod's CPU-bound capacity** and use that baseline to
+   estimate replica requirements ([Manual scaling](#manual-scaling)).
+2. **Distribute HTTP requests to new replicas** with L7 load balancing, then
+   verify that manual scaling improves throughput ([Manual scaling](#manual-scaling)).
+3. **Configure CPU-based autoscaling with headroom** with the Kubernetes
+   [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
+   and interpret the replica count it settles on ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
+4. **Recognize when autoscaling cannot protect against event loss** and choose
+   how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
 
 {{< requirement >}}
 This guide assumes you understand Vector sources, transforms, and sinks, and
@@ -27,19 +33,6 @@ If you are new to Vector or Kubernetes, start with the
 [Kubernetes installation guide](/docs/setup/installation/platforms/kubernetes/).
 This guide builds on a working deployment rather than teaching those basics.
 {{< /requirement >}}
-
-## What you'll learn
-
-By the end of the walkthrough, you should be able to:
-
-1. **Measure a single pod's CPU-bound capacity** and use that baseline to
-   estimate replica requirements ([Manual scaling](#manual-scaling)).
-2. **Distribute HTTP requests to new replicas** with L7 load balancing, then
-   verify that manual scaling improves throughput ([Manual scaling](#manual-scaling)).
-3. **Configure CPU-based autoscaling with headroom** and interpret the replica
-   count it settles on ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
-4. **Recognize when autoscaling cannot protect against event loss** and choose
-   how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
 
 The experiment uses a stateless pipeline parsing
 [Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common)
