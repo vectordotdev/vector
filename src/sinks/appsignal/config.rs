@@ -1,7 +1,7 @@
 use futures::FutureExt;
-use http::StatusCode;
-use http_1::{HeaderValue, Request, header::AUTHORIZATION};
+use http::{HeaderValue, Request, header::AUTHORIZATION};
 use tower::ServiceBuilder;
+use vector_http::empty_body;
 use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
@@ -17,15 +17,14 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::ValidatedSink,
-    http::client_v1::{HttpClient, empty_body},
+    http::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
             BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
 };
@@ -144,7 +143,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedAppsignal {
+pub(super) struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
@@ -200,19 +199,16 @@ async fn healthcheck(
     authorization: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::get(uri.into_v1()).header(AUTHORIZATION, authorization);
+    let request = Request::get(uri.into_uri()).header(AUTHORIZATION, authorization);
     let response = client.send(request.body(empty_body())?).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-
-    match status {
+    match response.status() {
         status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
-pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+pub(super) fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
     Ok(endpoint.append_path(path)?)
 }
 

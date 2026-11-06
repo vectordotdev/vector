@@ -13,7 +13,7 @@ use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
-pub struct K8sPathsProvider {
+pub(super) struct K8sPathsProvider {
     pod_state: Store<Pod>,
     namespace_state: Store<Namespace>,
     include_paths: Vec<glob::Pattern>,
@@ -23,7 +23,7 @@ pub struct K8sPathsProvider {
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
-    pub const fn new(
+    pub(super) const fn new(
         pod_state: Store<Pod>,
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,

@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use hyper::body::Incoming;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{Layer, Service, ServiceExt, service_fn, util::BoxCloneService};
@@ -16,11 +17,11 @@ use vector_lib::{
     internal_event::{CounterName, GaugeName},
 };
 
-/// Request served by the legacy Warp HTTP listener.
-pub(crate) type HttpRequest = http::Request<hyper::Body>;
+/// Request served by the Warp HTTP listener.
+pub(crate) type HttpRequest<B = Incoming> = http::Request<B>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http_1::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http::Request<tonic::body::Body>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -39,7 +40,10 @@ impl RequestControl {
         }
     }
 
-    pub(crate) fn http_layer<R>(&self, error_response: R) -> RequestControlLayer<R, HttpRequest> {
+    pub(crate) fn http_layer<R, B>(
+        &self,
+        error_response: R,
+    ) -> RequestControlLayer<R, HttpRequest<B>> {
         self.layer(error_response, "http")
     }
 
@@ -171,12 +175,6 @@ pub(crate) trait AcknowledgementResponse: Sized {
 
 impl<B: 'static> AcknowledgementResponse for http::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
-        self.extensions_mut().remove()
-    }
-}
-
-impl<B: 'static> AcknowledgementResponse for http_1::Response<B> {
-    fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut()
             .remove::<SharedPendingAcknowledgement<Self>>()?
             .take()
@@ -305,9 +303,9 @@ mod tests {
     };
 
     use http::StatusCode;
-    use hyper::{Body, body::HttpBody};
+    use http_body_util::BodyExt;
     use prost::Message;
-    use tonic::body::{BoxBody, empty_body};
+    use tonic::body::Body as TonicBody;
     use vector_lib::event::{BatchNotifier, Event, EventStatus, LogEvent};
 
     use super::*;
@@ -316,19 +314,21 @@ mod tests {
         http::middleware_error_response as http_error_response, status::Status,
     };
 
-    type HttpResponse = http::Response<Body>;
-    type GrpcResponse = http_1::Response<BoxBody>;
+    // Request control never reads the request body.
+    type HttpRequest = super::HttpRequest<()>;
+    type HttpResponse = warp::reply::Response;
+    type GrpcResponse = http::Response<TonicBody>;
 
     fn http_request() -> HttpRequest {
-        http::Request::new(Body::empty())
+        http::Request::new(())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http_1::Request::new(empty_body())
+        http::Request::new(TonicBody::empty())
     }
 
     fn http_ok() -> HttpResponse {
-        http::Response::new(Body::empty())
+        HttpResponse::default()
     }
 
     fn grpc_ok() -> GrpcResponse {

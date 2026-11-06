@@ -79,7 +79,7 @@ impl SinkConfig for SqsSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct ValidatedSqsSink {
+pub(super) struct ValidatedSqsSink {
     message_group_id: Option<UnconfinedTemplate>,
     message_deduplication_id: Option<UnconfinedTemplate>,
 }

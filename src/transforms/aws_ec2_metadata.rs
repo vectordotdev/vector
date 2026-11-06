@@ -10,14 +10,16 @@ use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::Body;
+use http_body_util::BodyExt as _;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
+use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
+    cpu_time::spawn_timed,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -30,11 +32,11 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
-    cpu_time::spawn_timed,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
+    tls::MaybeTlsSettings,
     transforms::{TaskTransform, Transform},
 };
 
@@ -215,7 +217,7 @@ impl TransformConfig for Ec2Metadata {
         let required = self.required;
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
-        let http_client = HttpClient::new(None, &proxy)?;
+        let http_client = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)?;
 
         let mut client = MetadataClient::new(
             http_client,
@@ -341,7 +343,7 @@ impl Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: HttpClient<Body>,
+    client: HttpClient,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -368,8 +370,8 @@ struct IdentityDocument {
 
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        client: HttpClient<Body>,
+    pub(crate) fn new(
+        client: HttpClient,
         host: Uri,
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
@@ -406,7 +408,7 @@ impl MetadataClient {
         }
     }
 
-    pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
+    pub(crate) async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
         if let Some((token, next_refresh)) = self.token.clone() {
             // If the next refresh is greater (in the future) than
             // the current time we can return the token since its still valid
@@ -422,7 +424,7 @@ impl MetadataClient {
 
         let req = Request::put(uri)
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -435,7 +437,7 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
+        let token = res.into_body().collect().await?.to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
@@ -443,7 +445,7 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+    pub(crate) async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         self.get_metadata(&DYNAMIC_DOCUMENT)
             .await?
             .map(|body| {
@@ -458,7 +460,7 @@ impl MetadataClient {
         clippy::too_many_lines,
         reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+    pub(crate) async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
@@ -608,7 +610,7 @@ impl MetadataClient {
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
-            .body(Body::empty())?;
+            .body(empty_body())?;
 
         match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -622,7 +624,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
+                let body = res.into_body().collect().await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -667,7 +669,7 @@ fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
 }
 
 impl Keys {
-    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+    pub(crate) fn new(namespace: Option<OptionalTargetPath>) -> Self {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {
@@ -691,7 +693,7 @@ impl Keys {
 
 #[derive(Debug)]
 struct UnexpectedHttpStatusError {
-    status: http::StatusCode,
+    status: StatusCode,
 }
 
 impl fmt::Display for UnexpectedHttpStatusError {
@@ -915,8 +917,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
@@ -946,8 +948,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),

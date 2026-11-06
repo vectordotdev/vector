@@ -85,7 +85,7 @@ impl<T: AsyncWrite, F> AsyncWrite for AfterRead<T, F> {
     }
 }
 
-pub enum DecoderError<E> {
+pub(super) enum DecoderError<E> {
     IO(io::Error),
     Other(E),
 }
@@ -108,7 +108,7 @@ impl<E> From<io::Error> for DecoderError<E> {
     }
 }
 
-pub struct LenientFramedReadDecoder<D> {
+pub(super) struct LenientFramedReadDecoder<D> {
     inner: D,
 }
 
@@ -116,7 +116,7 @@ impl<D> LenientFramedReadDecoder<D>
 where
     D: Decoder,
 {
-    pub const fn new(inner: D) -> Self {
+    pub(super) const fn new(inner: D) -> Self {
         Self { inner }
     }
 }

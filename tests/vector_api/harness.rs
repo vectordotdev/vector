@@ -264,7 +264,10 @@ pub async fn wait_for_startup(
     timeout: Duration,
 ) -> Result<(), String> {
     let start = Instant::now();
-    let mut connected = false;
+    // This opens no connection; the health RPC below fails until the API is ready.
+    client
+        .connect()
+        .map_err(|e| format!("Failed to set up the API client: {e}"))?;
 
     loop {
         // Check if Vector crashed
@@ -279,13 +282,8 @@ pub async fn wait_for_startup(
             };
         }
 
-        // Try to connect if not connected yet
-        if !connected && client.connect().await.is_ok() {
-            connected = true;
-        }
-
-        // Check if API is ready (only if connected)
-        if connected && client.health().await.is_ok() {
+        // Check if API is ready
+        if client.health().await.is_ok() {
             return Ok(());
         }
 

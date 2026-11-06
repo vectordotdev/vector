@@ -191,7 +191,7 @@ struct Bucket {
 }
 
 /// Merges partial events from a stream, with support for size limits and oversized behavior.
-pub fn merge_partial_events(
+pub(super) fn merge_partial_events(
     stream: impl Stream<Item = Event> + 'static,
     log_namespace: LogNamespace,
     maybe_max_merged_line_bytes: Option<usize>,

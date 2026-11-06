@@ -83,7 +83,7 @@ pub(super) struct AmqpService {
 }
 
 #[derive(Debug, Snafu)]
-pub enum AmqpError {
+pub(crate) enum AmqpError {
     #[snafu(display("Failed retrieving Acknowledgement: {}", error))]
     AcknowledgementFailed { error: lapin::Error },
 

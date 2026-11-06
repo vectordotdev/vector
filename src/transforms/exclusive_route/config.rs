@@ -18,7 +18,7 @@ pub(super) const UNMATCHED_ROUTE: &str = "_unmatched";
 /// Individual route configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct Route {
+pub(crate) struct Route {
     /// The name of the route is also the name of the transform port.
     ///
     ///  The `_unmatched` name is reserved and thus cannot be used as route ID.
@@ -53,7 +53,7 @@ impl Eq for Route {}
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct ExclusiveRouteConfig {
+pub(crate) struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
     /// Routes are evaluated in order from first to last, and only the first matching route receives each event
     /// (first-match-wins).

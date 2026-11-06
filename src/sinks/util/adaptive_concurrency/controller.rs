@@ -13,7 +13,6 @@ use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemap
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
-    http::HttpError,
     internal_events::{
         AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
         AdaptiveConcurrencyLimitData, AdaptiveConcurrencyObservedRtt,
@@ -296,9 +295,6 @@ where
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
-                } else if error.downcast_ref::<HttpError>().is_some() {
-                    // HTTP protocol-level errors are not backpressure
-                    false
                 } else {
                     warn!(
                         message = "Unhandled error response.",

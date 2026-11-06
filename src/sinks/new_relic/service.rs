@@ -4,20 +4,18 @@ use std::{
 };
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use tracing::Instrument;
+use vector_http::full_body;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{
-    http::client_v1::{HttpClient, full_body},
-    sinks::prelude::*,
-};
+use crate::{http::HttpClient, sinks::prelude::*};
 
 #[derive(Debug, Clone)]
-pub struct NewRelicApiRequest {
+pub(super) struct NewRelicApiRequest {
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
@@ -42,7 +40,7 @@ impl MetaDescriptive for NewRelicApiRequest {
 }
 
 #[derive(Debug)]
-pub struct NewRelicApiResponse {
+pub(super) struct NewRelicApiResponse {
     event_status: EventStatus,
     metadata: RequestMetadata,
 }
@@ -62,7 +60,7 @@ impl DriverResponse for NewRelicApiResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewRelicApiService {
+pub(super) struct NewRelicApiService {
     pub client: HttpClient,
 }
 

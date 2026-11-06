@@ -4,7 +4,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use futures::StreamExt;
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{AsyncClient, MqttOptions, PublishOptions};
 use tokio::time::timeout;
 
 use crate::{
@@ -34,7 +34,7 @@ fn mqtt_broker_port() -> u16 {
 async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<String>) {
     for message in messages {
         client
-            .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+            .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
             .await
             .unwrap();
     }
@@ -43,12 +43,11 @@ async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<Stri
 fn get_mqtt_client() -> AsyncClient {
     let mut mqtt_options = MqttOptions::new(
         "integration-test-producer",
-        mqtt_broker_address(),
-        mqtt_broker_port(),
+        (mqtt_broker_address(), mqtt_broker_port()),
     );
-    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(5);
 
-    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_options).capacity(10).build();
 
     tokio::spawn(async move {
         loop {
