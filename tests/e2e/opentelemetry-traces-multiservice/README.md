@@ -119,7 +119,9 @@ In CI, a Vector-team member can submit a PR review starting with
 `/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit.
 Comments, “run all” commands, automatic PR CI, and schedules do not trigger it.
 
-Read the results on the CI job's summary page. Download the
+The job comments on the PR when it starts and edits that comment with each transport's
+result when it finishes. It also sets an `e2e/opentelemetry-traces-multiservice` commit
+status. Read the full results on the CI job's summary page. Download the
 `otel-traces-multiservice-<commit>` artifact for input/output captures, `coverage.json`,
-`differences.txt`, configs, and runner logs. Results are separated by transport;
+`differences.txt`, `result.json`, configs, and runner logs. Results are separated by transport;
 failed runs may leave partial results.
