@@ -193,7 +193,7 @@ jobs:
       - prep-pr
       - build-test-runner
     runs-on: ubuntu-24.04-8core
-    # Room for every retry attempt below, as in integration.yml.
+    # Fits all three 30-minute retry attempts in the step below.
     timeout-minutes: 90
     permissions:
       contents: read
