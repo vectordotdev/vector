@@ -97,9 +97,9 @@ transforms:
       . = unnest(parsed.log_events)
       . = map_values(.) -> |value| {
          event = del(value.log_events)
-         value |= object!(event)
+         value |= event
          message = del(value.message)
-         value |= object!(parse_json!(string!(message)))
+         value |= object!(parse_json!(message))
       }
 
 # you may want to add more transforms here
@@ -132,7 +132,9 @@ See their guide for more examples.
 ## Deploying Vector
 
 First, deploy vector with the [`aws_kinesis_firehose`][aws_kinesis_firehose] source. See example
-configuration above.
+configuration above. The configuration reads the access key from `${FIREHOSE_ACCESS_KEY}`, and
+[environment variable interpolation][env_vars] is disabled by default, so start Vector with
+`--dangerously-allow-env-var-interpolation`.
 
 {{< info >}}
 Remember that the port must be publicly accessible and the endpoint must be
@@ -383,7 +385,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --config config.yaml
+flog -f json | vector --dangerously-allow-env-var-interpolation --config config.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -498,9 +500,9 @@ transforms:
       . = unnest(parsed.log_events)
       . = map_values(.) -> |value| {
          event = del(value.log_events)
-         value |= object!(event)
+         value |= event
          message = del(value.message)
-         value |= object!(parse_json!(string!(message)))
+         value |= object!(parse_json!(message))
       }
 ```
 
@@ -593,9 +595,9 @@ iteration to finish up our processing.
 ```coffee
 . = map_values(.) -> |value| {
    event = del(value.log_events)
-   value |= object!(event)
+   value |= event
    message = del(value.message)
-   value |= object!(parse_json!(string!(message)))
+   value |= object!(parse_json!(message))
 }
 ```
 
@@ -665,6 +667,7 @@ Here are original events with all of the additional context!
 [aws_kinesis_firehose]: /docs/reference/configuration/sources/aws_kinesis_firehose/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
+[env_vars]: /docs/reference/environment_variables/
 [flog]: https://github.com/mingrammer/flog
 [parse_aws_cloudwatch_log_subscription_message]: /docs/reference/vrl/functions/#parse_json
 [parse_json]: /docs/reference/vrl/functions/#parse_json
