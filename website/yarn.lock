@@ -55,16 +55,16 @@
   resolved "https://registry.yarnpkg.com/@alpinejs/persist/-/persist-3.17.5.tgz#b940e3c268f31917e8b7926c17bfea318b5f018f"
   integrity sha512-hH1UmIXgakz93pHFif5a6N0HLRO2237l7i0xvS7cpxV47WLJv8+1hAiWABjKZA2VQuWEghXMvYFjtoOLihP5PQ==
 
-"@babel/cli@^8.0.6":
-  version "8.0.6"
-  resolved "https://registry.yarnpkg.com/@babel/cli/-/cli-8.0.6.tgz#d209800ad1f078f7cbb9a2f4e0f546a72d1180e9"
-  integrity sha512-um8l/siZ6XioGNxbmEry1Z3u77Ye6bkDkg6lXewtZDacGNC+MLh85CWcnMV/A12i4eh77HkhkSKVlZtk4JsucA==
+"@babel/cli@^8.1.0":
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/@babel/cli/-/cli-8.1.0.tgz#e68865491637e62459d05414b4950ffebb708e46"
+  integrity sha512-C4fCHysy+LdXz6nsk59mAKoYBrYTxkbJb6sCEqyx1E8C5+77dEc4I4FjmIO6crtWvHxvn+sL5VD/tIjtQMYceQ==
   dependencies:
     "@jridgewell/trace-mapping" "^0.3.31"
     chokidar "^5.0.0"
     commander "^14.0.2"
     convert-source-map "^2.0.0"
-    glob "^13.0.0"
+    glob "^14.0.0"
     slash "^5.1.0"
 
 "@babel/code-frame@^8.0.0", "@babel/code-frame@^8.0.6":
@@ -1012,6 +1012,11 @@
   dependencies:
     tslib "^2.4.0"
 
+"@isaacs/nonrecursive-glob-match@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@isaacs/nonrecursive-glob-match/-/nonrecursive-glob-match-1.0.3.tgz#7f6724fd8a6ca315d6bb7f63f0e4d079060da246"
+  integrity sha512-SI7kyKHq4XXDRozw+r9GlRZkia1ZkFrpLW98r2IC2Bpr8YkFGE3fvjzmxCG0x78A++69HmDNrDvSMYBZmHGpKA==
+
 "@jridgewell/gen-mapping@0.4.0-beta.0":
   version "0.4.0-beta.0"
   resolved "https://registry.yarnpkg.com/@jridgewell/gen-mapping/-/gen-mapping-0.4.0-beta.0.tgz#af8672fd994cd5d598f0ac59f47eca6bc62c9895"
@@ -1547,7 +1552,7 @@ binary-extensions@^2.0.0:
   resolved "https://registry.yarnpkg.com/binary-extensions/-/binary-extensions-2.3.0.tgz#f6e14a97858d327252200242d4ccfe522c445522"
   integrity sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==
 
-brace-expansion@^5.0.8:
+brace-expansion@^5.0.12:
   version "5.0.12"
   resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-5.0.12.tgz#995fbb4750a77c4d16a7dc942ff2ca6ef8e675ec"
   integrity sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==
@@ -1881,14 +1886,14 @@ glob-parent@~5.1.2:
   dependencies:
     is-glob "^4.0.1"
 
-glob@^13.0.0:
-  version "13.0.6"
-  resolved "https://registry.yarnpkg.com/glob/-/glob-13.0.6.tgz#078666566a425147ccacfbd2e332deb66a2be71d"
-  integrity sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw==
+glob@^14.0.0:
+  version "14.0.3"
+  resolved "https://registry.yarnpkg.com/glob/-/glob-14.0.3.tgz#71e124649b3e28fdb09bdb07ef478b10c68fd6e1"
+  integrity sha512-A1vjIwC3qpdCso45Iw127gnp7sPhqgY8lUQhDrArIs+GbmfaaVPFuoyy7WyLT9EPZCRZ7j7aLdwUhQmHWesEow==
   dependencies:
-    minimatch "^10.2.2"
+    minimatch "^11.0.2"
     minipass "^7.1.3"
-    path-scurry "^2.0.2"
+    path-scurry "^3.0.0"
 
 graceful-fs@^4.2.4:
   version "4.2.11"
@@ -2112,12 +2117,13 @@ mini-svg-data-uri@^1.2.3:
   resolved "https://registry.npmjs.org/mini-svg-data-uri/-/mini-svg-data-uri-1.4.3.tgz"
   integrity sha512-gSfqpMRC8IxghvMcxzzmMnWpXAChSA+vy4cia33RgerMS8Fex95akUyQZPbxJJmeBGiGmK7n/1OpUX8ksRjIdA==
 
-minimatch@^10.2.2:
-  version "10.2.6"
-  resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-10.2.6.tgz#fd956bbe0b77241e9f15ac5dccb1c638060968ef"
-  integrity sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==
+minimatch@^11.0.2:
+  version "11.0.4"
+  resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-11.0.4.tgz#3ed156790c2754647ee94dab305a3f93cd16481e"
+  integrity sha512-/UJ1dEoVQTjPNDh6SGlUo+ueLMmoHTas4q+8yaAR/5t6nLAIiBDJtoYUh20IYleix7ehiQkgczb84PE3uzHkxg==
   dependencies:
-    brace-expansion "^5.0.8"
+    "@isaacs/nonrecursive-glob-match" "^1.0.3"
+    brace-expansion "^5.0.12"
 
 minipass@^7.1.2, minipass@^7.1.3:
   version "7.1.3"
@@ -2200,10 +2206,10 @@ path-exists@^3.0.0:
   resolved "https://registry.yarnpkg.com/path-exists/-/path-exists-3.0.0.tgz#ce0ebeaa5f78cb18925ea7d810d7b59b010fd515"
   integrity sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ==
 
-path-scurry@^2.0.2:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/path-scurry/-/path-scurry-2.0.2.tgz#6be0d0ee02a10d9e0de7a98bae65e182c9061f85"
-  integrity sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==
+path-scurry@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/path-scurry/-/path-scurry-3.0.0.tgz#384894267bb8d1889242d176433f91ae1eec5cbb"
+  integrity sha512-1pTbQqH1wIwMi/eleQ5leFTTCkzFsPcgXNjwOA8YGGW/W4/kHT3dssE7Z6NH+zuqNLOzOB0uaD61yl7cAcVhgg==
   dependencies:
     lru-cache "^11.0.0"
     minipass "^7.1.2"

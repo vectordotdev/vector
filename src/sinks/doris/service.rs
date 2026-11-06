@@ -21,13 +21,13 @@ use vector_common::{
 };
 
 #[derive(Clone)]
-pub struct DorisService {
+pub(super) struct DorisService {
     client: ThreadSafeDorisSinkClient,
     log_request: bool,
 }
 
 impl DorisService {
-    pub const fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
+    pub(super) const fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
         DorisService {
             client,
             log_request,
@@ -84,7 +84,7 @@ impl DorisService {
     }
 }
 #[derive(Debug, Snafu)]
-pub struct DorisResponse {
+pub(super) struct DorisResponse {
     pub metadata: RequestMetadata,
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,

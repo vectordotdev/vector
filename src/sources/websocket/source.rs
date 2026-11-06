@@ -80,11 +80,11 @@ pub enum WebSocketSourceError {
 }
 
 impl WebSocketSource {
-    pub const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
+    pub(crate) const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
         Self { config, params }
     }
 
-    pub async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
+    pub(crate) async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 

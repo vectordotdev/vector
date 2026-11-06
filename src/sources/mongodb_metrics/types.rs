@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// Type of mongo instance.
 /// Can be determined with `isMaster` command, see `CommandIsMaster`.
 #[derive(Debug, PartialEq, Eq)]
-pub enum NodeType {
+pub(super) enum NodeType {
     Mongod,  // MongoDB daemon
     Mongos,  // Mongo sharding server
     Replset, // <https://docs.mongodb.com/manual/reference/glossary/#term-replica-set>
@@ -15,7 +15,7 @@ pub enum NodeType {
 /// <https://docs.mongodb.com/manual/reference/command/isMaster/>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandIsMaster {
+pub(super) struct CommandIsMaster {
     pub msg: Option<String>,
     pub set_name: Option<String>,
     pub hosts: Option<Vec<String>>,
@@ -24,7 +24,7 @@ pub struct CommandIsMaster {
 /// <https://docs.mongodb.com/manual/reference/command/buildInfo/>
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandBuildInfo {
+pub(super) struct CommandBuildInfo {
     pub version: String,
     pub git_version: String,
     pub bits: i64,
@@ -35,7 +35,7 @@ pub struct CommandBuildInfo {
 /// <https://docs.mongodb.com/manual/reference/command/serverStatus/>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatus {
+pub(super) struct CommandServerStatus {
     #[serde(flatten)]
     pub instance: CommandServerStatusInstance,
     pub asserts: CommandServerStatusAsserts,
@@ -57,7 +57,7 @@ pub struct CommandServerStatus {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusInstance {
+pub(super) struct CommandServerStatusInstance {
     pub uptime: f64,
     pub uptime_estimate: i64,
     pub local_time: DateTime,
@@ -65,7 +65,7 @@ pub struct CommandServerStatusInstance {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusAsserts {
+pub(super) struct CommandServerStatusAsserts {
     pub regular: i64,
     pub warning: i64,
     pub msg: i64,
@@ -75,21 +75,21 @@ pub struct CommandServerStatusAsserts {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusConnections {
+pub(super) struct CommandServerStatusConnections {
     pub active: i64,
     pub available: i64,
     pub current: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusExtraInfo {
+pub(super) struct CommandServerStatusExtraInfo {
     pub heap_usage_bytes: Option<i64>,
     pub page_faults: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMem {
+pub(super) struct CommandServerStatusMem {
     pub resident: i64,
     pub r#virtual: i64,
     pub mapped: Option<i64>,
@@ -98,14 +98,14 @@ pub struct CommandServerStatusMem {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusGlobalLock {
+pub(super) struct CommandServerStatusGlobalLock {
     pub total_time: i64,
     pub active_clients: CommandServerStatusGlobalLockInner,
     pub current_queue: CommandServerStatusGlobalLockInner,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusGlobalLockInner {
+pub(super) struct CommandServerStatusGlobalLockInner {
     pub total: i64,
     pub readers: i64,
     pub writers: i64,
@@ -113,13 +113,13 @@ pub struct CommandServerStatusGlobalLockInner {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusLock {
+pub(super) struct CommandServerStatusLock {
     pub time_acquiring_micros: Option<CommandServerStatusLockModes>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusLockModes {
+pub(super) struct CommandServerStatusLockModes {
     #[serde(rename = "r")]
     pub read: Option<i64>,
     #[serde(rename = "w")]
@@ -128,7 +128,7 @@ pub struct CommandServerStatusLockModes {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetrics {
+pub(super) struct CommandServerStatusMetrics {
     pub cursor: CommandServerStatusMetricsCursor,
     pub document: CommandServerStatusMetricsDocument,
     pub get_last_error: CommandServerStatusMetricsGetLastError,
@@ -140,7 +140,7 @@ pub struct CommandServerStatusMetrics {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsCursor {
+pub(super) struct CommandServerStatusMetricsCursor {
     #[serde(rename = "timedOut")]
     pub timed_out: i64,
     pub open: CommandServerStatusMetricsCursorOpen,
@@ -148,7 +148,7 @@ pub struct CommandServerStatusMetricsCursor {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsCursorOpen {
+pub(super) struct CommandServerStatusMetricsCursorOpen {
     pub no_timeout: i64,
     pub pinned: i64,
     pub total: i64,
@@ -158,7 +158,7 @@ pub struct CommandServerStatusMetricsCursorOpen {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsDocument {
+pub(super) struct CommandServerStatusMetricsDocument {
     pub deleted: i64,
     pub inserted: i64,
     pub returned: i64,
@@ -166,45 +166,45 @@ pub struct CommandServerStatusMetricsDocument {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsGetLastError {
+pub(super) struct CommandServerStatusMetricsGetLastError {
     pub wtime: CommandServerStatusMetricsGetLastErrorWtime,
     pub wtimeouts: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsGetLastErrorWtime {
+pub(super) struct CommandServerStatusMetricsGetLastErrorWtime {
     pub num: i64,
     pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsOperation {
+pub(super) struct CommandServerStatusMetricsOperation {
     pub scan_and_order: i64,
     pub write_conflicts: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsQueryExecutor {
+pub(super) struct CommandServerStatusMetricsQueryExecutor {
     pub scanned: i64,
     pub scanned_objects: i64,
     pub collection_scans: Option<CommandServerStatusMetricsQueryExecutorCollections>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsQueryExecutorCollections {
+pub(super) struct CommandServerStatusMetricsQueryExecutorCollections {
     pub total: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsRecord {
+pub(super) struct CommandServerStatusMetricsRecord {
     pub moves: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsRepl {
+pub(super) struct CommandServerStatusMetricsRepl {
     pub apply: CommandServerStatusMetricsReplApply,
     pub buffer: CommandServerStatusMetricsReplBuffer,
     pub executor: CommandServerStatusMetricsReplExecutor,
@@ -212,21 +212,21 @@ pub struct CommandServerStatusMetricsRepl {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusMetricsReplApply {
+pub(super) struct CommandServerStatusMetricsReplApply {
     pub batches: CommandServerStatusMetricsReplApplyBatches,
     pub ops: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplApplyBatches {
+pub(super) struct CommandServerStatusMetricsReplApplyBatches {
     pub num: i64,
     pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplBuffer {
+pub(super) struct CommandServerStatusMetricsReplBuffer {
     pub count: i64,
     pub max_size_bytes: i64,
     pub size_bytes: i64,
@@ -234,21 +234,21 @@ pub struct CommandServerStatusMetricsReplBuffer {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplExecutor {
+pub(super) struct CommandServerStatusMetricsReplExecutor {
     pub queues: CommandServerStatusMetricsReplExecutorQueues,
     pub unsignaled_events: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplExecutorQueues {
+pub(super) struct CommandServerStatusMetricsReplExecutorQueues {
     pub network_in_progress: i64,
     pub sleepers: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplNetwork {
+pub(super) struct CommandServerStatusMetricsReplNetwork {
     pub bytes: i64,
     pub getmores: CommandServerStatusMetricsReplNetworkGetmores,
     pub ops: i64,
@@ -257,14 +257,14 @@ pub struct CommandServerStatusMetricsReplNetwork {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplNetworkGetmores {
+pub(super) struct CommandServerStatusMetricsReplNetworkGetmores {
     pub num: i64,
     pub total_millis: i64,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusMetricsReplTtl {
+pub(super) struct CommandServerStatusMetricsReplTtl {
     pub deleted_documents: i64,
     pub passes: i64,
 }
@@ -272,26 +272,26 @@ pub struct CommandServerStatusMetricsReplTtl {
 /// <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latency-stats-document>
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusOpLatenciesStat {
+pub(super) struct CommandServerStatusOpLatenciesStat {
     pub latency: i64,
     pub ops: i64,
     pub histogram: Vec<CommandServerStatusOpLatenciesStatHistBucket>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusOpLatenciesStatHistBucket {
+pub(super) struct CommandServerStatusOpLatenciesStatHistBucket {
     pub(crate) micros: i64,
     pub count: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusStorageEngine {
+pub(super) struct CommandServerStatusStorageEngine {
     pub name: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusWiredTiger {
+pub(super) struct CommandServerStatusWiredTiger {
     #[serde(rename = "block-manager")]
     pub block_manager: CommandServerStatusWiredTigerBlockManager,
     pub cache: CommandServerStatusWiredTigerCache,
@@ -302,7 +302,7 @@ pub struct CommandServerStatusWiredTiger {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerBlockManager {
+pub(super) struct CommandServerStatusWiredTigerBlockManager {
     #[serde(rename = "blocks pre-loaded")]
     pub blocks_pre_loaded: i64,
     #[serde(rename = "blocks read")]
@@ -320,7 +320,7 @@ pub struct CommandServerStatusWiredTigerBlockManager {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerCache {
+pub(super) struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes currently in the cache")]
     pub bytes_total: i64,
     #[serde(rename = "maximum bytes configured")]
@@ -348,21 +348,21 @@ pub struct CommandServerStatusWiredTigerCache {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerConcurrentTransactions {
+pub(super) struct CommandServerStatusWiredTigerConcurrentTransactions {
     pub write: CommandServerStatusWiredTigerConcurrentTransactionsStats,
     pub read: CommandServerStatusWiredTigerConcurrentTransactionsStats,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusWiredTigerConcurrentTransactionsStats {
+pub(super) struct CommandServerStatusWiredTigerConcurrentTransactionsStats {
     pub out: i64,
     pub available: i64,
     pub total_tickets: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerLog {
+pub(super) struct CommandServerStatusWiredTigerLog {
     #[serde(rename = "log bytes of payload data")]
     pub bytes_payload_data: i64,
     #[serde(rename = "log bytes written")]
@@ -388,13 +388,13 @@ pub struct CommandServerStatusWiredTigerLog {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerSession {
+pub(super) struct CommandServerStatusWiredTigerSession {
     #[serde(rename = "open session count")]
     pub sessions: i64,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CommandServerStatusWiredTigerTransaction {
+pub(super) struct CommandServerStatusWiredTigerTransaction {
     #[serde(rename = "transaction begins")]
     pub begins: i64,
     #[serde(rename = "transaction checkpoints")]
@@ -415,7 +415,7 @@ pub struct CommandServerStatusWiredTigerTransaction {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandServerStatusNetwork {
+pub(super) struct CommandServerStatusNetwork {
     pub bytes_in: i64,
     pub bytes_out: i64,
     pub num_requests: i64,

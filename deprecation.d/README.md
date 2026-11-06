@@ -9,6 +9,10 @@ release notes:
 - **`deprecation_announcements`** – items deprecated in this release (announced for the first time).
 - **`planned_deprecations`** – items deprecated in an earlier release.
 
+A valid new active notice also satisfies `vdev check changelog-fragments`. Deprecation announcements
+need no separate changelog fragment or `no-changelog` label. Removing a deprecated feature still
+requires a breaking changelog fragment; see the [deprecation policy](../docs/DEPRECATION_POLICY.md).
+
 ## File format
 
 Each file must be named `<unique_slug>.md` and begin with YAML frontmatter:
