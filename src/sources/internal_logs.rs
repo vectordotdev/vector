@@ -18,6 +18,9 @@ use crate::{
     trace::TraceSubscription,
 };
 
+const HOST: &str = "host";
+const PID: &str = "pid";
+
 /// Configuration for the `internal_logs` source.
 #[configurable_component(source(
     "internal_logs",
@@ -50,7 +53,7 @@ pub struct InternalLogsConfig {
 }
 
 fn default_pid_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("pid"))
+    OptionalValuePath::from(owned_value_path!(PID))
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
@@ -84,14 +87,14 @@ impl InternalLogsConfig {
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             )
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 pid_key,
-                &owned_value_path!("pid"),
+                &owned_value_path!(PID),
                 Kind::integer(),
                 None,
             )
@@ -178,7 +181,7 @@ async fn run(
                 InternalLogsConfig::NAME,
                 &mut log,
                 legacy_host_key,
-                path!("host"),
+                path!(HOST),
                 hostname.to_owned(),
             );
         }
@@ -188,7 +191,7 @@ async fn run(
             InternalLogsConfig::NAME,
             &mut log,
             legacy_pid_key,
-            path!("pid"),
+            path!(PID),
             pid,
         );
 
