@@ -14,6 +14,7 @@ use tokio::{sync::mpsc, task::JoinSet};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
 use vector_lib::{
+    cpu_time::SpawnTimedExt,
     source_sender::chunk_size_events,
     stream::expiration_map::{Emitter, map_with_expiration},
 };
@@ -25,7 +26,6 @@ use vrl::{
 
 use crate::{
     conditions::Condition,
-    cpu_time::SpawnTimedExt,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
