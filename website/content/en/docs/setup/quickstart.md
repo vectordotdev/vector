@@ -125,7 +125,7 @@ Hello, World!
 ```
 
 {{< info title="JSON encoding" >}}
-If you want to see something cool, try setting `encoding.codec = "json"` in the sink config.
+If you want to see something cool, try setting `codec: "json"` under `encoding` in the sink config.
 {{< /info >}}
 
 ## Hello Syslog!
