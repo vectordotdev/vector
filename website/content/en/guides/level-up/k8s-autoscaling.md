@@ -19,7 +19,8 @@ walkthrough, you should be able to:
    scaling improves throughput ([Manual scaling](#manual-scaling)).
 3. **Configure CPU-based autoscaling with headroom** with the Kubernetes
    [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-   and interpret the replica count it settles on ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
+   and predict, from the single-pod baseline, how many replicas it settles on
+   ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
 4. **Recognize when autoscaling cannot protect against event loss** and choose
    how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
 
