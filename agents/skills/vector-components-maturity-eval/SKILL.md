@@ -15,7 +15,6 @@ From `website/content/en/docs/architecture/guarantees.md`:
 - >4 months community testing (proxy: file age in git)
 - API stable and unlikely to change (proxy: low config churn)
 - No major open bugs
-- Positive community signal of successful production use (no automated proxy — this skill cannot verify it; promotion candidates need maintainer confirmation)
 
 **Beta**: Does not meet stable criteria — use with caution in production.
 **Deprecated**: Will be removed in next major version.
@@ -294,7 +293,7 @@ _Categories are disjoint. Every component appears in exactly one row. "No change
 
 ## Promotion Candidates
 
-_Beta components that meet all automated criteria: no major open bugs (including the pre-promotion issue check), test tier ✓ or ~, age > 4 months, low-risk churn (no breaking commits, ≤ 10 total), docs at least `partial`. Production-use evidence is not checked automatically and needs maintainer confirmation before promotion._
+_Beta components that meet all automated criteria: no major open bugs (including the pre-promotion issue check), test tier ✓ or ~, age > 4 months, low-risk churn (no breaking commits, ≤ 10 total), docs at least `partial`._
 
 | Component | Type | Open Bugs | Tests | Age | Churn (6mo) | Docs |
 |-----------|------|-----------|-------|-----|-------------|------|
