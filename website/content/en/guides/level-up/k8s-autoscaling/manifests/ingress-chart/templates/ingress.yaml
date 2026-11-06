@@ -4,10 +4,10 @@ metadata:
   name: vector-http
   namespace: {{ .Release.Namespace }}
   annotations:
-    # Allow arbitrarily large POST bodies (100 MiB chunks from producers)
+    # Allow arbitrarily large POST bodies from the lading producer
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     # Stream request body directly to the upstream without buffering so
-    # backpressure propagates back to the producer curl client
+    # backpressure propagates back to the lading producer
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 spec:
   ingressClassName: nginx

@@ -4,12 +4,13 @@
 #
 # Each pod opens `parallel_connections` concurrent HTTP connections to Nginx,
 # which round-robins each request to a Vector pod at the HTTP layer (L7).
-# Unlike the previous sequential-curl producer, lading keeps all connections
-# busy simultaneously, so it saturates as many Vector pods as the cluster has.
+# Lading keeps all connections busy simultaneously, so every Vector pod
+# receives load.
 #
 # bytes_per_second is set above what 1–3 Vector pods can handle (bottlenecked in
-# Phases 1–2) but below what 8 pods can handle, so Phase 3 has headroom and the
-# HPA can find a natural equilibrium in Phase 4 (5 pods at ~70% CPU).
+# the 1-pod and 3-pod manual scaling runs) but below what 8 pods can handle, so
+# the 8-pod run has headroom and the HPA can find a natural equilibrium
+# (5 pods at ~70% CPU).
 apiVersion: v1
 kind: ConfigMap
 metadata:

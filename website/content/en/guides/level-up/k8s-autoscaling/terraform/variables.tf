@@ -18,7 +18,7 @@ variable "ami_id" {
 variable "node_instance_type" {
   type = string
   # c5.4xlarge: 16 vCPU, 32 GiB
-  # Phase 3 (8-worker) CPU requests: 8×1000m Vector + 5×100m producers + 500m consumer + ~200m system ≈ 9.2 vCPU
+  # 8-pod run CPU requests: 8×1000m Vector + 200m producer + 500m consumer + ~200m system ≈ 8.9 vCPU
   default = "c5.4xlarge"
 }
 
