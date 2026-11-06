@@ -17,9 +17,9 @@ walkthrough, you should be able to:
    estimate replica requirements ([Manual scaling](#manual-scaling)).
 2. **Load balance HTTP requests to new replicas**, then verify that manual
    scaling improves throughput ([Manual scaling](#manual-scaling)).
-3. **Configure CPU-based autoscaling with headroom** with the Kubernetes
-   [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-   and predict, from the single-pod baseline, how many replicas it settles on
+3. **Replace a fixed replica count with CPU-based autoscaling** using the
+   Kubernetes [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/),
+   which settles at a stable count with CPU headroom and no over-provisioning
    ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
 4. **Recognize when autoscaling cannot protect against event loss** and choose
    how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
