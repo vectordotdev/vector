@@ -297,8 +297,8 @@ impl RunningTopology {
     /// Attempts to load a new configuration and update this running topology.
     ///
     /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then
-    /// `Ok(())` is returned.
+    /// old components, changing of existing components, adding of new components -- then the
+    /// applied diff is returned. It includes the components queued with `extend_reload_set`.
     ///
     /// If the new configuration is not valid, or not all of the changes in the new configuration
     /// were able to be made, then this method will attempt to undo the changes made and bring the
@@ -313,7 +313,7 @@ impl RunningTopology {
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<(), ReloadError> {
+    ) -> Result<ConfigDiff, ReloadError> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
@@ -359,7 +359,7 @@ impl RunningTopology {
 
                 info!("New configuration loaded successfully.");
 
-                return Ok(());
+                return Ok(diff);
             }
         }
 

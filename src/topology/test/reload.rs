@@ -113,6 +113,37 @@ async fn topology_rebuild_old() {
 }
 
 #[tokio::test]
+async fn topology_reload_returns_applied_diff() {
+    test_util::trace_init();
+
+    let (_guard, address) = next_addr();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", prom_remote_write_source(address));
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let mut new_config = old_config.clone();
+    new_config.add_sink("out2", &["in"], basic_sink(1).1);
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+    topology.extend_reload_set(HashSet::from([ComponentKey::from("out")]));
+    let diff = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
+
+    assert!(diff.sources.to_change.is_empty());
+    assert_eq!(
+        diff.sinks.to_change,
+        HashSet::from([ComponentKey::from("out")])
+    );
+    assert_eq!(
+        diff.sinks.to_add,
+        HashSet::from([ComponentKey::from("out2")])
+    );
+}
+
+#[tokio::test]
 async fn topology_old() {
     test_util::trace_init();
 
