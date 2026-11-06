@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use async_recursion::async_recursion;
+use futures::future::Either;
 use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
@@ -55,102 +55,40 @@ where
         }
     }
 
-    pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
+    pub(crate) fn send(
+        &mut self,
+        item: T,
+    ) -> impl Future<Output = crate::Result<TryWriteOutcome<T>>> + Send + '_ {
         match self {
-            Self::InMemory(tx) => tx
-                .send(item)
-                .await
-                .map(|()| TryWriteOutcome::Written)
-                .map_err(Into::into),
-            Self::DiskV2(writer) => {
-                let pre_count = item.event_count() as u64;
-                let pre_size = item.size_of() as u64;
-                let mut writer = writer.lock().await;
-
-                let Some(item) = item.filter_unencodable() else {
-                    // The whole item was filtered out (e.g. every sub-item over the
-                    // protobuf nesting budget). Report the drop directly via the
-                    // ledger's usage handle so it shows up in the disk-v2 stage's
-                    // `received` / `dropped` metrics — `BufferSender` does not carry
-                    // its own handle for backends that `provides_instrumentation()`.
-                    writer.track_dropped(pre_count, pre_size);
-                    return Ok(TryWriteOutcome::Dropped);
-                };
-                if item.event_count() as u64 != pre_count {
-                    let dropped_events = pre_count - item.event_count() as u64;
-                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
-                    writer.track_dropped(dropped_events, dropped_bytes);
-                }
-
-                writer.write_record_outcome(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::InMemory(tx) => Either::Left(async move {
+                tx.send(item)
+                    .await
+                    .map(|()| TryWriteOutcome::Written)
+                    .map_err(Into::into)
+            }),
+            // The disk arm is boxed so the in-memory future does not include the writer's state.
+            Self::DiskV2(writer) => Either::Right(Box::pin(disk_send(writer, item))),
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
+    pub(crate) fn try_send(
+        &mut self,
+        item: T,
+    ) -> impl Future<Output = crate::Result<TryWriteOutcome<T>>> + Send + '_ {
         match self {
-            Self::InMemory(tx) => tx
-                .try_send(item)
-                .map(|()| TryWriteOutcome::Written)
-                .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
-            Self::DiskV2(writer) => {
-                let mut writer = writer.lock().await;
-
-                // Filtering here is unconditional and independent of current occupancy.
-                // Whether an unencodable item should be dropped or handed to an overflow
-                // stage is a `WhenFull` policy decision, so it is made in `BufferSender`
-                // before the item ever reaches this backend: `WhenFull::Overflow` diverts
-                // items failing `is_fully_encodable` straight to the overflow stage, and
-                // anything arriving here is therefore expected to be persistable. Keeping
-                // the filter unconditional means a given item is treated the same at 99%
-                // full as at 100% full.
-                let pre_count = item.event_count() as u64;
-                let pre_size = item.size_of() as u64;
-                let Some(item) = item.filter_unencodable() else {
-                    writer.track_dropped(pre_count, pre_size);
-                    return Ok(TryWriteOutcome::Dropped);
-                };
-                if item.event_count() as u64 != pre_count {
-                    let dropped_events = pre_count - item.event_count() as u64;
-                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
-                    writer.track_dropped(dropped_events, dropped_bytes);
-                }
-
-                writer.try_write_record(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::InMemory(tx) => Either::Left(std::future::ready(
+                tx.try_send(item)
+                    .map(|()| TryWriteOutcome::Written)
+                    .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
+            )),
+            Self::DiskV2(writer) => Either::Right(Box::pin(disk_try_send(writer, item))),
         }
     }
 
-    pub(crate) async fn flush(&mut self) -> crate::Result<()> {
+    pub(crate) fn flush(&mut self) -> impl Future<Output = crate::Result<()>> + Send + '_ {
         match self {
-            Self::InMemory(_) => Ok(()),
-            Self::DiskV2(writer) => {
-                let mut writer = writer.lock().await;
-                writer.flush().await.map_err(|e| {
-                    // Errors on the I/O path, which is all that flushing touches, are never recoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::InMemory(_) => Either::Left(std::future::ready(Ok(()))),
+            Self::DiskV2(writer) => Either::Right(Box::pin(disk_flush(writer))),
         }
     }
 
@@ -171,6 +109,91 @@ where
             Self::DiskV2(writer) => writer.try_lock().ok().map(|writer| writer.usage_snapshot()),
         }
     }
+}
+
+async fn disk_send<T: Bufferable>(
+    writer: &Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>,
+    item: T,
+) -> crate::Result<TryWriteOutcome<T>> {
+    let pre_count = item.event_count() as u64;
+    let pre_size = item.size_of() as u64;
+    let mut writer = writer.lock().await;
+
+    let Some(item) = item.filter_unencodable() else {
+        // The whole item was filtered out (e.g. every sub-item over the
+        // protobuf nesting budget). Report the drop directly via the
+        // ledger's usage handle so it shows up in the disk-v2 stage's
+        // `received` / `dropped` metrics — `BufferSender` does not carry
+        // its own handle for backends that `provides_instrumentation()`.
+        writer.track_dropped(pre_count, pre_size);
+        return Ok(TryWriteOutcome::Dropped);
+    };
+    if item.event_count() as u64 != pre_count {
+        let dropped_events = pre_count - item.event_count() as u64;
+        let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+        writer.track_dropped(dropped_events, dropped_bytes);
+    }
+
+    writer.write_record_outcome(item).await.map_err(|e| {
+        // Record-level failures that can never succeed (a record too large to encode
+        // within the max record size) are handled inside the writer and surfaced as a
+        // dropped outcome. Anything that reaches this point -- I/O errors,
+        // serialization failures, an inconsistent writer state -- is genuinely
+        // unrecoverable.
+        error!("Disk buffer writer has encountered an unrecoverable error.");
+
+        e.into()
+    })
+}
+
+async fn disk_try_send<T: Bufferable>(
+    writer: &Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>,
+    item: T,
+) -> crate::Result<TryWriteOutcome<T>> {
+    let mut writer = writer.lock().await;
+
+    // Filtering here is unconditional and independent of current occupancy.
+    // Whether an unencodable item should be dropped or handed to an overflow
+    // stage is a `WhenFull` policy decision, so it is made in `BufferSender`
+    // before the item ever reaches this backend: `WhenFull::Overflow` diverts
+    // items failing `is_fully_encodable` straight to the overflow stage, and
+    // anything arriving here is therefore expected to be persistable. Keeping
+    // the filter unconditional means a given item is treated the same at 99%
+    // full as at 100% full.
+    let pre_count = item.event_count() as u64;
+    let pre_size = item.size_of() as u64;
+    let Some(item) = item.filter_unencodable() else {
+        writer.track_dropped(pre_count, pre_size);
+        return Ok(TryWriteOutcome::Dropped);
+    };
+    if item.event_count() as u64 != pre_count {
+        let dropped_events = pre_count - item.event_count() as u64;
+        let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+        writer.track_dropped(dropped_events, dropped_bytes);
+    }
+
+    writer.try_write_record(item).await.map_err(|e| {
+        // Record-level failures that can never succeed (a record too large to encode
+        // within the max record size) are handled inside the writer and surfaced as a
+        // dropped outcome. Anything that reaches this point -- I/O errors,
+        // serialization failures, an inconsistent writer state -- is genuinely
+        // unrecoverable.
+        error!("Disk buffer writer has encountered an unrecoverable error.");
+
+        e.into()
+    })
+}
+
+async fn disk_flush<T: Bufferable>(
+    writer: &Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>,
+) -> crate::Result<()> {
+    let mut writer = writer.lock().await;
+    writer.flush().await.map_err(|e| {
+        // Errors on the I/O path, which is all that flushing touches, are never recoverable.
+        error!("Disk buffer writer has encountered an unrecoverable error.");
+
+        e.into()
+    })
 }
 
 enum UsageAccounting {
@@ -219,9 +242,8 @@ impl UsageAccounting {
 ///
 /// TODO: We should eventually rework `BufferSender`/`BufferReceiver` so that they contain a vector
 /// of the fields we already have here, but instead of cascading via calling into `overflow`, we'd
-/// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
-/// `SenderAdapter` instances instead... which would let us get rid of the boxing and
-/// `#[async_recursion]` stuff.
+/// linearize the nesting instead. The overflow call is `Box::pin`ned so only that recursion is
+/// boxed; linearizing would remove that box too.
 #[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
@@ -317,7 +339,11 @@ impl<T: Bufferable> BufferSender<T> {
         self.overflow.as_ref().map(AsRef::as_ref)
     }
 
-    #[async_recursion]
+    /// Sends `item` into this buffer, overflowing or dropping it when the buffer is full.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a disk stage hits an unrecoverable I/O or serialization failure.
     pub async fn send(
         &mut self,
         mut item: T,
@@ -355,21 +381,25 @@ impl<T: Bufferable> BufferSender<T> {
                 // item perfectly well, so diverting it past memory would send an item the
                 // base could have kept to a stage that must drop it.
                 if self.base.requires_encodable_items() && !item.is_fully_encodable() {
-                    self.overflow
-                        .as_mut()
-                        .unwrap_or_else(|| unreachable!("overflow must exist"))
-                        .send(item, send_reference)
-                        .await?;
+                    Box::pin(
+                        self.overflow
+                            .as_mut()
+                            .unwrap_or_else(|| unreachable!("overflow must exist"))
+                            .send(item, send_reference),
+                    )
+                    .await?;
                     UsageAccounting::NotAccepted
                 } else {
                     match self.base.try_send(item).await? {
                         TryWriteOutcome::Written => UsageAccounting::Accepted,
                         TryWriteOutcome::Full(item) => {
-                            self.overflow
-                                .as_mut()
-                                .unwrap_or_else(|| unreachable!("overflow must exist"))
-                                .send(item, send_reference)
-                                .await?;
+                            Box::pin(
+                                self.overflow
+                                    .as_mut()
+                                    .unwrap_or_else(|| unreachable!("overflow must exist"))
+                                    .send(item, send_reference),
+                            )
+                            .await?;
                             UsageAccounting::NotAccepted
                         }
                         TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
@@ -397,11 +427,15 @@ impl<T: Bufferable> BufferSender<T> {
         Ok(())
     }
 
-    #[async_recursion]
+    /// Flushes this buffer and any overflow stage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a disk stage hits an unrecoverable I/O failure.
     pub async fn flush(&mut self) -> crate::Result<()> {
         self.base.flush().await?;
         if let Some(overflow) = self.overflow.as_mut() {
-            overflow.flush().await?;
+            Box::pin(overflow.flush()).await?;
         }
 
         Ok(())
@@ -416,7 +450,10 @@ mod tests {
     use tracing::Span;
 
     use super::SenderAdapter;
-    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+    use crate::{
+        BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord,
+        topology::builder::TopologyBuilder,
+    };
 
     #[tokio::test]
     async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
@@ -447,5 +484,22 @@ mod tests {
         let _guard = writer.lock().await;
 
         assert_eq!(sender.disk_usage_snapshot(), None);
+    }
+
+    #[tokio::test]
+    async fn memory_send_future_omits_disk_state() {
+        let (mut sender, _receiver) = TopologyBuilder::<SizedRecord>::standalone_memory(
+            NonZeroUsize::new(1).unwrap(),
+            WhenFull::Block,
+            &Span::none(),
+            None,
+            None,
+        );
+        let fut = sender.send(SizedRecord::new(1), None);
+        let size = std::mem::size_of_val(&fut);
+        assert!(
+            size < 512,
+            "memory BufferSender::send future is {size} bytes; the disk arm should be boxed"
+        );
     }
 }

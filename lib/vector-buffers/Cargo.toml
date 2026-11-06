@@ -9,7 +9,6 @@ publish = false
 workspace = true
 
 [dependencies]
-async-recursion = "1.1.1"
 async-stream = "0.3.6"
 async-trait.workspace = true
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
