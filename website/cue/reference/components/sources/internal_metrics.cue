@@ -895,26 +895,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		source_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
-		}
-		source_buffer_max_event_size: {
-			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
-		}
 		source_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"
@@ -1060,22 +1040,6 @@ components: sources: internal_metrics: {
 					required: false
 				}
 			}
-		}
-		transform_buffer_max_byte_size: {
-			description:        "The maximum number of bytes the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
-		}
-		transform_buffer_max_event_size: {
-			description:        "The maximum number of events the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
 		transform_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
