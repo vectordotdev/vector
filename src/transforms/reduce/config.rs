@@ -16,7 +16,10 @@ use crate::{
     schema::Definition,
     transforms::{
         Transform,
-        reduce::{merge_strategy::MergeStrategy, transform::Reduce},
+        reduce::{
+            merge_strategy::MergeStrategy,
+            transform::{Reduce, ShardedReduce},
+        },
     },
 };
 
@@ -112,12 +115,22 @@ const fn default_flush_period_ms() -> Duration {
 
 impl_generate_config_from_default!(ReduceConfig);
 
+// TODO: maybe put this in reduceConfig, or like other transforms
+const REDUCE_CONCURRENCY: Option<NonZeroUsize> = NonZeroUsize::new(8);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
-            .map(Transform::event_task)
+        let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
+        let shards = REDUCE_CONCURRENCY.filter(|n| n.get() > 1 && !self.group_by.is_empty());
+
+        Ok(match shards {
+            None => Transform::event_task(reduce),
+            Some(shards) => {
+                Transform::event_task(ShardedReduce::new(reduce, shards, context.cpu_ns.clone()))
+            }
+        })
     }
 
     fn input(&self) -> Input {
