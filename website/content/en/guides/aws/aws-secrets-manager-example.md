@@ -72,6 +72,16 @@ Create an IAM policy that allows Vector to read the secret:
     {
       "Effect": "Allow",
       "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage"
+      ],
+      "Resource": [
+        "arn:aws:sqs:us-west-2:123456789012:your-logs-bucket-notifications"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "cloudwatch:PutMetricData"
       ],
       "Resource": "*"
@@ -101,8 +111,9 @@ sources:
   s3_logs:
     type: aws_s3
     region: "us-west-2"
-    bucket: "your-logs-bucket"
-    key_prefix: "application-logs/"
+    # The aws_s3 source reads new objects from S3 event notifications sent to SQS
+    sqs:
+      queue_url: "https://sqs.us-west-2.amazonaws.com/123456789012/your-logs-bucket-notifications"
     # Use secrets for S3 authentication
     auth:
       access_key_id: "SECRET[aws_creds.s3_access_key]"
@@ -111,6 +122,26 @@ sources:
   # Source: Internal metrics
   internal_metrics:
     type: internal_metrics
+
+  # Optional: Database source using secret password
+  postgres_metrics:
+    type: postgresql_metrics
+    endpoints:
+      - "postgresql://vector:SECRET[aws_creds.database_password]@postgres.internal:5432/metrics"
+    scrape_interval_secs: 60
+
+  # Optional: Webhook source with secret validation
+  webhook:
+    type: http_server
+    address: "0.0.0.0:8080"
+    # Expose the signature header as the `x-signature` field
+    headers:
+      - x-signature
+    # Keep the raw body in `.message` so its signature can be checked
+    decoding:
+      codec: bytes
+    framing:
+      method: bytes
 
 # Transform: Parse and enrich logs
 transforms:
@@ -137,6 +168,17 @@ transforms:
           level: "{{ level }}"
           service: "{{ service }}"
 
+  # Transform: Validate webhook signature
+  validate_webhook:
+    type: remap
+    inputs:
+      - webhook
+    source: |
+      expected_signature = encode_base16(hmac(string!(.message), "SECRET[aws_creds.webhook_secret]", algorithm: "SHA-256"))
+      if ."x-signature" != expected_signature {
+        abort
+      }
+
 # Sink: Send metrics to CloudWatch
 sinks:
   cloudwatch_metrics:
@@ -157,9 +199,10 @@ sinks:
       codec: json
     compression: gzip
     # Use secret for API authentication
-    headers:
-      Authorization: "Bearer SECRET[aws_creds.external_api_token]"
-      X-API-Version: "v1"
+    request:
+      headers:
+        Authorization: "Bearer SECRET[aws_creds.external_api_token]"
+        X-API-Version: "v1"
     # Batch logs for efficiency
     batch:
       max_bytes: 1048576  # 1MB
@@ -175,38 +218,13 @@ sinks:
     region: "us-west-2"
     compression: gzip
     encoding:
-      codec: ndjson
+      codec: json
+    framing:
+      method: newline_delimited
     # Use the same S3 credentials from secrets
     auth:
       access_key_id: "SECRET[aws_creds.s3_access_key]"
       secret_access_key: "SECRET[aws_creds.s3_secret_key]"
-
-  # Optional: Database source using secret password
-  postgres_metrics:
-    type: postgresql_metrics
-    endpoints:
-      - "postgresql://vector:SECRET[aws_creds.database_password]@postgres.internal:5432/metrics"
-    scrape_interval_secs: 60
-
-  # Optional: Webhook source with secret validation
-  webhook:
-    type: http_server
-    address: "0.0.0.0:8080"
-    decoding:
-      codec: json
-    framing:
-      method: bytes
-
-# Transform: Validate webhook signature
-  validate_webhook:
-    type: remap
-    inputs:
-      - webhook
-    source: |
-      expected_signature = hmac_sha256(string!(.message), "SECRET[aws_creds.webhook_secret]")
-      if .headers."x-signature" != expected_signature {
-        abort
-      }
 ```
 
 ## Step 4: Deploy Vector

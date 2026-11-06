@@ -85,6 +85,7 @@ sources:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
     access_key: "${FIREHOSE_ACCESS_KEY}" # this will also be set when configuring Firehose
+    store_access_key: false
 
 transforms:
   parse:
@@ -96,9 +97,9 @@ transforms:
       . = unnest(parsed.log_events)
       . = map_values(.) -> |value| {
          event = del(value.log_events)
-         value |= event
-         message = del(.message)
-         . |= object!(parse_json!(message))
+         value |= object!(event)
+         message = del(value.message)
+         value |= object!(parse_json!(string!(message)))
       }
 
 # you may want to add more transforms here
@@ -309,7 +310,6 @@ $ aws iam create-role \
 }
 EOF
 )
-`
 ```
 
 Now we will attach a policy to our role to let it publish to the Firehose
@@ -342,7 +342,7 @@ $ aws logs put-subscription-filter \
   --filter-name "Destination" \
   --filter-pattern "" \
   --destination-arn "arn:aws:firehose:${AWS_REGION}:${AWS_ACCOUNT_ID}:deliverystream/${FIREHOSE_DELIVERY_STREAM}" \
-  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole
+  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole"
 ```
 
 {{< info >}}
@@ -462,6 +462,7 @@ sources:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set in the Firehose config
     access_key: "my secret key" # this will also be set in the Firehose config
+    store_access_key: false
 ```
 
 will accept this request, decode the record (which is gzip'ed and then base64 encoded), to produce an event that looks like:
@@ -497,9 +498,9 @@ transforms:
       . = unnest(parsed.log_events)
       . = map_values(.) -> |value| {
          event = del(value.log_events)
-         value |= event
-         message = del(.message)
-         . |= object!(parse_json!(message))
+         value |= object!(event)
+         message = del(value.message)
+         value |= object!(parse_json!(string!(message)))
       }
 ```
 
@@ -592,9 +593,9 @@ iteration to finish up our processing.
 ```coffee
 . = map_values(.) -> |value| {
    event = del(value.log_events)
-   value |= event
-   message = del(.message)
-   . |= object!(parse_json!(message))
+   value |= object!(event)
+   message = del(value.message)
+   value |= object!(parse_json!(string!(message)))
 }
 ```
 

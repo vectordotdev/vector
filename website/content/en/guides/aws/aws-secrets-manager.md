@@ -116,9 +116,10 @@ sinks:
     uri: "https://api.example.com/events"
     encoding:
       codec: json
-    headers:
-      Authorization: "Bearer SECRET[my_aws_secrets.oauth_token]"
-      X-API-Key: "SECRET[my_aws_secrets.api_key]"
+    request:
+      headers:
+        Authorization: "Bearer SECRET[my_aws_secrets.oauth_token]"
+        X-API-Key: "SECRET[my_aws_secrets.api_key]"
 ```
 
 ### 3. Complete example
@@ -149,8 +150,9 @@ sinks:
       - app_logs
     encoding:
       codec: json
-    headers:
-      Authorization: "Bearer SECRET[production_secrets.api_token]"
+    request:
+      headers:
+        Authorization: "Bearer SECRET[production_secrets.api_token]"
 ```
 
 ## Configuration options
@@ -224,14 +226,8 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 Enable debug logging to see more details about secret retrieval:
 
-```yaml
-api:
-  enabled: true
-  address: "0.0.0.0:8686"
-
-# Add debug logging
-log:
-  level: debug
+```bash
+VECTOR_LOG=debug vector --config vector.yaml
 ```
 
 Check Vector logs for messages related to secret retrieval:
