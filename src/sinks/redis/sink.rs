@@ -67,7 +67,7 @@ pub(super) struct ConnectionState {
 }
 
 impl ConnectionState {
-    pub const fn new_no_generation(conn: ConnectionManager) -> Self {
+    const fn new_no_generation(conn: ConnectionManager) -> Self {
         Self {
             connection: conn,
             generation: None,

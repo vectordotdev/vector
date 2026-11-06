@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{Layer, Service, ServiceExt, service_fn, util::BoxCloneService};
@@ -21,7 +21,7 @@ use vector_lib::{
 pub(crate) type HttpRequest<B = Incoming> = http::Request<B>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http::Request<tonic::body::Body>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -305,7 +305,7 @@ mod tests {
     use http::StatusCode;
     use http_body_util::BodyExt;
     use prost::Message;
-    use tonic::body::{BoxBody, empty_body};
+    use tonic::body::Body as TonicBody;
     use vector_lib::event::{BatchNotifier, Event, EventStatus, LogEvent};
 
     use super::*;
@@ -317,14 +317,14 @@ mod tests {
     // Request control never reads the request body.
     type HttpRequest = super::HttpRequest<()>;
     type HttpResponse = warp::reply::Response;
-    type GrpcResponse = http::Response<BoxBody>;
+    type GrpcResponse = http::Response<TonicBody>;
 
     fn http_request() -> HttpRequest {
         http::Request::new(())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http::Request::new(empty_body())
+        http::Request::new(TonicBody::empty())
     }
 
     fn http_ok() -> HttpResponse {

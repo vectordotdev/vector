@@ -18,7 +18,7 @@ use vector_lib::{
 
 use crate::{
     http::HttpClient,
-    sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
+    sinks::{HTTPRequestBuilderSnafu, util::HttpEndpoint},
 };
 
 pub(in crate::sinks) enum Field {
@@ -260,7 +260,7 @@ impl InfluxDbWriteRequest {
             .header("Content-Type", "text/plain")
             .header("Authorization", self.authorization.as_str())
             .body(body)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
 }

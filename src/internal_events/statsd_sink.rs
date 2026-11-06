@@ -6,7 +6,7 @@ use vector_lib::{NamedInternalEvent, counter};
 use crate::event::metric::{MetricKind, MetricValue};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct StatsdInvalidMetricError<'a> {
+pub(crate) struct StatsdInvalidMetricError<'a> {
     pub value: &'a MetricValue,
     pub kind: MetricKind,
 }

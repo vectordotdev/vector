@@ -12,12 +12,12 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct CloudwatchRetryLogic<Request, Response> {
+pub(super) struct CloudwatchRetryLogic<Request, Response> {
     request: PhantomData<Request>,
     response: PhantomData<Response>,
 }
 impl<Request, Response> CloudwatchRetryLogic<Request, Response> {
-    pub const fn new() -> CloudwatchRetryLogic<Request, Response> {
+    pub(super) const fn new() -> CloudwatchRetryLogic<Request, Response> {
         CloudwatchRetryLogic {
             request: PhantomData,
             response: PhantomData,

@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use vector_lib::event::TraceEvent;
 
-pub use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
+pub(crate) use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
 pub(crate) use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     request_builder::{DDTracesMetadata, RequestBuilderError, build_request},
@@ -28,7 +28,12 @@ mod integration_tests;
 /// The duration of time in nanoseconds that a bucket covers.
 pub(crate) const BUCKET_DURATION_NANOSECONDS: u64 = 10_000_000_000;
 
-#[allow(warnings, clippy::trivially_copy_pass_by_ref, clippy::nursery)]
+#[allow(
+    warnings,
+    unreachable_pub,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::nursery
+)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }

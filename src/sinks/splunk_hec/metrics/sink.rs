@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-pub struct HecMetricsSink<S> {
+pub(super) struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
@@ -141,9 +141,9 @@ impl HecMetricsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
 
-pub fn process_metric(
+pub(super) fn process_metric(
     metric: Metric,
     event_byte_size: usize,
     sourcetype: Option<&ConfinedTemplate>,

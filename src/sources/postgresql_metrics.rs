@@ -889,7 +889,7 @@ impl PostgresqlMetrics {
 struct RowReader(usize);
 
 impl RowReader {
-    pub fn read<'a, T: FromSql<'a> + ByteSizeOf>(
+    fn read<'a, T: FromSql<'a> + ByteSizeOf>(
         &mut self,
         row: &'a Row,
         key: &'static str,
@@ -899,7 +899,7 @@ impl RowReader {
         Ok(value)
     }
 
-    pub const fn into_inner(self) -> usize {
+    const fn into_inner(self) -> usize {
         self.0
     }
 }

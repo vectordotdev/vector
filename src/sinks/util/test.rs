@@ -8,7 +8,7 @@ use futures::{FutureExt, SinkExt, channel::mpsc, stream};
 use futures_util::StreamExt;
 use http::{Request, Response, StatusCode, request::Parts};
 use http_body_util::{BodyExt, Full};
-use hyper_1::{body::Incoming, service::service_fn};
+use hyper::{body::Incoming, service::service_fn};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::{conn::auto, graceful::GracefulShutdown},
@@ -187,7 +187,7 @@ where
 mod tests {
     use std::time::Duration;
 
-    use hyper_1::client::conn::http1;
+    use hyper::client::conn::http1;
     use tokio::{net::TcpStream, time::timeout};
 
     use super::*;

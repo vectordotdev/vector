@@ -165,7 +165,7 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
 
 pub(crate) struct KafkaStatisticsContext {
     pub(crate) expose_lag_metrics: bool,
-    pub span: Span,
+    pub(crate) span: Span,
 }
 
 impl ClientContext for KafkaStatisticsContext {

@@ -67,7 +67,6 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
-recommends = "datadog-signing-keys (>= 1:1.4.0)"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"
@@ -119,6 +118,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-core-proto-013",
   "lib/vector-http",
   "lib/vector-lib",
   "lib/vector-lookup",
@@ -134,6 +134,7 @@ members = [
   "lib/vector-vrl/metrics",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lib/vendored/datadog-agent-metrics-v3",
   "tests/antithesis/harness",
   "vdev",
 ]
@@ -159,10 +160,10 @@ rc_buffer = "warn"
 todo = "warn"
 
 [workspace.dependencies]
-datadog-agent-metrics-v3 = { git = "https://github.com/DataDog/saluki.git", tag = "1.7.2" }
+datadog-agent-metrics-v3 = { path = "lib/vendored/datadog-agent-metrics-v3" }
 protobuf = { version = "3.7", default-features = false, features = ["with-bytes"] }
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
-antithesis_sdk = { version = "0.2", default-features = false, features = [] }
+antithesis_sdk = { version = "0.3", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
 async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
@@ -173,9 +174,8 @@ aws-sdk-s3 = { version = "1.157.0", default-features = false, features = ["behav
 aws-sdk-sts = { version = "1.124.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
 aws-smithy-runtime-api = { version = "1.19.2", default-features = false }
 aws-smithy-types = { version = "1.9.1", default-features = false }
-axum = { version = "0.7.9", default-features = false }
+axum = { version = "0.8.9", default-features = false }
 base64 = { version = "0.23.0", default-features = false, features = ["std"] }
-bitflags = { version = "2.13.2", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
@@ -203,7 +203,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
-jsonschema = { version = "0.38.1", default-features = false }
+jsonschema = { version = "0.49.9", default-features = false }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
@@ -214,11 +214,11 @@ ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
-proptest-derive = { version = "0.8.0" }
-prost = { version = "0.13", default-features = false, features = ["std"] }
-prost-build = { version = "0.13", default-features = false }
-prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.13", default-features = false }
+proptest-derive = { version = "0.9.0" }
+prost = { version = "0.14", default-features = false, features = ["std"] }
+prost-build = { version = "0.14", default-features = false }
+prost-reflect = { version = "0.16", features = ["serde"], default-features = false }
+prost-types = { version = "0.14", default-features = false }
 quickcheck = { version = "1.1.0" }
 rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
 rand_distr = { version = "0.6.0", default-features = false }
@@ -243,11 +243,12 @@ tokio-tungstenite = { version = "0.30.0", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
-toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.12.3", default-features = false, features = ["transport", "codegen", "prost", "tls", "gzip", "zstd"] }
-tonic-build = { version = "0.12.3", default-features = false, features = ["transport", "prost"] }
-tonic-health = { version = "0.12.3", default-features = false }
-tonic-reflection = { version = "0.12.3", default-features = false, features = ["server"] }
+toml = { version = "1.1.8", default-features = false, features = ["serde", "display", "parse"] }
+tonic = { version = "0.14.9", default-features = false, features = ["transport", "router", "codegen", "tls-ring", "tls-native-roots", "gzip", "zstd"] }
+tonic-prost = { version = "0.14.9", default-features = false }
+tonic-prost-build = { version = "0.14.9", default-features = false, features = ["transport"] }
+tonic-health = { version = "0.14.9", default-features = false }
+tonic-reflection = { version = "0.14.9", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -364,7 +365,7 @@ opendal-http-transport-reqwest = { version = "0.58.2", default-features = false,
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http-1 = { package = "tower-http", version = "0.6.8", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
+tower-http = { version = "0.6.8", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
@@ -416,7 +417,7 @@ parquet = { version = "60.1.0", default-features = false, features = [
   "lz4",
   "flate2-rust_backened",
 ], optional = true }
-axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"] }
+axum = { workspace = true, features = ["http1", "tokio"] }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.20", default-features = false, features = ["pipe", "ssl", "chrono"], optional = true }
@@ -444,13 +445,13 @@ governor = { version = "0.10.0", default-features = false, features = ["dashmap"
 h2 = { version = "0.4.11", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
-headers-1 = { package = "headers", version = "0.4.1", default-features = false }
+headers = { version = "0.4.1", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
 http = { version = "1.0", default-features = false, features = ["std"] }
 http-serde = "2"
 http-body = { version = "1", default-features = false }
 http-body-util = { version = "0.1", default-features = false }
-hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["client", "http1", "http2", "server"] }
+hyper = { version = "1", default-features = false, features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "server", "server-auto", "server-graceful", "service", "tokio"] }
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
@@ -497,6 +498,7 @@ tokio-tungstenite = { workspace = true, features = ["connect"], optional = true 
 toml.workspace = true
 strum.workspace = true
 tonic = { workspace = true, optional = true }
+tonic-prost = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
 tonic-reflection = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
@@ -534,7 +536,7 @@ antithesis-instrumentation = { workspace = true, optional = true }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
-tonic-build = { workspace = true, optional = true }
+tonic-prost-build = { workspace = true, optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
@@ -569,6 +571,8 @@ wiremock = "0.6.4"
 zstd = { workspace = true, features = ["zdict_builder"] }
 
 [patch.crates-io]
+# Preserve inbound Prost recursion limits until GreptimeTeam/greptimedb-ingester-rust#64 is released.
+greptimedb-ingester = { git = "https://github.com/vectordotdev/greptimedb-ingester-rust.git", rev = "173e32ae82fbaf83008716857a8584c94c198d70" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
@@ -652,6 +656,7 @@ docker = ["dep:bollard", "dep:dirs-next"]
 api = [
   "dep:base64",
   "dep:tonic",
+  "dep:tonic-prost",
   "dep:tonic-health",
   "dep:tonic-reflection",
   "dep:prost",
@@ -692,7 +697,7 @@ aws-core = [
 ]
 
 # Anything that requires Protocol Buffers.
-protobuf-build = ["dep:tonic-build", "dep:prost-build"]
+protobuf-build = ["dep:tonic-prost-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
@@ -782,7 +787,7 @@ sources-exec = []
 sources-file = ["vector-lib/file-source"]
 sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "sources-utils-net-unix", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
+sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic", "dep:tonic-prost"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
@@ -838,7 +843,7 @@ sources-websocket = ["dep:tokio-tungstenite"]
 sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
 sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
-sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "http-body-util/channel", "protobuf-build", "tower-http-1/trace"]
+sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-prost", "dep:tonic-health", "http-body-util/channel", "protobuf-build", "tower-http/trace"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -1020,7 +1025,7 @@ sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
-sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
+sinks-vector = ["sinks-utils-udp", "dep:tonic", "dep:tonic-prost", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
 sinks-websocket_server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal", "dep:opendal-http-transport-reqwest"]
@@ -1157,6 +1162,7 @@ e2e-tests-datadog = [
   "sources-datadog_agent",
   "sinks-datadog_logs",
   "sinks-datadog_metrics",
+  "sinks-datadog_traces",
   "dep:async-compression"
 ]
 
@@ -1192,7 +1198,7 @@ vector-unit-test-tests = [
   "sinks-console"
 ]
 
-component-validation-runner = ["dep:tonic", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
+component-validation-runner = ["dep:tonic", "dep:tonic-prost", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
 # For now, only include components that implement ValidatableComponent.
 # In the future, this can change to simply reference the targets `sources`, `transforms`, `sinks`
 component-validation-tests = [

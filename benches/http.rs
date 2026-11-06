@@ -4,7 +4,7 @@ use bytes::Bytes;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group};
 use http::Response;
 use http_body_util::Empty;
-use hyper_1::service::service_fn;
+use hyper::service::service_fn;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto,

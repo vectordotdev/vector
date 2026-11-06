@@ -1909,7 +1909,7 @@ mod splunk_response {
     use serde::Serialize;
 
     // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/TroubleshootHTTPEventCollector#Possible_error_codes
-    pub enum HecStatusCode {
+    pub(super) enum HecStatusCode {
         Success = 0,
         TokenIsRequired = 2,
         InvalidAuthorization = 3,
@@ -1923,7 +1923,7 @@ mod splunk_response {
     }
 
     #[derive(Serialize)]
-    pub enum HecResponseMetadata {
+    pub(super) enum HecResponseMetadata {
         #[serde(rename = "ackId")]
         AckId(u64),
         #[serde(rename = "invalid-event-number")]
@@ -1931,7 +1931,7 @@ mod splunk_response {
     }
 
     #[derive(Serialize)]
-    pub struct HecResponse {
+    pub(super) struct HecResponse {
         text: &'static str,
         code: u8,
         #[serde(skip_serializing_if = "Option::is_none", flatten)]
@@ -1939,7 +1939,7 @@ mod splunk_response {
     }
 
     impl HecResponse {
-        pub const fn new(code: HecStatusCode) -> Self {
+        pub(super) const fn new(code: HecStatusCode) -> Self {
             let text = match code {
                 HecStatusCode::Success => "Success",
                 HecStatusCode::TokenIsRequired => "Token is required",
@@ -1960,20 +1960,22 @@ mod splunk_response {
             }
         }
 
-        pub const fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
+        pub(super) const fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
             self.metadata = Some(metadata);
             self
         }
     }
 
-    pub const INVALID_AUTHORIZATION: HecResponse =
+    pub(super) const INVALID_AUTHORIZATION: HecResponse =
         HecResponse::new(HecStatusCode::InvalidAuthorization);
-    pub const TOKEN_IS_REQUIRED: HecResponse = HecResponse::new(HecStatusCode::TokenIsRequired);
-    pub const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
-    pub const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
-    pub const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
-    pub const NO_CHANNEL: HecResponse = HecResponse::new(HecStatusCode::DataChannelIsMissing);
-    pub const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
+    pub(super) const TOKEN_IS_REQUIRED: HecResponse =
+        HecResponse::new(HecStatusCode::TokenIsRequired);
+    pub(super) const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
+    pub(super) const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
+    pub(super) const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
+    pub(super) const NO_CHANNEL: HecResponse =
+        HecResponse::new(HecStatusCode::DataChannelIsMissing);
+    pub(super) const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
 }
 
 async fn register_ack(
