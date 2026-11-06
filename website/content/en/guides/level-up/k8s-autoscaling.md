@@ -69,7 +69,14 @@ avoids event loss only as long as those stalled connections stay open. If the
 NGINX Ingress Controller or the load generator times out and closes a connection
 first, the in-flight request's events are lost along with it.
 
-## Architecture
+## Test setup
+
+The experiments compare one, three, and eight fixed Vector replicas with an
+HPA-managed deployment. All runs use a [K3s](https://k3s.io/) single-node
+cluster on an [Amazon EC2](https://aws.amazon.com/ec2/) `c5.4xlarge` instance
+(16 vCPU, 32 GiB RAM), which reduces latency and network variance in the
+measurements. A local Kubernetes cluster with enough capacity also works,
+although the results may be less consistent.
 
 ```goat
 +-----------------------------------------------+
@@ -106,6 +113,11 @@ first, the in-flight request's events are lost along with it.
                                                            +----------------------------------+
 ```
 
+Every run uses the same load and pod settings. [lading](https://github.com/DataDog/lading)
+sends `apache_common` log lines at 55 MiB/s over 100 persistent connections.
+Each Vector pod has 1 vCPU and 2 GiB of memory, with `requests == limits` for
+Guaranteed QoS.
+
 ### Load balancing with NGINX Ingress Controller
 
 To distribute traffic across available pods as replicas are created and
@@ -122,24 +134,6 @@ without traffic.
 
 For this reason, the experiments place the NGINX Ingress Controller in front
 of Vector instead of exposing Vector directly through a ClusterIP Service.
-
-## Methodology
-
-The experiments apply a sustained CPU-bound workload to a stateless Vector
-pipeline and compare one, three, and eight fixed replicas with an HPA-managed
-deployment. We used a [K3s](https://k3s.io/) single-node cluster on an
-[Amazon EC2](https://aws.amazon.com/ec2/) `c5.4xlarge` instance (16 vCPU,
-32 GiB RAM). The single-node cluster reduces latency and network variance in
-the measurements. The same setup can run on a local Kubernetes cluster with
-sufficient capacity, although the results may be less consistent.
-
-All runs use the same workload and pod configuration:
-
-- **Load generator:** [lading](https://github.com/DataDog/lading), generating
-  `apache_common` log lines over 100 persistent parallel connections.
-- **Load level:** 55 MiB/s across all tests.
-- **Vector pod resources:** 1 vCPU and 2 GiB of memory, with
-  `requests == limits` for Guaranteed QoS.
 
 ## Manual scaling
 
