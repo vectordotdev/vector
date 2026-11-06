@@ -13,11 +13,10 @@ const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'~');
 use bytes::Bytes;
 use http::{
-    Method, Response, StatusCode, Uri,
-    header::{CONTENT_LENGTH, CONTENT_TYPE, EXPECT},
+    Method, Request, Response, StatusCode, Uri,
+    header::{CONTENT_LENGTH, CONTENT_TYPE, EXPECT, LOCATION},
 };
-use http_body::{Body as _, Collected};
-use hyper::{Body, Request};
+use http_body_util::{BodyExt as _, Collected};
 use serde_json::Value;
 use snafu::Snafu;
 use std::{
@@ -27,6 +26,7 @@ use std::{
 };
 use tracing::debug;
 use uuid::Uuid;
+use vector_http::{RequestBody, empty_body, full_body};
 
 /// Content-Type header value for Doris Stream Load requests.
 /// Doris expects plain text with UTF-8 encoding for JSON data.
@@ -45,16 +45,16 @@ const GROUP_COMMIT_HEADER: &str = "group_commit";
 const GROUP_COMMIT_SYNC_MODE: &str = "sync_mode";
 
 /// Group commit async mode - data written to WAL first, returns immediately.
-/// Data is visible after async commit based on group_commit_interval.
+/// Data is visible after async commit based on `group_commit_interval`.
 const GROUP_COMMIT_ASYNC_MODE: &str = "async_mode";
 
-/// Thread-safe version of the DorisSinkClient, wrapped in an Arc
-pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
+/// Thread-safe version of the `DorisSinkClient`, wrapped in an Arc
+pub(super) type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 
-/// DorisSinkClient handles the HTTP communication with Doris server
+/// `DorisSinkClient` handles the HTTP communication with Doris server
 /// This client is thread-safe by design
 #[derive(Clone, Debug)]
-pub struct DorisSinkClient {
+pub(super) struct DorisSinkClient {
     http_client: HttpClient,
     base_url: Uri,
     auth: Option<Auth>,
@@ -64,7 +64,7 @@ pub struct DorisSinkClient {
 }
 
 impl DorisSinkClient {
-    pub async fn new(
+    pub(super) fn new(
         http_client: HttpClient,
         base_url: Uri,
         auth: Option<Auth>,
@@ -86,18 +86,16 @@ impl DorisSinkClient {
         }
     }
 
-    /// Converts a DorisSinkClient into a thread-safe version
-    pub fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
+    /// Converts a `DorisSinkClient` into a thread-safe version
+    pub(super) fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
         Arc::new(self)
     }
 
     /// Generate a unique label for the stream load
     fn generate_label(&self, database: &str, table: &str) -> String {
         format!(
-            "{}_{}_{}_{}_{}",
+            "{}_{database}_{table}_{}_{}",
             self.label_prefix,
-            database,
-            table,
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -108,9 +106,9 @@ impl DorisSinkClient {
 
     /// Check if group commit is enabled in the custom headers
     /// Group commit has three modes:
-    /// - off_mode: disabled, label is required
-    /// - sync_mode: enabled, label should be skipped
-    /// - async_mode: enabled, label should be skipped
+    /// - `off_mode`: disabled, label is required
+    /// - `sync_mode`: enabled, label should be skipped
+    /// - `async_mode`: enabled, label should be skipped
     fn is_group_commit_enabled(&self) -> bool {
         self.headers.iter().any(|(k, v)| {
             k.eq_ignore_ascii_case(GROUP_COMMIT_HEADER)
@@ -120,13 +118,13 @@ impl DorisSinkClient {
     }
 
     /// Build a request for the Doris stream load
-    async fn build_request(
+    fn build_request(
         &self,
         database: &str,
         table: &str,
         payload: &Bytes,
         redirect_url: Option<&str>,
-    ) -> Result<Request<Body>, crate::Error> {
+    ) -> Result<Request<RequestBody>, crate::Error> {
         let uri = if let Some(redirect_url) = redirect_url {
             debug!(%redirect_url, "Using redirect URL.");
             redirect_url.parse::<Uri>().map_err(|source| {
@@ -140,12 +138,14 @@ impl DorisSinkClient {
         } else {
             // Build original URL using Uri components to avoid trailing slash issues
             let scheme = self.base_url.scheme_str().unwrap_or("http");
-            let authority = self.base_url.authority().map(|a| a.as_str()).unwrap_or("");
+            let authority = self
+                .base_url
+                .authority()
+                .map_or("", http::uri::Authority::as_str);
             let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
             let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
-                "{}://{}/api/{}/{}/_stream_load",
-                scheme, authority, encoded_database, encoded_table
+                "{scheme}://{authority}/api/{encoded_database}/{encoded_table}/_stream_load"
             );
 
             stream_load_url.parse::<Uri>().map_err(|source| {
@@ -174,7 +174,7 @@ impl DorisSinkClient {
             let label = self.generate_label(database, table);
             debug!(%uri, %label, "Building request.");
             builder = builder.header("label", &label);
-        };
+        }
 
         // Add compression headers if needed
         if let Some(ce) = self.compression.content_encoding() {
@@ -190,8 +190,8 @@ impl DorisSinkClient {
             builder = builder.header(header.as_str(), value.as_str());
         }
 
-        let body = Body::from(payload.clone());
-        let mut request = builder.body(body).map_err(|source| {
+        // Cloning `Bytes` only bumps a reference count; redirects replay the same payload.
+        let mut request = builder.body(payload.clone()).map_err(|source| {
             debug!(
                 message = "Failed to build HTTP request.",
                 %source,
@@ -211,30 +211,29 @@ impl DorisSinkClient {
             headers_count = request.headers().len()
         );
 
-        Ok(request)
+        Ok(request.map(full_body))
     }
 
     /// Handle redirects and send the HTTP request to Doris
     /// Returns the HTTP response and event status
-    pub async fn send_stream_load(
+    pub(super) async fn send_stream_load(
         &self,
         database: String,
         table: String,
         payload: Bytes,
     ) -> Result<DorisStreamLoadResponse, crate::Error> {
-        // Track visited URLs to prevent redirect loops
-        let mut visited_urls = HashSet::new();
-        let mut redirect_count = 0;
         // Doris Stream Load typically redirects once (FE -> BE), but we allow up to 3
         // redirects to handle potential multi-hop scenarios while preventing infinite loops.
         const MAX_REDIRECTS: u8 = 3;
 
+        // Track visited URLs to prevent redirect loops
+        let mut visited_urls = HashSet::new();
+        let mut redirect_count = 0;
+
         let payload_ref = &payload;
 
         // Build and send initial request
-        let request = self
-            .build_request(&database, &table, payload_ref, None)
-            .await?;
+        let request = self.build_request(&database, &table, payload_ref, None)?;
         let endpoint = request.uri().to_string();
         let byte_size = payload.len();
 
@@ -255,7 +254,7 @@ impl DorisSinkClient {
             && redirect_count < MAX_REDIRECTS
         {
             // Get redirect location
-            if let Some(location) = response.headers().get(http::header::LOCATION) {
+            if let Some(location) = response.headers().get(LOCATION) {
                 if let Ok(location_str) = location.to_str() {
                     debug!(
                         message = "Following redirect.",
@@ -270,9 +269,8 @@ impl DorisSinkClient {
                     }
 
                     // Build and send redirect request
-                    let redirect_req = self
-                        .build_request(&database, &table, payload_ref, Some(location_str))
-                        .await?;
+                    let redirect_req =
+                        self.build_request(&database, &table, payload_ref, Some(location_str))?;
 
                     response = self.http_client.send(redirect_req).await?;
                     status = response.status();
@@ -337,11 +335,13 @@ impl DorisSinkClient {
         })
     }
 
-    pub async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
+    pub(super) async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
         // Use Doris bootstrap API endpoint for health check, GET method
         let scheme = endpoint.scheme_str().unwrap_or("http");
-        let authority = endpoint.authority().map(|a| a.as_str()).unwrap_or("");
-        let uri_str = format!("{}://{}/api/bootstrap", scheme, authority);
+        let authority = endpoint
+            .authority()
+            .map_or("", http::uri::Authority::as_str);
+        let uri_str = format!("{scheme}://{authority}/api/bootstrap");
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
             debug!(
@@ -360,7 +360,7 @@ impl DorisSinkClient {
         let mut request = Request::builder()
             .method(Method::GET)
             .uri(uri)
-            .body(Body::empty())
+            .body(empty_body())
             .map_err(|source| HealthCheckError::HealthCheckBuildRequest { source })?;
 
         if let Some(auth) = &self.auth {
@@ -389,17 +389,16 @@ impl DorisSinkClient {
                                 node = %endpoint
                             );
                             return Ok(());
-                        } else {
-                            debug!(
-                                message = "Doris FE node returned non-success message.",
-                                node = %endpoint,
-                                message = %msg
-                            );
-                            return Err(HealthCheckError::HealthCheckFailed {
-                                message: msg.to_string(),
-                            }
-                            .into());
                         }
+                        debug!(
+                            message = "Doris FE node returned non-success message.",
+                            node = %endpoint,
+                            message = %msg
+                        );
+                        return Err(HealthCheckError::HealthCheckFailed {
+                            message: msg.to_string(),
+                        }
+                        .into());
                     }
                 }
                 Err(source) => {
@@ -415,7 +414,7 @@ impl DorisSinkClient {
         );
 
         Err(HealthCheckError::HealthCheckFailed {
-            message: format!("HTTP status: {}", status),
+            message: format!("HTTP status: {status}"),
         }
         .into())
     }
@@ -423,7 +422,7 @@ impl DorisSinkClient {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct DorisStreamLoadResponse {
+pub(super) struct DorisStreamLoadResponse {
     pub http_status_code: StatusCode,
     pub stream_load_status: StreamLoadStatus,
     pub response: Response<Bytes>,
@@ -476,7 +475,7 @@ impl From<StreamLoadStatus> for vector_common::finalization::EventStatus {
 
 /// Errors that can occur during Doris Stream Load operations.
 #[derive(Debug, Snafu)]
-pub enum StreamLoadError {
+pub(super) enum StreamLoadError {
     #[snafu(display("Invalid redirect URI: {}", source))]
     InvalidRedirectUri { source: http::uri::InvalidUri },
 
@@ -507,7 +506,7 @@ pub enum StreamLoadError {
 
 /// Errors that can occur during Doris health check operations.
 #[derive(Debug, Snafu)]
-pub enum HealthCheckError {
+pub(super) enum HealthCheckError {
     #[snafu(display("Invalid health check URI: {}", source))]
     InvalidUri { source: http::uri::InvalidUri },
 
@@ -522,4 +521,114 @@ pub enum HealthCheckError {
 
     #[snafu(display("Doris health check failed: {}", message))]
     HealthCheckFailed { message: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use http_body_util::{BodyExt as _, Full};
+    use hyper::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
+    };
+    use tokio::net::TcpListener;
+    use vector_common::sensitive_string::SensitiveString;
+
+    use super::*;
+    use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
+
+    #[tokio::test]
+    async fn stream_load_replays_payload_and_auth_across_redirect() {
+        let (_guard, addr) = next_addr();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let server_received = Arc::clone(&received);
+        let listener = TcpListener::bind(addr).await.unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let received = Arc::clone(&server_received);
+                tokio::spawn(async move {
+                    let service = service_fn(move |request: Request<Incoming>| {
+                        let received = Arc::clone(&received);
+                        async move {
+                            let (parts, body) = request.into_parts();
+                            let body = body.collect().await.unwrap().to_bytes();
+                            let response = if parts.uri.path() == "/be/_stream_load" {
+                                Response::new(Full::new(Bytes::from_static(
+                                    br#"{"Status":"Success"}"#,
+                                )))
+                            } else {
+                                Response::builder()
+                                    .status(StatusCode::TEMPORARY_REDIRECT)
+                                    .header(
+                                        LOCATION,
+                                        format!("http://{addr}/be/_stream_load?k=a%2Fb"),
+                                    )
+                                    .body(Full::default())
+                                    .unwrap()
+                            };
+                            received.lock().unwrap().push((parts, body));
+                            Ok::<_, std::convert::Infallible>(response)
+                        }
+                    });
+                    auto::Builder::new(TokioExecutor::new())
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await
+                        .unwrap();
+                });
+            }
+        });
+
+        let http_client = HttpClient::new(
+            MaybeTlsSettings::from_config(None, false).unwrap(),
+            &ProxyConfig::default(),
+        )
+        .unwrap();
+        let client = DorisSinkClient::new(
+            http_client,
+            format!("http://{addr}").parse().unwrap(),
+            Some(Auth::Basic {
+                user: "user".to_string(),
+                password: SensitiveString::from("pass".to_string()),
+            }),
+            Compression::None,
+            "vector".to_string(),
+            HashMap::new(),
+        );
+        let payload = Bytes::from_static(b"{\"message\":\"hello\"}\n");
+
+        let response = client
+            .send_stream_load("my db".to_string(), "t/bl".to_string(), payload.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(response.http_status_code, StatusCode::OK);
+        assert_eq!(response.stream_load_status, StreamLoadStatus::Successful);
+        let received = received.lock().unwrap();
+        let targets = received
+            .iter()
+            .map(|(parts, _)| parts.uri.path_and_query().unwrap().as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            targets,
+            [
+                "/api/my%20db/t%2Fbl/_stream_load",
+                "/be/_stream_load?k=a%2Fb"
+            ]
+        );
+        for (parts, body) in received.iter() {
+            assert_eq!(parts.method, Method::PUT);
+            assert_eq!(body, &payload);
+            assert_eq!(parts.headers["authorization"], "Basic dXNlcjpwYXNz");
+            assert_eq!(parts.headers["expect"], DORIS_EXPECT_HEADER);
+            assert_eq!(parts.headers["content-type"], DORIS_CONTENT_TYPE);
+            assert_eq!(
+                parts.headers["content-length"],
+                payload.len().to_string().as_str()
+            );
+            assert!(parts.headers.contains_key("label"));
+        }
+    }
 }

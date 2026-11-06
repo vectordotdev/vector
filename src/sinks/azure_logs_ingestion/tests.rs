@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use futures::stream;
 use http::Response;
+use http_body_util::{BodyExt, Full};
 use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -116,8 +117,7 @@ async fn basic_config_error_with_no_auth() {
             let err_str = e.to_string();
             assert!(
                 err_str.contains("missing field `auth`"),
-                "Config parsing did not complain about missing auth field: {}",
-                err_str
+                "Config parsing did not complain about missing auth field: {err_str}"
             );
         }
     }
@@ -240,7 +240,7 @@ async fn correct_request() {
             endpoint_tx.send(request).await.unwrap();
             Ok(Response::builder()
                 .status(204)
-                .body(hyper::Body::empty())
+                .body(Full::default())
                 .unwrap())
         }
     })
@@ -251,14 +251,13 @@ async fn correct_request() {
     let validated = config.validate().unwrap();
     let (sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     run_and_assert_sink_compliance(sink, stream::iter(vec![log1, log2]), &SINK_TAGS).await;
@@ -271,7 +270,7 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
-    let body_bytes: Bytes = http_body::Body::collect(body)
+    let body_bytes: Bytes = BodyExt::collect(body)
         .await
         .expect("failed to collect body")
         .to_bytes();
@@ -298,6 +297,93 @@ async fn correct_request() {
         &parts.uri.path_and_query().unwrap().to_string(),
         "/dataCollectionRules/dcr-00000000000000000000000000000000/streams/Custom-UnitTest?api-version=2023-01-01"
     );
+}
+
+#[tokio::test]
+async fn retries_transport_error() {
+    use hyper::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let (_guard, addr) = crate::test_util::addr::next_addr();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let server = tokio::spawn(async move {
+        let mut connections = tokio::task::JoinSet::new();
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            while connections.try_join_next().is_some() {}
+            let requests = Arc::clone(&server_requests);
+            connections.spawn(async move {
+                let service = service_fn(move |request: http::Request<Incoming>| {
+                    let requests = Arc::clone(&requests);
+                    async move {
+                        BodyExt::collect(request.into_body()).await.unwrap();
+                        if requests.fetch_add(1, Ordering::Relaxed) == 0 {
+                            Err(std::io::Error::other(
+                                "close the first connection without a response",
+                            ))
+                        } else {
+                            Ok(Response::builder()
+                                .status(204)
+                                .body(Full::new(Bytes::new()))
+                                .unwrap())
+                        }
+                    }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    tracing::debug!(message = "Test server connection closed.", %error);
+                }
+            });
+        }
+    });
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        endpoint: "http://localhost:9001"
+        dcr_immutable_id: dcr-00000000000000000000000000000000
+        stream_name: Custom-UnitTest
+        request:
+          retry_attempts: 1
+        auth:
+          azure_credential_kind: client_secret_credential
+          azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+          azure_client_id: mock-client-id
+          azure_client_secret: mock-client-secret
+    "#})
+    .unwrap();
+    let (sink, _) = config
+        .build_inner(
+            &SinkContext::default(),
+            &config.validate().unwrap(),
+            HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
+            Arc::new(create_mock_credential()),
+            config.token_scope.clone(),
+            config.timestamp_field.clone(),
+        )
+        .unwrap();
+    let (batch, receiver) = crate::event::BatchNotifier::new_with_receiver();
+    let mut log = LogEvent::from("retry after connection closes");
+    insert_timestamp_kv(&mut log);
+    let events =
+        crate::test_util::map_event_batch_stream(stream::iter([Event::Log(log)]), Some(batch));
+    let status = timeout(Duration::from_secs(10), async {
+        sink.run(events).await.unwrap();
+        receiver.await
+    })
+    .await;
+    server.abort();
+
+    assert_eq!(status.unwrap(), crate::event::BatchStatus::Delivered);
+    assert_eq!(requests.load(Ordering::Relaxed), 2);
 }
 
 fn create_mock_credential() -> impl TokenCredential {
@@ -351,7 +437,7 @@ async fn mock_healthcheck_with_400_response() {
             Ok(Response::builder()
                 .status(400)
                 .header("Content-Type", "application/json")
-                .body(body.into())
+                .body(Full::new(Bytes::from(body)))
                 .unwrap())
         }
     })
@@ -363,14 +449,13 @@ async fn mock_healthcheck_with_400_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     let hc_err = healthcheck.await.unwrap_err();
@@ -378,13 +463,11 @@ async fn mock_healthcheck_with_400_response() {
     // Both generic 400 "Bad Request", and our mock error message should be present
     assert!(
         err_str.contains("Bad Request"),
-        "Healthcheck error does not contain 'Bad Request': {}",
-        err_str
+        "Healthcheck error does not contain 'Bad Request': {err_str}"
     );
     assert!(
         err_str.contains("Mock400ErrorResponse"),
-        "Healthcheck error does not contain 'Mock400ErrorResponse': {}",
-        err_str
+        "Healthcheck error does not contain 'Mock400ErrorResponse': {err_str}"
     );
 }
 
@@ -418,7 +501,7 @@ async fn mock_healthcheck_with_403_response() {
             Ok(Response::builder()
                 .status(403)
                 .header("Content-Type", "application/json")
-                .body(body.into())
+                .body(Full::new(Bytes::from(body)))
                 .unwrap())
         }
     })
@@ -430,21 +513,19 @@ async fn mock_healthcheck_with_403_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     let hc_err = healthcheck.await.unwrap_err();
     let err_str = hc_err.to_string();
     assert!(
         err_str.contains("Forbidden"),
-        "Healthcheck error does not contain 'Forbidden': {}",
-        err_str
+        "Healthcheck error does not contain 'Forbidden': {err_str}"
     );
 }

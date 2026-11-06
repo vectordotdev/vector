@@ -1,0 +1,33 @@
+{{- /*
+  Renders a file from the website directory as a code block. below.js adds a header with the label, line count,
+  a GitHub link, and a copy button, and makes the block collapsible.
+
+  Params:
+    file:      path relative to the website directory (required)
+    lang:      highlight language (default: the file extension)
+    dir:       label with the path relative to the page bundle instead of the file name (default: false)
+    label:     custom label (overrides dir)
+    collapsed: start collapsed (default: false)
+*/ -}}
+{{- $path := .Get "file" -}}
+{{- if not $path -}}
+  {{- errorf "code-file shortcode at %s: no \"file\" param given" .Page.File.Path -}}
+{{- end -}}
+{{- if not (fileExists $path) -}}
+  {{- errorf "code-file shortcode at %s: file %q does not exist" .Page.File.Path $path -}}
+{{- end -}}
+{{- $lang := .Get "lang" | default (path.Ext $path | strings.TrimPrefix ".") -}}
+{{- $label := .Get "label" -}}
+{{- if not $label -}}
+  {{- if eq (printf "%v" (.Get "dir")) "true" -}}
+    {{- $parts := split $path (printf "%s/" .Page.File.BaseFileName) -}}
+    {{- $label = index $parts (sub (len $parts) 1) -}}
+  {{- else -}}
+    {{- $label = path.Base $path -}}
+  {{- end -}}
+{{- end -}}
+{{- $collapsed := eq (printf "%v" (.Get "collapsed")) "true" -}}
+{{- $githubUrl := printf "https://github.com/vectordotdev/vector/blob/master/website/%s" $path -}}
+<div data-code-filename="{{ $label }}" data-code-url="{{ $githubUrl }}" data-code-collapsed="{{ $collapsed }}">
+  {{- highlight (readFile $path) $lang "" -}}
+</div>

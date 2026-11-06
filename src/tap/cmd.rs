@@ -18,7 +18,8 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     };
     let mut client = Client::new(uri);
 
-    if client.connect().await.is_err() || client.health().await.is_err() {
+    // `connect` opens no connection, so the health RPC is what detects an unreachable API.
+    if client.connect().is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
@@ -52,7 +53,7 @@ async fn tap_internal(
     let tap_runner = TapRunner::new(
         &url,
         opts.inputs_of.clone(),
-        opts.outputs_patterns().clone(),
+        opts.outputs_patterns(),
         &output_channel,
     );
 
@@ -64,22 +65,22 @@ async fn tap_internal(
                 if let Some(client) = client_opt.take() {
                     tap_runner.run_tap_with_client(
                         client,
-                        opts.interval as i64,
-                        opts.limit as i64,
+                        i64::from(opts.interval),
+                        i64::from(opts.limit),
                         opts.duration_ms,
                         opts.quiet,
                     ).await
                 } else {
                     tap_runner.run_tap(
-                        opts.interval as i64,
-                        opts.limit as i64,
+                        i64::from(opts.interval),
+                        i64::from(opts.limit),
                         opts.duration_ms,
                         opts.quiet,
                     ).await
                 }
             } => {
                 match exec_result {
-                    Ok(_) => {
+                    Ok(()) => {
                         break;
                     }
                     Err(tap_executor_error) => {
@@ -89,8 +90,7 @@ async fn tap_internal(
                             break;
                         } else if !opts.no_reconnect {
                             eprintln!(
-                                "[tap] Connection failed with error {:?}. Reconnecting in {:?} seconds.",
-                                tap_executor_error,
+                                "[tap] Connection failed with error {tap_executor_error:?}. Reconnecting in {:?} seconds.",
                                 RECONNECT_DELAY_MS / 1000);
                             tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
                         } else {

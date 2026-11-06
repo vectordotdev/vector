@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http::{Request, Uri, header::CONTENT_TYPE};
+use http::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use super::{
@@ -26,7 +26,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct StackdriverMetricsTowerRequestConfigDefaults;
+pub(super) struct StackdriverMetricsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
@@ -39,7 +39,7 @@ impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-pub struct StackdriverConfig {
+pub(super) struct StackdriverConfig {
     #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
     pub(super) endpoint: HttpEndpoint,
@@ -135,10 +135,10 @@ impl ValidatedSink for StackdriverConfig {
 
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
-        let healthcheck = healthcheck().boxed();
+        let healthcheck = async { Ok(()) }.boxed();
         let started = chrono::Utc::now();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let request_builder = StackdriverMetricsRequestBuilder {
             encoder: StackdriverMetricsEncoder {
@@ -153,7 +153,7 @@ impl ValidatedSink for StackdriverConfig {
         auth.spawn_regenerate_token();
 
         let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
-            uri: uri.into_uri(),
+            endpoint: uri.clone(),
             auth,
         };
 
@@ -173,7 +173,7 @@ impl ValidatedSink for StackdriverConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedStackdriverMetrics {
+pub(super) struct ValidatedStackdriverMetrics {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
 }
@@ -199,7 +199,7 @@ mod tests {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct StackdriverMetricsDefaultBatchSettings;
+pub(super) struct StackdriverMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
@@ -209,25 +209,22 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverMetricsServiceRequestBuilder {
-    pub(super) uri: Uri,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: GcpAuthenticator,
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
+        let builder =
+            Request::post(self.endpoint.as_uri().clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
             .body(request.take_payload())
             .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::<crate::Error>::into)?;
+            .map_err(crate::Error::from)?;
 
         self.auth.apply(&mut request);
 
         Ok(request)
     }
-}
-
-async fn healthcheck() -> crate::Result<()> {
-    Ok(())
 }

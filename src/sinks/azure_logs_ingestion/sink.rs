@@ -8,7 +8,7 @@ use crate::sinks::prelude::*;
 
 use super::service::AzureLogsIngestionRequest;
 
-pub struct AzureLogsIngestionSink<S> {
+pub(super) struct AzureLogsIngestionSink<S> {
     batch_settings: BatcherSettings,
     encoding: JsonEncoding,
     service: S,
@@ -22,7 +22,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
-    pub fn new(
+    pub(super) fn new(
         batch_settings: BatcherSettings,
         transformer: Transformer,
         service: S,
@@ -86,7 +86,7 @@ pub(super) struct JsonEncoding {
 }
 
 impl JsonEncoding {
-    pub fn new(transformer: Transformer, timestamp_field: String) -> Self {
+    pub(super) fn new(transformer: Transformer, timestamp_field: String) -> Self {
         Self {
             timestamp_field,
             encoder: (
@@ -106,7 +106,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
         mut input: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
-        for event in input.iter_mut() {
+        for event in &mut input {
             let log = event.as_mut_log();
 
             // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or

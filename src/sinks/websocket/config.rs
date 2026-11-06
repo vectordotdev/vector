@@ -39,7 +39,7 @@ impl GenerateConfig for WebSocketSinkConfig {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -70,6 +70,7 @@ impl ValidatedSink for WebSocketSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         Ok(ValidatedWebSocketSink { uri, transformer })
     }
 
@@ -83,7 +84,7 @@ impl ValidatedSink for WebSocketSinkConfig {
         let ValidatedWebSocketSink { uri, transformer } = validated.clone();
         let connector = self.build_connector(uri)?;
         let serializer = self.encoding.build()?;
-        let ws_sink = WebSocketSink::new(self, connector.clone(), transformer, serializer)?;
+        let ws_sink = WebSocketSink::new(self, connector.clone(), transformer, serializer);
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),
@@ -124,7 +125,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let _validated = config.validate().expect("validation should succeed");
         // Serializer construction is deferred to `build`; validation retains the
@@ -143,7 +144,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -160,7 +161,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(

@@ -6,7 +6,7 @@
 //! reconciles it on every (re)load. These tests exercise the observable parts:
 //! per-sink identity (no cross-sink clobbering) and value updates on reload.
 
-use vector_lib::metrics::Controller;
+use vector_lib::{extra_context::ExtraContext, metrics::Controller};
 
 use crate::{
     config::Config,
@@ -30,6 +30,10 @@ fn confinement_gauge<'a>(metrics: &'a [Metric], component_id: &str) -> Option<&'
 }
 
 #[track_caller]
+#[expect(
+    clippy::float_cmp,
+    reason = "The confinement gauge must equal its exact fixture value."
+)]
 fn assert_gauge(metrics: &[Metric], component_id: &str, expected: f64) {
     let metric = confinement_gauge(metrics, component_id).unwrap_or_else(|| {
         panic!(
@@ -155,7 +159,7 @@ async fn value_updated_on_reload() {
     new_config.add_sink(sink_id, &[source_id], sink_v2.with_confinement(false));
 
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .expect("reload should succeed");
 

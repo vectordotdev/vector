@@ -99,7 +99,7 @@ pub mod windows_event_log;
 
 pub mod util;
 
-pub use vector_lib::source::Source;
+pub use vector_lib::source::{Source, SourceError, opaque_source, source_with_error};
 
 #[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors

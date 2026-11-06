@@ -35,7 +35,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-pub struct KinesisClientBuilder;
+pub(super) struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
     type Client = KinesisClient;
@@ -45,8 +45,8 @@ impl ClientBuilder for KinesisClientBuilder {
     }
 }
 
-pub const MAX_PAYLOAD_SIZE: usize = 5_000_000;
-pub const MAX_PAYLOAD_EVENTS: usize = 500;
+pub(super) const MAX_PAYLOAD_SIZE: usize = 5_000_000;
+pub(super) const MAX_PAYLOAD_EVENTS: usize = 500;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KinesisDefaultBatchSettings;
@@ -99,6 +99,10 @@ impl KinesisStreamsSinkConfig {
         }
     }
 
+    /// Creates the AWS client.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisClientBuilder>(
             &KinesisClientBuilder {},
@@ -141,6 +145,7 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+        self.base.encoding.validate()?;
 
         Ok(ValidatedKinesisStreams { batch_settings })
     }
@@ -176,10 +181,10 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
 impl GenerateConfig for KinesisStreamsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"partition_key_field: foo
+            r"partition_key_field: foo
             stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -239,6 +244,7 @@ impl RetryLogic for KinesisRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
 
     #[test]
     fn generate_config() {
@@ -257,11 +263,11 @@ mod tests {
                 ),
                 encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
                 compression: Compression::None,
-                request: Default::default(),
+                request: TowerRequestConfig::default(),
                 tls: None,
-                auth: Default::default(),
+                auth: AwsAuthentication::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

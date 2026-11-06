@@ -6,7 +6,7 @@ mod integration_tests;
 
 use super::{
     client::Client,
-    config::{BaseSSSinkConfig, message_deduplication_id, message_group_id},
+    config::{BaseSSSinkConfig, is_fifo, message_deduplication_id, message_group_id},
     request_builder::{SSRequestBuilder, SendMessageEntry},
     service::SendMessageResponse,
     sink::SSSink,

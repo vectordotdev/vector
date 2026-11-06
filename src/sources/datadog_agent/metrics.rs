@@ -30,6 +30,14 @@ use crate::{
     sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
+mod v3;
+
+pub(crate) use v3::decode_ddseries_v3;
+#[cfg(test)]
+pub(crate) use v3::decode_v3_metric_data;
+
+const MAX_DATADOG_SERIES_UNIT_EVENT_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
     pub(crate) series: Vec<DatadogSeriesMetric>,
@@ -41,11 +49,14 @@ pub(super) fn build_warp_filter(
 ) -> BoxedFilter<(Response,)> {
     let sketches_service = sketches_service(handler.clone(), source.clone());
     let series_v1_service = series_v1_service(handler.clone(), source.clone());
-    let series_v2_service = series_v2_service(handler, source);
+    let series_v2_service = series_v2_service(handler.clone(), source.clone());
+    let series_v3_service = series_v3_service(handler, source);
     sketches_service
         .or(series_v1_service)
         .unify()
         .or(series_v2_service)
+        .unify()
+        .or(series_v3_service)
         .unify()
         .boxed()
 }
@@ -164,6 +175,46 @@ fn series_v2_service(
         .boxed()
 }
 
+fn series_v3_service(
+    handler: RequestHandler,
+    source: DatadogAgentSource,
+) -> BoxedFilter<(Response,)> {
+    warp::post()
+        .and(path!("api" / "intake" / "metrics" / "v3" / "series" / ..).and(warp::path::full()))
+        .and(warp::header::optional::<String>("content-encoding"))
+        .and(warp::header::optional::<String>("dd-api-key"))
+        .and(warp::query::<ApiKeyQueryParams>())
+        .and(capped_body())
+        .and_then({
+            move |path: FullPath,
+                  encoding_header: Option<String>,
+                  api_token: Option<String>,
+                  query_params: ApiKeyQueryParams,
+                  body: Bytes| {
+                let events = source
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v3(
+                            body,
+                            source.api_key_extractor.extract(
+                                path.as_str(),
+                                api_token,
+                                query_params.dd_api_key,
+                            ),
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
+                    });
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
+        .boxed()
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -191,6 +242,10 @@ fn decode_datadog_sketches(
     Ok(metrics)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_series_v2(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -218,34 +273,125 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
-/// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
-/// utilized for passing through origin metadata set by the Agent.
-fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
-    metadata
-        .and_then(|metadata| metadata.origin.as_ref())
-        .map_or_else(EventMetadata::default, |origin| {
-            trace!(
-                "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
-                origin.origin_product, origin.origin_category, origin.origin_service,
-            );
-            EventMetadata::default().with_origin_metadata(DatadogMetricOriginMetadata::new(
-                Some(origin.origin_product),
-                Some(origin.origin_category),
-                Some(origin.origin_service),
-            ))
-        })
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+fn decode_datadog_series_v3(
+    body: Bytes,
+    api_key: Option<Arc<str>>,
+    split_metric_namespace: bool,
+    events_received: &Registered<EventsReceived>,
+) -> Result<Vec<Event>, ErrorMessage> {
+    if body.is_empty() {
+        debug!(message = "Empty payload ignored.");
+        return Ok(Vec::new());
+    }
+
+    let metrics = decode_ddseries_v3(body, &api_key, split_metric_namespace).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("Error decoding Datadog v3 series: {error:?}"),
+        )
+    })?;
+
+    events_received.emit(CountByteSize(
+        metrics.len(),
+        metrics.estimated_json_encoded_size_of(),
+    ));
+
+    Ok(metrics)
 }
 
+/// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
+/// utilized for passing through origin metadata set by the Agent.
+fn get_event_metadata(metadata: Option<&Metadata>, metric_type: Option<i32>) -> EventMetadata {
+    let origin = metadata.and_then(|metadata| metadata.origin.as_ref());
+    let metric_type = metric_type.or_else(|| {
+        origin
+            .map(|origin| origin.metric_type)
+            .filter(|metric_type| *metric_type != 0)
+    });
+    if origin.is_none() && metric_type.is_none() {
+        EventMetadata::default()
+    } else {
+        let (origin_product, origin_category, origin_service) =
+            origin.map_or((None, None, None), |origin| {
+                trace!(
+                    "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
+                    origin.origin_product, origin.origin_category, origin.origin_service,
+                );
+                (
+                    Some(origin.origin_product),
+                    Some(origin.origin_category),
+                    Some(origin.origin_service),
+                )
+            });
+        EventMetadata::default().with_origin_metadata(
+            DatadogMetricOriginMetadata::new(origin_product, origin_category, origin_service)
+                .with_metric_type(metric_type),
+        )
+    }
+}
+
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
     split_metric_namespace: bool,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
-    let decoded_metrics: Vec<Event> = payload
-        .series
+    decode_ddseries(payload.series, api_key, split_metric_namespace, None)
+}
+
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
+fn decode_ddseries(
+    series: Vec<metric_payload::MetricSeries>,
+    api_key: &Option<Arc<str>>,
+    split_metric_namespace: bool,
+    metric_types: Option<&[Option<i32>]>,
+) -> crate::Result<Vec<Event>> {
+    validate_unit_event_expansion(
+        series
+            .iter()
+            .map(|series| (series.unit.as_str(), series.points.len())),
+    )?;
+
+    let decoded_metrics: Vec<Event> = series
         .into_iter()
-        .flat_map(|serie| {
+        .enumerate()
+        .flat_map(|(index, serie)| {
+            // A series without points cannot emit an event. Skip it before expanding its tags
+            // into a MetricTags map, since a compressed v3 payload can otherwise make this an
+            // arbitrarily large allocation that is immediately discarded.
+            if serie.points.is_empty() {
+                return Vec::new();
+            }
+
             let (namespace, name) = if split_metric_namespace {
                 namespace_name_from_dd_metric(&serie.metric)
             } else {
@@ -253,7 +399,17 @@ pub(crate) fn decode_ddseries_v2(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let event_metadata = get_event_metadata(serie.metadata.as_ref());
+            let metric_type = metric_types
+                .and_then(|metric_types| metric_types.get(index))
+                .copied()
+                .flatten();
+            let mut event_metadata = get_event_metadata(serie.metadata.as_ref(), metric_type);
+            if !serie.unit.is_empty() {
+                event_metadata.set_datadog_metric_unit(serie.unit.clone());
+            }
+            if let Some(api_key) = api_key {
+                event_metadata.set_datadog_api_key(Arc::clone(api_key));
+            }
 
             // It is possible to receive non-rate metrics from the Agent with an interval set.
             // That interval can be applied with the `as_rate` function in the Datadog UI.
@@ -303,8 +459,6 @@ pub(crate) fn decode_ddseries_v2(
             });
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
-            // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
-            // serie.unit is omitted
             match metric_payload::MetricType::try_from(serie.r#type) {
                 Ok(metric_payload::MetricType::Count) => serie
                     .points
@@ -355,13 +509,12 @@ pub(crate) fn decode_ddseries_v2(
                     .map(|dd_point| {
                         let i = Some(serie.interval)
                             .filter(|v| *v != 0)
-                            .map(|v| v as u32)
-                            .unwrap_or(1);
+                            .map_or(1, |v| v as u32);
                         Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
-                                value: dd_point.value * (i as f64),
+                                value: dd_point.value * f64::from(i),
                             },
                             event_metadata.clone(),
                         )
@@ -382,17 +535,35 @@ pub(crate) fn decode_ddseries_v2(
                 }
             }
         })
-        .map(|mut metric| {
-            if let Some(k) = &api_key {
-                metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
-            }
-            metric.into()
-        })
+        .map(Event::from)
         .collect();
 
     Ok(decoded_metrics)
 }
 
+fn validate_unit_event_expansion<'a>(
+    series: impl IntoIterator<Item = (&'a str, usize)>,
+) -> crate::Result<()> {
+    let expanded_bytes = series
+        .into_iter()
+        .try_fold(0usize, |total, (unit, points)| {
+            unit.len()
+                .checked_mul(points)
+                .and_then(|bytes| total.checked_add(bytes))
+                .ok_or("Datadog series unit expansion size overflow")
+        })?;
+
+    if expanded_bytes > MAX_DATADOG_SERIES_UNIT_EVENT_BYTES {
+        return Err("Datadog series unit expansion exceeds size limit".into());
+    }
+
+    Ok(())
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_series_v1(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -410,6 +581,19 @@ fn decode_datadog_series_v1(
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
             format!("Error parsing JSON: {error:?}"),
+        )
+    })?;
+
+    validate_unit_event_expansion(metrics.series.iter().map(|series| {
+        (
+            series.unit.as_deref().unwrap_or_default(),
+            series.points.len(),
+        )
+    }))
+    .map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("Error decoding Datadog series: {error:?}"),
         )
     })?;
 
@@ -435,7 +619,9 @@ fn decode_datadog_series_v1(
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter().map(extract_tag_key_and_value).collect()
+    tags.into_iter()
+        .map(|tag| extract_tag_key_and_value(&tag))
+        .collect()
 }
 
 fn into_vector_metric(
@@ -444,7 +630,26 @@ fn into_vector_metric(
     schema_definition: &Arc<schema::Definition>,
     split_metric_namespace: bool,
 ) -> Vec<Event> {
+    // Avoid copying large units or expanding tags for a series that cannot emit an event.
+    if dd_metric.points.is_empty() {
+        return Vec::new();
+    }
+
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
+    let mut event_metadata = dd_metric
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.origin.as_ref())
+        .map_or_else(EventMetadata::default, |origin| {
+            EventMetadata::default().with_origin_metadata(origin.clone())
+        });
+    if let Some(unit) = dd_metric.unit.filter(|unit| !unit.is_empty()) {
+        event_metadata.set_datadog_metric_unit(unit);
+    }
+    if let Some(api_key) = api_key {
+        event_metadata.set_datadog_api_key(api_key);
+    }
+    event_metadata.set_schema_definition(schema_definition);
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -470,10 +675,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -488,10 +694,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -509,12 +716,13 @@ fn into_vector_metric(
             .iter()
             .map(|dd_point| {
                 let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: dd_point.1 * (i as f64),
+                        value: dd_point.1 * f64::from(i),
                     },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -529,17 +737,7 @@ fn into_vector_metric(
             .collect::<Vec<_>>(),
     }
     .into_iter()
-    .map(|mut metric| {
-        if let Some(k) = &api_key {
-            metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
-        }
-
-        metric
-            .metadata_mut()
-            .set_schema_definition(schema_definition);
-
-        metric.into()
-    })
+    .map(Event::from)
     .collect()
 }
 
@@ -553,6 +751,15 @@ fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
     }
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -570,7 +777,7 @@ pub(crate) fn decode_ddsketch(
                 .host_key()
                 .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
 
-            let event_metadata = get_event_metadata(sketch_series.metadata.as_ref());
+            let event_metadata = get_event_metadata(sketch_series.metadata.as_ref(), None);
 
             sketch_series.dogsketches.into_iter().map(move |sketch| {
                 let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();

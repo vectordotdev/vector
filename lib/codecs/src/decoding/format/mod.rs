@@ -52,6 +52,11 @@ pub trait Deserializer: DynClone + Send + Sync {
     /// **Note**: The type of the produced events depends on the implementation.
     ///
     /// TODO: <https://github.com/vectordotdev/vector/issues/25044>
+    ///
+    /// # Errors
+    ///
+    /// Implementations must return an error if the bytes cannot be parsed into events of the
+    /// expected format.
     fn parse(
         &self,
         bytes: Bytes,

@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
@@ -14,7 +12,7 @@ use vector_lib::{
 
 #[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusParseError<'a> {
+pub(crate) struct PrometheusParseError<'a> {
     pub error: ParserError,
     pub url: http::Uri,
     pub body: Cow<'a, str>,
@@ -44,11 +42,13 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusRemoteWriteParseError {
+pub(crate) struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit(self) {
         error!(
@@ -67,25 +67,22 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusNormalizationError;
+pub(crate) struct PrometheusInvalidMetricError;
 
-impl InternalEvent for PrometheusNormalizationError {
+impl InternalEvent for PrometheusInvalidMetricError {
     fn emit(self) {
-        let normalization_reason = "Prometheus metric normalization failed.";
+        let reason = "Prometheus metric contains a line break in an identifier.";
         error!(
-            message = normalization_reason,
-            error_type = error_type::CONVERSION_FAILED,
+            message = reason,
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONVERSION_FAILED,
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: normalization_reason
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

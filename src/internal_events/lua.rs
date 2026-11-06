@@ -1,25 +1,25 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-    error_type,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, LossyF64, UNINTENTIONAL,
+    error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
 
 use crate::transforms::lua::v2::BuildError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaGcTriggered {
+pub(crate) struct LuaGcTriggered {
     pub used_memory: usize,
 }
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
+        gauge!(GaugeName::LuaMemoryUsedBytes).set(LossyF64(self.used_memory));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaScriptError {
+pub(crate) struct LuaScriptError {
     pub error: mlua::Error,
 }
 
@@ -47,7 +47,7 @@ impl InternalEvent for LuaScriptError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaBuildError {
+pub(crate) struct LuaBuildError {
     pub error: BuildError,
 }
 
@@ -70,12 +70,19 @@ impl InternalEvent for LuaBuildError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
 fn mlua_error_code(err: &mlua::Error) -> &'static str {
-    use mlua::Error::*;
+    use mlua::Error::{
+        BadArgument, BindError, CallbackDestructed, CallbackError, CoroutineUnresumable,
+        ExternalError, FromLuaConversionError, MemoryControlNotAvailable, MemoryError,
+        MetaMethodRestricted, MetaMethodTypeError, MismatchedRegistryKey, PreviouslyResumedPanic,
+        RecursiveMutCallback, RuntimeError, SafetyError, StackError, SyntaxError,
+        ToLuaConversionError, UserDataBorrowError, UserDataBorrowMutError, UserDataDestructed,
+        UserDataTypeMismatch, WithContext,
+    };
 
     match err {
         SyntaxError { .. } => "syntax_error",
@@ -107,7 +114,11 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
 }
 
 const fn lua_build_error_code(err: &BuildError) -> &'static str {
-    use BuildError::*;
+    use BuildError::{
+        InvalidHooksInit, InvalidHooksProcess, InvalidHooksShutdown, InvalidSearchDirs,
+        InvalidSource, InvalidTimerHandler, RuntimeErrorGc, RuntimeErrorHooksInit,
+        RuntimeErrorHooksProcess, RuntimeErrorHooksShutdown, RuntimeErrorTimerHandler,
+    };
 
     match err {
         InvalidSearchDirs { .. } => "invalid_search_dir",

@@ -1,72 +1,89 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
-use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+#[cfg(feature = "sources-pulsar")]
+use vector_lib::{
+    counter,
+    internal_event::{CounterName, error_stage, error_type},
 };
-use vector_lib::{NamedInternalEvent, counter};
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct PulsarSendingError {
-    pub count: usize,
-    pub error: vector_lib::Error,
-}
+#[cfg(feature = "sinks-pulsar")]
+pub(crate) use self::sink::*;
 
-impl InternalEvent for PulsarSendingError {
-    fn emit(self) {
-        let reason = "A Pulsar sink generated an error.";
-        error!(
-            message = reason,
-            error = %self.error,
-            error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::REQUEST_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: self.count,
-            reason,
-        });
+#[cfg(feature = "sinks-pulsar")]
+mod sink {
+    use vector_lib::{
+        NamedInternalEvent, counter,
+        internal_event::{
+            ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage,
+            error_type,
+        },
+    };
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct PulsarSendingError {
+        pub count: usize,
+        pub error: vector_lib::Error,
     }
-}
 
-#[derive(NamedInternalEvent)]
-pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
-    pub property_field: F,
-}
+    impl InternalEvent for PulsarSendingError {
+        fn emit(self) {
+            let reason = "A Pulsar sink generated an error.";
+            error!(
+                message = reason,
+                error = %self.error,
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::SENDING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::SENDING,
+            )
+            .increment(1);
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: self.count,
+                reason,
+            });
+        }
+    }
 
-impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
-    fn emit(self) {
-        error!(
-            message = "Failed to extract properties. Value should be a map of String -> Bytes.",
-            error_code = "extracting_property",
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            property_field = %self.property_field,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_code" => "extracting_property",
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
+    #[derive(NamedInternalEvent)]
+    pub(crate) struct PulsarPropertyExtractionError<F: std::fmt::Display> {
+        pub property_field: F,
+    }
+
+    impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
+        fn emit(self) {
+            error!(
+                message = "Failed to extract properties. Value should be a map of String -> Bytes.",
+                error_code = "extracting_property",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
+                property_field = %self.property_field,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "extracting_property",
+                "error_type" => error_type::PARSER_FAILED,
+                "stage" => error_stage::PROCESSING,
+            )
+            .increment(1);
+        }
     }
 }
 
 #[cfg(feature = "sources-pulsar")]
-pub enum PulsarErrorEventType {
+pub(crate) enum PulsarErrorEventType {
     Read,
     Ack,
     NAck,
 }
 
 #[cfg(feature = "sources-pulsar")]
+#[expect(
+    unreachable_pub,
+    reason = "`registered_event!` generates a public handle with this type as `InternalEventHandle::Data`"
+)]
 pub struct PulsarErrorEventData {
     pub msg: String,
     pub error_type: PulsarErrorEventType,

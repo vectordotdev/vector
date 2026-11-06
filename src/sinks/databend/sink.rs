@@ -4,7 +4,7 @@ use super::{
 };
 use crate::sinks::prelude::*;
 
-pub struct DatabendSink {
+pub(super) struct DatabendSink {
     batch_settings: BatcherSettings,
     request_builder: DatabendRequestBuilder,
     service: Svc<DatabendService, DatabendRetryLogic>,

@@ -28,6 +28,9 @@ pub struct EncodedList {
     enrichment_tables: Vec<&'static str>,
 }
 
+/// # Panics
+/// Panics if the component list cannot be serialized to JSON.
+#[must_use]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sources = SourceDescription::types();
     let transforms = TransformDescription::types();
@@ -57,16 +60,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 println!("- {name}");
             }
         }
-        Format::Json => {
-            let list = EncodedList {
-                sources,
-                transforms,
-                sinks,
-                enrichment_tables,
-            };
-            println!("{}", serde_json::to_string(&list).unwrap());
-        }
-        Format::Avro => {
+        Format::Json | Format::Avro => {
             let list = EncodedList {
                 sources,
                 transforms,

@@ -1,0 +1,11 @@
+{{- /* Normalizes a deprecation fragment version and derives its sort key.
+       Fragments may use the "0.56" shorthand, which means "0.56.0".
+       Returns a dict:
+         version: the X.Y.Z string
+         key:     an integer that orders versions numerically (each component
+                  gets six decimal digits, so "0.100.0" sorts after "0.99.0") */ -}}
+{{- $version := string . -}}
+{{- if eq (len (split $version ".")) 2 }}{{ $version = printf "%s.0" $version }}{{ end -}}
+{{- $key := 0 -}}
+{{- range split $version "." }}{{ $key = add (mul $key 1000000) (int .) }}{{ end -}}
+{{- return (dict "version" $version "key" $key) -}}

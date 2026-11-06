@@ -22,7 +22,7 @@ use crate::sinks::{
 };
 
 #[derive(Debug, Clone)]
-pub struct GreptimeDBGrpcService {
+pub(super) struct GreptimeDBGrpcService {
     /// the client that connects to greptimedb
     client: Arc<Database>,
 }
@@ -85,7 +85,7 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
 }
 
 impl GreptimeDBGrpcService {
-    pub fn try_new(config: impl Into<GreptimeDBGrpcServiceConfig>) -> crate::Result<Self> {
+    pub(super) fn try_new(config: impl Into<GreptimeDBGrpcServiceConfig>) -> crate::Result<Self> {
         let config = config.into();
 
         let grpc_client = new_client_from_config(&config)?;
@@ -96,8 +96,8 @@ impl GreptimeDBGrpcService {
             client.set_auth(AuthScheme::Basic(Basic {
                 username: username.to_owned(),
                 password: password.clone().into(),
-            }))
-        };
+            }));
+        }
 
         Ok(GreptimeDBGrpcService {
             client: Arc::new(client),
@@ -159,5 +159,11 @@ pub(super) fn healthcheck(
     let config = config.into();
     let client = new_client_from_config(&config)?;
 
-    Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
+    Ok(async move {
+        client
+            .health_check()
+            .await
+            .map_err(std::convert::Into::into)
+    }
+    .boxed())
 }

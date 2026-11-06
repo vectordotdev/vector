@@ -7,7 +7,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, kind::Collection, value::simdutf_bytes_utf8_lossy};
 
 use super::{Deserializer, default_lossy};
 
@@ -22,6 +22,7 @@ pub struct NativeJsonDeserializerConfig {
 
 impl NativeJsonDeserializerConfig {
     /// Creates a new `NativeJsonDeserializerConfig`.
+    #[must_use]
     pub fn new(options: NativeJsonDeserializerOptions) -> Self {
         Self {
             native_json: options,
@@ -29,6 +30,7 @@ impl NativeJsonDeserializerConfig {
     }
 
     /// Build the `NativeJsonDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> NativeJsonDeserializer {
         NativeJsonDeserializer {
             lossy: self.native_json.lossy,
@@ -36,11 +38,13 @@ impl NativeJsonDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::all_bits()
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Vector => {
@@ -95,18 +99,20 @@ impl Deserializer for NativeJsonDeserializer {
             return Ok(smallvec![]);
         }
 
-        let json: serde_json::Value = match self.lossy {
-            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
-            false => serde_json::from_slice(&bytes),
+        let json: serde_json::Value = if self.lossy {
+            serde_json::from_str(&simdutf_bytes_utf8_lossy(&bytes))
+        } else {
+            serde_json::from_slice(&bytes)
         }
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
-        let events = match json {
-            serde_json::Value::Array(values) => values
+        let events = if let serde_json::Value::Array(values) = json {
+            values
                 .into_iter()
                 .map(serde_json::from_value)
-                .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![serde_json::from_value(json)?],
+                .collect::<Result<SmallVec<[Event; 1]>, _>>()?
+        } else {
+            smallvec![serde_json::from_value(json)?]
         };
 
         Ok(events)
@@ -120,6 +126,11 @@ mod test {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Related fixture values retain names that describe their types or encodings."
+    )]
     fn parses_top_level_arrays() {
         let config = NativeJsonDeserializerConfig::default();
         let deserializer = config.build();

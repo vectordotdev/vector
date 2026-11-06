@@ -1,8 +1,4 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use chrono::{DateTime, Utc};
-use derivative::Derivative;
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     conversion,
@@ -31,14 +27,13 @@ const TIMESTAMP_KEY: &str = "timestamp";
 /// Normalizes parsed data for consistency.
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Cri {
     log_namespace: LogNamespace,
 }
 
 impl Cri {
-    pub const fn new(log_namespace: LogNamespace) -> Self {
+    pub(super) const fn new(log_namespace: LogNamespace) -> Self {
         Self { log_namespace }
     }
 }
@@ -101,7 +96,7 @@ impl FunctionTransform for Cri {
                                 log_schema().timestamp_key().map(LegacyKey::Overwrite),
                                 path!(TIMESTAMP_KEY),
                                 Value::Timestamp(dt.with_timezone(&Utc)),
-                            )
+                            );
                         }
                         Err(e) => {
                             emit!(ParserConversionError {
@@ -186,7 +181,7 @@ fn parse_log_line(line: &[u8]) -> Option<ParsedLog<'_>> {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(super) mod tests {
     use bytes::Bytes;
     use vrl::value;
 
@@ -198,7 +193,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
+    pub(crate) fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
                 Bytes::from(

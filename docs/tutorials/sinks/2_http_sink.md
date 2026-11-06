@@ -17,6 +17,7 @@ use crate::{
     internal_events::SinkRequestBuildError,
 };
 use vector_core::config::telemetry;
+use vector_http::full_body;
 use bytes::Bytes;
 ```
 
@@ -60,8 +61,8 @@ struct BasicSink {
 
 impl BasicSink {
     pub fn new(config: &BasicConfig) -> Self {
-        let tls = TlsSettings::from_options(&None).unwrap();
-        let client = HttpClient::new(tls, &Default::default()).unwrap();
+        let tls = TlsSettings::from_options(None).unwrap();
+        let client = HttpClient::new(tls.into(), &Default::default()).unwrap();
         let endpoint = config.endpoint.clone();
 
         Self { client, endpoint }
@@ -346,16 +347,16 @@ that will be invoked to send the actual data.
 ```rust
     fn call(&mut self, request: BasicRequest) -> Self::Future {
         let byte_size = request.payload.len();
-        let body = hyper::Body::from(request.payload);
+        let body = full_body(request.payload);
         let req = http::Request::post(&self.endpoint)
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            match client.call(req).await {
+            match client.send(req).await {
                 Ok(response) => {
                     if response.status().is_success() {
                         Ok(BasicResponse {
@@ -548,21 +549,21 @@ BODY:
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
 [poll_ready]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.poll_ready
 [call]: https://docs.rs/tower/latest/tower/trait.Service.html#tymethod.call
-[http_client]: https://rust-doc.vector.dev/vector/http/struct.httpclient
-[encoder]: https://rust-doc.vector.dev/vector/sinks/util/encoding/trait.encoder
-[event]: https://rust-doc.vector.dev/vector/event/enum.event
-[encoder_encode_input]: https://rust-doc.vector.dev/vector/sinks/util/encoding/trait.encoder#tymethod.encode_input
-[event_finalizers]: https://rust-doc.vector.dev/vector/event/struct.eventfinalizers
-[event_finalizer]: https://rust-doc.vector.dev/vector/event/struct.eventfinalizer
-[request_builder]: https://rust-doc.vector.dev/vector/sinks/util/request_builder/trait.requestbuilder
-[compression_none]: https://rust-doc.vector.dev/vector/sinks/util/buffer/compression/enum.compression#variant.None
-[request_builder_compression]: https://rust-doc.vector.dev/vector/sinks/util/request_builder/trait.requestbuilder#tymethod.compression
-[request_builder_encoder]: https://rust-doc.vector.dev/vector/sinks/util/request_builder/trait.requestbuilder#tymethod.encoder
-[request_builder_split_input]: https://rust-doc.vector.dev/vector/sinks/util/request_builder/trait.requestbuilder#tymethod.split_input
-[request_builder_build_request]: https://rust-doc.vector.dev/vector/sinks/util/request_builder/trait.requestbuilder#tymethod.build_request
-[driver_response]: https://rust-doc.vector.dev/vector_core/stream/trait.driverresponse
-[sinkbuilder_ext_request_builder]: https://rust-doc.vector.dev/vector/sinks/util/builder/trait.sinkbuilderext#method.request_builder
-[sinkbuilder_ext_into_driver]: https://rust-doc.vector.dev/vector/sinks/util/builder/trait.sinkbuilderext#method.into_driver
+[http_client]: ../../../src/http/client.rs
+[encoder]: ../../../src/sinks/util/encoding.rs
+[event]: ../../../lib/vector-core/src/event/mod.rs
+[encoder_encode_input]: ../../../src/sinks/util/encoding.rs
+[event_finalizers]: ../../../lib/vector-common/src/finalization.rs
+[event_finalizer]: ../../../lib/vector-common/src/finalization.rs
+[request_builder]: ../../../src/sinks/util/request_builder.rs
+[compression_none]: ../../../src/sinks/util/buffer/compression.rs
+[request_builder_compression]: ../../../src/sinks/util/request_builder.rs
+[request_builder_encoder]: ../../../src/sinks/util/request_builder.rs
+[request_builder_split_input]: ../../../src/sinks/util/request_builder.rs
+[request_builder_build_request]: ../../../src/sinks/util/request_builder.rs
+[driver_response]: ../../../lib/vector-stream/src/driver.rs
+[sinkbuilder_ext_request_builder]: ../../../src/sinks/util/builder.rs
+[sinkbuilder_ext_into_driver]: ../../../src/sinks/util/builder.rs
 [stream_filter_map]: https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html#method.filter_map
-[driver]: https://rust-doc.vector.dev/vector_core/stream/struct.driver
-[grouped_count_byte_size]: https://rust-doc.vector.dev/vector_common/request_metadata/enum.groupedcountbytesize
+[driver]: ../../../lib/vector-stream/src/driver.rs
+[grouped_count_byte_size]: ../../../lib/vector-common/src/request_metadata.rs

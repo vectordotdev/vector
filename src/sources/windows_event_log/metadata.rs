@@ -11,8 +11,8 @@ use windows::core::HSTRING;
 
 use super::subscription::{FORMAT_CACHE_CAPACITY, PublisherHandle};
 
-/// Resolves task, opcode, and keyword names from provider metadata via EvtFormatMessage.
-pub fn resolve_event_metadata(
+/// Resolves task, opcode, and keyword names from provider metadata via `EvtFormatMessage`.
+pub(super) fn resolve_event_metadata(
     publisher_cache: &mut LruCache<String, PublisherHandle>,
     format_cache: &mut HashMap<String, LruCache<(u32, u64), Option<String>>>,
     cache_hits_counter: &Counter,
@@ -87,17 +87,14 @@ fn get_or_open_publisher(
     }
 
     let provider_hstring = HSTRING::from(provider_name);
-    let raw = unsafe {
-        EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0)
-            .map(|h| h.0)
-            .unwrap_or(0)
-    };
+    let raw =
+        unsafe { EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0).map_or(0, |h| h.0) };
 
     cache.put(provider_name.to_string(), PublisherHandle(raw));
     raw
 }
 
-/// Two-level cache lookup: outer HashMap keyed by `&str` (zero allocation),
+/// Two-level cache lookup: outer `HashMap` keyed by `&str` (zero allocation),
 /// inner LRU keyed by `(flag, field_value)`.
 fn cached_format(
     cache: &mut HashMap<String, LruCache<(u32, u64), Option<String>>>,
@@ -177,8 +174,8 @@ fn format_metadata_field(
     if s.is_empty() { None } else { Some(s) }
 }
 
-/// Renders a human-readable event message using the Windows EvtFormatMessage API.
-pub fn format_event_message(
+/// Renders a human-readable event message using the Windows `EvtFormatMessage` API.
+pub(super) fn format_event_message(
     publisher_cache: &mut LruCache<String, PublisherHandle>,
     event_handle: EVT_HANDLE,
     provider_name: &str,

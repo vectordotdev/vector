@@ -12,7 +12,6 @@ pub struct LuaEvent {
 }
 
 impl IntoLua for LuaEvent {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self.event {
@@ -88,8 +87,7 @@ mod test {
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }

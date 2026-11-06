@@ -39,7 +39,7 @@ pub struct MultilineConfig {
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 1000))]
-    #[configurable(metadata(docs::examples = 600000))]
+    #[configurable(metadata(docs::examples = 600_000))]
     #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_ms: Duration,
 }

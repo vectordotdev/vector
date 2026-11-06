@@ -33,7 +33,7 @@ impl SSRequestBuilder {
     pub(super) fn new(
         message_group_id: Option<UnconfinedTemplate>,
         message_deduplication_id: Option<UnconfinedTemplate>,
-        encoding_config: EncodingConfig,
+        encoding_config: &EncodingConfig,
     ) -> crate::Result<Self> {
         let transformer = encoding_config.transformer();
         let serializer = encoding_config.build()?;

@@ -1,6 +1,14 @@
 #!/bin/sh
 set -e
 
+# Restore a pre-existing /etc/vector/vector.yaml that preinst moved aside
+# (see preinst for why). This puts the user's original content back in
+# place of the stub conffile dpkg just unpacked, so nothing is lost and no
+# conffile prompt was ever shown.
+if [ -e /etc/vector/vector.yaml.vector-preserve ]; then
+  mv -f /etc/vector/vector.yaml.vector-preserve /etc/vector/vector.yaml
+fi
+
 # Add Vector to adm group to read /var/logs
 usermod --append --groups adm vector || true
 

@@ -180,9 +180,8 @@ impl ConfinementChecker {
     /// confinement. Returns `Ok(None)` if the template is static and needs no
     /// confinement.
     fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
-        let fields = match tpl.get_fields() {
-            Some(f) => f,
-            None => return Ok(None),
+        let Some(fields) = tpl.get_fields() else {
+            return Ok(None);
         };
         let prefix = tpl.literal_prefix();
         if prefix.is_empty() {
@@ -259,35 +258,31 @@ impl ConfinementChecker {
                 UriChecker::from_prefix(&prefix).map(|c| Some(Self::Uri(Box::new(c))))
             }
             None => {
-                // Template with no event-field references. Fully static ones
-                // (no strftime either) are validated for URI structure to
-                // enforce the HTTP/HTTPS + authority requirement uniformly.
-                // Strftime-only templates (e.g. `https://logs.example.com/%Y/%m`)
-                // are not: their source is not a literal URI — the strftime
-                // directives render to time-derived text, never event input —
-                // and `http::Uri` would reject the raw `%` directives as
-                // invalid percent escapes.
-                if !tpl.inner.is_dynamic() {
-                    Self::validate_static_uri(tpl).map(|()| None)
+                // No event-field references. Static templates are validated
+                // in full; strftime-only ones can't be (raw `%` directives
+                // are invalid percent escapes), so their literal prefix —
+                // scheme and authority before the first `%` — is validated
+                // instead.
+                if tpl.inner.is_dynamic() {
+                    Self::validate_static_uri_prefix(tpl.inner.literal_prefix()).map(|()| None)
                 } else {
-                    Ok(None)
+                    Self::validate_static_uri(tpl).map(|()| None)
                 }
             }
         }
     }
 
-    /// Validate a static URI template for structure and scheme.
-    ///
-    /// Static templates don't need a runtime checker, but we still enforce:
-    /// - Must be HTTP or HTTPS scheme
-    /// - Must have valid URI structure with non-empty authority
-    ///
-    /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
-    /// or schemeless `//host` URIs even when static.
+    /// Validate a fully static URI template: HTTP/HTTPS scheme and a
+    /// non-empty authority, so `ftp://` or relative URIs fail at build time.
     fn validate_static_uri(tpl: &Template) -> Result<(), BuildError> {
-        // Static templates don't need a runtime checker, but we still enforce
-        // HTTP/HTTPS scheme and a non-empty authority (host) uniformly.
         UriChecker::parse_http_uri(tpl.get_ref()).map(|_| ())
+    }
+
+    /// Validate the literal prefix of a strftime-only URI template. The raw
+    /// `%` directives can't be parsed as a URI, so check the operator-authored
+    /// scheme and authority before the first `%` the same way.
+    fn validate_static_uri_prefix(prefix: &str) -> Result<(), BuildError> {
+        UriChecker::parse_http_uri(prefix).map(|_| ())
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
@@ -381,13 +376,29 @@ pub(crate) struct UriChecker {
 }
 
 impl UriChecker {
+    /// Parse `s` with `http::Uri`, rejecting raw non-ASCII bytes outside the
+    /// fragment.
+    ///
+    /// `http::Uri` accepts raw UTF-8 in the path and query (the `http` 0.2
+    /// parser did not). Some servers map Unicode look-alikes such as U+FF0E
+    /// FULLWIDTH FULL STOP or U+FF0F FULLWIDTH SOLIDUS onto `.` and `/`, which
+    /// would bypass the dot-dot and separator checks, so non-ASCII stays
+    /// rejected like any other unparseable URI.
+    /// The fragment is discarded by the parser and was never validated, so it is not checked either.
+    fn parse_ascii_uri(s: &str) -> Option<Uri> {
+        let before_fragment = s.split_once('#').map_or(s, |(before, _)| before);
+        before_fragment
+            .is_ascii()
+            .then(|| s.parse::<Uri>().ok())
+            .flatten()
+    }
+
     /// Parse `prefix` as an HTTP(S) URI, validating the scheme and that a
     /// non-empty authority (host) is present. Returns the parsed `Uri` plus the
     /// lowercased scheme and authority.
     fn parse_http_uri(prefix: &str) -> Result<(Uri, String, String), BuildError> {
-        let uri = prefix
-            .parse::<Uri>()
-            .map_err(|_| BuildError::NoStaticUriAuthority {
+        let uri =
+            Self::parse_ascii_uri(prefix).ok_or_else(|| BuildError::NoStaticUriAuthority {
                 prefix: prefix.to_string(),
             })?;
 
@@ -478,11 +489,9 @@ impl UriChecker {
 
         // Parse with http::Uri so all structural checks use the same tokeniser
         // that built the baseline — no raw-string heuristics.
-        let uri = rendered
-            .parse::<Uri>()
-            .map_err(|_| ConfineError::UriParseFailed {
-                rendered: rendered.to_string(),
-            })?;
+        let uri = Self::parse_ascii_uri(rendered).ok_or_else(|| ConfineError::UriParseFailed {
+            rendered: rendered.to_string(),
+        })?;
 
         // 2. Authority check: scheme + host must exactly match the base.
         //    Catches @-userinfo injection and host-extension attacks.
@@ -567,6 +576,7 @@ impl ConfinementConfig {
     /// Returns a `ConfinementConfig` that opts out of confinement.
     ///
     /// Use only in tests where templates intentionally have no literal prefix.
+    #[must_use]
     pub const fn unconfined() -> Self {
         Self {
             dangerously_allow_unconfined_template_resolution: true,
@@ -592,4 +602,7 @@ impl ConfinementConfig {
         );
     }
 }
-use super::*;
+use super::{
+    ConfinementConfig, Hash, MAX_RENDERED_PATH_LEN, Snafu, Template, UnconfinedTemplate, Uri,
+    confined_preview, warn,
+};

@@ -73,9 +73,8 @@ where
             match Pin::new(&mut *self.stream).as_mut().poll_peek(cx) {
                 Poll::Ready(Some(_)) => {
                     ready!(self.sink.poll_ready_unpin(cx))?;
-                    let item = match self.stream.poll_next_unpin(cx) {
-                        Poll::Ready(Some(item)) => item,
-                        _ => panic!("Item should exist after poll_peek succeeds"),
+                    let Poll::Ready(Some(item)) = self.stream.poll_next_unpin(cx) else {
+                        panic!("Item should exist after poll_peek succeeds");
                     };
                     self.sink.start_send_unpin(item)?;
                 }

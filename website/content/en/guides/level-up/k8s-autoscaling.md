@@ -152,7 +152,7 @@ Deploy the shared test components before starting the measurements. The
 consumer drains all data forwarded by Vector, and the NGINX Ingress Controller
 distributes requests across the Vector replicas:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir="true" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir=true >}}
 
 ```bash
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -174,7 +174,7 @@ The following Helm values configure Vector with an
 `http_server` source, the `parse_regex!` transform, and the `socket` sink that forwards data to
 the consumer:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir="true" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true >}}
 
 ```bash
 helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
@@ -189,7 +189,7 @@ helm upgrade --install producer manifests/producer-chart \
 The following Ingress routes HTTP POST requests to the Vector Service at the request level (L7),
 so every pod receives a share of traffic as soon as it's Ready, independent of how or why the replica count changes:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir="true" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir=true >}}
 
 Note that `proxy-read-timeout` and `proxy-send-timeout` are left at their
 60-second defaults. Under overload, a stalled connection that exceeds those
@@ -199,7 +199,7 @@ that request's events rather than just delaying them.
 The producer is [lading](https://github.com/DataDog/lading), configured to
 generate `apache_common` log lines at 55 MiB/s across 100 parallel connections:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir="true" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir=true >}}
 
 After the environment is running, collect two samples of Vector's per-component
 counters 30 seconds apart. Calculate throughput from the change in
@@ -549,9 +549,9 @@ configuration. The probe inherits the same `KUBECONFIG` as the playbook and
 prints one JSON result per experiment; the playbook aggregates those results
 and prints the summary.
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.yaml" open="false" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.yaml" collapsed=true >}}
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/experiment.yaml" open="false" >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/scripts/experiment.yaml" collapsed=true >}}
 
 ```bash
 # Run all experiments.

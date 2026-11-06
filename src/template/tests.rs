@@ -116,7 +116,7 @@ fn render_log_static() {
     let event = Event::Log(LogEvent::from("hello world"));
     let template = UnconfinedTemplate::try_from("foo").unwrap();
 
-    assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("foo")), template.render(&event));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn render_log_unsigned_number() {
     let event = Event::Log(LogEvent::from("hello world"));
     let template = UnsignedIntTemplate::from(123);
 
-    assert_eq!(Ok(123), template.render(&event))
+    assert_eq!(Ok(123), template.render(&event));
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn render_log_unsigned_number_dynamic() {
     event.as_mut_log().insert(event_path!("foo"), 123);
 
     let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
-    assert_eq!(Ok(123), template.render(&event))
+    assert_eq!(Ok(123), template.render(&event));
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn render_log_dynamic() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("{{log_stream}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("stream")), template.render(&event));
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn render_log_metadata() {
         .insert(metadata_path!("metadata_key"), "metadata_value");
     let template = UnconfinedTemplate::try_from("{{%metadata_key}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event));
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn render_log_dynamic_with_prefix() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("abcd-{{log_stream}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event));
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn render_log_dynamic_with_postfix() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("{{log_stream}}-abcd").unwrap();
 
-    assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event));
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn render_log_dynamic_multiple_keys() {
     assert_eq!(
         Ok(Bytes::from("stream-bar-quux.log")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn render_log_dynamic_weird_junk() {
     assert_eq!(
         Ok(Bytes::from(r"{stream}{\{{}}}-bar-quux.log")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn render_log_timestamp_strftime_style() {
 
     let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event));
 }
 
 #[test]
@@ -266,7 +266,7 @@ fn render_log_timestamp_strftime_style_namespace() {
 
     let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event));
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn render_log_timestamp_multiple_strftime_style() {
     assert_eq!(
         Ok(Bytes::from("abcd-2001-02-03_04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -308,7 +308,7 @@ fn render_log_dynamic_with_strftime() {
     assert_eq!(
         Ok(Bytes::from("butts-2001-02-03_04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -330,7 +330,7 @@ fn render_log_dynamic_with_nested_strftime() {
     assert_eq!(
         Ok(Bytes::from("nested %F 04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -354,7 +354,7 @@ fn render_log_dynamic_with_reverse_nested_strftime() {
     assert_eq!(
         Ok(Bytes::from("nested foo 04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn render_log_unsigned_int_with_timezone() {
     let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
 
     assert_eq!(
-        Ok(2001020312),
+        Ok(2_001_020_312),
         template.with_tz_offset(offset).render(&event)
     );
 }
@@ -650,6 +650,28 @@ fn uri_path_field_cannot_smuggle_backslash() {
         c.confine("https://api.internal/ingest/foo\\..\\admin")
             .unwrap_err(),
         ConfineError::DotDotSegment { .. }
+    ));
+}
+
+#[test]
+fn uri_rejects_non_ascii() {
+    // `http::Uri` accepts raw UTF-8 in the path, but servers that map
+    // Unicode look-alikes onto `.` and `/` would turn U+FF0E FULLWIDTH FULL
+    // STOP and U+FF0F FULLWIDTH SOLIDUS into a traversal. Reject at render
+    // time.
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+    assert!(matches!(
+        c.confine("https://api.internal/ingest/\u{FF0E}\u{FF0E}\u{FF0F}admin")
+            .unwrap_err(),
+        ConfineError::UriParseFailed { .. }
+    ));
+
+    // A non-ASCII static prefix is rejected at build time.
+    let tpl = Template::try_from("https://api.internal/\u{00FC}/{{ tenant }}").unwrap();
+    assert!(matches!(
+        ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
+        BuildError::NoStaticUriAuthority { .. }
     ));
 }
 
@@ -931,14 +953,18 @@ fn uri_template_confine_enforces_uri_semantics() {
 }
 
 #[rstest]
-// URIs — dynamic or static — must be absolute http(s) URIs with a fully
-// static authority. Reject at build time otherwise.
+// URIs — dynamic, static, or strftime-only — must be absolute http(s) URIs
+// with a fully static authority. Reject at build time otherwise. For
+// strftime-only templates the literal prefix before the first `%` carries
+// the scheme and authority, so they validate the same way.
 #[case::relative_uri("/api/{{ tenant }}", "authority")]
 #[case::schemeless("//api.example.com/{{ tenant }}", "authority")]
 #[case::static_relative_uri("/api/endpoint", "authority")]
 #[case::static_schemeless("//api.example.com/path", "authority")]
+#[case::strftime_only_relative_uri("/relative/%Y", "authority")]
 #[case::unsupported_scheme("ftp://files.example.com/{{ path }}", "ftp")]
 #[case::static_unsupported_scheme("ftp://files.example.com/path", "ftp")]
+#[case::strftime_only_unsupported_scheme("ftp://files.example.com/%Y", "ftp")]
 fn uri_template_confine_rejects_invalid_scheme_or_authority(
     #[case] template: &str,
     #[case] err_fragment: &str,

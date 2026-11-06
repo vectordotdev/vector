@@ -47,7 +47,7 @@ impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
 }
 
 #[derive(Clone, Debug)]
-pub struct StackdriverMetricsEncoder {
+pub(super) struct StackdriverMetricsEncoder {
     pub(super) default_namespace: String,
     pub(super) started: chrono::DateTime<Utc>,
     pub(super) resource: gcp::GcpTypedResource,
@@ -74,8 +74,7 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     .namespace
                     .unwrap_or_else(|| self.default_namespace.clone());
                 let metric_type = format!(
-                    "custom.googleapis.com/{}/metrics/{}",
-                    namespace, series.name.name
+                    "custom.googleapis.com/{namespace}/metrics/{}", series.name.name
                 );
 
                 let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
@@ -107,6 +106,10 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     .into_iter_single()
                     .collect::<std::collections::HashMap<_, _>>();
 
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_possible_truncation, reason = "Preserve the metric wire conversion.")]
+                let int64_value = point_value as i64;
+
                 gcp::GcpSerie {
                     metric: gcp::GcpMetric {
                         r#type: metric_type,
@@ -121,7 +124,7 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     points: vec![gcp::GcpPoint {
                         interval,
                         value: gcp::GcpPointValue {
-                            int64_value: Some(point_value as i64),
+                            int64_value: Some(int64_value),
                         },
                     }],
                 }
