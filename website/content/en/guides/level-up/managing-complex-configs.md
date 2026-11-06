@@ -118,13 +118,23 @@ tests:
       - extract_from: "foo"
 ```
 
-When we add a unit test output without any conditions, the test only checks
-that the transform emits at least one event:
+When we add a unit test output without any conditions it will simply print the
+input and output events of a transform, allowing us to inspect its behavior:
 
 ```sh
 $ vector test ./vector.yaml
-Running tests
-test check_simple_log ... passed
+Running vector.yaml tests
+test vector.yaml: check_simple_log ... passed
+
+inspections:
+
+--- vector.yaml ---
+
+test 'check_simple_log':
+
+check transform 'foo' payloads (events encoded as JSON):
+  input: {"timestamp":"2020-02-11T15:04:02.361999Z", "message":"2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"}
+  output: {"level":"info","message":"Sorry, I'm busy this week Cecil", "timestamp":"2019-11-28T12:00:00+00:00"}
 ```
 
 As we introduce new transforms to our config we can change the test output
@@ -164,9 +174,10 @@ With Vector you can split a config down into as many files as you like and run
 them all as a larger topology:
 
 ```bash
-# These two examples run the same two configs together:
+# These three examples run the same two configs together:
 vector -c ./configs/foo.yaml -c ./configs/bar.yaml
 vector -c ./configs/*.yaml
+vector -c ./configs/foo.yaml ./configs/bar.yaml
 ```
 
 If you have a large chain of components it's a good idea to break them out into
@@ -233,8 +244,6 @@ type: "console"
 inputs:
   - "change_fields"
 target: "stdout"
-encoding:
-  codec: "json"
 ```
 
 And for Vector to look for the configuration in the component type related folders,
