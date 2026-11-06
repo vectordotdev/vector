@@ -113,6 +113,8 @@ sources:
 sinks:
   my_api_sink:
     type: http
+    inputs:
+      - my_database
     uri: "https://api.example.com/events"
     encoding:
       codec: json
