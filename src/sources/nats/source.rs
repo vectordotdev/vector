@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// The outcome of processing a single NATS message.
-pub enum ProcessingStatus {
+pub(super) enum ProcessingStatus {
     /// The message payload was fully decoded and sent downstream.
     Success,
     /// A non-recoverable error occurred while decoding the payload.
@@ -39,7 +39,7 @@ pub enum ProcessingStatus {
 /// Processes a single NATS message, sending decoded events downstream.
 ///
 /// This function contains the common logic for both Core and JetStream NATS.
-pub async fn process_message(
+pub(super) async fn process_message(
     msg: &async_nats::Message,
     config: &NatsSourceConfig,
     decoder: &Decoder,
@@ -129,7 +129,7 @@ pub(crate) async fn create_consumer_stream(
         .context(MessagesSnafu)
 }
 
-pub async fn run_nats_jetstream(
+pub(super) async fn run_nats_jetstream(
     config: NatsSourceConfig,
     connection: async_nats::Client,
     initial_messages: async_nats::jetstream::consumer::pull::Stream,
@@ -224,7 +224,7 @@ pub async fn run_nats_jetstream(
     }
 }
 
-pub async fn run_nats_core(
+pub(super) async fn run_nats_core(
     config: NatsSourceConfig,
     _connection: async_nats::Client,
     mut subscriber: async_nats::Subscriber,
@@ -279,7 +279,7 @@ pub async fn run_nats_core(
     Ok(())
 }
 
-pub async fn create_subscription(
+pub(super) async fn create_subscription(
     config: &NatsSourceConfig,
 ) -> Result<(async_nats::Client, async_nats::Subscriber), BuildError> {
     let nc = config.connect().await?;

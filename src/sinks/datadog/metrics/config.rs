@@ -77,7 +77,7 @@ impl SeriesApiVersion {
 ///
 /// Each of these corresponds to a specific request path when making a request to the agent API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DatadogMetricsEndpoint {
+pub(super) enum DatadogMetricsEndpoint {
     Series(SeriesApiVersion),
     Sketches,
 }
@@ -110,14 +110,14 @@ impl DatadogMetricsEndpoint {
 }
 
 /// Maps Datadog metric endpoints to cached native HTTP 1 URIs.
-pub struct DatadogMetricsEndpointConfiguration {
+pub(super) struct DatadogMetricsEndpointConfiguration {
     series_endpoint: Uri,
     sketches_endpoint: Uri,
 }
 
 impl DatadogMetricsEndpointConfiguration {
     /// Creates native HTTP 1 endpoints for the metrics APIs.
-    pub fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
+    pub(super) fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
             series_endpoint: series_endpoint.into_uri(),
             sketches_endpoint: sketches_endpoint.into_uri(),
@@ -125,7 +125,7 @@ impl DatadogMetricsEndpointConfiguration {
     }
 
     /// Gets the URI for the given Datadog metrics endpoint.
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
+    pub(super) fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),

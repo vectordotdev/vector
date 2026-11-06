@@ -40,7 +40,7 @@ fn encode_f64_value(
     clippy::cast_precision_loss,
     reason = "Preserve the metric wire conversion."
 )]
-pub fn metric_to_insert_request(
+pub(super) fn metric_to_insert_request(
     metric: &Metric,
     options: &RequestBuilderOptions,
 ) -> RowInsertRequest {

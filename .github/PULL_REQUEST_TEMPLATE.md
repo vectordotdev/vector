@@ -17,6 +17,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 Changes to CI, website, playground and similar are generally not considered user facing -->
 
 - [ ] Yes. Please add a changelog fragment based on our [guidelines](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
+  For a new deprecation announcement, follow the [deprecation policy](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATION_POLICY.md) and add a `deprecation.d/` notice instead.
 - [ ] No. A maintainer will apply the `no-changelog` label to this PR.
 
 ## Contributor Guidelines

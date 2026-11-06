@@ -1246,7 +1246,7 @@ pub struct S3Object {
 mod urlencoded_string {
     use percent_encoding::{percent_decode, utf8_percent_encode};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -1269,7 +1269,7 @@ mod urlencoded_string {
         })
     }
 
-    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

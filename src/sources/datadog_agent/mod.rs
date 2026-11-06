@@ -3,6 +3,7 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub mod apm_stats;
 pub mod llmobs;
 pub mod logs;
 pub mod metrics;
@@ -24,7 +25,10 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        BytesDeserializerConfig,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::{BatchNotifier, BatchStatus},
@@ -66,6 +70,7 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
+pub const APM_STATS: &str = "apm_stats";
 
 #[allow(
     clippy::struct_excessive_bools,
@@ -91,7 +96,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
-    /// The data types accepted by the component. Defaults to all data types.
+    /// The data types accepted by the component. Defaults to all data types except `apm_stats`.
     ///
     /// When `multiple_outputs` is enabled, each data type is sent to its own output.
     /// Data types disabled by the deprecated `disable_*` options are removed from this list.
@@ -133,7 +138,8 @@ pub struct DatadogAgentConfig {
     ///
     /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
-    /// `agent.traces`, respectively.
+    /// `agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
+    /// sent to `agent.apm_stats`.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
@@ -197,6 +203,17 @@ pub enum DatadogAgentDataType {
 
     /// LLM Observability events.
     Llmobs,
+
+    /// APM stats (alpha), emitted as received (still encoded and compressed).
+    ///
+    /// Not enabled by default. Requires `multiple_outputs`.
+    ApmStats,
+}
+
+impl DatadogAgentDataType {
+    const fn enabled_by_default(self) -> bool {
+        !matches!(self, Self::ApmStats)
+    }
 }
 
 const fn example_enabled_data_types() -> [&'static str; 3] {
@@ -244,6 +261,9 @@ impl SourceConfig for DatadogAgentConfig {
             warn!(
                 "DEPRECATED: `disable_logs`, `disable_metrics`, `disable_traces`, and `disable_llmobs` are deprecated. Use `enabled_data_types` instead. See https://vector.dev/deprecations/#datadog_agent-disable_options for migration instructions."
             );
+        }
+        if self.is_enabled(DatadogAgentDataType::ApmStats) && !self.multiple_outputs {
+            return Err("`apm_stats` requires `multiple_outputs` to be enabled.".into());
         }
         let log_namespace = cx.log_namespace(self.log_namespace);
 
@@ -420,6 +440,26 @@ impl SourceConfig for DatadogAgentConfig {
         )
         .with_standard_vector_source_metadata();
 
+        let apm_stats_definition = BytesDeserializerConfig::new()
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    "content_encoding"
+                ))),
+                &owned_value_path!("content_encoding"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("content_type"))),
+                &owned_value_path!("content_type"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
+
         let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
@@ -437,6 +477,12 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
+                );
+            }
+            if self.is_enabled(DatadogAgentDataType::ApmStats) {
+                output.push(
+                    SourceOutput::new_maybe_logs(DataType::Log, apm_stats_definition)
+                        .with_port(APM_STATS),
                 );
             }
         } else {
@@ -468,10 +514,13 @@ impl DatadogAgentConfig {
             DatadogAgentDataType::Metrics => self.disable_metrics,
             DatadogAgentDataType::Traces => self.disable_traces,
             DatadogAgentDataType::Llmobs => self.disable_llmobs,
+            DatadogAgentDataType::ApmStats => None,
         };
         self.enabled_data_types
             .as_ref()
-            .is_none_or(|data_types| data_types.contains(&data_type))
+            .map_or(data_type.enabled_by_default(), |data_types| {
+                data_types.contains(&data_type)
+            })
             && !disabled.unwrap_or(false)
     }
 }
@@ -574,8 +623,11 @@ impl DatadogAgentSource {
             .is_enabled(DatadogAgentDataType::Logs)
             .then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
+        let apm_stats_enabled = config.is_enabled(DatadogAgentDataType::ApmStats);
+
         if config.is_enabled(DatadogAgentDataType::Traces) {
-            let trace_filter = traces::build_warp_filter(handler.clone(), self.clone());
+            let trace_filter =
+                traces::build_warp_filter(handler.clone(), self.clone(), !apm_stats_enabled);
             filters = filters
                 .map(|f| f.or(trace_filter.clone()).unify().boxed())
                 .or(Some(trace_filter));
@@ -586,6 +638,13 @@ impl DatadogAgentSource {
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
+        }
+
+        if apm_stats_enabled {
+            let apm_stats_filter = apm_stats::build_warp_filter(handler.clone(), self.clone());
+            filters = filters
+                .map(|f| f.or(apm_stats_filter.clone()).unify().boxed())
+                .or(Some(apm_stats_filter));
         }
 
         if config.is_enabled(DatadogAgentDataType::Llmobs) {
