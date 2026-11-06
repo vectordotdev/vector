@@ -2,6 +2,7 @@
 mod configurable;
 mod confined;
 mod confinement;
+pub mod internal_event;
 mod parsing;
 mod unconfined;
 mod unsigned;
@@ -17,14 +18,11 @@ use derive_more::Display;
 use http::Uri;
 use regex::Regex;
 
+use lookup::lookup_v2::parse_target_path;
 use snafu::Snafu;
 use tracing::warn;
-use vector_lib::{
-    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
-    lookup::lookup_v2::parse_target_path,
-};
-
-use crate::{
+use vector_config::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component};
+use vector_core::{
     config::log_schema,
     event::{EventRef, Metric, Value},
 };

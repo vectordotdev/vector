@@ -1,15 +1,15 @@
 use chrono::{Offset, TimeZone, Utc};
 use chrono_tz::Tz;
+use lookup::{PathPrefix, metadata_path};
 use rstest::rstest;
-use vector_lib::{
+use vector_core::{
     config::LogNamespace,
-    lookup::{PathPrefix, metadata_path},
+    event::{Event, LogEvent, MetricKind, MetricValue},
     metric_tags,
 };
 use vrl::event_path;
 
 use super::*;
-use crate::event::{Event, LogEvent, MetricKind, MetricValue};
 
 #[test]
 fn uri_template_serde_roundtrip_string() {
@@ -907,8 +907,6 @@ fn confined_template_rejects_escape() {
 fn http_prefix_treated_as_non_uri_for_confine() {
     // `confine` does not interpret content as URI, so `http://` prefixes
     // are treated as ordinary string prefixes (useful for object-store keys).
-    use crate::event::Event;
-    use vector_lib::event::LogEvent;
 
     let mut event = Event::Log(LogEvent::from("x"));
     event
@@ -931,8 +929,6 @@ fn http_prefix_treated_as_non_uri_for_confine() {
 #[test]
 fn uri_template_confine_enforces_uri_semantics() {
     // UriTemplate::confine enforces URI-specific checks
-    use crate::event::Event;
-    use vector_lib::event::LogEvent;
 
     let mut event = Event::Log(LogEvent::from("x"));
     event
@@ -994,8 +990,6 @@ fn uri_template_confine_opt_out_returns_correct_type() {
 #[test]
 fn uri_template_confine_accepts_http_and_https_schemes() {
     // Both http:// and https:// must be accepted for UriTemplate, including mixed case
-    use crate::event::Event;
-    use vector_lib::event::LogEvent;
 
     let config = ConfinementConfig::default();
 

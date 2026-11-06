@@ -13789,6 +13789,7 @@ dependencies = [
  "vector-lookup",
  "vector-stream",
  "vector-tap",
+ "vector-template",
  "vector-top",
  "vrl",
 ]
@@ -13848,6 +13849,30 @@ dependencies = [
  "vector-buffers",
  "vector-common",
  "vector-core",
+]
+
+[[package]]
+name = "vector-template"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "derivative",
+ "derive_more",
+ "http 1.5.0",
+ "metrics",
+ "regex",
+ "rstest 0.26.1",
+ "serde",
+ "serde_json",
+ "snafu 0.9.2",
+ "tracing 0.1.44",
+ "vector-common",
+ "vector-config",
+ "vector-core",
+ "vector-lookup",
+ "vrl",
 ]
 
 [[package]]
