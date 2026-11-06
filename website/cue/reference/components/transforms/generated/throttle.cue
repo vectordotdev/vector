@@ -14,16 +14,35 @@ generated: components: transforms: throttle: configuration: {
 				description: """
 					Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
 
-					If true, the counter will be incremented for each discarded event, including the key value
-					associated with the discarded event. If false, the counter will not be emitted. Instead, the
-					number of discarded events can be seen through the `component_discarded_events_total` internal
-					metric.
-
-					Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-					Only set this to true if you know that the number of unique keys is bounded.
+					This legacy option applies only when `events_discarded_tags` is not configured.
+					When false, discard counts remain available through `component_discarded_events_total`.
+					Defaults to false because the `key` tag has potentially unbounded cardinality.
 					"""
 				required: false
 				type: bool: default: false
+			}
+			events_discarded_tags: {
+				description: """
+					Tags to include on the `events_discarded_total` internal metric.
+
+					Configuring this map enables the counter and replaces the legacy `key` tag selection,
+					regardless of `emit_events_discarded_per_key`. An empty map emits the counter without
+					attribution tags. Vector's component and collector tags are still added normally.
+					When this option is absent, `emit_events_discarded_per_key` retains its existing behavior.
+					To include a `key` tag, select it explicitly with a template, such as `key: "{{ workload_id }}"`.
+					It is an ordinary log template, not a reference to Vector's resolved throttle key.
+
+					Values are event templates evaluated only for discarded events. Missing fields emit a
+					warning and omit that tag; empty results also omit it. These tags do not change rate-limit
+					buckets or `component_discarded_events_total`. Vector's global metric tags, such as
+					`component_id`, are reserved. Only use values with bounded cardinality.
+					"""
+				required: false
+				type: object: options: "*": {
+					description: "An event template for a discard metric tag."
+					required:    true
+					type: string: syntax: "template"
+				}
 			}
 			include_group_tag: {
 				description: """

@@ -6,7 +6,7 @@ use vector_lib::{
 #[derive(Debug, NamedInternalEvent)]
 pub(crate) struct ThrottleEventDiscarded {
     pub key: String,
-    pub emit_events_discarded_per_key: bool,
+    pub tags: Option<Vec<(String, String)>>,
     pub include_group_tag: bool,
 }
 
@@ -15,8 +15,8 @@ impl InternalEvent for ThrottleEventDiscarded {
         let message = "Rate limit exceeded.";
 
         debug!(message, key = %self.key);
-        if self.emit_events_discarded_per_key {
-            counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1);
+        if let Some(tags) = self.tags {
+            counter!(CounterName::EventsDiscardedTotal, &tags).increment(1);
         }
 
         let group = self.include_group_tag.then_some(self.key);
@@ -61,7 +61,7 @@ mod tests {
         for key in ["group-a", "group-b", "None"] {
             ThrottleEventDiscarded {
                 key: key.to_string(),
-                emit_events_discarded_per_key: false,
+                tags: None,
                 include_group_tag: true,
             }
             .emit();
@@ -81,7 +81,7 @@ mod tests {
         vector_lib::metrics::init_test();
         ThrottleEventDiscarded {
             key: "group-a".to_string(),
-            emit_events_discarded_per_key: false,
+            tags: None,
             include_group_tag: false,
         }
         .emit();

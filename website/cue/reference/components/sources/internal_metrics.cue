@@ -306,7 +306,11 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		events_discarded_total: {
-			description:       "The total number of events discarded by this component."
+			description: """
+				The total number of events discarded by this component.
+				The throttle transform can enable this counter with selected event-derived tags using
+				`internal_metrics.events_discarded_tags`. An empty map emits without attribution tags.
+				"""
 			type:              "counter"
 			default_namespace: "vector"
 			tags: _internal_metrics_tags & {

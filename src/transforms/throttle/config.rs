@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use governor::clock;
 use serde_with::serde_as;
 use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
-use super::transform::Throttle;
+use super::transform::{ConfigError, Throttle};
 use crate::{
     conditions::AnyCondition,
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -20,15 +20,30 @@ use crate::{
 pub struct ThrottleInternalMetricsConfig {
     /// Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
     ///
-    /// If true, the counter will be incremented for each discarded event, including the key value
-    /// associated with the discarded event. If false, the counter will not be emitted. Instead, the
-    /// number of discarded events can be seen through the `component_discarded_events_total` internal
-    /// metric.
-    ///
-    /// Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-    /// Only set this to true if you know that the number of unique keys is bounded.
+    /// This legacy option applies only when `events_discarded_tags` is not configured.
+    /// When false, discard counts remain available through `component_discarded_events_total`.
+    /// Defaults to false because the `key` tag has potentially unbounded cardinality.
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
+
+    /// Tags to include on the `events_discarded_total` internal metric.
+    ///
+    /// Configuring this map enables the counter and replaces the legacy `key` tag selection,
+    /// regardless of `emit_events_discarded_per_key`. An empty map emits the counter without
+    /// attribution tags. Vector's component and collector tags are still added normally.
+    /// When this option is absent, `emit_events_discarded_per_key` retains its existing behavior.
+    /// To include a `key` tag, select it explicitly with a template, such as `key: "{{ workload_id }}"`.
+    /// It is an ordinary log template, not a reference to Vector's resolved throttle key.
+    ///
+    /// Values are event templates evaluated only for discarded events. Missing fields emit a
+    /// warning and omit that tag; empty results also omit it. These tags do not change rate-limit
+    /// buckets or `component_discarded_events_total`. Vector's global metric tags, such as
+    /// `component_id`, are reserved. Only use values with bounded cardinality.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(
+        docs::additional_props_description = "An event template for a discard metric tag."
+    ))]
+    pub events_discarded_tags: Option<HashMap<String, UnconfinedTemplate>>,
 
     /// Whether or not to include the `group` tag on the `component_discarded_events_total`
     /// internal metric.
@@ -40,6 +55,20 @@ pub struct ThrottleInternalMetricsConfig {
     /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
     #[serde(default)]
     pub include_group_tag: bool,
+}
+
+impl ThrottleInternalMetricsConfig {
+    pub(super) fn validate(&self) -> Result<(), ConfigError> {
+        if let Some(tag) = self
+            .events_discarded_tags
+            .iter()
+            .flat_map(|tags| tags.keys())
+            .find(|tag| vector_lib::metrics::LABELS.contains(tag.as_str()))
+        {
+            return Err(ConfigError::ReservedMetricTag { tag: tag.clone() });
+        }
+        Ok(())
+    }
 }
 
 /// Configuration for the `throttle` transform.
@@ -103,7 +132,9 @@ impl TransformConfig for ThrottleConfig {
                 "`threshold` and `window_secs` must be non-zero".to_string(),
             ])
         } else {
-            Ok(())
+            self.internal_metrics
+                .validate()
+                .map_err(|error| vec![error.to_string()])
         }
     }
 
@@ -130,12 +161,33 @@ mod tests {
     }
 
     #[test]
-    fn internal_metrics_include_group_tag_defaults_to_false() {
+    fn internal_metrics_defaults_preserve_existing_labels() {
         let config = serde_yaml::from_str::<ThrottleConfig>(
             "threshold: 1\nwindow_secs: 1\ninternal_metrics: {}\n",
         )
         .unwrap();
         assert!(!config.internal_metrics.include_group_tag);
+        assert!(config.internal_metrics.events_discarded_tags.is_none());
+        assert!(!config.internal_metrics.emit_events_discarded_per_key);
+        assert!(
+            serde_json::to_value(&config).unwrap()["internal_metrics"]
+                .get("events_discarded_tags")
+                .is_none()
+        );
+        assert!(
+            ThrottleConfig::default()
+                .internal_metrics
+                .events_discarded_tags
+                .is_none()
+        );
+        let without_internal_metrics =
+            serde_yaml::from_str::<ThrottleConfig>("threshold: 1\nwindow_secs: 1\n").unwrap();
+        assert!(
+            without_internal_metrics
+                .internal_metrics
+                .events_discarded_tags
+                .is_none()
+        );
     }
 
     #[test]
