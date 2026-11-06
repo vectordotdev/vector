@@ -204,7 +204,7 @@ async fn emqx_client_session(http: &reqwest::Client, token: &str, client_id: &st
 }
 
 /// Kicks the client through the EMQX REST API, which also discards its session, and waits until
-/// it has reconnected with a new one.
+/// it has reconnected with a new session and subscribed again.
 async fn discard_session(client_id: &str) {
     let http = reqwest::Client::new();
     let login: Value = http
@@ -232,14 +232,17 @@ async fn discard_session(client_id: &str) {
     timeout(Duration::from_secs(10), async {
         loop {
             let session = emqx_client_session(&http, token, client_id).await;
-            if session["connected"] == true && session["created_at"] != created_at {
+            if session["connected"] == true
+                && session["created_at"] != created_at
+                && session["subscriptions_cnt"].as_u64() > Some(0)
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     })
     .await
-    .expect("Source did not reconnect");
+    .expect("Source did not reconnect and resubscribe");
 }
 
 async fn assert_receives(rx: &mut (impl Stream<Item = Event> + Unpin), messages: Vec<String>) {
