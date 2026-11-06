@@ -736,17 +736,20 @@ fn wrap_with_line_agg(
             }),
             logic,
         )
-        .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
-                filename,
+        .map(|aggregated| {
+            let (file_id, start_offset, initial_end) = aggregated.initial_context;
+            Line {
+                text: aggregated.line,
+                filename: aggregated.source,
                 file_id,
                 start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
-            },
-        ),
+                end_offset: aggregated
+                    .last_context
+                    .map_or(initial_end, |(_, _, lastline_end_offset)| {
+                        lastline_end_offset
+                    }),
+            }
+        }),
     )
 }
 

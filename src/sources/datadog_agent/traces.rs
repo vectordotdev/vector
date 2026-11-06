@@ -25,11 +25,14 @@ use crate::{
 pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
+    discard_apm_stats: bool,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(handler, source)
-        .or(build_stats_filter())
-        .unify()
-        .boxed()
+    let trace_filter = build_trace_filter(handler, source);
+    if discard_apm_stats {
+        trace_filter.or(build_stats_filter()).unify().boxed()
+    } else {
+        trace_filter
+    }
 }
 
 fn build_trace_filter(

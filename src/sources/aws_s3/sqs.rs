@@ -314,6 +314,7 @@ pub struct State {
 
     deferred: Option<DeferredConfig>,
     notification_parser: Option<Arc<dyn NotificationParser>>,
+    source_type: &'static str,
 }
 
 pub(super) struct Ingestor {
@@ -353,7 +354,7 @@ impl Ingestor {
             max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
-                .map_or_else(crate::num_threads, NonZeroUsize::get),
+                .map_or_else(vector_lib::num_threads, NonZeroUsize::get),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
@@ -361,13 +362,19 @@ impl Ingestor {
 
             deferred: config.deferred,
             notification_parser: None,
+            source_type: AwsS3Config::NAME,
         };
 
         Ok(Ingestor { state })
     }
 
-    pub(super) fn with_notification_parser(mut self, parser: Arc<dyn NotificationParser>) -> Self {
+    pub(super) fn with_notification_parser(
+        mut self,
+        parser: Arc<dyn NotificationParser>,
+        source_type: &'static str,
+    ) -> Self {
         self.state.notification_parser = Some(parser);
+        self.state.source_type = source_type;
         self
     }
 
@@ -690,6 +697,7 @@ impl IngestorProcess {
         log_namespace: LogNamespace,
     ) -> Result<(), ProcessingError> {
         let download_start = Instant::now();
+        let source_type = self.state.source_type;
 
         let object_result = self
             .state
@@ -767,7 +775,7 @@ impl IngestorProcess {
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context, _lastline_context)| line),
+                .map(|aggregated| aggregated.line),
             ),
             None => lines,
         };
@@ -790,6 +798,7 @@ impl IngestorProcess {
                         handle_single_log(
                             log_event,
                             log_namespace,
+                            source_type,
                             &reference,
                             metadata.as_ref(),
                             timestamp,
@@ -1004,6 +1013,7 @@ fn s3_record_batch(
 fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
+    source_type: &'static str,
     reference: &S3ObjectReference,
     metadata: Option<&HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
@@ -1047,7 +1057,7 @@ fn handle_single_log(
         log,
         log_schema().source_type_key(),
         path!(SOURCE_TYPE),
-        Value::from_static_str(AwsS3Config::NAME),
+        Value::from_static_str(source_type),
     );
 
     // This handles the transition from the original timestamp logic. Originally the
@@ -1236,7 +1246,7 @@ pub struct S3Object {
 mod urlencoded_string {
     use percent_encoding::{percent_decode, utf8_percent_encode};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -1259,7 +1269,7 @@ mod urlencoded_string {
         })
     }
 
-    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

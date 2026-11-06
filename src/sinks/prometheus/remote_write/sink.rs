@@ -42,7 +42,7 @@ impl ByteSizeOf for RemoteWriteMetric {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PrometheusRemoteWriteDefaultBatchSettings;
+pub(crate) struct PrometheusRemoteWriteDefaultBatchSettings;
 
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);

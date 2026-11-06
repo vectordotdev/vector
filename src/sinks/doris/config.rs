@@ -234,7 +234,7 @@ impl ValidatedSink for DorisConfig {
         let commons = DorisCommon::parse_many(self)?;
         let common = &commons[0];
 
-        let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
+        let client = HttpClient::new(common.tls_settings.clone().into(), &cx.proxy)?;
 
         let services_futures = commons
             .iter()

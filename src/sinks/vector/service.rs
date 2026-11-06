@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
 use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
+use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
@@ -21,13 +21,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport<BoxBody>>,
+pub(super) struct VectorService {
+    pub client: proto_vector::Client<GrpcTransport<TonicBody>>,
     pub protocol: String,
     pub endpoint: String,
 }
 
-pub struct VectorResponse {
+pub(super) struct VectorResponse {
     events_byte_size: GroupedCountByteSize,
 }
 
@@ -42,7 +42,7 @@ impl DriverResponse for VectorResponse {
 }
 
 #[derive(Clone, Default)]
-pub struct VectorRequest {
+pub(super) struct VectorRequest {
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
     pub request: proto_vector::PushEventsRequest,
@@ -68,8 +68,8 @@ impl VectorService {
     /// Sends every request to the scheme and authority of `uri`; its path is ignored.
     ///
     /// Fails if `uri` has no scheme or authority.
-    pub fn new(
-        client: Http2Client<BoxBody>,
+    pub(super) fn new(
+        client: Http2Client<TonicBody>,
         uri: Uri,
         compression: VectorCompression,
     ) -> crate::Result<Self> {
@@ -90,17 +90,17 @@ impl VectorService {
 }
 
 /// Returns the `scheme://authority/` origin that tonic prefixes to each gRPC method path.
-fn grpc_origin(uri: &Uri) -> crate::Result<http_1::Uri> {
-    let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+fn grpc_origin(uri: &Uri) -> crate::Result<Uri> {
+    let (Some(scheme), Some(authority)) = (uri.scheme(), uri.authority()) else {
         return Err(VectorSinkError::NotAbsoluteUri {
             uri: uri.to_string(),
         }
         .into());
     };
 
-    Ok(http_1::Uri::builder()
-        .scheme(scheme)
-        .authority(authority.as_str())
+    Ok(Uri::builder()
+        .scheme(scheme.clone())
+        .authority(authority.clone())
         .path_and_query("/")
         .build()?)
 }

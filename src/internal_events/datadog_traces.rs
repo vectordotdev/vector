@@ -4,7 +4,7 @@ use vector_lib::internal_event::{
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogTracesEncodingError {
+pub(crate) struct DatadogTracesEncodingError {
     pub error_message: &'static str,
     pub error_reason: String,
     pub dropped_events: usize,
@@ -37,7 +37,7 @@ impl InternalEvent for DatadogTracesEncodingError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogTracesAPMStatsError<E> {
+pub(crate) struct DatadogTracesAPMStatsError<E> {
     pub error: E,
 }
 

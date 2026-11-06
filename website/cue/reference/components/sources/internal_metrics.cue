@@ -125,10 +125,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		connection_send_errors_total: {
-			description:       "The total number of errors sending data via the connection."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			description:        "The total number of errors sending data via the connection."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _internal_metrics_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
@@ -856,10 +858,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		metadata_refresh_failed_total: {
-			description:       "The total number of failed efforts to refresh AWS EC2 metadata."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
+			description:        "The total number of failed efforts to refresh AWS EC2 metadata."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		metadata_refresh_successful_total: {
 			description:       "The total number of AWS EC2 metadata refreshes."
@@ -890,26 +894,6 @@ components: sources: internal_metrics: {
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
-		}
-		source_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
-		}
-		source_buffer_max_event_size: {
-			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
 		}
 		source_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
@@ -1056,22 +1040,6 @@ components: sources: internal_metrics: {
 					required: false
 				}
 			}
-		}
-		transform_buffer_max_byte_size: {
-			description:        "The maximum number of bytes the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
-		}
-		transform_buffer_max_event_size: {
-			description:        "The maximum number of events the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
 		transform_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."

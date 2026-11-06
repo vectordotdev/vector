@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use serde_json::Value;
 use tracing::info;
 use vector::test_util::trace_init;
@@ -7,8 +5,6 @@ use vector::test_util::trace_init;
 use super::*;
 
 const LOGS_ENDPOINT: &str = "/api/v2/logs";
-const MAX_RETRIES: usize = 10;
-const WAIT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn expected_log_events() -> usize {
     std::env::var("EXPECTED_LOG_EVENTS").map_or(1000, |n_expected| {
@@ -63,52 +59,27 @@ fn reduce_to_data(payloads: Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
         .collect()
 }
 
+async fn get_log_payloads(address: &str) -> Vec<Value> {
+    info!("getting log payloads from {address}");
+    let mut payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(address, LOGS_ENDPOINT)
+        .await
+        .payloads;
+
+    // The logs endpoint receives an empty healthcheck payload in the beginning
+    payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
+    reduce_to_data(payloads)
+}
+
 #[tokio::test]
 async fn validate() {
     trace_init();
 
-    // Retry until we have log payloads or hit max retries.
-    // This is to ensure events flow through to fakeintake before asking for them.
-    info!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = Vec::new();
-    for _ in 0..MAX_RETRIES {
-        agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
-            &fake_intake_agent_address(),
-            LOGS_ENDPOINT,
-        )
-        .await
-        .payloads;
-
-        if !agent_payloads.is_empty() {
-            break;
-        }
-
-        info!("No valid payloads yet, retrying...");
-        tokio::time::sleep(WAIT_INTERVAL).await;
-    }
-
-    // If we still don't have valid payloads after retries, fail the test
-    assert!(
-        !agent_payloads.is_empty(),
-        "Failed to get valid log payloads from agent pipeline after {MAX_RETRIES} retries"
-    );
-
-    // The logs endpoint receives an empty healthcheck payload in the beginning
-    agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
-
-    let mut agent_payloads = reduce_to_data(agent_payloads);
+    // The Compose `logs-ready` gate waits until both intakes hold every log event, so this
+    // reads a complete snapshot.
+    let mut agent_payloads = get_log_payloads(&fake_intake_agent_address()).await;
     common_assertions(&mut agent_payloads);
 
-    info!("getting log payloads from agent-vector pipeline");
-    let vector_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
-        &fake_intake_vector_address(),
-        LOGS_ENDPOINT,
-    )
-    .await
-    .payloads;
-
-    let mut vector_payloads = reduce_to_data(vector_payloads);
-
+    let mut vector_payloads = get_log_payloads(&fake_intake_vector_address()).await;
     common_assertions(&mut vector_payloads);
 
     assert_eq!(agent_payloads, vector_payloads);

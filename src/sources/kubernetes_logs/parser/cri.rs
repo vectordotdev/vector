@@ -33,7 +33,7 @@ pub(super) struct Cri {
 }
 
 impl Cri {
-    pub const fn new(log_namespace: LogNamespace) -> Self {
+    pub(super) const fn new(log_namespace: LogNamespace) -> Self {
         Self { log_namespace }
     }
 }
@@ -181,7 +181,7 @@ fn parse_log_line(line: &[u8]) -> Option<ParsedLog<'_>> {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(super) mod tests {
     use bytes::Bytes;
     use vrl::value;
 
@@ -193,7 +193,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
+    pub(crate) fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
                 Bytes::from(

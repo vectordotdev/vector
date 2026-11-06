@@ -925,15 +925,12 @@ async fn spawn_event_handling_tasks(
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
     crate::spawn_in_current_span(async move {
-        future::ready({
-            if let Some(evt) = event_handler.handle_event(received_from, event_data)
-                && event_sink.send_event(evt).await.is_err()
-            {
-                error!("Encountered error while sending event.");
-            }
-            active_task_nums.fetch_sub(1, Ordering::AcqRel);
-        })
-        .await;
+        if let Some(evt) = event_handler.handle_event(received_from, event_data)
+            && event_sink.send_event(evt).await.is_err()
+        {
+            error!("Encountered error while sending event.");
+        }
+        active_task_nums.fetch_sub(1, Ordering::AcqRel);
     })
 }
 
@@ -1029,7 +1026,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
-        pub fn new(
+        fn new(
             addr: SocketAddr,
             content_type: String,
             multithreaded: bool,
@@ -1052,7 +1049,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockUnixFrameHandler<F> {
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
                 socket_path: tempfile::tempdir().unwrap().keep().join("unix_test"),
@@ -1068,7 +1065,7 @@ mod test {
             clippy::cast_possible_truncation,
             reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
         )]
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,
@@ -1803,11 +1800,8 @@ mod test {
         let total_events = max_frame_handling_tasks * 10;
 
         join_handles.push(tokio::spawn(async move {
-            future::ready({
-                let events = collect_n(rx, total_events).await;
-                assert_eq!(total_events, events.len(), "Missed events");
-            })
-            .await;
+            let events = collect_n(rx, total_events).await;
+            assert_eq!(total_events, events.len(), "Missed events");
         }));
 
         for i in 0..total_events {

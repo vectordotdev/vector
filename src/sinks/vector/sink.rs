@@ -48,7 +48,7 @@ impl Default for EventCollection {
     }
 }
 
-pub struct VectorSink<S> {
+pub(super) struct VectorSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
 }

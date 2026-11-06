@@ -36,8 +36,9 @@ use futures::{
 use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    Message,
+    Message, Utf8Bytes,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::WebSocketConfig,
 };
 use tokio_util::codec::Encoder as _;
 use url::Url;
@@ -53,7 +54,7 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
-pub struct WebSocketListenerSink {
+pub(super) struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -66,7 +67,10 @@ pub struct WebSocketListenerSink {
 
 impl WebSocketListenerSink {
     #[cfg(test)]
-    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: WebSocketListenerSinkConfig,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         Self::from_validated(config, &validated, tls, cx)
@@ -266,15 +270,23 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {err}");
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                });
-            })?;
+        // tungstenite allocates `read_buffer_size` bytes up front for each connection (default
+        // 128 KiB). This sink can serve many clients that send only small acks, so keep the 4 KiB
+        // read buffer of earlier tungstenite releases.
+        let ws_config = WebSocketConfig::default().read_buffer_size(4096);
+        let ws_stream = tokio_tungstenite::accept_hdr_async_with_config(
+            stream,
+            header_callback,
+            Some(ws_config),
+        )
+        .await
+        .map_err(|err| {
+            debug!("Error during websocket handshake: {err}");
+            emit!(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone()
+            });
+        })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -408,7 +420,12 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        let bytes = bytes.freeze();
+                        let text = match Utf8Bytes::try_from(bytes.clone()) {
+                            Ok(text) => text,
+                            Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                        };
+                        Message::Text(text)
                     };
                     let message_len = message.len();
 

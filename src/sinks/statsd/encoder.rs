@@ -9,7 +9,7 @@ use vector_lib::event::{Metric, MetricKind, MetricTags, MetricValue, StatisticKi
 
 use crate::{
     internal_events::StatsdInvalidMetricError,
-    sinks::util::{buffer::metrics::compress_distribution, encode_namespace},
+    sinks::util::{buffer::metrics::compress_distribution, encode_metric_tag, encode_namespace},
 };
 
 /// Error type for errors that can never happen, but for use with `Encoder`.
@@ -19,7 +19,7 @@ use crate::{
 /// `Infallible`. This type exists to bridge that gap, acting as a marker type for "we emit no
 /// errors" while supporting the trait bounds on `Encoder<T>::Error`.
 #[derive(Debug)]
-pub struct InfallibleIo;
+pub(super) struct InfallibleIo;
 
 impl From<io::Error> for InfallibleIo {
     fn from(_: io::Error) -> Self {
@@ -34,7 +34,7 @@ pub(super) struct StatsdEncoder {
 
 impl StatsdEncoder {
     /// Creates a new `StatsdEncoder` with the given default namespace, if any.
-    pub const fn new(default_namespace: Option<String>) -> Self {
+    pub(super) const fn new(default_namespace: Option<String>) -> Self {
         Self { default_namespace }
     }
 }
@@ -112,16 +112,16 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
 // event, since the tags with multiple values may not have been grouped together.
 // This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
-    let parts: Vec<_> = tags
-        .iter_all()
-        .map(|(name, tag_value)| match tag_value {
-            Some(value) => format!("{name}:{value}"),
-            None => name.to_owned(),
-        })
-        .collect();
-
-    // `parts` is already sorted by key because of BTreeMap
-    parts.join(",")
+    let mut output = String::new();
+    let mut first = true;
+    for (name, tag_value) in tags.iter_all() {
+        if !first {
+            output.push(',');
+        }
+        first = false;
+        encode_metric_tag(&mut output, name, tag_value);
+    }
+    output
 }
 
 fn encode_and_write_single_event<V: Display>(

@@ -705,7 +705,7 @@ impl ConsumerStateInner<Consuming> {
         (Some(deadline).into(), draining)
     }
 
-    pub const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Consuming(self))
     }
 }
@@ -758,7 +758,7 @@ impl ConsumerStateInner<Draining> {
         }
     }
 
-    pub const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Draining(self))
     }
 }
@@ -1442,15 +1442,15 @@ mod test {
 
     use super::*;
 
-    pub fn kafka_host() -> String {
+    pub(super) fn kafka_host() -> String {
         std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
     }
-    pub fn kafka_port() -> u16 {
+    fn kafka_port() -> u16 {
         let port = std::env::var("KAFKA_PORT").unwrap_or_else(|_| "9091".into());
         port.parse().expect("Invalid port number")
     }
 
-    pub fn kafka_address() -> String {
+    pub(super) fn kafka_address() -> String {
         format!("{}:{}", kafka_host(), kafka_port())
     }
 

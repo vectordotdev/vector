@@ -8,7 +8,7 @@ use vector_lib::{
 
 use crate::{
     config::ValidatedSink,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,
@@ -22,8 +22,7 @@ use crate::{
         prelude::*,
         util::{
             HttpEndpoint,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     template::ConfinementConfig,
@@ -43,7 +42,7 @@ fn default_endpoint() -> HttpEndpoint {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct GreptimeDBLogsConfig {
+pub(super) struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
     #[derivative(Default(value = "default_endpoint()"))]
@@ -152,7 +151,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedGreptimeDBLogs {
+pub(super) struct ValidatedGreptimeDBLogs {
     confined_table: ConfinedTemplate,
     confined_dbname: ConfinedTemplate,
     confined_pipeline_name: ConfinedTemplate,
