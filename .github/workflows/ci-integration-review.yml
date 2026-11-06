@@ -193,8 +193,8 @@ jobs:
       - prep-pr
       - build-test-runner
     runs-on: ubuntu-24.04-8core
-    # Fits all three 30-minute retry attempts in the step below.
-    timeout-minutes: 90
+    # Fits all three 15-minute retry attempts in the step below.
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
@@ -250,7 +250,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 30
+          timeout_minutes: 15
           max_attempts: 3
           command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
