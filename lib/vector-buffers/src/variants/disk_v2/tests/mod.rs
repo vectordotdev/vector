@@ -31,6 +31,7 @@ mod known_errors;
 mod model;
 mod record;
 mod size_limits;
+mod split_records;
 
 impl AsyncFile for DuplexStream {
     async fn metadata(&self) -> io::Result<Metadata> {
