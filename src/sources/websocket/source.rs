@@ -428,10 +428,18 @@ impl PingManager {
             }
         }
 
-        ws_sink.send(self.message.clone()).await.map_err(|error| {
-            emit!(WebSocketSendError { error: &error });
-            WebSocketSourceError::Tungstenite { source: error }
-        })?;
+        tokio::select! {
+            res = ws_sink.send(self.message.clone()) => {
+                if let Err(error) = res {
+                    emit!(WebSocketSendError { error: &error });
+                    return Err(WebSocketSourceError::Tungstenite { source: error });
+                }
+            }
+
+            _ = self.ping_timeout_interval.tick(), if self.waiting_for_pong => {
+                return Err(WebSocketSourceError::PongTimeout);
+            }
+        }
 
         if !self.waiting_for_pong {
             self.ping_timeout_interval.reset();
