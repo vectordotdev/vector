@@ -155,7 +155,9 @@ generated: components: sinks: clickhouse: configuration: {
 			Keys must not conflict with parameters already managed by Vector
 			(`query`, `param_database`, `param_table`, `input_format_import_nested_json`,
 			`input_format_skip_unknown_fields`, `date_time_input_format`,
-			`insert_distributed_one_random_shard`, and the `async_insert_*` family).
+			`insert_distributed_one_random_shard`, `async_insert`, `wait_for_async_insert`,
+			`wait_for_async_insert_timeout`, `async_insert_deduplicate`, `async_insert_max_data_size`,
+			and `async_insert_max_query_number`).
 			"""
 		required: false
 		type: object: {
