@@ -715,7 +715,7 @@ mod tests {
         config::{ConfigBuilder, build_unit_tests},
         event::{
             LogEvent, Metric, TraceEvent, TraceLayout, Value,
-            metric::{MetricKind, MetricValue},
+            metric::{MetricKind, MetricValue, StatisticKind},
         },
         metrics::Controller,
         schema,
@@ -1200,6 +1200,46 @@ mod tests {
                 }))
             )
         );
+    }
+
+    #[test]
+    fn check_remap_metric_type() {
+        let conf = RemapConfig {
+            source: Some(
+                r#"if ends_with(string!(.name), "_count") { .type = "counter" }"#.to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let distribution = MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 1],
+            statistic: StatisticKind::Histogram,
+        };
+        let cases = [
+            (
+                "requests_count",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                "queue_depth",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            // Unsupported conversions are ignored rather than failing the program, so the metric
+            // passes through unchanged instead of being dropped.
+            ("latency_count", distribution.clone(), distribution),
+        ];
+
+        for (name, value, expected) in cases {
+            let metric = Event::Metric(Metric::new(name, MetricKind::Absolute, value));
+            let result = transform_one(&mut tform, metric).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.value(), &expected, "{name}");
+            assert_eq!(metric.kind(), MetricKind::Absolute, "{name}");
+        }
     }
 
     #[test]
