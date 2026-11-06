@@ -1,6 +1,6 @@
 ---
 date: "2026-07-01"
-title: Load balancing and scaling Vector on Kubernetes
+title: Scaling Vector on Kubernetes by load balancing
 short: K8s autoscaling
 description: Learn how to take a CPU-bound Vector deployment beyond one pod on Kubernetes by measuring capacity, distributing HTTP traffic, and configuring autoscaling.
 authors: ["thomasqueirozb"]
