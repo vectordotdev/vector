@@ -193,7 +193,8 @@ jobs:
       - prep-pr
       - build-test-runner
     runs-on: ubuntu-24.04-8core
-    timeout-minutes: 30
+    # Room for every retry attempt below, as in integration.yml.
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
@@ -249,7 +250,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 35
+          timeout_minutes: 30
           max_attempts: 3
           command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
