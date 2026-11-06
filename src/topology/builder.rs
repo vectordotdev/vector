@@ -757,12 +757,17 @@ impl<'a> Builder<'a> {
                     .take_until_if(tripwire),
             )
             .await
-            .map(|()| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
             .inspect_err(|error| debug!(%error, "Sink finished with an error."))
-            .map_err(Into::into)
+            .map_err(TaskError::from)?;
+
+            // Let the sink flush its final batch before waiting for acknowledgements.
+            // This is a no-op if a reload interrupted the stream before EOF.
+            rx.get_mut()
+                .finish()
+                .await
+                .map_err(|error| TaskError::wrapped(Box::new(error)))?;
+            debug!("Sink finished normally.");
+            Ok(TaskOutput::Sink(rx))
         };
 
         let task = Task::new(key.clone(), typetag, sink);

@@ -179,7 +179,7 @@ pub fn init_instrumentation() {
 
 /// # Panics
 ///
-/// Panics if a benchmark message cannot be sent.
+/// Panics if a benchmark message cannot be sent or buffer completion fails.
 pub async fn wtr_measurement<const N: usize>(
     mut sender: BufferSender<Message<N>>,
     mut receiver: BufferReceiver<Message<N>>,
@@ -191,6 +191,7 @@ pub async fn wtr_measurement<const N: usize>(
     drop(sender);
 
     while receiver.next().await.is_some() {}
+    receiver.finish().await.unwrap();
 }
 
 /// # Panics

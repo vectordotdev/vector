@@ -31,6 +31,7 @@ fn io_err_permission_denied() -> io::Error {
 
 struct FileInner {
     buf: Option<Vec<u8>>,
+    fail_flush: bool,
 }
 
 impl FileInner {
@@ -48,6 +49,7 @@ impl Default for FileInner {
     fn default() -> Self {
         Self {
             buf: Some(Vec::new()),
+            fail_flush: false,
         }
     }
 }
@@ -61,6 +63,7 @@ impl fmt::Debug for FileInner {
 
         f.debug_struct("FileInner")
             .field("buf", &buf_debug)
+            .field("fail_flush", &self.fail_flush)
             .finish()
     }
 }
@@ -143,7 +146,11 @@ impl ReadableMemoryMap for TestMmap {}
 
 impl WritableMemoryMap for TestMmap {
     fn flush(&self) -> io::Result<()> {
-        Ok(())
+        if self.inner.lock().expect("poisoned").fail_flush {
+            Err(io::Error::other("injected checkpoint failure"))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -307,6 +314,15 @@ impl FilesystemInner {
 /// A `Filesystem` that tracks files in memory and allows introspection from the outside.
 pub struct TestFilesystem {
     inner: Arc<Mutex<FilesystemInner>>,
+}
+
+impl TestFilesystem {
+    pub fn set_flush_error(&self, fail: bool) {
+        let inner = self.inner.lock().expect("poisoned");
+        for file in inner.files.values() {
+            file.inner.lock().expect("poisoned").fail_flush = fail;
+        }
+    }
 }
 
 impl fmt::Debug for TestFilesystem {
