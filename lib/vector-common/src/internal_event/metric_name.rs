@@ -80,6 +80,7 @@ pub enum CounterName {
     StaleEventsFlushedTotal,
     StartedTotal,
     StoppedTotal,
+    TagCardinalityTtlExpirationsTotal,
     TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
     TopologyDiskBufferLifecycleEventsTotal,
@@ -464,6 +465,7 @@ impl CounterName {
             Self::StaleEventsFlushedTotal => "stale_events_flushed_total",
             Self::StartedTotal => "started_total",
             Self::StoppedTotal => "stopped_total",
+            Self::TagCardinalityTtlExpirationsTotal => "tag_cardinality_ttl_expirations_total",
             Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
             Self::TopologyDiskBufferLifecycleEventsTotal => {
