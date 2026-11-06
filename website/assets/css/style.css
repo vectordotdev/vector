@@ -72,6 +72,19 @@
   }
 }
 
+.disclosure-chevron {
+  transition: transform 300ms ease;
+}
+
+.disclosure-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+/* Height is animated by below.js. */
+.disclosure-content {
+  overflow: hidden;
+}
+
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
 
@@ -280,8 +293,9 @@
   }
 }
 
-/* Code controls added by below.js. Long snippets get a header, while short
-   snippets keep the copy button alongside the code. */
+/* Code controls added by below.js. Long snippets and snippets with a filename
+   get a collapsible header, while short snippets keep the copy button
+   alongside the code. */
 @layer prose {
 
 .has-code-controls {
@@ -289,7 +303,7 @@
 }
 
 /* Move Tailwind Typography's pre margin to the container (:where keeps .no-prose rules winning) */
-.prose .has-code-controls:where(:has(> pre)) {
+.prose .has-code-controls:where(:has(> pre, > .disclosure-content > pre)) {
   margin-top: 1.5em;
   margin-bottom: 1.5em;
 }
@@ -311,25 +325,39 @@
   @apply m-0 border-b border-gray-800 px-3 py-2;
 }
 
-.is-collapsible:has([aria-expanded="false"]) .code-block-controls {
+.is-collapsible:has(> .disclosure-content[hidden]) .code-block-controls {
   @apply border-b-0;
 }
 
+/* Fills the free header space, so the whole header toggles the content. */
+.code-toggle-button {
+  @apply mr-auto flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded py-1.5 text-left font-sans text-xs text-gray-400;
+}
+
+.code-toggle-button:hover {
+  @apply text-white;
+}
+
+.code-toggle-button .disclosure-chevron {
+  @apply h-4 w-4 flex-none;
+}
+
 .code-line-count {
-  @apply mr-auto font-sans text-xs text-gray-400;
+  @apply min-w-0 truncate;
 }
 
 .code-copy-button,
-.code-toggle-button {
-  @apply flex-none rounded p-1.5 font-sans text-xs font-medium text-gray-200 cursor-pointer;
+.code-source-link {
+  @apply flex-none rounded p-1.5 text-gray-200 cursor-pointer;
 }
 
 .code-copy-button:hover,
-.code-toggle-button:hover {
+.code-source-link:hover {
   @apply bg-gray-800 text-white;
 }
 
-.code-copy-button svg {
+.code-copy-button svg,
+.code-source-link svg {
   @apply block h-4 w-4;
 }
 
@@ -337,12 +365,24 @@
 
 /* Unlayered so these override toc.sass's `.prose *:focus { outline: none }`. */
 .prose .code-copy-button:focus-visible,
+.prose .code-source-link:focus-visible,
 .prose .code-toggle-button:focus-visible {
   @apply outline-2 outline-offset-2 outline-secondary text-white;
 }
 
 .prose .has-code-controls pre:focus-visible {
   @apply outline-2 -outline-offset-2 outline-secondary;
+}
+
+/* Unlayered so these override the `.prose a` link colors. */
+.prose .code-source-link,
+.dark .prose .code-source-link {
+  @apply text-gray-200;
+}
+
+.prose .code-source-link:hover,
+.dark .prose .code-source-link:hover {
+  @apply text-white;
 }
 
 .hover\:underline {
