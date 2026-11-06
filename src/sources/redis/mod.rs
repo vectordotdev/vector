@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -49,10 +51,37 @@ pub enum DataTypeConfig {
 
 /// Options for the Redis `list` data type.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
     method: Method,
+
+    /// The maximum number of entries to read from the list per batch.
+    ///
+    /// The source blocks until at least one entry is available, then reads up to `batch_size - 1`
+    /// more without waiting, so each batch costs two Redis commands (a blocking pop and a counted
+    /// pop) and batches only fill up when entries are queued. Values greater than
+    /// `1` use the `count` argument of `LPOP`/`RPOP`, which requires Redis 6.2 or newer. Older
+    /// servers reject it; the source then logs a warning and reads one entry at a time.
+    ///
+    /// Entries are removed from the list as they are read, so up to `batch_size` entries can be
+    /// lost if Vector stops unexpectedly before they are processed.
+    #[serde(default = "default_batch_size")]
+    #[configurable(metadata(docs::examples = 100))]
+    batch_size: NonZeroUsize,
+}
+
+const fn default_batch_size() -> NonZeroUsize {
+    NonZeroUsize::MIN
+}
+
+impl Default for ListOption {
+    fn default() -> Self {
+        Self {
+            method: Method::default(),
+            batch_size: default_batch_size(),
+        }
+    }
 }
 
 /// Method for getting events from the `list` data type.
@@ -178,10 +207,7 @@ impl SourceConfig for RedisSourceConfig {
         };
 
         match self.data_type {
-            DataTypeConfig::List => {
-                let method = self.list.unwrap_or_default().method;
-                handler.watch(method).await
-            }
+            DataTypeConfig::List => handler.watch(self.list.unwrap_or_default()).await,
             DataTypeConfig::Channel => handler.subscribe(connection_info).await,
         }
     }
@@ -230,6 +256,14 @@ struct InputHandler {
 }
 
 impl InputHandler {
+    /// Decodes and emits each entry in order; stops if downstream has closed.
+    async fn handle_lines(&mut self, lines: Vec<String>) -> Result<(), ()> {
+        for line in lines {
+            self.handle_line(line).await?;
+        }
+        Ok(())
+    }
+
     async fn handle_line(&mut self, line: String) -> Result<(), ()> {
         let now = Utc::now();
 
@@ -296,6 +330,33 @@ mod test {
     fn generate_config() {
         crate::test_util::test_generate_config::<RedisSourceConfig>();
     }
+
+    fn parse_list_option(yaml: &str) -> Result<ListOption, serde_yaml::Error> {
+        serde_yaml::from_str(yaml)
+    }
+
+    #[test]
+    fn list_batch_size_defaults_to_one() {
+        let list = parse_list_option("method: lpop").unwrap();
+        assert_eq!(list.batch_size.get(), 1);
+    }
+
+    #[test]
+    fn list_batch_size_is_configurable() {
+        let list = parse_list_option("method: rpop\nbatch_size: 100").unwrap();
+        assert_eq!(list.method, Method::Rpop);
+        assert_eq!(list.batch_size.get(), 100);
+    }
+
+    #[test]
+    fn list_batch_size_rejects_zero() {
+        assert!(parse_list_option("method: lpop\nbatch_size: 0").is_err());
+    }
+
+    #[test]
+    fn list_option_default_has_batch_size_one() {
+        assert_eq!(ListOption::default().batch_size.get(), 1);
+    }
 }
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
@@ -351,6 +412,7 @@ mod integration_test {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
                 method: Method::Rpop,
+                ..Default::default()
             }),
             url: redis_url(),
             key: key.clone(),
@@ -392,6 +454,7 @@ mod integration_test {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
                 method: Method::Rpop,
+                ..Default::default()
             }),
             url: redis_url(),
             key: key.clone(),
@@ -433,6 +496,7 @@ mod integration_test {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
                 method: Method::Lpop,
+                ..Default::default()
             }),
             url: redis_url(),
             key: key.clone(),
@@ -458,8 +522,59 @@ mod integration_test {
         );
     }
 
+    async fn assert_list_batches_in_order(method: Method, expected: Vec<String>) {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+
+        let key = format!("test-key-{}", random_string(10));
+        for i in 1..=1000 {
+            let _: i64 = conn.rpush(&key, i.to_string()).await.unwrap();
+        }
+
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method,
+                batch_size: NonZeroUsize::new(100).unwrap(),
+            }),
+            url: redis_url(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+
+        let events = run_and_assert_source_compliance_n(config, 1000, &SOURCE_TAGS).await;
+
+        let messages: Vec<String> = events
+            .iter()
+            .map(|event| {
+                event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(messages, expected);
+
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 0);
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_lpop_in_batches() {
+        let expected = (1..=1000).map(|i| i.to_string()).collect();
+        assert_list_batches_in_order(Method::Lpop, expected).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_rpop_in_batches() {
+        let expected = (1..=1000).rev().map(|i| i.to_string()).collect();
+        assert_list_batches_in_order(Method::Rpop, expected).await;
+    }
+
     /// Holds a pop reply after Redis removes the entry, then shuts down before delivering it.
-    async fn assert_no_entries_lost_on_shutdown(method: Method) {
+    async fn assert_no_entries_lost_on_shutdown(method: Method, batch_size: usize) {
         let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
         let key = format!("test-key-{}", random_string(10));
@@ -468,7 +583,10 @@ mod integration_test {
         let proxy = freezable_redis_proxy().await;
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
-            list: Some(ListOption { method }),
+            list: Some(ListOption {
+                method,
+                batch_size: NonZeroUsize::new(batch_size).unwrap(),
+            }),
             url: proxy.url.clone(),
             key: key.clone(),
             redis_key: None,
@@ -519,12 +637,165 @@ mod integration_test {
 
     #[tokio::test]
     async fn redis_source_list_lpop_loses_no_entries_on_shutdown() {
-        assert_no_entries_lost_on_shutdown(Method::Lpop).await;
+        assert_no_entries_lost_on_shutdown(Method::Lpop, 1).await;
     }
 
     #[tokio::test]
     async fn redis_source_list_rpop_loses_no_entries_on_shutdown() {
-        assert_no_entries_lost_on_shutdown(Method::Rpop).await;
+        assert_no_entries_lost_on_shutdown(Method::Rpop, 1).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_in_batches_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Lpop, 10).await;
+    }
+
+    /// Holds the counted pop's reply past the blocking pop's shutdown grace period, then releases
+    /// it: the whole batch, which Redis has already removed, must still be delivered.
+    #[tokio::test]
+    async fn redis_source_list_in_batches_delivers_slow_batch_on_shutdown() {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+        if !list::integration_test::server_supports_pop_count(&mut conn).await {
+            return;
+        }
+        let key = format!("test-key-{}", random_string(10));
+        for value in ["1", "2", "3", "4", "5"] {
+            let _: i64 = conn.rpush(&key, value).await.unwrap();
+        }
+
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+                batch_size: NonZeroUsize::new(5).unwrap(),
+            }),
+            url: proxy.url.clone(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let mut source = config.build(cx).await.unwrap();
+
+        // Let the blocking pop's reply through, then hold the counted pop's reply.
+        proxy.frozen.store(true, Ordering::SeqCst);
+        for reply in ["blocking pop", "counted pop"] {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                tokio::select! {
+                    () = proxy.reply_held.notified() => {}
+                    result = &mut source => panic!("source stopped before the {reply} reply: {result:?}"),
+                }
+            })
+            .await
+            .unwrap_or_else(|_| panic!("proxy did not capture the {reply} reply"));
+            if reply == "blocking pop" {
+                proxy.release_reply.notify_one();
+            }
+        }
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 0, "Redis must have removed the whole batch");
+
+        // Keep the batch reply in flight for longer than the blocking pop's grace period.
+        let shutdown = shutdown.shutdown_all(Some(Instant::now() + Duration::from_secs(30)));
+        tokio::time::timeout(Duration::from_secs(6), &mut source)
+            .await
+            .expect_err("source abandoned the in-flight batch during shutdown")
+            .to_string();
+        proxy.frozen.store(false, Ordering::SeqCst);
+        proxy.release_reply.notify_one();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (result, ()) = tokio::join!(source, shutdown);
+            result.unwrap();
+        })
+        .await
+        .expect("source did not finish after the batch reply was released");
+        let events = rx.collect::<Vec<_>>().await;
+        let messages: Vec<String> = events
+            .iter()
+            .map(|event| {
+                event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(messages, ["1", "2", "3", "4", "5"]);
+    }
+
+    /// On servers without `LPOP key count` (older than Redis 6.2), holds the rejected count
+    /// probe's reply, shuts down, then releases it: the source must not start the pipelined
+    /// fallback after shutdown, so the entries behind the first one stay in the list.
+    #[tokio::test]
+    async fn redis_source_list_fallback_does_not_read_after_shutdown() {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+        if list::integration_test::server_supports_pop_count(&mut conn).await {
+            return;
+        }
+        let key = format!("test-key-{}", random_string(10));
+        for value in ["1", "2", "3"] {
+            let _: i64 = conn.rpush(&key, value).await.unwrap();
+        }
+
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+                batch_size: NonZeroUsize::new(10).unwrap(),
+            }),
+            url: proxy.url.clone(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let mut source = config.build(cx).await.unwrap();
+
+        // Hold the blocking pop's reply, let it through, then hold the count probe's reply.
+        proxy.frozen.store(true, Ordering::SeqCst);
+        for reply in ["blocking pop", "count probe"] {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                tokio::select! {
+                    () = proxy.reply_held.notified() => {}
+                    result = &mut source => panic!("source stopped before the {reply} reply: {result:?}"),
+                }
+            })
+            .await
+            .unwrap_or_else(|_| panic!("proxy did not capture the {reply} reply"));
+            if reply == "blocking pop" {
+                proxy.release_reply.notify_one();
+            }
+        }
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(
+            remaining, 2,
+            "only the blocking pop may have removed an entry"
+        );
+
+        let shutdown = shutdown.shutdown_all(Some(Instant::now() + Duration::from_secs(10)));
+        assert!(futures::poll!(&mut source).is_pending());
+        proxy.frozen.store(false, Ordering::SeqCst);
+        proxy.release_reply.notify_one();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (result, ()) = tokio::join!(source, shutdown);
+            result.unwrap();
+        })
+        .await
+        .expect("source did not finish after the probe reply was released");
+        let events = rx.collect::<Vec<_>>().await;
+        assert_eq!(events.len(), 1, "no entries may be read after shutdown");
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 2, "no pipelined pops may be sent after shutdown");
     }
 
     struct RedisProxy {
@@ -589,13 +860,15 @@ mod integration_test {
         }
     }
 
-    #[tokio::test]
-    async fn redis_source_list_shutdown_is_bounded_when_replies_stop() {
+    /// Stops the source while its blocking pop's reply never arrives (the list is empty and
+    /// replies are frozen), and checks that shutdown still finishes.
+    async fn assert_shutdown_is_bounded_when_replies_stop(batch_size: usize) {
         let proxy = freezable_redis_proxy().await;
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
                 method: Method::Lpop,
+                batch_size: NonZeroUsize::new(batch_size).unwrap(),
             }),
             url: proxy.url,
             key: format!("test-key-{}", random_string(10)),
@@ -627,6 +900,16 @@ mod integration_test {
             stopped.is_ok(),
             "source did not stop while its Redis connection was unresponsive"
         );
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_shutdown_is_bounded_when_replies_stop() {
+        assert_shutdown_is_bounded_when_replies_stop(1).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_in_batches_shutdown_is_bounded_when_replies_stop() {
+        assert_shutdown_is_bounded_when_replies_stop(100).await;
     }
 
     #[tokio::test]
