@@ -24,7 +24,7 @@ Let's setup all the imports we will need for the tutorial:
 ```rust
 use crate::sinks::prelude::*;
 use vector_lib::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol,
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol, register,
 };
 ```
 

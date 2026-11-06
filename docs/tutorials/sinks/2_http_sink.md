@@ -18,6 +18,7 @@ use crate::{
 };
 use vector_core::config::telemetry;
 use vector_http::full_body;
+use vector_lib::internal_event::emit;
 use bytes::Bytes;
 ```
 
