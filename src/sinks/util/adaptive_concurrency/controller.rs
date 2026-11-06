@@ -10,6 +10,10 @@ use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 use vector_lib::stats::{EwmaVar, Mean, MeanVariance};
 
 use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
+
+/// Whole logical requests, including those sleeping between retry attempts, allowed per unit of
+/// the current concurrency limit.
+const RETRY_HEADROOM: usize = 2;
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
@@ -25,6 +29,9 @@ use crate::{
 #[derive(Clone)]
 pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
+    // Bounds whole retry sequences, which hold no `semaphore` permit while they back off.
+    logical: Arc<ShrinkableSemaphore>,
+    logical_per_permit: usize,
     concurrency: Option<usize>,
     settings: AdaptiveConcurrencySettings,
     logic: L,
@@ -69,8 +76,18 @@ impl<L> Controller<L> {
         // mechanisms. Otherwise, the current limit is set to 1 and the
         // maximum to `settings.max_concurrency_limit`.
         let current_limit = concurrency.unwrap_or(settings.initial_concurrency);
+        // A concurrency of 1 is how sinks request strict ordering, so retries stay serialized.
+        let logical_per_permit = if concurrency == Some(1) {
+            1
+        } else {
+            RETRY_HEADROOM
+        };
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
+            logical: Arc::new(ShrinkableSemaphore::new(
+                current_limit.saturating_mul(logical_per_permit),
+            )),
+            logical_per_permit,
             concurrency,
             settings,
             logic,
@@ -112,6 +129,10 @@ impl<L> Controller<L> {
         &self,
     ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
         Arc::clone(&self.semaphore).acquire()
+    }
+
+    pub(super) fn logical_semaphore(&self) -> Arc<ShrinkableSemaphore> {
+        Arc::clone(&self.logical)
     }
 
     pub(super) fn start_request(&self) {
@@ -239,6 +260,7 @@ impl<L> Controller<L> {
         {
             // Increase (additive) the current concurrency limit
             self.semaphore.add_permits(1);
+            self.logical.add_permits(self.logical_per_permit);
             inner.current_limit += 1;
         }
         // Back pressure responses, either explicit or implicit due
@@ -260,6 +282,8 @@ impl<L> Controller<L> {
                 ((inner.current_limit as f64 * self.settings.decrease_ratio) as usize).max(1);
             self.semaphore
                 .forget_permits(inner.current_limit - new_limit);
+            self.logical
+                .forget_permits((inner.current_limit - new_limit) * self.logical_per_permit);
             inner.current_limit = new_limit;
         }
         self.limit.emit(AdaptiveConcurrencyLimitData {

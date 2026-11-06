@@ -8,7 +8,7 @@ use tower::{
     buffer::{Buffer, BufferLayer},
     discover::Change,
     layer::{Layer, util::Stack},
-    limit::{ConcurrencyLimit, RateLimit},
+    limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
 };
@@ -25,6 +25,7 @@ use crate::{
         Batch, BatchSink, Partition, PartitionBatchSink,
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+            LogicalConcurrencyLimit,
         },
         retries::{FibonacciRetryPolicy, JitterMode, RetryLogic},
         service::map::MapLayer,
@@ -38,12 +39,10 @@ mod map;
 pub mod net;
 
 pub type Svc<S, L> = RateLimit<
-    ConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>,
+    LogicalConcurrencyLimit<
+        Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>,
+    >,
 >;
-
-/// Multiplier applied to the per-attempt concurrency limit to bound the number of logical requests
-/// that may be in flight at once, including those sleeping between retry attempts.
-const RETRY_HEADROOM: usize = 2;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -392,33 +391,22 @@ where
         let policy = self.settings.retry_policy(self.retry_logic.clone());
         // Retry sits outside the adaptive concurrency limit so that a permit is not held while a
         // request sleeps between attempts. Since that means the adaptive limit no longer bounds the
-        // requests waiting to be retried, bound whole retry sequences separately.
-        //
-        // A concurrency of 1 is how sinks request strict ordering (e.g. Loki's ordered modes, Azure
-        // append blobs, `concurrency: none`), so there the whole retry sequence stays serialized.
-        let max_logical_requests = match self.settings.concurrency {
-            Some(1) => 1,
-            Some(limit) => limit.saturating_mul(RETRY_HEADROOM),
-            None => self
-                .settings
-                .adaptive_concurrency
-                .max_concurrency_limit
-                .saturating_mul(RETRY_HEADROOM),
-        };
+        // requests waiting to be retried, bound whole retry sequences to a multiple of its current
+        // limit (to the limit itself for a concurrency of 1, which keeps ordered sinks serialized).
+        let adaptive = AdaptiveConcurrencyLimit::new(
+            Timeout::new(inner, self.settings.timeout),
+            self.retry_logic.clone(),
+            self.settings.concurrency,
+            self.settings.adaptive_concurrency,
+        );
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
-            .concurrency_limit(max_logical_requests)
+            .layer(adaptive.logical_limit_layer())
             .retry(policy)
-            .layer(AdaptiveConcurrencyLimitLayer::new(
-                self.settings.concurrency,
-                self.settings.adaptive_concurrency,
-                self.retry_logic.clone(),
-            ))
-            .timeout(self.settings.timeout)
-            .service(inner)
+            .service(adaptive)
     }
 }
 
@@ -598,9 +586,9 @@ mod tests {
         );
     }
 
-    fn retry_test_settings(concurrency: usize) -> TowerRequestSettings {
+    fn retry_test_settings(concurrency: Concurrency) -> TowerRequestSettings {
         let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
-            concurrency: Concurrency::Fixed(concurrency),
+            concurrency,
             retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
             retry_max_duration_secs: NonZeroU64::new(60).unwrap(),
             retry_jitter_mode: JitterMode::None,
@@ -638,7 +626,7 @@ mod tests {
                 future::ok::<_, std::io::Error>(req).boxed()
             }
         });
-        let svc = buffered(retry_test_settings(2), inner);
+        let svc = buffered(retry_test_settings(Concurrency::Fixed(2)), inner);
 
         let first = tokio::spawn(svc.clone().oneshot(0));
         let second = tokio::spawn(svc.clone().oneshot(1));
@@ -666,7 +654,7 @@ mod tests {
                 future::err::<usize, _>(std::io::Error::other("")).boxed()
             })
         };
-        let svc = buffered(retry_test_settings(2), inner);
+        let svc = buffered(retry_test_settings(Concurrency::Fixed(2)), inner);
 
         // With a concurrency of 2, four logical requests may be in flight. All keep failing.
         for req in 0..4 {
@@ -679,6 +667,33 @@ mod tests {
             .await
             .expect_err("request should be held back by the retry bound");
         assert_eq!(fifth_calls.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retrying_requests_follow_the_adaptive_limit() {
+        let third_calls = Arc::new(AtomicUsize::new(0));
+        let inner = {
+            let third_calls = Arc::clone(&third_calls);
+            tower::service_fn(move |req: usize| {
+                if req == 2 {
+                    third_calls.fetch_add(1, Ordering::AcqRel);
+                }
+                future::err::<usize, _>(std::io::Error::other("")).boxed()
+            })
+        };
+        let svc = buffered(retry_test_settings(Concurrency::Adaptive), inner);
+
+        // The adaptive limit starts at 1, so two logical requests may be in flight, not two per
+        // unit of `max_concurrency_limit`.
+        for req in 0..2 {
+            tokio::spawn(svc.clone().oneshot(req));
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
+            .await
+            .expect_err("request should be held back by the retry bound");
+        assert_eq!(third_calls.load(Ordering::Acquire), 0);
     }
 
     #[tokio::test(start_paused = true)]
@@ -697,7 +712,7 @@ mod tests {
                 }
             })
         };
-        let svc = buffered(retry_test_settings(1), inner);
+        let svc = buffered(retry_test_settings(Concurrency::Fixed(1)), inner);
 
         let first = tokio::spawn(svc.clone().oneshot(0));
         tokio::time::sleep(Duration::from_secs(1)).await;
