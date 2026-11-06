@@ -169,9 +169,9 @@ ls tests/integration/
 | ---- | ------- |
 | ✓ | Real E2E test against a live external service |
 | ~ | No live external service, but tests exercise the component's real I/O path (e.g. a local test server, mocked/stubbed protocol peer) |
-| ✗ | No meaningful tests found in either `tests/integration/` or the component's source directory |
+| ✗ | No test meeting ✓ or ~ in either `tests/integration/` or the component's source directory |
 
-To assess tier: first check for a matching directory under `tests/integration/`. If present, inspect its `config/test.yaml` — `test_filter` selects the Rust test functions (usually in `src/**/integration_tests.rs`); `paths` only controls when CI triggers the suite and says nothing about coverage. Read the referenced test code to confirm it spins up a real external service (docker-compose service definitions, live endpoints, external SDK clients that are not faked). A test that starts a real Kafka container and produces/consumes messages is ✓; a directory that exists but only validates Vector config parsing or uses fully mocked I/O is ~.
+To assess tier: first check for a matching directory under `tests/integration/`. If present, inspect its `config/test.yaml` — `test_filter` selects the Rust test functions (usually in `src/**/integration_tests.rs`); `paths` only controls when CI triggers the suite and says nothing about coverage. Read the referenced test code to confirm it spins up a real external service (docker-compose service definitions, live endpoints, external SDK clients that are not faked). A test that starts a real Kafka container and produces/consumes messages is ✓. Tests that only validate config parsing do not qualify for ~; if no test exercises the I/O path, the tier is ✗.
 
 Before assigning ✗, check the tests in the component's own source directory (`src/sources/<name>/`, `src/sinks/<name>/`, or `<name>.rs`). Classify by what the tests actually do, not by file names or whether a `tests/integration/` directory exists — e.g. a sink whose `sink.rs` tests run against a local server with TLS and reconnect scenarios is ~, not ✗.
 
