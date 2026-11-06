@@ -58,6 +58,17 @@ pub(crate) async fn await_connection(connection: &AmqpConfig) {
 }
 
 impl AmqpConfig {
+    // native-tls pins TLS 1.2-1.3 itself (`set_min/max_proto_version`), overriding host policy.
+    pub(crate) fn enforce_protocol_version_bounds(&self) -> vector_lib::tls::Result<()> {
+        let tls = self.tls.as_ref();
+        vector_lib::tls::enforce_protocol_version_bounds(
+            tls.and_then(|tls| tls.min_version),
+            tls.and_then(|tls| tls.max_version),
+            "lapin",
+            vector_lib::tls::TLS12_TO_TLS13,
+        )
+    }
+
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {

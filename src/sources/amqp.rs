@@ -146,6 +146,7 @@ impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        self.connection.enforce_protocol_version_bounds()?;
 
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
