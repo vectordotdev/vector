@@ -166,7 +166,7 @@ them all as a larger topology:
 ```bash
 # These two examples run the same two configs together:
 vector -c ./configs/foo.yaml -c ./configs/bar.yaml
-vector -c ./configs/*.yaml
+vector -c './configs/*.yaml'
 ```
 
 If you have a large chain of components it's a good idea to break them out into

@@ -217,8 +217,8 @@ If you're considering migrating from legacy mode (`log_namespace = false`) to Ve
 ### VRL Updates
 
 VRL scripts that reference metadata fields will need to be updated to use the metadata accessor syntax.
-Source metadata such as `host` and `timestamp` lives under the source type (for example, `%http_server`),
-while the `%vector` namespace (`ingest_timestamp`, `source_type`) is read-only:
+Source metadata such as `host` lives under the source type (for example, `%demo_logs`).
+The `%vector` namespace, which holds `ingest_timestamp` and `source_type`, is read-only:
 
 **Legacy mode:**
 
@@ -230,8 +230,7 @@ while the `%vector` namespace (`ingest_timestamp`, `source_type`) is read-only:
 **Vector namespace mode:**
 
 ```coffee
-%http_server.host = "new-host"
-%http_server.timestamp = now()
+%demo_logs.host = "new-host"
 ```
 
 ### Sink Behavior Differences
