@@ -89,7 +89,7 @@ impl InternalLogsConfig {
                 host_key,
                 &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             )
             .with_source_metadata(
                 InternalLogsConfig::NAME,
