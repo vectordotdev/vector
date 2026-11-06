@@ -1,5 +1,6 @@
-use std::{io::Cursor, sync::Arc, time::Duration};
+use std::{io::Cursor, time::Duration};
 
+use fslock::LockFile;
 use futures::{StreamExt, stream};
 use tokio::{select, time::sleep};
 use tokio_test::{assert_pending, task::spawn};
@@ -11,10 +12,34 @@ use super::{
 };
 use crate::{
     EventCount, assert_buffer_is_empty, assert_buffer_records,
-    buffer_usage_data::BufferUsageHandle,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::{BufferWriter, DiskBufferConfigBuilder, Ledger, writer::RecordWriter},
+    variants::disk_v2::writer::RecordWriter,
 };
+
+#[tokio::test]
+async fn dropping_buffer_releases_lock_without_yielding() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (writer, reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            drop(writer);
+            drop(reader);
+            drop(ledger);
+
+            // No await point since the drops: background tasks have not run, so the lock must
+            // already be free for the buffer to be reopened in the same process.
+            let mut lock =
+                LockFile::open(&data_dir.join("buffer.lock")).expect("open should not fail");
+            assert!(
+                lock.try_lock().expect("try_lock should not fail"),
+                "buffer lock should be released once all buffer handles are dropped"
+            );
+        }
+    })
+    .await;
+}
 
 #[tokio::test]
 async fn basic_read_write_loop() {
@@ -158,26 +183,8 @@ async fn initial_size_correct_with_multievents() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Build a write-only buffer without a finalizer task. Using
-            // `from_config_inner` would spawn a background finalizer that holds
-            // an Arc<Ledger> (and the lock file), causing a racy
-            // LedgerLockAlreadyHeld when we reopen the buffer below.
-            let config = DiskBufferConfigBuilder::from_path(&data_dir)
-                .build()
-                .expect("creating buffer config should not fail");
-            let usage_handle = BufferUsageHandle::noop();
-            let ledger = Ledger::load_or_create(config, usage_handle)
-                .await
-                .expect("ledger should not fail to load/create");
-            let ledger = Arc::new(ledger);
-
-            let mut writer = BufferWriter::new(Arc::clone(&ledger));
-            writer
-                .validate_last_write()
-                .await
-                .expect("validate_last_write should not fail");
-
-            ledger.synchronize_buffer_usage();
+            // Create a regular buffer, no customizations required.
+            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
 
             let input_items = (512..768)
                 .cycle()
@@ -230,8 +237,7 @@ async fn initial_size_correct_with_multievents() {
             writer.flush().await.expect("writer flush should not fail");
             writer.close();
 
-            // Drop the first buffer. No background finalizer task exists, so the
-            // ledger lock is released immediately when the last Arc is dropped.
+            // Now drop our buffer and reopen it.
             drop(writer);
             drop(ledger);
 
