@@ -38,9 +38,10 @@ This guide builds on a working deployment rather than teaching those basics.
 The experiment uses a stateless pipeline parsing
 [Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common)
 data over HTTP behind the [NGINX](https://www.nginx.com/) Ingress Controller.
-It isolates Vector CPU capacity, not downstream sink limits or cluster node
-scaling. Treat the replica counts and 70% CPU target as results and settings
-for this workload, not production sizing recommendations.
+The consumer discards everything it receives and the node has CPU to spare,
+so Vector's CPU is the only limit. The replica counts and the 70% CPU target
+fit this workload; measure your own pipeline before you size a production
+deployment.
 
 If you already operate autoscaled Vector deployments, you can skip the basic
 setup and scaling sections. The sections on
