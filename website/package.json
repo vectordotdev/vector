@@ -13,7 +13,7 @@
     "@algolia/autocomplete-js": "^1.19.12",
     "@algolia/autocomplete-theme-classic": "^1.19.12",
     "@alpinejs/persist": "^3.17.5",
-    "@babel/cli": "^8.0.6",
+    "@babel/cli": "^8.1.0",
     "@babel/core": "^8.0.9",
     "@babel/preset-env": "^8.0.7",
     "@babel/preset-react": "^8.0.0",
