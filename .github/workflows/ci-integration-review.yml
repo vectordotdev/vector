@@ -92,6 +92,8 @@ jobs:
       checkout_ref: ${{ github.event.review.commit_id }}
 
   integration-tests:
+    # Skip the matrix for commands that do not target integration tests instead of starting no-op jobs.
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-all')
     needs:
       - prep-pr
       - build-test-runner
@@ -188,7 +190,10 @@ jobs:
 
   e2e-tests:
     # The dedicated command also starts with the ordinary opentelemetry-traces command.
-    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: |
+      github.repository == 'vectordotdev/vector'
+      && (startsWith(github.event.review.body, '/ci-run-e2e') || startsWith(github.event.review.body, '/ci-run-all'))
+      && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
