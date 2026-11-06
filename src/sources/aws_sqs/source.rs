@@ -30,7 +30,7 @@ const MAX_BATCH_SIZE: i32 = 10;
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 #[derive(Clone)]
-pub struct SqsSource {
+pub(super) struct SqsSource {
     pub client: SqsClient,
     pub queue_url: String,
     pub decoder: Decoder,
@@ -43,7 +43,7 @@ pub struct SqsSource {
 }
 
 impl SqsSource {
-    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub(super) async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
             let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));

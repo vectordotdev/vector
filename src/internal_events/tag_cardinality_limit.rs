@@ -1,6 +1,8 @@
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent},
+    internal_event::{
+        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, LossyF64,
+    },
 };
 
 #[derive(NamedInternalEvent)]
@@ -99,10 +101,8 @@ pub(crate) struct TagCardinalityTrackedKeys {
 }
 
 impl InternalEvent for TagCardinalityTrackedKeys {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!(GaugeName::TagCardinalityTrackedKeys).set(self.count as f64);
+        gauge!(GaugeName::TagCardinalityTrackedKeys).set(LossyF64(self.count));
     }
 }
 
