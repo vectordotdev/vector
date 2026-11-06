@@ -15,8 +15,8 @@ walkthrough, you should be able to:
 
 1. **Measure a single pod's CPU-bound capacity** and use that baseline to
    estimate replica requirements ([Manual scaling](#manual-scaling)).
-2. **Distribute HTTP requests to new replicas** with L7 load balancing, then
-   verify that manual scaling improves throughput ([Manual scaling](#manual-scaling)).
+2. **Load balance HTTP requests to new replicas**, then verify that manual
+   scaling improves throughput ([Manual scaling](#manual-scaling)).
 3. **Configure CPU-based autoscaling with headroom** with the Kubernetes
    [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
    and interpret the replica count it settles on ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
