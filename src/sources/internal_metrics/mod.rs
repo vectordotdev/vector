@@ -481,8 +481,7 @@ mod tests {
         assert_eq!(gauge.kind(), MetricKind::Absolute);
         assert_eq!(gauge.value(), &MetricValue::Gauge { value: 2.0 });
 
-        // Declared a counter but non-monotonic, so it is left absolute too.
-        let cardinality = find(&metrics, vector_lib::metrics::CARDINALITY_COUNTER_KEY_NAME);
+        let cardinality = find(&metrics, "internal_metrics_cardinality");
         assert_eq!(cardinality.kind(), MetricKind::Absolute);
     }
 
