@@ -251,6 +251,11 @@ generated: components: sources: aws_s3: configuration: {
 				required: false
 				type: bool: default: true
 			}
+			endpoint: {
+				description: "Custom endpoint for use with AWS-compatible services."
+				required:    false
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+			}
 			max_number_of_messages: {
 				description: """
 					Maximum number of messages to poll from SQS in a batch
@@ -312,6 +317,15 @@ generated: components: sources: aws_s3: configuration: {
 					examples: [20]
 					unit: "seconds"
 				}
+			}
+			region: {
+				description: """
+					The [AWS region][aws_region] of the target service.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required: false
+				type: string: examples: ["us-east-1"]
 			}
 			tls_options: {
 				description: "TLS configuration."
