@@ -384,13 +384,13 @@ The report is complete. Tell the user where the file was written. Do not publish
 - Working directory is the Vector repo root
 **Parent/shared CUE files**: Some CUE files define shared configuration for families of components and have no `development` field of their own (children inherit it). Known true parent files (exclude from per-component inventory): `sinks/aws_cloudwatch.cue`, `sinks/datadog.cue`, `sinks/gcp.cue`, `sinks/humio.cue`, `sinks/influxdb.cue`, `sinks/sematext.cue`, `sinks/splunk_hec.cue`. Child components (e.g. `datadog_logs`, `gcp_pubsub`) are identified by the prefix rule in Phase 2c — any sink whose name starts with a parent prefix inherits shared config from that parent. `sinks/statsd.cue` and `sources/syslog.cue` are real components whose `development` value is inherited via `sinks.socket.classes` and `sources.socket.classes` respectively — follow that reference to resolve the value and include them in the inventory. Child sinks that inherit their `development` value (no local field, e.g. `datadog_events`, `datadog_logs`, `datadog_metrics`, `humio_logs`, `humio_metrics`) — resolve each by reading its CUE file and following the `classes:` reference to the parent.
 
-**E2E test directory naming**: directory names use hyphens, not underscores (e.g. `tests/integration/docker-logs/` → `docker_logs`, `tests/integration/windows-event-log/` → `windows_event_log`). Do not assume a 1-to-1 mapping between component name and directory name. Use the table below as authoritative, and for any component not listed, scan every `tests/integration/*/config/test.yaml` for a `paths:` entry or `test_filter:` that references the component name before concluding no test exists.
+**E2E test directory naming**: directory names use hyphens, not underscores (e.g. `tests/integration/docker-logs/` → `docker_logs`, `tests/integration/windows-event-log/` → `windows_event_log`). Do not assume a 1-to-1 mapping between component name and directory name. Use the table below as authoritative, and for any component not listed, scan every `tests/integration/*/config/test.yaml` for a `test_filter:` that selects the component's tests before concluding no test exists. A `paths:` entry naming the component is only a hint; confirm against `test_filter` and the test code.
 
 | Directory | Components covered |
 | --------- | ------------------ |
 | `aws/` | all `aws_*` sources and sinks |
 | `gcp/` | all `gcp_*` sinks |
-| `prometheus/` | `prometheus_remote_write` (source and sink) only — `test_filter` is `::prometheus::remote_write::` |
+| `prometheus/` | `prometheus_scrape`, `prometheus_exporter`, `prometheus_remote_write` (source and sink). All have integration tests behind the `prometheus-integration-tests` feature, but `test_filter` is `::prometheus::remote_write::`, so CI only runs the remote_write ones — note this for scrape/exporter |
 | `azure/` | `azure_logs_ingestion`, `azure_blob` sinks |
 | `nginx/` | `nginx_metrics` source |
 | `mongodb/` | `mongodb_metrics` source |
