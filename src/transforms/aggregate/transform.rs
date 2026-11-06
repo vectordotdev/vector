@@ -1,4 +1,4 @@
-use super::{AggregateConfig, AggregationMode};
+use super::{AggregateConfig, AggregationMode, LateEventsStrategy};
 
 use std::{
     collections::{BTreeMap, HashMap, hash_map::Entry},
@@ -132,6 +132,14 @@ impl Aggregate {
                     event_time.allowed_lateness_ms)
                 .into());
             }
+            if event_time.late_events.metric_types.is_some()
+                && event_time.late_events.strategy != LateEventsStrategy::Forward
+            {
+                return Err(
+                    "`event_time.late_events.metric_types` requires `event_time.late_events.strategy` to be `forward`"
+                        .into(),
+                );
+            }
         }
 
         Ok(Self {
@@ -142,7 +150,7 @@ impl Aggregate {
             event_time_prev_buckets: BTreeMap::default(),
             event_time_multi_buckets: BTreeMap::default(),
             watermark: None,
-            config: *config,
+            config: config.clone(),
         })
     }
 
