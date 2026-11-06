@@ -101,7 +101,7 @@ pub mod sinks;
 pub mod sources;
 #[cfg(feature = "api-client")]
 pub mod tap;
-pub mod template;
+pub use vector_lib::template;
 pub mod test_util;
 #[cfg(feature = "top")]
 pub mod top;

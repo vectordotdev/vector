@@ -124,6 +124,7 @@ members = [
   "lib/vector-lookup",
   "lib/vector-stream",
   "lib/vector-tap",
+  "lib/vector-template",
   "lib/vector-top",
   "lib/vector-vrl/category",
   "lib/vector-vrl/cli",

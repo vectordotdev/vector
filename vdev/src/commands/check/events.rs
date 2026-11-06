@@ -375,10 +375,12 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
-/// block (which preserves comments and original formatting that `to_token_stream` strips).
+/// `emit!(ComponentEventsDropped...)` / `emit(ComponentEventsDropped...)` detection regex, applied
+/// to the raw source slice of an impl block (which preserves comments and original formatting that
+/// `to_token_stream` strips). Library crates without `vector_lib` call the `emit` function.
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
+    Regex::new(r"(?:^|[^A-Za-z0-9_.])(?:emit!?|register!)\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)")
+        .unwrap()
 });
 
 fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
@@ -1113,6 +1115,17 @@ fn first_ident(s: &str) -> Option<String> {
 #[command()]
 pub(super) struct Cli {}
 
+/// Path prefixes whose structs and impls define internal events.
+const INTERNAL_EVENT_PATHS: &[&str] = &[
+    "src/internal_events/",
+    "lib/vector-common/src/internal_event/",
+    "lib/vector-template/src/internal_event.rs",
+];
+
+/// Path prefixes that get the log-message format check: the binary crate and
+/// the library crates split out of it.
+const LOG_FORMAT_CHECK_PATHS: &[&str] = &["src/", "lib/vector-template/"];
+
 fn collect_source_paths() -> Result<Vec<PathBuf>> {
     let mut paths: Vec<PathBuf> = Vec::new();
     for pattern in ["src/**/*.rs", "lib/**/*.rs"] {
@@ -1129,9 +1142,12 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
     let text = fs::read_to_string(path)?;
     let lower = text.to_ascii_lowercase();
 
-    let in_internal_events = path_str.starts_with("src/internal_events/")
-        || path_str.starts_with("lib/vector-common/src/internal_event/");
-    let in_src = path_str.starts_with("src/");
+    let in_internal_events = INTERNAL_EVENT_PATHS
+        .iter()
+        .any(|prefix| path_str.starts_with(prefix));
+    let check_log_format = LOG_FORMAT_CHECK_PATHS
+        .iter()
+        .any(|prefix| path_str.starts_with(prefix));
     let skip_dropped = lower.contains("## skip check-dropped-events ##");
 
     for caps in RE_USES.captures_iter(&text) {
@@ -1140,7 +1156,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
     }
 
     let mut errors = 0usize;
-    if in_src {
+    if check_log_format {
         let format_reports = format_check_log_messages(&text, &path_str);
         if !format_reports.is_empty() {
             for r in &format_reports {
@@ -1319,10 +1335,24 @@ mod tests {
     }
 
     #[test]
+    fn recognizes_component_events_dropped_emit_macro_and_function() {
+        for body in [
+            r#"emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason: "discarded" });"#,
+            r#"emit(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason: "discarded" });"#,
+        ] {
+            let event = scan_dropped_event(body);
+            assert!(event.emits_component_events_dropped, "{body}");
+            assert!(run("TestEventsDropped", event).is_empty());
+        }
+    }
+
+    #[test]
     fn unrelated_group_calls_do_not_bypass_dropped_event_validation() {
         for body in [
             "// ComponentEventsDropped\nother.emit_with_group(group);",
             "let _: Option<ComponentEventsDropped> = None; other.emit_with_group(group);",
+            "other.emit(ComponentEventsDropped { count: 1 }); other.emit_with_group(group);",
+            "other_emit(ComponentEventsDropped { count: 1 }); other.emit_with_group(group);",
             r#"let _ = "ComponentEventsDropped { count: 1 }.emit_with_group(group)";
                 other.emit_with_group(group);"#,
             "let _ = ComponentEventsDropped { count: 1 }; other.emit_with_group(group);",
