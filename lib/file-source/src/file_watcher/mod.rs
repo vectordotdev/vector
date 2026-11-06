@@ -1,4 +1,4 @@
-use async_compression::tokio::bufread::GzipDecoder;
+use async_compression::tokio::bufread::{GzipDecoder, ZstdDecoder};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use std::{
@@ -14,19 +14,24 @@ use tokio::{
     time::Instant,
 };
 use tracing::debug;
-use vector_common::constants::GZIP_MAGIC;
+use vector_common::constants::{GZIP_MAGIC, ZSTD_MAGIC};
 
 use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
-use vector_common::compression::gzip_multiple_decoder;
+use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder};
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
 
 #[cfg(test)]
 mod tests;
+
+enum Compression {
+    Gzip,
+    Zstd,
+}
 
 /// Enum-based reader that preserves type information for metadata access.
 ///
@@ -48,6 +53,7 @@ enum FileReader {
     /// Gzipped file reader - no meaningful file position tracking
     /// Boxed to reduce enum size (this variant is much larger than others)
     Gzipped(Box<BufReader<GzipDecoder<BufReader<File>>>>),
+    Zstd(Box<BufReader<ZstdDecoder<BufReader<File>>>>),
     /// Null reader for skipped files
     Null(io::Cursor<Vec<u8>>),
 }
@@ -59,7 +65,7 @@ impl FileReader {
     async fn file_size(&self) -> Option<u64> {
         match self {
             FileReader::Plain(reader) => reader.get_ref().metadata().await.ok().map(|m| m.len()),
-            FileReader::Gzipped(_) | FileReader::Null(_) => None,
+            FileReader::Gzipped(_) | FileReader::Zstd(_) | FileReader::Null(_) => None,
         }
     }
 }
@@ -73,6 +79,7 @@ impl AsyncRead for FileReader {
         match self.get_mut() {
             FileReader::Plain(r) => Pin::new(r).poll_read(cx, buf),
             FileReader::Gzipped(r) => Pin::new(r).poll_read(cx, buf),
+            FileReader::Zstd(r) => Pin::new(r).poll_read(cx, buf),
             FileReader::Null(r) => Pin::new(r).poll_read(cx, buf),
         }
     }
@@ -83,6 +90,7 @@ impl AsyncBufRead for FileReader {
         match self.get_mut() {
             FileReader::Plain(r) => Pin::new(r).poll_fill_buf(cx),
             FileReader::Gzipped(r) => Pin::new(r).poll_fill_buf(cx),
+            FileReader::Zstd(r) => Pin::new(r).poll_fill_buf(cx),
             FileReader::Null(r) => Pin::new(r).poll_fill_buf(cx),
         }
     }
@@ -91,6 +99,7 @@ impl AsyncBufRead for FileReader {
         match self.get_mut() {
             FileReader::Plain(r) => Pin::new(r).consume(amt),
             FileReader::Gzipped(r) => Pin::new(r).consume(amt),
+            FileReader::Zstd(r) => Pin::new(r).consume(amt),
             FileReader::Null(r) => Pin::new(r).consume(amt),
         }
     }
@@ -194,21 +203,21 @@ impl FileWatcher {
             false
         };
 
-        let gzipped = is_gzipped(&mut reader).await?;
+        let compression = is_compressed(&mut reader).await?;
 
         // Determine the actual position at which we should start reading.
         // For non-gzipped files, we use FileReader::Plain which allows metadata access.
         // For gzipped files, position tracking is not meaningful.
         let (reader, file_position): (FileReader, FilePosition) =
-            match (gzipped, too_old, read_from) {
-                (true, true, _) => {
+            match (compression, too_old, read_from) {
+                (Some(_), true, _) => {
                     debug!(
                         message = "Not reading gzipped file older than `ignore_older`.",
                         ?path,
                     );
                     (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
-                (true, _, ReadFrom::Checkpoint(file_position)) => {
+                (Some(_), _, ReadFrom::Checkpoint(file_position)) => {
                     debug!(
                         message = "Not re-reading gzipped file with existing stored offset.",
                         ?path,
@@ -220,26 +229,30 @@ impl FileWatcher {
                 // we were reading before. Should we merge this and the next branch to read
                 // compressed file from the beginning even when `read_from = "end"` (implicitly via
                 // default or explicitly via config)?
-                (true, _, ReadFrom::End) => {
+                (Some(_), _, ReadFrom::End) => {
                     debug!(
                         message = "Can't read from the end of already-compressed file.",
                         ?path,
                     );
                     (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
-                (true, false, ReadFrom::Beginning) => (
+                (Some(Compression::Gzip), false, ReadFrom::Beginning) => (
                     FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
                     0,
                 ),
-                (false, false, ReadFrom::Checkpoint(file_position)) => {
+                (Some(Compression::Zstd), false, ReadFrom::Beginning) => (
+                    FileReader::Zstd(Box::new(BufReader::new(zstd_multiple_decoder(reader)))),
+                    0,
+                ),
+                (None, false, ReadFrom::Checkpoint(file_position)) => {
                     let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
                     (FileReader::Plain(reader), pos)
                 }
-                (false, false, ReadFrom::Beginning) => {
+                (None, false, ReadFrom::Beginning) => {
                     let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
                     (FileReader::Plain(reader), pos)
                 }
-                (false, true, _) | (false, false, ReadFrom::End) => {
+                (None, true, _) | (None, false, ReadFrom::End) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
                     (FileReader::Plain(reader), pos)
                 }
@@ -284,32 +297,36 @@ impl FileWatcher {
         let new_file = File::open(&path).await?;
 
         let file_info = new_file.file_info().await?;
-        let unwatch_info =
-            if (file_info.portable_dev(), file_info.portable_ino()) == (self.devno, self.inode) {
-                None
-            } else {
-                // Capture metrics from the old file before switching
-                let old_info = self.get_unwatch_info().await;
+        let unwatch_info = if (file_info.portable_dev(), file_info.portable_ino())
+            == (self.devno, self.inode)
+        {
+            None
+        } else {
+            // Capture metrics from the old file before switching
+            let old_info = self.get_unwatch_info().await;
 
-                let mut reader = BufReader::new(new_file);
-                let gzipped = is_gzipped(&mut reader).await?;
-                let new_reader = if gzipped {
-                    if self.file_position != 0 {
-                        FileReader::Null(io::Cursor::new(Vec::new()))
-                    } else {
-                        FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
-                    }
-                } else {
+            let mut reader = BufReader::new(new_file);
+            let compressed = is_compressed(&mut reader).await?;
+            let new_reader: FileReader = match compressed {
+                Some(_) if self.file_position != 0 => FileReader::Null(io::Cursor::new(Vec::new())),
+                Some(Compression::Gzip) => {
+                    FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
+                }
+                Some(Compression::Zstd) => {
+                    FileReader::Zstd(Box::new(BufReader::new(zstd_multiple_decoder(reader))))
+                }
+                None => {
                     reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                     FileReader::Plain(reader)
-                };
-                self.reader = new_reader;
-
-                self.devno = file_info.portable_dev();
-                self.inode = file_info.portable_ino();
-
-                Some(old_info)
+                }
             };
+            self.reader = new_reader;
+
+            self.devno = file_info.portable_dev();
+            self.inode = file_info.portable_ino();
+
+            Some(old_info)
+        };
 
         self.reached_eof = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
@@ -491,9 +508,17 @@ impl FileWatcher {
     }
 }
 
-async fn is_gzipped<R: AsyncRead + Unpin>(r: &mut BufReader<R>) -> io::Result<bool> {
+async fn is_compressed<R: AsyncRead + Unpin>(
+    r: &mut BufReader<R>,
+) -> io::Result<Option<Compression>> {
     let header_bytes = r.fill_buf().await?;
-    // WARN: The paired `BufReader::consume` is not called intentionally. If we
-    // do we'll chop a decent part of the potential gzip stream off.
-    Ok(header_bytes.starts_with(GZIP_MAGIC))
+    // WARN: The paired `BufReader::consume` is intentionally not called. If we
+    // do we'll chop a decent part of the compressed stream off.
+    Ok(if header_bytes.starts_with(ZSTD_MAGIC) {
+        Some(Compression::Zstd)
+    } else if header_bytes.starts_with(GZIP_MAGIC) {
+        Some(Compression::Gzip)
+    } else {
+        None
+    })
 }
