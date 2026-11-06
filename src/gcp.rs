@@ -31,6 +31,7 @@ const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
 
 const GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
+pub const BIGQUERY_STORAGE_URL: &str = "https://bigquerystorage.googleapis.com:443";
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
 pub static PUBSUB_ADDRESS: LazyLock<String> = LazyLock::new(|| {
