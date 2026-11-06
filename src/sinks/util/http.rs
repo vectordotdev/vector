@@ -473,11 +473,13 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Generic `Service` implementation for HTTP stream sinks.
+///
+/// Requests advertise `Accept-Encoding: zstd,gzip,deflate,br` unless the request builder set the
+/// header, and compressed responses are decoded before retry logic reads them.
 #[derive(Clone)]
 pub struct HttpService<B, T: Send> {
     client: HttpClient,
     request_builder: Arc<B>,
-    response_decompression: bool,
     #[cfg(feature = "aws-core")]
     sig_v4_config: Option<Arc<SigV4Config>>,
     _phantom: PhantomData<fn() -> T>,
@@ -492,7 +494,6 @@ where
         Self {
             client,
             request_builder: Arc::new(request_builder),
-            response_decompression: false,
             #[cfg(feature = "aws-core")]
             sig_v4_config: None,
             _phantom: PhantomData,
@@ -514,15 +515,6 @@ where
             sig_v4_config: Some(Arc::new(sig_v4_config)),
             ..Self::new(client, request_builder)
         }
-    }
-
-    /// Requests and decodes compressed responses, matching legacy HTTP batch services.
-    ///
-    /// Other services continue to request identity encoding.
-    #[must_use]
-    pub const fn with_response_decompression(mut self) -> Self {
-        self.response_decompression = true;
-        self
     }
 }
 
@@ -561,7 +553,6 @@ where
     fn call(&mut self, mut request: HttpRequest<T>) -> Self::Future {
         let request_builder = Arc::clone(&self.request_builder);
         let client = self.client.clone();
-        let response_decompression = self.response_decompression;
         #[cfg(feature = "aws-core")]
         let sig_v4_config = self.sig_v4_config.clone();
         let metadata = std::mem::take(request.metadata_mut());
@@ -580,18 +571,11 @@ where
             let byte_size = request.body().len();
             let (protocol, endpoint) = protocol_endpoint(request.uri().clone());
             let request = request.map(full_body);
-            let response = if response_decompression {
-                let mut service = Decompression::new(service_fn(|request| client.send(request)));
-                let response = service.call(request).await?;
-                collect_response(response, byte_size, &protocol, &endpoint)
-                    .await
-                    .map_err(HttpError::from)?
-            } else {
-                let response = client.send(request).await?;
-                collect_response(response, byte_size, &protocol, &endpoint)
-                    .await
-                    .map_err(HttpError::new)?
-            };
+            let mut service = Decompression::new(service_fn(|request| client.send(request)));
+            let response = service.call(request).await?;
+            let response = collect_response(response, byte_size, &protocol, &endpoint)
+                .await
+                .map_err(HttpError::from)?;
             Ok(HttpResponse {
                 response,
                 events_byte_size,
@@ -701,7 +685,7 @@ mod tests {
             }
         })
         .await;
-        HttpService::new(client(), request_builder(&uri)).with_response_decompression()
+        HttpService::new(client(), request_builder(&uri))
     }
 
     fn client() -> HttpClient {
@@ -868,7 +852,6 @@ mod tests {
                     service: "example-service".to_owned(),
                 },
             )
-            .with_response_decompression()
         }
 
         #[tokio::test]

@@ -528,8 +528,7 @@ impl HttpSinkConfig {
                 )
             }
             _ => HttpService::new(client, http_sink_request_builder),
-        }
-        .with_response_decompression();
+        };
 
         let service = ServiceBuilder::new()
             .settings(

@@ -185,8 +185,7 @@ impl ValidatedSink for PubsubConfig {
             uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
-        let service =
-            HttpService::new(client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(client, service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings,
