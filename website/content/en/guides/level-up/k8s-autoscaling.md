@@ -35,14 +35,6 @@ If you are new to Vector or Kubernetes, start with the
 This guide builds on a working deployment rather than teaching those basics.
 {{< /requirement >}}
 
-The experiment uses a stateless pipeline parsing
-[Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common)
-data over HTTP behind the [NGINX](https://www.nginx.com/) Ingress Controller.
-The consumer discards everything it receives and the node has CPU to spare,
-so Vector's CPU is the only limit. The replica counts and the 70% CPU target
-fit this workload; measure your own pipeline before you size a production
-deployment.
-
 If you already operate autoscaled Vector deployments, you can skip the basic
 setup and scaling sections. The sections on
 [burst handling](#handling-sudden-bursts) and
@@ -114,7 +106,8 @@ although the results may be less consistent.
 ```
 
 Every run uses the same load and pod settings. [lading](https://github.com/DataDog/lading)
-sends `apache_common` log lines at 55 MiB/s over 100 persistent connections.
+sends [Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common)
+lines (`apache_common`) at 55 MiB/s over 100 persistent connections.
 Each Vector pod has 1 vCPU and 2 GiB of memory, with `requests == limits` for
 Guaranteed QoS.
 
@@ -484,10 +477,16 @@ If sudden bursts must not lose data, use one or more of the following:
    60-second default proxy timeouts and cause in-flight events to be lost. Keep
    enough pods Ready to absorb the burst or put a durable queue before Vector.
 
+The experiments send Vector's output to a consumer that discards it, so the
+`socket` sink does not limit throughput. In production, a slow sink can apply
+backpressure that bubbles up to the source, causing fewer events to be
+processed, CPU usage to drop, and events to be lost. Because this HPA
+configuration scales on CPU, it can then keep too few replicas.
+
 For your own deployment, the next step is to repeat the single-pod measurement
 with representative traffic in a test environment, then verify traffic reaches
 added replicas before enabling the HPA. Test burst behavior as well as steady-state
-throughput; a stable replica count alone does not establish reliable delivery.
+throughput. A stable replica count alone does not establish reliable delivery.
 
 ## Replicating the experiments
 
