@@ -1,5 +1,6 @@
 //! Typed [`TraceEvent`] -> OTLP `ExportTraceServiceRequest` encoding.
 
+use indexmap::IndexMap;
 use vector_core::event::EventFinalizers;
 use vector_core::event::typed_trace::{
     DatadogAgentEnvelope, DatadogChunkContext, DatadogTracerContext, Resource, Scope, Span,
@@ -20,7 +21,8 @@ impl ExportTraceServiceRequest {
     /// Compatible non-empty events are re-coalesced by resource (including resource-level
     /// Datadog bridge state) then by scope and Datadog chunk bridge keys. Empty events become
     /// isolated empty `ScopeSpans` messages. Span order follows event order, then span order
-    /// within each event.
+    /// within each event. Grouping is linear in the number of events, regardless of how many
+    /// distinct resources or scopes they carry.
     ///
     /// The returned finalizers are every input event's, including clones shared across a
     /// trace-ID partition. Hold them until delivery finishes: dropping them acknowledges
@@ -31,37 +33,25 @@ impl ExportTraceServiceRequest {
         reporter: &mut impl TraceConversionReporter,
     ) -> (Self, EventFinalizers) {
         let mut finalizers = EventFinalizers::default();
-        let mut groups: Vec<ResourceGroup> = Vec::new();
-        let mut last_group = None;
+        let mut groups: IndexMap<ResourceKey, ResourceGroup> = IndexMap::new();
         for event in events {
             let (trace_id, resource, scope, mut datadog, spans, mut metadata) = event.into_parts();
             finalizers.merge(metadata.take_finalizers());
-            let agent = datadog.take_agent();
             let chunk = datadog.take_chunk();
-            let tracer = datadog.tracer;
-            let found = recent_match(last_group, &groups, |group| {
-                group.matches(&resource, agent.as_ref(), &tracer)
-            });
-            let index = if let Some(index) = found {
-                index
-            } else {
-                groups.push(ResourceGroup {
+            groups
+                .entry(ResourceKey {
                     resource,
-                    agent,
-                    tracer,
-                    scope_groups: Vec::new(),
-                    last_scope: None,
-                });
-                groups.len() - 1
-            };
-            last_group = Some(index);
-            groups[index].push(trace_id, scope, chunk, spans, reporter);
+                    agent: datadog.take_agent(),
+                    tracer: datadog.tracer,
+                })
+                .or_default()
+                .push(trace_id, scope, chunk, spans, reporter);
         }
         (
             Self {
                 resource_spans: groups
                     .into_iter()
-                    .map(|group| ResourceSpans::from_group(group, reporter))
+                    .map(|(key, group)| ResourceSpans::from_group(key, group, reporter))
                     .collect(),
             },
             finalizers,
@@ -69,58 +59,31 @@ impl ExportTraceServiceRequest {
     }
 }
 
-struct ResourceGroup {
+#[derive(Eq, Hash, PartialEq)]
+struct ResourceKey {
     resource: Resource,
     agent: Option<DatadogAgentEnvelope>,
     tracer: DatadogTracerContext,
-    scope_groups: Vec<ScopeGroup>,
-    last_scope: Option<usize>,
 }
 
-/// Index of the matching item, checking `last` before scanning.
-///
-/// Events from one request tend to share a resource and scope with their predecessor, so
-/// the repeated full equality scan is the uncommon path.
-fn recent_match<T>(
-    last: Option<usize>,
-    items: &[T],
-    matches: impl Fn(&T) -> bool,
-) -> Option<usize> {
-    last.filter(|&index| matches(&items[index]))
-        .or_else(|| items.iter().position(&matches))
+#[derive(Default)]
+struct ResourceGroup {
+    /// First-seen order is emission order. Coalesced keys merge; each empty event has its own
+    /// key so it stays a separate `ScopeSpans` at the position it arrived.
+    scopes: IndexMap<ScopeGroupKey, Vec<(TraceId, Span)>>,
 }
 
-enum ScopeGroup {
+#[derive(Eq, Hash, PartialEq)]
+enum ScopeGroupKey {
     Coalesced {
         scope: Scope,
         chunk: Option<DatadogChunkContext>,
-        spans: Vec<(TraceId, Span)>,
     },
-    Empty {
-        scope: Scope,
-    },
-}
-
-impl ScopeGroup {
-    fn coalesces(&self, event_scope: &Scope, event_chunk: Option<&DatadogChunkContext>) -> bool {
-        matches!(
-            self,
-            Self::Coalesced { scope, chunk, .. }
-                if scope == event_scope && chunk.as_ref() == event_chunk
-        )
-    }
+    /// `index` is this group's insertion position, so empty events never share a key.
+    Empty { scope: Scope, index: usize },
 }
 
 impl ResourceGroup {
-    fn matches(
-        &self,
-        resource: &Resource,
-        agent: Option<&DatadogAgentEnvelope>,
-        tracer: &DatadogTracerContext,
-    ) -> bool {
-        self.resource == *resource && self.agent.as_ref() == agent && self.tracer == *tracer
-    }
-
     /// Adds one event's scope-level parts, whose resource-level state matches this group, to
     /// its scope group.
     fn push(
@@ -133,7 +96,9 @@ impl ResourceGroup {
     ) {
         if spans.is_empty() {
             reporter.report(TraceConversionIssue::EmptyEvent);
-            self.scope_groups.push(ScopeGroup::Empty { scope });
+            let index = self.scopes.len();
+            self.scopes
+                .insert(ScopeGroupKey::Empty { scope, index }, Vec::new());
         } else {
             self.push_spans(trace_id, scope, chunk, spans, reporter);
         }
@@ -157,63 +122,54 @@ impl ResourceGroup {
             }
             chunk => chunk,
         };
-        let spans = spans.into_iter().map(|span| (trace_id, span));
-        if let Some(index) = recent_match(self.last_scope, &self.scope_groups, |group| {
-            group.coalesces(&scope, chunk.as_ref())
-        }) {
-            let ScopeGroup::Coalesced {
-                spans: group_spans, ..
-            } = &mut self.scope_groups[index]
-            else {
-                unreachable!("coalesces is false for an empty scope group");
-            };
-            group_spans.extend(spans);
-            self.last_scope = Some(index);
-        } else {
-            self.scope_groups.push(ScopeGroup::Coalesced {
-                scope,
-                chunk,
-                spans: spans.collect(),
-            });
-            self.last_scope = Some(self.scope_groups.len() - 1);
-        }
+        self.scopes
+            .entry(ScopeGroupKey::Coalesced { scope, chunk })
+            .or_default()
+            .extend(spans.into_iter().map(|span| (trace_id, span)));
+    }
+
+    fn into_scope_spans(self, reporter: &mut impl TraceConversionReporter) -> Vec<ScopeSpans> {
+        self.scopes
+            .into_iter()
+            .map(|(key, spans)| match key {
+                ScopeGroupKey::Coalesced { scope, chunk } => {
+                    ScopeSpans::from_typed(scope, chunk.as_ref(), spans, reporter)
+                }
+                ScopeGroupKey::Empty { scope, .. } => {
+                    ScopeSpans::from_typed(scope, None, spans, reporter)
+                }
+            })
+            .collect()
     }
 }
 
 impl ResourceSpans {
-    fn from_group(group: ResourceGroup, reporter: &mut impl TraceConversionReporter) -> Self {
+    fn from_group(
+        key: ResourceKey,
+        group: ResourceGroup,
+        reporter: &mut impl TraceConversionReporter,
+    ) -> Self {
         let (resource, schema_url) =
-            PbResource::from_typed(group.resource, group.agent, group.tracer, reporter);
+            PbResource::from_typed(key.resource, key.agent, key.tracer, reporter);
         Self {
             resource: Some(resource),
-            scope_spans: group
-                .scope_groups
-                .into_iter()
-                .map(|group| ScopeSpans::from_group(group, reporter))
-                .collect(),
+            scope_spans: group.into_scope_spans(reporter),
             schema_url,
         }
     }
 }
 
 impl ScopeSpans {
-    fn from_group(group: ScopeGroup, reporter: &mut impl TraceConversionReporter) -> Self {
-        let (scope, spans) = match group {
-            ScopeGroup::Empty { scope } => (scope, Vec::new()),
-            ScopeGroup::Coalesced {
-                scope,
-                chunk,
-                spans,
-            } => {
-                let spans = spans
-                    .into_iter()
-                    .map(|(trace_id, span)| {
-                        PbSpan::from_typed(trace_id, span, chunk.as_ref(), reporter)
-                    })
-                    .collect();
-                (scope, spans)
-            }
-        };
+    fn from_typed(
+        scope: Scope,
+        chunk: Option<&DatadogChunkContext>,
+        spans: Vec<(TraceId, Span)>,
+        reporter: &mut impl TraceConversionReporter,
+    ) -> Self {
+        let spans = spans
+            .into_iter()
+            .map(|(trace_id, span)| PbSpan::from_typed(trace_id, span, chunk, reporter))
+            .collect();
         let (scope, schema_url) = InstrumentationScope::from_typed(scope);
         Self {
             scope: Some(scope),

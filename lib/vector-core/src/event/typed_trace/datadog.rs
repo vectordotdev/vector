@@ -1,6 +1,7 @@
 //! Datadog-native event and span context.
 
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 
 use bytes::Bytes;
 use vector_common::byte_size_of::ByteSizeOf;
@@ -115,6 +116,19 @@ impl PartialEq for DatadogAgentEnvelope {
 
 impl Eq for DatadogAgentEnvelope {}
 
+impl Hash for DatadogAgentEnvelope {
+    /// Rates hash by IEEE bits so this matches [`PartialEq`].
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.host_name.hash(state);
+        self.env.hash(state);
+        self.agent_version.hash(state);
+        self.target_tps.to_bits().hash(state);
+        self.error_tps.to_bits().hash(state);
+        self.rare_sampler_enabled.hash(state);
+        self.tags.hash(state);
+    }
+}
+
 impl ByteSizeOf for DatadogAgentEnvelope {
     fn allocated_bytes(&self) -> usize {
         self.host_name.len()
@@ -125,7 +139,7 @@ impl ByteSizeOf for DatadogAgentEnvelope {
 }
 
 /// Tracer-payload tags copied onto every event derived from that payload.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct DatadogTracerContext {
     /// Tracer-payload tags.
     pub tags: Attributes,
@@ -138,7 +152,7 @@ impl ByteSizeOf for DatadogTracerContext {
 }
 
 /// Chunk-scoped Datadog sampling state.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct DatadogChunkContext {
     /// Sampling priority. `None` means the wire field was absent.
     pub priority: Option<SamplingPriority>,
@@ -180,11 +194,19 @@ impl ByteSizeOf for DatadogSpanContext {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
     use std::mem::size_of;
 
     use similar_asserts::assert_eq;
 
     use super::{DatadogAgentEnvelope, DatadogChunkContext, DatadogEventContext};
+
+    fn hash_of(value: &impl Hash) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
 
     #[test]
     fn optional_envelopes_are_boxed() {
@@ -212,6 +234,28 @@ mod tests {
             ..DatadogAgentEnvelope::default()
         }));
         assert_eq!(ctx.agent().unwrap().host_name, "h");
+    }
+
+    #[test]
+    fn hash_follows_float_bits() {
+        let nan = DatadogAgentEnvelope {
+            target_tps: f64::NAN,
+            error_tps: -0.0,
+            ..DatadogAgentEnvelope::default()
+        };
+        let same_nan = DatadogAgentEnvelope {
+            target_tps: f64::NAN,
+            error_tps: -0.0,
+            ..DatadogAgentEnvelope::default()
+        };
+        assert_eq!(nan, same_nan);
+        assert_eq!(hash_of(&nan), hash_of(&same_nan));
+
+        let positive_zero = DatadogAgentEnvelope {
+            error_tps: 0.0,
+            ..nan.clone()
+        };
+        assert_ne!(nan, positive_zero);
     }
 
     #[test]
