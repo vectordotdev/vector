@@ -1,8 +1,194 @@
 use crate::sources::docker_logs::*;
 
+fn container_log_info() -> ContainerLogInfo {
+    let created = DateTime::parse_from_rfc3339("2026-11-06T21:03:14Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    ContainerLogInfo::new(
+        ContainerId::new("probe".to_owned()),
+        ContainerMetadata {
+            labels: HashMap::new(),
+            name: "probe".into(),
+            name_str: "probe".to_owned(),
+            image: "probe".into(),
+            created_at: created,
+        },
+        created,
+    )
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted: bool) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, timestamp: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: format!("{timestamp} last\n").into(),
+            },
+            None,
+            false,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let last = "2026-11-06T21:03:17.556996444Z";
+    // Distinct records may legitimately share a timestamp within one stream.
+    assert!(event(&mut info, last).is_some());
+    assert!(event(&mut info, last).is_some());
+
+    let mut container = ContainerState::new_running();
+    // The follow stream finishes before the main loop receives `die`.
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, "2026-11-06T21:03:16Z").is_none());
+    assert!(event(&mut info, last).is_none());
+    assert!(event(&mut info, last).is_none());
+    let next = "2026-11-06T21:03:17.556996445Z";
+    assert!(event(&mut info, next).is_some());
+    assert!(event(&mut info, next).is_some());
+
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, next).is_none());
+}
+
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
+}
+
+#[rstest::rstest]
+#[case(LogNamespace::Legacy, false)]
+#[case(LogNamespace::Vector, false)]
+#[case(LogNamespace::Legacy, true)]
+#[case(LogNamespace::Vector, true)]
+fn reattached_stream_preserves_partial_message(
+    #[case] log_namespace: LogNamespace,
+    #[case] container_restarted: bool,
+) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            &bytes_received,
+            log_namespace,
+        )
+    };
+    let partial = "2026-11-06T21:03:17.556996444Z prefix";
+    let final_chunk = "2026-11-06T21:03:17.556996445Z suffix\n";
+    // Reattachment must produce the same message as an uninterrupted stream.
+    let mut uninterrupted = container_log_info();
+    if !container_restarted {
+        assert!(event(&mut uninterrupted, partial).is_none());
+    }
+    let expected = event(&mut uninterrupted, final_chunk).unwrap();
+    assert!(event(&mut info, partial).is_none());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    // Replayed chunks must not be appended to the retained prefix again.
+    assert!(event(&mut info, partial).is_none());
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, partial).is_none());
+    let log = event(&mut info, final_chunk).unwrap();
+    assert_eq!(log.value(), expected.value());
+    if log_namespace == LogNamespace::Legacy {
+        let expected: &[u8] = if container_restarted {
+            b"suffix"
+        } else {
+            b"prefixsuffix"
+        };
+        assert_eq!(
+            log.get(vrl::event_path!("message"))
+                .unwrap()
+                .coerce_to_bytes()
+                .as_ref(),
+            expected,
+        );
+    }
+    // Once emitted, neither the merged event nor its final chunk is repeated.
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, final_chunk).is_none());
+    let log = event(&mut info, "2026-11-06T21:03:18Z next\n").unwrap();
+    let message = match log_namespace {
+        LogNamespace::Legacy => log.get(vrl::event_path!("message")),
+        LogNamespace::Vector => log.get(vrl::event_path!()),
+    }
+    .unwrap();
+    assert_eq!(message.coerce_to_bytes().as_ref(), b"next");
+}
+
+#[rstest::rstest]
+#[case(true)]
+#[case(false)]
+fn stopped_container_releases_partial_message(#[case] stop_before_return: bool) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    assert!(
+        info.new_event(
+            LogOutput::StdOut {
+                message: "2026-11-06T21:03:17.556996444Z unfinished".into(),
+            },
+            None,
+            true,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+        .is_none()
+    );
+    assert!(info.partial_event_merge_state.is_some());
+    let last_log = info.last_log;
+    let mut container = ContainerState::new_running();
+    if stop_before_return {
+        // `die` arrives while the follow stream is still draining.
+        container.stopped();
+        assert!(!container.return_info(info));
+    } else {
+        assert!(container.return_info(info));
+        // A same-generation reattachment must retain the prefix until stopped.
+        let info = container.take_info().unwrap();
+        assert!(info.partial_event_merge_state.is_some());
+        container.stopped();
+        assert!(!container.return_info(info));
+    }
+    let parked = container.info.as_ref().unwrap();
+    assert!(parked.partial_event_merge_state.is_none());
+    assert_eq!(parked.last_log, last_log);
+}
+
+#[test]
+fn stop_releases_already_parked_partial_message() {
+    let mut info = container_log_info();
+    info.partial_event_merge_state = Some(LogEventMergeState::new(LogEvent::from("unfinished")));
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    container.stopped();
+    assert!(
+        container
+            .info
+            .as_ref()
+            .unwrap()
+            .partial_event_merge_state
+            .is_none()
+    );
 }
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
