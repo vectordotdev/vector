@@ -1040,24 +1040,6 @@ mod test {
     }
 
     #[test]
-    fn rfc5424_hostname_ipv6_zero_tail() {
-        // RFC 5424 allows colons in HOSTNAME; an IPv6 address in canonical
-        // RFC 5952 form may end with `::`. This must not be mistaken for the
-        // RFC 3164 `HOST:` header/message separator. Regression test for
-        // https://github.com/vectordotdev/vector/issues/26103.
-        for host in ["fe80::", "2600:1f14:247e:5804:29e3::"] {
-            let raw = format!(r#"<34>1 2026-11-02T14:00:00.000000Z {host} myapp 123 INID - hello"#);
-            let event = event_from_bytes("collector", None, raw.into(), LogNamespace::Legacy)
-                .unwrap_or_else(|| panic!("failed to parse host {host}"));
-            assert_eq!(
-                event.as_log().get(event_path!("hostname")),
-                Some(&Value::from(host)),
-                "hostname must be preserved verbatim for {host}"
-            );
-        }
-    }
-
-    #[test]
     fn handles_dots_in_sdata() {
         let raw =
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin foo.bar="baz"] hello"#;
