@@ -805,9 +805,6 @@ impl EventStreamBuilder {
             container_id: info.id.as_str(),
         });
 
-        // Create event streamer
-        let mut partial_event_merge_state = None;
-
         let core = Arc::clone(&self.core);
 
         let bytes_received = register(BytesReceived::from(Protocol::HTTP));
@@ -820,7 +817,6 @@ impl EventStreamBuilder {
                         message,
                         core.config.partial_event_marker_field.clone(),
                         core.config.auto_partial_merge,
-                        &mut partial_event_merge_state,
                         &bytes_received,
                         self.log_namespace,
                     )),
@@ -991,6 +987,10 @@ impl ContainerState {
 
     fn take_info(&mut self) -> Option<ContainerLogInfo> {
         self.info.take().map(|mut info| {
+            // Do not join an unfinished message from a previous container run.
+            if info.generation != self.generation {
+                info.partial_event_merge_state = None;
+            }
             // Update info
             info.generation = self.generation;
             info.last_log_before_stream = info.last_log.map(|(timestamp, _)| timestamp);
@@ -1009,6 +1009,8 @@ struct ContainerLogInfo {
     last_log: Option<(DateTime<FixedOffset>, u64)>,
     /// Replay boundary captured before attaching a new log stream.
     last_log_before_stream: Option<DateTime<FixedOffset>>,
+    /// Buffered partial message, retained with the cursor across reattachments.
+    partial_event_merge_state: Option<LogEventMergeState>,
     /// generation of `ContainerState` at `event_stream` creation
     generation: u64,
     metadata: ContainerMetadata,
@@ -1023,6 +1025,7 @@ impl ContainerLogInfo {
             created,
             last_log: None,
             last_log_before_stream: None,
+            partial_event_merge_state: None,
             generation: 0,
             metadata,
         }
@@ -1047,7 +1050,6 @@ impl ContainerLogInfo {
         log_output: LogOutput,
         partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
-        partial_event_merge_state: &mut Option<LogEventMergeState>,
         bytes_received: &Registered<BytesReceived>,
         log_namespace: LogNamespace,
     ) -> Option<LogEvent> {
@@ -1244,7 +1246,7 @@ impl ContainerLogInfo {
                 // message has to be merged into that existing state.
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
-                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                if let Some(partial_event_merge_state) = &mut self.partial_event_merge_state {
                     // Depending on the log namespace the actual contents of the log "message" will be
                     // found in either the root of the event ("."), or at the globally configured "message_key".
                     match log_namespace {
@@ -1262,7 +1264,7 @@ impl ContainerLogInfo {
                         }
                     }
                 } else {
-                    *partial_event_merge_state = Some(LogEventMergeState::new(log));
+                    self.partial_event_merge_state = Some(LogEventMergeState::new(log));
                 }
                 return None;
             }
@@ -1271,7 +1273,7 @@ impl ContainerLogInfo {
             // state from before, the current event must be a final event, that
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
-            match partial_event_merge_state.take() {
+            match self.partial_event_merge_state.take() {
                 // Depending on the log namespace the actual contents of the log "message" will be
                 // found in either the root of the event ("."), or at the globally configured "message_key".
                 Some(partial_event_merge_state) => match log_namespace {

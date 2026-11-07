@@ -1,13 +1,10 @@
 use crate::sources::docker_logs::*;
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted: bool) {
+fn container_log_info() -> ContainerLogInfo {
     let created = DateTime::parse_from_rfc3339("2026-11-06T21:03:14Z")
         .unwrap()
         .with_timezone(&Utc);
-    let mut info = ContainerLogInfo::new(
+    ContainerLogInfo::new(
         ContainerId::new("probe".to_owned()),
         ContainerMetadata {
             labels: HashMap::new(),
@@ -17,17 +14,22 @@ fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted:
             created_at: created,
         },
         created,
-    );
+    )
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted: bool) {
+    let mut info = container_log_info();
     let bytes_received = register(BytesReceived::from(Protocol::HTTP));
-    let mut merge_state = None;
-    let mut event = |info: &mut ContainerLogInfo, timestamp: &str| {
+    let event = |info: &mut ContainerLogInfo, timestamp: &str| {
         info.new_event(
             LogOutput::StdOut {
                 message: format!("{timestamp} last\n").into(),
             },
             None,
             false,
-            &mut merge_state,
             &bytes_received,
             LogNamespace::Legacy,
         )
@@ -60,6 +62,78 @@ fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted:
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
+}
+
+#[rstest::rstest]
+#[case(LogNamespace::Legacy, false)]
+#[case(LogNamespace::Vector, false)]
+#[case(LogNamespace::Legacy, true)]
+#[case(LogNamespace::Vector, true)]
+fn reattached_stream_preserves_partial_message(
+    #[case] log_namespace: LogNamespace,
+    #[case] container_restarted: bool,
+) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            &bytes_received,
+            log_namespace,
+        )
+    };
+    let partial = "2026-11-06T21:03:17.556996444Z prefix";
+    let final_chunk = "2026-11-06T21:03:17.556996445Z suffix\n";
+    // Reattachment must produce the same message as an uninterrupted stream.
+    let mut uninterrupted = container_log_info();
+    if !container_restarted {
+        assert!(event(&mut uninterrupted, partial).is_none());
+    }
+    let expected = event(&mut uninterrupted, final_chunk).unwrap();
+    assert!(event(&mut info, partial).is_none());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    // Replayed chunks must not be appended to the retained prefix again.
+    assert!(event(&mut info, partial).is_none());
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, partial).is_none());
+    let log = event(&mut info, final_chunk).unwrap();
+    assert_eq!(log.value(), expected.value());
+    if log_namespace == LogNamespace::Legacy {
+        let expected: &[u8] = if container_restarted {
+            b"suffix"
+        } else {
+            b"prefixsuffix"
+        };
+        assert_eq!(
+            log.get(vrl::event_path!("message"))
+                .unwrap()
+                .coerce_to_bytes()
+                .as_ref(),
+            expected,
+        );
+    }
+    // Once emitted, neither the merged event nor its final chunk is repeated.
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, final_chunk).is_none());
+    let log = event(&mut info, "2026-11-06T21:03:18Z next\n").unwrap();
+    let message = match log_namespace {
+        LogNamespace::Legacy => log.get(vrl::event_path!("message")),
+        LogNamespace::Vector => log.get(vrl::event_path!()),
+    }
+    .unwrap();
+    assert_eq!(message.coerce_to_bytes().as_ref(), b"next");
 }
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
