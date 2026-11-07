@@ -19,7 +19,7 @@ use futures::{
 use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio::{
-    fs::{self, remove_file},
+    fs::{self, File, remove_file},
     time::sleep,
 };
 
@@ -118,42 +118,33 @@ where
 
         let mut known_small_files = HashMap::new();
 
-        let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths() {
-            if let Some(file_id) = self
-                .fingerprinter
-                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
-                .await
-            {
-                existing_files.push((path, file_id));
-            }
-        }
-
-        let metadata = join_all(
-            existing_files
-                .iter()
-                .map(|(path, _file_id)| fs::metadata(path)),
-        )
-        .await;
+        let paths: Vec<_> = self.paths_provider.paths().into_iter().collect();
+        let metadata = join_all(paths.iter().map(fs::metadata)).await;
 
         let created = metadata.into_iter().map(|m| {
             m.and_then(|m| m.created())
                 .map_or_else(|_| Utc::now(), DateTime::<Utc>::from)
         });
 
-        let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
+        let mut existing_files: Vec<(DateTime<Utc>, PathBuf)> = paths
             .into_iter()
             .zip(created)
-            .map(|((path, file_id), key)| (key, path, file_id))
+            .map(|(path, key)| (key, path))
             .collect();
 
-        existing_files.sort_by_key(|(key, _, _)| *key);
+        existing_files.sort_by_key(|(key, _)| *key);
 
         let checkpoints = checkpointer.view();
 
-        for (_key, path, file_id) in existing_files {
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
-                .await;
+        for (_key, path) in existing_files {
+            if let Some((file_id, file)) = self
+                .fingerprinter
+                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                .await
+            {
+                self.watch_new_file(path, file_id, file, &mut fp_map, &checkpoints, true)
+                    .await;
+            }
         }
         self.emitter.emit_files_open(fp_map.len());
 
@@ -198,7 +189,7 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths() {
-                    if let Some(file_id) = self
+                    if let Some((file_id, file)) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                         .await
@@ -219,7 +210,9 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                if let Ok(Some(unwatch_info)) =
+                                    watcher.update_path(path, file).await
+                                {
                                     // Inode changed - emit metrics for the old file
                                     self.emitter.emit_file_unwatched(
                                         &unwatch_info.path,
@@ -233,10 +226,10 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                let (old_path, new_path) = (&watcher.path, &path);
+                                let old_path = &watcher.path;
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
                                     fs::metadata(old_path).await.and_then(|m| m.modified()),
-                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
+                                    file.metadata().await.and_then(|m| m.modified()),
                                 ) && old_modified_time < new_modified_time
                                 {
                                     info!(
@@ -244,7 +237,8 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
+                                    if let Ok(Some(unwatch_info)) =
+                                        watcher.update_path(path, file).await
                                     {
                                         // Inode changed - emit metrics for the old file
                                         self.emitter.emit_file_unwatched(
@@ -257,8 +251,15 @@ where
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
-                                .await;
+                            self.watch_new_file(
+                                path,
+                                file_id,
+                                file,
+                                &mut fp_map,
+                                &checkpoints,
+                                false,
+                            )
+                            .await;
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -348,11 +349,12 @@ where
                         && watcher.last_read_success().elapsed() >= grace_period
                     {
                         // Try to remove
-                        match remove_file(&watcher.path).await {
-                            Ok(()) => {
+                        match watcher.remove_file().await {
+                            Ok(true) => {
                                 self.emitter.emit_file_deleted(&watcher.path);
                                 watcher.set_dead();
                             }
+                            Ok(false) => {}
                             Err(error) => {
                                 // We will try again after some time.
                                 self.emitter.emit_file_delete_error(&watcher.path, error);
@@ -457,6 +459,7 @@ where
         &self,
         path: PathBuf,
         file_id: FileFingerprint,
+        file: File,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
@@ -488,6 +491,7 @@ where
 
         match FileWatcher::new(
             path.clone(),
+            file,
             read_from,
             self.ignore_before,
             self.max_line_bytes,
@@ -629,4 +633,398 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs as std_fs, io,
+        path::Path,
+        sync::atomic::{AtomicBool, Ordering},
+    };
+
+    use async_compression::tokio::bufread::GzipEncoder;
+    use file_source_common::FingerprintStrategy;
+    use futures::{
+        FutureExt as _, StreamExt as _,
+        channel::{mpsc, oneshot},
+    };
+    use tokio::{fs::File, io::AsyncReadExt as _};
+
+    use crate::file_watcher::RawLine;
+
+    use super::*;
+
+    #[derive(Clone, Default)]
+    struct NoErrors {
+        rotate_on_add: Option<(PathBuf, &'static [u8])>,
+    }
+
+    impl FileSourceInternalEvents for NoErrors {
+        fn emit_file_added(&self, path: &Path) {
+            if let Some((rotated, replacement)) = &self.rotate_on_add {
+                std_fs::rename(path, rotated).unwrap();
+                std_fs::write(path, replacement).unwrap();
+            }
+        }
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+        fn emit_file_watch_error(&self, path: &Path, error: io::Error) {
+            panic!("watch {path:?}: {error}");
+        }
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
+        fn emit_file_deleted(&self, _: &Path) {}
+        fn emit_file_delete_error(&self, path: &Path, error: io::Error) {
+            panic!("delete {path:?}: {error}");
+        }
+        fn emit_file_fingerprint_read_error(&self, path: &Path, error: io::Error) {
+            panic!("fingerprint {path:?}: {error}");
+        }
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+        fn emit_file_checksum_failed(&self, path: &Path) {
+            panic!("checksum {path:?}");
+        }
+        fn emit_file_checkpoint_write_error(&self, error: io::Error) {
+            panic!("checkpoint: {error}");
+        }
+        fn emit_files_open(&self, _: usize) {}
+        fn emit_path_globbing_failed(&self, path: &Path, error: &io::Error) {
+            panic!("glob {path:?}: {error}");
+        }
+        fn emit_file_line_too_long(&self, _: &bytes::BytesMut, _: usize, _: usize) {
+            panic!("unexpected oversized line");
+        }
+    }
+
+    struct NoPaths;
+
+    impl PathsProvider for NoPaths {
+        type IntoIter = Vec<PathBuf>;
+
+        fn paths(&self) -> Self::IntoIter {
+            Vec::new()
+        }
+    }
+
+    struct DiscoverAfterStartup {
+        path: PathBuf,
+        startup: AtomicBool,
+    }
+
+    impl PathsProvider for DiscoverAfterStartup {
+        type IntoIter = Vec<PathBuf>;
+
+        fn paths(&self) -> Self::IntoIter {
+            if self.startup.swap(false, Ordering::Relaxed) {
+                Vec::new()
+            } else {
+                vec![self.path.clone()]
+            }
+        }
+    }
+
+    fn checksum_strategy() -> FingerprintStrategy {
+        FingerprintStrategy::FirstLinesChecksum {
+            ignored_header_bytes: 0,
+            lines: 1,
+        }
+    }
+
+    fn test_server(
+        data_dir: &Path,
+        strategy: FingerprintStrategy,
+    ) -> FileServer<NoPaths, NoErrors> {
+        test_server_with_paths(data_dir, strategy, NoPaths)
+    }
+
+    fn test_server_with_paths<PP: PathsProvider>(
+        data_dir: &Path,
+        strategy: FingerprintStrategy,
+        paths_provider: PP,
+    ) -> FileServer<PP, NoErrors> {
+        FileServer {
+            paths_provider,
+            max_read_bytes: 2048,
+            ignore_checkpoints: false,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: data_dir.to_path_buf(),
+            glob_minimum_cooldown: Duration::from_millis(25),
+            fingerprinter: Fingerprinter::new(strategy, 1024, false),
+            oldest_first: false,
+            remove_after: None,
+            emitter: NoErrors::default(),
+            rotate_wait: Duration::from_mins(1),
+        }
+    }
+
+    async fn fingerprint(
+        server: &mut FileServer<NoPaths, NoErrors>,
+        path: &Path,
+    ) -> (FileFingerprint, File) {
+        server
+            .fingerprinter
+            .fingerprint_or_emit(path, &mut HashMap::new(), &server.emitter)
+            .await
+            .unwrap()
+    }
+
+    async fn next_line(watcher: &mut FileWatcher) -> RawLine {
+        watcher.read_line().await.unwrap().raw_line.unwrap()
+    }
+
+    #[tokio::test]
+    async fn remove_after_preserves_replacement_file() {
+        const ORIGINAL: &[u8] = b"original event\n";
+        const REPLACEMENT: &[u8] = b"unread replacement event\n";
+
+        for rotate in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("0.log");
+            let rotated = dir.path().join("0.log.rotated");
+            std_fs::write(&path, ORIGINAL).unwrap();
+            let paths = DiscoverAfterStartup {
+                path: path.clone(),
+                startup: AtomicBool::new(true),
+            };
+            let mut server = test_server_with_paths(dir.path(), checksum_strategy(), paths);
+            server.glob_minimum_cooldown = Duration::from_mins(1);
+            server.remove_after = Some(Duration::ZERO);
+            if rotate {
+                server.emitter.rotate_on_add = Some((rotated.clone(), REPLACEMENT));
+            }
+            let (tx, mut rx) = mpsc::channel(1);
+            let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+            let shutdown = shutdown_rx.shared();
+            let run = server.run(
+                tx,
+                shutdown.clone(),
+                shutdown,
+                Checkpointer::new(dir.path()),
+            );
+            let consume = async {
+                let batch = rx.next().await.unwrap();
+                assert_eq!(batch.len(), 1);
+                assert_eq!(batch[0].text.as_ref(), &ORIGINAL[..ORIGINAL.len() - 1]);
+                // Two idle batches allow the EOF read backoff to expire before cleanup.
+                for _ in 0..2 {
+                    assert!(rx.next().await.unwrap().is_empty());
+                }
+                if rotate {
+                    assert_eq!(std_fs::read(&path).unwrap(), REPLACEMENT);
+                    assert_eq!(std_fs::read(&rotated).unwrap(), ORIGINAL);
+                } else {
+                    assert!(!path.exists());
+                }
+                shutdown_tx.send(()).unwrap();
+                while rx.next().await.is_some() {}
+            };
+            tokio::time::timeout(Duration::from_secs(5), async {
+                let (result, ()) = futures::future::join(run, consume).await;
+                result.unwrap();
+            })
+            .await
+            .unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn rotation_uses_fingerprinted_handle_and_checkpoint() {
+        const FIRST: &[u8] = b"2026-10-16T00:31:00.000Z stdout F first event\n";
+        const TARGET: &[u8] = b"2026-10-16T00:32:52.539Z stdout F original event\n";
+        const REPLACEMENT: &[u8] = b"2026-10-16T00:33:00.000Z stdout F replacement event\n";
+
+        for strategy in [checksum_strategy(), FingerprintStrategy::DevInode] {
+            for resume in [false, true] {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("0.log");
+                let rotated = dir.path().join("0.log.rotated");
+                let mut original = FIRST.to_vec();
+                original.extend_from_slice(TARGET);
+                std_fs::write(&path, &original).unwrap();
+                let mut server = test_server(dir.path(), strategy.clone());
+                let (original_id, original_file) = fingerprint(&mut server, &path).await;
+                let checkpointer = Checkpointer::new(dir.path());
+                let checkpoints = checkpointer.view();
+                if resume {
+                    checkpoints.update(original_id, u64::try_from(FIRST.len()).unwrap());
+                }
+
+                std_fs::rename(&path, &rotated).unwrap();
+                std_fs::write(&path, REPLACEMENT).unwrap();
+                let mut watchers = IndexMap::new();
+                server
+                    .watch_new_file(
+                        path.clone(),
+                        original_id,
+                        original_file,
+                        &mut watchers,
+                        &checkpoints,
+                        false,
+                    )
+                    .await;
+                let original_watcher = watchers.get_mut(&original_id).unwrap();
+                if !resume {
+                    let line = next_line(original_watcher).await;
+                    assert_eq!(line.bytes.as_ref(), &FIRST[..FIRST.len() - 1]);
+                    assert_eq!(line.offset, 0);
+                }
+                let line = next_line(original_watcher).await;
+                assert_eq!(line.bytes.as_ref(), &TARGET[..TARGET.len() - 1]);
+                assert_eq!(line.offset, u64::try_from(FIRST.len()).unwrap());
+                assert_eq!(
+                    original_watcher.get_file_position(),
+                    u64::try_from(original.len()).unwrap()
+                );
+
+                let (replacement_id, replacement_file) = fingerprint(&mut server, &path).await;
+                assert_ne!(replacement_id, original_id);
+                server
+                    .watch_new_file(
+                        path,
+                        replacement_id,
+                        replacement_file,
+                        &mut watchers,
+                        &checkpoints,
+                        false,
+                    )
+                    .await;
+                let line = next_line(watchers.get_mut(&replacement_id).unwrap()).await;
+                assert_eq!(line.bytes.as_ref(), &REPLACEMENT[..REPLACEMENT.len() - 1]);
+                assert_eq!(line.offset, 0);
+                assert_eq!(watchers.len(), 2);
+                assert_eq!(std_fs::read(rotated).unwrap(), original);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn replacement_uses_fingerprinted_handle_and_preserves_offset() {
+        const CONTENT: &[u8] = b"same first line\nsecond line\nthird line\n";
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("original.log");
+        let candidate = dir.path().join("candidate.log");
+        let renamed = dir.path().join("candidate.log.rotated");
+        std_fs::write(&path, CONTENT).unwrap();
+        std_fs::write(&candidate, CONTENT).unwrap();
+        let mut server = test_server(dir.path(), checksum_strategy());
+        let (original_id, original_file) = fingerprint(&mut server, &path).await;
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            original_file,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        let first = next_line(&mut watcher).await;
+        assert_eq!(first.bytes.as_ref(), b"same first line");
+        let position = watcher.get_file_position();
+        let (candidate_id, candidate_file) = fingerprint(&mut server, &candidate).await;
+        assert_eq!(candidate_id, original_id);
+
+        std_fs::rename(&candidate, &renamed).unwrap();
+        std_fs::write(&candidate, b"unrelated replacement\n").unwrap();
+        let old_info = watcher
+            .update_path(candidate, candidate_file)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(old_info.path, path);
+        assert_eq!(watcher.get_file_position(), position);
+        for expected in [b"second line".as_slice(), b"third line".as_slice()] {
+            let line = next_line(&mut watcher).await;
+            assert_eq!(line.bytes.as_ref(), expected);
+        }
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        assert_eq!(std_fs::read(renamed).unwrap(), CONTENT);
+    }
+
+    #[tokio::test]
+    async fn fingerprinted_gzip_rewinds_and_keeps_skip_semantics() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log.gz");
+        let mut compressed = Vec::new();
+        GzipEncoder::new(b"first\nsecond\n".as_slice())
+            .read_to_end(&mut compressed)
+            .await
+            .unwrap();
+        std_fs::write(&path, compressed).unwrap();
+        let mut server = test_server(dir.path(), checksum_strategy());
+        for read_from in [ReadFrom::Beginning, ReadFrom::End, ReadFrom::Checkpoint(6)] {
+            let (_, file) = fingerprint(&mut server, &path).await;
+            let mut watcher = FileWatcher::new(
+                path.clone(),
+                file,
+                read_from,
+                None,
+                1024,
+                Bytes::from_static(b"\n"),
+            )
+            .await
+            .unwrap();
+            if read_from == ReadFrom::Beginning {
+                for expected in [b"first".as_slice(), b"second".as_slice()] {
+                    let line = next_line(&mut watcher).await;
+                    assert_eq!(line.bytes.as_ref(), expected);
+                }
+            }
+            assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn fingerprinted_handle_preserves_start_position_options() {
+        let cases = [
+            ("startup/end", true, ReadFrom::End, false, None, 2),
+            ("new/end", false, ReadFrom::End, false, None, 0),
+            ("startup/start", true, ReadFrom::Beginning, false, None, 0),
+            ("checkpoint/end", true, ReadFrom::End, false, Some(6), 1),
+            ("checkpoint/new", false, ReadFrom::End, false, Some(6), 1),
+            ("ignored/end", true, ReadFrom::End, true, Some(6), 2),
+            ("ignored/new", false, ReadFrom::End, true, Some(6), 0),
+            ("ignored/start", true, ReadFrom::Beginning, true, Some(6), 0),
+        ];
+        let lines = [b"first".as_slice(), b"second".as_slice()];
+        for (name, startup, read_from, ignore_checkpoints, checkpoint, skip) in cases {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("input.log");
+            std_fs::write(&path, b"first\nsecond\n").unwrap();
+            let mut server = test_server(dir.path(), checksum_strategy());
+            server.read_from = read_from;
+            server.ignore_checkpoints = ignore_checkpoints;
+            let (file_id, file) = fingerprint(&mut server, &path).await;
+            let checkpointer = Checkpointer::new(dir.path());
+            let checkpoints = checkpointer.view();
+            if let Some(position) = checkpoint {
+                checkpoints.update(file_id, position);
+            }
+            let mut watchers = IndexMap::new();
+            server
+                .watch_new_file(path, file_id, file, &mut watchers, &checkpoints, startup)
+                .await;
+            let watcher = watchers.get_mut(&file_id).unwrap();
+            let mut position = u64::try_from(
+                lines[..skip]
+                    .iter()
+                    .map(|line| line.len() + 1)
+                    .sum::<usize>(),
+            )
+            .unwrap();
+            assert_eq!(watcher.get_file_position(), position, "{name}");
+            for expected in &lines[skip..] {
+                let line = next_line(watcher).await;
+                assert_eq!(line.bytes.as_ref(), *expected, "{name}");
+                assert_eq!(line.offset, position, "{name}");
+                position += u64::try_from(expected.len() + 1).unwrap();
+            }
+            assert!(
+                watcher.read_line().await.unwrap().raw_line.is_none(),
+                "{name}"
+            );
+        }
+    }
 }

@@ -25,6 +25,7 @@ async fn test_bytes_unread_basic() {
     // Create watcher starting from beginning
     let mut fw = FileWatcher::new(
         path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         ReadFrom::Beginning,
         None,
         100_000,
@@ -76,6 +77,7 @@ async fn test_bytes_unread_after_delete() {
     // Create watcher starting from beginning
     let mut fw = FileWatcher::new(
         path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         ReadFrom::Beginning,
         None,
         100_000,
@@ -112,6 +114,7 @@ async fn test_bytes_unread_growing_file() {
     // Create watcher
     let mut fw = FileWatcher::new(
         path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         ReadFrom::Beginning,
         None,
         100_000,
@@ -154,6 +157,7 @@ async fn test_bytes_unread_gzip_is_unknown_even_at_eof() {
     write_gzip(&path).await;
     let mut fw = FileWatcher::new(
         path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         ReadFrom::Beginning,
         None,
         100_000,
@@ -177,7 +181,14 @@ async fn test_bytes_unread_gzip_is_unknown_even_at_eof() {
     // replacement plain reader can report the bytes beyond its inherited offset.
     let replacement = dir.path().join("replacement.log");
     fs::write(&replacement, b"line1\nline2\nline3\n").unwrap();
-    let old_info = fw.update_path(replacement).await.unwrap().unwrap();
+    let old_info = fw
+        .update_path(
+            replacement.clone(),
+            tokio::fs::File::open(&replacement).await.unwrap(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(old_info.path, path);
     assert_eq!(old_info.bytes_unread, None);
     assert!(old_info.reached_eof);
@@ -197,6 +208,7 @@ async fn test_bytes_unread_skipped_gzip_is_unknown() {
     ] {
         let mut fw = FileWatcher::new(
             path.clone(),
+            tokio::fs::File::open(&path).await.unwrap(),
             read_from,
             ignore_before,
             100_000,
