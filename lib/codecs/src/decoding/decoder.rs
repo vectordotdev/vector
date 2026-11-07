@@ -84,11 +84,10 @@ impl Decoder {
     }
 
     /// Parses a frame using the included deserializer, and handles any errors by logging.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns a parsing error if the deserializer cannot parse the frame into events.
     pub fn deserializer_parse(&self, frame: Bytes) -> Result<DecodedFrame, Error> {
         let byte_size = frame.len();
 

@@ -413,15 +413,20 @@ impl ChunkedGelfDecoder {
     }
 
     /// Decode a GELF chunk
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chunk header is shorter than 10 bytes, the total chunks value is
+    /// zero or exceeds the GELF maximum, the sequence number is not below the total chunks, the
+    /// total chunks value differs from the one of a pending message with the same ID, or the
+    /// message would exceed the maximum length, the pending messages limit, or the buffered
+    /// payload limit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the chunk starts a new multi-chunk message outside of a Tokio runtime, or if the
+    /// shared pending messages lock is poisoned.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "The codec API panic documentation needs a separate audit."
-    )]
     #[allow(
         clippy::too_many_lines,
         reason = "Keep this codec mapping together during the lint rollout."
@@ -624,11 +629,17 @@ impl ChunkedGelfDecoder {
     /// Decode a GELF message that may be chunked or not. The source bytes are expected to be
     /// datagram-based (or message-based), so it must not contain multiple GELF messages
     /// delimited by '\0', such as it would be in a stream-based protocol.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a chunked message has an invalid chunk header, inconsistent chunk
+    /// metadata, or exceeds the maximum length, the pending messages limit, or the buffered
+    /// payload limit, or if the complete message cannot be decompressed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a chunk starts a new multi-chunk message outside of a Tokio runtime, or if the
+    /// shared pending messages lock is poisoned.
     pub fn decode_message(
         &mut self,
         mut src: Bytes,

@@ -8,6 +8,7 @@ use vector_lib::{
         DatadogMetricOriginMetadata, LogEvent,
         metric::{Bucket, Quantile, Sample},
     },
+    internal_event::emit,
 };
 use vrl::{
     event_path, path,
@@ -333,7 +334,7 @@ fn render_tag_into(
     let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
-            emit!(crate::internal_events::TemplateRenderingError {
+            emit(crate::internal_events::TemplateRenderingError {
                 error: err,
                 drop_event: false,
                 field: Some(key_template.get_ref()),
@@ -353,7 +354,7 @@ fn render_tag_into(
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error: value_error,
                     drop_event: false,
                     field: Some(template.get_ref()),
@@ -380,7 +381,7 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
         .or_else(|| Some(Utc::now()));
 
     // Assign the OriginService for the new metric
-    let metadata = event
+    let mut metadata = event
         .metadata()
         .clone()
         .with_schema_definition(&Arc::new(Definition::any()))
@@ -389,6 +390,9 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
             None,
             Some(ORIGIN_SERVICE_VALUE),
         ));
+    // Configured metrics derive new meaning from arbitrary log fields, so an upstream metric unit
+    // no longer describes them. The `all_metrics` reconstruction path keeps the original metadata.
+    metadata.clear_datadog_metric_unit();
 
     let field = parse_target_path(config.field()).map_err(|_e| PathNotFound {
         path: config.field().to_string(),
@@ -696,21 +700,24 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             kind: TransformParseErrorKind::IntError,
         })?;
 
+    // A histogram is allowed to report no sum at all, so an absent path is not an error here. A
+    // path that is present but not a float still is.
     let sum = log
         .get(event_path!("aggregated_histogram", "sum"))
-        .ok_or_else(|| TransformError::PathNotFound {
-            path: "aggregated_histogram.sum".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "aggregated_histogram.sum".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
+        .map(|sum| {
+            sum.as_float()
+                .map(|sum| *sum)
+                .ok_or_else(|| TransformError::ParseError {
+                    path: "aggregated_histogram.sum".to_string(),
+                    kind: TransformParseErrorKind::FloatError,
+                })
+        })
+        .transpose()?;
 
     Ok(MetricValue::AggregatedHistogram {
         buckets,
         count: count as u64,
-        sum: *sum,
+        sum,
     })
 }
 
@@ -872,31 +879,31 @@ impl FunctionTransform for LogToMetric {
                 }
                 Err(err) => match err {
                     TransformError::MetricValueError { path, path_value } => {
-                        emit!(MetricMetadataInvalidFieldValueError {
+                        emit(MetricMetadataInvalidFieldValueError {
                             field: path.as_ref(),
-                            field_value: path_value.as_ref()
+                            field_value: path_value.as_ref(),
                         });
                     }
                     TransformError::PathNotFound { path } => {
-                        emit!(ParserMissingFieldError::<DROP_EVENT> {
-                            field: path.as_ref()
+                        emit(ParserMissingFieldError::<DROP_EVENT> {
+                            field: path.as_ref(),
                         });
                     }
                     TransformError::ParseError { path, kind } => {
-                        emit!(MetricMetadataParseError {
+                        emit(MetricMetadataParseError {
                             field: path.as_ref(),
                             kind: &kind.to_string(),
                         });
                     }
                     TransformError::MetricDetailsNotFound => {
-                        emit!(MetricMetadataMetricDetailsNotFoundError {});
+                        emit(MetricMetadataMetricDetailsNotFoundError {});
                     }
                     TransformError::PairExpansionError { key, value, error } => {
-                        emit!(PairExpansionError {
+                        emit(PairExpansionError {
                             key: &key,
                             value: &value,
                             drop_event: true,
-                            error
+                            error,
                         });
                     }
                     _ => {}
@@ -911,34 +918,34 @@ impl FunctionTransform for LogToMetric {
                     Err(err) => {
                         match err {
                             TransformError::PathNull { path } => {
-                                emit!(LogToMetricFieldNullError {
-                                    field: path.as_ref()
+                                emit(LogToMetricFieldNullError {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::PathNotFound { path } => {
-                                emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                    field: path.as_ref()
+                                emit(ParserMissingFieldError::<DROP_EVENT> {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::ParseFloatError { path, error } => {
-                                emit!(LogToMetricParseFloatError {
+                                emit(LogToMetricParseFloatError {
                                     field: path.as_ref(),
-                                    error
+                                    error,
                                 });
                             }
                             TransformError::TemplateRenderingError(error) => {
-                                emit!(crate::internal_events::TemplateRenderingError {
+                                emit(crate::internal_events::TemplateRenderingError {
                                     error,
                                     drop_event: true,
                                     field: None,
                                 });
                             }
                             TransformError::PairExpansionError { key, value, error } => {
-                                emit!(PairExpansionError {
+                                emit(PairExpansionError {
                                     key: &key,
                                     value: &value,
                                     drop_event: true,
-                                    error
+                                    error,
                                 });
                             }
                             _ => {}
@@ -1102,6 +1109,30 @@ mod tests {
             )
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[test]
+    fn configured_metric_clears_inherited_datadog_unit() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            "#,
+        );
+        let mut event = create_event("status", "42");
+        event.metadata_mut().set_datadog_metric_unit("millisecond");
+        let metric_config = config
+            .metrics
+            .as_ref()
+            .and_then(|metrics| metrics.first())
+            .expect("test config should contain one metric");
+
+        let Ok(metric) = to_metric_with_config(metric_config, &event) else {
+            panic!("configured metric should be created");
+        };
+
+        assert_eq!(metric.metadata().datadog_metric_unit(), None);
     }
 
     #[tokio::test]
@@ -1935,7 +1966,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     count: 5,
-                    sum: 18.0,
+                    sum: Some(18.0),
                     buckets: vec![
                         Bucket {
                             upper_limit: 1.0,
@@ -1963,6 +1994,86 @@ mod tests {
                 "host" => "localhost",
             )))
             .with_timestamp(Some(ts()))
+        );
+    }
+
+    /// A histogram is allowed to report no sum, so an absent `sum` field is not a missing-path
+    /// error. A present-but-unparseable one still is, which `transform_histogram_invalid_sum`
+    /// covers.
+    #[tokio::test]
+    async fn transform_histogram_without_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        let metric = do_transform(config, log).await.unwrap();
+        assert_eq!(
+            metric.as_metric().value(),
+            &MetricValue::AggregatedHistogram {
+                count: 3,
+                sum: None,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                ],
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn transform_histogram_invalid_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "sum": "not a number",
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        assert!(
+            do_transform(config, log).await.is_none(),
+            "a sum that is present but not a float must still be rejected"
         );
     }
 

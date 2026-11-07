@@ -1,0 +1,67 @@
+name: Announce Releases on Discord
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Published release tag"
+        type: string
+        required: true
+    secrets:
+      DISCORD_ANNOUNCEMENTS_WEBHOOK_URL:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    # Disable the native GitHub release webhook before enabling this repository variable.
+    if: github.repository == 'vectordotdev/vector' && vars.DISCORD_RELEASES_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: Read published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          encoded_tag=$(jq -rn --arg tag "$RELEASE_TAG" '$tag | @uri')
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$encoded_tag" > "$RUNNER_TEMP/release.json"
+          jq -e --arg tag "$RELEASE_TAG" '
+            .tag_name == $tag and .draft == false and .published_at != null
+          ' "$RUNNER_TEMP/release.json" > /dev/null
+
+      - name: Post release to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::error::DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not configured"
+            exit 1
+          fi
+
+          # Bound the payload size even when every character uses four UTF-8 bytes.
+          jq '{
+            username: "Vector Releases",
+            allowed_mentions: {parse: []},
+            embeds: [{
+              title: (("Vector " + .tag_name)[:128]),
+              url: .html_url,
+              description: ((.body // "") |
+                if length > 1000 then .[:1000] + "…" else . end),
+              footer: {text: (if .prerelease or (.tag_name | split("+")[0] | contains("-")) then "Pre-release" else "Release" end)}
+            }]
+          }' "$RUNNER_TEMP/release.json" > "$RUNNER_TEMP/discord-release.json"
+
+          curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            --header 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/discord-release.json" \
+            --output /dev/null \
+            "${DISCORD_WEBHOOK_URL}?wait=true"
+
+      - name: Report notification failure
+        if: failure()
+        run: echo "::warning::Discord release notification failed; release publishing can continue."

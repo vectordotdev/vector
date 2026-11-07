@@ -25,7 +25,7 @@ use crate::{event::BatchStatus, shutdown::ShutdownSignal};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
-pub struct HecAcknowledgementsConfig {
+pub(super) struct HecAcknowledgementsConfig {
     /// Enables end-to-end acknowledgements.
     pub enabled: Option<bool>,
 
@@ -89,7 +89,7 @@ impl From<bool> for HecAcknowledgementsConfig {
     }
 }
 
-pub struct IndexerAcknowledgement {
+pub(super) struct IndexerAcknowledgement {
     max_pending_acks: u64,
     max_pending_acks_per_channel: u64,
     max_number_of_ack_channels: u64,
@@ -103,7 +103,7 @@ impl IndexerAcknowledgement {
         clippy::needless_pass_by_value,
         reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
+    pub(super) fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
         let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
@@ -159,7 +159,7 @@ impl IndexerAcknowledgement {
     }
 
     /// Gets the next available ack id from a specified channel, creating the channel if it does not exist
-    pub async fn get_ack_id_from_channel(
+    pub(super) async fn get_ack_id_from_channel(
         &self,
         channel_id: String,
         batch_rx: BatchStatusReceiver,
@@ -178,7 +178,7 @@ impl IndexerAcknowledgement {
     }
 
     /// Gets the requested ack id statuses from a specified channel, creating the channel if it does not exist
-    pub async fn get_acks_status_from_channel(
+    pub(super) async fn get_acks_status_from_channel(
         &self,
         channel_id: String,
         ack_ids: &[u64],
@@ -202,7 +202,7 @@ impl IndexerAcknowledgement {
     }
 }
 
-pub struct Channel {
+pub(super) struct Channel {
     last_used_timestamp: RwLock<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
@@ -279,12 +279,12 @@ impl Channel {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct HecAckStatusRequest {
+pub(super) struct HecAckStatusRequest {
     pub acks: Vec<u64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct HecAckStatusResponse {
+pub(super) struct HecAckStatusResponse {
     pub acks: HashMap<u64, bool>,
 }
 

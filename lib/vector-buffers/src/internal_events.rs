@@ -27,24 +27,10 @@ impl InternalEvent for BufferCreated {
                 "stage" => stage.clone(),
             )
             .set(self.max_size_events as f64);
-            // DEPRECATED: buffer-bytes-events-metrics
-            gauge!(
-                GaugeName::BufferMaxEventSize,
-                "buffer_id" => self.buffer_id.clone(),
-                "stage" => stage.clone(),
-            )
-            .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
                 GaugeName::BufferMaxSizeBytes,
-                "buffer_id" => self.buffer_id.clone(),
-                "stage" => stage.clone(),
-            )
-            .set(self.max_size_bytes as f64);
-            // DEPRECATED: buffer-bytes-events-metrics
-            gauge!(
-                GaugeName::BufferMaxByteSize,
                 "buffer_id" => self.buffer_id,
                 "stage" => stage,
             )

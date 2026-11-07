@@ -19,7 +19,11 @@
 #
 #     /ci-run-integration-all
 #
-# 4. Run all CI (including all integration tests)
+# 4. Run the trace model E2E tests (datadog-traces and opentelemetry-traces-multiservice)
+#
+#     /ci-run-e2e-trace-model
+#
+# 5. Run all CI (including all integration tests)
 #
 #     /ci-run-all
 #
@@ -193,7 +197,8 @@ jobs:
       - prep-pr
       - build-test-runner
     runs-on: ubuntu-24.04-8core
-    timeout-minutes: 30
+    # Fits all three 15-minute retry attempts in the step below.
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
@@ -205,6 +210,7 @@ jobs:
           [
             "datadog-logs",
             "datadog-metrics",
+            "datadog-traces",
             "opentelemetry-logs",
             "opentelemetry-metrics",
             "opentelemetry-metrics-native",
@@ -217,7 +223,8 @@ jobs:
           REVIEW_BODY: ${{ github.event.review.body }}
           SERVICE: ${{ matrix.service }}
         run: |
-          if [[ "$REVIEW_BODY" == /ci-run-e2e-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-e2e-${SERVICE}"* ]]; then
+          if [[ "$REVIEW_BODY" == /ci-run-e2e-all* ]] || [[ "$REVIEW_BODY" == /ci-run-all* ]] || [[ "$REVIEW_BODY" == "/ci-run-e2e-${SERVICE}"* ]] || \
+             { [[ "$REVIEW_BODY" == /ci-run-e2e-trace-model* ]] && [[ "$SERVICE" == datadog-traces ]]; }; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -249,13 +256,13 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 35
+          timeout_minutes: 15
           max_attempts: 3
           command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   otel-traces-multiservice:
     name: Multiservice OpenTelemetry trace validation
-    if: github.repository == 'vectordotdev/vector' && startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: github.repository == 'vectordotdev/vector' && (startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice') || startsWith(github.event.review.body, '/ci-run-e2e-trace-model'))
     needs:
       - prep-pr
       - build-test-runner
@@ -311,7 +318,7 @@ jobs:
 
       - name: Upload multiservice trace evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: otel-traces-multiservice-${{ github.event.review.commit_id }}
           path: target/otel-traces-multiservice-evidence/

@@ -440,12 +440,12 @@ fn ports_to_proto_outputs(
 }
 
 /// gRPC observability service implementation.
-pub struct ObservabilityService {
+pub(crate) struct ObservabilityService {
     watch_rx: WatchRx,
 }
 
 impl ObservabilityService {
-    pub const fn new(watch_rx: WatchRx) -> Self {
+    pub(crate) const fn new(watch_rx: WatchRx) -> Self {
         Self { watch_rx }
     }
 }
