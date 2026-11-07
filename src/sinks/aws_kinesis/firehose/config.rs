@@ -38,7 +38,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-pub struct KinesisFirehoseClientBuilder;
+pub(super) struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
     type Client = KinesisClient;
@@ -50,8 +50,8 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
-pub const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
-pub const MAX_PAYLOAD_EVENTS: usize = 500;
+pub(super) const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
+pub(super) const MAX_PAYLOAD_EVENTS: usize = 500;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KinesisFirehoseDefaultBatchSettings;

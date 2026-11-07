@@ -4,7 +4,7 @@ use metrics::Counter;
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
         error_stage, error_type,
     },
     json_size::JsonSize,
@@ -60,7 +60,7 @@ impl PodCounters {
 /// must call [`PodCountersCache::remove_idle`] periodically to release the handles of the
 /// pods that stopped logging.
 #[derive(Debug, Default)]
-pub struct PodCountersCache {
+pub(crate) struct PodCountersCache {
     unlabeled: Option<PodCounters>,
     by_namespace: HashMap<Arc<str>, HashMap<Arc<str>, PodCounters>>,
     pods: usize,
@@ -109,7 +109,7 @@ impl PodCountersCache {
     /// Releases the handles of the pods that logged no line since the previous call, so
     /// that their metrics can expire. A pod that logs again gets new handles, which
     /// continue its series if the metric did not expire yet.
-    pub fn remove_idle(&mut self) {
+    pub(crate) fn remove_idle(&mut self) {
         // Keep the handles used since the previous call. `mem::take` returns the `used`
         // flag and resets it to `false`, so the next call releases the handles unless a
         // line sets the flag again.
@@ -124,7 +124,7 @@ impl PodCountersCache {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesLogsEventsReceived<'a> {
+pub(crate) struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: JsonSize,
     /// The pod the line came from, when its file path encodes one.
@@ -167,7 +167,7 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
 const ANNOTATION_FAILED: &str = "annotation_failed";
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesLogsEventAnnotationError<'a> {
+pub(crate) struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
 }
 
@@ -241,7 +241,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesLogsFormatPickerEdgeCase {
+pub(crate) struct KubernetesLogsFormatPickerEdgeCase {
     pub what: &'static str,
 }
 
@@ -256,7 +256,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesLogsDockerFormatParseError<'a> {
+pub(crate) struct KubernetesLogsDockerFormatParseError<'a> {
     pub error: &'a dyn std::error::Error,
 }
 
@@ -281,7 +281,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
 const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesLifecycleError<E> {
+pub(crate) struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
     pub count: usize,
@@ -303,7 +303,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: self.message,
         });
@@ -311,7 +311,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesMergedLineTooBigError<'a> {
+pub(crate) struct KubernetesMergedLineTooBigError<'a> {
     pub event: &'a Value,
     pub configured_limit: usize,
     pub encountered_size_so_far: usize,
@@ -334,7 +334,7 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Found line that exceeds max_merged_line_bytes; discarding.",
         });
@@ -342,7 +342,7 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesMergedLineTruncated {
+pub(crate) struct KubernetesMergedLineTruncated {
     pub configured_limit: usize,
     pub original_size: usize,
 }
@@ -375,20 +375,20 @@ mod tests {
 
         let mut counters = PodCountersCache::default();
         for _ in 0..2 {
-            emit!(KubernetesLogsEventsReceived {
+            emit(KubernetesLogsEventsReceived {
                 file: "k8s.log",
                 byte_size: JsonSize::new(100),
                 pod: Some(("k8s-counters-test-a", "k8s-counters-test-ns")),
                 counters: &mut counters,
             });
         }
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(50),
             pod: Some(("k8s-counters-test-b", "k8s-counters-test-ns")),
             counters: &mut counters,
         });
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(7),
             pod: None,
@@ -450,7 +450,7 @@ mod tests {
         };
 
         let mut counters = PodCountersCache::default();
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(100),
             pod: Some(("k8s-idle-test", "k8s-idle-test-ns")),

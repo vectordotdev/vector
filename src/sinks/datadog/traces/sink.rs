@@ -10,6 +10,7 @@ use tower::Service;
 use vector_lib::{
     config::log_schema,
     event::{Event, Value},
+    internal_event::emit,
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -69,7 +70,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
-pub struct TracesSink<S> {
+pub(super) struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
@@ -84,7 +85,7 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
@@ -113,7 +114,7 @@ where
                 match request {
                     Err(e) => {
                         let (error_message, error_reason, dropped_events) = e.into_parts();
-                        emit!(DatadogTracesEncodingError {
+                        emit(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
                             dropped_events,

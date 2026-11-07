@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct RedisTowerRequestConfigDefaults;
+pub(super) struct RedisTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for RedisTowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::None;
@@ -26,7 +26,7 @@ impl TowerRequestConfigDefaults for RedisTowerRequestConfigDefaults {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum DataTypeConfig {
+pub(super) enum DataTypeConfig {
     /// The Redis `list` type.
     ///
     /// This resembles a deque, where messages can be popped and pushed from either end.
@@ -51,7 +51,7 @@ pub enum DataTypeConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub struct ListOption {
+pub(super) struct ListOption {
     /// The method to use for pushing messages into a `list`.
     pub method: ListMethod,
 }
@@ -79,7 +79,7 @@ pub enum ListMethod {
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub struct SortedSetOption {
+pub(super) struct SortedSetOption {
     /// The method to use for pushing messages into a `sorted set`.
     pub method: Option<SortedSetMethod>,
 
@@ -109,7 +109,7 @@ pub enum SortedSetMethod {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RedisDefaultBatchSettings;
+pub(super) struct RedisDefaultBatchSettings;
 
 impl SinkBatchSettings for RedisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
@@ -121,7 +121,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 #[configurable_component(sink("redis", "Publish observability data to Redis."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct RedisSinkConfig {
+pub(super) struct RedisSinkConfig {
     pub(super) encoding: EncodingConfig,
 
     #[serde(default)]
@@ -209,7 +209,7 @@ impl SinkConfig for RedisSinkConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedRedisSink {
+pub(super) struct ValidatedRedisSink {
     key: ConfinedTemplate,
     batch_settings: BatcherSettings,
 }

@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PostgresqlMetricsCollectError<'a> {
+pub(crate) struct PostgresqlMetricsCollectError<'a> {
     pub error: String,
     pub endpoint: &'a str,
 }

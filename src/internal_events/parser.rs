@@ -1,17 +1,18 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
 #[cfg(feature = "sources-kubernetes_logs")]
-pub use self::kubernetes_logs::*;
+pub(crate) use self::kubernetes_logs::*;
 
-pub const DROP_EVENT: bool = true;
+pub(crate) const DROP_EVENT: bool = true;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
+pub(crate) struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
     pub field: &'a str,
 }
 
@@ -35,7 +36,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
         .increment(1);
 
         if DROP_EVENT {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+            emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 }
@@ -67,7 +68,7 @@ mod kubernetes_logs {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct ParserMatchError<'a> {
+    pub(crate) struct ParserMatchError<'a> {
         pub value: &'a [u8],
     }
 
@@ -91,7 +92,7 @@ mod kubernetes_logs {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct ParserConversionError<'a> {
+    pub(crate) struct ParserConversionError<'a> {
         pub name: &'a str,
         pub error: crate::types::Error,
     }

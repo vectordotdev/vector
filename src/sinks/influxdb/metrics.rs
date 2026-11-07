@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt, future::ready, mem, sync::Arc, time::Durati
 
 use bytes::{Bytes, BytesMut};
 use futures::{StreamExt, stream::BoxStream};
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tower::{Service, ServiceBuilder};
 use vector_lib::{
@@ -11,6 +11,7 @@ use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     finalization::{EventFinalizers, EventStatus},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
@@ -26,7 +27,7 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,
@@ -42,8 +43,10 @@ use crate::{
             },
             builder::SinkBuilderExt,
             encode_namespace,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             service::ServiceBuilderExt,
             statistic::{DistributionStatistic, validate_quantiles},
         },
@@ -329,10 +332,7 @@ struct InfluxDbMetricsRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<Arc<MetricBatch>> for InfluxDbMetricsRequestBuilder {
-    fn build(
-        &self,
-        request: HttpRequest<Arc<MetricBatch>>,
-    ) -> crate::Result<http_1::Request<Bytes>> {
+    fn build(&self, request: HttpRequest<Arc<MetricBatch>>) -> crate::Result<http::Request<Bytes>> {
         let body = encode_events(
             self.protocol_version,
             &request.get_additional_metadata().metrics,
@@ -483,7 +483,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(InfluxdbEncodingError {
+            emit(InfluxdbEncodingError {
                 error_message,
                 count,
             });
