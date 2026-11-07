@@ -8,25 +8,26 @@ params:
 stats:
   in_flight:
     max: [4, 5]
-    mean: [3.0, 4.0]
+    mean: [2.4, 4.0]
     mode: [3, 5]
   rate:
     max: [55, 90]
-    mean: [31, 54]
+    mean: [24, 54]
 
 # Since our internal framework doesn't track the dropped requests, the
 # values won't be representative of the actual number of requests in
-# flight.
+# flight. Timed-out retries in backoff hold logical slots, two per unit of the
+# limit, which holds back fresh requests.
 
 controller:
   in_flight:
     max: [13, 85]
-    mean: [7.0, 41]
+    mean: [5.5, 41]
     mode: [1, 11]
   concurrency_limit:
     max: [10, 86]
-    mean: [7.0, 52]
-    mode: [4, 77]
+    mean: [6.0, 52]
+    mode: [2, 77]
   observed_rtt:
     min: [0.100, 0.102]
     max: [0.100, 11.2]

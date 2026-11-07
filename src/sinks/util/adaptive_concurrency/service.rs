@@ -10,7 +10,10 @@ use futures::future::BoxFuture;
 use tokio::sync::OwnedSemaphorePermit;
 use tower::{Service, load::Load};
 
-use super::{AdaptiveConcurrencySettings, controller::Controller, future::ResponseFuture};
+use super::{
+    AdaptiveConcurrencySettings, controller::Controller, future::ResponseFuture,
+    logical::LogicalConcurrencyLimitLayer,
+};
 use crate::sinks::util::retries::RetryLogic;
 
 /// Enforces a limit on the concurrent number of requests the underlying
@@ -22,7 +25,7 @@ pub struct AdaptiveConcurrencyLimit<S, L> {
     state: State,
 }
 
-enum State {
+pub(super) enum State {
     Waiting(BoxFuture<'static, OwnedSemaphorePermit>),
     Ready(OwnedSemaphorePermit),
     Empty,
@@ -41,6 +44,12 @@ impl<S, L> AdaptiveConcurrencyLimit<S, L> {
             controller: Arc::new(Controller::new(concurrency, options, logic)),
             state: State::Empty,
         }
+    }
+
+    /// A layer bounding whole logical requests, retries included, to a multiple of this
+    /// limiter's current concurrency limit.
+    pub(crate) fn logical_limit_layer(&self) -> LogicalConcurrencyLimitLayer {
+        LogicalConcurrencyLimitLayer::new(self.controller.logical_semaphore())
     }
 }
 

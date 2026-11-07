@@ -7,14 +7,15 @@ params:
 
 # With a constant time link that gives deferrals over a certain rate,
 # the limiter will ramp up to a little over that request rate and then
-# drop down repeatedly.
+# drop down repeatedly. Retries waking together after backoff can briefly
+# push the rate above the limit.
 
 stats:
   in_flight:
     max: [16, 24]
     mean: [6.0, 9.0]
   rate:
-    max: [90, 123]
+    max: [90, 150]
     mean: [31, 75]
 
 controller:
