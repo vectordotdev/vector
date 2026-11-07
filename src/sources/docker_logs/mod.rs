@@ -993,6 +993,7 @@ impl ContainerState {
         self.info.take().map(|mut info| {
             // Update info
             info.generation = self.generation;
+            info.last_log_before_stream = info.last_log.map(|(timestamp, _)| timestamp);
             info
         })
     }
@@ -1006,6 +1007,8 @@ struct ContainerLogInfo {
     created: DateTime<Utc>,
     /// Timestamp of last log message with it's generation
     last_log: Option<(DateTime<FixedOffset>, u64)>,
+    /// Replay boundary captured before attaching a new log stream.
+    last_log_before_stream: Option<DateTime<FixedOffset>>,
     /// generation of `ContainerState` at `event_stream` creation
     generation: u64,
     metadata: ContainerMetadata,
@@ -1019,6 +1022,7 @@ impl ContainerLogInfo {
             id,
             created,
             last_log: None,
+            last_log_before_stream: None,
             generation: 0,
             metadata,
         }
@@ -1061,6 +1065,16 @@ impl ContainerLogInfo {
         let timestamp_str = splitter.next()?;
         let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
+                // Reattachments can happen without a container generation change (for
+                // example, when the follow stream ends before the die event arrives).
+                // Keep this boundary fixed so equal timestamps within this stream are
+                // still accepted, but records delivered by an earlier stream are not.
+                if self
+                    .last_log_before_stream
+                    .is_some_and(|last| timestamp <= last)
+                {
+                    return None;
+                }
                 // Timestamp check. This is included to avoid processing the same log multiple times, which can
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.

@@ -1,5 +1,62 @@
 use crate::sources::docker_logs::*;
 
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted: bool) {
+    let created = DateTime::parse_from_rfc3339("2026-11-06T21:03:14Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let mut info = ContainerLogInfo::new(
+        ContainerId::new("probe".to_owned()),
+        ContainerMetadata {
+            labels: HashMap::new(),
+            name: "probe".into(),
+            name_str: "probe".to_owned(),
+            image: "probe".into(),
+            created_at: created,
+        },
+        created,
+    );
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let mut merge_state = None;
+    let mut event = |info: &mut ContainerLogInfo, timestamp: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: format!("{timestamp} last\n").into(),
+            },
+            None,
+            false,
+            &mut merge_state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let last = "2026-11-06T21:03:17.556996444Z";
+    // Distinct records may legitimately share a timestamp within one stream.
+    assert!(event(&mut info, last).is_some());
+    assert!(event(&mut info, last).is_some());
+
+    let mut container = ContainerState::new_running();
+    // The follow stream finishes before the main loop receives `die`.
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, "2026-11-06T21:03:16Z").is_none());
+    assert!(event(&mut info, last).is_none());
+    assert!(event(&mut info, last).is_none());
+    let next = "2026-11-06T21:03:17.556996445Z";
+    assert!(event(&mut info, next).is_some());
+    assert!(event(&mut info, next).is_some());
+
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    assert!(event(&mut info, next).is_none());
+}
+
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
