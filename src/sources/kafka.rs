@@ -894,10 +894,6 @@ async fn coordinate_kafka_callbacks(
                         callbacks.close();
                         let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, true);
                         if let Ok(tpl) = consumer.assignment() {
-                            // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-                            if tpl.capacity() == 0 {
-                                return;
-                            }
                             tpl.elements()
                                 .iter()
                                 .for_each(|el| {
@@ -1354,10 +1350,6 @@ impl KafkaSourceContext {
     /// each topic-partition has been set up. This function blocks until the
     /// rendezvous channel sender is dropped by the callback handler.
     fn consume_partitions(&self, tpl: &TopicPartitionList) {
-        // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-        if tpl.capacity() == 0 {
-            return;
-        }
         let (send, rendezvous) = sync_channel(0);
         self.callbacks
             .send(KafkaCallback::PartitionsAssigned(
