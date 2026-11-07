@@ -20,10 +20,10 @@ use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio::{
     fs::{self, remove_file},
-    task::{Id, JoinSet},
     time::sleep,
 };
 
+use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -78,11 +78,24 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    // The first `shutdown_data` signal here is to stop this file
-    // server from outputting new data; the second
-    // `shutdown_checkpointer` is for finishing the background
-    // checkpoint writer task, which has to wait for all
-    // acknowledgements to be completed.
+    /// Read watched files until shutdown, forwarding their lines to the output sink.
+    ///
+    /// `shutdown_data` stops output; `shutdown_checkpointer` stops the background
+    /// checkpoint writer after all acknowledgements have completed.
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    /// Creating a watcher can also panic as described by [`FileWatcher::new`].
+    /// Requires a Tokio runtime with timers enabled.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing polling and shutdown flow together during the lint rollout."
+    )]
     pub async fn run<C, S1, S2>(
         mut self,
         mut chans: C,
@@ -96,7 +109,7 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
-        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
+        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = IndexMap::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
@@ -106,7 +119,7 @@ where
         let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().into_iter() {
+        for path in self.paths_provider.paths() {
             if let Some(file_id) = self
                 .fingerprinter
                 .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
@@ -125,8 +138,7 @@ where
 
         let created = metadata.into_iter().map(|m| {
             m.and_then(|m| m.created())
-                .map(DateTime::<Utc>::from)
-                .unwrap_or_else(|_| Utc::now())
+                .map_or_else(|_| Utc::now(), DateTime::<Utc>::from)
         });
 
         let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
@@ -185,7 +197,7 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+                for path in self.paths_provider.paths() {
                     if let Some(file_id) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
@@ -207,7 +219,14 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                    // Inode changed - emit metrics for the old file
+                                    self.emitter.emit_file_unwatched(
+                                        &unwatch_info.path,
+                                        unwatch_info.reached_eof,
+                                        unwatch_info.bytes_unread,
+                                    );
+                                }
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -225,7 +244,15 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
+                                    {
+                                        // Inode changed - emit metrics for the old file
+                                        self.emitter.emit_file_unwatched(
+                                            &unwatch_info.path,
+                                            unwatch_info.reached_eof,
+                                            unwatch_info.bytes_unread,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -241,39 +268,25 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                let mut set = JoinSet::new();
+                let mut set = JoinMap::new();
 
-                let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
+                known_small_files
                     .iter()
                     .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
                     .map(|(path, _last_time_open)| path.clone())
-                    .map(|path| {
-                        let path_ = path.clone();
-                        let abort_handle =
-                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
-                        (abort_handle.id(), path)
-                    })
-                    .collect();
+                    .for_each(|path| set.spawn(path.clone(), remove_file(path)));
 
-                while let Some(res) = set.join_next().await {
-                    match res {
-                        Ok((path, Ok(()))) => {
+                while let Some((path, result)) = set.join_next().await {
+                    match result.map_err(std::io::Error::other).flatten() {
+                        Ok(()) => {
                             let removed = known_small_files.remove(&path);
 
                             if removed.is_some() {
                                 self.emitter.emit_file_deleted(&path);
                             }
                         }
-                        Ok((path, Err(err))) => {
+                        Err(err) => {
                             self.emitter.emit_file_delete_error(&path, err);
-                        }
-                        Err(join_err) => {
-                            self.emitter.emit_file_delete_error(
-                                remove_file_tasks
-                                    .get(&join_err.id())
-                                    .expect("panicked/cancelled task id not in task id pool"),
-                                std::io::Error::other(join_err),
-                            );
                         }
                     }
                 }
@@ -294,13 +307,13 @@ where
                     discarded_for_size_and_truncated,
                 }) = watcher.read_line().await
                 {
-                    discarded_for_size_and_truncated.iter().for_each(|buf| {
+                    for buf in &discarded_for_size_and_truncated {
                         self.emitter.emit_file_line_too_long(
                             &buf.clone(),
                             self.max_line_bytes,
                             buf.len(),
-                        )
-                    });
+                        );
+                    }
 
                     let sz = line.bytes.len();
                     trace!(
@@ -362,16 +375,24 @@ where
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
-            fp_map.retain(|file_id, watcher| {
-                if watcher.dead() {
-                    self.emitter
-                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
-                    checkpoints.set_dead(*file_id);
-                    false
-                } else {
-                    true
+            // First collect dead file IDs, then process them (get_unwatch_info is async).
+            let dead_file_ids: Vec<_> = fp_map
+                .iter()
+                .filter(|(_, watcher)| watcher.dead())
+                .map(|(file_id, _)| *file_id)
+                .collect();
+
+            for file_id in dead_file_ids {
+                if let Some(watcher) = fp_map.shift_remove(&file_id) {
+                    let unwatch_info = watcher.get_unwatch_info().await;
+                    self.emitter.emit_file_unwatched(
+                        &unwatch_info.path,
+                        unwatch_info.reached_eof,
+                        unwatch_info.bytes_unread,
+                    );
+                    checkpoints.set_dead(file_id);
                 }
-            });
+            }
             self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
@@ -426,7 +447,7 @@ where
                     // _shutdown_token is dropped here, after checkpoints are written,
                     // which signals shutdown_done to the caller.
                 }
-                Either::Right((_, future)) => shutdown_data = future,
+                Either::Right(((), future)) => shutdown_data = future,
             }
             stats.record("sleeping", start.elapsed());
         }
@@ -457,13 +478,12 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        let read_from = if self.ignore_checkpoints {
+            fallback
+        } else {
             checkpoints
                 .get(file_id)
-                .map(ReadFrom::Checkpoint)
-                .unwrap_or(fallback)
-        } else {
-            fallback
+                .map_or(fallback, ReadFrom::Checkpoint)
         };
 
         match FileWatcher::new(
@@ -485,7 +505,7 @@ where
                 fp_map.insert(file_id, watcher);
             }
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
-        };
+        }
     }
 }
 
@@ -500,7 +520,7 @@ async fn checkpoint_writer(
         let sleep = sleep(sleep_duration);
         tokio::select! {
             _ = &mut shutdown => break,
-            _ = sleep => {},
+            () = sleep => {},
         }
 
         let emitter = emitter.clone();
@@ -509,11 +529,17 @@ async fn checkpoint_writer(
         match checkpointer.write_checkpoints().await {
             Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
             Err(error) => emitter.emit_file_checkpoint_write_error(error),
-        };
+        }
     }
     checkpointer
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing duration conversion until overflow handling is audited."
+)]
 pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
     ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
 }
@@ -569,6 +595,11 @@ impl TimingStats {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing floating-point precision of diagnostic throughput formatting."
+)]
 fn scale(bytes: u64) -> String {
     let units = ["", "k", "m", "g"];
     let mut bytes = bytes as f32;
@@ -577,14 +608,14 @@ fn scale(bytes: u64) -> String {
         bytes /= 1000.0;
         i += 1;
     }
-    format!("{:.3}{}/sec", bytes, units[i])
+    format!("{bytes:.3}{}/sec", units[i])
 }
 
 impl Default for TimingStats {
     fn default() -> Self {
         Self {
             started_at: time::Instant::now(),
-            segments: Default::default(),
+            segments: BTreeMap::default(),
             events: Default::default(),
             bytes: Default::default(),
         }

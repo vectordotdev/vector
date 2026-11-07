@@ -24,8 +24,8 @@ pub struct MmdbConfig {
 }
 
 impl GenerateConfig for MmdbConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             path: "/path/to/GeoLite2-City.mmdb".into(),
         })
         .unwrap()
@@ -36,13 +36,14 @@ impl EnrichmentTableConfig for MmdbConfig {
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
+        _: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(Mmdb::new(self.clone())?))
     }
 }
 
 #[derive(Clone)]
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a MaxMind database.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a `MaxMind` database.
 pub struct Mmdb {
     config: MmdbConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -51,6 +52,12 @@ pub struct Mmdb {
 
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database file cannot be opened or parsed, a test lookup against
+    /// the database fails or its result cannot be decoded, or the file's modification time
+    /// cannot be read.
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 
@@ -59,7 +66,7 @@ impl Mmdb {
         let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
 
         match result {
-            Ok(_) => Ok(Mmdb {
+            Ok(()) => Ok(Mmdb {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 config,
@@ -75,11 +82,16 @@ impl Mmdb {
             let mut filtered = Value::from(ObjectMap::new());
             let mut data_value = Value::from(data);
             for field in fields {
+                // Unparseable field names in the caller's `select` list are
+                // skipped: this matches the pre-migration behavior where the
+                // JIT `&str` path parser failed to iterate and the field was
+                // omitted from the output entirely.
+                let Ok(field_path) = vrl::path::parse_value_path(field) else {
+                    continue;
+                };
                 filtered.insert(
-                    field.as_str(),
-                    data_value
-                        .remove(field.as_str(), false)
-                        .unwrap_or(Value::Null),
+                    &field_path,
+                    data_value.remove(&field_path, false).unwrap_or(Value::Null),
                 );
             }
             filtered.into_object()
@@ -198,6 +210,29 @@ mod tests {
                 ("longitude".into(), Value::from(-1.25)),
             ])
             .into(),
+        );
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn city_partial_lookup_skips_unparseable_selects() {
+        // An unparseable path in the select list is silently dropped from the
+        // output rather than surfacing as a null-valued literal field.
+        let values = find_select(
+            "2.125.160.216",
+            "tests/data/GeoIP2-City-Test.mmdb",
+            Some(&[
+                "location.latitude".to_string(),
+                "not a valid path".to_string(),
+            ]),
+        )
+        .unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert(
+            "location".into(),
+            ObjectMap::from([("latitude".into(), Value::from(51.75))]).into(),
         );
 
         assert_eq!(values, expected);

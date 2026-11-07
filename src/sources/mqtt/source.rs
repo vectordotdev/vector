@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
@@ -14,10 +15,10 @@ use crate::{
     internal_events::{EndpointBytesReceived, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
-    sources::{mqtt::MqttSourceConfig, util},
+    sources::{SourceError, mqtt::MqttSourceConfig, util},
 };
 
-pub struct MqttSource {
+pub(super) struct MqttSource {
     connector: MqttConnector,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -25,7 +26,11 @@ pub struct MqttSource {
 }
 
 impl MqttSource {
-    pub fn new(
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    pub(super) fn new(
         connector: MqttConnector,
         decoder: Decoder,
         log_namespace: LogNamespace,
@@ -39,15 +44,16 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub(super) async fn run(
+        self,
+        mut out: SourceSender,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), SourceError> {
         let (client, mut connection) = self.connector.connect();
 
         match &self.config.topic {
             OneOrMany::One(topic) => {
-                client
-                    .subscribe(topic, QoS::AtLeastOnce)
-                    .await
-                    .map_err(|_| ())?;
+                client.subscribe(topic, QoS::AtLeastOnce).await?;
             }
             OneOrMany::Many(topics) => {
                 client
@@ -57,8 +63,7 @@ impl MqttSource {
                             .cloned()
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
-                    .await
-                    .map_err(|_| ())?;
+                    .await?;
             }
         }
 
@@ -71,16 +76,9 @@ impl MqttSource {
                     // delivery guarantees.
                     // We need this issue resolved first:
                     // https://github.com/bytebeamio/rumqtt/issues/349
-                    match mqtt_event {
-                        Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
-                            self.process_message(publish, &mut out).await;
-                        }
-                        Ok(MqttEvent::Incoming(
-                            Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
-                        )) => {
-                            // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
-                        }
-                        _ => {}
+                    // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
+                    if let Ok(MqttEvent::Incoming(Incoming::Publish(publish))) = mqtt_event {
+                        self.process_message(publish, &mut out).await;
                     }
                 }
             }
@@ -88,12 +86,12 @@ impl MqttSource {
     }
 
     async fn process_message(&self, publish: Publish, out: &mut SourceSender) {
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
-            endpoint: &self.connector.options.broker_address().0,
+            endpoint: &self.config.common.host,
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
 
         let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
         // Error is logged by `vector_lib::codecs::Decoder`, no further handling
@@ -117,7 +115,7 @@ impl MqttSource {
 
         match out.send_batch(decoded).await {
             Ok(()) => {}
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
         }
     }
 

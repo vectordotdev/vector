@@ -24,7 +24,6 @@ pub struct IncrementalToAbsoluteConfig {
     ///
     /// By default, incremental metrics are evicted after 5 minutes of not being updated. The next
     /// incremental value will be reset.
-    #[configurable(derived)]
     #[serde(default)]
     pub cache: NormalizerConfig<IncrementalToAbsoluteDefaultNormalizerSettings>,
 }
@@ -38,8 +37,9 @@ impl NormalizerSettings for IncrementalToAbsoluteDefaultNormalizerSettings {
     const TIME_TO_LIVE: Option<u64> = Some(300);
 }
 
+#[must_use]
 pub const fn default_expire_metrics_secs() -> Duration {
-    Duration::from_secs(120)
+    Duration::from_mins(2)
 }
 
 impl_generate_config_from_default!(IncrementalToAbsoluteConfig);
@@ -69,13 +69,17 @@ pub struct IncrementalToAbsolute {
 }
 
 impl IncrementalToAbsolute {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metric cache configuration is invalid.
     pub fn new(config: &IncrementalToAbsoluteConfig) -> crate::Result<Self> {
         // Create a new MetricSet with the proper cache settings
         Ok(Self {
             data: MetricSet::new(config.cache.validate()?.into_settings()),
         })
     }
-    pub fn transform_one(&mut self, event: Event) -> Option<Event> {
+    pub fn transform_one(&mut self, event: &Event) -> Option<Event> {
         self.data
             .make_absolute(event.as_metric().clone())
             .map(Event::Metric)
@@ -91,7 +95,7 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(&v))))
     }
 }
 

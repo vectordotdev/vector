@@ -35,6 +35,11 @@ pub struct DnsQueryMessage {
 }
 
 #[derive(Clone, Debug, Default)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "These fields represent independent DNS header flags"
+)]
 pub struct QueryHeader {
     pub id: u16,
     pub opcode: u8,

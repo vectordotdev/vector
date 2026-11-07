@@ -6,20 +6,23 @@ use tracing::Instrument;
 
 use super::{
     create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
-    create_buffer_v2_with_max_record_size, read_next, read_next_some,
+    create_buffer_v2_with_max_record_size_and_usage, read_next, read_next_some,
 };
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
+
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
+        TryWriteOutcome,
         common::align16,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
     },
 };
 
 #[tokio::test]
-async fn writer_error_when_record_is_over_the_limit() {
+async fn writer_drops_record_that_is_over_the_limit() {
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -32,11 +35,18 @@ async fn writer_error_when_record_is_over_the_limit() {
             let second_write_size = align16((first_write_size + 1).try_into().unwrap())
                 .try_into()
                 .unwrap();
-            let second_record = SizedRecord::new(second_write_size);
+            let mut second_record = SizedRecord::new(second_write_size);
+            // Attach a finalizer so we can assert the oversized record resolves as `Delivered`
+            // (the source acks/checkpoints and moves on) rather than `Rejected` (which nacks
+            // acking sources like Pulsar, causing a poison-record retry loop).
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            second_record.add_batch_notifier(batch);
+
+            let third_record = SizedRecord::new(first_write_size);
 
             let max_record_size = get_corrected_max_record_size(&first_record);
-            let (mut writer, _reader, ledger) =
-                create_buffer_v2_with_max_record_size(data_dir, max_record_size).await;
+            let (mut writer, _reader, ledger, usage) =
+                create_buffer_v2_with_max_record_size_and_usage(data_dir, max_record_size).await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -51,15 +61,50 @@ async fn writer_error_when_record_is_over_the_limit() {
             writer.flush().await.expect("flush should not fail");
             assert_buffer_size!(ledger, 1, first_bytes_written as u64);
 
-            // Second write should fail because it exceeds the size of the first write by at least 16 bytes, which is
-            // the alignment of the serializer.
-            let _result = writer
+            // The second write exceeds the maximum record size. Rather than erroring (which used to
+            // tear down the whole buffer/topology), the writer drops just this record and reports
+            // success with zero bytes written, leaving the buffer untouched.
+            let dropped_bytes_written = writer
                 .write_record(second_record)
                 .await
-                .expect_err("write should fail");
+                .expect("oversized record should be dropped, not error");
+            assert_eq!(
+                dropped_bytes_written, 0,
+                "an over-limit record should write no bytes",
+            );
+            let snapshot = usage.snapshot();
+            assert_eq!(snapshot.received_event_count, 2);
+            assert_eq!(snapshot.sent_event_count, 0);
+            assert_eq!(snapshot.dropped_event_count, 1);
+            assert_eq!(snapshot.dropped_event_count_intentional, 0);
 
+            // The dropped record's finalizer must resolve to `Delivered` so that acking sources
+            // (e.g. Pulsar, file) ack/checkpoint rather than nacking and redelivering a record
+            // that can never be written.
+            tokio::task::yield_now().await;
+            assert_eq!(
+                receiver.try_recv(),
+                Ok(BatchStatus::Delivered),
+                "over-limit record should resolve as Delivered so acking sources do not redeliver it",
+            );
+
+            // The buffer is unchanged: the oversized record never entered it.
             writer.flush().await.expect("flush should not fail");
             assert_buffer_size!(ledger, 1, first_bytes_written as u64);
+
+            // And the writer is not wedged: a subsequent in-limit write still succeeds.
+            let third_bytes_written = writer
+                .write_record(third_record)
+                .await
+                .expect("write after a dropped record should not fail");
+            assert_enough_bytes_written!(third_bytes_written, SizedRecord, first_write_size);
+
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_size!(
+                ledger,
+                2,
+                first_bytes_written as u64 + third_bytes_written as u64
+            );
         }
     })
     .await;
@@ -411,7 +456,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
                 .try_write_record(first_record)
                 .await
                 .expect("write should not fail");
-            assert_eq!(first_write_result, None);
+            assert!(matches!(first_write_result, TryWriteOutcome::Written));
             writer.flush().await.expect("flush should not fail");
 
             // This write should return immediately because the buffer should be exactly full at this point:
@@ -419,7 +464,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
                 .try_write_record(second_record.clone())
                 .await
                 .expect("write should not fail");
-            assert_eq!(second_write_result, Some(second_record));
+            assert!(matches!(second_write_result, TryWriteOutcome::Full(_)));
         }
     })
     .await;
@@ -454,7 +499,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 .try_write_record(first_record)
                 .await
                 .expect("write should not fail");
-            assert_eq!(first_write_result, None);
+            assert!(matches!(first_write_result, TryWriteOutcome::Written));
             writer.flush().await.expect("flush should not fail");
 
             // This write should return immediately because the buffer should be exactly full at this point:
@@ -462,7 +507,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 .try_write_record(second_record.clone())
                 .await
                 .expect("write should not fail");
-            assert_eq!(second_write_result, Some(second_record));
+            assert!(matches!(second_write_result, TryWriteOutcome::Full(_)));
 
             // Now that we know that the buffer is truly full, close it and reopen it. Even though
             // it's full, this should succeed because being full should not block things like

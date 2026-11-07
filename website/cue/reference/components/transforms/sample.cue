@@ -20,7 +20,6 @@ components: transforms: sample: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.sample.configuration

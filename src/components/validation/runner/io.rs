@@ -1,11 +1,10 @@
 use std::convert::Infallible;
 
 use http::{Request, Response};
-use hyper::Body;
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     Status,
-    body::BoxBody,
+    body::Body as TonicBody,
     server::NamedService,
     transport::{Channel, Endpoint},
 };
@@ -22,11 +21,11 @@ use crate::{
         Client as VectorClient, HealthCheckRequest, HealthCheckResponse, PushEventsRequest,
         PushEventsResponse, Server as VectorServer, Service as VectorService, ServingStatus,
     },
-    sources::util::grpc::run_grpc_server,
+    sources::util::grpc::{GrpcKeepaliveConfig, run_grpc_server},
 };
 
 #[derive(Clone)]
-pub struct EventForwardService {
+pub(super) struct EventForwardService {
     tx: mpsc::Sender<Vec<Event>>,
 }
 
@@ -46,7 +45,9 @@ impl VectorService for EventForwardService {
             .into_inner()
             .events
             .into_iter()
-            .map(Event::from)
+            .map(|wrapper| {
+                Event::try_from(wrapper).expect("validation events are encoded by Vector")
+            })
             .collect();
 
         self.tx
@@ -69,26 +70,31 @@ impl VectorService for EventForwardService {
     }
 }
 
-pub struct InputEdge {
+pub(super) struct InputEdge {
     #[allow(dead_code)]
     client: VectorClient<Channel>,
 }
 
-pub struct OutputEdge {
+pub(super) struct OutputEdge {
     listen_addr: GrpcAddress,
     service: VectorServer<EventForwardService>,
     rx: mpsc::Receiver<Vec<Event>>,
 }
 
 impl InputEdge {
-    pub fn from_address(address: GrpcAddress) -> Self {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
+    pub(super) fn from_address(address: GrpcAddress) -> Self {
         let channel = Endpoint::from(address.as_uri()).connect_lazy();
         Self {
             client: VectorClient::new(channel),
         }
     }
 
-    pub fn spawn_input_client(
+    pub(super) fn spawn_input_client(
         self,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) -> mpsc::Sender<TestEvent> {
@@ -119,7 +125,7 @@ impl InputEdge {
 }
 
 impl OutputEdge {
-    pub fn from_address(listen_addr: GrpcAddress) -> Self {
+    pub(super) fn from_address(listen_addr: GrpcAddress) -> Self {
         let (tx, rx) = mpsc::channel(1024);
 
         Self {
@@ -129,7 +135,7 @@ impl OutputEdge {
         }
     }
 
-    pub fn spawn_output_server(
+    pub(super) fn spawn_output_server(
         self,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) -> mpsc::Receiver<Vec<Event>> {
@@ -138,15 +144,16 @@ impl OutputEdge {
     }
 }
 
-pub fn spawn_grpc_server<S>(
+pub(super) fn spawn_grpc_server<S>(
     listen_addr: GrpcAddress,
     service: S,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<TonicBody>, Response = Response<TonicBody>, Error = Infallible>
         + NamedService
         + Clone
         + Send
+        + Sync
         + 'static,
     S::Future: Send + 'static,
 {
@@ -165,7 +172,9 @@ pub fn spawn_grpc_server<S>(
         let server = run_grpc_server(
             listen_addr.as_socket_addr(),
             tls_settings,
+            None,
             service,
+            GrpcKeepaliveConfig::default(),
             shutdown_signal,
         );
         pin!(server);
@@ -173,7 +182,7 @@ pub fn spawn_grpc_server<S>(
         loop {
             select! {
                 // Propagate our shutdown signal to the shutdown signal that `run_grpc_server` needs.
-                _ = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
+                () = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
                     trigger_shutdown.take().unwrap().cancel();
                 },
                 // TODO: Should we check the return value here to see if its an `Err`?

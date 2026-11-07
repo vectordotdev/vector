@@ -14,18 +14,22 @@ use crate::{
     sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 use async_trait::async_trait;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
+use tokio_tungstenite::tungstenite::{
+    Utf8Bytes, error::Error as TungsteniteError, protocol::Message,
+};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, emit,
+    EstimatedJsonEncodedSizeOf,
+    codecs::encoding::Serializer,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        emit, register,
     },
 };
 
-pub struct WebSocketSink {
+pub(super) struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,
@@ -34,21 +38,21 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         config: &WebSocketSinkConfig,
         connector: WebSocketConnector,
-    ) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
+        transformer: Transformer,
+        serializer: Serializer,
+    ) -> Self {
         let encoder = Encoder::<()>::new(serializer);
 
-        Ok(Self {
+        Self {
             transformer,
             encoder,
             connector,
             ping_interval: config.common.ping_interval,
             ping_timeout: config.common.ping_timeout,
-        })
+        }
     }
 
     async fn create_sink_and_stream(
@@ -85,27 +89,27 @@ impl WebSocketSink {
         WS: Stream<Item = Result<Message, TungsteniteError>> + Unpin,
         O: Sink<Message, Error = TungsteniteError> + Unpin,
     {
-        const PING: &[u8] = b"PING";
+        const PING: Bytes = Bytes::from_static(b"PING");
 
         // tokio::time::Interval panics if the period arg is zero. Since the struct members are
         // using NonZeroU64 that is not something we need to account for.
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
-        if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
-            emit!(WebSocketConnectionError { error });
+        if let Err(error) = ws_sink.send(Message::Ping(PING)).await {
+            emit(WebSocketConnectionError { error });
             return Err(());
         }
         let mut last_pong = Instant::now();
 
-        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                        Ok(()) => ws_sink.send(Message::Ping(PING)).await,
                         Err(e) => Err(e)
                     }
                 },
@@ -123,9 +127,7 @@ impl WebSocketSink {
                 },
 
                 event = input.next() => {
-                    let mut event = if let Some(event) = event {
-                        event
-                    } else {
+                    let Some(mut event) = event else {
                         break;
                     };
 
@@ -136,28 +138,29 @@ impl WebSocketSink {
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
-                    match self.encoder.encode(event, &mut bytes) {
-                        Ok(()) => {
-                            finalizers.update_status(EventStatus::Delivered);
+                    if let Ok(()) = self.encoder.encode(event, &mut bytes) {
+                        finalizers.update_status(EventStatus::Delivered);
 
-                            let message = if encode_as_binary {
-                                Message::binary(bytes)
-                            }
-                            else {
-                                Message::text(String::from_utf8_lossy(&bytes))
+                        let message = if encode_as_binary {
+                            Message::binary(bytes)
+                        } else {
+                            let bytes = bytes.freeze();
+                            let text = match Utf8Bytes::try_from(bytes.clone()) {
+                                Ok(text) => text,
+                                Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
                             };
-                            let message_len = message.len();
+                            Message::Text(text)
+                        };
+                        let message_len = message.len();
 
-                            ws_sink.send(message).await.map(|_| {
-                                events_sent.emit(CountByteSize(1, event_byte_size));
-                                bytes_sent.emit(ByteSize(message_len));
-                            })
-                        },
-                        Err(_) => {
-                            // Error is handled by `Encoder`.
-                            finalizers.update_status(EventStatus::Errored);
-                            Ok(())
-                        }
+                        ws_sink.send(message).await.map(|()| {
+                            events_sent.emit(CountByteSize(1, event_byte_size));
+                            bytes_sent.emit(ByteSize(message_len));
+                        })
+                    } else {
+                        // Error is handled by `Encoder`.
+                        finalizers.update_status(EventStatus::Errored);
+                        Ok(())
                     }
                 },
                 else => break,
@@ -165,9 +168,9 @@ impl WebSocketSink {
 
             if let Err(error) = result {
                 if is_closed(&error) {
-                    emit!(WebSocketConnectionShutdown);
+                    emit(WebSocketConnectionShutdown);
                 } else {
-                    emit!(WebSocketConnectionError { error });
+                    emit(WebSocketConnectionError { error });
                 }
                 return Err(());
             }
@@ -188,7 +191,7 @@ impl StreamSink<Event> for WebSocketSink {
             pin_mut!(ws_sink);
             pin_mut!(ws_stream);
 
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
 
             if self
                 .handle_events(&mut input, &mut ws_stream, &mut ws_sink)
@@ -222,7 +225,7 @@ mod tests {
     use super::*;
     use crate::{
         common::websocket::WebSocketCommonConfig,
-        config::{SinkConfig, SinkContext},
+        config::{AcknowledgementsConfig, SinkConfig, SinkContext},
         http::Auth,
         test_util::{
             CountReceiver,
@@ -247,7 +250,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -261,7 +264,6 @@ mod tests {
         let auth = Some(Auth::Bearer {
             token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
-        let auth_clone = auth.clone();
         let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
@@ -269,14 +271,14 @@ mod tests {
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
-                auth: None,
+                auth: auth.clone(),
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        send_events_and_assert(addr, config, tls, auth_clone).await;
+        send_events_and_assert(addr, config, tls, auth).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -304,7 +306,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         send_events_and_assert(addr, config, tls, None).await;
@@ -324,7 +326,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -374,10 +376,10 @@ mod tests {
             .message_key()
             .expect("global log_schema.message_key to be valid path")
             .to_string();
-        for (source, received) in lines.iter().zip(output) {
-            let json = serde_json::from_str::<JsonValue>(&received).expect("Invalid JSON");
-            let received = json.get(message_key.as_str()).unwrap().as_str().unwrap();
-            assert_eq!(source, received);
+        for (source, payload) in lines.iter().zip(output) {
+            let json = serde_json::from_str::<JsonValue>(&payload).expect("Invalid JSON");
+            let message = json.get(message_key.as_str()).unwrap().as_str().unwrap();
+            assert_eq!(source, message);
         }
     }
 
@@ -405,24 +407,21 @@ mod tests {
                             Some(a) => {
                                 let auth_callback = |req: &Request, res: Response| {
                                     let hdr = req.headers().get("Authorization");
-                                    if let Some(h) = hdr {
-                                        match a {
-                                            Auth::Bearer { token }
-                                                if format!("Bearer {}", token.inner()) != h.to_str().unwrap() =>
-                                            {
-                                                return Err(
-                                                    http::Response::<Option<String>>::new(None),
-                                                );
-                                            }
-                                            Auth::Bearer { .. } => {}
-                                            Auth::Basic {
-                                                user: _user,
-                                                password: _password,
-                                            } => { /* Not needed for tests at the moment */ }
-                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
-                                            #[cfg(feature = "aws-core")]
-                                            _ => {}
+                                    match a {
+                                        Auth::Bearer { token }
+                                            if hdr.and_then(|h| h.to_str().ok())
+                                                != Some(format!("Bearer {}", token.inner()).as_str()) =>
+                                        {
+                                            return Err(http::Response::<Option<String>>::new(None));
                                         }
+                                        Auth::Bearer { .. } => {}
+                                        Auth::Basic {
+                                            user: _user,
+                                            password: _password,
+                                        } => { /* Not needed for tests at the moment */ }
+                                        Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
+                                        #[cfg(feature = "aws-core")]
+                                        _ => {}
                                     }
                                     Ok(res)
                                 };
@@ -438,7 +437,7 @@ mod tests {
                                 .filter_map(|msg| {
                                     future::ready(match msg {
                                         Ok(msg) if msg.is_text() => {
-                                            Some(Ok(msg.into_text().unwrap()))
+                                            Some(Ok(msg.into_text().unwrap().to_string()))
                                         }
                                         Err(TungsteniteError::Protocol(
                                             ProtocolError::ResetWithoutClosingHandshake,
@@ -458,9 +457,10 @@ mod tests {
                 })
                 .flatten();
 
-            match interrupt_stream {
-                false => stream.boxed(),
-                true => stream.take_until(stream_tripwire).boxed(),
+            if interrupt_stream {
+                stream.take_until(stream_tripwire).boxed()
+            } else {
+                stream.boxed()
             }
         })
     }

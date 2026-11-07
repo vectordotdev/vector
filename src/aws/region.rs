@@ -15,12 +15,12 @@ pub struct RegionOrEndpoint {
 
     /// Custom endpoint for use with AWS-compatible services.
     #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
-    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 
 impl RegionOrEndpoint {
     /// Creates with the given region.
+    #[must_use]
     pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
@@ -37,6 +37,7 @@ impl RegionOrEndpoint {
     }
 
     /// Returns the endpoint.
+    #[must_use]
     pub fn endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }

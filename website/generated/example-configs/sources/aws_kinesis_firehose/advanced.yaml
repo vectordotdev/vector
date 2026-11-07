@@ -1,0 +1,11 @@
+sources:
+  my_source_id:
+    type: aws_kinesis_firehose
+    access_key: A94A8FE5CCB19BA61C4C08
+    access_keys:
+      - A94A8FE5CCB19BA61C4C08
+    address: 0.0.0.0:443
+    common_attributes:
+      - environment
+    record_compression: auto
+    store_access_key: false

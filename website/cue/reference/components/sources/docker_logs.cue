@@ -83,7 +83,6 @@ components: sources: docker_logs: {
 				container using [`exclude_containers`](#exclude_containers).
 				""",
 		]
-		notices: []
 	}
 
 	installation: {

@@ -37,6 +37,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         Self {
             inner: None,
@@ -69,6 +70,11 @@ impl Buffer {
         })
     }
 
+    /// Appends input to the buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if compression or writing to the buffer fails.
     pub fn push(&mut self, input: &[u8]) {
         self.num_items += 1;
         match self.buffer() {
@@ -88,17 +94,15 @@ impl Buffer {
         }
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.inner
-            .as_ref()
-            .map(|inner| match inner {
-                InnerBuffer::Plain(inner) => inner.get_ref().is_empty(),
-                InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Zstd(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Snappy(inner) => inner.is_empty(),
-            })
-            .unwrap_or(true)
+        self.inner.as_ref().is_none_or(|inner| match inner {
+            InnerBuffer::Plain(inner) => inner.get_ref().is_empty(),
+            InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Zstd(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Snappy(inner) => inner.is_empty(),
+        })
     }
 }
 
@@ -162,10 +166,7 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        io::Read,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use bytes::{Buf, BytesMut};
     use futures::{SinkExt, StreamExt, future, stream};
@@ -177,7 +178,7 @@ mod test {
 
     #[tokio::test]
     async fn gzip() {
-        use flate2::read::MultiGzDecoder;
+        use vector_common::decompression::CappedDecoder;
 
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -220,15 +221,11 @@ mod test {
             .unwrap();
 
         assert!(output.len() > 1);
-        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 80_000);
+        assert!(output.iter().map(BytesMut::len).sum::<usize>() < 80_000);
 
-        let decompressed = output.into_iter().flat_map(|batch| {
-            let mut decompressed = vec![];
-            MultiGzDecoder::new(batch.reader())
-                .read_to_end(&mut decompressed)
-                .unwrap();
-            decompressed
-        });
+        let decompressed = output
+            .into_iter()
+            .flat_map(|batch| CappedDecoder::gzip(batch.reader()).decompress().unwrap());
 
         assert!(
             decompressed.eq(std::iter::repeat_n(

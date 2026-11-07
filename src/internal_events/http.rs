@@ -3,7 +3,9 @@ use std::{error::Error, time::Duration};
 use http::Response;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
+    internal_event::{
+        CounterName, HistogramName, InternalEvent, LossyF64, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -78,7 +80,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!(HistogramName::ComponentReceivedEventsCount).record(self.count as f64);
+        histogram!(HistogramName::ComponentReceivedEventsCount).record(LossyF64(self.count));
         counter!(
             CounterName::ComponentReceivedEventsTotal,
             "http_path" => self.http_path.to_string(),
@@ -104,6 +106,7 @@ pub struct HttpBadRequest<'a> {
 
 #[cfg(feature = "sources-utils-http")]
 impl<'a> HttpBadRequest<'a> {
+    #[must_use]
     pub fn new(code: u16, message: &'a str) -> Self {
         Self {
             code,

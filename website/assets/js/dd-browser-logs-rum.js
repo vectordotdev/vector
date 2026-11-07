@@ -19,7 +19,7 @@ if (datadogRum) {
       sessionSampleRate: 100,
       sessionReplaySampleRate: 20,
       trackResources: true,
-      trackInteractions: true,
+      trackUserInteractions: true,
       trackLongTasks: true,
       internalAnalyticsSubdomain: '8b61d74c'
     });
@@ -32,6 +32,7 @@ if (datadogLogs) {
       clientToken: '{{ $ddConfig.client_token }}',
       site: '{{ $ddConfig.site }}',
       forwardErrorsToLogs: true,
+      forwardConsoleLogs: ['error'],
       env,
       service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}',
@@ -39,4 +40,3 @@ if (datadogLogs) {
     })
   }
 }
-

@@ -20,7 +20,6 @@ fn get_vector_lock_path() -> PathBuf {
     parent_path
         .expect("Failed to find vector repo root")
         .join("Cargo.lock")
-        .to_path_buf()
 }
 
 fn get_git_hash() -> String {
@@ -82,7 +81,7 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
                 )
             }
             SourceKind::Path => (vrl_dep.version.to_string(), None),
-            kind => unimplemented!("unhandled source kind: {:?}", kind),
+            kind => unimplemented!("unhandled source kind: {kind:?}"),
         }
     } else {
         (vrl_dep.version.to_string(), None)

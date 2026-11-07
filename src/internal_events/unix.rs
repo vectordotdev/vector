@@ -1,16 +1,13 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use std::{io::Error, path::Path};
-
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
 use crate::internal_events::SocketOutgoingConnectionError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSocketConnectionEstablished<'a> {
+pub(crate) struct UnixSocketConnectionEstablished<'a> {
     pub path: &'a std::path::Path,
 }
 
@@ -22,7 +19,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSocketOutgoingConnectionError<E> {
+pub(crate) struct UnixSocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
@@ -30,7 +27,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketOutgoingConnectionError { error: self.error });
+        emit(SocketOutgoingConnectionError { error: self.error });
     }
 }
 
@@ -39,7 +36,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     any(feature = "sources-utils-net-unix", feature = "sources-dnstap")
 ))]
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSocketError<'a, E> {
+pub(crate) struct UnixSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
@@ -67,7 +64,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSocketSendError<'a, E> {
+pub(crate) struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
@@ -89,12 +86,12 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSendIncompleteError {
+pub(crate) struct UnixSendIncompleteError {
     pub data_size: usize,
     pub sent: usize,
 }
@@ -117,16 +114,26 @@ impl InternalEvent for UnixSendIncompleteError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
+#[cfg(any(
+    feature = "sources-utils-net-unix",
+    feature = "sources-socket",
+    feature = "sources-dnstap"
+))]
 #[derive(Debug, NamedInternalEvent)]
-pub struct UnixSocketFileDeleteError<'a> {
-    pub path: &'a Path,
-    pub error: Error,
+pub(crate) struct UnixSocketFileDeleteError<'a> {
+    pub path: &'a std::path::Path,
+    pub error: std::io::Error,
 }
 
+#[cfg(any(
+    feature = "sources-utils-net-unix",
+    feature = "sources-socket",
+    feature = "sources-dnstap"
+))]
 impl InternalEvent for UnixSocketFileDeleteError<'_> {
     fn emit(self) {
         error!(

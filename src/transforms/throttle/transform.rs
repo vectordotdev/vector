@@ -1,4 +1,5 @@
 use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
+use vector_lib::internal_event::emit;
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
@@ -15,7 +16,7 @@ use crate::{
     config::TransformContext,
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::TaskTransform,
 };
 
@@ -23,7 +24,7 @@ use crate::{
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     pub quota: Quota,
     pub flush_keys_interval: Duration,
-    key_field: Option<Template>,
+    key_field: Option<UnconfinedTemplate>,
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
@@ -35,6 +36,10 @@ where
     C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the exclusion condition cannot be built.
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
@@ -42,9 +47,8 @@ where
     ) -> crate::Result<Self> {
         let flush_keys_interval = config.window_secs;
 
-        let threshold = match NonZeroU32::new(config.threshold) {
-            Some(threshold) => threshold,
-            None => return Err(Box::new(ConfigError::NonZero)),
+        let Some(threshold) = NonZeroU32::new(config.threshold) else {
+            return Err(Box::new(ConfigError::NonZero));
         };
 
         let quota = match Quota::with_period(Duration::from_secs_f64(
@@ -79,9 +83,10 @@ where
     }
 
     pub fn emit_event_discarded(&self, key: String) {
-        emit!(ThrottleEventDiscarded {
+        emit(ThrottleEventDiscarded {
             key,
-            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
+            include_group_tag: self.internal_metrics.include_group_tag,
         });
     }
 }
@@ -113,11 +118,11 @@ where
                     let key = self.key_field.as_ref().and_then(|t| {
                         t.render_string(&event)
                             .map_err(|error| {
-                                emit!(TemplateRenderingError {
+                                emit(TemplateRenderingError {
                                     error,
                                     field: Some("key_field"),
                                     drop_event: false,
-                                })
+                                });
                             })
                             .ok()
                     });
@@ -153,6 +158,7 @@ mod tests {
     use indoc::indoc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -274,7 +280,7 @@ mod tests {
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         let mut special_log = LogEvent::default();
-        special_log.insert("special", "true");
+        special_log.insert(event_path!("special"), "true");
         tx.send(special_log.into()).await.unwrap();
         // The rate limiter should allow this log through regardless of current limit
         match out_stream.next().await {
@@ -329,9 +335,9 @@ mod tests {
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         let mut log_a = LogEvent::default();
-        log_a.insert("bucket", "a");
+        log_a.insert(event_path!("bucket"), "a");
         let mut log_b = LogEvent::default();
-        log_b.insert("bucket", "b");
+        log_b.insert(event_path!("bucket"), "b");
         tx.send(log_a.into()).await.unwrap();
         tx.send(log_b.into()).await.unwrap();
 
@@ -359,13 +365,13 @@ mod tests {
 
     #[tokio::test]
     async fn emits_internal_events() {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = ThrottleConfig {
                 threshold: 1,
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
-                internal_metrics: Default::default(),
+                internal_metrics: ThrottleInternalMetricsConfig::default(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -378,7 +384,7 @@ mod tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 }

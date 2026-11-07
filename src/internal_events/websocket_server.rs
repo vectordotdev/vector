@@ -2,11 +2,11 @@ use std::{error::Error, fmt::Debug};
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, GaugeName, InternalEvent, LossyF64, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionEstablished {
+pub(crate) struct WebSocketListenerConnectionEstablished {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -20,12 +20,12 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
             )
         );
         counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
-        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(LossyF64(self.client_count));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionFailedError {
+pub(crate) struct WebSocketListenerConnectionFailedError {
     pub error: Box<dyn Error>,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -39,7 +39,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
         );
-        let mut all_tags = self.extra_tags.clone();
+        let mut all_tags = self.extra_tags;
         all_tags.extend([
             ("error_code".to_string(), "ws_connection_failed".to_string()),
             (
@@ -55,7 +55,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionShutdown {
+pub(crate) struct WebSocketListenerConnectionShutdown {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -69,12 +69,12 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
             )
         );
         counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
-        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(self.client_count as f64);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(LossyF64(self.client_count));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerSendError {
+pub(crate) struct WebSocketListenerSendError {
     pub error: Box<dyn Error>,
 }
 
@@ -98,7 +98,7 @@ impl InternalEvent for WebSocketListenerSendError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerMessageSent {
+pub(crate) struct WebSocketListenerMessageSent {
     pub message_size: usize,
     pub extra_tags: Vec<(String, String)>,
 }

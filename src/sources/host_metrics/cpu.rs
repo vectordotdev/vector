@@ -2,17 +2,25 @@ use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
-use vector_lib::{event::MetricTags, metric_tags};
+use vector_lib::{
+    event::MetricTags,
+    internal_event::{CounterName, GaugeName, emit},
+    metric_tags,
+};
 
 use super::{HostMetrics, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
 
 const MODE: &str = "mode";
-const CPU_SECS_TOTAL: &str = "cpu_seconds_total";
-const LOGICAL_CPUS: &str = "logical_cpus";
-const PHYSICAL_CPUS: &str = "physical_cpus";
+const CPU_SECS_TOTAL: CounterName = CounterName::CpuSecondsTotal;
+const LOGICAL_CPUS: GaugeName = GaugeName::LogicalCpus;
+const PHYSICAL_CPUS: GaugeName = GaugeName::PhysicalCpus;
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
         // adds the metrics from cpu time for each cpu
         match heim::cpu::times().await {
@@ -42,7 +50,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load CPU times.",
                     error,
                 });
@@ -52,7 +60,7 @@ impl HostMetrics {
         match heim::cpu::logical_count().await {
             Ok(count) => output.gauge(LOGICAL_CPUS, count as f64, MetricTags::default()),
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load logical CPU count.",
                     error,
                 });
@@ -62,12 +70,12 @@ impl HostMetrics {
         match heim::cpu::physical_count().await {
             Ok(Some(count)) => output.gauge(PHYSICAL_CPUS, count as f64, MetricTags::default()),
             Ok(None) => {
-                emit!(HostMetricsScrapeError {
+                emit(HostMetricsScrapeError {
                     message: "Unable to determine physical CPU count.",
                 });
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load physical CPU count.",
                     error,
                 });
@@ -89,7 +97,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .cpu_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
 
         assert!(!metrics.is_empty());
 
@@ -98,7 +106,7 @@ mod tests {
 
         for metric in metrics {
             // the cpu_seconds_total metrics must have mode
-            if metric.name() == CPU_SECS_TOTAL {
+            if metric.name() == CPU_SECS_TOTAL.as_str() {
                 let tags = metric.tags();
                 assert!(
                     tags.is_some(),
@@ -109,9 +117,9 @@ mod tests {
                     tags.contains_key(MODE),
                     "Metric cpu_seconds_total must have a mode tag"
                 );
-            } else if metric.name() == PHYSICAL_CPUS {
+            } else if metric.name() == PHYSICAL_CPUS.as_str() {
                 n_physical_cpus += 1;
-            } else if metric.name() == LOGICAL_CPUS {
+            } else if metric.name() == LOGICAL_CPUS.as_str() {
                 n_logical_cpus += 1;
             } else {
                 // catch any bogey

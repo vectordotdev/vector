@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: statsd
+    address: 0.0.0.0:9000
+    mode: tcp

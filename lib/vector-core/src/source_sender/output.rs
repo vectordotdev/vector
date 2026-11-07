@@ -24,7 +24,7 @@ use vector_common::{
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, PostProcessor, SendError, SourceSenderItem};
+use super::{PostProcessor, SendError, SourceSenderItem, chunk_size_events};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
@@ -76,7 +76,7 @@ impl Drop for UnsentEventCount {
             let _enter = self.span.enter();
             internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                reason: "Source send cancelled.",
+                reason: "Source send interrupted mid-flight; pipeline may be overloaded or shutting down.",
             });
         }
     }
@@ -281,7 +281,7 @@ impl Output {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        let mut stream = events.ready_chunks(chunk_size_events());
         while let Some(events) = stream.next().await {
             self.send_batch(events).await?;
         }
@@ -305,7 +305,7 @@ impl Output {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
 
-        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
+        for events in array::events_into_arrays(events, Some(chunk_size_events())) {
             self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {

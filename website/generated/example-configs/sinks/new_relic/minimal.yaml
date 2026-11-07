@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: new_relic
+    inputs:
+      - my-source-or-transform-id
+    account_id: xxxx
+    api: events
+    license_key: xxxx

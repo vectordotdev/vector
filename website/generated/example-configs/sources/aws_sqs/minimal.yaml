@@ -1,0 +1,4 @@
+sources:
+  my_source_id:
+    type: aws_sqs
+    queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue

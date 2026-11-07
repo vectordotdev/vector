@@ -4,7 +4,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use futures::StreamExt;
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{AsyncClient, MqttOptions, PublishOptions};
 use tokio::time::timeout;
 
 use crate::{
@@ -34,21 +34,20 @@ fn mqtt_broker_port() -> u16 {
 async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<String>) {
     for message in messages {
         client
-            .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+            .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
             .await
             .unwrap();
     }
 }
 
-async fn get_mqtt_client() -> AsyncClient {
+fn get_mqtt_client() -> AsyncClient {
     let mut mqtt_options = MqttOptions::new(
         "integration-test-producer",
-        mqtt_broker_address(),
-        mqtt_broker_port(),
+        (mqtt_broker_address(), mqtt_broker_port()),
     );
-    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(5);
 
-    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_options).capacity(10).build();
 
     tokio::spawn(async move {
         loop {
@@ -89,12 +88,12 @@ async fn mqtt_one_topic_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = get_mqtt_client().await;
+        let client = get_mqtt_client();
         send_test_events(&client, topic, &input).await;
 
         let mut expected_messages: HashSet<_> = input.into_iter().collect();
@@ -109,9 +108,10 @@ async fn mqtt_one_topic_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })
@@ -153,12 +153,12 @@ async fn mqtt_many_topics_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = get_mqtt_client().await;
+        let client = get_mqtt_client();
         send_test_events(&client, &format!("{topic_prefix_1}/test"), &input_1).await;
         send_test_events(&client, &format!("{topic_prefix_2}/test"), &input_2).await;
 
@@ -175,9 +175,10 @@ async fn mqtt_many_topics_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })

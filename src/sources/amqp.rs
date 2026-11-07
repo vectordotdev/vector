@@ -1,6 +1,7 @@
 //! `AMQP` source.
-//! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+//! Handles version AMQP 0.9.1 which is used by `RabbitMQ`.
 use std::{io::Cursor, pin::Pin};
+use vector_lib::internal_event::{emit, register};
 
 use async_stream::stream;
 use bytes::Bytes;
@@ -22,7 +23,7 @@ use vector_lib::{
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
     lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use crate::{
     SourceSender,
@@ -34,7 +35,7 @@ use crate::{
         StreamClosedError,
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
 
@@ -89,18 +90,15 @@ pub struct AmqpSourceConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub(crate) framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
@@ -289,7 +287,7 @@ fn populate_log_event(
         log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
+        Value::from_static_str(AmqpSourceConfig::NAME),
     );
 
     // This handles the transition from the original timestamp logic. Originally the
@@ -302,7 +300,7 @@ fn populate_log_event(
                     metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
                     timestamp,
                 );
-            };
+            }
 
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
@@ -311,9 +309,13 @@ fn populate_log_event(
                 log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
-    };
+    }
 }
 
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Receives an event from `AMQP` and pushes it along the pipeline.
 async fn receive_event(
     config: &AmqpSourceConfig,
@@ -321,9 +323,9 @@ async fn receive_event(
     log_namespace: LogNamespace,
     finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
     msg: Delivery,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let decoder = config.decoder(log_namespace)?;
     let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
@@ -342,13 +344,13 @@ async fn receive_event(
         exchange: &exchange,
         delivery_tag: msg.delivery_tag as i64,
     };
-    let events_received = register!(EventsReceived);
+    let events_received = register(EventsReceived);
 
     let stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, byte_size)) => {
-                    emit!(AmqpBytesReceived {
+                    emit(AmqpBytesReceived {
                         byte_size,
                         protocol: "amqp_0_9_1",
                     });
@@ -402,24 +404,23 @@ async fn finalize_event_stream(
 
             match out.send_event_stream(&mut stream).await {
                 Err(_) => {
-                    emit!(StreamClosedError { count: 1 });
+                    emit(StreamClosedError { count: 1 });
                 }
-                Ok(_) => {
+                Ok(()) => {
                     finalizer.add(msg.into(), receiver);
                 }
             }
         }
-        None => match out.send_event_stream(&mut stream).await {
-            Err(_) => {
-                emit!(StreamClosedError { count: 1 });
-            }
-            Ok(_) => {
+        None => {
+            if out.send_event_stream(&mut stream).await.is_err() {
+                emit(StreamClosedError { count: 1 });
+            } else {
                 let ack_options = lapin::options::BasicAckOptions::default();
                 if let Err(error) = msg.acker.ack(ack_options).await {
-                    emit!(AmqpAckError { error });
+                    emit(AmqpAckError { error });
                 }
             }
-        },
+        }
     }
 }
 
@@ -431,7 +432,7 @@ async fn run_amqp_source(
     channel: Channel,
     log_namespace: LogNamespace,
     acknowledgements: bool,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
@@ -443,6 +444,7 @@ async fn run_amqp_source(
             .await
             .map_err(|error| {
                 error!(message = "Failed to apply basic_qos.", ?error);
+                crate::sources::SourceError::from(error)
             })?;
     }
 
@@ -457,6 +459,7 @@ async fn run_amqp_source(
         .await
         .map_err(|error| {
             error!(message = "Failed to consume.", ?error);
+            crate::sources::SourceError::from(error)
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -472,11 +475,11 @@ async fn run_amqp_source(
                 if let Some(try_m) = opt_m {
                     match try_m {
                         Err(error) => {
-                            emit!(AmqpEventError { error });
-                            return Err(());
+                            emit(AmqpEventError { error: &error });
+                            return Err(crate::sources::SourceError::from(error));
                         }
                         Ok(msg) => {
-                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?
+                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?;
                         }
                     }
                 } else {
@@ -494,19 +497,13 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
         BatchStatus::Delivered => {
             let ack_options = lapin::options::BasicAckOptions::default();
             if let Err(error) = entry.acker.ack(ack_options).await {
-                emit!(AmqpAckError { error });
+                emit(AmqpAckError { error });
             }
         }
-        BatchStatus::Errored => {
+        BatchStatus::Errored | BatchStatus::Rejected => {
             let ack_options = lapin::options::BasicRejectOptions::default();
             if let Err(error) = entry.acker.reject(ack_options).await {
-                emit!(AmqpRejectError { error });
-            }
-        }
-        BatchStatus::Rejected => {
-            let ack_options = lapin::options::BasicRejectOptions::default();
-            if let Err(error) = entry.acker.reject(ack_options).await {
-                emit!(AmqpRejectError { error });
+                emit(AmqpRejectError { error });
             }
         }
     }
@@ -524,6 +521,7 @@ pub mod test {
         crate::test_util::test_generate_config::<AmqpSourceConfig>();
     }
 
+    #[must_use]
     pub fn make_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),
@@ -538,6 +536,7 @@ pub mod test {
         config
     }
 
+    #[must_use]
     pub fn make_tls_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),
@@ -688,7 +687,7 @@ mod integration_test {
     ) {
         let payload = text.as_bytes();
         let payload_len = payload.len();
-        trace!("Sending message of length {} to {}.", payload_len, exchange,);
+        trace!("Sending message of length {payload_len} to {exchange}.");
 
         channel
             .basic_publish(
@@ -708,7 +707,7 @@ mod integration_test {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
-        trace!("Test exchange name: {}.", exchange);
+        trace!("Test exchange name: {exchange}.");
         let exchange: ShortString = exchange.into();
         let consumer = format!("test-consumer-{}", random_string(10));
 
@@ -773,7 +772,7 @@ mod integration_test {
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
-        trace!("{:?}", log);
+        trace!("{log:?}");
         assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
         assert_eq!(*log.get_source_type().unwrap(), "amqp".into());

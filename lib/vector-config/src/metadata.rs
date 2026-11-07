@@ -18,6 +18,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -25,6 +26,7 @@ impl Metadata {
         }
     }
 
+    #[must_use]
     pub fn title(&self) -> Option<&'static str> {
         self.title
     }
@@ -33,10 +35,7 @@ impl Metadata {
         self.title = Some(title);
     }
 
-    pub fn clear_title(&mut self) {
-        self.title = None;
-    }
-
+    #[must_use]
     pub fn with_description(desc: &'static str) -> Self {
         Self {
             description: Some(desc),
@@ -44,6 +43,7 @@ impl Metadata {
         }
     }
 
+    #[must_use]
     pub fn description(&self) -> Option<&'static str> {
         self.description
     }
@@ -52,10 +52,7 @@ impl Metadata {
         self.description = Some(desc);
     }
 
-    pub fn clear_description(&mut self) {
-        self.description = None;
-    }
-
+    #[must_use]
     pub fn default_value(&self) -> Option<&dyn ToValue> {
         self.default_value.as_deref()
     }
@@ -64,6 +61,7 @@ impl Metadata {
         self.default_value = Some(Box::new(default_value));
     }
 
+    #[must_use]
     pub fn deprecated(&self) -> bool {
         self.deprecated
     }
@@ -72,6 +70,7 @@ impl Metadata {
         self.deprecated = true;
     }
 
+    #[must_use]
     pub fn deprecated_message(&self) -> Option<&'static str> {
         self.deprecated_message
     }
@@ -80,6 +79,7 @@ impl Metadata {
         self.deprecated_message = Some(message);
     }
 
+    #[must_use]
     pub fn with_transparent(transparent: bool) -> Self {
         Self {
             transparent,
@@ -87,6 +87,7 @@ impl Metadata {
         }
     }
 
+    #[must_use]
     pub fn transparent(&self) -> bool {
         self.transparent
     }
@@ -95,6 +96,7 @@ impl Metadata {
         self.transparent = true;
     }
 
+    #[must_use]
     pub fn custom_attributes(&self) -> &[CustomAttribute] {
         &self.custom_attributes
     }
@@ -103,6 +105,7 @@ impl Metadata {
         self.custom_attributes.push(attribute);
     }
 
+    #[must_use]
     pub fn validations(&self) -> &[validation::Validation] {
         &self.validations
     }
@@ -111,6 +114,7 @@ impl Metadata {
         self.validations.push(validation);
     }
 
+    #[must_use]
     pub fn merge(mut self, other: Metadata) -> Self {
         self.custom_attributes.extend(other.custom_attributes);
         self.validations.extend(other.validations);

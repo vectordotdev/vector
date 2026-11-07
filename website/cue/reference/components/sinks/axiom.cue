@@ -18,7 +18,6 @@ components: sinks: axiom: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   1000
 				max_bytes:    1_048_576
 				timeout_secs: 1.0
@@ -66,7 +65,6 @@ components: sinks: axiom: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.axiom.configuration

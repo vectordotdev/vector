@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: prometheus_exporter
+    inputs:
+      - my-source-or-transform-id
+    address: 0.0.0.0:9598
+    distributions_as_summaries: false
+    flush_period_secs: 60
+    suppress_timestamp: false

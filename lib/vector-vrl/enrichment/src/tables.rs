@@ -131,6 +131,7 @@ impl TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
+    #[must_use]
     pub fn table_ids(&self) -> Vec<String> {
         let locked = self.loading.lock().unwrap();
         match *locked {
@@ -146,6 +147,11 @@ impl TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error after loading has finished, if the table is not loaded,
+    /// or if the table cannot index the requested fields.
     pub fn add_index(
         &mut self,
         table: &str,
@@ -169,12 +175,14 @@ impl TableRegistry {
 
     /// Returns a cheaply cloneable struct through that provides lock free read
     /// access to the enrichment tables.
+    #[must_use]
     pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
     }
 
     /// Returns the indexes that have been applied to the given table.
     /// If the table is reloaded we need these to reapply them to the new reloaded tables.
+    #[must_use]
     pub fn index_fields(&self, table: &str) -> Vec<(Case, Vec<String>)> {
         match &**self.tables.load() {
             Some(tables) => tables
@@ -187,13 +195,20 @@ impl TableRegistry {
 
     /// Checks if the table needs reloading.
     /// If in doubt (the table isn't in our list) we return true.
+    #[must_use]
     pub fn needs_reload(&self, table: &str) -> bool {
         match &**self.tables.load() {
-            Some(tables) => tables
-                .get(table)
-                .map(|table| table.needs_reload())
-                .unwrap_or(true),
+            Some(tables) => tables.get(table).is_none_or(|table| table.needs_reload()),
             None => true,
+        }
+    }
+
+    /// Extracts state from the table if available.
+    #[must_use]
+    pub fn extract_state(&self, table: &str) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        match &**self.tables.load() {
+            Some(tables) => tables.get(table).and_then(|t| t.extract_state()),
+            None => None,
         }
     }
 }
@@ -214,6 +229,11 @@ impl TableSearch {
     /// Search the given table to find the data.
     ///
     /// If we are in the writing stage, this function will return an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading has not finished, the table is not loaded,
+    /// or the table lookup fails, including when it does not find exactly one row.
     pub fn find_table_row<'a>(
         &self,
         table: &str,
@@ -241,6 +261,11 @@ impl TableSearch {
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
     /// Can return multiple matched records
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading has not finished, the table is not loaded,
+    /// or the table cannot evaluate the supplied search conditions.
     pub fn find_table_rows<'a>(
         &self,
         table: &str,

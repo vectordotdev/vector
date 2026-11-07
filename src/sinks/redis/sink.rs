@@ -1,4 +1,5 @@
 use std::{future, sync::Arc, time::Duration};
+use vector_lib::internal_event::emit;
 
 use redis::{
     RedisResult,
@@ -67,7 +68,7 @@ pub(super) struct ConnectionState {
 }
 
 impl ConnectionState {
-    pub const fn new_no_generation(conn: ConnectionManager) -> Self {
+    const fn new_no_generation(conn: ConnectionManager) -> Self {
         Self {
             connection: conn,
             generation: None,
@@ -146,7 +147,7 @@ impl RedisConnection {
                     node_connection_info,
                     task_conn_tx,
                 )
-                .await
+                .await;
             })),
         })
     }
@@ -164,7 +165,7 @@ impl RedisConnection {
         loop {
             if !repairing {
                 // Wait until a repair is needed
-                if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
+                if let Err(error) = conn_recv.wait_for(RepairState::needs_repair).await {
                     warn!("Connection state channel was dropped {error:?}.");
                     continue;
                 }
@@ -212,7 +213,7 @@ impl RedisConnection {
             Self::Sentinel {
                 connection_recv, ..
             } => {
-                match connection_recv.wait_for(|state| state.is_active()).await {
+                match connection_recv.wait_for(RepairState::is_active).await {
                     Ok(repair_state) => {
                         // SAFETY: we wait until we're in the active state before this runs
                         let state = repair_state
@@ -257,13 +258,18 @@ pub(super) struct RedisSink {
     transformer: vector_lib::codecs::Transformer,
     conn: RedisConnection,
     data_type: super::DataType,
-    key: Template,
+    key: ConfinedTemplate,
     score: Option<UnsignedIntTemplate>,
     batcher_settings: BatcherSettings,
 }
 
 impl RedisSink {
-    pub(super) fn new(config: &RedisSinkConfig, conn: RedisConnection) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: &RedisSinkConfig,
+        conn: RedisConnection,
+        key: ConfinedTemplate,
+        batcher_settings: BatcherSettings,
+    ) -> crate::Result<Self> {
         let list_method = config.list_option.map(|option| option.method);
         let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {
             (option.method, option.score.clone())
@@ -279,22 +285,20 @@ impl RedisSink {
             }
         };
 
-        let batcher_settings = config.batch.validate()?.into_batcher_settings()?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
-        let key = config.key.clone();
         let request = config.request;
 
         Ok(RedisSink {
             request,
-            batcher_settings,
-            transformer,
             encoder,
+            transformer,
             conn,
             data_type,
             key,
             score,
+            batcher_settings,
         })
     }
 
@@ -306,7 +310,7 @@ impl RedisSink {
             .key
             .render_string(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key"),
                     drop_event: true,
@@ -319,7 +323,7 @@ impl RedisSink {
             .as_ref()
             .map(|template| {
                 template.render(&event).map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("score"),
                         drop_event: true,
