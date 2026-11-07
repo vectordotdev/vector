@@ -966,8 +966,12 @@ impl ContainerState {
         self.generation += 1;
     }
 
-    const fn stopped(&mut self) {
+    fn stopped(&mut self) {
         self.running = false;
+        // Parked container information may outlive the container itself.
+        if let Some(info) = &mut self.info {
+            info.partial_event_merge_state = None;
+        }
     }
 
     const fn is_running(&self) -> bool {
@@ -976,11 +980,16 @@ impl ContainerState {
 
     /// True if it needs to be restarted.
     #[must_use]
-    fn return_info(&mut self, info: ContainerLogInfo) -> bool {
+    fn return_info(&mut self, mut info: ContainerLogInfo) -> bool {
         debug_assert!(self.info.is_none());
         // Generation is the only one strictly necessary,
         // but with v.running, restarting event_stream is automatically done.
         let restart = self.running || info.generation < self.generation;
+        if !restart {
+            // Match the old stream-local buffer lifetime when no reattachment
+            // is needed, without retaining the unfinished payload indefinitely.
+            info.partial_event_merge_state = None;
+        }
         self.info = Some(info);
         restart
     }

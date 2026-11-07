@@ -136,6 +136,61 @@ fn reattached_stream_preserves_partial_message(
     assert_eq!(message.coerce_to_bytes().as_ref(), b"next");
 }
 
+#[rstest::rstest]
+#[case(true)]
+#[case(false)]
+fn stopped_container_releases_partial_message(#[case] stop_before_return: bool) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    assert!(
+        info.new_event(
+            LogOutput::StdOut {
+                message: "2026-11-06T21:03:17.556996444Z unfinished".into(),
+            },
+            None,
+            true,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+        .is_none()
+    );
+    assert!(info.partial_event_merge_state.is_some());
+    let last_log = info.last_log;
+    let mut container = ContainerState::new_running();
+    if stop_before_return {
+        // `die` arrives while the follow stream is still draining.
+        container.stopped();
+        assert!(!container.return_info(info));
+    } else {
+        assert!(container.return_info(info));
+        // A same-generation reattachment must retain the prefix until stopped.
+        let info = container.take_info().unwrap();
+        assert!(info.partial_event_merge_state.is_some());
+        container.stopped();
+        assert!(!container.return_info(info));
+    }
+    let parked = container.info.as_ref().unwrap();
+    assert!(parked.partial_event_merge_state.is_none());
+    assert_eq!(parked.last_log, last_log);
+}
+
+#[test]
+fn stop_releases_already_parked_partial_message() {
+    let mut info = container_log_info();
+    info.partial_event_merge_state = Some(LogEventMergeState::new(LogEvent::from("unfinished")));
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    container.stopped();
+    assert!(
+        container
+            .info
+            .as_ref()
+            .unwrap()
+            .partial_event_merge_state
+            .is_none()
+    );
+}
+
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     #[test]
