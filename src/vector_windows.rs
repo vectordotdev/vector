@@ -397,9 +397,8 @@ pub fn run() -> Result<i32> {
 }
 
 fn stop_wait_hint(graceful_shutdown_duration: Option<Duration>) -> Duration {
-    graceful_shutdown_duration.map_or(Duration::ZERO, |limit| {
-        limit.min(Duration::from_millis(u32::MAX.into()))
-    })
+    let longest = Duration::from_millis(u32::MAX.into());
+    graceful_shutdown_duration.map_or(longest, |limit| limit.min(longest))
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
