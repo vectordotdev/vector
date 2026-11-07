@@ -49,9 +49,8 @@ pub struct OctetCountingDecoder {
     /// Whether the newline-delimited fallback is currently discarding the
     /// remainder of an oversized, non-terminated frame.
     newline_discarding: bool,
-    /// How far into the buffer the newline-delimited fallback has already
-    /// scanned for a delimiter, so partially delivered frames are not
-    /// rescanned from the start on every call.
+    /// How far the newline fallback has scanned for a delimiter, so
+    /// partial frames are not rescanned from the start on every call.
     newline_scan_pos: usize,
 }
 
@@ -182,11 +181,8 @@ impl OctetCountingDecoder {
 
                     Ok(None)
                 } else if let Some(msg) = src.get(from..to) {
-                    // The message bytes are passed through as-is: the framer is
-                    // byte-oriented, and UTF-8 handling (strict or lossy) is the
-                    // responsibility of the deserializer, which applies
-                    // `String::from_utf8_lossy` when `lossy` is enabled (the
-                    // default for the syslog deserializer).
+                    // Pass raw bytes through: UTF-8 handling (strict/lossy)
+                    // is up to the deserializer (syslog: lossy by default).
                     let bytes = Bytes::copy_from_slice(msg);
                     src.advance(to);
                     self.octet_decoding = None;
@@ -248,16 +244,11 @@ impl OctetCountingDecoder {
             .map(|state| self.octet_decode(state, src))
     }
 
-    /// Newline-delimited fallback decoding on raw bytes.
-    ///
-    /// `CharacterDelimitedDecoder` only enforces `max_length` once a
-    /// delimiter (or EOF) is seen, so a sender streaming a frame that never
-    /// terminates would grow the read buffer without bound. This wrapper
-    /// restores the incremental enforcement of the previous `LinesCodec`-
-    /// based fallback: as soon as the buffered bytes exceed `max_length`
-    /// with no newline in sight, they are discarded and the decoder keeps
-    /// discarding up to the next newline before resuming, keeping memory
-    /// bounded regardless of the sender's behavior.
+    /// Newline fallback on raw bytes. Enforces `max_length` incrementally,
+    /// unlike the underlying decoder (which only checks at the delimiter):
+    /// past the limit with no newline in sight, discard up to the next
+    /// newline (as `LinesCodec` did), so a never-terminating sender cannot
+    /// grow the buffer unbounded.
     fn newline_decode(&mut self, src: &mut BytesMut) -> Result<Option<Bytes>, BoxedFramingError> {
         if self.newline_discarding {
             // Discard the remainder of the oversized frame up to its newline.
@@ -270,25 +261,19 @@ impl OctetCountingDecoder {
             }
             self.newline_scan_pos = 0;
         } else {
-            // The buffer may have shrunk (e.g. a final frame consumed by
-            // `decode_eof`), so clamp the scan cursor before slicing.
+            // The buffer may have shrunk (e.g. via `decode_eof`); clamp the cursor.
             self.newline_scan_pos = self.newline_scan_pos.min(src.len());
             if memchr(b'\n', &src[self.newline_scan_pos..]).is_some() {
-                // A complete line is available; frame it. The delimiter is
-                // rescanned once from the start of the line by the
-                // underlying decoder, which is linear in the frame length
-                // and matches the framing cost itself.
+                // Complete line available; the underlying decoder rescans
+                // for the delimiter once (linear, same as framing itself).
                 self.newline_scan_pos = 0;
             } else {
-                // Still accumulating a partial line: remember how far we
-                // have scanned so the next call only scans newly arrived
-                // bytes (mirrors the `next_index` cursor of the previous
-                // `LinesCodec`-based fallback).
+                // Partial line: only scan newly arrived bytes next call
+                // (the old `LinesCodec` `next_index` cursor).
                 self.newline_scan_pos = src.len();
                 if src.len() > self.other.max_length() {
-                    // Over the limit and no delimiter in sight: drop what
-                    // has been buffered so far and discard the rest of this
-                    // frame as it arrives.
+                    // Over the limit with no delimiter: drop the buffer and
+                    // discard the rest of this frame as it arrives.
                     emit(DecoderFrameTooLongError {
                         length: src.len(),
                         max_length: self.other.max_length(),
@@ -318,11 +303,9 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
         if let Some(ret) = self.checked_decode(src) {
             ret.map_err(Into::into)
         } else {
-            // Octet counting isn't used so fallback to newline-delimited
-            // decoding. Frames are passed through as raw bytes; UTF-8
-            // handling is left to the deserializer. A trailing `\r` is
-            // stripped to preserve the behavior of the previous
-            // `LinesCodec`-based fallback.
+            // Octet counting isn't used so fallback to newline decoding on
+            // raw bytes (UTF-8 is the deserializer's job; `\r` stripped for
+            // `LinesCodec` parity).
             self.newline_decode(src)
                 .map(|line| line.map(strip_trailing_carriage_return))
         }
