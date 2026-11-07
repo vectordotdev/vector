@@ -9,21 +9,22 @@ params:
 # concurrency, the limiter will ramp up to that concurrency and then
 # drop down repeatedly. Note that, due to the timing of the adjustment,
 # this may actually occasionally go over the error limit above, but it
-# will be rare.
+# will be rare. Retries sleeping in backoff hold the logical slots, two per unit
+# of the limit, so the sink sits idle while they all wait.
 stats:
   in_flight:
     max: [5, 18]
     mode: [0, 6]
     mean: [2.2, 5.0]
   rate:
-    max: [52, 63]
+    max: [48, 63]
     mean: [20, 44]
 
 controller:
   in_flight:
     max: [5, 41]
-    mode: [4, 29]
-    mean: [3.5, 26]
+    mode: [0, 29]
+    mean: [3.0, 26]
   concurrency_limit:
     max: [6, 41]
     mode: [2, 29]
