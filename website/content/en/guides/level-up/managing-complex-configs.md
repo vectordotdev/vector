@@ -145,8 +145,8 @@ tests:
           - type: "vrl"
             source: |
               assert_eq!(.message, "Sorry, I'm busy this week Cecil")
-      # And we add a new output without conditions for inspecting
-      # a new transform
+      # And we add a new output without conditions to check that
+      # a new transform emits events
       - extract_from: "bar"
 ```
 
