@@ -1340,7 +1340,17 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer_tx.try_send_start_wait();
-        while let Some(events) = input_rx.next().await {
+        loop {
+            let events = tokio::select! {
+                biased;
+                // Apply control messages while idle, so that a reload does not have to wait for
+                // the next event to remove or pause a sink.
+                () = self.outputs.recv_control_messages() => continue,
+                events = input_rx.next() => events,
+            };
+            let Some(events) = events else {
+                break;
+            };
             self.on_events_received(&events);
             self.transform.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf)
@@ -1380,6 +1390,10 @@ impl Runner {
                         None => unreachable!("bad poll"),
                     }
                 }
+
+                // Apply control messages while idle, so that a reload does not have to wait for
+                // the next event to remove or pause a sink.
+                () = self.outputs.recv_control_messages(), if !shutting_down => {}
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
                     if let Some(input_arrays) = input_arrays {

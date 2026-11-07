@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error, sync::Arc, time::Instant};
+use std::{collections::HashMap, error, sync::Arc, task::Poll, time::Instant};
 
 use vector_common::{
     EventDataEq,
@@ -20,6 +20,7 @@ use crate::{
 
 struct TransformOutput {
     fanout: Fanout,
+    control_channel_open: bool,
     events_sent: Registered<EventsSent>,
     log_schema_definitions: HashMap<OutputId, Arc<schema::Definition>>,
     output_id: Arc<OutputId>,
@@ -54,6 +55,7 @@ impl TransformOutputs {
                 None => {
                     primary_output = Some(TransformOutput {
                         fanout,
+                        control_channel_open: true,
                         events_sent: register(EventsSent::from(internal_event::Output(Some(
                             DEFAULT_OUTPUT.into(),
                         )))),
@@ -70,6 +72,7 @@ impl TransformOutputs {
                         name.clone(),
                         TransformOutput {
                             fanout,
+                            control_channel_open: true,
                             events_sent: register(EventsSent::from(internal_event::Output(Some(
                                 name.clone().into(),
                             )))),
@@ -96,6 +99,35 @@ impl TransformOutputs {
 
     pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
         TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
+    }
+
+    /// Waits for control messages on any output and applies all that are available.
+    ///
+    /// This lets an idle transform remove or pause a sink during a reload without waiting for its
+    /// next event. Never completes once the control channels of all outputs have closed.
+    pub async fn recv_control_messages(&mut self) {
+        std::future::poll_fn(|cx| {
+            let mut applied = false;
+            for output in self
+                .primary_output
+                .iter_mut()
+                .chain(self.named_outputs.values_mut())
+            {
+                while output.control_channel_open {
+                    match output.fanout.poll_control_message(cx) {
+                        Poll::Ready(true) => applied = true,
+                        Poll::Ready(false) => output.control_channel_open = false,
+                        Poll::Pending => break,
+                    }
+                }
+            }
+            if applied {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
     }
 
     /// Sends the events in the buffer to their respective outputs.
