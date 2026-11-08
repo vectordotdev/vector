@@ -15,7 +15,7 @@ const BRACKETS_SIZE: usize = 2;
 const BRACES_SIZE: usize = 2;
 
 const QUOTES_SIZE: usize = 2;
-const COMMA_SIZE: usize = 1;
+pub(crate) const COMMA_SIZE: usize = 1;
 const COLON_SIZE: usize = 1;
 
 const EPOCH_RFC3339_0: &str = "1970-01-01T00:00:00Z";
@@ -42,6 +42,12 @@ const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 /// Ideally, no allocations should take place in any implementation of this function.
 pub trait EstimatedJsonEncodedSizeOf {
     fn estimated_json_encoded_size_of(&self) -> JsonSize;
+}
+
+/// Estimated size of a `"key":value` object member, excluding the comma separating it from its
+/// siblings.
+pub(crate) fn estimated_json_encoded_member_size(key: &str, value_size: JsonSize) -> usize {
+    key.estimated_json_encoded_size_of().get() + COLON_SIZE + value_size.get()
 }
 
 impl<T: EstimatedJsonEncodedSizeOf> EstimatedJsonEncodedSizeOf for &T {
