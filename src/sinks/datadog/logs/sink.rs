@@ -6,7 +6,7 @@ use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     lookup::event_path,
 };
 use vrl::{
@@ -219,7 +219,7 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            emit!(DatadogLogsReservedAttributeConflict {
+            emit(DatadogLogsReservedAttributeConflict {
                 meaning,
                 source_path: current_path,
                 destination_path: expected_field_name,
@@ -306,9 +306,9 @@ impl LogRequestBuilder {
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
                 if events_with_estimated_size.pop_front().is_some() {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
-                        reason: "Event too large to encode."
+                        reason: "Event too large to encode.",
                     });
                 }
                 continue;
@@ -458,7 +458,7 @@ fn encode_log(
     // mismatch here indicates that the size calculation has diverged. Request serialization
     // separately enforces `max_payload_bytes` in release builds.
     debug_assert!(encoded_size <= truncation.max_log_bytes);
-    emit!(DatadogLogsEventTruncated {
+    emit(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
     });
@@ -624,7 +624,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(reqs) => Some(futures::stream::iter(reqs)),

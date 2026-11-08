@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
@@ -373,7 +374,7 @@ impl FileSink {
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
             compression: config.compression,
-            events_sent: register!(EventsSent::from(Output(None))),
+            events_sent: register(EventsSent::from(Output(None))),
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             truncation_config: config.truncate.clone(),
             confinement,
@@ -386,7 +387,7 @@ impl FileSink {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("path"),
                     drop_event: true,
@@ -400,7 +401,7 @@ impl FileSink {
             match confinement.confine(&rendered_path) {
                 Ok(normalized) => Some(path_to_bytes(&normalized)),
                 Err(error) => {
-                    emit!(FilePathOutsideBaseDirError {
+                    emit(FilePathOutsideBaseDirError {
                         path: &rendered_path,
                         base_dir: confinement.base_dir(),
                         error,
@@ -433,7 +434,7 @@ impl FileSink {
                         debug!(message = "Closing all the open files.");
                         for (path, file) in self.files.iter_mut() {
                             if let Err(error) = file.close().await {
-                                emit!(FileIoError {
+                                emit(FileIoError {
                                     error,
                                     code: "failed_closing_file",
                                     message: "Failed to close file.",
@@ -445,7 +446,7 @@ impl FileSink {
                             }
                         }
 
-                        emit!(FileOpen {
+                        emit(FileOpen {
                             count: 0
                         });
 
@@ -496,7 +497,7 @@ impl FileSink {
                     // We couldn't open the file for this event.
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
-                    emit!(FileIoError {
+                    emit(FileIoError {
                         code: "failed_opening_file",
                         message: "Unable to open the file.",
                         error,
@@ -513,7 +514,7 @@ impl FileSink {
                         .as_ref()
                         .map(|c| c.base_dir().to_path_buf())
                         .unwrap_or_default();
-                    emit!(FilePathOutsideBaseDirError {
+                    emit(FilePathOutsideBaseDirError {
                         path: &rendered,
                         base_dir: &base,
                         error,
@@ -526,8 +527,8 @@ impl FileSink {
             let outfile = OutFile::new(file, self.compression);
 
             self.files.insert_at(path.clone(), outfile, next_deadline);
-            emit!(FileOpen {
-                count: self.files.len()
+            emit(FileOpen {
+                count: self.files.len(),
             });
             self.files.get_mut(&path).unwrap()
         };
@@ -539,7 +540,7 @@ impl FileSink {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
                 self.events_sent.emit(CountByteSize(1, event_size));
-                emit!(FileBytesSent {
+                emit(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
                     include_file_metric_tag: self.include_file_metric_tag,
@@ -547,7 +548,7 @@ impl FileSink {
             }
             Err(error) => {
                 finalizers.update_status(EventStatus::Errored);
-                emit!(FileIoError {
+                emit(FileIoError {
                     code: "failed_writing_file",
                     message: "Failed to write the file.",
                     error,
@@ -599,7 +600,7 @@ impl FileSink {
 
     async fn close_file(&self, mut file: OutFile, path: Expired<Bytes>) {
         if let Err(error) = file.close().await {
-            emit!(FileIoError {
+            emit(FileIoError {
                 error,
                 code: "failed_closing_file",
                 message: "Failed to close file.",
@@ -608,8 +609,8 @@ impl FileSink {
             });
         }
         drop(file); // ignore close error
-        emit!(FileOpen {
-            count: self.files.len()
+        emit(FileOpen {
+            count: self.files.len(),
         });
     }
 }

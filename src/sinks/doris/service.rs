@@ -19,6 +19,7 @@ use vector_common::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
+use vector_lib::internal_event::emit;
 
 #[derive(Clone)]
 pub(super) struct DorisService {
@@ -66,7 +67,7 @@ impl DorisService {
             if let Some(loaded_rows) = loaded_rows
                 && let Some(load_bytes) = load_bytes
             {
-                emit!(DorisRowsLoaded {
+                emit(DorisRowsLoaded {
                     loaded_rows,
                     load_bytes,
                 });
@@ -78,7 +79,7 @@ impl DorisService {
                 .and_then(serde_json::Value::as_i64)
                 && filtered_rows > 0
             {
-                emit!(DorisRowsFiltered { filtered_rows });
+                emit(DorisRowsFiltered { filtered_rows });
             }
         }
     }

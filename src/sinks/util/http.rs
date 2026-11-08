@@ -22,6 +22,7 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::EventStatus,
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     stream::{DriverResponse, batcher::limiter::ItemBatchSize},
 };
@@ -571,7 +572,7 @@ where
             let request = request_builder
                 .build(request)
                 .inspect_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })
                 .map_err(HttpError::from)?;
             #[cfg(feature = "aws-core")]
@@ -610,7 +611,7 @@ where
     B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
-        emit!(EndpointBytesSent {
+        emit(EndpointBytesSent {
             byte_size,
             protocol,
             endpoint,

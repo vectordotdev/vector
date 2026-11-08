@@ -148,13 +148,13 @@ impl From<Protocol> for SharedString {
 ///     }
 /// );
 ///
-/// let handle = register!(Event { event_field: "message" });
+/// let handle = register(Event { event_field: "message" });
 ///
 /// handle.emit(DataType(123));
 /// ```
 ///
 /// In this example, the first set of fields describes the data required to register the event. This
-/// is what would be used by the `register!` macro. For example, `register!(Event { event_field:
+/// is what would be used by the `register` function. For example, `register(Event { event_field:
 /// "something" })`. The second set of fields describes the data required to store the registered
 /// handle, namely the `Counter`s and `Gauge`s that record the handle from `metrics` as well as any
 /// associated data for emitting traces or debug messages, followed by an initialization assignment

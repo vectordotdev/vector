@@ -22,6 +22,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
+    internal_event::emit,
     lookup::{OwnedValuePath, path},
     shutdown::ShutdownSignal,
     source_sender::SourceSender,
@@ -153,7 +154,7 @@ where
             let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
-                    emit!(SocketBindError {
+                    emit(SocketBindError {
                         mode: SocketMode::Tcp,
                         error: &error,
                     });
@@ -196,9 +197,9 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                emit!(SocketReceiveError {
+                                emit(SocketReceiveError {
                                     mode: SocketMode::Tcp,
-                                    error: &error
+                                    error: &error,
                                 });
                                 return;
                             }
@@ -220,7 +221,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit(ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -248,7 +249,7 @@ where
                                     // including paths that return early from
                                     // handle_stream (TLS handshake failure,
                                     // shutdown during handshake).
-                                    emit!(TcpSourceConnectionClosed);
+                                    emit(TcpSourceConnectionClosed);
                                     drop(tcp_connection_permit);
                                 })
                                 .instrument(span.or_current()),
@@ -295,12 +296,12 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error, peer_addr });
+                emit(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
         Some(()) = &mut handshake_timeout => {
-            emit!(TcpSocketTlsHandshakeTimeout {
+            emit(TcpSocketTlsHandshakeTimeout {
                 peer_addr,
                 timeout: Duration::from_secs(
                     tls_handshake_timeout_secs.map_or(0, NonZeroU64::get),
@@ -326,9 +327,9 @@ async fn handle_stream<T>(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(TcpBytesReceived {
+        emit(TcpBytesReceived {
             byte_size,
-            peer_addr
+            peer_addr,
         });
     });
 
@@ -395,7 +396,7 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
-                        emit!(SocketEventsReceived {
+                        emit(SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
@@ -459,7 +460,7 @@ async fn handle_stream<T>(
                                             error = %error,
                                         );
                                     } else {
-                                        emit!(TcpSendAckError { error, peer_addr });
+                                        emit(TcpSendAckError { error, peer_addr });
                                     }
                                     break;
                                 }
@@ -468,13 +469,13 @@ async fn handle_stream<T>(
                                 break;
                             }
                         } else {
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             break;
                         }
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            emit!(DecoderFramingError { error });
+                            emit(DecoderFramingError { error });
                             break;
                         }
                     }

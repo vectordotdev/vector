@@ -1,4 +1,5 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
+use vector_lib::internal_event::{emit, register};
 
 use aws_sdk_sqs::{
     Client as SqsClient,
@@ -58,7 +59,7 @@ impl SqsSource {
             });
             Arc::new(finalizer)
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
 
         for _ in 0..self.concurrency {
             let source = self.clone();
@@ -116,7 +117,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                emit(SqsMessageReceiveError { error: &err });
                 return;
             }
         };
@@ -126,10 +127,10 @@ impl SqsSource {
                 .iter()
                 .map(|message| message.body().map_or(0, str::len))
                 .sum();
-            emit!(EndpointBytesReceived {
+            emit(EndpointBytesReceived {
                 byte_size,
                 protocol: "http",
-                endpoint: &self.queue_url
+                endpoint: &self.queue_url,
             });
 
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
@@ -179,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(_) => emit!(StreamClosedError { count }),
+                Err(_) => emit(StreamClosedError { count }),
             }
         }
     }
@@ -212,7 +213,7 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(SqsMessageDeleteError { error: &err });
+            emit(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -255,7 +256,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Vector,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -308,7 +309,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Legacy,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);

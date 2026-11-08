@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
@@ -85,12 +86,12 @@ impl MqttSource {
     }
 
     async fn process_message(&self, publish: Publish, out: &mut SourceSender) {
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
             endpoint: &self.config.common.host,
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
 
         let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
         // Error is logged by `vector_lib::codecs::Decoder`, no further handling
@@ -114,7 +115,7 @@ impl MqttSource {
 
         match out.send_batch(decoded).await {
             Ok(()) => {}
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
         }
     }
 
