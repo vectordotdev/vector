@@ -81,8 +81,9 @@ where
     /// Read watched files until shutdown, forwarding their lines to the output sink.
     ///
     /// `shutdown_data` triggers a final read pass of watched files before stopping
-    /// output; `shutdown_checkpointer` stops the background checkpoint writer after
-    /// all acknowledgements have completed.
+    /// output; `shutdown_checkpointer` must wait for the receiver to finish updating
+    /// offsets and for all acknowledgements to complete before stopping the
+    /// background checkpoint writer.
     ///
     /// # Errors
     /// Returns the output sink's error if sending a batch of lines fails.

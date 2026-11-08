@@ -1014,20 +1014,27 @@ impl Source {
             events.right_stream()
         };
 
-        let event_processing_loop = out.send_event_stream(&mut stream);
+        let event_processing_loop = async move { out.send_event_stream(&mut stream).await };
+        let (send_receiver_done, receiver_done) = tokio::sync::oneshot::channel::<()>();
 
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
-                        error,
-                        count: events_count,
-                    }),
-                });
+            let fut = util::run_file_server(
+                file_server,
+                file_source_tx,
+                shutdown,
+                receiver_done,
+                checkpointer,
+            )
+            .map(|result| match result {
+                Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                Err(error) => emit(KubernetesLifecycleError {
+                    message: "File server exited with an error.",
+                    error,
+                    count: events_count,
+                }),
+            });
             slot.bind(Box::pin(fut));
         }
         {
@@ -1037,16 +1044,21 @@ impl Source {
                 shutdown,
                 Duration::from_secs(30), // more than enough time to propagate
             )
-            .map(|result| match result {
-                Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                Ok(Err(_)) => emit(StreamClosedError {
-                    count: events_count,
-                }),
-                Err(error) => emit(KubernetesLifecycleError {
-                    error,
-                    message: "Event processing loop timed out during the shutdown.",
-                    count: events_count,
-                }),
+            .map(move |result| {
+                // Final offsets are updated by the receiver, not by FileServer.
+                // Release checkpoint shutdown on success, error, or timeout.
+                _ = send_receiver_done.send(());
+                match result {
+                    Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
+                    Ok(Err(_)) => emit(StreamClosedError {
+                        count: events_count,
+                    }),
+                    Err(error) => emit(KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                        count: events_count,
+                    }),
+                }
             });
             slot.bind(Box::pin(fut));
         }
