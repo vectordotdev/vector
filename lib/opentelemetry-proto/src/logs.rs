@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
-    config::{LegacyKey, LogNamespace, log_schema},
+    config::{LegacyKey, LogNamespace, LogSchema, log_schema},
     event::{Event, LogEvent},
 };
 use vrl::{
@@ -38,6 +38,7 @@ pub const EVENT_NAME_KEY: &str = "event_name";
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
         let now = Utc::now();
+        let schema = log_schema();
 
         self.scope_logs.into_iter().flat_map(move |scope_log| {
             let scope = scope_log.scope;
@@ -48,7 +49,7 @@ impl ResourceLogs {
                     scope: scope.clone(),
                     log_record,
                 }
-                .into_event(log_namespace, now)
+                .into_event(log_namespace, schema, now)
             })
         })
     }
@@ -67,7 +68,12 @@ impl ResourceLog {
         clippy::too_many_lines,
         reason = "keep the existing protocol field mapping together; splitting is deferred"
     )]
-    fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
+    fn into_event(
+        self,
+        log_namespace: LogNamespace,
+        schema: &LogSchema,
+        now: DateTime<Utc>,
+    ) -> Event {
         let mut log = match log_namespace {
             LogNamespace::Vector => {
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
@@ -79,7 +85,7 @@ impl ResourceLog {
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    log.maybe_insert(log_schema().message_key_target_path(), v);
+                    log.maybe_insert(schema.message_key_target_path(), v);
                 }
                 log
             }
@@ -248,14 +254,14 @@ impl ResourceLog {
         log_namespace.insert_source_metadata(
             SOURCE_NAME,
             &mut log,
-            log_schema().timestamp_key().map(LegacyKey::Overwrite),
+            schema.timestamp_key().map(LegacyKey::Overwrite),
             path!(TIMESTAMP_KEY),
             timestamp,
         );
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            log_schema().source_type_key(),
+            schema.source_type_key(),
             path!("source_type"),
             Value::from_static_str(SOURCE_NAME),
         );
@@ -300,7 +306,11 @@ impl ResourceLog {
 /// If that metadata is absent, the event field is treated as the marker for sources that
 /// write it there.
 #[must_use]
-pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceRequest {
+pub fn log_event_to_export_request(log: LogEvent) -> ExportLogsServiceRequest {
+    encode_log_event(log, log_schema())
+}
+
+fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceRequest {
     let mut record = LogRecord::default();
 
     let mut fields = match log.namespace() {
@@ -333,12 +343,6 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
             fields
         }
         LogNamespace::Legacy => {
-            let schema = log_schema();
-            // A marker at the configured metadata path leaves the event field as user data.
-            // Otherwise, remove the root marker for Legacy sources that ignore the prefix.
-            let source_type_key = schema
-                .source_type_key_target_path()
-                .filter(|path| path.prefix == PathPrefix::Event || !log.contains(*path));
             // Read timestamps before removing a message that may contain them. The
             // opentelemetry source ignores the timestamp key's metadata prefix, so
             // prefer metadata but retain the event-root fallback.
@@ -354,15 +358,23 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
                 .and_then(|path| log.get((PathPrefix::Event, path)))
                 .and_then(Value::as_timestamp)
                 .and_then(timestamp_nanos);
+            // Remove the marker before the message, so that it is not sent in the body when the
+            // message contains it. A marker at the configured metadata path leaves the event
+            // field as user data. Otherwise, remove the root marker for Legacy sources that
+            // ignore the prefix.
+            if let Some(path) = schema.source_type_key_target_path() {
+                if path.prefix == PathPrefix::Event || log.contains(path) {
+                    log.remove_prune(path, true);
+                } else {
+                    log.remove_prune((PathPrefix::Event, &path.path), true);
+                }
+            }
             // The message key can point into metadata (for example `%message`), so remove it
             // with its full target path before the metadata is discarded.
             if let Some(path) = schema.message_key_target_path() {
                 record.body = log.remove_prune(path, true).and_then(into_body);
             }
             let (mut fields, _) = log.into_parts();
-            if let Some(path) = source_type_key {
-                fields.remove(&path.path, true);
-            }
             record.time_unix_nano = metadata_time
                 .or_else(|| {
                     let extracted_time = schema
@@ -402,8 +414,7 @@ fn take_record_fields(
     record: &mut LogRecord,
 ) -> (Resource, InstrumentationScope) {
     record.severity_text = take(fields, path!(SEVERITY_TEXT_KEY), into_string).unwrap_or_default();
-    record.severity_number =
-        take(fields, path!(SEVERITY_NUMBER_KEY), into_severity_number).unwrap_or_default();
+    record.severity_number = take(fields, path!(SEVERITY_NUMBER_KEY), into_i32).unwrap_or_default();
     record.flags = take(fields, path!(FLAGS_KEY), into_u32).unwrap_or_default();
     record.event_name = take(fields, path!(EVENT_NAME_KEY), into_string).unwrap_or_default();
     record.dropped_attributes_count =
@@ -505,12 +516,11 @@ fn into_u32(value: Value) -> Result<u32, Value> {
     }
 }
 
-fn into_severity_number(value: Value) -> Result<i32, Value> {
+/// Any `i32` is accepted, because the source keeps severity numbers that are newer than the
+/// vendored OTLP schema.
+fn into_i32(value: Value) -> Result<i32, Value> {
     match value {
-        Value::Integer(int) => i32::try_from(int)
-            .ok()
-            .filter(|number| SeverityNumber::try_from(*number).is_ok())
-            .ok_or(Value::Integer(int)),
+        Value::Integer(int) => i32::try_from(int).map_err(|_| Value::Integer(int)),
         other => Err(other),
     }
 }
@@ -535,7 +545,6 @@ fn into_kv_list(value: Value) -> Result<Vec<KeyValue>, Value> {
 mod tests {
     use chrono::{TimeZone, Utc};
     use prost::Message;
-    use vector_core::config::{LogSchema, init_log_schema};
     use vrl::{event_path, owned_value_path, path::OwnedTargetPath};
 
     use super::*;
@@ -618,26 +627,52 @@ mod tests {
         )
     }
 
-    fn round_trip(namespace: LogNamespace) {
+    fn round_trip(namespace: LogNamespace, schema: &LogSchema) {
         let expected = full_request();
-        let mut events: Vec<Event> = expected.resource_logs[0]
-            .clone()
-            .into_event_iter(namespace)
-            .collect();
-        assert_eq!(events.len(), 1);
-        let log = events.pop().unwrap().into_log();
+        let resource_logs = expected.resource_logs[0].clone();
+        let scope_logs = resource_logs.scope_logs[0].clone();
+        let log = ResourceLog {
+            resource: resource_logs.resource,
+            scope: scope_logs.scope,
+            log_record: scope_logs.log_records[0].clone(),
+        }
+        .into_event(namespace, schema, Utc::now())
+        .into_log();
         assert_eq!(log.namespace(), namespace);
-        assert_eq!(log_event_to_export_request(log), expected);
+        assert_eq!(encode_log_event(log, schema), expected);
     }
 
     #[test]
     fn decoded_legacy_log_round_trips() {
-        round_trip(LogNamespace::Legacy);
+        round_trip(LogNamespace::Legacy, &LogSchema::default());
     }
 
     #[test]
     fn decoded_vector_namespace_log_round_trips() {
-        round_trip(LogNamespace::Vector);
+        round_trip(LogNamespace::Vector, &LogSchema::default());
+    }
+
+    #[test]
+    fn decoded_log_with_unknown_severity_number_round_trips() {
+        // A severity number that is newer than the vendored OTLP schema.
+        let severity_number = 25;
+        assert!(SeverityNumber::try_from(severity_number).is_err());
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let log = ResourceLog {
+                resource: None,
+                scope: None,
+                log_record: LogRecord {
+                    severity_number,
+                    ..Default::default()
+                },
+            }
+            .into_event(namespace, &LogSchema::default(), Utc::now())
+            .into_log();
+            let request = encode_log_event(log, &LogSchema::default());
+            let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+            assert_eq!(record.severity_number, severity_number);
+            assert!(record.attributes.is_empty());
+        }
     }
 
     #[test]
@@ -646,9 +681,8 @@ mod tests {
         schema.set_message_key(Some(OwnedTargetPath::metadata(owned_value_path!(
             "message"
         ))));
-        init_log_schema(schema, true);
 
-        round_trip(LogNamespace::Legacy);
+        round_trip(LogNamespace::Legacy, &schema);
     }
 
     #[test]
@@ -659,12 +693,11 @@ mod tests {
             "payload",
             "timestamp"
         ))));
-        init_log_schema(schema, true);
         let mut log = LogEvent::default();
         log.insert(event_path!("payload", "message"), "hello");
         log.insert(event_path!("payload", "timestamp"), Utc.timestamp_nanos(5));
 
-        let request = log_event_to_export_request(log);
+        let request = encode_log_event(log, &schema);
         let record = &request.resource_logs[0].scope_logs[0].log_records[0];
         assert_eq!(record.time_unix_nano, 5);
         assert_eq!(
@@ -690,16 +723,15 @@ mod tests {
             "payload",
             "timestamp"
         ))));
-        init_log_schema(schema, true);
         let mut log = LogEvent::default();
         log.insert((PathPrefix::Metadata, path!("payload", "message")), "hello");
         log.insert(
-            log_schema().timestamp_key_target_path().unwrap(),
+            schema.timestamp_key_target_path().unwrap(),
             Utc.timestamp_nanos(5),
         );
         log.insert(event_path!("payload", "timestamp"), Utc.timestamp_nanos(9));
 
-        let request = log_event_to_export_request(log);
+        let request = encode_log_event(log, &schema);
         let record = &request.resource_logs[0].scope_logs[0].log_records[0];
         assert_eq!(record.time_unix_nano, 5);
         assert_eq!(
@@ -724,25 +756,25 @@ mod tests {
         );
     }
 
-    fn init_metadata_timestamp_key() {
+    fn metadata_timestamp_key_schema() -> LogSchema {
         let mut schema = LogSchema::default();
         schema.set_timestamp_key(Some(OwnedTargetPath::metadata(owned_value_path!(
             "timestamp"
         ))));
-        init_log_schema(schema, true);
+        schema
     }
 
     #[test]
     fn native_legacy_log_reads_metadata_timestamp_key() {
-        init_metadata_timestamp_key();
+        let schema = metadata_timestamp_key_schema();
         let mut log = LogEvent::from("disk full");
         log.insert(
-            log_schema().timestamp_key_target_path().unwrap(),
+            schema.timestamp_key_target_path().unwrap(),
             Utc.timestamp_nanos(1_700_000_000_000_000_000),
         );
         log.insert(event_path!("timestamp"), "root field");
 
-        let request = log_event_to_export_request(log);
+        let request = encode_log_event(log, &schema);
         let record = &request.resource_logs[0].scope_logs[0].log_records[0];
         assert_eq!(record.time_unix_nano, 1_700_000_000_000_000_000);
         // With a metadata timestamp key, a `timestamp` event field is an ordinary field.
@@ -755,27 +787,26 @@ mod tests {
     #[test]
     fn decoded_legacy_log_with_metadata_timestamp_key_round_trips() {
         // The source writes the timestamp to the event root even with a metadata key.
-        init_metadata_timestamp_key();
-        round_trip(LogNamespace::Legacy);
+        round_trip(LogNamespace::Legacy, &metadata_timestamp_key_schema());
     }
 
-    fn init_metadata_source_type_key() {
+    fn metadata_source_type_key_schema() -> LogSchema {
         let mut schema = LogSchema::default();
         schema.set_source_type_key(Some(OwnedTargetPath::metadata(owned_value_path!(
             "source_type"
         ))));
-        init_log_schema(schema, true);
+        schema
     }
 
     #[test]
     fn native_legacy_log_preserves_payload_with_metadata_source_type() {
-        init_metadata_source_type_key();
+        let schema = metadata_source_type_key_schema();
         let mut log = LogEvent::from("disk full");
-        log.insert(log_schema().source_type_key_target_path().unwrap(), "kafka");
+        log.insert(schema.source_type_key_target_path().unwrap(), "kafka");
         // Even when the values match, the event field is not the metadata marker.
         log.insert(event_path!("source_type"), "kafka");
 
-        let request = log_event_to_export_request(log);
+        let request = encode_log_event(log, &schema);
         let record = &request.resource_logs[0].scope_logs[0].log_records[0];
         assert_eq!(record.attributes, vec![kv("source_type", string("kafka"))]);
     }
@@ -783,8 +814,40 @@ mod tests {
     #[test]
     fn decoded_legacy_log_with_metadata_source_type_key_round_trips() {
         // The source writes the marker to the event root even with a metadata key.
-        init_metadata_source_type_key();
-        round_trip(LogNamespace::Legacy);
+        round_trip(LogNamespace::Legacy, &metadata_source_type_key_schema());
+    }
+
+    #[test]
+    fn native_legacy_log_omits_source_type_inside_message() {
+        for (message_key, source_type_key) in [
+            (
+                OwnedTargetPath::event(owned_value_path!("payload")),
+                OwnedTargetPath::event(owned_value_path!("payload", "source_type")),
+            ),
+            (
+                OwnedTargetPath::metadata(owned_value_path!("payload")),
+                OwnedTargetPath::metadata(owned_value_path!("payload", "source_type")),
+            ),
+        ] {
+            let mut schema = LogSchema::default();
+            schema.set_message_key(Some(message_key.clone()));
+            schema.set_source_type_key(Some(source_type_key.clone()));
+            let mut log = LogEvent::default();
+            log.insert(&message_key.with_field_appended("message"), "hello");
+            log.insert(&source_type_key, "file");
+
+            let request = encode_log_event(log, &schema);
+            let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+            assert_eq!(
+                record.body,
+                Some(AnyValue {
+                    value: Some(PBValue::KvlistValue(KeyValueList {
+                        values: vec![kv("message", string("hello"))],
+                    })),
+                })
+            );
+            assert!(record.attributes.is_empty());
+        }
     }
 
     #[test]
@@ -815,7 +878,8 @@ mod tests {
         let mut log = LogEvent::from("message");
         log.insert(event_path!("trace_id"), "not-hex");
         log.insert(event_path!("span_id"), "0102");
-        log.insert(event_path!("severity_number"), 99);
+        // Larger than an OTLP `int32`.
+        log.insert(event_path!("severity_number"), 1_i64 << 31);
         log.insert(event_path!("attributes", "host"), "from-attributes");
         log.insert(event_path!("host"), "from-root");
 
@@ -829,7 +893,7 @@ mod tests {
             record.attributes,
             vec![
                 kv("host", string("from-attributes")),
-                kv("severity_number", PBValue::IntValue(99)),
+                kv("severity_number", PBValue::IntValue(1 << 31)),
                 kv("span_id", string("0102")),
                 kv("trace_id", string("not-hex")),
             ]
@@ -874,7 +938,7 @@ mod tests {
                 scope: None,
                 log_record: LogRecord::decode(encoded.as_slice()).unwrap(),
             }
-            .into_event(log_namespace, Utc::now());
+            .into_event(log_namespace, &LogSchema::default(), Utc::now());
             let log = event.as_log();
             let event_name = match log_namespace {
                 LogNamespace::Legacy => log.get(event_path!(EVENT_NAME_KEY)),
@@ -896,7 +960,7 @@ mod tests {
                     scope: None,
                     log_record: LogRecord::decode(encoded).unwrap(),
                 }
-                .into_event(log_namespace, Utc::now());
+                .into_event(log_namespace, &LogSchema::default(), Utc::now());
                 let log = event.as_log();
                 assert!(log.get(event_path!(EVENT_NAME_KEY)).is_none());
                 assert!(

@@ -115,6 +115,7 @@ components: sinks: opentelemetry: {
 				| `trace_id`, `span_id` (hex strings) | `traceId`, `spanId` |
 				| `severity_text`, `severity_number` | `severityText`, `severityNumber` |
 				| `flags`, `dropped_attributes_count` | `flags`, `droppedAttributesCount` |
+				| `event_name` | `eventName` |
 
 				If `log_schema.timestamp_key` is inside `log_schema.message_key`, the timestamp sets
 				`timeUnixNano` and also remains in the body. For example, this applies to `.payload`
