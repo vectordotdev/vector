@@ -2,8 +2,9 @@
 
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use vector_lib::internal_event::emit;
 
-pub struct ClickhouseSink<S> {
+pub(super) struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     database: ConfinedTemplate,
@@ -19,7 +20,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         batch_settings: BatcherSettings,
         service: S,
         database: ConfinedTemplate,
@@ -54,7 +55,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -84,7 +85,7 @@ where
 
 /// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct PartitionKey {
+pub(crate) struct PartitionKey {
     pub database: String,
     pub table: String,
     pub format: Format,
@@ -110,7 +111,7 @@ impl KeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,

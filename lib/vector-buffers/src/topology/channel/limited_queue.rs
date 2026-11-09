@@ -113,6 +113,7 @@ pub struct ChannelMetricMetadata {
 }
 
 impl ChannelMetricMetadata {
+    #[must_use]
     pub fn new(kind: BufferChannelKind, output: Option<String>) -> Self {
         Self { kind, output }
     }
@@ -128,8 +129,6 @@ struct Metrics {
     // field, so we need to suppress the warning here.
     #[expect(dead_code)]
     max_gauge: Gauge,
-    #[expect(dead_code)]
-    legacy_max_gauge: Gauge,
     #[cfg(test)]
     recorded_values: Arc<Mutex<Vec<usize>>>,
 }
@@ -158,27 +157,19 @@ impl Metrics {
             ),
         };
 
-        let (max_name, legacy_name, max_value) = match (kind, limit) {
-            (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => (
-                GaugeName::SourceBufferMaxSizeEvents,
-                GaugeName::SourceBufferMaxEventSize,
-                n.get() as f64,
-            ),
-            (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => (
-                GaugeName::SourceBufferMaxSizeBytes,
-                GaugeName::SourceBufferMaxByteSize,
-                n.get() as f64,
-            ),
-            (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => (
-                GaugeName::TransformBufferMaxSizeEvents,
-                GaugeName::TransformBufferMaxEventSize,
-                n.get() as f64,
-            ),
-            (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => (
-                GaugeName::TransformBufferMaxSizeBytes,
-                GaugeName::TransformBufferMaxByteSize,
-                n.get() as f64,
-            ),
+        let (max_name, max_value) = match (kind, limit) {
+            (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => {
+                (GaugeName::SourceBufferMaxSizeEvents, n.get() as f64)
+            }
+            (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => {
+                (GaugeName::SourceBufferMaxSizeBytes, n.get() as f64)
+            }
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => {
+                (GaugeName::TransformBufferMaxSizeEvents, n.get() as f64)
+            }
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => {
+                (GaugeName::TransformBufferMaxSizeBytes, n.get() as f64)
+            }
         };
         #[cfg(test)]
         let recorded_values = Arc::new(Mutex::new(Vec::new()));
@@ -186,15 +177,11 @@ impl Metrics {
             let max_gauge = gauge!(max_name, "output" => label_value.clone());
             max_gauge.set(max_value);
             let mean_gauge_handle = gauge!(mean_name, "output" => label_value.clone());
-            // DEPRECATED: buffer-bytes-events-metrics
-            let legacy_max_gauge = gauge!(legacy_name, "output" => label_value.clone());
-            legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
                 gauge: gauge!(level_name, "output" => label_value),
                 mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
-                legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
             }
@@ -202,15 +189,11 @@ impl Metrics {
             let max_gauge = gauge!(max_name);
             max_gauge.set(max_value);
             let mean_gauge_handle = gauge!(mean_name);
-            // DEPRECATED: buffer-bytes-events-metrics
-            let legacy_max_gauge = gauge!(legacy_name);
-            legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name),
                 gauge: gauge!(level_name),
                 mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
-                legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
             }
@@ -342,6 +325,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     }
 
     /// Gets the number of items that this channel could accept.
+    #[must_use]
     pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
     }
@@ -431,6 +415,7 @@ pub struct LimitedReceiver<T> {
 
 impl<T: Send + 'static> LimitedReceiver<T> {
     /// Gets the number of items that this channel could accept.
+    #[must_use]
     pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
     }
@@ -460,6 +445,7 @@ impl<T: Send + 'static> LimitedReceiver<T> {
         }
     }
 
+    #[must_use]
     pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
         let mut receiver = self;
         Box::pin(stream! {
@@ -479,6 +465,7 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
+#[must_use]
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
     metric_metadata: Option<ChannelMetricMetadata>,

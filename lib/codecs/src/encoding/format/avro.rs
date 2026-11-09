@@ -166,11 +166,10 @@ impl AvroSerializerConfig {
     }
 
     /// Build the `AvroSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the schema cannot be parsed or its named schemas cannot be resolved.
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;

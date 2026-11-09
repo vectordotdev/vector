@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -191,10 +192,10 @@ impl SourceConfig for RedisSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let bytes_received = register!(BytesReceived::from(Protocol::from(
-            connection_info.protocol
+        let bytes_received = register(BytesReceived::from(Protocol::from(
+            connection_info.protocol,
         )));
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let handler = InputHandler {
             client,
             bytes_received: bytes_received.clone(),
@@ -305,7 +306,7 @@ impl InputHandler {
                     });
 
                     if (self.cx.out.send_batch(events).await).is_err() {
-                        emit!(StreamClosedError { count });
+                        emit(StreamClosedError { count });
                         return Err(());
                     }
                 }

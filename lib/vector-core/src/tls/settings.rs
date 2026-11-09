@@ -169,8 +169,8 @@ impl TlsConfig {
     }
 }
 
-/// Directly usable settings for TLS connectors
-#[derive(Clone, Default)]
+/// Directly usable settings for TLS connectors, constructed with an explicit client or server role.
+#[derive(Clone)]
 pub struct TlsSettings {
     verify_certificate: bool,
     pub(super) verify_hostname: bool,
@@ -190,9 +190,9 @@ pub(super) struct IdentityStore {
 }
 
 impl TlsSettings {
-    /// Generate a filled out settings struct from the given optional
-    /// option set, interpreted as client options. If `options` is
-    /// `None`, the result is set to defaults (ie empty).
+    /// Construct TLS settings for a client.
+    ///
+    /// With no options, certificate and hostname verification are enabled using system roots.
     pub fn from_options(options: Option<&TlsConfig>) -> Result<Self> {
         Self::from_options_base(options, false)
     }
@@ -450,7 +450,7 @@ fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
 }
 
 impl TlsConfig {
-    fn load_authorities(&self) -> Result<Vec<X509>> {
+    pub fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {

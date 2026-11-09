@@ -1,4 +1,7 @@
-#![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
+#![expect(
+    unsafe_op_in_unsafe_fn,
+    reason = "`#[derive(ShallowCopy)]` from evmap-derive 0.2 calls unsafe functions without an `unsafe` block"
+)]
 
 use std::{
     num::NonZeroU64,
@@ -6,6 +9,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use evmap::{
@@ -117,8 +121,9 @@ pub struct Memory {
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
-    #[allow(dead_code)]
-    expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
+    /// Never read. Holding a receiver keeps the channel open, so `expired_items_sender.send`
+    /// does not fail when no memory source is subscribed.
+    _expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
     expired_items_sender: Sender<Vec<MemoryEntryPair>>,
 }
 
@@ -140,7 +145,7 @@ impl Memory {
                 metadata: MemoryMetadata::default(),
             })),
             expired_items_sender: expired_tx,
-            expired_items_receiver: expired_rx,
+            _expired_items_receiver: expired_rx,
         }
     }
 
@@ -153,11 +158,7 @@ impl Memory {
         if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
             Self {
                 config,
-                read_handle_factory: prev_memory.read_handle_factory,
-                read_handle: prev_memory.read_handle,
-                write_handle: prev_memory.write_handle,
-                expired_items_sender: prev_memory.expired_items_sender,
-                expired_items_receiver: prev_memory.expired_items_receiver,
+                ..*prev_memory
             }
         } else {
             Self::new(config)
@@ -185,9 +186,9 @@ impl Memory {
         for (k, value) in value {
             let new_entry_key = String::from(k);
             let Ok(v) = serde_json::to_string(&value) else {
-                emit!(MemoryEnrichmentTableInsertFailed {
+                emit(MemoryEnrichmentTableInsertFailed {
                     key: &new_entry_key,
-                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                 });
                 continue;
             };
@@ -212,9 +213,9 @@ impl Memory {
                     > max_byte_size
             {
                 // Reject new entries
-                emit!(MemoryEnrichmentTableInsertFailed {
+                emit(MemoryEnrichmentTableInsertFailed {
                     key: &new_entry_key,
-                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                 });
                 continue;
             }
@@ -222,9 +223,9 @@ impl Memory {
                 .metadata
                 .byte_size
                 .saturating_add(new_entry_size as u64);
-            emit!(MemoryEnrichmentTableInserted {
+            emit(MemoryEnrichmentTableInserted {
                 key: &new_entry_key,
-                include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                include_key_metric_tag: self.config.internal_metrics.include_key_tag,
             });
             writer.write_handle.update(new_entry_key, new_entry);
         }
@@ -249,9 +250,9 @@ impl Memory {
                     // Byte size is not reduced at this point, because the actual deletion
                     // will only happen at refresh time
                     writer.write_handle.empty(k.clone());
-                    emit!(MemoryEnrichmentTableTtlExpired {
+                    emit(MemoryEnrichmentTableTtlExpired {
                         key: k,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     needs_flush = true;
                 }
@@ -307,9 +308,9 @@ impl Memory {
                 byte_size += k.size_of() + v.get_one().size_of();
             }
             writer.metadata.byte_size = byte_size as u64;
-            emit!(MemoryEnrichmentTableFlushed {
+            emit(MemoryEnrichmentTableFlushed {
                 new_objects_count: reader.len(),
-                new_byte_size: byte_size
+                new_byte_size: byte_size,
             });
         }
     }
@@ -337,7 +338,7 @@ impl Clone for Memory {
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
             expired_items_sender: self.expired_items_sender.clone(),
-            expired_items_receiver: self.expired_items_sender.subscribe(),
+            _expired_items_receiver: self.expired_items_sender.subscribe(),
         }
     }
 }
@@ -373,15 +374,15 @@ impl Table for Memory {
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
                 if let Some(row) = self.get_read_handle().get_one(key.as_ref()) {
-                    emit!(MemoryEnrichmentTableRead {
+                    emit(MemoryEnrichmentTableRead {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     row.as_object_map(Instant::now(), &key).map(|r| vec![r])
                 } else {
-                    emit!(MemoryEnrichmentTableReadFailed {
+                    emit(MemoryEnrichmentTableReadFailed {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     Ok(Vec::default())
                 }
@@ -430,8 +431,8 @@ impl StreamSink<Event> for Memory {
         reason = "Keep the existing branching and control flow during the lint rollout."
     )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let events_sent = register!(EventsSent::from(Output(None)));
-        let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
+        let events_sent = register(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("memory_enrichment_table".into())));
         let mut flush_interval: Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>> = self
             .config
             .flush_interval

@@ -1,4 +1,5 @@
 use std::{num::NonZeroUsize, time::Duration};
+use vector_lib::internal_event::emit;
 
 use futures::FutureExt;
 use redis::{
@@ -115,7 +116,7 @@ impl InputHandler {
 /// Emits the error and returns whether it was an I/O error, which warrants a backoff.
 fn is_io_error_after_reporting(error: RedisError) -> bool {
     let kind = error.kind();
-    emit!(RedisReceiveEventError::from(error));
+    emit(RedisReceiveEventError::from(error));
     kind == ErrorKind::IoError
 }
 
@@ -199,7 +200,7 @@ async fn pop_count(
         .into_iter()
         .filter_map(|value| {
             String::from_owned_redis_value(value)
-                .map_err(|error| emit!(RedisReceiveEventError::from(error)))
+                .map_err(|error| emit(RedisReceiveEventError::from(error)))
                 .ok()
         })
         .collect())

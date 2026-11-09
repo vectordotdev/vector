@@ -1,4 +1,5 @@
 use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -138,8 +139,8 @@ impl StaticMetrics {
         reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn run(mut self) -> vector_lib::source_sender::SendResult {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::STATIC));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
 
@@ -190,7 +191,7 @@ impl StaticMetrics {
                 .map(|metric| metric.with_timestamp(Some(Utc::now())));
 
             if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(error);
             }
         }

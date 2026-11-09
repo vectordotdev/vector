@@ -9,7 +9,7 @@ use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
 use vector_lib::{
     codecs::encoding::{Chunker, Chunking},
-    internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent},
+    internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent, emit},
 };
 
 #[cfg(unix)]
@@ -61,9 +61,9 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                     chunks_delivered
                 }
                 Err(err) => {
-                    emit!(UdpChunkingError {
+                    emit(UdpChunkingError {
                         data_size,
-                        error: err
+                        error: err,
                     });
                     false
                 }
@@ -87,7 +87,7 @@ async fn send_and_emit(
 ) -> bool {
     match send_datagram(socket, bytes).await {
         Ok(()) => {
-            emit!(SocketEventsSent {
+            emit(SocketEventsSent {
                 mode: match socket {
                     DatagramSocket::Udp(_) => SocketMode::Udp,
                     #[cfg(unix)]
@@ -101,15 +101,15 @@ async fn send_and_emit(
         }
         Err(error) => {
             match socket {
-                DatagramSocket::Udp(_) => emit!(SocketSendError {
+                DatagramSocket::Udp(_) => emit(SocketSendError {
                     mode: SocketMode::Udp,
-                    error
+                    error,
                 }),
                 #[cfg(unix)]
                 DatagramSocket::Unix(_, path) => {
-                    emit!(UnixSocketSendError {
+                    emit(UnixSocketSendError {
                         path: path.as_path(),
-                        error: &error
+                        error: &error,
                     });
                 }
             }
@@ -126,12 +126,12 @@ async fn send_datagram(socket: &mut DatagramSocket, buf: &[u8]) -> tokio::io::Re
     }?;
     if sent != buf.len() {
         match socket {
-            DatagramSocket::Udp(_) => emit!(UdpSendIncompleteError {
+            DatagramSocket::Udp(_) => emit(UdpSendIncompleteError {
                 data_size: buf.len(),
                 sent,
             }),
             #[cfg(unix)]
-            DatagramSocket::Unix(..) => emit!(UnixSendIncompleteError {
+            DatagramSocket::Unix(..) => emit(UnixSendIncompleteError {
                 data_size: buf.len(),
                 sent,
             }),

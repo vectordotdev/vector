@@ -2,6 +2,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use futures::{FutureExt, StreamExt, stream::BoxStream};
@@ -164,11 +165,11 @@ impl UdpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(UdpSocketConnectionEstablished {});
+                    emit(UdpSocketConnectionEstablished {});
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketOutgoingConnectionError { error });
+                    emit(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -206,7 +207,7 @@ where
             transformer,
             encoder,
             chunker,
-            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
+            bytes_sent: register(BytesSent::from(Protocol::UDP)),
         }
     }
 }

@@ -45,6 +45,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     finalizer::OrderedFinalizer,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, ObjectMap, kind::Collection};
@@ -644,7 +645,7 @@ impl ConsumerStateInner<Consuming> {
                         Some((status, entry)) => {
                             if status == BatchStatus::Delivered
                                 && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                                    emit!(KafkaOffsetUpdateError { error });
+                                    emit(KafkaOffsetUpdateError { error });
                                 }
                         }
                         None if finalizer.is_none() => {
@@ -664,10 +665,10 @@ impl ConsumerStateInner<Consuming> {
                                 status = PartitionConsumerStatus::PartitionEOF;
                                 finalizer.take();
                             },
-                            _ => emit!(KafkaReadError { error }),
+                            _ => emit(KafkaReadError { error }),
                         },
                         Some(Ok(msg)) => {
-                            emit!(KafkaBytesReceived {
+                            emit(KafkaBytesReceived {
                                 byte_size: msg.payload_len(),
                                 protocol: "tcp",
                                 topic: msg.topic(),
@@ -705,7 +706,7 @@ impl ConsumerStateInner<Consuming> {
         (Some(deadline).into(), draining)
     }
 
-    pub const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Consuming(self))
     }
 }
@@ -758,7 +759,7 @@ impl ConsumerStateInner<Draining> {
         }
     }
 
-    pub const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Draining(self))
     }
 }
@@ -966,7 +967,7 @@ fn drive_kafka_consumer(
                 // the consumer to serve client callbacks, such as rebalance notifications
                 message = stream.next() => match message {
                     None => unreachable!("MessageStream never returns Ready(None)"),
-                    Some(Err(error)) => emit!(KafkaReadError { error }),
+                    Some(Err(error)) => emit(KafkaReadError { error }),
                     Some(Ok(_msg)) => {
                         unreachable!("Messages are consumed in dedicated tasks for each partition.")
                     }
@@ -1004,7 +1005,7 @@ async fn parse_message(
             }
         });
         if out.send_event_stream(&mut stream).await.is_err() {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
         } else {
             // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
             // here, when `stream` is dropped and runs the destructor [...]".
@@ -1032,7 +1033,7 @@ fn parse_stream<'a>(
         Some(decompressor) => match decompressor.decompress(payload) {
             Ok(decompressed) => Bytes::from(decompressed),
             Err(error) => {
-                emit!(KafkaPayloadDecompressionError {
+                emit(KafkaPayloadDecompressionError {
                     error: &error,
                     topic: msg.topic(),
                     partition: msg.partition(),
@@ -1055,7 +1056,7 @@ fn parse_stream<'a>(
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, _byte_size)) => {
-                    emit!(KafkaEventsReceived {
+                    emit(KafkaEventsReceived {
                         count: events.len(),
                         byte_size: events.estimated_json_encoded_size_of(),
                         topic: &rmsg.topic,
@@ -1407,7 +1408,7 @@ impl KafkaSourceContext {
                 Ok(()) | Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
                     /* Success, or nothing to do - yay \0/ */
                 }
-                Err(error) => emit!(KafkaOffsetUpdateError { error }),
+                Err(error) => emit(KafkaOffsetUpdateError { error }),
             }
         }
     }
@@ -1442,15 +1443,15 @@ mod test {
 
     use super::*;
 
-    pub fn kafka_host() -> String {
+    pub(super) fn kafka_host() -> String {
         std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
     }
-    pub fn kafka_port() -> u16 {
+    fn kafka_port() -> u16 {
         let port = std::env::var("KAFKA_PORT").unwrap_or_else(|_| "9091".into());
         port.parse().expect("Invalid port number")
     }
 
-    pub fn kafka_address() -> String {
+    pub(super) fn kafka_address() -> String {
         format!("{}:{}", kafka_host(), kafka_port())
     }
 
