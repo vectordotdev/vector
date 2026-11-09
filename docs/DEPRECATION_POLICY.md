@@ -81,7 +81,6 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  The minimum removal version is calculated automatically as two minor versions after `deprecated_since`.
   Use the fragment body for the full migration guide (rationale, before/after examples, links).
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
