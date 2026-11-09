@@ -816,7 +816,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     {
         for (key, value) in el {
             match value {
-                Value::Array(arr) => {
+                Value::Array(arr) if !arr.is_empty() => {
                     for arr_el in arr {
                         tags.insert(key.to_string(), bytes_to_str(arr_el));
                     }
@@ -2390,7 +2390,9 @@ mod tests {
           "kind": "incremental",
           "name": "test.multi_value_tags",
           "tags": {
-            "key": ["value1", "value2"]
+            "key": ["value1", "value2"],
+            "host": "localhost",
+            "env": []
           }
         }"#;
 
@@ -2403,7 +2405,12 @@ mod tests {
 
         assert_eq!(
             tags.iter_all().collect::<Vec<_>>(),
-            vec![("key", Some("value1")), ("key", Some("value2"))]
+            vec![
+                ("env", None),
+                ("host", Some("localhost")),
+                ("key", Some("value1")),
+                ("key", Some("value2")),
+            ]
         );
     }
 }
