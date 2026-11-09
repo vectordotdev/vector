@@ -3,5 +3,6 @@ sources:
     type: redis
     data_type: list
     key: vector
+    redis_channel: redis_channel
     redis_key: redis_key
     url: redis://127.0.0.1:6379/0
