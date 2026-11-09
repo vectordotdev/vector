@@ -1,4 +1,9 @@
-use std::{fs::remove_file, io, path::PathBuf};
+use std::{
+    fs::{remove_file, symlink_metadata},
+    io,
+    os::unix::fs::{FileTypeExt, MetadataExt},
+    path::{Path, PathBuf},
+};
 
 use bytes::{Bytes, BytesMut};
 use futures::StreamExt;
@@ -35,7 +40,7 @@ use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
@@ -486,7 +491,16 @@ fn build_unix_datagram_source_inner(
     out: SourceSender,
 ) -> crate::Result<Source> {
     Ok(Box::pin(async move {
-        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+        let socket = match bind_unix_datagram(&listen_path) {
+            Ok(socket) => socket,
+            Err(error) => {
+                emit!(SocketBindError {
+                    mode: SocketMode::Unix,
+                    error,
+                });
+                return Err(());
+            }
+        };
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
             crate::net::set_receive_buffer_size(&socket, receive_buffer_bytes)
                 .expect("Failed to set Unix datagram receive buffer size");
@@ -518,6 +532,31 @@ fn build_unix_datagram_source_inner(
 
         result
     }))
+}
+
+fn bind_unix_datagram(listen_path: &Path) -> io::Result<UnixDatagram> {
+    let bind_error = match UnixDatagram::bind(listen_path) {
+        Ok(socket) => return Ok(socket),
+        Err(error) if error.kind() == io::ErrorKind::AddrInUse => error,
+        Err(error) => return Err(error),
+    };
+    let metadata = symlink_metadata(listen_path)?;
+    if !metadata.file_type().is_socket() {
+        return Err(bind_error);
+    }
+    let probe = std::os::unix::net::UnixDatagram::unbound()?;
+    probe.set_nonblocking(true)?;
+    match probe.connect(listen_path) {
+        Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {
+            let current = symlink_metadata(listen_path)?;
+            if current.dev() != metadata.dev() || current.ino() != metadata.ino() {
+                return Err(bind_error);
+            }
+            remove_file(listen_path)?;
+            UnixDatagram::bind(listen_path)
+        }
+        _ => Err(bind_error),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -720,7 +759,52 @@ fn append_events(
 mod tests {
     use tokio::net::UnixDatagram;
 
-    use super::{UnixDatagramBatchReceiver, unnamed_socket_host};
+    use super::{UnixDatagramBatchReceiver, bind_unix_datagram, unnamed_socket_host};
+
+    #[tokio::test]
+    async fn rebinds_abandoned_unix_datagram_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("socket");
+        drop(UnixDatagram::bind(&path).unwrap());
+        let receiver = bind_unix_datagram(&path).unwrap();
+        let sender = UnixDatagram::unbound().unwrap();
+        sender.send_to(b"resumed", &path).await.unwrap();
+        let mut buffer = [0; 32];
+        let received = receiver.recv(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..received], b"resumed");
+    }
+
+    #[tokio::test]
+    async fn preserves_live_unix_datagram_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("socket");
+        let receiver = UnixDatagram::bind(&path).unwrap();
+        assert_eq!(
+            bind_unix_datagram(&path).unwrap_err().kind(),
+            std::io::ErrorKind::AddrInUse
+        );
+        let sender = UnixDatagram::unbound().unwrap();
+        sender.send_to(b"original", &path).await.unwrap();
+        let mut buffer = [0; 32];
+        let received = receiver.recv(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..received], b"original");
+    }
+
+    #[tokio::test]
+    async fn preserves_non_socket_paths_and_symlinks() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("file");
+        std::fs::write(&path, b"preserved").unwrap();
+        assert!(bind_unix_datagram(&path).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"preserved");
+        let target = directory.path().join("abandoned");
+        drop(UnixDatagram::bind(&target).unwrap());
+        let link = directory.path().join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(bind_unix_datagram(&link).is_err());
+        assert!(link.is_symlink());
+        assert!(target.exists());
+    }
 
     #[tokio::test]
     async fn recvmmsg_receives_multiple_unix_datagrams_and_peer_paths() {
