@@ -3,8 +3,6 @@ what: "APT/YUM repository configuration that trusts only Datadog signing keys"
 deprecated_since: "0.62.0"
 ---
 
-## APT/YUM signing key migration {#package-repository-signing-key}
-
 On **November 30, 2026**, Vector's APT and YUM repositories switch to a new
 signing key. To continue installing or updating packages after that date, add
 the new key.
