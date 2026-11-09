@@ -575,7 +575,14 @@ where
             let response = service.call(request).await?;
             let response = collect_response(response, byte_size, &protocol, &endpoint)
                 .await
-                .map_err(HttpError::from)?;
+                .map_err(|error| {
+                    // Decompression preserves transport errors but boxes them alongside decoder errors.
+                    if error.is::<hyper::Error>() {
+                        HttpError::new(error)
+                    } else {
+                        HttpError::from(error)
+                    }
+                })?;
             Ok(HttpResponse {
                 response,
                 events_byte_size,
@@ -646,6 +653,10 @@ mod tests {
 
     use flate2::write::GzEncoder;
     use http_body_util::Full;
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+        net::TcpListener,
+    };
     use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
     use super::*;
@@ -733,6 +744,65 @@ mod tests {
             retry_logic.should_retry_response(&response),
             RetryAction::Retry(_)
         ));
+    }
+
+    #[rstest::rstest]
+    #[case::plain(false)]
+    #[case::gzip(true)]
+    #[tokio::test]
+    async fn retries_incomplete_response_body(#[case] compressed: bool) {
+        let message = b"retry after the service has recovered";
+        let body = if compressed {
+            let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(message).unwrap();
+            encoder.finish().unwrap()
+        } else {
+            message.to_vec()
+        };
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let uri = format!("http://{}/", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut stream = BufReader::new(stream);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                assert_ne!(stream.read_line(&mut line).await.unwrap(), 0);
+                if line == "\r\n" {
+                    break;
+                }
+            }
+            let mut request_body = [0; 6];
+            stream.read_exact(&mut request_body).await.unwrap();
+            assert_eq!(&request_body, b"events");
+
+            let encoding = if compressed {
+                "content-encoding: gzip\r\n"
+            } else {
+                ""
+            };
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n{encoding}connection: close\r\n\r\n",
+                body.len()
+            );
+            stream.write_all(headers.as_bytes()).await.unwrap();
+            stream.write_all(&body[..body.len() / 2]).await.unwrap();
+            stream.shutdown().await.unwrap();
+        });
+        let mut service = HttpService::new(client(), request_builder(&uri));
+        let error =
+            tokio::time::timeout(std::time::Duration::from_secs(5), service.call(request()))
+                .await
+                .unwrap()
+                .unwrap_err();
+        server.await.unwrap();
+
+        let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);
+        assert!(retry_logic.is_retriable_error(&error), "{error:?}");
+        let no_retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::None);
+        assert!(!no_retry_logic.is_retriable_error(&error));
     }
 
     #[tokio::test]
