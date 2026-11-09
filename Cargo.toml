@@ -943,6 +943,7 @@ sinks-logs = [
   "sinks-new_relic_logs",
   "sinks-opensearch",
   "sinks-opentelemetry",
+  "sinks-opsimate",
   "sinks-papertrail",
   "sinks-postgres",
   "sinks-pulsar",
@@ -1015,6 +1016,7 @@ sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-opensearch = ["sinks-elasticsearch"]
 sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
+sinks-opsimate = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]

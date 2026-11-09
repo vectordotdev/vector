@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: opsimate
+    inputs:
+      - my-source-or-transform-id
+    api_token: ${OPSIMATE_API_TOKEN}
+    endpoint: http://opsimate.example.com:3001
