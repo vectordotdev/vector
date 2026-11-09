@@ -116,7 +116,7 @@ done
 
 ### 2c. Config churn — commits to CUE file in last 6 months
 
-Count commits to both the hand-written component file and its generated counterpart (the generated file carries the actual configuration API and may change without touching the top-level file). Also capture the commit messages — you will classify them in Phase 5.
+Count commits to both the hand-written component file and its generated counterpart (the generated file carries the actual configuration API and may change without touching the top-level file). Also capture each commit's short SHA and subject — you will classify them in Phase 5.
 
 Skip the same shared parent files excluded in Phase 1 (`aws_cloudwatch`, `datadog`, `gcp`, `humio`, `influxdb`, `sematext`, `splunk_hec` under `sinks/`) — they are not real components and their churn data should not appear in the evaluation.
 
@@ -149,7 +149,7 @@ for kind in sources transforms sinks; do
       done
     fi
     count=$(git log --since="6 months ago" --format="%H" -- "${paths[@]}" 2>/dev/null | sort -u | grep -c . || true)
-    msgs=$(git log --since="6 months ago" --format="%s" -- "${paths[@]}" 2>/dev/null | sort -u)
+    msgs=$(git log --since="6 months ago" --format="%h %s" -- "${paths[@]}" 2>/dev/null | sort -u)
     safe_msgs="${msgs//|/\\|}"
     echo "${kind}/${name}|${count}|${safe_msgs//$'\n'/;}"
   done
@@ -224,9 +224,9 @@ For every component, assign one recommendation:
 | **watch** | Stable with concerning signals |
 | **deprecate-candidate** | Little activity, superseded, or already deprecated in CUE |
 
-**Churn classification** — before applying thresholds, classify the commit messages collected in Phase 2c:
+**Churn classification** — before applying thresholds, classify the commits collected in Phase 2c:
 
-- **Breaking**: conventional-commit breaking marker (`type!:` or `type(scope)!:`), or message contains "breaking", "removed", "renamed", "deprecated", or "revert" — these signal API instability.
+- **Breaking**: the commit adds a `changelog.d/*.breaking.md` fragment that names this component — these signal API instability. Fragments are deleted from `changelog.d/` at release, so read them from the commit: `git show --name-only --diff-filter=A --format= <sha> -- 'changelog.d/*.breaking.md'`, then `git show <sha>:<path>`.
 - **Additive**: message starts with `feat:` or says "add", "support", "extend" — new optional config fields that don't break existing users.
 - **Neutral**: fixes, docs, chores, refactors.
 
