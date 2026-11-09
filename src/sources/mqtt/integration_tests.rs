@@ -4,7 +4,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use futures::{Stream, StreamExt};
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{AsyncClient, MqttOptions, PublishOptions};
 use serde_json::{Value, json};
 use tokio::time::timeout;
 
@@ -40,7 +40,7 @@ fn emqx_api_url() -> String {
 async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<String>) {
     for message in messages {
         client
-            .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+            .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
             .await
             .unwrap();
     }
@@ -49,12 +49,11 @@ async fn send_test_events(client: &AsyncClient, topic: &str, messages: &Vec<Stri
 fn get_mqtt_client() -> AsyncClient {
     let mut mqtt_options = MqttOptions::new(
         format!("integration-test-producer-{}", random_string(6)),
-        mqtt_broker_address(),
-        mqtt_broker_port(),
+        (mqtt_broker_address(), mqtt_broker_port()),
     );
     mqtt_options.set_keep_alive(5);
 
-    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+    let (client, mut eventloop) = AsyncClient::builder(mqtt_options).capacity(10).build();
 
     tokio::spawn(async move {
         loop {

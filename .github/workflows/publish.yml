@@ -68,7 +68,7 @@ jobs:
     if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     container:
-      image: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
+      image: almalinux:8@sha256:2d0f2eb2a83cc09dbc2eb92fade4dbe8f709628149e81aa00aec70630406603b
       # Align HOME with the container's root user so rustup/sudo don't warn
       # about $HOME (/github/home) differing from the euid-obtained home (/root).
       env:
@@ -206,7 +206,7 @@ jobs:
           # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
           # and to https://github.com/actions/runner-images
           - architecture: arm64
-            runner: macos-14-xlarge
+            runner: macos-15-xlarge
     steps:
       - name: Verify Runner Architecture
         run: |
@@ -296,7 +296,6 @@ jobs:
       - build-linux-cross
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      DD_PKG_VERSION: "latest"
     strategy:
       matrix:
         runner:
@@ -319,11 +318,6 @@ jobs:
           git \
           systemd \
           make
-      - name: Install dd-pkg for linting
-        run: |
-          ARCH=$(uname -m)
-          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
@@ -351,7 +345,6 @@ jobs:
       - build-linux-cross
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      DD_PKG_VERSION: "latest"
     strategy:
       matrix:
         runner:
@@ -359,7 +352,7 @@ jobs:
           - ubuntu-24.04-arm
         container:
           # Lowest supported glibc tier (EL8 family, glibc 2.28). Catches glibc-floor regressions.
-          - "almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c"
+          - "almalinux:8@sha256:2d0f2eb2a83cc09dbc2eb92fade4dbe8f709628149e81aa00aec70630406603b"
           - "quay.io/centos/centos:stream9"
           - "amazonlinux:2023"
           - "fedora:39"
@@ -367,9 +360,11 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - run: |
-          yum update -y
-          yum install -y \
+      - name: Update system packages
+        run: yum -v update -y
+      - name: Install test dependencies
+        run: |
+          yum -v install -y \
           ca-certificates \
           git \
           systemd \
@@ -378,13 +373,8 @@ jobs:
           # conflicts with curl-minimal on some distros and --allowerased is not
           # supported on some distros
           if ! command -v curl &> /dev/null ; then
-            yum install -y curl
+            yum -v install -y curl
           fi
-      - name: Install dd-pkg for linting
-        run: |
-          ARCH=$(uname -m)
-          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
@@ -416,7 +406,7 @@ jobs:
         include:
           # Refer to https://github.com/actions/runner-images
           - target: arm64-apple-darwin
-            runner: macos-14
+            runner: macos-15
     steps:
       - name: Checkout Vector
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -455,12 +445,12 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -535,9 +525,6 @@ jobs:
           path: target/artifacts
           merge-multiple: true
       - name: Publish artifacts to S3
-        env:
-          LEGACY_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-          LEGACY_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
         run: make release-s3
 
   publish-github:
@@ -580,6 +567,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-github
+
+  announce-discord:
+    name: Announce release on Discord
+    needs: [generate-publish-metadata, publish-github]
+    if: ${{ !inputs.skip_publish && inputs.channel == 'release' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discord-releases.yml
+    with:
+      tag: v${{ needs.generate-publish-metadata.outputs.vector_version }}
+    secrets:
+      DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: ${{ secrets.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL }}
 
   generate-sha256sum:
     name: Generate SHA256 checksums

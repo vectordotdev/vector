@@ -1,13 +1,12 @@
 use serde::Deserialize;
 use tracing::{debug, error};
 
-use crate::{
-    http::HttpError,
-    sinks::{
-        doris::{service::DorisResponse, sink::DorisPartitionKey},
-        prelude::*,
-        util::{http::HttpRequest, retries::RetryAction},
-    },
+use vector_http::HttpError;
+
+use crate::sinks::{
+    doris::{service::DorisResponse, sink::DorisPartitionKey},
+    prelude::*,
+    util::{http::HttpRequest, retries::RetryAction},
 };
 
 /// Internal struct for parsing Doris Stream Load API responses
@@ -21,7 +20,7 @@ struct DorisStreamLoadResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct DorisRetryLogic;
+pub(super) struct DorisRetryLogic;
 
 impl RetryLogic for DorisRetryLogic {
     type Error = HttpError;

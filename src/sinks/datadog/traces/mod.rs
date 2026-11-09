@@ -17,7 +17,12 @@ mod request_builder;
 mod service;
 mod sink;
 
-#[allow(warnings, clippy::trivially_copy_pass_by_ref, clippy::nursery)]
+#[allow(
+    warnings,
+    unreachable_pub,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::nursery
+)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }

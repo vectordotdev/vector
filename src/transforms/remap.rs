@@ -14,6 +14,7 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     enrichment::TableRegistry,
+    internal_event::emit,
     lookup::{PathPrefix, metadata_path, owned_value_path},
     schema::Definition,
 };
@@ -633,7 +634,7 @@ where
                 }
             },
             Err(Terminate::Interrupted) => {
-                emit!(RemapMappingError {
+                emit(RemapMappingError {
                     error: ExpressionError::Interrupted.to_string(),
                     event_dropped: true,
                 });
@@ -642,7 +643,7 @@ where
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingAbort {
+                            emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
                             });
                         }
@@ -650,7 +651,7 @@ where
                     }
                     Terminate::Error(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingError {
+                            emit(RemapMappingError {
                                 error: error.to_string(),
                                 event_dropped: self.drop_on_error,
                             });

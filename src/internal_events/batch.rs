@@ -1,5 +1,6 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
@@ -26,6 +27,6 @@ impl InternalEvent for LargeEventDroppedError {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

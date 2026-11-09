@@ -7,7 +7,7 @@ use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsKinesisFirehoseRequestReceived<'a> {
+pub(crate) struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,
 }
@@ -23,14 +23,14 @@ impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsKinesisFirehoseRequestError<'a> {
+pub(crate) struct AwsKinesisFirehoseRequestError<'a> {
     request_id: Option<&'a str>,
     error_code: String,
     error: &'a str,
 }
 
 impl<'a> AwsKinesisFirehoseRequestError<'a> {
-    pub fn new(code: hyper::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
+    pub(crate) fn new(code: http::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
         Self {
             error_code: http_error_code(code.as_u16()),
             error,
@@ -60,7 +60,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
+pub(crate) struct AwsKinesisFirehoseAutomaticRecordDecodeError {
     pub compression: Compression,
     pub error: std::io::Error,
 }

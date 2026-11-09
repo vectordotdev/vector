@@ -7,7 +7,7 @@ use vector_lib::{
 
 #[cfg(feature = "sinks-mqtt")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct MqttConnectionError {
+pub(crate) struct MqttConnectionError {
     pub error: rumqttc::ConnectionError,
 }
 
@@ -33,7 +33,7 @@ impl InternalEvent for MqttConnectionError {
 
 #[cfg(feature = "sources-mqtt")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct MqttSubscribeError {
+pub(crate) struct MqttSubscribeError {
     pub error: rumqttc::ClientError,
 }
 
