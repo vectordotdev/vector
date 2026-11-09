@@ -244,7 +244,7 @@ Use the classification when applying the thresholds below. Report the raw count 
 
 ```bash
 # Open issues with the component label, regardless of issue type
-gh issue list -R vectordotdev/vector --state open --label "<kind>:<name>" --limit 100 --json number,title,body,labels,issueType
+gh issue list -R vectordotdev/vector --state open --label "<kind>:<name>" --limit 100 --json number,title,body,labels
 # Open issues mentioning the component name, regardless of type or labels
 gh search issues --repo vectordotdev/vector --state open --limit 100 --json number,title,body,labels "<name>"
 ```
