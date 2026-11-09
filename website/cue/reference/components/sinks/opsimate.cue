@@ -75,7 +75,8 @@ components: sinks: opsimate: {
 		setup: {
 			title: "Setup"
 			body:  """
-				1. In OpsiMate, create a custom alert integration and copy its API token.
+				1. Find the API token of your OpsiMate server: the value of its `API_TOKEN` setting
+				   (`opsimate` in a default installation).
 
 				2. Point the sink at your OpsiMate server with `endpoint` (the base URL, for example
 				   `http://opsimate.example.com:3001`) and pass the token as `api_token`. Alerts are sent to
@@ -98,7 +99,8 @@ components: sinks: opsimate: {
 
 				* `id` (required): a stable identifier for the alert, used to update or resolve it later.
 				* `alertName` (required): the human-readable name of the alert.
-				* `tags` (required): an array of tags used to route the alert to services.
+				* `tags` (required): an object of string key/value pairs, such as `{"service": "checkout", "host": "web-01"}`,
+				  used for filtering, grouping and enrichment rules.
 				* `summary`, `severity`, `status`, `startsAt`, `team`, `links` (optional).
 
 				Shape the payload upstream with a `remap` transform, for example:

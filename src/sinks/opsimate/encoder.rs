@@ -57,7 +57,14 @@ mod tests {
         log.insert(vrl::event_path!("severity"), "critical");
         log.insert(
             vrl::event_path!("tags"),
-            Value::Array(vec!["web".into(), "disk".into()]),
+            Value::Object(
+                [
+                    ("service".into(), "web".into()),
+                    ("resource".into(), "disk".into()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
         );
         Event::Log(log)
     }
@@ -85,7 +92,7 @@ mod tests {
                 "id": "disk-full-web-1",
                 "alertName": "DiskFull",
                 "severity": "critical",
-                "tags": ["web", "disk"],
+                "tags": { "service": "web", "resource": "disk" },
             })
         );
     }
@@ -111,7 +118,7 @@ mod tests {
             json!({
                 "id": "disk-full-web-1",
                 "alertName": "DiskFull",
-                "tags": ["web", "disk"],
+                "tags": { "service": "web", "resource": "disk" },
             })
         );
     }
