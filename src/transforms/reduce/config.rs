@@ -58,6 +58,20 @@ pub struct ReduceConfig {
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
 
+    // TODO: change the default value
+    /// The number of parallel tasks used to reduce events.
+    ///
+    /// Groups are distributed across tasks by hashing their `group_by` values, so all events of a
+    /// group are always reduced by the same task, in arrival order. Only the order of output events
+    /// across different groups may change.
+    ///
+    /// Has no effect when `group_by` is empty: all events then belong to a single group, which is
+    /// reduced by a single task. Set to `1` to always reduce in a single task.
+    #[serde(default = "default_concurrency")]
+    #[derivative(Default(value = "default_concurrency()"))]
+    #[configurable(metadata(docs::human_name = "Concurrency"))]
+    pub concurrency: NonZeroUsize,
+
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
@@ -113,17 +127,19 @@ const fn default_flush_period_ms() -> Duration {
     Duration::from_secs(1)
 }
 
-impl_generate_config_from_default!(ReduceConfig);
+const fn default_concurrency() -> NonZeroUsize {
+    NonZeroUsize::new(8).expect("the default concurrency is non-zero")
+}
 
-// TODO: maybe put this in reduceConfig, or like other transforms
-const REDUCE_CONCURRENCY: Option<NonZeroUsize> = NonZeroUsize::new(8);
+impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
-        let shards = REDUCE_CONCURRENCY.filter(|n| n.get() > 1 && !self.group_by.is_empty());
+        // Without `group_by`, every event has the same discriminant, so extra shards would stay idle.
+        let shards = Some(self.concurrency).filter(|n| n.get() > 1 && !self.group_by.is_empty());
 
         Ok(match shards {
             None => Transform::event_task(reduce),
