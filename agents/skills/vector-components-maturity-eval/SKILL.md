@@ -62,8 +62,6 @@ Issues use the GitHub issue **Type** field. The type name is `Bug`.
 
 Use GraphQL so the `issueType` field is returned and can be verified. The `--paginate` flag fetches all pages; `--jq` streams one JSON object per issue (no wrapping array, so each line is a complete parseable object); python collects all lines into a single array.
 
-Run under Bash with `pipefail`; if the fetch fails, stop the evaluation instead of treating it as zero open bugs.
-
 ```bash
 set -o pipefail
 gh api graphql --paginate \
