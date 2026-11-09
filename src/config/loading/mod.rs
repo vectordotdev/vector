@@ -424,7 +424,7 @@ pub(crate) fn load_builder(
     let value = representation::parse_config_value(&content, format)?;
     let ignored = value
         .as_object()
-        .map(|map| ignored_fields::find(map, None))
+        .map(|map| ignored_fields::find(&ignored_fields::validator(), map, None))
         .unwrap_or_default();
     let mut builder: ConfigBuilder = representation::deserialize_config_value(value)?;
     builder.loading_warnings = ignored_fields::warnings(&ignored);

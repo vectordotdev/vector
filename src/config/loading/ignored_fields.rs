@@ -6,8 +6,8 @@
 //! copy of that schema to collect the fields belonging to matching variants.
 
 use std::{
+    cell::LazyCell,
     collections::{BTreeMap, BTreeSet},
-    sync::LazyLock,
 };
 
 use jsonschema::Validator;
@@ -26,25 +26,36 @@ const IGNORED_FIELD: &str = "x-vector-ignored-field";
 const SERDE_IGNORED: &str = "serde::ignored";
 const SERDE_OPTIONAL_TAG: &str = "serde::optional_tag";
 
-static VALIDATOR: LazyLock<Option<Validator>> = LazyLock::new(|| {
-    let result = generate_root_schema::<ConfigBuilder>()
-        .map_err(|error| format!("{error:?}"))
-        .and_then(|schema| serde_json::to_value(schema).map_err(|error| error.to_string()))
-        .and_then(|mut schema| {
-            prepare_schema(&mut schema);
-            jsonschema::validator_for(&schema).map_err(|error| error.to_string())
-        });
-    match result {
-        Ok(validator) => Some(validator),
-        Err(error) => {
-            warn!(%error, "Could not check configuration for ignored fields.");
-            None
-        }
-    }
-});
+/// Validator over the schema of every compiled-in component, built on first use.
+///
+/// It is large, so it is owned by a single load and freed with it rather than kept in a static.
+pub(super) type LazyValidator = LazyCell<Option<Validator>>;
 
-pub(super) fn find(map: &Map<String, Value>, hint: Option<ComponentHint>) -> Vec<String> {
-    let Some(validator) = VALIDATOR.as_ref() else {
+pub(super) fn validator() -> LazyValidator {
+    LazyCell::new(|| {
+        let result = generate_root_schema::<ConfigBuilder>()
+            .map_err(|error| format!("{error:?}"))
+            .and_then(|schema| serde_json::to_value(schema).map_err(|error| error.to_string()))
+            .and_then(|mut schema| {
+                prepare_schema(&mut schema);
+                jsonschema::validator_for(&schema).map_err(|error| error.to_string())
+            });
+        match result {
+            Ok(validator) => Some(validator),
+            Err(error) => {
+                warn!(%error, "Could not check configuration for ignored fields.");
+                None
+            }
+        }
+    })
+}
+
+pub(super) fn find(
+    validator: &LazyValidator,
+    map: &Map<String, Value>,
+    hint: Option<ComponentHint>,
+) -> Vec<String> {
+    let Some(validator) = validator.as_ref() else {
         return Vec::new();
     };
     let value = match hint {

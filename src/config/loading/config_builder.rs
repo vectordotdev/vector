@@ -16,6 +16,7 @@ pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
     secrets: HashMap<String, String>,
     interpolate_env: bool,
+    validator: ignored_fields::LazyValidator,
 }
 
 impl ConfigBuilderLoader {
@@ -77,6 +78,7 @@ impl Default for ConfigBuilderLoader {
             builder: ConfigBuilder::default(),
             secrets: HashMap::new(),
             interpolate_env: super::env_var_interpolation_enabled(),
+            validator: ignored_fields::validator(),
         }
     }
 }
@@ -94,7 +96,7 @@ impl Process for ConfigBuilderLoader {
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        let ignored = ignored_fields::find(&map, hint);
+        let ignored = ignored_fields::find(&self.validator, &map, hint);
         match hint {
             Some(ComponentHint::Source) => {
                 self.builder

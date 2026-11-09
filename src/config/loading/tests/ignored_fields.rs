@@ -81,7 +81,11 @@ fn supported_defaults_aliases_and_maps_do_not_warn() {
     let value: Value = serde_yaml::from_str(CONFIG).unwrap();
     let _: ConfigBuilder = serde_json::from_value(value.clone()).unwrap();
     assert_eq!(
-        ignored_fields::find(value.as_object().unwrap(), None),
+        ignored_fields::find(
+            &ignored_fields::validator(),
+            value.as_object().unwrap(),
+            None
+        ),
         Vec::<String>::new()
     );
 }
