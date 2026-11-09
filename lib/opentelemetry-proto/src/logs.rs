@@ -1,3 +1,5 @@
+use std::{borrow::Cow, cmp::Ordering};
+
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
@@ -7,7 +9,7 @@ use vector_core::{
 use vrl::{
     core::Value,
     path,
-    path::{PathPrefix, ValuePath},
+    path::{OwnedSegment, OwnedValuePath, PathPrefix, ValuePath},
     value::ObjectMap,
 };
 
@@ -360,31 +362,45 @@ fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceR
                 .and_then(|path| log.get((PathPrefix::Event, path)))
                 .and_then(Value::as_timestamp)
                 .and_then(timestamp_nanos);
-            // Remove the marker before the message, so that it is not sent in the body when the
-            // message contains it. A marker at the configured metadata path leaves the event
-            // field as user data. Otherwise, remove the root marker for Legacy sources that
-            // ignore the prefix.
-            if let Some(path) = schema.source_type_key_target_path() {
-                if path.prefix == PathPrefix::Event || log.contains(path) {
-                    log.remove_prune(path, true);
+            // The message, the source type marker, and the timestamp can share an array, for
+            // example as `.payload[0]` and `.payload[1]`. Remove them in an order that does not
+            // move the values that are still to be removed.
+            let message_path = schema
+                .message_key_target_path()
+                .map(|path| resolve_indexes(&log, path.prefix, &path.path));
+            // A marker at the configured metadata path leaves the event field as user data.
+            // Otherwise, remove the root marker for Legacy sources that ignore the prefix.
+            let source_type_path = schema.source_type_key_target_path().map(|path| {
+                let prefix = if path.prefix == PathPrefix::Event || log.contains(path) {
+                    path.prefix
                 } else {
-                    log.remove_prune((PathPrefix::Event, &path.path), true);
+                    PathPrefix::Event
+                };
+                resolve_indexes(&log, prefix, &path.path)
+            });
+            // A timestamp inside the message stays in the body.
+            let timestamp_path = schema
+                .timestamp_key()
+                .filter(|_| event_time.is_some())
+                .map(|path| resolve_indexes(&log, PathPrefix::Event, path))
+                .filter(|path| {
+                    message_path
+                        .as_ref()
+                        .is_none_or(|message| locate(path, message) != Location::Inside)
+                });
+            // The message is the first entry.
+            let mut pending = [message_path, source_type_path, timestamp_path];
+            while let Some(index) = next_removal(&pending) {
+                let Some((prefix, path)) = pending[index].take() else {
+                    break;
+                };
+                let removed = log.remove_prune((prefix, &*path), true);
+                if index == 0 {
+                    record.body = removed.and_then(into_body);
                 }
             }
-            // The message key can point into metadata (for example `%message`), so remove it
-            // with its full target path before the metadata is discarded.
-            if let Some(path) = schema.message_key_target_path() {
-                record.body = log.remove_prune(path, true).and_then(into_body);
-            }
             let (mut fields, _) = log.into_parts();
-            record.time_unix_nano = metadata_time
-                .or_else(|| {
-                    let extracted_time = schema
-                        .timestamp_key()
-                        .and_then(|path| take(&mut fields, path, into_timestamp_nanos));
-                    event_time.or(extracted_time)
-                })
-                .unwrap_or_default();
+            record.time_unix_nano = metadata_time.or(event_time).unwrap_or_default();
             record.observed_time_unix_nano = take(
                 &mut fields,
                 path!(OBSERVED_TIMESTAMP_KEY),
@@ -468,21 +484,114 @@ fn take_record_fields(
     (resource, scope)
 }
 
-/// Remove the value at `path` and convert it. If the conversion fails, the value is put back
-/// so that it is sent as an attribute instead of being lost.
+/// Convert the value at `path` and remove it. If the conversion fails, the value stays in
+/// place, so that it is sent as an attribute instead of being lost. The value is not removed
+/// first, because removing an array element moves the elements after it.
 fn take<'a, T>(
     fields: &mut Value,
     path: impl ValuePath<'a> + Copy,
     convert: fn(Value) -> Result<T, Value>,
 ) -> Option<T> {
-    let value = fields.remove(path, true)?;
-    match convert(value) {
-        Ok(converted) => Some(converted),
+    let slot = fields.get_mut(path)?;
+    match convert(std::mem::replace(slot, Value::Null)) {
+        Ok(converted) => {
+            fields.remove(path, true);
+            Some(converted)
+        }
         Err(value) => {
-            fields.insert(path, value);
+            *slot = value;
             None
         }
     }
+}
+
+type FieldPath<'a> = (PathPrefix, Cow<'a, OwnedValuePath>);
+
+/// Replace the negative array indexes in `path` with the indexes that they point to in `log`,
+/// so that the path points to the same value after other array elements are removed.
+fn resolve_indexes<'a>(
+    log: &LogEvent,
+    prefix: PathPrefix,
+    path: &'a OwnedValuePath,
+) -> FieldPath<'a> {
+    let mut resolved = Cow::Borrowed(path);
+    for (depth, segment) in path.segments.iter().enumerate() {
+        if let OwnedSegment::Index(index) = *segment
+            && index < 0
+            && let Some(Value::Array(array)) = log.get((prefix, &resolved.segments[..depth]))
+            && let Some(index) = index
+                .checked_add_unsigned(array.len())
+                .filter(|index| *index >= 0)
+        {
+            resolved.to_mut().segments[depth] = OwnedSegment::Index(index);
+        }
+    }
+    (prefix, resolved)
+}
+
+/// Where the value at one path is, compared with the value at another path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Location {
+    /// Removing one of the values does not move or remove the other.
+    Separate,
+    /// Both values are in one array, and this value comes first.
+    Before,
+    /// Both values are in one array, and this value comes after the other.
+    After,
+    /// This value contains the other value, or both paths are the same.
+    Contains,
+    /// The other value contains this value.
+    Inside,
+}
+
+/// Find where the value at `path` is, compared with the value at `other`. The paths must not
+/// have negative array indexes that point to a value (see [`resolve_indexes`]).
+fn locate((prefix, path): &FieldPath<'_>, (other_prefix, other): &FieldPath<'_>) -> Location {
+    if prefix != other_prefix {
+        return Location::Separate;
+    }
+    for segments in path.segments.iter().zip(&other.segments) {
+        match segments {
+            (OwnedSegment::Field(field), OwnedSegment::Field(other_field))
+                if field == other_field => {}
+            (OwnedSegment::Index(index), OwnedSegment::Index(other_index)) => {
+                match index.cmp(other_index) {
+                    Ordering::Less => return Location::Before,
+                    Ordering::Greater => return Location::After,
+                    Ordering::Equal => {}
+                }
+            }
+            _ => return Location::Separate,
+        }
+    }
+    if path.segments.len() <= other.segments.len() {
+        Location::Contains
+    } else {
+        Location::Inside
+    }
+}
+
+/// The index of a pending path whose removal does not move or remove the value at any other
+/// pending path. If there is no such path (for example, when two paths are the same), the
+/// first pending path is used.
+fn next_removal(pending: &[Option<FieldPath<'_>>]) -> Option<usize> {
+    let mut first = None;
+    for (index, path) in pending.iter().enumerate() {
+        let Some(path) = path else {
+            continue;
+        };
+        first.get_or_insert(index);
+        let disturbs_other = pending.iter().enumerate().any(|(other_index, other)| {
+            other_index != index
+                && other.as_ref().is_some_and(|other| {
+                    matches!(locate(path, other), Location::Before | Location::Contains)
+                })
+        });
+        if !disturbs_other {
+            return Some(index);
+        }
+    }
+    first
 }
 
 fn into_body(value: Value) -> Option<AnyValue> {
@@ -951,6 +1060,82 @@ mod tests {
                 kv("trace_id", string("not-hex")),
             ]
         );
+    }
+
+    fn payload_index(index: isize) -> OwnedTargetPath {
+        OwnedTargetPath::event(OwnedValuePath {
+            segments: vec![OwnedSegment::field("payload"), OwnedSegment::Index(index)],
+        })
+    }
+
+    #[test]
+    fn native_legacy_log_keeps_array_siblings_of_invalid_timestamp() {
+        let mut schema = LogSchema::default();
+        schema.set_timestamp_key(Some(payload_index(0)));
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("payload"),
+            Value::Array(vec!["bad".into(), "keep".into()]),
+        );
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.time_unix_nano, 0);
+        assert_eq!(
+            record.attributes,
+            vec![kv(
+                "payload",
+                PBValue::ArrayValue(ArrayValue {
+                    values: vec![
+                        AnyValue {
+                            value: Some(string("bad")),
+                        },
+                        AnyValue {
+                            value: Some(string("keep")),
+                        },
+                    ],
+                }),
+            )]
+        );
+    }
+
+    #[test]
+    fn native_legacy_log_removes_schema_fields_that_share_an_array() {
+        // The array indexes of the message, the source type marker, and the timestamp.
+        for indexes @ [message, source_type, timestamp] in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+            [-1, 0, 1],
+            [0, -2, 2],
+        ] {
+            let mut schema = LogSchema::default();
+            schema.set_message_key(Some(payload_index(message)));
+            schema.set_source_type_key(Some(payload_index(source_type)));
+            schema.set_timestamp_key(Some(payload_index(timestamp)));
+            let mut payload = vec![Value::Null; 3];
+            let position = |index: isize| usize::try_from(index.rem_euclid(3)).unwrap();
+            payload[position(message)] = "disk full".into();
+            payload[position(source_type)] = "file".into();
+            payload[position(timestamp)] = Utc.timestamp_nanos(5).into();
+            let mut log = LogEvent::default();
+            log.insert(event_path!("payload"), Value::Array(payload));
+
+            let request = encode_log_event(log, &schema);
+            let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+            assert_eq!(
+                record.body,
+                Some(AnyValue {
+                    value: Some(string("disk full")),
+                }),
+                "{indexes:?}"
+            );
+            assert_eq!(record.time_unix_nano, 5, "{indexes:?}");
+            assert!(record.attributes.is_empty(), "{indexes:?}");
+        }
     }
 
     #[test]
