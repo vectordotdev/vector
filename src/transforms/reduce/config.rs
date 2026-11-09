@@ -127,18 +127,17 @@ const fn default_flush_period_ms() -> Duration {
     Duration::from_secs(1)
 }
 
+impl_generate_config_from_default!(ReduceConfig);
+
 const fn default_concurrency() -> NonZeroUsize {
     NonZeroUsize::new(8).expect("the default concurrency is non-zero")
 }
-
-impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
-        // Without `group_by`, every event has the same discriminant, so extra shards would stay idle.
         let shards = Some(self.concurrency).filter(|n| n.get() > 1 && !self.group_by.is_empty());
 
         Ok(match shards {
