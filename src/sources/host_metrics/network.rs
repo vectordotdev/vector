@@ -4,7 +4,10 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, internal_event::CounterName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::CounterName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -21,6 +24,10 @@ pub struct NetworkConfig {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn network_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "network";
         match heim::net::io_counters().await {
@@ -85,7 +92,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load network I/O counters.",
                     error,
                 });

@@ -1,4 +1,4 @@
-pub mod request_limiter;
+pub(super) mod request_limiter;
 
 use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
@@ -22,6 +22,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
+    internal_event::emit,
     lookup::{OwnedValuePath, path},
     shutdown::ShutdownSignal,
     source_sender::SourceSender,
@@ -43,11 +44,16 @@ use crate::{
         TcpSocketTlsConnectionError, TcpSocketTlsHandshakeTimeout, TcpSourceConnectionClosed,
     },
     net::is_graceful_tls_shutdown,
+    sources::SourceError,
     sources::util::{AfterReadExt, LenientFramedRead},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
+///
+/// # Errors
+///
+/// Returns an error if the address cannot be bound or the inherited listener cannot be configured.
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
@@ -118,6 +124,10 @@ where
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or the source decoder cannot be configured.
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -144,18 +154,18 @@ where
             let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
-                    emit!(SocketBindError {
+                    emit(SocketBindError {
                         mode: SocketMode::Tcp,
                         error: &error,
-                    })
+                    });
+                    SourceError::from(error)
                 })?;
 
             info!(
                 message = "Listening.",
                 addr = %listener
                     .local_addr()
-                    .map(SocketListenAddr::SocketAddr)
-                    .unwrap_or(addr)
+                    .map_or(addr, SocketListenAddr::SocketAddr)
             );
 
             let tripwire = cx.shutdown.clone();
@@ -169,7 +179,7 @@ where
             let shutdown_clone = cx.shutdown.clone();
 
             let request_limiter =
-                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, vector_lib::num_threads());
 
             listener
                 .accept_stream_limited(max_connections)
@@ -187,9 +197,9 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                emit!(SocketReceiveError {
+                                emit(SocketReceiveError {
                                     mode: SocketMode::Tcp,
-                                    error: &error
+                                    error: &error,
                                 });
                                 return;
                             }
@@ -199,7 +209,7 @@ where
                         let span = info_span!("connection", %peer_addr);
 
                         let tripwire = tripwire
-                            .map(move |_| {
+                            .map(move |()| {
                                 info!(
                                     message = "Resetting connection (still open after seconds).",
                                     seconds = ?shutdown_timeout_secs
@@ -211,7 +221,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit(ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -239,7 +249,7 @@ where
                                     // including paths that return early from
                                     // handle_stream (TLS handshake failure,
                                     // shutdown during handshake).
-                                    emit!(TcpSourceConnectionClosed);
+                                    emit(TcpSourceConnectionClosed);
                                     drop(tcp_connection_permit);
                                 })
                                 .instrument(span.or_current()),
@@ -253,6 +263,10 @@ where
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[allow(clippy::too_many_arguments)]
 async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
@@ -282,12 +296,12 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error, peer_addr });
+                emit(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
-        Some(_) = &mut handshake_timeout => {
-            emit!(TcpSocketTlsHandshakeTimeout {
+        Some(()) = &mut handshake_timeout => {
+            emit(TcpSocketTlsHandshakeTimeout {
                 peer_addr,
                 timeout: Duration::from_secs(
                     tls_handshake_timeout_secs.map_or(0, NonZeroU64::get),
@@ -313,9 +327,9 @@ async fn handle_stream<T>(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(TcpBytesReceived {
+        emit(TcpBytesReceived {
             byte_size,
-            peer_addr
+            peer_addr,
         });
     });
 
@@ -338,8 +352,8 @@ async fn handle_stream<T>(
 
     loop {
         let mut permit = tokio::select! {
-            _ = &mut tripwire => break,
-            Some(_) = &mut connection_close_timeout  => {
+            () = &mut tripwire => break,
+            Some(()) = &mut connection_close_timeout  => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
@@ -361,13 +375,13 @@ async fn handle_stream<T>(
         tokio::pin!(timeout);
 
         tokio::select! {
-            _ = &mut tripwire => break,
+            () = &mut tripwire => break,
             _ = &mut shutdown_signal => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
             },
-            _ = &mut timeout => {
+            () = &mut timeout => {
                 // This connection is currently holding a permit, but has not received data for some time. Release
                 // the permit to let another connection try
                 continue;
@@ -382,7 +396,7 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
-                        emit!(SocketEventsReceived {
+                        emit(SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
@@ -419,52 +433,49 @@ async fn handle_stream<T>(
                         }
 
                         source.handle_events(&mut events, peer_addr);
-                        match out.send_batch(events).await {
-                            Ok(_) => {
-                                let ack = match receiver {
-                                    None => TcpSourceAck::Ack,
-                                    Some(receiver) =>
-                                        match receiver.await {
-                                            BatchStatus::Delivered => TcpSourceAck::Ack,
-                                            BatchStatus::Errored => {TcpSourceAck::Error},
-                                            BatchStatus::Rejected => {
-                                                // Sinks are responsible for emitting ComponentEventsDropped.
-                                                TcpSourceAck::Reject
-                                            }
+                        if out.send_batch(events).await.is_ok() {
+                            let ack = match receiver {
+                                None => TcpSourceAck::Ack,
+                                Some(receiver) =>
+                                    match receiver.await {
+                                        BatchStatus::Delivered => TcpSourceAck::Ack,
+                                        BatchStatus::Errored => {TcpSourceAck::Error},
+                                        BatchStatus::Rejected => {
+                                            // Sinks are responsible for emitting ComponentEventsDropped.
+                                            TcpSourceAck::Reject
                                         }
-                                };
-                                if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut().get_mut();
-                                    if let Err(error) = stream.write_all(&ack_bytes).await {
-                                        // Per spec, `*Error` events MUST only be
-                                        // emitted on real errors. A peer-initiated
-                                        // graceful TLS shutdown during the ack
-                                        // write is a lifecycle event, not an error
-                                        // — log at warn and skip the emit.
-                                        if is_graceful_tls_shutdown(&error) {
-                                            warn!(
-                                                message = "Connection closed by peer before acknowledgement could be sent.",
-                                                error = %error,
-                                            );
-                                        } else {
-                                            emit!(TcpSendAckError { error, peer_addr });
-                                        }
-                                        break;
                                     }
-                                }
-                                if ack != TcpSourceAck::Ack {
+                            };
+                            if let Some(ack_bytes) = acker.build_ack(ack){
+                                let stream = reader.get_mut().get_mut();
+                                if let Err(error) = stream.write_all(&ack_bytes).await {
+                                    // Per spec, `*Error` events MUST only be
+                                    // emitted on real errors. A peer-initiated
+                                    // graceful TLS shutdown during the ack
+                                    // write is a lifecycle event, not an error
+                                    // — log at warn and skip the emit.
+                                    if is_graceful_tls_shutdown(&error) {
+                                        warn!(
+                                            message = "Connection closed by peer before acknowledgement could be sent.",
+                                            error = %error,
+                                        );
+                                    } else {
+                                        emit(TcpSendAckError { error, peer_addr });
+                                    }
                                     break;
                                 }
                             }
-                            Err(_) => {
-                                emit!(StreamClosedError { count });
+                            if ack != TcpSourceAck::Ack {
                                 break;
                             }
+                        } else {
+                            emit(StreamClosedError { count });
+                            break;
                         }
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            emit!(DecoderFramingError { error });
+                            emit(DecoderFramingError { error });
                             break;
                         }
                     }

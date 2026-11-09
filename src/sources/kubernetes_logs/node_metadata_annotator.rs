@@ -21,7 +21,7 @@ use crate::event::{Event, LogEvent};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(super) struct FieldsSpec {
     /// Event field for the Node's labels.
     ///
     /// Set to `""` to suppress this key.
@@ -41,7 +41,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with node metadata.
-pub struct NodeMetadataAnnotator {
+pub(super) struct NodeMetadataAnnotator {
     node_state_reader: Store<Node>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
@@ -49,7 +49,7 @@ pub struct NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Create a new [`NodeMetadataAnnotator`].
-    pub const fn new(
+    pub(super) const fn new(
         node_state_reader: Store<Node>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
@@ -64,7 +64,7 @@ impl NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Annotates an event with the information from the [`Node::metadata`].
-    pub fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
+    pub(super) fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Node>::new(node);
         let resource = self.node_state_reader.get(&obj)?;
@@ -84,7 +84,7 @@ fn annotate_from_metadata(
     if let Some(labels) = &metadata.labels {
         let legacy_key_prefix = fields_spec.node_labels.path.as_ref().map(|k| &k.path);
 
-        for (key, value) in labels.iter() {
+        for (key, value) in labels {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -96,7 +96,7 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("node_labels", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 }
@@ -108,6 +108,10 @@ mod tests {
 
     use super::*;
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn test_annotate_from_metadata() {
         let cases = vec![
@@ -246,7 +250,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_eq!(log, expected);

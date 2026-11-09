@@ -21,6 +21,7 @@ use vector_lib::{
         Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
     finalizer::OrderedFinalizer,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, Value};
@@ -39,7 +40,6 @@ use crate::{
         FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -220,7 +220,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -239,6 +239,10 @@ pub struct FileConfig {
     pub rotate_wait: Duration,
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
@@ -252,7 +256,7 @@ const fn default_read_from() -> ReadFromConfig {
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_secs(1)
 }
 
 const fn default_multi_line_timeout() -> u64 {
@@ -373,9 +377,9 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
             encoding: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
             rotate_wait: default_rotate_wait(),
         }
     }
@@ -470,6 +474,14 @@ impl SourceConfig for FileConfig {
     }
 }
 
+///
+/// # Panics
+///
+/// Panics if an include or exclude glob pattern is invalid.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
@@ -480,11 +492,9 @@ pub fn file_source(
 ) -> super::Source {
     // the include option must be specified but also must contain at least one entry.
     if config.include.is_empty() {
-        error!(
-            message = "`include` configuration option must contain at least one file pattern.",
-            internal_log_rate_limit = false
-        );
-        return Box::pin(future::ready(Err(())));
+        let error = "`include` configuration option must contain at least one file pattern.";
+        error!(message = error, internal_log_rate_limit = false);
+        return Box::pin(future::ready(Err(error.into())));
     }
 
     let exclude_patterns = config
@@ -587,7 +597,7 @@ pub fn file_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
-    Box::pin(async move {
+    crate::sources::opaque_source(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
@@ -598,7 +608,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(FileBytesReceived {
+                emit(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
                     include_file_metric_tag,
@@ -657,18 +667,15 @@ pub fn file_source(
             event
         });
         tokio::spawn(async move {
-            match out
+            if let Ok(()) = out
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
             {
-                Ok(()) => {
-                    debug!("Finished sending.");
-                }
-                Err(_) => {
-                    let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { count });
-                }
+                debug!("Finished sending.");
+            } else {
+                let (count, _) = messages.size_hint();
+                emit(StreamClosedError { count });
             }
         });
 
@@ -678,7 +685,7 @@ pub fn file_source(
             let rt = tokio::runtime::Handle::current();
             let result =
                 rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
-            emit!(FileOpen { count: 0 });
+            emit(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -699,13 +706,13 @@ fn reconcile_position_options(
     if start_at_beginning.is_some() {
         warn!(
             message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead."
-        )
+        );
     }
 
     match start_at_beginning {
         Some(true) => (
             ignore_checkpoints.unwrap_or(true),
-            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+            read_from.map_or(ReadFrom::Beginning, Into::into),
         ),
         _ => (
             ignore_checkpoints.unwrap_or(false),
@@ -730,17 +737,20 @@ fn wrap_with_line_agg(
             }),
             logic,
         )
-        .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
-                filename,
+        .map(|aggregated| {
+            let (file_id, start_offset, initial_end) = aggregated.initial_context;
+            Line {
+                text: aggregated.line,
+                filename: aggregated.source,
                 file_id,
                 start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
-            },
-        ),
+                end_offset: aggregated
+                    .last_context
+                    .map_or(initial_end, |(_, _, lastline_end_offset)| {
+                        lastline_end_offset
+                    }),
+            }
+        }),
     )
 }
 
@@ -805,7 +815,7 @@ fn create_event(
         file,
     );
 
-    emit!(FileEventsReceived {
+    emit(FileEventsReceived {
         count: 1,
         file,
         byte_size: event.estimated_json_encoded_size_of(),
@@ -900,25 +910,25 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: device_and_inode
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: checksum
               bytes: 128
               ignored_header_bytes: 512
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(
@@ -930,32 +940,32 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             encoding:
               charset: utf-16le
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: beginning
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: end
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::End);
@@ -1016,7 +1026,7 @@ mod tests {
                     )
                     .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1048,7 +1058,7 @@ mod tests {
                 .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1359,6 +1369,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_multiple_paths() {
         let n = 5;
@@ -1412,6 +1426,10 @@ mod tests {
         assert_eq!(is, [n as usize; 3]);
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_exclude_paths() {
         let n = 5;
@@ -1460,12 +1478,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_key_acknowledged() {
-        file_key(Acks).await
+        file_key(Acks).await;
     }
 
     #[tokio::test]
     async fn file_key_no_acknowledge() {
-        file_key(NoAcks).await
+        file_key(NoAcks).await;
     }
 
     async fn file_key(acks: AckingMode) {
@@ -1566,12 +1584,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
-        file_start_position_server_restart(Acks).await
+        file_start_position_server_restart(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_no_acknowledge() {
-        file_start_position_server_restart(NoAcks).await
+        file_start_position_server_restart(NoAcks).await;
     }
 
     async fn file_start_position_server_restart(acking: AckingMode) {
@@ -1743,12 +1761,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
-        file_start_position_server_restart_with_file_rotation(Acks).await
+        file_start_position_server_restart_with_file_rotation(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
-        file_start_position_server_restart_with_file_rotation(NoAcks).await
+        file_start_position_server_restart_with_file_rotation(NoAcks).await;
     }
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
@@ -1793,6 +1811,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
     async fn file_start_position_ignore_old_files() {

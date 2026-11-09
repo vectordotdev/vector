@@ -170,10 +170,6 @@ fn selected_for_minimal(param: &Value) -> bool {
         .get("required")
         .and_then(Value::as_bool)
         .unwrap_or(false)
-        || param
-            .get("minimal")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
 }
 
 fn has_field_examples(param: &Value) -> bool {

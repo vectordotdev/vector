@@ -74,7 +74,7 @@ pub fn add_headers(
                     }
                 }
             }
-        };
+        }
     }
 }
 
@@ -177,6 +177,10 @@ mod tests {
         );
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn multiple_headers_wildcard() {
         let header_names = [HttpConfigParamKind::Glob(

@@ -17,14 +17,14 @@ use super::service::{
 };
 
 /// The main Zerobus sink.
-pub struct ZerobusSink {
+pub(super) struct ZerobusSink {
     service: ZerobusService,
     request_limits: TowerRequestSettings,
     batch_settings: BatcherSettings,
 }
 
 impl ZerobusSink {
-    pub const fn new(
+    pub(super) const fn new(
         service: ZerobusService,
         request_limits: TowerRequestSettings,
         batch_settings: BatcherSettings,

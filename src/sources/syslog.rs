@@ -1,4 +1,5 @@
 use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -140,7 +141,8 @@ pub struct UnixConfig {
 
 impl SyslogConfig {
     #[cfg(test)]
-    pub fn from_mode(mode: Mode) -> Self {
+    #[must_use]
+    pub const fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
@@ -269,7 +271,7 @@ impl SourceConfig for SyslogConfig {
                                     &host_key,
                                     host.map(Value::from),
                                     log_namespace,
-                                )
+                                );
                             },
                             shutdown,
                             out,
@@ -339,6 +341,7 @@ impl TcpSource for SyslogTcpSource {
     }
 }
 
+#[must_use]
 pub fn udp(
     addr: SocketListenAddr,
     _max_length: usize,
@@ -351,10 +354,11 @@ pub fn udp(
     Box::pin(async move {
         let listenfd = ListenFd::from_env();
         let socket = try_bind_udp_socket(addr, listenfd).await.map_err(|error| {
-            emit!(SocketBindError {
+            emit(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
-            })
+            });
+            super::SourceError::from(error)
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes
@@ -369,7 +373,7 @@ pub fn udp(
             r#type = "udp"
         );
 
-        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+        let bytes_received = register(BytesReceived::from(Protocol::UDP));
 
         let mut stream = UdpFramed::new(
             socket,
@@ -389,7 +393,7 @@ pub fn udp(
                     Ok(((mut events, byte_size), received_from)) => {
                         let count = events.len();
                         bytes_received.emit(ByteSize(byte_size));
-                        emit!(SocketEventsReceived {
+                        emit(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
@@ -399,7 +403,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(SocketReceiveError {
+                        emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
                         });
@@ -415,15 +419,23 @@ pub fn udp(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
-                Err(())
+                emit(StreamClosedError { count });
+                Err(error.into())
             }
         }
     })
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Keep batch notifier and optional metadata signatures consistent with the existing finalization callbacks. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn handle_events(
     events: &mut [Event],
     host_key: &Option<OwnedValuePath>,
@@ -435,6 +447,10 @@ fn handle_events(
     }
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Keep batch notifier and optional metadata signatures consistent with the existing finalization callbacks. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn enrich_syslog_event(
     event: &mut Event,
     host_key: &Option<OwnedValuePath>,
@@ -474,7 +490,7 @@ fn enrich_syslog_event(
     if log_namespace == LogNamespace::Legacy {
         let timestamp = log
             .get(event_path!("timestamp"))
-            .and_then(|timestamp| timestamp.as_timestamp().cloned())
+            .and_then(|timestamp| timestamp.as_timestamp().copied())
             .unwrap_or_else(Utc::now);
         log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
     }
@@ -541,10 +557,10 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-syslog.sock
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config.mode, Mode::Unix(_)));
@@ -728,12 +744,12 @@ mod test {
         })
         .unwrap();
 
-        let receive_buffer_bytes = match config.mode {
-            Mode::Tcp {
-                receive_buffer_bytes,
-                ..
-            } => receive_buffer_bytes,
-            _ => panic!("expected Mode::Tcp"),
+        let Mode::Tcp {
+            receive_buffer_bytes,
+            ..
+        } = config.mode
+        else {
+            panic!("expected Mode::Tcp")
         };
 
         assert_eq!(receive_buffer_bytes, Some(256));
@@ -749,9 +765,8 @@ mod test {
         })
         .unwrap();
 
-        let keepalive = match config.mode {
-            Mode::Tcp { keepalive, .. } => keepalive,
-            _ => panic!("expected Mode::Tcp"),
+        let Mode::Tcp { keepalive, .. } = config.mode else {
+            panic!("expected Mode::Tcp")
         };
 
         assert_eq!(keepalive, None);
@@ -769,9 +784,8 @@ mod test {
         })
         .unwrap();
 
-        let keepalive = match config.mode {
-            Mode::Tcp { keepalive, .. } => keepalive,
-            _ => panic!("expected Mode::Tcp"),
+        let Mode::Tcp { keepalive, .. } = config.mode else {
+            panic!("expected Mode::Tcp")
         };
 
         let keepalive = keepalive.expect("keepalive config not set");
@@ -804,12 +818,12 @@ mod test {
         })
         .unwrap();
 
-        let receive_buffer_bytes = match config.mode {
-            Mode::Udp {
-                receive_buffer_bytes,
-                ..
-            } => receive_buffer_bytes,
-            _ => panic!("expected Mode::Udp"),
+        let Mode::Udp {
+            receive_buffer_bytes,
+            ..
+        } = config.mode
+        else {
+            panic!("expected Mode::Udp")
         };
 
         assert_eq!(receive_buffer_bytes, Some(256));
@@ -852,7 +866,7 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let msg = "i am foobar";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}",
             r#"[meta sequenceId="1" sysUpTime="37" language="EN"]"#,
             r#"[origin ip="192.168.0.1" software="test"]"#
         );
@@ -904,7 +918,7 @@ mod test {
     fn handles_incorrect_sd_element() {
         let msg = "qwerty";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}",
             r"[incorrect x]"
         );
 
@@ -944,7 +958,7 @@ mod test {
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}",
             r"[incorrect x=]"
         );
 
@@ -960,6 +974,10 @@ mod test {
 
     #[test]
     fn handles_empty_sd_element() {
+        #[allow(
+            clippy::needless_pass_by_value,
+            reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+        )]
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
@@ -969,7 +987,7 @@ mod test {
         }
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r"[empty]"
         );
 
@@ -977,7 +995,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[non_empty x="1"][empty]"#
         );
 
@@ -985,7 +1003,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[empty][non_empty x="1"]"#
         );
 
@@ -993,7 +1011,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[empty not_really="testing the test"]"#
         );
 
@@ -1036,7 +1054,7 @@ mod test {
     #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
-        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
+        let raw = format!(r"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}");
         let event = event_from_bytes(
             "host",
             Some(Value::from("192.168.0.254")),
@@ -1204,8 +1222,7 @@ mod test {
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
 
-            let input_lines: Vec<String> =
-                input_messages.iter().map(|msg| msg.to_string()).collect();
+            let input_lines: Vec<String> = input_messages.iter().map(ToString::to_string).collect();
 
             send_lines(in_addr, input_lines).await.unwrap();
 
@@ -1232,6 +1249,34 @@ mod test {
             assert_eq!(output_messages, input_messages);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_udp_syslog_send_error_retains_cause() {
+        let (_guard, in_addr) = next_addr();
+        let config = SyslogConfig::from_mode(Mode::Udp {
+            address: in_addr.into(),
+            receive_buffer_bytes: None,
+        });
+
+        let key = ComponentKey::from("in");
+        let (tx, rx) = SourceSender::new_test();
+        drop(rx);
+        let (context, _shutdown) = SourceContext::new_shutdown(&key, tx);
+        let source = config.build(context).await.unwrap();
+        let source = tokio::spawn(source);
+
+        sleep(Duration::from_millis(150)).await;
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let message = SyslogMessageRfc5424::random(0, 30, 4, 3, 3).to_string();
+        socket.send_to(message.as_bytes(), in_addr).await.unwrap();
+
+        let error = tokio::time::timeout(Duration::from_secs(5), source)
+            .await
+            .expect("source error timed out")
+            .unwrap()
+            .expect_err("source should fail when its output is closed");
+        assert_eq!(error.to_string(), "Sender is closed.");
     }
 
     #[tokio::test]
@@ -1267,8 +1312,7 @@ mod test {
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
 
-            let input_lines: Vec<String> =
-                input_messages.iter().map(|msg| msg.to_string()).collect();
+            let input_lines: Vec<String> = input_messages.iter().map(ToString::to_string).collect();
 
             let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
             for line in input_lines {
@@ -1350,7 +1394,7 @@ mod test {
             let stream = UnixStream::connect(&in_path).await.unwrap();
             let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
-            let lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
+            let lines: Vec<String> = input_messages.iter().map(ToString::to_string).collect();
             let mut lines = stream::iter(lines).map(Ok);
             sink.send_all(&mut lines).await.unwrap();
 
@@ -1564,7 +1608,7 @@ mod test {
     fn structured_data_from_fields(fields: ObjectMap) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
-        for (key, value) in fields.into_iter() {
+        for (key, value) in fields {
             let subfields = value
                 .into_object()
                 .unwrap()
@@ -1580,7 +1624,7 @@ mod test {
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
-    pub enum Severity {
+    pub(super) enum Severity {
         #[serde(rename(deserialize = "emergency"))]
         LOG_EMERG,
         #[serde(rename(deserialize = "alert"))]
@@ -1624,7 +1668,7 @@ mod test {
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Debug)]
-    pub enum Facility {
+    pub(super) enum Facility {
         #[serde(rename(deserialize = "kernel"))]
         LOG_KERN = 0 << 3,
         #[serde(rename(deserialize = "user"))]
@@ -1691,6 +1735,10 @@ mod test {
         facility as u8 | severity as u8
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn value_to_string(v: Value) -> String {
         if v.is_bytes() {
             let buf = v.as_bytes().unwrap();

@@ -21,12 +21,15 @@ pub struct ProcessConfig {
 }
 
 const RUNTIME_TOTAL: CounterName = CounterName::ProcessRuntimeTotal;
-const RUNTIME: CounterName = CounterName::ProcessRuntime;
 const CPU_USAGE: GaugeName = GaugeName::ProcessCpuUsage;
 const MEMORY_USAGE: GaugeName = GaugeName::ProcessMemoryUsage;
 const MEMORY_VIRTUAL_USAGE: GaugeName = GaugeName::ProcessMemoryVirtualUsage;
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
@@ -58,7 +61,6 @@ impl HostMetrics {
                 tags(),
             );
             output.counter(RUNTIME_TOTAL, process.run_time() as f64, tags());
-            output.counter(RUNTIME, process.run_time() as f64, tags());
         }
     }
 }
@@ -89,34 +91,23 @@ mod tests {
     }
 
     #[test]
-    fn emits_process_runtime_total_and_legacy_twin() {
+    fn emits_process_runtime_total_without_legacy_name() {
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(HostMetricsConfig::default()).process_metrics(&mut buffer);
         let metrics = buffer.into_metrics();
 
-        // The canonical `process_runtime_total` counter must be emitted with a
-        // matching legacy `process_runtime` counter carrying the same value and
-        // tags during the migration period.
-        let legacy = metrics
-            .iter()
-            .filter(|metric| metric.name() == "process_runtime")
-            .collect::<Vec<_>>();
-        let total = metrics
-            .iter()
-            .filter(|metric| metric.name() == "process_runtime_total")
-            .collect::<Vec<_>>();
-
         assert!(
-            !legacy.is_empty(),
-            "expected at least one process_runtime counter"
+            metrics
+                .iter()
+                .any(|metric| metric.name() == "process_runtime_total"),
+            "expected at least one process_runtime_total counter"
         );
-        assert_eq!(total.len(), legacy.len());
-
-        for (legacy, total) in legacy.iter().zip(total.iter()) {
-            assert_eq!(legacy.value(), total.value());
-            for tag in ["pid", "name", "command"] {
-                assert_eq!(legacy.tag_value(tag), total.tag_value(tag));
-            }
-        }
+        // The legacy `process_runtime` name was removed in 0.62.0.
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.name() == "process_runtime"),
+            "the legacy process_runtime counter must not be emitted"
+        );
     }
 }

@@ -6,7 +6,7 @@ use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     lookup::event_path,
 };
 use vrl::{
@@ -71,11 +71,13 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
+    #[must_use]
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
+    #[must_use]
     pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
         self.truncation = truncation;
         self
@@ -217,7 +219,7 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            emit!(DatadogLogsReservedAttributeConflict {
+            emit(DatadogLogsReservedAttributeConflict {
                 meaning,
                 source_path: current_path,
                 destination_path: expected_field_name,
@@ -235,6 +237,7 @@ pub fn position_reserved_attr_event_root(
 // `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
 // `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
 // just to test equality.
+#[must_use]
 pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
     path.prefix == PathPrefix::Event
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
@@ -272,7 +275,12 @@ struct LogRequestBuilder {
 }
 
 impl LogRequestBuilder {
-    pub fn build_request(
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Retain ownership of the API key while building and returning its requests."
+    )]
+    fn build_request(
         &self,
         events: Vec<Event>,
         api_key: Arc<str>,
@@ -298,9 +306,9 @@ impl LogRequestBuilder {
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
                 if events_with_estimated_size.pop_front().is_some() {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
-                        reason: "Event too large to encode."
+                        reason: "Event too large to encode.",
                     });
                 }
                 continue;
@@ -354,6 +362,11 @@ impl LogRequestBuilder {
         Ok((events_serialized, buf, byte_size))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Release the uncompressed request buffer before returning the encoded request."
+    )]
     fn finish_request(
         &self,
         buf: Vec<u8>,
@@ -445,7 +458,7 @@ fn encode_log(
     // mismatch here indicates that the size calculation has diverged. Request serialization
     // separately enforces `max_payload_bytes` in release builds.
     debug_assert!(encoded_size <= truncation.max_log_bytes);
-    emit!(DatadogLogsEventTruncated {
+    emit(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
     });
@@ -611,7 +624,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(reqs) => Some(futures::stream::iter(reqs)),
@@ -661,6 +674,7 @@ mod tests {
         simdutf_bytes_utf8_lossy,
     };
     use crate::{
+        codecs::Transformer,
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
         sinks::{
             datadog::logs::config::{
@@ -733,7 +747,7 @@ mod tests {
     ) -> Vec<super::LogApiRequest> {
         LogRequestBuilder {
             default_api_key: Arc::from("unused"),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             compression: Compression::None,
             conforms_as_agent,
             max_payload_bytes,
@@ -902,6 +916,11 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "A metric counter is integer-valued, so exact zero proves no events were dropped."
+    )]
     #[test]
     fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();

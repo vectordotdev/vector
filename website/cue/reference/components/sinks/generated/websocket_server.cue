@@ -10,7 +10,7 @@ generated: components: sinks: websocket_server: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	address: {
 		description: """
@@ -109,7 +109,7 @@ generated: components: sinks: websocket_server: configuration: {
 						type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
 					}
 					client_key: {
-						description: "Configuration for client key used for tracking ACKed message for message buffering."
+						description: "Configuration for client key used for tracking acknowledged message for message buffering."
 						required:    false
 						type: object: options: {
 							name: {
@@ -119,7 +119,7 @@ generated: components: sinks: websocket_server: configuration: {
 								type: string: {}
 							}
 							type: {
-								description: "The type of client key to use, when tracking ACKed message for message buffering."
+								description: "The type of client key to use, when tracking acknowledged message for message buffering."
 								required:    false
 								type: string: {
 									default: "ip_address"
@@ -143,7 +143,7 @@ generated: components: sinks: websocket_server: configuration: {
 					}
 					message_id_path: {
 						description: """
-																Name of the field that contains the ACKed message ID. Use "." if message ID is the root of
+																Name of the field that contains the acknowledged message ID. Use "." if message ID is the root of
 																the message.
 																"""
 						required: true

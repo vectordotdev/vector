@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use vector_lib::internal_event::{emit, register};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
@@ -80,6 +81,10 @@ pub struct DnstapConfig {
     pub log_namespace: Option<bool>,
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_max_frame_length() -> usize {
     bytesize::kib(100u64) as usize
 }
@@ -100,6 +105,7 @@ pub enum Mode {
 }
 
 impl DnstapConfig {
+    #[must_use]
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
             mode: Mode::Unix(unix::UnixConfig::new(socket_path)),
@@ -115,6 +121,7 @@ impl DnstapConfig {
         self.raw_data_only.unwrap_or(false)
     }
 
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> vector_lib::schema::Definition {
         let event_schema = DnstapEventSchema;
 
@@ -195,8 +202,7 @@ impl SourceConfig for DnstapConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let frame_handler =
-                    unix::DnstapFrameHandler::new(config.clone(), common_frame_handler);
+                let frame_handler = unix::DnstapFrameHandler::new(config, common_frame_handler);
                 build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
             }
         }
@@ -234,7 +240,7 @@ struct CommonFrameHandler {
 }
 
 impl CommonFrameHandler {
-    pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
+    fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
         let source_type_key = log_schema().source_type_key();
         let timestamp_key = log_schema().timestamp_key();
 
@@ -252,7 +258,7 @@ impl CommonFrameHandler {
             host_key,
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
-            bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            bytes_received: register(BytesReceived::from(Protocol::from("protobuf"))),
             lowercase_hostnames: config.lowercase_hostnames,
             log_namespace,
         }
@@ -299,8 +305,8 @@ impl FrameHandler for CommonFrameHandler {
                 lowercase_hostnames: self.lowercase_hostnames,
             },
         ) {
-            emit!(DnstapParseError {
-                error: format!("Dnstap protobuf decode error {err:?}.")
+            emit(DnstapParseError {
+                error: format!("Dnstap protobuf decode error {err:?}."),
             });
             return None;
         }
@@ -411,7 +417,7 @@ mod tests {
 
         definition
             .schema_definition(schema)
-            .assert_valid_for_event(&event)
+            .assert_valid_for_event(&event);
     }
 }
 
@@ -451,14 +457,14 @@ mod integration_tests {
                     mode: Mode::Unix(UnixConfig {
                         socket_path: socket,
                         socket_file_mode: Some(511),
-                        socket_receive_buffer_size: Some(10485760),
-                        socket_send_buffer_size: Some(10485760),
+                        socket_receive_buffer_size: Some(10_485_760),
+                        socket_send_buffer_size: Some(10_485_760),
                     }),
-                    max_frame_length: 102400,
+                    max_frame_length: 102_400,
                     host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
-                    max_frame_handling_tasks: Some(100000),
+                    max_frame_handling_tasks: Some(100_000),
                     lowercase_hostnames: false,
                     log_namespace: None,
                 }
@@ -466,7 +472,7 @@ mod integration_tests {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
             });
 
             send_query(raw_data, query_type);
@@ -669,7 +675,7 @@ mod integration_tests {
             "dnstap",
             "-reopen",
         ])
-        .await
+        .await;
     }
 
     async fn nslookup(port: &str) {
@@ -680,11 +686,11 @@ mod integration_tests {
             "h1.example.com",
             "localhost",
         ])
-        .await
+        .await;
     }
 
     async fn nsupdate() {
-        dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await
+        dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await;
     }
 
     #[tokio::test]

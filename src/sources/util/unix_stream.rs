@@ -1,4 +1,5 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, StreamExt};
 use smallvec::SmallVec;
@@ -31,6 +32,14 @@ use crate::{
     },
 };
 
+///
+/// # Errors
+///
+/// The returned source reports an error if processing the socket stream fails.
+///
+/// # Panics
+///
+/// The returned source panics if binding the listener or setting its permissions fails.
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
@@ -60,7 +69,7 @@ where
         change_socket_permissions(&listen_path, socket_file_mode)
             .expect("Failed to set socket permissions");
 
-        let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
+        let bytes_received = register(BytesReceived::from(Protocol::UNIX));
 
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
@@ -82,7 +91,7 @@ where
                 .peer_addr()
                 .ok()
                 .and_then(|addr| {
-                    addr.as_pathname().map(|e| e.to_owned()).map({
+                    addr.as_pathname().map(ToOwned::to_owned).map({
                         |path| {
                             span.record("peer_path", field::debug(&path));
                             path.to_string_lossy().into_owned()
@@ -109,14 +118,14 @@ where
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit(ConnectionOpen { count }));
 
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((frame, _byte_size)) => {
                                 let mut events = frame.into();
 
-                                emit!(SocketEventsReceived {
+                                emit(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     count: events.len(),
@@ -126,13 +135,13 @@ where
 
                                 let count = events.len();
                                 if (out.send_batch(events).await).is_err() {
-                                    emit!(StreamClosedError { count });
+                                    emit(StreamClosedError { count });
                                 }
                             }
                             Err(error) => {
-                                emit!(UnixSocketError {
+                                emit(UnixSocketError {
                                     error: &error,
-                                    path: &listen_path
+                                    path: &listen_path,
                                 });
 
                                 if !error.can_continue() {
@@ -160,9 +169,9 @@ where
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(UnixSocketFileDeleteError {
+            emit(UnixSocketFileDeleteError {
                 path: &listen_path,
-                error
+                error,
             });
         }
 

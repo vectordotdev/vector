@@ -8,7 +8,7 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::telemetry,
     event::event_exceeds_max_nesting_cost,
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     request_metadata::GroupedCountByteSize,
     stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
 };
@@ -40,15 +40,15 @@ struct EventCollection {
 impl Default for EventCollection {
     fn default() -> Self {
         Self {
-            finalizers: Default::default(),
-            events: Default::default(),
+            finalizers: EventFinalizers::default(),
+            events: Vec::default(),
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),
         }
     }
 }
 
-pub struct VectorSink<S> {
+pub(super) struct VectorSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
 }
@@ -68,7 +68,7 @@ where
                         let reason = format!(
                             "Event nesting cost {cost} exceeds protobuf budget of {budget}."
                         );
-                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                        emit(ComponentEventsDropped::<UNINTENTIONAL> {
                             count: 1,
                             reason: &reason,
                         });

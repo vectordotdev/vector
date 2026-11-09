@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {
@@ -156,7 +154,7 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_with_config(
                 prost_build,

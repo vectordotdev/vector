@@ -84,12 +84,13 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  Use the fragment body for the full migration guide (rationale, before/after examples, links). Then run
-  `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and commit both files.
+  Use the fragment body for the full migration guide (rationale, before/after examples, links).
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
   change, so it does not belong in `changelog.d/`). The fragment is rendered on the release page in the
   Deprecation Announcements section and on the [deprecations index](https://vector.dev/deprecations/).
+  A valid new active notice satisfies `vdev check changelog-fragments` automatically; no `no-changelog` label is needed.
+  Existing changelog fragments are still validated, and removing a deprecated feature still requires a breaking fragment.
 - Add a deprecation note to the component docs if applicable. Typically, this means adding `deprecation: "description of the deprecation"`
   to the cue file or `#[configurable(deprecated = "use <alternative> instead")]` to the parameter.
 - For a component that is being renamed, remove the documentation page for the old name and add a new one for the new
@@ -118,5 +119,6 @@ When removing a deprecation in a subsequent release, the pull request should:
   change (the feature stops working), so it belongs in the release notes' Breaking changes section alongside other
   breaking changes. The Past Deprecations section is the lifecycle view, answering a different question for a
   different reader.
-- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This records the
-  removal in `website/data/deprecations.json` and deletes the original fragment in one step.
+- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This moves the
+  fragment to [`website/content/en/deprecations/enacted/`](../website/content/en/deprecations/enacted/) and records
+  `removed_in` in its frontmatter.

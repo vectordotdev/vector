@@ -1,3 +1,8 @@
+use crate::config::SourceAcknowledgementsConfig;
+mod decoding;
+
+use crate::http::KeepaliveConfig;
+use crate::sources::util::grpc::GrpcKeepaliveConfig;
 use std::{
     net,
     sync::Arc,
@@ -83,6 +88,7 @@ fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
                     observed_time_unix_nano: 2,
                     severity_number: 9,
                     severity_text: "info".into(),
+                    event_name: "build.finished".into(),
                     body: Some(AnyValue {
                         value: Some(StringValue("log body".into())),
                     }),
@@ -117,7 +123,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                 }],
                 dropped_attributes_count: 0,
             }),
-            schema_url: "".to_string(),
+            schema_url: String::new(),
             scope_metrics: vec![ScopeMetrics {
                 scope: Some(InstrumentationScope {
                     name: "vector-collector-instrumentation".to_string(),
@@ -125,7 +131,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                     attributes: vec![],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 metrics: vec![Metric {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
@@ -187,8 +193,8 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     flags: 0,
                     name: "span".to_string(),
                     kind: 1,
-                    start_time_unix_nano: 1713525203000000000,
-                    end_time_unix_nano: 1713525205000000000,
+                    start_time_unix_nano: 1_713_525_203_000_000_000,
+                    end_time_unix_nano: 1_713_525_205_000_000_000,
                     attributes: vec![],
                     dropped_attributes_count: 0,
                     events: vec![],
@@ -196,11 +202,11 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     links: vec![],
                     dropped_links_count: 0,
                     status: None,
-                    trace_state: "".to_string(),
+                    trace_state: String::new(),
                 }],
-                schema_url: "".to_string(),
+                schema_url: String::new(),
             }],
-            schema_url: "".to_string(),
+            schema_url: String::new(),
         }],
     }
 }
@@ -208,6 +214,50 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
 #[test]
 fn generate_config() {
     test_util::test_generate_config::<OpentelemetryConfig>();
+}
+
+#[tokio::test]
+async fn rejects_deeply_nested_protobuf() {
+    use vector_lib::opentelemetry::proto::common::v1::{ArrayValue, any_value};
+
+    for preserve_otlp in [false, true] {
+        let env = build_otlp_test_env_with(LOGS, None, preserve_otlp).await;
+        test_util::wait_for_tcp(env.config.http.address).await;
+        let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
+            .await
+            .unwrap();
+        let mut body = AnyValue {
+            value: Some(StringValue("nested".to_owned())),
+        };
+        // Each array adds two Protobuf message levels, exceeding the decode-depth
+        // budget with a small payload rather than relying on the message-size cap.
+        for _ in 0..64 {
+            body = AnyValue {
+                value: Some(any_value::Value::ArrayValue(ArrayValue {
+                    values: vec![body],
+                })),
+            };
+        }
+        let mut request = create_test_logs_request().into_inner();
+        request.resource_logs[0].scope_logs[0].log_records[0].body = Some(body);
+        let encoded = request.encode_to_vec();
+
+        let error = client.export(request).await.unwrap_err();
+        assert_eq!(error.code(), tonic::Code::Internal);
+        assert!(error.message().contains("recursion limit reached"));
+
+        let response = reqwest::Client::new()
+            .post(format!("http://{}/v1/logs", env.config.http.address))
+            .header("Content-Type", "application/x-protobuf")
+            .body(encoded)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+
+        client.export(create_test_logs_request()).await.unwrap();
+        assert_eq!(test_util::collect_ready(env.output).len(), 1);
+    }
 }
 
 #[test]
@@ -485,6 +535,10 @@ async fn receive_grpc_logs_vector_namespace() {
 
         let meta = event.as_log().metadata().value();
         assert_eq!(
+            meta.get(path!("opentelemetry", "event_name")).unwrap(),
+            &value!("build.finished")
+        );
+        assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
@@ -581,6 +635,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         let actual_event = output.pop().unwrap();
         schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
+            ("event_name", "build.finished".into()),
             (
                 "attributes",
                 Value::Object(vec_into_btmap(vec![("attr_key", "attr_val".into())])),
@@ -643,7 +698,7 @@ async fn receive_sum_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -651,7 +706,7 @@ async fn receive_sum_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -736,7 +791,7 @@ async fn receive_sum_non_monotonic_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -744,7 +799,7 @@ async fn receive_sum_non_monotonic_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -829,7 +884,7 @@ async fn receive_gauge_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -837,7 +892,7 @@ async fn receive_gauge_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -897,6 +952,10 @@ async fn receive_gauge_metric() {
         .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn receive_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -919,7 +978,7 @@ async fn receive_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -927,7 +986,7 @@ async fn receive_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1010,7 +1069,7 @@ async fn receive_histogram_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -1025,6 +1084,92 @@ async fn receive_histogram_metric() {
     .await;
 }
 
+/// OTLP's `HistogramDataPoint.sum` is optional, and the spec tells producers to leave it unset when
+/// recording negative values so as to stay compatible with `OpenMetrics`. An unset sum must reach the
+/// event as `None` rather than a fabricated zero, so that downstream consumers can tell it apart
+/// from a histogram whose sum genuinely is zero.
+#[tokio::test]
+async fn receive_histogram_metric_without_sum() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(METRICS, None).await;
+
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
+            .await
+            .unwrap();
+        let (event_time, event_time_nanos) = current_time_and_nanos();
+
+        let req = Request::new(ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: None,
+                schema_url: String::new(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: None,
+                    schema_url: String::new(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        metadata: vec![],
+                        data: Some(Data::Histogram(Histogram {
+                            aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                            data_points: vec![HistogramDataPoint {
+                                attributes: vec![],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: event_time_nanos,
+                                count: 3,
+                                sum: None,
+                                bucket_counts: vec![1, 2],
+                                explicit_bounds: vec![50.0],
+                                exemplars: vec![],
+                                flags: 0,
+                                min: None,
+                                max: None,
+                            }],
+                        })),
+                    }],
+                }],
+            }],
+        });
+        _ = client.export(req).await;
+        let mut output = test_util::collect_ready(env.output);
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![
+                        Bucket {
+                            count: 1,
+                            upper_limit: 50.0,
+                        },
+                        Bucket {
+                            count: 2,
+                            upper_limit: f64::INFINITY,
+                        },
+                    ],
+                    count: 3,
+                    sum: None,
+                },
+            )
+            .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
+            .with_tags(Some(MetricTags::default())),
+        );
+        expected_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("metrics".into()),
+        }));
+        assert_eq!(actual_event, expected_event);
+    })
+    .await;
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn receive_histogram_delta_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1047,7 +1192,7 @@ async fn receive_histogram_delta_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1055,7 +1200,7 @@ async fn receive_histogram_delta_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1138,7 +1283,7 @@ async fn receive_histogram_delta_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -1153,6 +1298,10 @@ async fn receive_histogram_delta_metric() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn receive_exponential_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1175,7 +1324,7 @@ async fn receive_exponential_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1183,7 +1332,7 @@ async fn receive_exponential_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1259,7 +1408,7 @@ async fn receive_exponential_histogram_metric() {
                     buckets: vec![
                         Bucket {
                             count: 1,
-                            upper_limit: -0.8408964152537146,
+                            upper_limit: -0.840_896_415_253_714_6,
                         },
                         Bucket {
                             count: 2,
@@ -1271,15 +1420,15 @@ async fn receive_exponential_histogram_metric() {
                         },
                         Bucket {
                             count: 2,
-                            upper_limit: 1.189207115002721,
+                            upper_limit: 1.189_207_115_002_721,
                         },
                         Bucket {
                             count: 1,
-                            upper_limit: 1.4142135623730951,
+                            upper_limit: 1.414_213_562_373_095_1,
                         },
                     ],
                     count: 7,
-                    sum: 700.00,
+                    sum: Some(700.00),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -1294,6 +1443,10 @@ async fn receive_exponential_histogram_metric() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn receive_summary_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1316,7 +1469,7 @@ async fn receive_summary_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1324,7 +1477,7 @@ async fn receive_summary_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1429,34 +1582,43 @@ async fn receive_summary_metric() {
 fn get_source_config_with_headers(
     grpc_addr: net::SocketAddr,
     http_addr: net::SocketAddr,
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
 ) -> OpentelemetryConfig {
     OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
+            tls: Option::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
+            tls: Option::default(),
+            keepalive: KeepaliveConfig::default(),
             headers: vec![
                 "User-Agent".to_string(),
                 "X-*".to_string(),
                 "AbsentHeader".to_string(),
             ],
         },
-        acknowledgements: Default::default(),
+        acknowledgements: SourceAcknowledgementsConfig::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
-        log_namespace: Default::default(),
-        use_otlp_decoding: use_otlp_decoding.into(),
+        log_namespace: Option::default(),
+        decoding: preserve_otlp.then(|| super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     }
 }
 
 async fn send_and_collect_otel_event(
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
     output_port: &str,
     endpoint: &str,
     body: Vec<u8>,
@@ -1464,7 +1626,7 @@ async fn send_and_collect_otel_event(
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
 
-    let source = get_source_config_with_headers(grpc_addr, http_addr, use_otlp_decoding);
+    let source = get_source_config_with_headers(grpc_addr, http_addr, preserve_otlp);
 
     let (sender, output, _) = new_source(EventStatus::Delivered, output_port.to_string());
     let server = source
@@ -1489,7 +1651,60 @@ async fn send_and_collect_otel_event(
 }
 
 #[tokio::test]
-async fn http_headers_logs_use_otlp_decoding_false() {
+async fn receive_http_native_event_name() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        // ExportLogsServiceRequest containing only LogRecord field 12 (event_name).
+        // Encode independently of the generated types to catch a missing or incorrect wire tag.
+        let encoded = b"\x0a\x14\x12\x12\x12\x10\x62\x0ebuild.finished";
+        for (vector_namespace, preserve_otlp) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let env = build_otlp_test_env_with(LOGS, Some(vector_namespace), preserve_otlp).await;
+            test_util::wait_for_tcp(env.config.http.address).await;
+            let response = reqwest::Client::new()
+                .post(format!("http://{}/v1/logs", env.config.http.address))
+                .header("Content-Type", "application/x-protobuf")
+                .body(encoded.as_slice())
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+            let mut events = test_util::collect_ready(env.output);
+            assert_eq!(events.len(), 1);
+            let event = events.pop().unwrap();
+            let log = event.as_log();
+            let event_name = if preserve_otlp {
+                log.get(event_path!(
+                    "resourceLogs",
+                    0,
+                    "scopeLogs",
+                    0,
+                    "logRecords",
+                    0,
+                    "eventName"
+                ))
+            } else if vector_namespace {
+                log.metadata()
+                    .value()
+                    .get(path!("opentelemetry", "event_name"))
+            } else {
+                log.get(event_path!("event_name"))
+            };
+            assert_eq!(event_name, Some(&value!("build.finished")));
+            env.config
+                .outputs(LogNamespace::Legacy)
+                .remove(0)
+                .schema_definition(true)
+                .unwrap()
+                .assert_valid_for_event(&event);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn http_headers_logs_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let (_guard_0, grpc_addr) = next_addr();
         let (_guard_1, http_addr) = next_addr();
@@ -1519,6 +1734,7 @@ async fn http_headers_logs_use_otlp_decoding_false() {
                         observed_time_unix_nano: 2,
                         severity_number: 9,
                         severity_text: "info".into(),
+                        event_name: String::new(),
                         body: Some(AnyValue {
                             value: Some(StringValue("log body".into())),
                         }),
@@ -1574,7 +1790,7 @@ async fn http_headers_logs_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_logs_use_otlp_decoding_true() {
+async fn http_headers_logs_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let (_guard_0, grpc_addr) = next_addr();
         let (_guard_1, http_addr) = next_addr();
@@ -1600,6 +1816,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
                         observed_time_unix_nano: 2,
                         severity_number: 9,
                         severity_text: "info".into(),
+                        event_name: String::new(),
                         body: Some(AnyValue {
                             value: Some(StringValue("log body".into())),
                         }),
@@ -1635,7 +1852,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
 }
 
 #[tokio::test]
-async fn http_headers_metrics_use_otlp_decoding_false() {
+async fn http_headers_metrics_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             false,
@@ -1670,7 +1887,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_metrics_use_otlp_decoding_true() {
+async fn http_headers_metrics_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             true,
@@ -1687,7 +1904,7 @@ async fn http_headers_metrics_use_otlp_decoding_true() {
 }
 
 #[tokio::test]
-async fn http_headers_traces_use_otlp_decoding_false() {
+async fn http_headers_traces_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             false,
@@ -1726,7 +1943,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_traces_use_otlp_decoding_true() {
+async fn http_headers_traces_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             true,
@@ -1764,9 +1981,9 @@ async fn http_headers_traces_use_otlp_decoding_true() {
     .await;
 }
 
-async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
+async fn assert_grpc_trace_layout_marker(preserve_otlp: bool) {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let env = build_otlp_test_env_with(TRACES, None, use_otlp_decoding).await;
+        let env = build_otlp_test_env_with(TRACES, None, preserve_otlp).await;
         let mut client = TraceServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
@@ -1775,7 +1992,7 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
             .await;
         let mut events = test_util::collect_ready(env.output);
         assert_eq!(events.len(), 1);
-        let expected = if use_otlp_decoding {
+        let expected = if preserve_otlp {
             TraceLayout::OtlpResourceSpans
         } else {
             TraceLayout::OtelFlattened
@@ -1789,32 +2006,29 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
 }
 
 #[tokio::test]
-async fn grpc_traces_use_otlp_decoding_false_sets_layout_marker() {
+async fn grpc_traces_preserve_otlp_false_sets_layout_marker() {
     assert_grpc_trace_layout_marker(false).await;
 }
 
 #[tokio::test]
-async fn grpc_traces_use_otlp_decoding_true_sets_layout_marker() {
+async fn grpc_traces_preserve_otlp_true_sets_layout_marker() {
     assert_grpc_trace_layout_marker(true).await;
 }
 
-pub struct OTelTestEnv {
+pub(super) struct OTelTestEnv {
     pub grpc_addr: String,
     pub config: OpentelemetryConfig,
     pub output: Box<dyn Stream<Item = Event> + Unpin + Send>,
 }
 
-pub async fn build_otlp_test_env(
-    event_name: &'static str,
-    log_namespace: Option<bool>,
-) -> OTelTestEnv {
+async fn build_otlp_test_env(event_name: &'static str, log_namespace: Option<bool>) -> OTelTestEnv {
     build_otlp_test_env_with(event_name, log_namespace, false).await
 }
 
 async fn build_otlp_test_env_with(
     event_name: &'static str,
     log_namespace: Option<bool>,
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
 ) -> OTelTestEnv {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
@@ -1822,20 +2036,29 @@ async fn build_otlp_test_env_with(
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
+            tls: Option::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
-            headers: Default::default(),
+            tls: Option::default(),
+            keepalive: KeepaliveConfig::default(),
+            headers: Vec::default(),
         },
-        acknowledgements: Default::default(),
+        acknowledgements: SourceAcknowledgementsConfig::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace,
-        use_otlp_decoding: use_otlp_decoding.into(),
+        decoding: preserve_otlp.then(|| super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
@@ -1910,7 +2133,7 @@ fn current_time_and_nanos() -> (SystemTime, u64) {
 }
 
 #[tokio::test]
-async fn http_logs_use_otlp_decoding_emits_metric() {
+async fn http_logs_preserve_otlp_emits_metric() {
     use crate::metrics::Controller;
 
     test_util::trace_init();
@@ -1921,20 +2144,29 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
     let source = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
+            tls: Option::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
-            keepalive: Default::default(),
-            headers: Default::default(),
+            tls: Option::default(),
+            keepalive: KeepaliveConfig::default(),
+            headers: Vec::default(),
         },
-        acknowledgements: Default::default(),
+        acknowledgements: SourceAcknowledgementsConfig::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: None,
-        use_otlp_decoding: true.into(),
+        decoding: Some(super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     };
 
     let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -1956,6 +2188,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
                     observed_time_unix_nano: 2,
                     severity_number: 9,
                     severity_text: "info".into(),
+                    event_name: String::new(),
                     body: Some(AnyValue {
                         value: Some(StringValue("log body".into())),
                     }),
@@ -2003,6 +2236,9 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
 
 #[cfg(test)]
 mod otlp_decoding_config_tests {
+    use crate::config::SourceAcknowledgementsConfig;
+    use crate::http::KeepaliveConfig;
+    use crate::sources::util::grpc::GrpcKeepaliveConfig;
     use indoc::indoc;
 
     use crate::config::{DataType, LogNamespace, SourceConfig};
@@ -2045,7 +2281,7 @@ mod otlp_decoding_config_tests {
     }
 
     #[test]
-    fn test_otlp_decoding_from_bool() {
+    fn test_legacy_otlp_decoding_from_bool() {
         // Test direct From<bool> trait implementation
         let config_true = OtlpDecodingConfig::from(true);
         assert!(config_true.logs);
@@ -2072,9 +2308,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(config.use_otlp_decoding.logs);
-        assert!(config.use_otlp_decoding.metrics);
-        assert!(config.use_otlp_decoding.traces);
+        assert!(config.otlp_decoding().logs);
+        assert!(config.otlp_decoding().metrics);
+        assert!(config.otlp_decoding().traces);
 
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -2086,13 +2322,13 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(!config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(!config.otlp_decoding().traces);
     }
 
     #[test]
-    fn test_otlp_decoding_deserialization_from_struct() {
+    fn test_legacy_otlp_decoding_deserialization_from_struct() {
         // Test deserializing from a struct with all fields
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -2107,9 +2343,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(config.otlp_decoding().traces);
 
         // Test deserializing from a struct with partial fields (using defaults)
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
@@ -2123,14 +2359,14 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs); // default false
-        assert!(!config.use_otlp_decoding.metrics); // default false
-        assert!(config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs); // default false
+        assert!(!config.otlp_decoding().metrics); // default false
+        assert!(config.otlp_decoding().traces);
     }
 
     #[test]
     fn test_otlp_decoding_default_when_not_specified() {
-        // Test that when use_otlp_decoding is not specified, it uses defaults (all false)
+        // Test that when decoding is not specified, it uses defaults (all false)
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
             grpc:
@@ -2140,9 +2376,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(!config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(!config.otlp_decoding().traces);
     }
 
     #[tokio::test]
@@ -2151,23 +2387,30 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 headers: vec![],
             },
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: true,
-                metrics: true,
-                traces: true,
-            },
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [
+                        OtlpSignalType::Logs,
+                        OtlpSignalType::Metrics,
+                        OtlpSignalType::Traces,
+                    ]
+                    .into_iter()
+                    .collect(),
+                },
+            ),
+            use_otlp_decoding: None,
         };
 
         // All should return Some deserializer
@@ -2194,23 +2437,24 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 headers: vec![],
             },
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: false,
-                metrics: false,
-                traces: true,
-            },
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [OtlpSignalType::Traces].into_iter().collect(),
+                },
+            ),
+            use_otlp_decoding: None,
         };
 
         // Only traces should return Some deserializer
@@ -2240,23 +2484,26 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 headers: vec![],
             },
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: false,
-                metrics: true,
-                traces: true,
-            },
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [OtlpSignalType::Metrics, OtlpSignalType::Traces]
+                        .into_iter()
+                        .collect(),
+                },
+            ),
+            use_otlp_decoding: None,
         };
 
         let outputs = config_mixed.outputs(LogNamespace::Legacy);

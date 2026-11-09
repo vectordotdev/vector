@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
     config::{LegacyKey, LogNamespace, log_schema},
@@ -32,6 +33,7 @@ pub const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
 pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const FLAGS_KEY: &str = "flags";
 pub const TIMESTAMP_KEY: &str = "timestamp";
+pub const EVENT_NAME_KEY: &str = "event_name";
 
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
@@ -127,6 +129,15 @@ impl ResourceLog {
         }
 
         // Optional fields
+        if !self.log_record.event_name.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(EVENT_NAME_KEY))),
+                path!(EVENT_NAME_KEY),
+                self.log_record.event_name,
+            );
+        }
         if let Some(resource) = self.resource
             && !resource.attributes.is_empty()
         {
@@ -274,7 +285,7 @@ impl ResourceLog {
 ///
 /// - Legacy namespace: the message field becomes the body and the timestamp field becomes
 ///   `time_unix_nano`. The fields written by the source (`attributes`, `resources`, `scope`,
-///   `trace_id`, `span_id`, `severity_text`, `severity_number`, `flags`,
+///   `trace_id`, `span_id`, `severity_text`, `severity_number`, `flags`, `event_name`,
 ///   `dropped_attributes_count`, and `observed_timestamp`) fill the matching OTLP fields.
 /// - Vector namespace: the event value becomes the body. The same fields are read from the
 ///   `opentelemetry` source metadata. When they are missing, the timestamp falls back to the
@@ -394,6 +405,7 @@ fn take_record_fields(
     record.severity_number =
         take(fields, path!(SEVERITY_NUMBER_KEY), into_severity_number).unwrap_or_default();
     record.flags = take(fields, path!(FLAGS_KEY), into_u32).unwrap_or_default();
+    record.event_name = take(fields, path!(EVENT_NAME_KEY), into_string).unwrap_or_default();
     record.dropped_attributes_count =
         take(fields, path!(DROPPED_ATTRIBUTES_COUNT_KEY), into_u32).unwrap_or_default();
     record.trace_id = take(fields, path!(TRACE_ID_KEY), into_id::<16>).unwrap_or_default();
@@ -522,6 +534,7 @@ fn into_kv_list(value: Value) -> Result<Vec<KeyValue>, Value> {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use prost::Message;
     use vector_core::config::{LogSchema, init_log_schema};
     use vrl::{event_path, owned_value_path, path::OwnedTargetPath};
 
@@ -600,6 +613,7 @@ mod tests {
                 flags: 1,
                 trace_id: (1..=16).collect(),
                 span_id: (1..=8).collect(),
+                event_name: "build.finished".to_owned(),
             },
         )
     }
@@ -848,5 +862,50 @@ mod tests {
             },
         );
         assert_eq!(log_event_to_export_request(log), expected);
+    }
+
+    #[test]
+    fn decodes_native_event_name_in_both_namespaces() {
+        // OTLP LogRecord field 12, independently encoded so the test checks the wire tag.
+        let encoded = b"\x62\x0ebuild.finished";
+        for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let event = ResourceLog {
+                resource: None,
+                scope: None,
+                log_record: LogRecord::decode(encoded.as_slice()).unwrap(),
+            }
+            .into_event(log_namespace, Utc::now());
+            let log = event.as_log();
+            let event_name = match log_namespace {
+                LogNamespace::Legacy => log.get(event_path!(EVENT_NAME_KEY)),
+                LogNamespace::Vector => log
+                    .metadata()
+                    .value()
+                    .get(path!(SOURCE_NAME, EVENT_NAME_KEY)),
+            };
+            assert_eq!(event_name, Some(&Value::from("build.finished")));
+        }
+    }
+
+    #[test]
+    fn omits_absent_or_empty_event_name() {
+        for encoded in [b"".as_slice(), b"\x62\x00".as_slice()] {
+            for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+                let event = ResourceLog {
+                    resource: None,
+                    scope: None,
+                    log_record: LogRecord::decode(encoded).unwrap(),
+                }
+                .into_event(log_namespace, Utc::now());
+                let log = event.as_log();
+                assert!(log.get(event_path!(EVENT_NAME_KEY)).is_none());
+                assert!(
+                    log.metadata()
+                        .value()
+                        .get(path!(SOURCE_NAME, EVENT_NAME_KEY))
+                        .is_none()
+                );
+            }
+        }
     }
 }

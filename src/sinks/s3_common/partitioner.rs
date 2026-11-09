@@ -1,4 +1,4 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use crate::{
     internal_events::TemplateRenderingError, sinks::util::partitioner::render_key_with_fallback,
@@ -23,6 +23,7 @@ pub struct S3KeyPartitioner {
 }
 
 impl S3KeyPartitioner {
+    #[must_use]
     pub const fn new(
         key_prefix_template: ConfinedTemplate,
         ssekms_key_id_template: Option<ConfinedTemplate>,
@@ -52,7 +53,7 @@ impl Partitioner for S3KeyPartitioner {
             .as_ref()
             .map(|t| {
                 t.render_string(item).map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("ssekms_key_id"),
                         drop_event: true,

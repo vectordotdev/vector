@@ -1,5 +1,6 @@
 pub mod logs;
 pub mod metrics;
+pub mod traces;
 
 use reqwest::{Client, Method};
 use serde::{Deserialize, de::DeserializeOwned};
@@ -20,8 +21,7 @@ fn fake_intake_agent_address() -> String {
 struct FakeIntakePayload<D> {
     // When string, base64 encoded
     data: D,
-    #[serde(rename = "encoding")]
-    _encoding: String,
+    encoding: String,
     #[serde(rename = "timestamp")]
     _timestamp: String,
 }
@@ -43,7 +43,7 @@ type FakeIntakeResponseJson = FakeIntakeResponse<FakeIntakePayloadJson>;
 
 impl FakeIntakeResponseT for FakeIntakeResponseJson {
     fn build_url(base: &str, endpoint: &str) -> String {
-        format!("{base}/fakeintake/payloads?endpoint={endpoint}&format=json",)
+        format!("{base}/fakeintake/payloads?endpoint={endpoint}&format=json")
     }
 }
 
@@ -51,7 +51,7 @@ type FakeIntakeResponseRaw = FakeIntakeResponse<FakeIntakePayloadRaw>;
 
 impl FakeIntakeResponseT for FakeIntakeResponseRaw {
     fn build_url(base: &str, endpoint: &str) -> String {
-        format!("{base}/fakeintake/payloads?endpoint={endpoint}",)
+        format!("{base}/fakeintake/payloads?endpoint={endpoint}")
     }
 }
 

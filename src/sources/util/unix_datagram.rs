@@ -1,4 +1,5 @@
 use std::{fs::remove_file, path::PathBuf};
+use vector_lib::internal_event::{emit, register};
 
 use bytes::BytesMut;
 use futures::StreamExt;
@@ -25,6 +26,14 @@ use crate::{
     },
 };
 
+///
+/// # Errors
+///
+/// The returned source reports an error if processing the datagram stream fails.
+///
+/// # Panics
+///
+/// The returned source panics if binding the socket or setting its permissions fails.
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
@@ -49,9 +58,9 @@ pub fn build_unix_datagram_source(
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
-            emit!(UnixSocketFileDeleteError {
+            emit(UnixSocketFileDeleteError {
                 path: &listen_path,
-                error
+                error,
             });
         }
 
@@ -66,35 +75,36 @@ async fn listen(
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let mut buf = BytesMut::with_capacity(max_length);
-    let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
+    let bytes_received = register(BytesReceived::from(Protocol::UNIX));
     loop {
         buf.resize(max_length, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
                     let error = vector_lib::codecs::decoding::Error::FramingError(error.into());
-                    emit!(SocketReceiveError {
+                    emit(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
-                    })
+                    });
+                    crate::sources::SourceError::from(error)
                 })?;
 
                 let span = info_span!("datagram");
-                let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).inspect(|path| {
-                        span.record("peer_path", field::debug(path));
-                    });
-
-                    path.map(|p| p.to_string_lossy().into_owned())
-                } else {
+                let received_from = if address.is_unnamed() {
                     // In most cases, we'll be connecting to this
                     // socket from an unnamed socket (a socket not
                     // bound to a file). Instead of a filename, we'll
                     // surface a specific host value.
                     span.record("peer_path", field::debug(UNNAMED_SOCKET_HOST));
                     Some(UNNAMED_SOCKET_HOST.to_owned())
+                } else {
+                    let path = address.as_pathname().map(ToOwned::to_owned).inspect(|path| {
+                        span.record("peer_path", field::debug(path));
+                    });
+
+                    path.map(|p| p.to_string_lossy().into_owned())
                 };
 
                 bytes_received.emit(ByteSize(byte_size));
@@ -106,7 +116,7 @@ async fn listen(
                 loop {
                     match stream.next().await {
                         Some(Ok((mut events, _byte_size))) => {
-                            emit!(SocketEventsReceived {
+                            emit(SocketEventsReceived {
                                 mode: SocketMode::Unix,
                                 byte_size: events.estimated_json_encoded_size_of(),
                                 count: events.len()
@@ -116,11 +126,11 @@ async fn listen(
 
                             let count = events.len();
                             if (out.send_batch(events).await).is_err() {
-                                emit!(StreamClosedError { count });
+                                emit(StreamClosedError { count });
                             }
                         },
                         Some(Err(error)) => {
-                            emit!(SocketReceiveError {
+                            emit(SocketReceiveError {
                                 mode: SocketMode::Unix,
                                 error: &error
                             });

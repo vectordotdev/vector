@@ -144,6 +144,10 @@ impl<'a> CGroupRecurser<'a> {
     }
 
     /// Try to load the `cpu` controller data file and emit metrics if it is found.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of cgroup counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn load_cpu(&mut self, cgroup: &CGroup, tags: &MetricTags) {
         if let Some(Some(cpu)) = filter_result_sync(
             cgroup.load_cpu(&mut self.buffer).await,
@@ -168,6 +172,10 @@ impl<'a> CGroupRecurser<'a> {
     }
 
     /// Try to load the `memory` controller data files and emit metrics if they are found.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of cgroup counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn load_memory(&mut self, cgroup: &CGroup, tags: &MetricTags) {
         if let Some(Some(current)) = filter_result_sync(
             cgroup.load_memory_current(&mut self.buffer).await,
@@ -294,7 +302,7 @@ impl CGroupRoot {
         };
 
         let (path, name) = match &config.base {
-            Some(base) => (base.to_path_buf(), base.to_path_buf()),
+            Some(base) => (base.clone(), base.clone()),
             None => ("/".into(), "/".into()),
         };
         Some(Self { name, path, mode })
@@ -390,6 +398,10 @@ impl CGroup {
 macro_rules! define_stat_struct {
     ($name:ident ( $( $field:ident, )* )) => {
         #[derive(Clone, Copy, Debug, Default)]
+        #[allow(
+            clippy::struct_field_names,
+            reason = "Field names are matched against kernel cgroup file keys. https://github.com/vectordotdev/vector/issues/23659"
+        )]
         struct $name {
             $( $field: u64, )*
         }
@@ -499,10 +511,10 @@ mod tests {
 
     #[tokio::test]
     async fn generates_cgroups_metrics() {
-        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r"
             collectors:
               - cgroups
-        "#})
+        "})
         .unwrap();
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
@@ -616,12 +628,12 @@ mod tests {
 
         async fn test(&self) {
             let path = self.0.path();
-            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r#"
+            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r"
                 collectors:
                   - cgroups
                 cgroups:
                   base_dir: {path:?}
-            "#})
+            "})
             .unwrap();
             let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
@@ -684,9 +696,9 @@ mod tests {
         }
 
         fn cpu_stat(&mut self, subdir: &str) {
-            let a = self.1.random_range(1000000..1000000000);
-            let b = self.1.random_range(1000000..1000000000);
-            let c = self.1.random_range(1000000..1000000000);
+            let a = self.1.random_range(1_000_000..1_000_000_000);
+            let b = self.1.random_range(1_000_000..1_000_000_000);
+            let c = self.1.random_range(1_000_000..1_000_000_000);
             self.f(
                 subdir,
                 "cpu.stat",
@@ -695,12 +707,12 @@ mod tests {
         }
 
         fn memory_stat(&mut self, subdir: &str) {
-            let anon = self.1.random_range(1000000..1000000000);
-            let file = self.1.random_range(1000000..1000000000);
+            let anon = self.1.random_range(1_000_000..1_000_000_000);
+            let file = self.1.random_range(1_000_000..1_000_000_000);
             self.f(
                 subdir,
                 "memory.stat",
-                &format!("anon {anon}\nfile {file}\n",),
+                &format!("anon {anon}\nfile {file}\n"),
             );
         }
 

@@ -27,8 +27,9 @@ use crate::{
         },
         prelude::*,
         util::{
-            HttpEndpoint, encoding::Encoder as _, http::HttpRequest,
-            http_v1::HttpServiceRequestBuilder,
+            HttpEndpoint,
+            encoding::Encoder as _,
+            http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
@@ -71,7 +72,7 @@ async fn component_spec_compliance() {
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
+    config.endpoint = HttpEndpoint::new(mock_endpoint).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -312,36 +313,37 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn fails_missing_creds() {
-    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r#"
+    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r"
             project_id: project
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .unwrap();
-    if config.build(SinkContext::default()).await.is_ok() {
-        panic!("config.build failed to error");
-    }
+    assert!(
+        config.build(SinkContext::default()).await.is_err(),
+        "config.build failed to error"
+    );
 }
 
 #[test]
 fn fails_invalid_log_names() {
-    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r"
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .expect_err("Config parsing failed to error with missing ids");
 
-    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r"
             project_id: project
             folder_id: folder
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .expect_err("Config parsing failed to error with extraneous ids");
 }

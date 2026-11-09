@@ -14,6 +14,7 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     enrichment::TableRegistry,
+    internal_event::emit,
     lookup::{PathPrefix, metadata_path, owned_value_path},
     schema::Definition,
 };
@@ -23,7 +24,7 @@ use vrl::{
     compiler::{
         CompileConfig, ExpressionError, Program, TypeState, VrlRuntime,
         runtime::{Runtime, Terminate},
-        state::ExternalEnv,
+        state::{ExternalEnv, LocalEnv},
     },
     diagnostic::{DiagnosticMessage, Note},
     path,
@@ -37,7 +38,7 @@ use crate::{
         ComponentKey, DataType, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput, log_schema,
     },
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, LogEvent, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
@@ -175,7 +176,7 @@ impl Clone for RemapConfig {
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
             runtime: self.runtime,
-            cache: Mutex::new(Default::default()),
+            cache: Mutex::new(Vec::default()),
         }
     }
 }
@@ -213,7 +214,7 @@ impl RemapConfig {
         };
 
         let state = TypeState {
-            local: Default::default(),
+            local: LocalEnv::default(),
             external: ExternalEnv::new_with_kind(
                 merged_schema_definition.event_kind().clone(),
                 merged_schema_definition.metadata_kind().clone(),
@@ -261,7 +262,8 @@ impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
         let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
-                let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
+                // Cloning clears the schema-compilation cache before binding runtime state.
+                let (remap, warnings) = Remap::new_ast(&self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
         };
@@ -321,9 +323,15 @@ impl TransformConfig for RemapConfig {
         let mut default_definitions = HashMap::new();
 
         for (output_id, input_definition) in input_definitions {
-            let default_definition = compiled
-                .clone()
-                .map(|(state, meaning)| {
+            let default_definition = compiled.clone().map_or_else(
+                |()| {
+                    Definition::new_with_default_metadata(
+                        // The program failed to compile, so it can "never" return a value
+                        Kind::never(),
+                        input_definition.log_namespaces().clone(),
+                    )
+                },
+                |(state, meaning)| {
                     let mut new_type_def = Definition::new(
                         state.external.target_kind().clone(),
                         state.external.metadata_kind().clone(),
@@ -343,14 +351,8 @@ impl TransformConfig for RemapConfig {
                         new_type_def = new_type_def.with_meaning(path, &id);
                     }
                     new_type_def
-                })
-                .unwrap_or_else(|_| {
-                    Definition::new_with_default_metadata(
-                        // The program failed to compile, so it can "never" return a value
-                        Kind::never(),
-                        input_definition.log_namespaces().clone(),
-                    )
-                });
+                },
+            );
 
             // When a message is dropped and re-routed, we keep the original event, but also annotate
             // it with additional metadata.
@@ -429,6 +431,10 @@ pub trait VrlRunner {
     /// Creates a runner. Pass the transform build context for runner implementations that require it.
     fn new(context: &TransformContext) -> Self;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution fails or the program aborts.
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -470,8 +476,12 @@ impl VrlRunner for AstRunner {
 }
 
 impl Remap<AstRunner> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the VRL program cannot be compiled.
     pub fn new_ast(
-        config: RemapConfig,
+        config: &RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
         Self::new(config, context)
@@ -482,7 +492,11 @@ impl<Runner> Remap<Runner>
 where
     Runner: VrlRunner,
 {
-    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the VRL program cannot be compiled.
+    pub fn new(config: &RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
         let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.metrics_storage.clone(),
@@ -513,13 +527,12 @@ where
         &self.runner
     }
 
-    fn dropped_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn dropped_data(&self, reason: &str, error: &ExpressionError) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
             .rfind(|note| matches!(note, Note::UserErrorMessage(_)))
-            .map(|note| note.to_string())
-            .unwrap_or_else(|| error.to_string());
+            .map_or_else(|| error.to_string(), std::string::ToString::to_string);
         serde_json::json!({
                 "reason": reason,
                 "message": message,
@@ -529,7 +542,7 @@ where
         })
     }
 
-    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
+    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: &ExpressionError) {
         match event {
             Event::Log(log) => match log.namespace() {
                 LogNamespace::Legacy => {
@@ -607,8 +620,7 @@ where
 
         let log_namespace = event
             .maybe_as_log()
-            .map(|log| log.namespace())
-            .unwrap_or(LogNamespace::Legacy);
+            .map_or(LogNamespace::Legacy, LogEvent::namespace);
 
         let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
@@ -618,11 +630,11 @@ where
                 TargetEvents::One(event) => push_default(event, output),
                 TargetEvents::Logs(events) => events.for_each(|event| push_default(event, output)),
                 TargetEvents::Traces(events) => {
-                    events.for_each(|event| push_default(event, output))
+                    events.for_each(|event| push_default(event, output));
                 }
             },
             Err(Terminate::Interrupted) => {
-                emit!(RemapMappingError {
+                emit(RemapMappingError {
                     error: ExpressionError::Interrupted.to_string(),
                     event_dropped: true,
                 });
@@ -631,7 +643,7 @@ where
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingAbort {
+                            emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
                             });
                         }
@@ -639,7 +651,7 @@ where
                     }
                     Terminate::Error(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingError {
+                            emit(RemapMappingError {
                                 error: error.to_string(),
                                 event_dropped: self.drop_on_error,
                             });
@@ -656,7 +668,7 @@ where
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
-                    self.annotate_dropped(&mut event, reason, error);
+                    self.annotate_dropped(&mut event, reason, &error);
                     push_dropped(event, output);
                 }
             }
@@ -666,7 +678,7 @@ where
 
 #[inline]
 fn push_default(event: Event, output: &mut TransformOutputsBuf) {
-    output.push(None, event)
+    output.push(None, event);
 }
 
 #[inline]
@@ -704,7 +716,7 @@ mod tests {
         config::{ConfigBuilder, build_unit_tests},
         event::{
             LogEvent, Metric, TraceEvent, TraceLayout, Value,
-            metric::{MetricKind, MetricValue},
+            metric::{MetricKind, MetricValue, StatisticKind},
         },
         metrics::Controller,
         schema,
@@ -730,6 +742,10 @@ mod tests {
         )
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "Test constructors own their configuration."
+    )]
     fn remap_with_runner<Runner: VrlRunner>(config: RemapConfig) -> Result<Remap<Runner>> {
         let schema_definitions = HashMap::from([
             (
@@ -742,7 +758,7 @@ mod tests {
             ),
         ]);
 
-        Remap::new(config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
+        Remap::new(&config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
     }
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
@@ -810,13 +826,13 @@ mod tests {
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
-        )
+        );
     }
 
     #[test]
     fn config_both_source_and_file() {
         let config = RemapConfig {
-            source: Some("".to_owned()),
+            source: Some(String::new()),
             file: Some("".into()),
             ..Default::default()
         };
@@ -825,7 +841,7 @@ mod tests {
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
-        )
+        );
     }
 
     #[test]
@@ -919,7 +935,7 @@ mod tests {
         assert_eq!(get_field_string(&result, "."), "root string");
 
         let mut outputs = conf.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), initial_definition)],
         );
 
@@ -1049,7 +1065,7 @@ mod tests {
         };
         let mut tform = remap(conf).unwrap();
 
-        assert!(transform_one(&mut tform, event).is_none())
+        assert!(transform_one(&mut tform, event).is_none());
     }
 
     #[test]
@@ -1140,7 +1156,7 @@ mod tests {
         };
         let mut tform = remap(conf).unwrap();
 
-        assert!(transform_one(&mut tform, event).is_none())
+        assert!(transform_one(&mut tform, event).is_none());
     }
 
     #[test]
@@ -1188,6 +1204,46 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_metric_type() {
+        let conf = RemapConfig {
+            source: Some(
+                r#"if ends_with(string!(.name), "_count") { .type = "counter" }"#.to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let distribution = MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 1],
+            statistic: StatisticKind::Histogram,
+        };
+        let cases = [
+            (
+                "requests_count",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                "queue_depth",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            // Unsupported conversions are ignored rather than failing the program, so the metric
+            // passes through unchanged instead of being dropped.
+            ("latency_count", distribution.clone(), distribution),
+        ];
+
+        for (name, value, expected) in cases {
+            let metric = Event::Metric(Metric::new(name, MetricKind::Absolute, value));
+            let result = transform_one(&mut tform, metric).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.value(), &expected, "{name}");
+            assert_eq!(metric.kind(), MetricKind::Absolute, "{name}");
+        }
+    }
+
+    #[test]
     fn remap_timezone_fallback() {
         let error = Event::from_json_value(
             serde_json::json!({"timestamp": "2022-12-27 00:00:00"}),
@@ -1211,7 +1267,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, error).unwrap();
         let log = output.as_log();
@@ -1249,7 +1305,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, error).unwrap();
         let log = output.as_log();
@@ -1263,6 +1319,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn check_remap_branching() {
         let happy =
             Event::from_json_value(serde_json::json!({"hello": "world"}), LogNamespace::Legacy)
@@ -1346,7 +1406,7 @@ mod tests {
             .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -1479,7 +1539,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output =
             transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
@@ -1539,7 +1599,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
@@ -1605,7 +1665,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1624,7 +1684,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
+        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -1696,7 +1756,7 @@ mod tests {
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
         let out = collect_outputs(ft, event);
-        assert_eq!(0, out.named.values().map(|v| v.len()).sum::<usize>());
+        assert_eq!(0, out.named.values().map(OutputBuffer::len).sum::<usize>());
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }
@@ -1729,7 +1789,7 @@ mod tests {
 
     #[tokio::test]
     async fn emits_internal_events() {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = RemapConfig {
                 source: Some("abort".to_owned()),
                 drop_on_abort: true,
@@ -1745,8 +1805,8 @@ mod tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 
     #[test]
@@ -1766,7 +1826,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[("in".into(), schema::Definition::default_legacy_namespace())],
         );
 
@@ -1788,7 +1848,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1835,7 +1895,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1869,7 +1929,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1912,7 +1972,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1952,7 +2012,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1980,7 +2040,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2020,7 +2080,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2081,7 +2141,7 @@ mod tests {
         assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
 
         let outputs1 = conf.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(

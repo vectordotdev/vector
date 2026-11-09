@@ -8,7 +8,7 @@ fn generate_config() {
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     #[test]
-    /// Should only run when docker daemon is up. DockerLogsSource::new will fail if docker socket
+    /// Should only run when docker daemon is up. `DockerLogsSource::new` will fail if docker socket
     /// is not present even though it is not used.
     fn exclude_self() {
         let (tx, _rx) = SourceSender::new_test();
@@ -149,7 +149,7 @@ mod integration_tests {
 
         let config = ContainerCreateBody {
             image: Some("busybox".to_string()),
-            cmd: Some(cmd.iter().map(|i| i.to_string()).collect::<Vec<_>>()),
+            cmd: Some(cmd.iter().map(ToString::to_string).collect::<Vec<_>>()),
             labels: label.map(|label| {
                 vec![(label.to_string(), String::new())]
                     .into_iter()
@@ -187,7 +187,7 @@ mod integration_tests {
                         panic!("{error:?}");
                     }
                 })
-                .await
+                .await;
         }
     }
 
@@ -421,7 +421,7 @@ mod integration_tests {
                 meta.get(path!("vector", "ingest_timestamp"))
                     .unwrap()
                     .is_timestamp()
-            )
+            );
         })
         .await;
     }
@@ -562,7 +562,7 @@ mod integration_tests {
 
             let out = source_with_config(DockerLogsConfig {
                 include_containers: Some(vec![prefix]),
-                exclude_containers: Some(vec![excluded0.to_owned()]),
+                exclude_containers: Some(vec![excluded0.clone()]),
                 ..DockerLogsConfig::default()
             })
             .await;

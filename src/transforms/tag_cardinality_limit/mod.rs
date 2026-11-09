@@ -2,7 +2,7 @@ use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
-use vector_lib::{event::Event, transform::TaskTransform};
+use vector_lib::{event::Event, internal_event::emit, transform::TaskTransform};
 
 use crate::internal_events::{
     TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -61,12 +61,13 @@ enum TagSettings {
 pub struct TagCardinalityLimit {
     config: Config,
     accepted_tags: HashMap<Option<MetricId>, HashMap<String, AcceptedTagValueSet>>,
-    /// Total count of currently-tracked (metric_bucket, tag_key) pairs.
+    /// Total count of currently-tracked (`metric_bucket`, `tag_key`) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
 }
 
 impl TagCardinalityLimit {
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -88,7 +89,7 @@ impl TagCardinalityLimit {
     /// successful new-key allocation in `accepted_tags`.
     fn record_new_key_allocation(&mut self) {
         self.tracked_keys_count += 1;
-        emit!(TagCardinalityTrackedKeys {
+        emit(TagCardinalityTrackedKeys {
             count: self.tracked_keys_count,
         });
     }
@@ -243,7 +244,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value.clone());
 
             if tag_value_set.len() == config.value_limit {
-                emit!(TagCardinalityValueLimitReached { key });
+                emit(TagCardinalityValueLimitReached { key });
             }
 
             AcceptResult::Tracked
@@ -325,7 +326,7 @@ impl TagCardinalityLimit {
     pub fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
         let metric_name = metric.name().to_string();
-        let metric_namespace = metric.namespace().map(|n| n.to_string());
+        let metric_namespace = metric.namespace().map(std::string::ToString::to_string);
         let metric_key = match self.config.tracking_scope {
             TrackingScope::PerMetric => Some((metric_namespace, metric_name.clone())),
             TrackingScope::Global => {
@@ -357,7 +358,7 @@ impl TagCardinalityLimit {
                         if self.tag_limit_exceeded(metric_key.as_ref(), key, value) {
                             let include_extended_tags =
                                 resolved.internal_metrics.include_extended_tags;
-                            emit!(TagCardinalityLimitRejectingEvent {
+                            emit(TagCardinalityLimitRejectingEvent {
                                 metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
@@ -385,7 +386,7 @@ impl TagCardinalityLimit {
                                     }
                                     TagSettings::Excluded => false, // unreachable: excluded tags return Tracked
                                 };
-                                emit!(TagCardinalityLimitRejectingTag {
+                                emit(TagCardinalityLimitRejectingTag {
                                     metric_name: &metric_name,
                                     tag_key: key,
                                     tag_value: &value.to_string(),
@@ -403,7 +404,7 @@ impl TagCardinalityLimit {
             }
 
             if any_untracked {
-                emit!(TagCardinalityLimitUntracked);
+                emit(TagCardinalityLimitUntracked);
             }
         }
         Some(event)

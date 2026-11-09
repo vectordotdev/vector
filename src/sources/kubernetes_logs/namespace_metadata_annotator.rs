@@ -21,7 +21,7 @@ use crate::event::{Event, LogEvent};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(super) struct FieldsSpec {
     /// Event field for the Namespace's labels.
     ///
     /// Set to `""` to suppress this key.
@@ -57,7 +57,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with namespace metadata.
-pub struct NamespaceMetadataAnnotator {
+pub(super) struct NamespaceMetadataAnnotator {
     namespace_state_reader: Store<Namespace>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
@@ -65,7 +65,7 @@ pub struct NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Create a new [`NamespaceMetadataAnnotator`].
-    pub const fn new(
+    pub(super) const fn new(
         namespace_state_reader: Store<Namespace>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
@@ -80,7 +80,7 @@ impl NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Annotates an event with the information from the [`Namespace::metadata`].
-    pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
+    pub(super) fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Namespace>::new(pod_namespace);
         let resource = self.namespace_state_reader.get(&obj)?;
@@ -105,7 +105,7 @@ fn annotate_from_metadata(
     if let Some(labels) = &metadata.labels {
         let legacy_key_prefix = fields_spec.namespace_labels.path.as_ref().map(|k| &k.path);
 
-        for (key, value) in labels.iter() {
+        for (key, value) in labels {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -117,7 +117,7 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("namespace_labels", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 
@@ -128,7 +128,7 @@ fn annotate_from_metadata(
             .as_ref()
             .map(|k| &k.path);
 
-        for (key, value) in annotations.iter() {
+        for (key, value) in annotations {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -140,7 +140,7 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("namespace_annotations", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 }
@@ -152,6 +152,10 @@ mod tests {
 
     use super::*;
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn test_annotate_from_metadata() {
         let cases = vec![
@@ -541,7 +545,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_eq!(log, expected);

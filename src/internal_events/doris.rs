@@ -5,7 +5,7 @@ use vector_lib::{
 
 /// Emitted when rows are successfully loaded into Doris.
 #[derive(Debug, NamedInternalEvent)]
-pub struct DorisRowsLoaded {
+pub(crate) struct DorisRowsLoaded {
     pub loaded_rows: i64,
     pub load_bytes: i64,
 }
@@ -30,7 +30,7 @@ impl InternalEvent for DorisRowsLoaded {
 
 /// Emitted when rows are filtered by Doris during loading.
 #[derive(Debug, NamedInternalEvent)]
-pub struct DorisRowsFiltered {
+pub(crate) struct DorisRowsFiltered {
     pub filtered_rows: i64,
 }
 

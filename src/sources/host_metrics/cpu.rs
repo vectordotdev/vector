@@ -4,7 +4,7 @@ use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
 use vector_lib::{
     event::MetricTags,
-    internal_event::{CounterName, GaugeName},
+    internal_event::{CounterName, GaugeName, emit},
     metric_tags,
 };
 
@@ -17,6 +17,10 @@ const LOGICAL_CPUS: GaugeName = GaugeName::LogicalCpus;
 const PHYSICAL_CPUS: GaugeName = GaugeName::PhysicalCpus;
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
         // adds the metrics from cpu time for each cpu
         match heim::cpu::times().await {
@@ -46,7 +50,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load CPU times.",
                     error,
                 });
@@ -56,7 +60,7 @@ impl HostMetrics {
         match heim::cpu::logical_count().await {
             Ok(count) => output.gauge(LOGICAL_CPUS, count as f64, MetricTags::default()),
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load logical CPU count.",
                     error,
                 });
@@ -66,12 +70,12 @@ impl HostMetrics {
         match heim::cpu::physical_count().await {
             Ok(Some(count)) => output.gauge(PHYSICAL_CPUS, count as f64, MetricTags::default()),
             Ok(None) => {
-                emit!(HostMetricsScrapeError {
+                emit(HostMetricsScrapeError {
                     message: "Unable to determine physical CPU count.",
                 });
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load physical CPU count.",
                     error,
                 });

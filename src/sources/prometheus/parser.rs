@@ -12,10 +12,14 @@ use crate::event::{
     metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
 };
 
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc> {
     timestamp
         .and_then(|timestamp| {
-            Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000)
+            Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1_000_000)
                 .latest()
         })
         .unwrap_or(default)
@@ -53,6 +57,14 @@ pub(super) fn parse_request(
         .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn reparse_groups(
     groups: Vec<MetricGroup>,
     tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
@@ -116,7 +128,8 @@ fn reparse_groups(
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     if skip_nan_values
-                        && (metric.sum.is_nan() || metric.buckets.iter().any(|b| b.bucket.is_nan()))
+                        && (metric.sum.is_some_and(f64::is_nan)
+                            || metric.buckets.iter().any(|b| b.bucket.is_nan()))
                     {
                         continue;
                     }
@@ -218,7 +231,7 @@ fn combine_tags(
     tag_overrides: impl IntoIterator<Item = (String, String)>,
 ) -> MetricTags {
     let mut tags = base_tags.into();
-    for (k, v) in tag_overrides.into_iter() {
+    for (k, v) in tag_overrides {
         tags.replace(k, v);
     }
 
@@ -379,7 +392,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1027.0 },
                 )
-                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_timestamp(Utc.timestamp_opt(1_395_066_363, 0).latest())
                 .with_tags(Some(metric_tags!(
                     "method" => "post",
                     "code" => "200",
@@ -389,7 +402,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 3.0 },
                 )
-                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_timestamp(Utc.timestamp_opt(1_395_066_363, 0).latest())
                 .with_tags(Some(metric_tags!(
                     "method" => "post",
                     "code" => "400"
@@ -470,7 +483,7 @@ mod test {
                     "msdos_file_access_time_seconds",
                     MetricKind::Absolute,
                     MetricValue::Gauge {
-                        value: 1458255915.0
+                        value: 1_458_255_915.0
                     },
                 )
                 .with_tags(Some(metric_tags!(
@@ -621,7 +634,7 @@ mod test {
                         value: f64::INFINITY
                     },
                 )
-                .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
+                .with_timestamp(Utc.timestamp_opt(-3_982_045, 0).latest())
                 .with_tags(Some(metric_tags!("problem" => "division by zero")))
             ]),
         );
@@ -643,14 +656,14 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 1.0 },
                 )
-                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_timestamp(Utc.timestamp_opt(1_395_066_363, 0).latest())
                 .with_tags(Some(metric_tags!("env" => "production"))),
                 Metric::new(
                     "latency",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
-                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_timestamp(Utc.timestamp_opt(1_395_066_363, 0).latest())
                 .with_tags(Some(metric_tags!("env" => "testing")))
             ]),
         );
@@ -779,8 +792,8 @@ mod test {
                         buckets: vector_lib::buckets![
                             0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                         ],
-                        count: 144320,
-                        sum: 53423.0,
+                        count: 144_320,
+                        sum: Some(53423.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -790,13 +803,13 @@ mod test {
 
     #[test]
     fn test_histogram_doesnt_panic() {
-        let mut exp = r#"
+        let mut exp = r"
             # HELP http_request_duration_seconds A histogram of the request duration.
             # TYPE http_request_duration_seconds histogram
-            "#
+            "
         .to_string();
 
-        let to_float = |v: i32| -> f64 { v as f64 };
+        let to_float = |v: i32| -> f64 { f64::from(v) };
         exp += &(0..=15)
             .map(to_float)
             .chain(std::iter::once(f64::NAN))
@@ -823,7 +836,8 @@ mod test {
                             })
                             .collect(),
                         count: 0,
-                        sum: 0.0,
+                        // This exposition carries only `_bucket` lines, so there is no reported sum.
+                        sum: None,
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -849,9 +863,9 @@ mod test {
                     "duration",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_lib::buckets![1.0 => 133988],
-                        count: 144320,
-                        sum: 53423.0,
+                        buckets: vector_lib::buckets![1.0 => 133_988],
+                        count: 144_320,
+                        sum: Some(53423.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -880,7 +894,7 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
                         count: 2000,
-                        sum: 2000.0,
+                        sum: Some(2000.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -952,7 +966,7 @@ mod test {
                             36000.0 => 0
                         ],
                         count: 536,
-                        sum: 19690.129384881966,
+                        sum: Some(19_690.129_384_881_966),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "z")))
@@ -972,7 +986,7 @@ mod test {
                             36000.0 => 0
                         ],
                         count: 1,
-                        sum: 28.975436316,
+                        sum: Some(28.975_436_316),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "x")))
@@ -984,7 +998,7 @@ mod test {
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
                         count: 3255,
-                        sum: 381111.7498891335,
+                        sum: Some(381_111.749_889_133_5),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "y")))
@@ -1031,7 +1045,7 @@ mod test {
                             0.99 => 76656.0
                         ],
                         count: 2693,
-                        sum: 1.7560473e+07,
+                        sum: 1.756_047_3e+07,
                     },
                 )
                 .with_tags(Some(metric_tags!("service" => "a")))
@@ -1041,14 +1055,14 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: vector_lib::quantiles![
-                            0.0 => 0.009460965,
-                            0.25 => 0.009793382,
-                            0.5 => 0.009870205,
-                            0.75 => 0.01001838,
-                            1.0 => 0.018827136
+                            0.0 => 0.009_460_965,
+                            0.25 => 0.009_793_382,
+                            0.5 => 0.009_870_205,
+                            0.75 => 0.010_018_38,
+                            1.0 => 0.018_827_136
                         ],
-                        count: 602767,
-                        sum: 4668.551713715,
+                        count: 602_767,
+                        sum: 4_668.551_713_715,
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP)),
@@ -1057,6 +1071,10 @@ mod test {
     }
 
     // https://github.com/vectordotdev/vector/issues/3276
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn test_nginx() {
         let exp = r#"
@@ -1095,14 +1113,14 @@ mod test {
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 263719.0 },
+                    MetricValue::Counter { value: 263_719.0 },
                 )
                 .with_tags(Some(metric_tags! { "direction" => "in", "host" => "*" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 255061.0 },
+                    MetricValue::Counter { value: 255_061.0 },
                 )
                 .with_tags(Some(metric_tags! { "direction" => "in", "host" => "_" }))
                 .with_timestamp(Some(*TIMESTAMP)),
@@ -1118,21 +1136,21 @@ mod test {
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 944199.0 },
+                    MetricValue::Counter { value: 944_199.0 },
                 )
                 .with_tags(Some(metric_tags! { "direction" => "out", "host" => "*" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 360775.0 },
+                    MetricValue::Counter { value: 360_775.0 },
                 )
                 .with_tags(Some(metric_tags! { "direction" => "out", "host" => "_" }))
                 .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 583424.0 },
+                    MetricValue::Counter { value: 583_424.0 },
                 )
                 .with_tags(Some(
                     metric_tags! { "direction" => "out", "host" => "nginx-vts-status" }
@@ -1314,7 +1332,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(metric_tags! { "type" => "a" }))
@@ -1383,7 +1401,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(metric_tags! { "type" => "a" }))
@@ -1403,6 +1421,10 @@ mod test {
         );
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "These deterministic fixture values are compared exactly."
+    )]
     #[test]
     fn test_skip_nan_counter_enabled() {
         let exp = r#"
@@ -1448,6 +1470,10 @@ mod test {
         }
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "These deterministic fixture values are compared exactly."
+    )]
     #[test]
     fn test_skip_nan_gauge_enabled() {
         let exp = r#"
@@ -1511,12 +1537,12 @@ mod test {
 
     #[test]
     fn test_skip_nan_all_valid_values() {
-        let exp = r#"
+        let exp = r"
             # TYPE counter_metric counter
             counter_metric 123.0 1612411506789
             # TYPE gauge_metric gauge
             gauge_metric 456.0 1612411506789
-            "#;
+            ";
 
         let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 2); // Both should be preserved

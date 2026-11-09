@@ -1,9 +1,10 @@
-//! The `vector` source. See [VectorConfig].
+//! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use tonic::{Request, Response, Status, service::RoutesBuilder};
 use tonic_health::server::health_reporter;
 use tower::layer::util::Identity;
 use vector_lib::{
@@ -23,7 +24,6 @@ use crate::{
     },
     internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -62,7 +62,7 @@ impl proto::Service for Service {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
                 Err(error) => {
-                    emit!(GrpcEventDecodeError { error: &error });
+                    emit(GrpcEventDecodeError { error: &error });
                     return Err(Status::invalid_argument(error.to_string()));
                 }
             }
@@ -84,7 +84,7 @@ impl proto::Service for Service {
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
@@ -94,10 +94,10 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
+            .and_then(|()| handle_batch_status(receiver))
             .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
@@ -145,7 +145,7 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -159,6 +159,7 @@ pub struct VectorConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    #[must_use]
     pub fn from_address(addr: SocketAddr) -> Self {
         Self {
             address: addr,
@@ -173,8 +174,8 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
-            acknowledgements: Default::default(),
-            keepalive: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
             log_namespace: None,
         }
     }
@@ -210,7 +211,7 @@ impl SourceConfig for VectorConfig {
         .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Create the standard gRPC health service
-        let (mut health_reporter, health_service) = health_reporter();
+        let (health_reporter, health_service) = health_reporter();
 
         // Register the Vector service as serving in the health reporter
         health_reporter
@@ -234,6 +235,7 @@ impl SourceConfig for VectorConfig {
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
+            crate::sources::SourceError::from(error)
         });
 
         Ok(Box::pin(source))
@@ -361,7 +363,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -380,7 +382,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -416,10 +418,10 @@ mod tests {
         // to ensure interoperability.
         let sink_config = match compression {
             Some(c) => indoc::formatdoc! {r#"
-                address: "{addr}"
+                address: "http://{addr}"
                 compression: "{c}"
             "#},
-            None => format!("address: \"{addr}\"\n"),
+            None => format!("address: \"http://{addr}\"\n"),
         };
         let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
@@ -452,6 +454,62 @@ mod tests {
     #[tokio::test]
     async fn receive_zstd_compressed_message() {
         run_test(Some("zstd")).await;
+    }
+
+    #[tokio::test]
+    async fn rejects_deeply_nested_protobuf() {
+        use vector_lib::event::proto::{
+            EventWrapper, Log, Value, ValueArray, ValueMap, event_wrapper, value,
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source: VectorConfig = serde_yaml::from_str(&format!("address: \"{addr}\"\n")).unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let server = tokio::spawn(
+            source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap(),
+        );
+        test_util::wait_for_tcp(addr).await;
+        let mut client = proto::Client::connect(format!("http://{addr}"))
+            .await
+            .unwrap();
+
+        let request = |depth| {
+            let mut nested = Value {
+                kind: Some(value::Kind::Integer(1)),
+            };
+            for _ in 0..depth {
+                nested = Value {
+                    kind: Some(value::Kind::Array(ValueArray {
+                        items: vec![nested],
+                    })),
+                };
+            }
+            proto::PushEventsRequest {
+                events: vec![EventWrapper {
+                    event: Some(event_wrapper::Event::Log(Log {
+                        value: Some(Value {
+                            kind: Some(value::Kind::Map(ValueMap {
+                                fields: [("nested".to_owned(), nested)].into(),
+                            })),
+                        }),
+                        ..Default::default()
+                    })),
+                }],
+            }
+        };
+
+        // Each array adds two Protobuf message levels. This exceeds Prost's depth
+        // budget while remaining well below the request-size limit.
+        let error = client.push_events(request(64)).await.unwrap_err();
+        assert_eq!(error.code(), tonic::Code::Internal);
+        assert!(error.message().contains("recursion limit reached"));
+
+        client.push_events(request(1)).await.unwrap();
+        assert_eq!(test_util::collect_ready(rx).len(), 1);
+        server.abort();
     }
 
     #[tokio::test]
@@ -566,6 +624,8 @@ mod tests {
 
     #[tokio::test]
     async fn standard_grpc_health_check_works() {
+        use tonic_health::pb::health_check_response::ServingStatus;
+
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
@@ -600,7 +660,6 @@ mod tests {
             .await
             .unwrap();
 
-        use tonic_health::pb::health_check_response::ServingStatus;
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
 
         // Check the named Vector service health
@@ -612,5 +671,47 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+    }
+
+    #[tokio::test]
+    async fn sink_reconnects_after_source_max_connection_age() {
+        use futures::StreamExt;
+        use tokio::time::{Duration, sleep};
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source: VectorConfig = toml::from_str(&format!(
+            "address = \"{addr}\"\n[keepalive]\nmax_connection_age_secs = 1"
+        ))
+        .unwrap();
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Retries are disabled, so the second batch must succeed on a new connection.
+        let sink: SinkConfig = toml::from_str(&format!(
+            "address = \"http://{addr}\"\nbatch.timeout_secs = 0.1\nrequest.retry_attempts = 0"
+        ))
+        .unwrap();
+        let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
+
+        let (first_batch, first_receiver) = BatchNotifier::new_with_receiver();
+        let (_, first_stream) = test_util::random_events_with_stream(16, 5, Some(first_batch));
+        let (second_batch, second_receiver) = BatchNotifier::new_with_receiver();
+        let (_, second_stream) = test_util::random_events_with_stream(16, 5, Some(second_batch));
+        let wait_for_max_age = futures::stream::once(async move {
+            assert_eq!(first_receiver.await, BatchStatus::Delivered);
+            sleep(Duration::from_millis(1500)).await;
+        })
+        .filter_map(|()| std::future::ready(None));
+
+        sink.run(first_stream.chain(wait_for_max_age).chain(second_stream))
+            .await
+            .unwrap();
+
+        assert_eq!(second_receiver.await, BatchStatus::Delivered);
     }
 }

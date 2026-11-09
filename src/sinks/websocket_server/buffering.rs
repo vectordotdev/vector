@@ -12,7 +12,7 @@ use vector_lib::{
 };
 use vrl::{prelude::VrlValueConvert, value::Value};
 
-use crate::serde::default_decoding;
+use crate::{config::LogNamespace, serde::default_decoding};
 
 /// Configuration for message buffering which enables message replay for clients that connect later.
 #[configurable_component]
@@ -46,7 +46,7 @@ pub struct BufferingAckConfig {
     #[serde(default = "default_decoding")]
     pub ack_decoding: DeserializerConfig,
 
-    /// Name of the field that contains the ACKed message ID. Use "." if message ID is the root of
+    /// Name of the field that contains the acknowledged message ID. Use "." if message ID is the root of
     /// the message.
     pub message_id_path: ConfigValuePath,
 
@@ -54,12 +54,12 @@ pub struct BufferingAckConfig {
     pub client_key: ClientKeyConfig,
 }
 
-/// Configuration for client key used for tracking ACKed message for message buffering.
+/// Configuration for client key used for tracking acknowledged message for message buffering.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[configurable(metadata(
-    docs::enum_tag_description = "The type of client key to use, when tracking ACKed message for message buffering."
+    docs::enum_tag_description = "The type of client key to use, when tracking acknowledged message for message buffering."
 ))]
 pub enum ClientKeyConfig {
     /// Use client IP address as the unique key for that client
@@ -87,29 +87,29 @@ const fn default_max_events() -> NonZeroUsize {
 
 const LAST_RECEIVED_QUERY_PARAM_NAME: &str = "last_received";
 
-pub struct BufferReplayRequest {
+pub(super) struct BufferReplayRequest {
     should_replay: bool,
     replay_from: Option<Uuid>,
 }
 
 impl BufferReplayRequest {
-    pub const NO_REPLAY: Self = Self {
+    pub(super) const NO_REPLAY: Self = Self {
         should_replay: false,
         replay_from: None,
     };
-    pub const REPLAY_ALL: Self = Self {
+    pub(super) const REPLAY_ALL: Self = Self {
         should_replay: true,
         replay_from: None,
     };
 
-    pub const fn with_replay_from(replay_from: Uuid) -> Self {
+    const fn with_replay_from(replay_from: Uuid) -> Self {
         Self {
             should_replay: true,
             replay_from: Some(replay_from),
         }
     }
 
-    pub fn replay_messages(
+    pub(super) fn replay_messages(
         &self,
         buffer: &VecDeque<(Uuid, Message)>,
         replay: impl FnMut(&(Uuid, Message)),
@@ -123,11 +123,11 @@ impl BufferReplayRequest {
     }
 }
 
-pub trait WsMessageBufferConfig {
+pub(super) trait WsMessageBufferConfig {
     /// Returns true if this configuration enables buffering.
     fn should_buffer(&self) -> bool;
     /// Generates key for a client based on connection request and address.
-    /// This key should be used for storing client checkpoints (last ACKed message).
+    /// This key should be used for storing client checkpoints (last acknowledged message).
     fn client_key(&self, request: &Request, client_address: &SocketAddr) -> Option<String>;
     /// Returns configured size of the buffer.
     fn buffer_capacity(&self) -> usize;
@@ -180,11 +180,12 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             return BufferReplayRequest::NO_REPLAY;
         }
 
-        let default_request = client_checkpoint
-            .map(BufferReplayRequest::with_replay_from)
-            // If we don't have ACK support, or don't have an ACK stored for the client,
-            // default to no replay
-            .unwrap_or(BufferReplayRequest::NO_REPLAY);
+        // If we don't have ACK support, or don't have an ACK stored for the client,
+        // default to no replay.
+        let default_request = client_checkpoint.map_or(
+            BufferReplayRequest::NO_REPLAY,
+            BufferReplayRequest::with_replay_from,
+        );
 
         // Early return if query params are missing
         let Some(query_params) = request.uri().query() else {
@@ -212,13 +213,13 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
                             return BufferReplayRequest::with_replay_from(last_received_val);
                         }
                         Err(err) => {
-                            warn!(message = "Parsing last received message UUID failed.", %err)
+                            warn!(message = "Parsing last received message UUID failed.", %err);
                         }
                     }
                 }
             }
             Err(err) => {
-                warn!(message = "Parsing request URL for websocket connection request failed.", %err)
+                warn!(message = "Parsing request URL for websocket connection request failed.", %err);
             }
         }
 
@@ -250,7 +251,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             .ack_decoding
             .build()
             .expect("Invalid `ack_decoding` config.")
-            .parse(request.into_data().into(), Default::default())
+            .parse(request.into_data(), LogNamespace::default())
             .inspect_err(|err| {
                 debug!(message = "Parsing ACK request failed.", %err);
             })

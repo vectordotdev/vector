@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(crate) enum RequestBuilderError {
     #[snafu(display(
         "Building an APM stats request payload failed ({}, {})",
         message,
@@ -39,16 +39,19 @@ pub enum RequestBuilderError {
     FailedToBuild {
         message: &'static str,
         reason: String,
-        dropped_events: u64,
+        dropped_events: usize,
     },
 
     #[allow(dead_code)]
     #[snafu(display("Unsupported endpoint ({})", reason))]
-    UnsupportedEndpoint { reason: String, dropped_events: u64 },
+    UnsupportedEndpoint {
+        reason: String,
+        dropped_events: usize,
+    },
 }
 
 impl RequestBuilderError {
-    pub fn into_parts(self) -> (&'static str, String, u64) {
+    pub(crate) fn into_parts(self) -> (&'static str, String, usize) {
         match self {
             Self::FailedToBuild {
                 message,
@@ -63,34 +66,37 @@ impl RequestBuilderError {
     }
 }
 
-pub struct DatadogTracesRequestBuilder {
+pub(super) struct DatadogTracesRequestBuilder {
     api_key: Arc<str>,
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
     max_size: usize,
     /// Contains the Aggregated stats across a time window.
     stats_aggregator: Arc<Mutex<Aggregator>>,
+    disable_apm_stats: bool,
 }
 
 impl DatadogTracesRequestBuilder {
-    pub const fn new(
+    pub(super) const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
         max_size: usize,
         stats_aggregator: Arc<Mutex<Aggregator>>,
-    ) -> Result<Self, RequestBuilderError> {
-        Ok(Self {
+        disable_apm_stats: bool,
+    ) -> Self {
+        Self {
             api_key,
             endpoint_configuration,
             compression,
             max_size,
             stats_aggregator,
-        })
+            disable_apm_stats,
+        }
     }
 }
 
-pub struct DDTracesMetadata {
+pub(crate) struct DDTracesMetadata {
     pub api_key: Arc<str>,
     pub endpoint: DatadogTracesEndpoint,
     pub finalizers: EventFinalizers,
@@ -111,12 +117,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let (key, events) = input;
         let trace_events = events
             .into_iter()
-            .filter_map(|e| e.try_into_trace())
+            .filter_map(Event::try_into_trace)
             .collect::<Vec<TraceEvent>>();
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
         // separately from the sink framework, by the thread `flush_apm_stats_thread()`
-        compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
+        if !self.disable_apm_stats {
+            compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
+        }
 
         encode_traces(&key, trace_events, self.max_size)
             .into_iter()
@@ -151,7 +159,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                         Err(e) => Err(RequestBuilderError::FailedToBuild {
                             message: "Payload compression failed.",
                             reason: e.to_string(),
-                            dropped_events: processed.len() as u64,
+                            dropped_events: processed.len(),
                         }),
                     }
                 })
@@ -177,7 +185,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 /// * `payload`                  - Compressed and encoded bytes to send.
 /// * `compression`              - `Compression` used to reference the Content-Encoding header.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
-pub fn build_request(
+pub(crate) fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
     payload: Bytes,
     compression: Compression,
@@ -197,19 +205,20 @@ pub fn build_request(
         body: payload,
         headers,
         finalizers: ddtraces_metadata.finalizers,
-        uri: endpoint_configuration
-            .get_uri_for_endpoint(ddtraces_metadata.endpoint)
-            .into_uri(),
+        uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
         uncompressed_size: ddtraces_metadata.uncompressed_size,
         metadata: request_metadata,
     }
 }
 
+/// An encoded payload and the trace events it contains.
+type EncodeResult = Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>;
+
 fn encode_traces(
     key: &PartitionKey,
     trace_events: Vec<TraceEvent>,
     max_size: usize,
-) -> Vec<Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>> {
+) -> Vec<EncodeResult> {
     let mut results = Vec::new();
     let mut processed = Vec::new();
     let mut payload = build_empty_payload(key);
@@ -231,14 +240,13 @@ fn encode_traces(
                     }));
 
                     break;
-                } else {
-                    // try with a fresh payload
-                    results.push(Ok((
-                        payload.encode_to_vec(),
-                        std::mem::take(&mut processed),
-                    )));
-                    payload = build_empty_payload(key);
                 }
+                // try with a fresh payload
+                results.push(Ok((
+                    payload.encode_to_vec(),
+                    std::mem::take(&mut processed),
+                )));
+                payload = build_empty_payload(key);
             } else {
                 processed.push(trace);
                 break;
@@ -252,6 +260,8 @@ fn encode_traces(
     results
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_precision_loss, reason = "Sampling rates use f64.")]
 fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     dd_proto::AgentPayload {
         host_name: key.hostname.clone().unwrap_or_default(),
@@ -267,6 +277,11 @@ fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve wire priority conversion."
+)]
 fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     let tags = trace
         .get(event_path!("tags"))
@@ -301,7 +316,7 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
             .unwrap_or_default(),
         dropped_trace: trace
             .get(event_path!("dropped"))
-            .and_then(|v| v.as_boolean())
+            .and_then(Value::as_boolean)
             .unwrap_or(false),
         spans,
         tags: tags.clone(),
@@ -346,6 +361,12 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve wire ID and error conversions."
+)]
 fn convert_span(span: &ObjectMap) -> dd_proto::Span {
     let trace_id = match span.get("trace_id") {
         Some(Value::Integer(val)) => *val,
@@ -461,6 +482,12 @@ fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
         .collect()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve wire flag conversion."
+)]
 fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
     dd_proto::SpanLink {
         trace_id: u64_id_field(link, "trace_id"),
@@ -472,6 +499,8 @@ fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_sign_loss, reason = "Preserve wire timestamp conversion.")]
 fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
     dd_proto::SpanEvent {
         time_unix_nano: match event.get("time_unix_nano") {
@@ -505,7 +534,7 @@ fn integer_field(object: &ObjectMap, key: &str) -> i64 {
 }
 
 fn u64_id_field(object: &ObjectMap, key: &str) -> u64 {
-    object.get(key).map(decode_u64_id).unwrap_or(0)
+    object.get(key).map_or(0, decode_u64_id)
 }
 
 fn string_field(object: &ObjectMap, key: &str) -> String {

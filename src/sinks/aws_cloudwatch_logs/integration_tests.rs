@@ -585,6 +585,53 @@ async fn cloudwatch_healthcheck() {
     healthcheck(config, client).await.unwrap();
 }
 
+#[tokio::test]
+async fn cloudwatch_healthcheck_without_create_nonexistent_log_group() {
+    use super::healthcheck::healthcheck;
+
+    trace_init();
+
+    let mut config: CloudwatchLogsSinkConfig = serde_yaml::from_str(
+        r"
+        stream_name: test-stream
+        group_name: nonexistent-group-name
+        create_missing_group: false
+        encoding:
+          codec: text
+        ",
+    )
+    .unwrap();
+    config.region = RegionOrEndpoint::with_both("us-east-1", cloudwatch_address());
+
+    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    let err = healthcheck(config, client).await.unwrap_err();
+    assert_eq!(err.to_string(), "No log group found");
+}
+
+#[tokio::test]
+async fn cloudwatch_healthcheck_skips_network_for_dynamic_group_name() {
+    use super::healthcheck::healthcheck;
+
+    trace_init();
+
+    // If the healthcheck tries to dispatch to CloudWatch, this endpoint should fail fast.
+    let mut config: CloudwatchLogsSinkConfig = serde_yaml::from_str(
+        r#"
+        stream_name: test-stream
+        group_name: "{{ file }}"
+        region: us-east-1
+        endpoint: http://127.0.0.1:1
+        encoding:
+          codec: text
+        "#,
+    )
+    .unwrap();
+    config.auth = AwsAuthentication::test_auth();
+
+    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    healthcheck(config, client).await.unwrap();
+}
+
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
     let region = Some(Region::new("us-east-1"));

@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -13,19 +14,25 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_lib::{
-    buffers::topology::channel::BufferSender,
+    buffers::{BufferConfig, topology::channel::BufferSender},
+    extra_context::ExtraContext,
     gauge,
     internal_event::GaugeName,
+    internal_event::emit,
     shutdown::ShutdownSignal,
+    spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
+    utilization::UtilizationRegistry,
 };
 
 use super::{
     BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
-    handle_errors, retain, take_healthchecks,
+    handle_errors,
+    orphaned_disk_buffers::{OrphanedDiskBufferScanner, referenced_disk_buffer_directories},
+    retain, take_healthchecks,
     task::{Task, TaskOutput},
 };
 use crate::{
@@ -34,11 +41,9 @@ use crate::{
         enrichment_table_sinks,
     },
     event::EventArray,
-    extra_context::ExtraContext,
+    internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
-    spawn_named,
-    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -77,9 +82,11 @@ pub struct RunningTopology {
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
+    orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
 }
 
 impl RunningTopology {
+    #[must_use]
     pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
@@ -102,10 +109,12 @@ impl RunningTopology {
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
             sink_confinement_gauges: HashMap::new(),
+            orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
         }
     }
 
     /// Gets the configuration that represents this running topology.
+    #[must_use]
     pub const fn config(&self) -> &Config {
         &self.config
     }
@@ -122,6 +131,7 @@ impl RunningTopology {
     /// Creates a subscription to topology changes.
     ///
     /// This is used by the tap API to observe configuration changes, and re-wire tap sinks.
+    #[must_use]
     pub fn watch(&self) -> watch::Receiver<TapResource> {
         self.watch.1.clone()
     }
@@ -133,6 +143,7 @@ impl RunningTopology {
     /// detect that the sources in the topology are no longer
     /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
+    #[must_use]
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
@@ -148,7 +159,7 @@ impl RunningTopology {
     /// in the [`RunningTopology`] instance has been dropped except for the
     /// `tasks` map. This map gets moved into the returned future and is used to
     /// poll for when the tasks have completed. Once the returned future is
-    /// dropped then everything from this RunningTopology instance is fully
+    /// dropped then everything from this `RunningTopology` instance is fully
     /// dropped.
     ///
     /// The returned future resolves to `true` if every component finished on its own before
@@ -200,7 +211,7 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles2
                     .keys()
-                    .map(|item| item.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -228,7 +239,7 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles
                     .keys()
-                    .map(|item| item.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -281,7 +292,7 @@ impl RunningTopology {
         }
 
         futures::future::join(source_shutdown_complete, shutdown_complete_future)
-            .map(|(_, graceful)| graceful)
+            .map(|((), graceful)| graceful)
     }
 
     /// Attempts to load a new configuration and update this running topology.
@@ -295,6 +306,10 @@ impl RunningTopology {
     /// topology back to its previous state, returning the appropriate error.
     ///
     /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if global options cannot be reloaded, building fails, or rollback fails.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
@@ -318,14 +333,6 @@ impl RunningTopology {
         let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
-        // Gives windows some time to make available any port
-        // released by shutdown components.
-        // Issue: https://github.com/vectordotdev/vector/issues/3035
-        if cfg!(windows) {
-            // This value is guess work.
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
@@ -345,6 +352,9 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
+                let previous_disk_buffer_paths = referenced_disk_buffer_directories(&self.config);
+                self.orphaned_disk_buffer_scanner
+                    .scan(&new_config, previous_disk_buffer_paths);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
 
@@ -372,6 +382,8 @@ impl RunningTopology {
         {
             self.connect_diff(&diff, &mut new_pieces);
             self.spawn_diff(&diff, new_pieces);
+            self.orphaned_disk_buffer_scanner
+                .scan(&self.config, HashSet::new());
             // `self.config` still holds the old config on the rollback path, so
             // this restores the gauges for the re-spawned old sinks.
             self.refresh_confinement_gauges();
@@ -432,6 +444,10 @@ impl RunningTopology {
     /// Shuts down any changed/removed component in the given configuration diff.
     ///
     /// If buffers for any of the changed/removed components can be recovered, they'll be returned.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn shutdown_diff(
         &mut self,
         diff: &ConfigDiff,
@@ -646,6 +662,36 @@ impl RunningTopology {
             .collect::<Vec<_>>();
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
+
+            if sink_buffer(&self.config, key).is_some_and(|buffer| buffer.has_disk_stage()) {
+                let usage = self
+                    .inputs
+                    .get(*key)
+                    .expect("removed sink input must exist")
+                    .disk_usage_snapshot();
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let drain_in_background = !wait_for_sinks.contains(*key);
+                match usage {
+                    Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
+                        emit(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: Some(usage),
+                            drain_in_background,
+                        });
+                    }
+                    None => {
+                        emit(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: None,
+                            drain_in_background,
+                        });
+                    }
+                    Some(_) => {}
+                }
+            }
+
             self.remove_inputs(key, diff, new_config);
 
             if let Some(registry) = self.utilization_registry.as_ref() {
@@ -666,6 +712,33 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
+            let old_buffer = sink_buffer(&self.config, key);
+            if old_buffer
+                .as_ref()
+                .is_some_and(BufferConfig::has_disk_stage)
+            {
+                let usage = self
+                    .inputs
+                    .get(*key)
+                    .expect("changed sink input must exist")
+                    .disk_usage_snapshot();
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let new_buffer_dirs = disk_buffer_directories(new_config, key);
+
+                if !reuse_buffers.contains(key)
+                    && !buffer_dirs
+                        .iter()
+                        .any(|path| new_buffer_dirs.contains(path))
+                {
+                    emit(TopologyDiskBufferReplacementUnreferenced {
+                        component_id: key,
+                        buffer_dirs: &buffer_dirs,
+                        new_buffer_dirs: &new_buffer_dirs,
+                        usage,
+                    });
+                }
+            }
+
             if reuse_buffers.contains(key) || changed_disk_buffer_sinks.contains(key) {
                 self.detach_triggers
                     .remove(key)
@@ -736,6 +809,10 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(crate) fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut TopologyPieces) {
         debug!("Connecting changed/added component(s).");
 
@@ -885,7 +962,7 @@ impl RunningTopology {
                 .outputs
                 .clone()
                 .into_iter()
-                .flat_map(|(output_id, control_tx)| {
+                .filter_map(|(output_id, control_tx)| {
                     self.outputs_tap_metadata.get(&output_id.component).map(
                         |(component_kind, component_type)| {
                             (
@@ -911,18 +988,14 @@ impl RunningTopology {
                     source_keys: diff
                         .sources
                         .changed_and_added()
-                        .map(|key| key.to_string())
-                        .chain(
-                            added_changed_table_sources
-                                .iter()
-                                .map(|key| key.to_string()),
-                        )
+                        .map(ToString::to_string)
+                        .chain(added_changed_table_sources.iter().map(ToString::to_string))
                         .collect(),
                     sink_keys: diff
                         .sinks
                         .changed_and_added()
-                        .map(|key| key.to_string())
-                        .chain(added_changed_tables.iter().map(|key| key.to_string()))
+                        .map(ToString::to_string)
+                        .chain(added_changed_tables.iter().map(ToString::to_string))
                         .collect(),
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
@@ -1050,7 +1123,7 @@ impl RunningTopology {
             .transforms()
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
-            let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
+            let changed_outputs = get_changed_outputs(diff, &transform.inputs);
             for output_id in changed_outputs {
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1070,7 +1143,7 @@ impl RunningTopology {
         for (sink_key, sink) in
             unchanged_sinks.chain(unchanged_table_sinks.iter().map(|(k, v)| (k, v)))
         {
-            let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
+            let changed_outputs = get_changed_outputs(diff, &sink.inputs);
             for output_id in changed_outputs {
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1358,6 +1431,9 @@ impl RunningTopology {
         Self::start_validated(config, diff, pieces).await
     }
 
+    /// # Panics
+    ///
+    /// Panics if metrics are uninitialized or required topology pieces are missing.
     pub async fn start_validated(
         config: Config,
         diff: ConfigDiff,
@@ -1415,6 +1491,9 @@ impl RunningTopology {
         running_topology.spawn_diff(&diff, pieces);
         // `running_topology.config` was set from the initial config in `new()`.
         running_topology.refresh_confinement_gauges();
+        running_topology
+            .orphaned_disk_buffer_scanner
+            .scan(&running_topology.config, HashSet::new());
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
@@ -1458,7 +1537,7 @@ impl RunningTopology {
 /// disappeared as one kind of producer and reappeared as another (e.g. an enrichment-table-derived
 /// source removed while a regular source with the same key was added, or a transform removed while
 /// a source with the same key was added).
-fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
+fn get_changed_outputs(diff: &ConfigDiff, output_ids: &Inputs<OutputId>) -> Vec<OutputId> {
     let producer_destroyed = |key: &ComponentKey| {
         diff.sources.to_change.contains(key)
             || diff.sources.to_remove.contains(key)
@@ -1483,6 +1562,23 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
         .collect()
 }
 
+fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {
+    config
+        .sink(sink_key)
+        .map(|sink| sink.buffer.clone())
+        .or_else(|| enrichment_table_sink_buffer(config, sink_key))
+}
+
+fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<PathBuf> {
+    let global_data_dir = config.global.data_dir.clone();
+    sink_buffer(config, sink_key)
+        .into_iter()
+        .flat_map(|buffer| buffer.stages().to_vec())
+        .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), sink_key))
+        .map(|usage| usage.data_dir().to_path_buf())
+        .collect()
+}
+
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {
     enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
@@ -1503,7 +1599,7 @@ fn enrichment_table_sink_buffer(
 mod tests {
     use std::collections::HashSet;
 
-    use vector_lib::config::ComponentKey;
+    use vector_lib::{config::ComponentKey, extra_context::ExtraContext};
 
     use crate::{
         config::Config,
@@ -1531,7 +1627,7 @@ mod tests {
 
         topology.extend_reload_set(HashSet::from([transform.clone()]));
         topology
-            .reload_config_and_respawn(config(), Default::default())
+            .reload_config_and_respawn(config(), ExtraContext::default())
             .await
             .unwrap();
         let transform_task_after_transform_reload = topology.tasks[&transform].id();
@@ -1544,7 +1640,7 @@ mod tests {
 
         topology.extend_reload_set(HashSet::from([sink.clone()]));
         topology
-            .reload_config_and_respawn(config(), Default::default())
+            .reload_config_and_respawn(config(), ExtraContext::default())
             .await
             .unwrap();
         assert_eq!(
@@ -1556,7 +1652,7 @@ mod tests {
 
         topology.extend_reload_set(HashSet::from([transform.clone()]));
         topology
-            .reload_config_and_respawn(config(), Default::default())
+            .reload_config_and_respawn(config(), ExtraContext::default())
             .await
             .unwrap();
         assert_ne!(

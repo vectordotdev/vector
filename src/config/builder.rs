@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{path::Path, time::Duration};
 
 use indexmap::IndexMap;
@@ -78,6 +76,10 @@ pub struct ConfigBuilder {
     #[serde(default, skip)]
     #[doc(hidden)]
     pub allow_empty: bool,
+
+    /// Diagnostics collected while loading, before unused fields are discarded.
+    #[serde(skip)]
+    pub(crate) loading_warnings: Vec<String>,
 }
 
 impl From<Config> for ConfigBuilder {
@@ -129,25 +131,34 @@ impl From<Config> for ConfigBuilder {
             secret,
             graceful_shutdown_duration,
             allow_empty: false,
+            loading_warnings: Vec::new(),
         }
     }
 }
 
 impl ConfigBuilder {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Compiles this builder into a [`Config`], logging any compilation warnings.
+    ///
+    /// # Errors
+    ///
+    /// Returns the compilation error messages if the configuration fails to compile. See
+    /// [`Self::build_with_warnings`] for the specific errors.
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
-        for warning in warnings {
-            warn!("{warning}");
-        }
+        super::loading::log_warnings(&warnings);
 
         Ok(config)
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Compiles this builder into a [`Config`], returning it with any compilation warnings.
+    ///
+    /// # Errors
+    ///
+    /// Returns the compilation error messages if component names are invalid, a component's
+    /// shape, resources, outputs, or values fail validation, the component graph has
+    /// ambiguous output names, unresolved inputs, type mismatches, or cycles, a test
+    /// references outputs that do not exist, or a sink fails validation.
     pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
         compiler::compile(self)
     }
@@ -213,8 +224,14 @@ impl ConfigBuilder {
         self.global.data_dir = Some(path.to_owned());
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Merges the configuration from `with` into this builder.
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if the `api` or `global` options conflict, the schema options
+    /// conflict, or `with` defines an enrichment table, source, sink, transform, test, or
+    /// secret backend whose name already exists in this builder. Components are only added
+    /// when no errors are found.
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
@@ -276,22 +293,29 @@ impl ConfigBuilder {
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
         self.secret.extend(with.secret);
+        self.loading_warnings.extend(with.loading_warnings);
 
         Ok(())
     }
 
+    /// Deserializes a builder from a TOML string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `input` is not valid TOML or does not deserialize into a `ConfigBuilder`.
     #[cfg(test)]
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_toml(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
+    /// Deserializes a builder from a JSON string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `input` is not valid JSON or does not deserialize into a `ConfigBuilder`.
     #[cfg(test)]
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_json(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }

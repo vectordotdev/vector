@@ -28,8 +28,10 @@ pub struct TopologyBuilder {
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration has no component configuration for `config_name`.
     pub fn from_configuration(
         configuration: &ValidationConfiguration,
         config_name: Option<&String>,
@@ -148,7 +150,7 @@ fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
     let output_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
-    let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    let mut output_sink = VectorSinkConfig::from_address(&output_listen_addr.as_uri());
 
     // We want to ensure that the output sink is flushed as soon as possible, so
     // we set the batch timeout to a very low value. We also disable retries, as

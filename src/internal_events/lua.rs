@@ -1,27 +1,25 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-    error_type,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, LossyF64, UNINTENTIONAL, emit,
+    error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
 
 use crate::transforms::lua::v2::BuildError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaGcTriggered {
+pub(crate) struct LuaGcTriggered {
     pub used_memory: usize,
 }
 
 impl InternalEvent for LuaGcTriggered {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
+        gauge!(GaugeName::LuaMemoryUsedBytes).set(LossyF64(self.used_memory));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaScriptError {
+pub(crate) struct LuaScriptError {
     pub error: mlua::Error,
 }
 
@@ -41,7 +39,7 @@ impl InternalEvent for LuaScriptError {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: "Error in lua script.",
         });
@@ -49,7 +47,7 @@ impl InternalEvent for LuaScriptError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LuaBuildError {
+pub(crate) struct LuaBuildError {
     pub error: BuildError,
 }
 
@@ -72,7 +70,7 @@ impl InternalEvent for LuaBuildError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 

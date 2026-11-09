@@ -4,7 +4,10 @@ use heim::units::information::byte;
 use heim::units::ratio::ratio;
 #[cfg(unix)]
 use nix::sys::statvfs::statvfs;
-use vector_lib::{configurable::configurable_component, internal_event::GaugeName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::GaugeName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
@@ -47,6 +50,15 @@ fn example_mountpoints() -> FilterList {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_lossless,
+        clippy::cast_precision_loss,
+        reason = "Native inode counter widths differ across platforms; preserve conversion of filesystem counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
         match heim::disk::partitions().await {
@@ -69,7 +81,7 @@ impl HostMetrics {
                         self.config
                             .filesystem
                             .devices
-                            .contains_path(partition.device().map(|d| d.as_ref()))
+                            .contains_path(partition.device().map(AsRef::as_ref))
                             .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -87,7 +99,7 @@ impl HostMetrics {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                emit!(HostMetricsScrapeFilesystemError {
+                                emit(HostMetricsScrapeFilesystemError {
                                     message: "Failed to load partitions info.",
                                     mount_point: partition
                                         .mount_point()
@@ -95,7 +107,7 @@ impl HostMetrics {
                                         .unwrap_or("unknown")
                                         .to_string(),
                                     error,
-                                })
+                                });
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -129,7 +141,7 @@ impl HostMetrics {
                     #[cfg(not(windows))]
                     output.gauge(
                         GaugeName::FilesystemUsedRatio,
-                        usage.ratio().get::<ratio>() as f64,
+                        f64::from(usage.ratio().get::<ratio>()),
                         tags.clone(),
                     );
 
@@ -163,7 +175,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load partitions info.",
                     error,
                 });

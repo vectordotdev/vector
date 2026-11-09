@@ -7,6 +7,7 @@ use vector_lib::{
     codecs::MetricTagValues,
     config::LogNamespace,
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{PathPrefix, event_path, owned_value_path, path},
 };
 use vrl::{
@@ -68,6 +69,7 @@ pub struct MetricToLogConfig {
 }
 
 impl MetricToLogConfig {
+    #[must_use]
     pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
         MetricToLog::new(
             self.host_tag.as_deref(),
@@ -123,6 +125,10 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
         .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
@@ -190,7 +196,10 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
                         ),
                     )
                     .with_known("count", Kind::integer())
-                    .with_known("sum", Kind::float()),
+                    // A histogram that reports no sum omits the field, so the schema must allow it
+                    // to be absent. The `aggregated_summary` equivalent below stays a plain float,
+                    // because a summary's sum is always reported.
+                    .with_known("sum", Kind::float().or_undefined()),
             )
             .or_undefined(),
             None,
@@ -263,6 +272,7 @@ pub struct MetricToLog {
 }
 
 impl MetricToLog {
+    #[must_use]
     pub fn new(
         host_tag: Option<&str>,
         timezone: TimeZone,
@@ -283,12 +293,13 @@ impl MetricToLog {
         }
     }
 
+    #[must_use]
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
         if self.tag_values == MetricTagValues::Single {
             metric.reduce_tags_to_single();
         }
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogSerializeError { error }))
+            .map_err(|error| emit(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -340,8 +351,8 @@ impl FunctionTransform for MetricToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
-            .map(|log| log.into());
-        output.extend(retval.into_iter())
+            .map(std::convert::Into::into);
+        output.extend(retval.into_iter());
     }
 }
 
@@ -372,7 +383,7 @@ mod tests {
     }
 
     async fn do_transform(metric: Metric) -> Option<LogEvent> {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = MetricToLogConfig {
                 host_tag: Some("host".into()),
                 timezone: None,
@@ -391,9 +402,9 @@ mod tests {
             assert_eq!(out.recv().await, None);
 
             result
-        })
+        }))
         .await
-        .map(|e| e.into_log())
+        .map(Event::into_log)
     }
 
     fn ts() -> DateTime<Utc> {
@@ -429,7 +440,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(counter).await.unwrap();
+        let log = Box::pin(do_transform(counter)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -460,7 +471,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(gauge).await.unwrap();
+        let log = Box::pin(do_transform(gauge)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -491,7 +502,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(set).await.unwrap();
+        let log = Box::pin(do_transform(set)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -524,7 +535,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(distro).await.unwrap();
+        let log = Box::pin(do_transform(distro)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -566,7 +577,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
-                sum: 50.0,
+                sum: Some(50.0),
             },
             event_metadata(),
         )
@@ -576,7 +587,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(histo).await.unwrap();
+        let log = Box::pin(do_transform(histo)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -632,7 +643,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(summary).await.unwrap();
+        let log = Box::pin(do_transform(summary)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
