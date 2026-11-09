@@ -18,7 +18,7 @@
       {{ partial "hero.html" . }}
     </div>
 
-    <div id="page-content" data-pagefind-body class="mt-10">
+    <div id="page-content" data-pagefind-body data-toc-headings="#active-deprecations,#past-deprecations,.changelog-card" class="mt-10">
       {{ if gt (len $pending) 0 }}
       <div>
         <div class="prose dark:prose-invert max-w-none">
@@ -48,7 +48,7 @@
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
-    <aside aria-label="Table of contents" class="sticky top-6">
+    <aside aria-label="Table of contents" class="deprecations-toc sticky top-6">
       {{ partial "toc.html" . }}
     </aside>
   </div>

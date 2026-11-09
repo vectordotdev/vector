@@ -628,3 +628,13 @@ a[type="button"] {
   padding-bottom: 1px;
   width: 20px;
 }
+
+.deprecations-toc #toc {
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.deprecations-toc .toc-list .toc-list > li + li {
+  margin-top: 0.375rem;
+}
