@@ -40,8 +40,8 @@ use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
-        UnixSocketFileDeleteError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketOversizedDatagram,
+        SocketReceiveError, StreamClosedError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{
@@ -172,6 +172,7 @@ unsafe impl Sync for UnixDatagramBatchReceiver {}
 
 #[cfg(target_os = "linux")]
 impl UnixDatagramBatchReceiver {
+    #[allow(clippy::cast_possible_truncation)]
     fn new(
         socket: UnixDatagram,
         max_length: usize,
@@ -234,8 +235,11 @@ impl UnixDatagramBatchReceiver {
             };
         }
 
+        // SAFETY: `StdUnixDatagram` owns a stable, valid descriptor for its entire lifetime.
+        let socket = unsafe { AsyncFd::register(socket) }?;
+
         Ok(Self {
-            socket: AsyncFd::new(socket)?,
+            socket,
             addresses,
             buffers,
             _iovecs: iovecs,
@@ -256,7 +260,7 @@ impl UnixDatagramBatchReceiver {
                 try_recvmmsg_unix(socket.get_ref(), headers, last_received, batch_size)
             }) {
                 Ok(result) => break result?,
-                Err(_would_block) => continue,
+                Err(_would_block) => {}
             }
         };
         self.last_received = received;
@@ -269,6 +273,7 @@ impl UnixDatagramBatchReceiver {
 }
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn try_recvmmsg_unix(
     socket: &StdUnixDatagram,
     headers: &mut [libc::mmsghdr; UNIX_DATAGRAM_BATCH_SIZE],
@@ -311,7 +316,7 @@ fn unix_peer_from_sockaddr(
     if len <= path_offset {
         return Ok(Some(unnamed_socket_host()));
     }
-    if storage.ss_family as libc::c_int != libc::AF_UNIX {
+    if libc::c_int::from(storage.ss_family) != libc::AF_UNIX {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "received a non-Unix address from a Unix datagram socket",
@@ -430,7 +435,7 @@ pub fn build_unix_datagram_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    build_unix_datagram_source_inner(
+    Ok(build_unix_datagram_source_inner(
         listen_path,
         socket_file_mode,
         max_length,
@@ -441,7 +446,7 @@ pub fn build_unix_datagram_source(
         handle_events,
         shutdown,
         out,
-    )
+    ))
 }
 
 /// Returns a Unix domain datagram source for message-oriented deserializers.
@@ -449,6 +454,10 @@ pub fn build_unix_datagram_source(
 /// Unlike [`build_unix_datagram_source`], this skips stream framing and decodes each datagram as
 /// one message. Datagram-oriented protocols such as syslog can use this to retain receive batching
 /// without constructing a framed stream per packet.
+///
+/// # Errors
+///
+/// The returned source reports an error if processing the datagram stream fails.
 #[allow(clippy::too_many_arguments)]
 pub fn build_unix_datagram_source_with_message_decoder(
     listen_path: PathBuf,
@@ -463,7 +472,7 @@ pub fn build_unix_datagram_source_with_message_decoder(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    build_unix_datagram_source_inner(
+    Ok(build_unix_datagram_source_inner(
         listen_path,
         socket_file_mode,
         max_length,
@@ -474,7 +483,7 @@ pub fn build_unix_datagram_source_with_message_decoder(
         handle_events,
         shutdown,
         out,
-    )
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -489,16 +498,16 @@ fn build_unix_datagram_source_inner(
     handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> crate::Result<Source> {
-    Ok(Box::pin(async move {
+) -> Source {
+    Box::pin(async move {
         let socket = match bind_unix_datagram(&listen_path) {
             Ok(socket) => socket,
             Err(error) => {
-                emit!(SocketBindError {
+                emit(SocketBindError {
                     mode: SocketMode::Unix,
-                    error,
+                    error: &error,
                 });
-                return Err(());
+                return Err(crate::sources::SourceError::from(error));
             }
         };
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
@@ -531,7 +540,7 @@ fn build_unix_datagram_source_inner(
         }
 
         result
-    }))
+    })
 }
 
 fn bind_unix_datagram(listen_path: &Path) -> io::Result<UnixDatagram> {
@@ -560,6 +569,7 @@ fn bind_unix_datagram(listen_path: &Path) -> io::Result<UnixDatagram> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 async fn listen(
     socket: UnixDatagram,
     max_length: usize,
@@ -582,7 +592,7 @@ async fn listen(
     let bytes_received = register(BytesReceived::from(Protocol::UNIX));
     loop {
         let batch = tokio::select! {
-            received = receiver.recv_batch() => received.map_err(|error| {
+            batch_result = receiver.recv_batch() => batch_result.map_err(|error| {
                 emit(SocketReceiveError {
                     mode: SocketMode::Unix,
                     error: &error,
@@ -597,6 +607,9 @@ async fn listen(
             .sum();
         for index in 0..batch.len() {
             if batch.truncated(index) {
+                emit(SocketOversizedDatagram {
+                    mode: SocketMode::Unix,
+                });
                 warn!(
                     message = "Discarding Unix datagram larger than max_length.",
                     max_length

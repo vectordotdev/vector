@@ -19,7 +19,7 @@ use {
 use super::SocketListenAddr;
 
 /// Maximum number of packets read by a single `recvmmsg` call.
-pub const UDP_BATCH_SIZE: usize = 32;
+pub(super) const UDP_BATCH_SIZE: usize = 32;
 
 #[cfg(target_os = "linux")]
 const UDP_RECEIVE_BUFFER_SIZE: usize = 65_536;
@@ -27,6 +27,7 @@ const UDP_RECEIVE_BUFFER_SIZE: usize = 65_536;
 #[cfg(target_os = "linux")]
 const UDP_GRO: libc::c_int = 104;
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_possible_truncation)]
 const UDP_GRO_CONTROL_LEN: usize =
     // SAFETY: `CMSG_SPACE` only calculates a buffer size from the supplied value.
     unsafe { libc::CMSG_SPACE(mem::size_of::<libc::c_ushort>() as libc::c_uint) as usize };
@@ -95,6 +96,12 @@ pub struct UdpBatchReceiver {
 }
 
 impl UdpBatchReceiver {
+    /// Creates a batched receiver from a Tokio UDP socket.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the datagram size is zero or the platform receiver cannot be
+    /// initialized.
     pub fn from_socket(socket: UdpSocket, max_datagram_size: usize) -> io::Result<Self> {
         if max_datagram_size == 0 {
             return Err(io::Error::new(
@@ -121,6 +128,11 @@ impl UdpBatchReceiver {
         }
     }
 
+    /// Receives the next nonempty batch of UDP datagrams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying socket receive operation fails.
     pub async fn recv_batch(&mut self) -> io::Result<UdpBatch<'_>> {
         match &mut self.inner {
             #[cfg(target_os = "linux")]
@@ -178,8 +190,11 @@ impl LinuxUdpBatchReceiver {
         // UDP_GRO was added in Linux 5.0. If it is unavailable, recvmmsg batching still works.
         _ = enable_udp_gro(&socket);
 
+        // SAFETY: `StdUdpSocket` owns a stable, valid descriptor for its entire lifetime.
+        let socket = unsafe { AsyncFd::register(socket) }?;
+
         Ok(Self {
-            socket: AsyncFd::new(socket)?,
+            socket,
             max_datagram_size,
             addresses: std::array::from_fn(|_| {
                 // SAFETY: `sockaddr_storage` is an output buffer that the kernel initializes.
@@ -202,7 +217,7 @@ impl LinuxUdpBatchReceiver {
                 .try_io(|socket| try_recvmmsg(socket.get_ref(), addresses, controls, buffers))
             {
                 Ok(result) => break result?,
-                Err(_would_block) => continue,
+                Err(_would_block) => {}
             }
         };
 
@@ -240,6 +255,7 @@ struct ReceivedMessages {
 }
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn try_recvmmsg(
     socket: &StdUdpSocket,
     addresses: &mut [libc::sockaddr_storage; UDP_BATCH_SIZE],
@@ -295,6 +311,7 @@ fn try_recvmmsg(
 }
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_possible_truncation)]
 fn enable_udp_gro(socket: &StdUdpSocket) -> io::Result<()> {
     let enabled: libc::c_int = 1;
     // SAFETY: `enabled` is live for the call and its size matches the supplied option length.
@@ -315,6 +332,7 @@ fn enable_udp_gro(socket: &StdUdpSocket) -> io::Result<()> {
 }
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_possible_truncation)]
 fn udp_gro_segment_size(header: &libc::msghdr) -> Option<usize> {
     // SAFETY: `header` comes from `recvmmsg`; its control pointer and length describe the
     // live ancillary-data buffer owned by the receiver.
@@ -372,6 +390,7 @@ fn split_udp_payload<'a>(
 }
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::cast_lossless, clippy::cast_possible_truncation)]
 fn sockaddr_to_socket_addr(
     storage: &libc::sockaddr_storage,
     len: libc::socklen_t,

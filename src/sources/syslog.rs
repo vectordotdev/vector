@@ -35,7 +35,8 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketOversizedDatagram,
+        SocketReceiveError, StreamClosedError,
     },
     net,
     shutdown::ShutdownSignal,
@@ -215,6 +216,7 @@ impl GenerateConfig for SyslogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
+    #[allow(clippy::too_many_lines)]
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let host_key = self
@@ -415,6 +417,7 @@ impl TcpSource for SyslogTcpSource {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn udp(
     addr: SocketListenAddr,
     max_length: usize,
@@ -440,6 +443,7 @@ pub fn udp(
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
+        // One extra byte makes an over-length datagram distinguishable from an exactly-sized one.
         let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
             emit(SocketReceiveError {
                 mode: SocketMode::Udp,
@@ -459,9 +463,15 @@ pub fn udp(
 
         loop {
             let batch = tokio::select! {
-                received = receiver.recv_batch() => match received {
+                batch_result = receiver.recv_batch() => match batch_result {
                     Ok(batch) => batch,
                     Err(error) => {
+                        #[cfg(windows)]
+                        if error.raw_os_error() == Some(10040) {
+                            emit(SocketOversizedDatagram {
+                                mode: SocketMode::Udp,
+                            });
+                        }
                         emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
@@ -480,6 +490,9 @@ pub fn udp(
             let mut output = Vec::with_capacity(batch.len());
             for datagram in batch.iter() {
                 if datagram.truncated {
+                    emit(SocketOversizedDatagram {
+                        mode: SocketMode::Udp,
+                    });
                     warn!(
                         message = "Discarding frame larger than max_length.",
                         max_length
@@ -610,6 +623,7 @@ mod test {
 
     use bytes::Bytes;
     use chrono::prelude::*;
+    use futures::StreamExt;
     use indoc::indoc;
     use rand::{RngExt, rng};
     use serde::Deserialize;
@@ -962,6 +976,28 @@ mod test {
         };
 
         assert_eq!(socket_file_mode, Some(0o777));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_unix_datagram_and_alias() {
+        for mode in ["unix_datagram", "unix_dgram"] {
+            let config: SyslogConfig = serde_yaml::from_str(&format!(
+                "mode: {mode}\npath: /tmp/vector-syslog.sock\nsocket_file_mode: 432\nreceive_buffer_bytes: 8388608\nmax_batch_bytes: 4194304\n"
+            ))
+            .unwrap();
+
+            match config.mode {
+                Mode::UnixDatagram(config) => {
+                    let config = config.platform_independent();
+                    assert_eq!(config.path, PathBuf::from("/tmp/vector-syslog.sock"));
+                    assert_eq!(config.socket_file_mode, Some(0o660));
+                    assert_eq!(config.receive_buffer_bytes, Some(8 * 1024 * 1024));
+                    assert_eq!(config.max_batch_bytes, Some(4 * 1024 * 1024));
+                }
+                _ => panic!("expected Mode::UnixDatagram"),
+            }
+        }
     }
 
     #[test]
@@ -1447,6 +1483,148 @@ mod test {
         .await;
     }
 
+    fn assert_oversized_datagram_count(mode: &str, expected: f64) {
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        let metric = metrics
+            .iter()
+            .find(|metric| {
+                metric.name() == "component_oversized_datagrams_total"
+                    && metric.tag_value("mode").as_deref() == Some(mode)
+            })
+            .expect("oversized datagram counter must be emitted");
+        assert_eq!(
+            metric.value(),
+            &crate::event::MetricValue::Counter { value: expected }
+        );
+    }
+
+    #[tokio::test]
+    async fn udp_rejects_datagram_one_byte_over_max_length() {
+        crate::test_util::trace_init();
+        let (_guard, in_addr) = next_addr();
+        let exact = b"<13>1 2026-10-12T13:00:00Z host app - - - exact";
+        let mut oversized = exact.to_vec();
+        oversized.push(b'x');
+
+        let mut config = SyslogConfig::from_mode(Mode::Udp {
+            address: in_addr.into(),
+            receive_buffer_bytes: None,
+        });
+        config.max_length = exact.len();
+
+        let key = ComponentKey::from("in");
+        let (tx, rx) = SourceSender::new_test();
+        let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+        let shutdown_complete = shutdown.shutdown_tripwire();
+        let source = config.build(context).await.unwrap();
+        tokio::spawn(source);
+        sleep(Duration::from_millis(150)).await;
+
+        let output_events = CountReceiver::receive_events(rx);
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        socket.send_to(exact, in_addr).await.unwrap();
+        for _ in 0..3 {
+            socket.send_to(&oversized, in_addr).await.unwrap();
+        }
+        socket.send_to(exact, in_addr).await.unwrap();
+        sleep(Duration::from_millis(150)).await;
+
+        shutdown
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+            .await;
+        shutdown_complete.await;
+
+        let events = output_events.await;
+        assert_eq!(events.len(), 2);
+        assert_oversized_datagram_count("udp", 3.0);
+        assert_eq!(
+            events[0]
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap()),
+            Some(&Value::Bytes(Bytes::from_static(b"exact")))
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_counts_oversized_datagrams() {
+        use tokio::net::UnixDatagram;
+
+        crate::test_util::trace_init();
+        let directory = tempfile::tempdir().unwrap();
+        let in_path = directory.path().join("oversized.sock");
+        let mut config = SyslogConfig::from_mode(Mode::UnixDatagram(
+            UnixDatagramConfig {
+                path: in_path.clone(),
+                socket_file_mode: None,
+                receive_buffer_bytes: None,
+                max_batch_bytes: None,
+            }
+            .into(),
+        ));
+        let exact = b"<184>Oct 29 18:45:35 access_log: exact";
+        config.max_length = exact.len();
+
+        let key = ComponentKey::from("in");
+        let (tx, mut output) = SourceSender::new_test();
+        let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+        let source = tokio::spawn(config.build(context).await.unwrap());
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !in_path.exists() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        let socket = UnixDatagram::unbound().unwrap();
+        socket.connect(&in_path).unwrap();
+        let mut oversized = exact.to_vec();
+        oversized.push(b'x');
+        socket.send(exact).await.unwrap();
+        for _ in 0..3 {
+            socket.send(&oversized).await.unwrap();
+        }
+        // A much larger packet also counts once, regardless of truncation size.
+        socket.send(&exact.repeat(4)).await.unwrap();
+        socket.send(exact).await.unwrap();
+
+        for _ in 0..2 {
+            let event = tokio::time::timeout(Duration::from_secs(5), output.next())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                event
+                    .as_log()
+                    .get(log_schema().message_key_target_path().unwrap()),
+                Some(&Value::Bytes(Bytes::from_static(b"exact")))
+            );
+        }
+        // Receiving the final good packet synchronizes processing of the
+        // earlier oversize packets without sleeping or depending on batching.
+        assert_oversized_datagram_count("unix", 4.0);
+        let discarded = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .into_iter()
+            .find(|metric| metric.name() == "component_discarded_events_total")
+            .unwrap();
+        assert_eq!(discarded.tag_value("intentional").as_deref(), Some("false"));
+        assert_eq!(
+            discarded.value(),
+            &crate::event::MetricValue::Counter { value: 4.0 }
+        );
+
+        shutdown
+            .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
+            .await;
+        source.await.unwrap().unwrap();
+        assert!(output.next().await.is_none());
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
@@ -1524,6 +1702,74 @@ mod test {
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_unix_datagram_syslog() {
+        use tokio::net::UnixDatagram;
+
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let num_messages: usize = 1000;
+            let directory = tempfile::tempdir().unwrap();
+            let in_path = directory.path().join("syslog.sock");
+
+            let config = SyslogConfig::from_mode(Mode::UnixDatagram(
+                UnixDatagramConfig {
+                    path: in_path.clone(),
+                    socket_file_mode: Some(0o660),
+                    receive_buffer_bytes: None,
+                    max_batch_bytes: None,
+                }
+                .into(),
+            ));
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            while !in_path.exists() {
+                tokio::task::yield_now().await;
+            }
+
+            let output_events = CountReceiver::receive_events(rx);
+            let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
+                .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
+                .collect();
+            let socket = UnixDatagram::unbound().unwrap();
+            socket.connect(&in_path).unwrap();
+            for message in &input_messages {
+                socket.send(message.to_string().as_bytes()).await.unwrap();
+            }
+
+            sleep(Duration::from_secs(1)).await;
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .await
+                .into_iter()
+                .map(|mut event| {
+                    event.as_mut_log().remove(event_path!("hostname"));
+                    event.as_mut_log().remove(event_path!("source_ip"));
+                    event.into()
+                })
+                .collect();
+            assert_eq!(output_messages, input_messages);
+            assert!(
+                !in_path.exists(),
+                "socket path should be removed on shutdown"
+            );
         })
         .await;
     }

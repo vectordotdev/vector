@@ -26,7 +26,7 @@ use crate::{
     event::Event,
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
-        SocketReceiveError, StreamClosedError,
+        SocketOversizedDatagram, SocketReceiveError, StreamClosedError,
     },
     net,
     serde::default_decoding,
@@ -254,11 +254,14 @@ pub(super) fn udp(
         info!(message = "Listening.", address = %config.address);
         loop {
             let batch = tokio::select! {
-                received = receiver.recv_batch() => match received {
+                batch_result = receiver.recv_batch() => match batch_result {
                     Ok(batch) => batch,
                     Err(error) => {
                         #[cfg(windows)]
                         if error.raw_os_error() == Some(10040) {
+                            emit(SocketOversizedDatagram {
+                                mode: SocketMode::Udp,
+                            });
                             warn!(
                                 message = "Discarding frame larger than max_length.",
                                 max_length
@@ -279,6 +282,11 @@ pub(super) fn udp(
             bytes_received.emit(ByteSize(batch.received_bytes()));
             let mut output = Vec::with_capacity(batch.len());
             for datagram in batch.iter() {
+                if datagram.truncated {
+                    emit(SocketOversizedDatagram {
+                        mode: SocketMode::Udp,
+                    });
+                }
                 let address = datagram.address;
                 let source_host = address.ip().to_string();
                 let now = Utc::now();

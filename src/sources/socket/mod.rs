@@ -1189,6 +1189,22 @@ mod test {
         .await;
     }
 
+    fn assert_oversized_udp_datagrams(expected: f64) {
+        let metric = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .into_iter()
+            .find(|metric| {
+                metric.name() == "component_oversized_datagrams_total"
+                    && metric.tag_value("mode").as_deref() == Some("udp")
+            })
+            .expect("oversized UDP datagram counter must be emitted");
+        assert_eq!(
+            metric.value(),
+            &crate::event::MetricValue::Counter { value: expected }
+        );
+    }
+
     #[tokio::test]
     async fn udp_max_length() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
@@ -1217,6 +1233,7 @@ mod test {
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "a short un".into()
             );
+            assert_oversized_udp_datagrams(2.0);
         })
         .await;
     }
@@ -1261,6 +1278,7 @@ mod test {
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "short one".into()
             );
+            assert_oversized_udp_datagrams(1.0);
         })
         .await;
     }
