@@ -5,13 +5,13 @@ deprecated_since: "0.62.0"
 
 ## APT/YUM signing key migration {#package-repository-signing-key}
 
-Vector's APT and YUM repositories will switch to a new signing key on
-**November 30, 2026**; existing users must add this key to continue installing or
-updating packages.
+On **November 30, 2026**, Vector's APT and YUM repositories switch to a new
+signing key. To continue installing or updating packages after that date, add
+the new key.
 
-On each host configured through `setup.vector.dev`, run these commands before
-the switch to add the new key while retaining your repository URL, channel and
-existing Datadog trust:
+On each host that you configured with `setup.vector.dev`, run the following
+commands before November 30, 2026. The script adds the new key and keeps your
+repository URL, channel, and existing trusted keys:
 
 ```sh
 curl -fsSL --proto '=https' --proto-redir '=https' \
