@@ -423,7 +423,7 @@ fn take_record_fields(
         take(fields, path!(DROPPED_ATTRIBUTES_COUNT_KEY), into_u32).unwrap_or_default();
     record.trace_id = take(fields, path!(TRACE_ID_KEY), into_id::<16>).unwrap_or_default();
     record.span_id = take(fields, path!(SPAN_ID_KEY), into_id::<8>).unwrap_or_default();
-    record.attributes = take(fields, path!(ATTRIBUTES_KEY), into_kv_list).unwrap_or_default();
+    let attributes = take(fields, path!(ATTRIBUTES_KEY), into_object).unwrap_or_default();
 
     let resource = Resource {
         attributes: take(fields, path!(RESOURCE_KEY), into_kv_list).unwrap_or_default(),
@@ -442,21 +442,28 @@ fn take_record_fields(
         .unwrap_or_default(),
     };
 
-    match std::mem::replace(fields, Value::Null) {
-        Value::Object(rest) => {
-            for (key, value) in rest {
-                if !record.attributes.iter().any(|kv| kv.key == key.as_str()) {
-                    record.attributes.push(KeyValue {
-                        key: key.into(),
-                        value: Some(value.into()),
-                    });
-                }
-            }
-        }
+    let mut rest = match std::mem::replace(fields, Value::Null) {
+        Value::Object(rest) => rest,
         // A Legacy event whose root is not an object has no message field; the root is the body.
-        other if record.body.is_none() => record.body = into_body(other),
-        _ => {}
+        other => {
+            if record.body.is_none() {
+                record.body = into_body(other);
+            }
+            ObjectMap::new()
+        }
+    };
+    // Keys from `attributes` come first and win over the remaining fields with the same key.
+    for key in attributes.keys() {
+        rest.remove(key);
     }
+    record.attributes = attributes
+        .into_iter()
+        .chain(rest)
+        .map(|(key, value)| KeyValue {
+            key: key.into(),
+            value: Some(value.into()),
+        })
+        .collect();
 
     (resource, scope)
 }
@@ -538,11 +545,15 @@ fn into_id<const LEN: usize>(value: Value) -> Result<Vec<u8>, Value> {
     }
 }
 
-fn into_kv_list(value: Value) -> Result<Vec<KeyValue>, Value> {
+fn into_object(value: Value) -> Result<ObjectMap, Value> {
     match value {
-        Value::Object(object) => Ok(object_into_kv_list(object)),
+        Value::Object(object) => Ok(object),
         other => Err(other),
     }
+}
+
+fn into_kv_list(value: Value) -> Result<Vec<KeyValue>, Value> {
+    into_object(value).map(object_into_kv_list)
 }
 
 #[cfg(test)]
