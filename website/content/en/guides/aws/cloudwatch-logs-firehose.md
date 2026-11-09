@@ -13,8 +13,10 @@ tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 * You have logs in [AWS CloudWatch Logs][AWS CloudWatch Logs] that you'd like to
   consume.
 * You are able to deploy Vector with a publicly exposed HTTPS endpoint.
+* You have [jq] installed, to write the Firehose access key to a secrets file.
 
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[jq]: https://jqlang.org/
 {{< /requirement >}}
 
 If you use [AWS CloudWatch Logs][AWS CloudWatch Logs] on Amazon Web Services
@@ -80,11 +82,16 @@ export FIREHOSE_S3_BUCKET="firehose-${AWS_ACCOUNT_ID}" # a bucket to write event
 Let's take a look at the configuration we will be using:
 
 ```yaml title="vector.yaml"
+secret:
+  local:
+    type: "file"
+    path: "secrets.json" # written in "Deploying Vector" below
+
 sources:
   firehose:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
-    access_key: "${FIREHOSE_ACCESS_KEY}" # this will also be set when configuring Firehose
+    access_key: "SECRET[local.firehose_access_key]" # the value of FIREHOSE_ACCESS_KEY, also set when configuring Firehose
     store_access_key: false
 
 transforms:
@@ -132,9 +139,20 @@ See their guide for more examples.
 ## Deploying Vector
 
 First, deploy vector with the [`aws_kinesis_firehose`][aws_kinesis_firehose] source. See example
-configuration above. The configuration reads the access key from `${FIREHOSE_ACCESS_KEY}`, and
-[environment variable interpolation][env_vars] is disabled by default, so start Vector with
-`--dangerously-allow-env-var-interpolation`.
+configuration above. The configuration reads the access key from `secrets.json` through the
+[`file` secrets backend][secrets]. Write that file from `FIREHOSE_ACCESS_KEY`:
+
+```bash
+(
+  umask 077
+  jq -n \
+    --arg key "${FIREHOSE_ACCESS_KEY:?Set FIREHOSE_ACCESS_KEY first}" \
+    '{firehose_access_key: $key}' > secrets.json
+)
+```
+
+A relative `path` is resolved against the directory Vector is started from. When running Vector as a
+service, use an absolute path.
 
 {{< info >}}
 Remember that the port must be publicly accessible and the endpoint must be
@@ -365,7 +383,7 @@ sinks:
   cloudwatch:
     type: "aws_cloudwatch_logs"
     inputs: ["stdin"]
-    group_name: "${LOG_GROUP}"
+    group_name: "/test/vector" # the same value as LOG_GROUP
     stream_name: "test"
     region: "us-east-1"
     encoding:
@@ -385,7 +403,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --dangerously-allow-env-var-interpolation --config config.yaml
+flog -f json | vector --config config.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -667,8 +685,8 @@ Here are original events with all of the additional context!
 [aws_kinesis_firehose]: /docs/reference/configuration/sources/aws_kinesis_firehose/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
-[env_vars]: /docs/reference/environment_variables/
 [flog]: https://github.com/mingrammer/flog
 [parse_aws_cloudwatch_log_subscription_message]: /docs/reference/vrl/functions/#parse_json
 [parse_json]: /docs/reference/vrl/functions/#parse_json
 [remap]: /docs/reference/configuration/transforms/remap/
+[secrets]: /docs/reference/configuration/secrets/
