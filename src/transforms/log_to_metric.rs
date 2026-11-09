@@ -820,12 +820,11 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
                     for arr_el in arr {
                         tags.insert(key.to_string(), bytes_to_str(arr_el));
                     }
-                },
+                }
                 _ => {
                     tags.insert(key.to_string(), bytes_to_str(value));
                 }
             }
-
         }
     }
     let tags_result = Some(tags);
