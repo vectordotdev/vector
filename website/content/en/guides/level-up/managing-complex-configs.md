@@ -145,8 +145,7 @@ tests:
           - type: "vrl"
             source: |
               assert_eq!(.message, "Sorry, I'm busy this week Cecil")
-      # And we add a new output without conditions to check that
-      # a new transform emits events
+      # Check that the new transform emits at least one event
       - extract_from: "bar"
 ```
 
