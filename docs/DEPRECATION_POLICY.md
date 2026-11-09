@@ -89,6 +89,8 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
   change, so it does not belong in `changelog.d/`). The fragment is rendered on the release page in the
   Deprecation Announcements section and on the [deprecations index](https://vector.dev/deprecations/).
+  A valid new active notice satisfies `vdev check changelog-fragments` automatically; no `no-changelog` label is needed.
+  Existing changelog fragments are still validated, and removing a deprecated feature still requires a breaking fragment.
 - Add a deprecation note to the component docs if applicable. Typically, this means adding `deprecation: "description of the deprecation"`
   to the cue file or `#[configurable(deprecated = "use <alternative> instead")]` to the parameter.
 - For a component that is being renamed, remove the documentation page for the old name and add a new one for the new

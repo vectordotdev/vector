@@ -21,6 +21,7 @@ use vector_lib::{
         Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
     finalizer::OrderedFinalizer,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, Value};
@@ -607,7 +608,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(FileBytesReceived {
+                emit(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
                     include_file_metric_tag,
@@ -674,7 +675,7 @@ pub fn file_source(
                 debug!("Finished sending.");
             } else {
                 let (count, _) = messages.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
             }
         });
 
@@ -684,7 +685,7 @@ pub fn file_source(
             let rt = tokio::runtime::Handle::current();
             let result =
                 rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
-            emit!(FileOpen { count: 0 });
+            emit(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -736,17 +737,20 @@ fn wrap_with_line_agg(
             }),
             logic,
         )
-        .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
-                filename,
+        .map(|aggregated| {
+            let (file_id, start_offset, initial_end) = aggregated.initial_context;
+            Line {
+                text: aggregated.line,
+                filename: aggregated.source,
                 file_id,
                 start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
-            },
-        ),
+                end_offset: aggregated
+                    .last_context
+                    .map_or(initial_end, |(_, _, lastline_end_offset)| {
+                        lastline_end_offset
+                    }),
+            }
+        }),
     )
 }
 
@@ -811,7 +815,7 @@ fn create_event(
         file,
     );
 
-    emit!(FileEventsReceived {
+    emit(FileEventsReceived {
         count: 1,
         file,
         byte_size: event.estimated_json_encoded_size_of(),

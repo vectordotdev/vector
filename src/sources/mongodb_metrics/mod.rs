@@ -16,8 +16,8 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
-    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags,
-    source_sender::SendError,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    internal_event::emit, metric_tags, source_sender::SendError,
 };
 
 use crate::{
@@ -155,9 +155,9 @@ impl SourceConfig for MongoDbMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(MongoDbMetrics::collect)).await;
-                emit!(CollectionCompleted {
+                emit(CollectionCompleted {
                     start,
-                    end: Instant::now()
+                    end: Instant::now(),
                 });
 
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
@@ -166,7 +166,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 cx.out
                     .send_batch(metrics)
                     .await
-                    .inspect_err(|_| emit!(StreamClosedError { count }))?;
+                    .inspect_err(|_| emit(StreamClosedError { count }))?;
             }
 
             Ok::<(), SendError>(())
@@ -262,11 +262,11 @@ impl MongoDbMetrics {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
+                    CollectError::Mongo(error) => emit(MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
+                    CollectError::Bson(error) => emit(MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -278,7 +278,7 @@ impl MongoDbMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
-        emit!(MongoDbMetricsEventsReceived {
+        emit(MongoDbMetricsEventsReceived {
             byte_size: metrics.estimated_json_encoded_size_of(),
             count: metrics.len(),
             endpoint: &self.endpoint,
@@ -302,7 +302,7 @@ impl MongoDbMetrics {
         let db = self.client.database("admin");
         let doc = db.run_command(command).await.map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size,
             protocol: "tcp",
             endpoint: &self.endpoint,

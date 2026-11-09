@@ -9,10 +9,11 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::emit;
 
 use futures::{FutureExt, StreamExt, future::BoxFuture};
-use http_1::{Request, Response};
-use http_body_1::{Body, Frame, SizeHint};
+use http::{Request, Response};
+use http_body::{Body, Frame, SizeHint};
 use pin_project::pin_project;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
@@ -20,13 +21,13 @@ use tokio::{
     time::{Sleep, sleep},
 };
 use tonic::{
-    body::BoxBody,
+    body::Body as TonicBody,
     server::NamedService,
     service::Routes,
     transport::server::{Connected, Server},
 };
 use tower::{Layer, Service};
-use tower_http_1::{
+use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
@@ -364,10 +365,11 @@ pub async fn run_grpc_server<S>(
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
 where
-    S: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<TonicBody>, Response = Response<TonicBody>, Error = Infallible>
         + NamedService
         + Clone
         + Send
+        + Sync
         + 'static,
     S::Future: Send + 'static,
 {
@@ -382,7 +384,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
@@ -425,9 +427,10 @@ pub async fn run_grpc_server_with_routes<L>(
 ) -> crate::Result<()>
 where
     L: Layer<DecompressionAndMetrics<Routes>> + Clone + Send + 'static,
-    L::Service: Service<Request<BoxBody>, Response = Response<BoxBody>> + Clone + Send + 'static,
-    <L::Service as Service<Request<BoxBody>>>::Future: Send + 'static,
-    <L::Service as Service<Request<BoxBody>>>::Error:
+    L::Service:
+        Service<Request<TonicBody>, Response = Response<TonicBody>> + Clone + Send + 'static,
+    <L::Service as Service<Request<TonicBody>>>::Future: Send + 'static,
+    <L::Service as Service<Request<TonicBody>>>::Error:
         Into<tower::BoxError> + std::fmt::Display + Send + 'static,
 {
     let span = Span::current();
@@ -441,7 +444,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // Request admission must see each HTTP/2 stream before its body is decompressed.
@@ -460,19 +463,23 @@ where
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
 #[must_use]
+#[expect(
+    clippy::type_complexity,
+    reason = "The closure types are `impl Fn` and cannot be named in a type alias."
+)]
 pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<
     SharedClassifier<GrpcErrorsAsFailures>,
-    impl Fn(&Request<BoxBody>) -> Span + Clone,
-    impl Fn(&Request<BoxBody>, &Span) + Clone,
-    impl Fn(&Response<BoxBody>, Duration, &Span) + Clone,
+    impl Fn(&Request<TonicBody>) -> Span + Clone,
+    impl Fn(&Request<TonicBody>, &Span) + Clone,
+    impl Fn(&Response<TonicBody>, Duration, &Span) + Clone,
     (),
     (),
     (),
 > {
     TraceLayer::new_for_grpc()
-        .make_span_with(move |request: &Request<BoxBody>| {
+        .make_span_with(move |request: &Request<TonicBody>| {
             // The path is defined as “/” {service name} “/” {method name}.
             let mut path = request.uri().path().split('/');
             let service = path.nth(1).unwrap_or("_unknown");
@@ -486,12 +493,12 @@ pub fn build_grpc_trace_layer(
                grpc_method = method,
             )
         })
-        .on_request(Box::new(|_request: &Request<BoxBody>, _span: &Span| {
-            emit!(GrpcServerRequestReceived);
+        .on_request(Box::new(|_request: &Request<TonicBody>, _span: &Span| {
+            emit(GrpcServerRequestReceived);
         }))
         .on_response(
-            |response: &Response<BoxBody>, latency: Duration, _span: &Span| {
-                emit!(GrpcServerResponseSent { response, latency });
+            |response: &Response<TonicBody>, latency: Duration, _span: &Span| {
+                emit(GrpcServerResponseSent { response, latency });
             },
         )
         .on_failure(())
@@ -503,15 +510,13 @@ pub fn build_grpc_trace_layer(
 mod tests {
     use std::future::{Ready, ready};
 
-    use tonic::body::empty_body;
-
     use super::*;
 
     #[derive(Clone)]
     struct EmptyBodyService;
 
-    impl Service<Request<BoxBody>> for EmptyBodyService {
-        type Response = Response<BoxBody>;
+    impl Service<Request<TonicBody>> for EmptyBodyService {
+        type Response = Response<TonicBody>;
         type Error = Infallible;
         type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -519,8 +524,8 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: Request<BoxBody>) -> Self::Future {
-            ready(Ok(Response::new(empty_body())))
+        fn call(&mut self, _req: Request<TonicBody>) -> Self::Future {
+            ready(Ok(Response::new(TonicBody::empty())))
         }
     }
 
@@ -530,7 +535,7 @@ mod tests {
         let mut service = MaxConnectionAgeService {
             service: EmptyBodyService,
         };
-        let mut request = Request::new(empty_body());
+        let mut request = Request::new(TonicBody::empty());
         request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
@@ -558,13 +563,13 @@ mod tests {
         let mut service = MaxConnectionAgeService {
             service: EmptyBodyService,
         };
-        let mut first_request = Request::new(empty_body());
+        let mut first_request = Request::new(TonicBody::empty());
         first_request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
                 active_requests: Arc::clone(&first_connection_active_requests),
             });
-        let mut second_request = Request::new(empty_body());
+        let mut second_request = Request::new(TonicBody::empty());
         second_request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {

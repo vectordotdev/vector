@@ -1,11 +1,11 @@
 use http::{Uri, uri::Scheme};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio_stream::{Stream, StreamExt};
-use tonic::body::BoxBody;
+use tonic::body::Body as TonicBody;
 use tonic_health::pb::{
     HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
 };
-use vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE;
+use vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE;
 use vector_core::{
     config::proxy::ProxyConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Sends tonic's gRPC requests over Vector's shared HTTP/2 client.
-type Transport = GrpcTransport<BoxBody>;
+type Transport = GrpcTransport<TonicBody>;
 
 /// gRPC client for the Vector observability API
 ///
@@ -84,7 +84,7 @@ impl Client {
         };
 
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(HTTP2_MAX_HEADER_LIST_SIZE);
         let transport = GrpcTransport(
             Http2Client::new(tls, &ProxyConfig::default(), builder)
                 .map_err(|source| Error::Connection { source })?,

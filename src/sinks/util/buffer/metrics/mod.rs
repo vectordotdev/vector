@@ -141,7 +141,7 @@ mod tests {
 
     type Buffer = Vec<Vec<Metric>>;
 
-    pub fn sample_counter(num: u32, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
+    fn sample_counter(num: u32, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
             format!("counter-{num}"),
             kind,
@@ -150,11 +150,11 @@ mod tests {
         .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
-    pub fn sample_gauge(num: u32, kind: MetricKind, value: f64) -> Metric {
+    fn sample_gauge(num: u32, kind: MetricKind, value: f64) -> Metric {
         Metric::new(format!("gauge-{num}"), kind, MetricValue::Gauge { value })
     }
 
-    pub fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
+    fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
         Metric::new(
             format!("set-{num}"),
             kind,
@@ -164,7 +164,7 @@ mod tests {
         )
     }
 
-    pub fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
+    fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
         Metric::new(
             format!("dist-{num}"),
             kind,
@@ -175,7 +175,7 @@ mod tests {
         )
     }
 
-    pub fn sample_aggregated_histogram(
+    fn sample_aggregated_histogram(
         num: u32,
         kind: MetricKind,
         bpower: f64,
@@ -192,12 +192,12 @@ mod tests {
                     4.0f64.powf(bpower) => cfactor * 4
                 ],
                 count: 7 * cfactor,
-                sum,
+                sum: Some(sum),
             },
         )
     }
 
-    pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: u32) -> Metric {
+    fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: u32) -> Metric {
         Metric::new(
             format!("quantiles-{num}"),
             kind,

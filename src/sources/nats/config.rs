@@ -168,11 +168,11 @@ pub struct NatsSourceConfig {
     pub jetstream: Option<JetStreamConfig>,
 }
 
-pub fn default_subject_key_field() -> OptionalValuePath {
+pub(super) fn default_subject_key_field() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("subject"))
 }
 
-pub const fn default_subscription_capacity() -> usize {
+const fn default_subscription_capacity() -> usize {
     65536
 }
 

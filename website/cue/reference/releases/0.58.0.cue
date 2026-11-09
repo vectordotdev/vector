@@ -1,6 +1,20 @@
 package metadata
 
 releases: "0.58.0": {
+	description: #"""
+		The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.58.0`! 🚀
+
+		Thanks to the 32 contributors who made the 59 changes in this release:
+
+		- [7 breaking changes](/releases/0.58.0/#breaking-changes)
+		- [3 security changes](/releases/0.58.0/#security-changes)
+		- [8 new features](/releases/0.58.0/#new-features)
+		- [14 enhancements](/releases/0.58.0/#enhancements)
+		- [27 bug fixes](/releases/0.58.0/#bug-fixes)
+
+		Upgrading to 0.58? Read the [upgrade guide](/highlights/2026-08-26-0-58-0-upgrade-guide/).
+		"""#
+
 	date: "2026-08-26"
 
 	whats_next: []

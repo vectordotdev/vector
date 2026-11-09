@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct NatsTowerRequestConfigDefaults;
+pub(super) struct NatsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::None;
@@ -24,7 +24,7 @@ impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
 #[serde_with::serde_as]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct NatsHeaderConfig {
+pub(super) struct NatsHeaderConfig {
     /// A unique identifier for the message. Useful for deduplication.
     ///
     /// Can be a template that references fields in the event, e.g., `{{ event_id }}`.
@@ -35,7 +35,7 @@ pub struct NatsHeaderConfig {
 }
 
 impl NatsHeaderConfig {
-    pub fn build_headers(&self, event: &Event) -> HeaderMap {
+    pub(super) fn build_headers(&self, event: &Event) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
         if let Some(template) = &self.message_id
@@ -53,7 +53,7 @@ impl NatsHeaderConfig {
 #[serde_with::serde_as]
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
-pub struct JetStreamConfig {
+pub(super) struct JetStreamConfig {
     /// Whether to enable Jetstream.
     #[serde(default)]
     pub enabled: bool,
@@ -311,7 +311,7 @@ async fn healthcheck(
         .await
 }
 
-pub enum NatsPublisher {
+pub(super) enum NatsPublisher {
     Core(async_nats::Client),
     JetStream(async_nats::jetstream::Context),
 }

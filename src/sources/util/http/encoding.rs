@@ -1,6 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
+use vector_lib::internal_event::emit;
 use warp::http::StatusCode;
 use warp::{Filter, filters::BoxedFilter};
 
@@ -231,9 +232,9 @@ pub fn emit_decompress_error(
     if is_decompressed_size_limit_error(&error) {
         return decompressed_too_large_error(encoding, max_decompressed_size);
     }
-    emit!(HttpDecompressError {
+    emit(HttpDecompressError {
         encoding,
-        error: &error
+        error: &error,
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,

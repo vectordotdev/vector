@@ -2,6 +2,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -343,14 +344,14 @@ impl HostMetricsConfig {
 
         let mut generator = HostMetrics::new(self);
 
-        let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+        let bytes_received = register(BytesReceived::from(Protocol::NONE));
 
         while interval.next().await.is_some() {
             bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(error);
             }
         }
@@ -386,7 +387,7 @@ impl HostMetrics {
             config,
             system: System::new(),
             components: Components::new_with_refreshed_list(),
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
         }
     }
 
@@ -400,7 +401,7 @@ impl HostMetrics {
             system: System::new(),
             components: Components::new_with_refreshed_list(),
             root_cgroup,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
         }
     }
 
@@ -481,7 +482,7 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load average info",
                     error,
                 });
@@ -498,7 +499,7 @@ impl HostMetrics {
                 MetricTags::default(),
             ),
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load host uptime info",
                     error,
                 });
@@ -512,7 +513,7 @@ impl HostMetrics {
                 MetricTags::default(),
             ),
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load host boot time info",
                     error,
                 });
@@ -587,7 +588,7 @@ where
     E: std::error::Error,
 {
     result
-        .map_err(|error| emit!(HostMetricsScrapeDetailError { message, error }))
+        .map_err(|error| emit(HostMetricsScrapeDetailError { message, error }))
         .ok()
 }
 

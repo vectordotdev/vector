@@ -241,7 +241,7 @@ where
 
                     response.events_sent().emit_event(events_sent);
 
-                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
+                // This condition occurs when the service's `call()` performs the request inline and reports a rejection through the response instead of an error
                 } else if response.event_status() == EventStatus::Rejected {
                     Self::emit_call_error(None, request_id, event_count);
                     finalizers.update_status(EventStatus::Rejected);
