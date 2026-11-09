@@ -33,21 +33,15 @@ where
         ));
 
         let flush_keys_interval = throttle.flush_keys_interval;
-        let cpu_ns = throttle.cpu_ns.clone();
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        // Hook the periodic key-flush task onto the component's CPU counter so
-        // its housekeeping work is attributed to this throttle transform.
-        let flush_handle = spawn_timed(
-            async move {
-                let mut interval = tokio::time::interval(flush_keys_interval);
-                loop {
-                    interval.tick().await;
-                    rate_limiter_clone.retain_recent();
-                }
-            },
-            cpu_ns,
-        );
+        let flush_handle = spawn_timed(async move {
+            let mut interval = tokio::time::interval(flush_keys_interval);
+            loop {
+                interval.tick().await;
+                rate_limiter_clone.retain_recent();
+            }
+        });
 
         Self {
             rate_limiter,

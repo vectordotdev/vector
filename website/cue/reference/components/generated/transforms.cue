@@ -35,6 +35,9 @@ generated: components: transforms: configuration: {
 
 			Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
 			adds a `clock_gettime` call on every future poll.
+
+			On Windows, the value is a rough estimate: thread CPU time is only updated at the scheduler
+			clock tick (typically 15.6 ms), so short polls are counted either as zero or as a whole tick.
 			"""
 		required: false
 		type: bool: default: false
