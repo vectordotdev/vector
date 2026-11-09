@@ -8,13 +8,10 @@ follow the following deprecation policy.
 
 ## Policy
 
-Vector will retain deprecated configuration or features for at least one minor version (this will transition to one
-major version when Vector hits 1.0).
+Deprecated configuration or features become eligible for removal two minor versions after the release announcing the
+deprecation. If a notice specifies a longer migration window, that window takes precedence.
 
-This means that deprecations will be eligible for removal in the next minor release after they are announced; however,
-we will typically aim to support deprecations for a longer time period depending on their development maintenance
-burden. For example, a deprecation announced in `v0.16.0` would be eligible to be removed in `v0.17.0` but may be
-removed later in `v0.20.0`.
+For example, a deprecation announced in `v0.62.0` is eligible for removal in `v0.64.0` or a later minor release.
 
 ### Security changes and critical bugs
 
@@ -60,8 +57,8 @@ When this happens, we will notify by:
 
 ### Migration
 
-Users will have 1 or more minor releases to migrate away from using the deprecation using the instructions provided in
-the deprecation notice.
+Users should follow the migration instructions in the deprecation notice before upgrading to a release in which the
+feature has been removed.
 
 ### Removal
 
@@ -84,6 +81,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
+  The minimum removal version is calculated automatically as two minor versions after `deprecated_since`.
   Use the fragment body for the full migration guide (rationale, before/after examples, links).
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
