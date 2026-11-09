@@ -8,6 +8,7 @@ const tableOfContents = () => {
       tocSelector: "#toc",
       contentSelector: "#page-content",
       headingSelector: content?.dataset.tocHeadings || "h2,h3,h4,h5",
+      includeTitleTags: Boolean(content?.dataset.tocHeadings),
       headingObjectCallback: (heading, element) => {
         // Notice cards sit below their section; headings inside their bodies are excluded.
         if (element.matches(".changelog-card")) {

@@ -8,8 +8,8 @@
 {{ $enacted := $entries.enacted }}
 {{ $latest := index site.Data.docs.versions 0 }}
 
-<div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
-  <main aria-label="Deprecations" class="lg:col-span-4 md:px-0 pb-32">
+<div class="deprecations-layout relative max-w-3xl lg:max-w-6xl mx-auto px-6 lg:px-8 mt-16">
+  <main aria-label="Deprecations" class="min-w-0 md:px-0 pb-32">
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>
@@ -47,7 +47,7 @@
     </div>
   </main>
 
-  <div class="hidden lg:block xl:col-span-1">
+  <div class="hidden min-w-0 lg:block">
     <aside aria-label="Table of contents" class="deprecations-toc sticky top-6">
       {{ partial "toc.html" . }}
     </aside>
