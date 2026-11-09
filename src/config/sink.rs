@@ -81,6 +81,22 @@ where
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
+    /// Enable CPU usage metrics for this sink.
+    ///
+    /// When set to `true`, each poll of the sink task, and of the tasks it spawns (such as request
+    /// building or HTTP connections), is timed using the OS thread CPU clock and the accumulated
+    /// nanoseconds are reported as the `component_cpu_usage_ns_total` counter, tagged with
+    /// `component_id`, `component_kind`, and `component_type`.
+    ///
+    /// Defaults to `false`. Enable only for sinks where CPU attribution is needed, as it adds a
+    /// `clock_gettime` call on every future poll.
+    ///
+    /// On Windows, `component_cpu_usage_ns_total` is a rough estimate: thread CPU time advances
+    /// only at the scheduler clock tick (typically 15.6 ms), so short polls are counted either as
+    /// zero or as a whole tick.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub measure_cpu_usage: bool,
+
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
@@ -135,6 +151,7 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: ProxyConfig::default(),
+            measure_cpu_usage: false,
             graph: GraphConfig::default(),
             validated: None,
         }
@@ -195,6 +212,7 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            measure_cpu_usage: self.measure_cpu_usage,
             graph: self.graph,
             validated: self.validated,
         }

@@ -5,6 +5,7 @@ pub use self::basic::BasicTransformConfig;
 
 mod noop;
 pub use self::noop::NoopTransformConfig;
+pub(crate) use self::noop::busy_spin;
 
 mod error_definitions;
 pub use self::error_definitions::ErrorDefinitionTransformConfig;

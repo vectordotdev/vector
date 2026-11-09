@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use futures_util::{FutureExt, StreamExt, future, stream::BoxStream};
@@ -6,6 +9,7 @@ use tokio::sync::oneshot::Sender;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     configurable::configurable_component,
+    cpu_time::spawn_timed,
     event::Event,
     sink::{StreamSink, VectorSink},
 };
@@ -13,6 +17,7 @@ use vector_lib::{
 use crate::{
     config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
+    test_util::mock::transforms::busy_spin,
 };
 
 /// Configuration for the `test_completion` sink.
@@ -24,6 +29,10 @@ pub struct CompletionSinkConfig {
 
     #[serde(skip)]
     completion_tx: Arc<Mutex<Option<Sender<bool>>>>,
+
+    /// CPU time burned per event, in a task spawned with `spawn_timed`.
+    #[serde(skip)]
+    cpu_burn_ms: Option<u64>,
 }
 
 impl_generate_config_from_default!(CompletionSinkConfig);
@@ -34,7 +43,14 @@ impl CompletionSinkConfig {
         Self {
             expected,
             completion_tx: Arc::new(Mutex::new(Some(completion_tx))),
+            cpu_burn_ms: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
+        self.cpu_burn_ms = Some(cpu_burn_ms);
+        self
     }
 }
 
@@ -72,6 +88,7 @@ impl ValidatedSink for CompletionSinkConfig {
         let sink = CompletionSink {
             remaining: self.expected,
             completion_tx,
+            cpu_burn: self.cpu_burn_ms.map(Duration::from_millis),
         };
         let healthcheck = future::ready(Ok(())).boxed();
 
@@ -82,6 +99,7 @@ impl ValidatedSink for CompletionSinkConfig {
 struct CompletionSink {
     remaining: usize,
     completion_tx: Option<Sender<bool>>,
+    cpu_burn: Option<Duration>,
 }
 
 #[async_trait]
@@ -89,6 +107,12 @@ impl StreamSink<Event> for CompletionSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             drop(event);
+
+            if let Some(cpu_burn) = self.cpu_burn {
+                spawn_timed(async move { busy_spin(cpu_burn) })
+                    .await
+                    .expect("CPU burn task panicked");
+            }
 
             if self.remaining > 0 {
                 self.remaining -= 1;

@@ -25,6 +25,7 @@ tokio = { workspace = true, features = ["rt", "time"] }
 tower = { version = "0.5.2", default-features = false }
 tracing.workspace = true
 url = { version = "2.5.4", default-features = false }
+vector-common = { path = "../vector-common" }
 vector-core = { path = "../vector-core" }
 
 [dev-dependencies]

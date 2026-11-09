@@ -140,7 +140,7 @@ impl RedisConnection {
         Ok(Self::Sentinel {
             connection_send: conn_tx,
             connection_recv: conn_rx,
-            repair_task: Arc::new(crate::spawn_in_current_span(async move {
+            repair_task: Arc::new(vector_lib::cpu_time::spawn_timed(async move {
                 Self::repair_connection_manager_task(
                     sentinel,
                     service_name,
