@@ -297,7 +297,12 @@ pub fn read_all(repo_root: &Path) -> Result<Deprecations> {
 /// Enact the active fragment `filename`: move it to `ENACTED_DIR` with
 /// `removed_in` added to its frontmatter. The body is kept verbatim.
 /// Returns the path of the new file.
-pub fn enact(repo_root: &Path, filename: &str, removed_in: &Version) -> Result<PathBuf> {
+pub fn enact(
+    repo_root: &Path,
+    filename: &str,
+    removed_in: &Version,
+    allow_early_removal: bool,
+) -> Result<PathBuf> {
     if !removed_in.pre.is_empty() || !removed_in.build.is_empty() {
         bail!(
             "removed_in {removed_in} has prerelease or build metadata; only plain X.Y.Z is allowed"
@@ -312,10 +317,17 @@ pub fn enact(repo_root: &Path, filename: &str, removed_in: &Version) -> Result<P
         .ok_or_else(|| anyhow!("No deprecation fragment found at {}", src.display()))?;
 
     let minimum = entry.deprecated_since.minimum_removal_version();
-    if removed_in < &minimum {
+    if !allow_early_removal && removed_in < &minimum {
         bail!(
             "removed_in ({removed_in}) must be {minimum} or later; \
-             the deprecation policy requires two minor version increments after {}.",
+             the deprecation policy requires two minor version increments after {}. \
+             Use --allow-early-removal only for a window specified in the notice or a policy exception.",
+            entry.deprecated_since
+        );
+    }
+    if !later_minor(removed_in, &entry.deprecated_since.0) {
+        bail!(
+            "removed_in ({removed_in}) must be in a later minor release than deprecated_since ({}).",
             entry.deprecated_since
         );
     }
@@ -539,7 +551,7 @@ mod tests {
             "foo.md",
             "---\nwhat: \"`foo` option\"\n# kept\ndeprecated_since: \"0.55\"\n---\n\nUse `bar`.\n\n```yaml\nbar: true\n```\n",
         );
-        let dest = enact(tmp.path(), "foo.md", &Version::new(0, 57, 0)).unwrap();
+        let dest = enact(tmp.path(), "foo.md", &Version::new(0, 57, 0), false).unwrap();
 
         assert!(!tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
         assert_eq!(dest, tmp.path().join(ENACTED_DIR).join("foo.md"));
@@ -569,7 +581,7 @@ mod tests {
                 "foo.md",
                 "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
             );
-            let error = enact(tmp.path(), "foo.md", &version).unwrap_err();
+            let error = enact(tmp.path(), "foo.md", &version, false).unwrap_err();
             assert!(format!("{error}").contains("must be 0.57.0 or later"));
             assert!(tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
             assert!(!tmp.path().join(ENACTED_DIR).exists());
