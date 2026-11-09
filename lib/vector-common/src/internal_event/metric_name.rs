@@ -131,7 +131,6 @@ pub enum CounterName {
     NetworkTransmitPacketsDropTotal,
     NetworkTransmitPacketsTotal,
     NetworkTransmitErrsTotal,
-    ProcessRuntime,
     ProcessRuntimeTotal,
 }
 
@@ -518,7 +517,6 @@ impl CounterName {
             Self::NetworkTransmitPacketsDropTotal => "network_transmit_packets_drop_total",
             Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
             Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
-            Self::ProcessRuntime => "process_runtime",
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
@@ -540,7 +538,6 @@ mod tests {
             "memory_enrichment_table_failed_insertions",
             "memory_enrichment_table_failed_reads",
             "memory_enrichment_table_ttl_expirations",
-            "process_runtime",
             "aggregate_failed_updates",
         ]);
 
