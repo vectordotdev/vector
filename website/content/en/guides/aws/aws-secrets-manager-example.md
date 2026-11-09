@@ -187,6 +187,7 @@ sinks:
     inputs:
       - internal_metrics
       - generate_metrics
+      - postgres_metrics
     namespace: "Vector/Application"
     region: "us-west-2"
 
@@ -195,6 +196,7 @@ sinks:
     type: http
     inputs:
       - parse_logs
+      - validate_webhook
     uri: "https://logs.example.com/v1/ingest"
     encoding:
       codec: json
