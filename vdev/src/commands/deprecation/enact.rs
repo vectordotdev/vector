@@ -18,7 +18,7 @@ pub struct Cli {
     version: Option<Version>,
 
     /// Allow removal before the default two-minor-version migration window.
-    /// Use only for a window specified in the notice or a policy exception.
+    /// Use only for a policy exception.
     #[arg(long)]
     allow_early_removal: bool,
 }

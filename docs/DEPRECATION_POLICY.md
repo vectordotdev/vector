@@ -9,7 +9,7 @@ follow the following deprecation policy.
 ## Policy
 
 Deprecated configuration or features become eligible for removal two minor versions after the release announcing the
-deprecation. Any other migration window stated in a notice takes precedence.
+deprecation.
 
 For example, a deprecation announced in `v0.62.0` is eligible for removal in `v0.64.0` or a later minor release.
 

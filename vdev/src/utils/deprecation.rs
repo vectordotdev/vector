@@ -321,7 +321,7 @@ pub fn enact(
         bail!(
             "removed_in ({removed_in}) must be {minimum} or later; \
              the deprecation policy requires two minor version increments after {}. \
-             Use --allow-early-removal only for a window specified in the notice or a policy exception.",
+             Use --allow-early-removal only for a policy exception.",
             entry.deprecated_since
         );
     }

@@ -6,7 +6,7 @@ use std::{
 
 use tempfile::{TempDir, tempdir};
 
-const NOTICE: &str = "---\nwhat: Legacy option\ndeprecated_since: \"0.62.0\"\n---\n\nThe migration window allows removal in 0.63.0.\n";
+const NOTICE: &str = "---\nwhat: Legacy option\ndeprecated_since: \"0.62.0\"\n---\n\nReplace the legacy option with `new_option`.\n";
 const ACTIVE: &str = "deprecation.d/legacy.md";
 const ENACTED: &str = "website/content/en/deprecations/enacted/legacy.md";
 
@@ -48,7 +48,7 @@ fn early_removal_requires_an_explicit_override() {
     assert!(!root.join(ACTIVE).exists());
     let notice = fs::read_to_string(root.join(ENACTED)).unwrap();
     assert!(notice.contains("removed_in: \"0.63.0\""));
-    assert!(notice.ends_with("The migration window allows removal in 0.63.0.\n"));
+    assert!(notice.ends_with("Replace the legacy option with `new_option`.\n"));
 
     let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
         .current_dir(root)
