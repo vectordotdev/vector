@@ -1,0 +1,3 @@
+The `kubernetes_logs` source no longer randomly stops collecting logs from a pod after a pod with the same name and namespace is deleted and recreated (for example during a `StatefulSet` rollout or a same-node restart).
+
+Previously, the delayed processing of the old pod's deletion event could evict the recreated pod from Vector's internal metadata store, because the store is keyed only by name and namespace. Once evicted, Vector stopped watching that pod's log files entirely and emitted `Failed to annotate event with pod metadata` errors. Pod incarnations are now distinguished by their UID, and a delayed deletion is only applied if the store still holds the same UID.
