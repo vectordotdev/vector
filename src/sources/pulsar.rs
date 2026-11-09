@@ -3,6 +3,7 @@
 //!
 //! [pulsar]: https://pulsar.apache.org/
 use std::path::Path;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::TimeZone;
 use futures_util::StreamExt;
@@ -330,9 +331,9 @@ async fn pulsar_source(
     let (finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    let events_received = register!(EventsReceived);
-    let pulsar_error_events = register!(PulsarErrorEvent);
+    let bytes_received = register(BytesReceived::from(Protocol::TCP));
+    let events_received = register(EventsReceived);
+    let pulsar_error_events = register(PulsarErrorEvent);
 
     loop {
         tokio::select! {
@@ -479,7 +480,7 @@ async fn finalize_event_stream(
 
             match out.send_event_stream(&mut stream).await {
                 Err(_error) => {
-                    emit!(StreamClosedError { count: 1 });
+                    emit(StreamClosedError { count: 1 });
                 }
                 Ok(()) => {
                     finalizer.add(FinalizerEntry { topic, message_id }, receiver);
@@ -488,7 +489,7 @@ async fn finalize_event_stream(
         }
         None => match out.send_event_stream(&mut stream).await {
             Err(_error) => {
-                emit!(StreamClosedError { count: 1 });
+                emit(StreamClosedError { count: 1 });
             }
             Ok(()) => {
                 if let Err(error) = consumer.ack_with_id(topic.as_str(), message_id).await {

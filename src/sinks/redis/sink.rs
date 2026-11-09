@@ -1,4 +1,5 @@
 use std::{future, sync::Arc, time::Duration};
+use vector_lib::internal_event::emit;
 
 use redis::{
     RedisResult,
@@ -309,7 +310,7 @@ impl RedisSink {
             .key
             .render_string(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key"),
                     drop_event: true,
@@ -322,7 +323,7 @@ impl RedisSink {
             .as_ref()
             .map(|template| {
                 template.render(&event).map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("score"),
                         drop_event: true,

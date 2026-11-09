@@ -70,21 +70,6 @@ pub(crate) fn opt_float_eq(l_value: Option<f64>, r_value: Option<f64>) -> bool {
     }
 }
 
-// These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {
-        vector_lib::internal_event::emit($event)
-    };
-}
-
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_lib::internal_event::register($event)
-    };
-}
-
 pub use span_fields::SpanField;
 
 // Re-export `inventory` so `register_extra_span_field!` can resolve `submit!` through this

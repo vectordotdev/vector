@@ -1,6 +1,7 @@
 ---
 what: "`buffer_max_byte_size` and `buffer_max_event_size` gauge metrics"
 deprecated_since: "0.53.0"
+removed_in: "0.62.0"
 ---
 
 The buffer maximum-size gauges were renamed to follow Vector's metric naming standard. The legacy

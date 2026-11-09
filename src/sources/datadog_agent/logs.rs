@@ -8,7 +8,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::StreamDecodingError,
     config::LegacyKey,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
     json_size::JsonSize,
     lookup::path,
 };
@@ -81,7 +81,7 @@ pub(crate) fn decode_log_body(
     }
 
     let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
-        emit!(DatadogAgentJsonParseError { error: &error });
+        emit(DatadogAgentJsonParseError { error: &error });
 
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,

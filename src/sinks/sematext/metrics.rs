@@ -9,7 +9,7 @@ use tower::Service;
 use vector_http::{HttpError, empty_body};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    internal_event::CountByteSize, request_metadata::RequestMetadata,
+    internal_event::CountByteSize, internal_event::emit, request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
 };
 
@@ -277,7 +277,7 @@ impl MetricNormalize for SematextMetricNormalize {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(SematextMetricsInvalidMetricError { metric: &metric });
+                emit(SematextMetricsInvalidMetricError { metric: &metric });
                 None
             }
         }
@@ -335,7 +335,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(SematextMetricsEncodeEventError { error });
+            emit(SematextMetricsEncodeEventError { error });
         }
     }
 

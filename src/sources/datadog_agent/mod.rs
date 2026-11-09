@@ -1,3 +1,4 @@
+use vector_lib::internal_event::{emit, register};
 #[cfg(all(test, feature = "datadog-agent-integration-tests"))]
 mod integration_tests;
 #[cfg(test)]
@@ -608,7 +609,7 @@ impl DatadogAgentSource {
             protocol,
             logs_schema_definition: logs_schema_definition.map(Arc::new),
             log_namespace,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             parse_ddtags,
             split_metric_namespace,
         }
@@ -703,7 +704,7 @@ impl DatadogAgentSource {
                 }
             }
         }
-        emit!(HttpBytesReceived {
+        emit(HttpBytesReceived {
             byte_size: body.len(),
             http_path: path,
             protocol: self.protocol,
@@ -748,7 +749,7 @@ impl RequestHandler {
         match result {
             Ok(()) => {}
             Err(SendError::Closed) => {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(warp::reject::custom(ApiError::ServerShutdown));
             }
             Err(SendError::Timeout) => {

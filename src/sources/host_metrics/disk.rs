@@ -1,6 +1,9 @@
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, internal_event::CounterName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::CounterName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -66,7 +69,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load disk I/O info.",
                     error,
                 });
