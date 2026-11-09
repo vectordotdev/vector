@@ -1,8 +1,9 @@
 use std::{io, mem, time::Duration};
+use vector_lib::internal_event::emit;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
-use http_1::{Request, Uri, header::CONTENT_TYPE};
+use http::{Request, Uri, header::CONTENT_TYPE};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
@@ -12,17 +13,19 @@ use vector_lib::stream::batcher::BatchConfig as StreamBatchConfig;
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::LargeEventDroppedError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             HttpEndpoint,
             encoding::Encoder as SinkEncoder,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -173,13 +176,13 @@ impl ValidatedSink for PubsubConfig {
         let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let healthcheck =
-            healthcheck(client.clone(), uri_base.clone().into_v1(), auth.clone()).boxed();
+            healthcheck(client.clone(), uri_base.as_uri().clone(), auth.clone()).boxed();
         auth.spawn_regenerate_token();
 
         // The suffix is a Google API method that attaches directly to the topic path without a
         // separator.
         let service_request_builder = PubsubServiceRequestBuilder {
-            uri: uri_base.append_raw_suffix(":publish")?.into_v1(),
+            uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
         let service =
@@ -323,7 +326,7 @@ impl StreamBatchConfig<PubsubMessage> for PubsubBatcher {
         self.batch.finalizers.merge(message.finalizers);
 
         if self.batch.messages.is_empty() && payload_size >= self.settings.size_limit {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: message.json.len(),
                 max_length: self.settings.size_limit,
             });
@@ -434,8 +437,8 @@ impl HttpServiceRequestBuilder<()> for PubsubServiceRequestBuilder {
         let mut request = Request::post(self.uri.clone())
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
-        self.auth.apply_v1(&mut request);
+            .context(HTTPRequestBuilderSnafu)?;
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -482,7 +485,7 @@ where
             .filter_map(|request| {
                 future::ready(match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),
@@ -498,7 +501,7 @@ where
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
     let mut request = Request::get(uri).body(empty_body())?;
-    auth.apply_v1(&mut request);
+    auth.apply(&mut request);
 
     let response = client.send(request).await?;
     healthcheck_status(response.status(), HealthcheckError::TopicNotFound.into())

@@ -23,7 +23,9 @@ use vector_lib::{
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::DATADOG_METRIC_RESOURCE_TAG_PREFIX,
-    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
+    sinks::util::{
+        Compression, Compressor, encode_metric_tag, encode_namespace, request_builder::EncodeResult,
+    },
 };
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
@@ -40,7 +42,7 @@ pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
 });
 
 #[derive(Debug, Snafu)]
-pub enum EncoderError {
+pub(super) enum EncoderError {
     #[snafu(display(
         "Invalid metric value '{}' was given; '{}' expected",
         metric_value,
@@ -63,7 +65,7 @@ impl EncoderError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::InvalidMetric { .. } => "invalid_metric",
             Self::ProtoEncodingFailed => "failed_to_encode_sketch",
@@ -72,7 +74,7 @@ impl EncoderError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum FinishError {
+pub(super) enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
@@ -93,7 +95,7 @@ impl FinishError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
@@ -147,7 +149,7 @@ impl Default for EncoderState {
     }
 }
 
-pub struct DatadogMetricsEncoder {
+pub(super) struct DatadogMetricsEncoder {
     endpoint: DatadogMetricsEndpoint,
     default_namespace: Option<Arc<str>>,
     uncompressed_limit: usize,
@@ -161,7 +163,7 @@ pub struct DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint.
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let payload_limits = endpoint.payload_limits();
 
         Self {
@@ -181,7 +183,7 @@ impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint, with specific payload limits.
     ///
     /// Only available in tests; production code always uses the API-defined limits via `new`.
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
         uncompressed_limit: usize,
@@ -377,11 +379,11 @@ impl DatadogMetricsEncoder {
     /// # Errors
     ///
     /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    pub(super) fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
         self.encode_single_metric(metric)
     }
 
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let raw_bytes_written = self.state.written;
         let byte_size = self.state.byte_size.clone();
 
@@ -626,7 +628,7 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
             tags.push(encode_tag(tag, value));
         }
     }
-    tags.sort();
+    tags.sort_unstable();
 
     SeriesTags {
         tags,
@@ -771,15 +773,14 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
 
 fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
     let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
-    pairs.sort();
+    pairs.sort_unstable();
     pairs
 }
 
 fn encode_tag(name: &str, value: Option<&str>) -> String {
-    match value {
-        Some(value) => format!("{name}:{value}"),
-        None => name.into(),
-    }
+    let mut encoded = String::new();
+    encode_metric_tag(&mut encoded, name, value);
+    encoded
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {

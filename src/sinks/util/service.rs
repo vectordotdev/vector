@@ -466,7 +466,7 @@ mod tests {
     }
 
     #[derive(Clone, Copy, Debug)]
-    pub struct TestTowerRequestConfigDefaults;
+    pub(super) struct TestTowerRequestConfigDefaults;
 
     impl TowerRequestConfigDefaults for TestTowerRequestConfigDefaults {
         const CONCURRENCY: Concurrency = Concurrency::None;

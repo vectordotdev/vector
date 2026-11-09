@@ -1,14 +1,17 @@
-use std::net::SocketAddr;
+use std::{convert::Infallible, net::SocketAddr};
 
+use bytes::Bytes;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group};
-use futures::TryFutureExt;
-use hyper::{
-    Body, Response, Server,
-    service::{make_service_fn, service_fn},
+use http::Response;
+use http_body_util::Empty;
+use hyper::service::service_fn;
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
 };
-use tokio::runtime::Runtime;
+use tokio::{net::TcpListener, runtime::Runtime};
 use vector::{
-    Error, config,
+    config,
     sinks::{
         self,
         util::{BatchConfig, Compression},
@@ -100,17 +103,22 @@ fn benchmark_http(c: &mut Criterion) {
 
 fn serve(addr: SocketAddr) -> Runtime {
     let rt = runtime();
+    let listener = rt.block_on(TcpListener::bind(addr)).unwrap();
     rt.spawn(async move {
-        let make_service = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_req| async {
-                Ok::<_, Error>(Response::new(Body::empty()))
-            }))
-        });
-
-        Server::bind(&addr)
-            .serve(make_service)
-            .map_err(|e| panic!("{e}"))
-            .await
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                // Connection errors do not stop the server.
+                _ = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(
+                        TokioIo::new(stream),
+                        service_fn(|_req| async {
+                            Ok::<_, Infallible>(Response::new(Empty::<Bytes>::new()))
+                        }),
+                    )
+                    .await;
+            });
+        }
     });
     rt
 }

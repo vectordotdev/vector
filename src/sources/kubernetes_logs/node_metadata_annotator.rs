@@ -21,7 +21,7 @@ use crate::event::{Event, LogEvent};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(super) struct FieldsSpec {
     /// Event field for the Node's labels.
     ///
     /// Set to `""` to suppress this key.
@@ -41,7 +41,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with node metadata.
-pub struct NodeMetadataAnnotator {
+pub(super) struct NodeMetadataAnnotator {
     node_state_reader: Store<Node>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
@@ -49,7 +49,7 @@ pub struct NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Create a new [`NodeMetadataAnnotator`].
-    pub const fn new(
+    pub(super) const fn new(
         node_state_reader: Store<Node>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
@@ -64,7 +64,7 @@ impl NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Annotates an event with the information from the [`Node::metadata`].
-    pub fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
+    pub(super) fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Node>::new(node);
         let resource = self.node_state_reader.get(&obj)?;

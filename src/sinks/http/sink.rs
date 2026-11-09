@@ -1,6 +1,7 @@
 //! Implementation of the `http` sink.
 
 use std::collections::BTreeMap;
+use vector_lib::internal_event::emit;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
@@ -59,7 +60,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -90,7 +91,7 @@ where
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Hash)]
-pub struct PartitionKey {
+pub(super) struct PartitionKey {
     pub uri: String,
     pub headers: BTreeMap<String, String>,
 }
@@ -115,7 +116,7 @@ impl Partitioner for KeyPartitioner {
             .uri
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("uri"),
                     drop_event: true,
@@ -128,7 +129,7 @@ impl Partitioner for KeyPartitioner {
             let value = template
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("headers"),
                         drop_event: true,
