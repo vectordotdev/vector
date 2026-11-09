@@ -23,11 +23,13 @@ const TRACE_ID_HIGH_TAG: &str = "_dd.p.tid";
 // empty strings still count.
 const STRING_COPY_OVERHEAD_BYTES: usize = std::mem::size_of::<Value>();
 
-/// Bounds the bytes copied out of idx string tables, and the payload-level values copied into
-/// every chunk, across all idx tracer payloads in one request.
+/// Bounds the bytes copied out of idx string tables, the payload-level values copied into every
+/// chunk, and the values built from non-string scalars, across all idx tracer payloads in one
+/// request.
 ///
-/// A single string table entry can be referenced any number of times, so the decoded events can
-/// be far larger than the request body that the decompression limit already bounds.
+/// A single string table entry can be referenced any number of times, and a scalar that takes a few
+/// bytes on the wire can become a much longer string or a whole `Value` slot, so the decoded events
+/// can be far larger than the request body that the decompression limit already bounds.
 pub(super) struct ExpansionBudget {
     limit: usize,
     used: Cell<usize>,
@@ -122,6 +124,17 @@ impl<'a> PayloadStrings<'a> {
         self.budget
             .charge(value.len().saturating_add(STRING_COPY_OVERHEAD_BYTES))?;
         Ok(value)
+    }
+
+    /// Charges a value that the conversion builds from a non-string scalar, such as the fixed-point
+    /// spelling of a double or a hex-encoded id.
+    ///
+    /// These values are not references into the string table, but their stored form can be far
+    /// larger than their encoding (`5e-324` is an 8-byte double and a 326-byte tag), so they count
+    /// like copied strings. `heap_bytes` is what the value allocates beyond its `Value` slot.
+    fn charge_built(&self, heap_bytes: usize) -> Result<(), IdxConversionError> {
+        self.budget
+            .charge(heap_bytes.saturating_add(STRING_COPY_OVERHEAD_BYTES))
     }
 
     /// Looks up a string that is copied into a JSON value and then into its escaped text.
@@ -353,18 +366,9 @@ fn convert_idx_link(
 ) -> Result<ObjectMap, IdxConversionError> {
     let (trace_id_high, trace_id_low) = split_trace_id(&link.trace_id);
     Ok(ObjectMap::from([
-        (
-            "trace_id".into(),
-            Value::from(encode_u64_id_hex(trace_id_low)),
-        ),
-        (
-            "trace_id_high".into(),
-            Value::from(encode_u64_id_hex(trace_id_high)),
-        ),
-        (
-            "span_id".into(),
-            Value::from(encode_u64_id_hex(link.span_id)),
-        ),
+        ("trace_id".into(), hex_id(strings, trace_id_low)?),
+        ("trace_id_high".into(), hex_id(strings, trace_id_high)?),
+        ("span_id".into(), hex_id(strings, link.span_id)?),
         (
             "attributes".into(),
             Value::from(attributes_as_strings(strings, &link.attributes)?),
@@ -375,6 +379,13 @@ fn convert_idx_link(
         ),
         ("flags".into(), Value::from(i64::from(link.flags))),
     ]))
+}
+
+/// Encodes a link id as hex. Even an empty link emits three of these strings.
+fn hex_id(strings: &PayloadStrings<'_>, id: u64) -> Result<Value, IdxConversionError> {
+    let text = encode_u64_id_hex(id);
+    strings.charge_built(text.len())?;
+    Ok(Value::from(text))
 }
 
 fn convert_idx_event(
@@ -497,12 +508,14 @@ fn event_attribute_value(
     strings: &PayloadStrings<'_>,
     value: &AnyValue,
 ) -> Result<Value, IdxConversionError> {
+    // A two-byte `AnyValue` in an array still becomes a whole `Value` slot.
+    let slot = |scalar: Value| strings.charge_built(0).map(|()| scalar);
     match &value.value {
-        None => Ok(Value::Null),
+        None => slot(Value::Null),
         Some(IdxValue::StringValueRef(index)) => Ok(Value::from(strings.get(*index)?)),
-        Some(IdxValue::BoolValue(bool_value)) => Ok(Value::from(*bool_value)),
-        Some(IdxValue::IntValue(int_value)) => Ok(Value::from(*int_value)),
-        Some(IdxValue::DoubleValue(double_value)) => Ok(metric_from_float(*double_value)),
+        Some(IdxValue::BoolValue(bool_value)) => slot(Value::from(*bool_value)),
+        Some(IdxValue::IntValue(int_value)) => slot(Value::from(*int_value)),
+        Some(IdxValue::DoubleValue(double_value)) => slot(metric_from_float(*double_value)),
         Some(IdxValue::ArrayValue(array)) if array.values.iter().all(is_scalar) => {
             Ok(Value::Array(
                 array
@@ -534,24 +547,26 @@ fn any_value_as_string(
     strings: &PayloadStrings<'_>,
     value: &AnyValue,
 ) -> Result<String, IdxConversionError> {
-    match &value.value {
-        None => Ok(String::new()),
-        Some(IdxValue::StringValueRef(index)) => Ok(strings.get(*index)?.to_owned()),
+    let text = match &value.value {
+        None => String::new(),
+        Some(IdxValue::StringValueRef(index)) => return Ok(strings.get(*index)?.to_owned()),
         Some(IdxValue::BoolValue(bool_value)) => {
-            Ok(if *bool_value { "true" } else { "false" }.to_owned())
+            if *bool_value { "true" } else { "false" }.to_owned()
         }
-        Some(IdxValue::IntValue(int_value)) => Ok(int_value.to_string()),
-        Some(IdxValue::DoubleValue(double_value)) => Ok(format_f64(*double_value)),
+        Some(IdxValue::IntValue(int_value)) => int_value.to_string(),
+        Some(IdxValue::DoubleValue(double_value)) => format_f64(*double_value),
         Some(IdxValue::BytesValue(bytes)) => {
             strings
                 .budget
                 .charge(lossy_utf8_len(bytes).saturating_add(STRING_COPY_OVERHEAD_BYTES))?;
-            Ok(String::from_utf8_lossy(bytes).into_owned())
+            return Ok(String::from_utf8_lossy(bytes).into_owned());
         }
         Some(IdxValue::ArrayValue(_) | IdxValue::KeyValueList(_)) => {
-            Ok(json_text(&any_value_json(strings, value)?))
+            return Ok(json_text(&any_value_json(strings, value)?));
         }
-    }
+    };
+    strings.charge_built(text.len())?;
+    Ok(text)
 }
 
 fn any_value_json(
@@ -1311,6 +1326,166 @@ mod tests {
             error,
             IdxConversionError::ExpansionLimitExceeded { .. }
         ));
+    }
+
+    /// `strconv.FormatFloat(5e-324, 'f', -1, 64)`: `"0."`, 323 zeros, then `"5"`.
+    fn min_subnormal_fixed_point() -> String {
+        let mut text = String::from("0.");
+        text.extend(std::iter::repeat_n('0', 323));
+        text.push('5');
+        text
+    }
+
+    fn subnormal_chunk_attributes(count: usize) -> ddtrace_proto::idx::TracerPayload {
+        let strings = Strings::new();
+        let keys: Vec<String> = (0..count).map(|index| format!("k{index}")).collect();
+        let mut trace = chunk(0, 1, Vec::new());
+        trace.attributes = strings.map(
+            keys.iter()
+                .map(|key| (key.as_str(), Strings::double(5e-324)))
+                .collect(),
+        );
+        strings.into_payload(vec![trace])
+    }
+
+    #[test]
+    fn subnormal_chunk_attribute_doubles_count_against_the_expansion_budget() {
+        let spelling = min_subnormal_fixed_point();
+        assert_eq!(spelling.len(), 326);
+
+        let error =
+            convert_idx_tracer_payload(subnormal_chunk_attributes(30), &ExpansionBudget::new(4096))
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { limit: 4096 }
+        ));
+
+        let events = convert_idx_tracer_payload(
+            subnormal_chunk_attributes(30),
+            &ExpansionBudget::new(32 * 1024),
+        )
+        .unwrap();
+        let tags = object(events[0].as_map().get("tags").unwrap());
+        assert_eq!(tags.len(), 30);
+        assert_eq!(tags.get("k0").unwrap(), &Value::from(spelling));
+    }
+
+    #[test]
+    fn integer_chunk_attributes_count_their_tag_strings_against_the_budget() {
+        // Each value is `-9223372036854775808`, which is 20 bytes as a tag string.
+        let attributes = |strings: &Strings| {
+            let keys: Vec<String> = (0..64).map(|index| format!("k{index}")).collect();
+            strings.map(
+                keys.iter()
+                    .map(|key| (key.as_str(), Strings::int(i64::MIN)))
+                    .collect(),
+            )
+        };
+
+        let strings = Strings::new();
+        let mut trace = chunk(0, 1, Vec::new());
+        trace.attributes = attributes(&strings);
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(4096),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { limit: 4096 }
+        ));
+
+        let strings = Strings::new();
+        let mut trace = chunk(0, 1, Vec::new());
+        trace.attributes = attributes(&strings);
+        let events = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(64 * 1024),
+        )
+        .unwrap();
+        let tags = object(events[0].as_map().get("tags").unwrap());
+        assert_eq!(
+            tags.get("k0").unwrap(),
+            &Value::from("-9223372036854775808")
+        );
+    }
+
+    #[test]
+    fn scalar_array_elements_count_against_the_expansion_budget() {
+        // An unset `AnyValue` encodes in two bytes but becomes a `Value::Null` element.
+        let nulls = |strings: &Strings| {
+            let mut span = base_span(strings);
+            span.events = vec![ddtrace_proto::idx::SpanEvent {
+                attributes: strings.map(vec![(
+                    "k",
+                    Strings::array(vec![AnyValue { value: None }; 1024]),
+                )]),
+                ..Default::default()
+            }];
+            chunk(0, 1, vec![span])
+        };
+
+        let strings = Strings::new();
+        let trace = nulls(&strings);
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(4096),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { limit: 4096 }
+        ));
+
+        let strings = Strings::new();
+        let trace = nulls(&strings);
+        let events = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(256 * 1024),
+        )
+        .unwrap();
+        let span_events = span_at(&events[0], 0)["span_events"].as_array().unwrap();
+        let attributes = object(&object(&span_events[0])["attributes"]);
+        assert_eq!(attributes["k"].as_array().unwrap().len(), 1024);
+    }
+
+    #[test]
+    fn link_ids_count_against_the_expansion_budget() {
+        // An unset link encodes in two bytes but emits three 16-character hex ids, which
+        // count against the budget.
+        let links = |strings: &Strings| {
+            let mut span = base_span(strings);
+            span.links = vec![ddtrace_proto::idx::SpanLink::default(); 1024];
+            chunk(0, 1, vec![span])
+        };
+
+        let strings = Strings::new();
+        let trace = links(&strings);
+        let error = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(1024 * 64),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            IdxConversionError::ExpansionLimitExceeded { .. }
+        ));
+
+        let strings = Strings::new();
+        let trace = links(&strings);
+        let events = convert_idx_tracer_payload(
+            strings.into_payload(vec![trace]),
+            &ExpansionBudget::new(1024 * 256),
+        )
+        .unwrap();
+        assert_eq!(
+            span_at(&events[0], 0)["span_links"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1024
+        );
     }
 
     #[test]
