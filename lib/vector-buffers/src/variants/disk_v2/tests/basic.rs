@@ -1,4 +1,4 @@
-use std::{io::Cursor, time::Duration};
+use std::{io::Cursor, sync::Arc, time::Duration};
 
 use fslock::LockFile;
 use futures::{StreamExt, stream};
@@ -12,8 +12,9 @@ use super::{
 };
 use crate::{
     EventCount, assert_buffer_is_empty, assert_buffer_records,
+    buffer_usage_data::BufferUsageHandle,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::writer::RecordWriter,
+    variants::disk_v2::{BufferWriter, DiskBufferConfigBuilder, Ledger, writer::RecordWriter},
 };
 
 #[tokio::test]
@@ -183,8 +184,25 @@ async fn initial_size_correct_with_multievents() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create a regular buffer, no customizations required.
-            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            // Build a write-only buffer without background tasks. The regular helper spawns
+            // cleanup, which can hold an Arc<Ledger> across asynchronous I/O and keep the lock
+            // held when we reopen the buffer below.
+            let config = DiskBufferConfigBuilder::from_path(&data_dir)
+                .build()
+                .expect("creating buffer config should not fail");
+            let usage_handle = BufferUsageHandle::noop();
+            let ledger = Ledger::load_or_create(config, usage_handle)
+                .await
+                .expect("ledger should not fail to load/create");
+            let ledger = Arc::new(ledger);
+
+            let mut writer = BufferWriter::new(Arc::clone(&ledger));
+            writer
+                .validate_last_write()
+                .await
+                .expect("validate_last_write should not fail");
+
+            ledger.synchronize_buffer_usage();
 
             let input_items = (512..768)
                 .cycle()
@@ -237,7 +255,7 @@ async fn initial_size_correct_with_multievents() {
             writer.flush().await.expect("writer flush should not fail");
             writer.close();
 
-            // Now drop our buffer and reopen it.
+            // No background tasks hold the ledger, so dropping these handles releases the lock.
             drop(writer);
             drop(ledger);
 
