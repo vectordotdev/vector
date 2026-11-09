@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use rdkafka::{
     ClientConfig,
@@ -27,7 +28,7 @@ pub(super) enum BuildError {
     KafkaCreateFailed { source: KafkaError },
 }
 
-pub struct KafkaSink {
+pub(crate) struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: RateLimit<KafkaService>,
@@ -37,7 +38,7 @@ pub struct KafkaSink {
 }
 
 pub(crate) fn create_producer(
-    client_config: ClientConfig,
+    client_config: &ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext {
@@ -51,7 +52,7 @@ pub(crate) fn create_producer(
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let producer = create_producer(producer_config)?;
+        let producer = create_producer(&producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -85,7 +86,7 @@ impl KafkaSink {
                     self.topic
                         .render_string(&event)
                         .map_err(|error| {
-                            emit!(TemplateRenderingError {
+                            emit(TemplateRenderingError {
                                 field: None,
                                 drop_event: true,
                                 error,
@@ -99,7 +100,7 @@ impl KafkaSink {
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

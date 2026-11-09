@@ -9,7 +9,7 @@ use vrl::event_path;
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
     aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
-    config::{ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{
             BulkConfig, ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig,
@@ -38,7 +38,7 @@ fn elasticsearch_address() -> String {
 async fn firehose_put_records_without_partition_key() {
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone()).await;
 
     ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
@@ -58,13 +58,13 @@ async fn firehose_put_records_without_partition_key() {
             ..Default::default()
         },
         tls: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        request_retry_partial: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        request_retry_partial: false,
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -135,7 +135,7 @@ async fn firehose_put_records_without_partition_key() {
 async fn firehose_put_records_with_partition_key() {
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone()).await;
 
     ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
@@ -158,13 +158,13 @@ async fn firehose_put_records_with_partition_key() {
             ..Default::default()
         },
         tls: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        request_retry_partial: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        request_retry_partial: false,
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -179,10 +179,10 @@ async fn firehose_put_records_with_partition_key() {
         events
     });
 
-    input.iter_mut().for_each(move |log| {
+    for log in &mut input {
         log.as_mut_log()
             .insert(event_path!("partition_key"), partition_value);
-    });
+    }
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
@@ -312,15 +312,13 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
             reqwest::get(format!("{}/_cluster/health", elasticsearch_address()))
                 .and_then(reqwest::Response::json::<Value>)
                 .await
-                .map(|v| {
+                .is_ok_and(|v| {
                     v.get("status")
-                        .and_then(|status| status.as_str())
-                        .map(|status| status != "red")
-                        .unwrap_or(false)
+                        .and_then(Value::as_str)
+                        .is_some_and(|status| status != "red")
                 })
-                .unwrap_or(false)
         },
-        Duration::from_secs(120),
+        Duration::from_mins(2),
     )
     .await;
 
@@ -334,24 +332,26 @@ async fn ensure_elasticsearch_delivery_stream(
 ) {
     let client = firehose_client().await;
 
-    match client
-        .create_delivery_stream()
-        .delivery_stream_name(delivery_stream_name.clone())
-        .elasticsearch_destination_configuration(
-            ElasticsearchDestinationConfiguration::builder()
-                .index_name(delivery_stream_name)
-                .domain_arn(elasticsearch_arn)
-                .role_arn("doesn't matter")
-                .type_name("doesn't matter")
-                .build()
-                .expect("all builder fields populated"),
-        )
-        .send()
-        .await
+    match Box::pin(
+        client
+            .create_delivery_stream()
+            .delivery_stream_name(delivery_stream_name.clone())
+            .elasticsearch_destination_configuration(
+                ElasticsearchDestinationConfiguration::builder()
+                    .index_name(delivery_stream_name)
+                    .domain_arn(elasticsearch_arn)
+                    .role_arn("doesn't matter")
+                    .type_name("doesn't matter")
+                    .build()
+                    .expect("all builder fields populated"),
+            )
+            .send(),
+    )
+    .await
     {
         Ok(_) => (),
         Err(error) => panic!("Unable to create the delivery stream {error:?}"),
-    };
+    }
 }
 
 fn gen_stream() -> String {

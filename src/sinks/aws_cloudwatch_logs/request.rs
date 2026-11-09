@@ -26,8 +26,8 @@ use crate::sinks::{
     util::http::OrderedHeaderName,
 };
 
-pub struct CloudwatchFuture {
-    client: Client,
+pub(super) struct CloudwatchFuture {
+    client: RequestClient,
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
@@ -36,7 +36,7 @@ pub struct CloudwatchFuture {
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
-struct Client {
+struct RequestClient {
     client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
@@ -57,7 +57,7 @@ enum State {
 }
 
 impl CloudwatchFuture {
-    /// Panics if events.is_empty()
+    /// Panics if `events.is_empty()`
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         client: CloudwatchLogsClient,
@@ -66,7 +66,7 @@ impl CloudwatchFuture {
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
-        retention: Retention,
+        retention: &Retention,
         kms_key: Option<String>,
         tags: Option<HashMap<String, String>>,
         mut events: Vec<Vec<InputLogEvent>>,
@@ -74,7 +74,7 @@ impl CloudwatchFuture {
         token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
         let retention_days = retention.days;
-        let client = Client {
+        let client = RequestClient {
             client,
             stream_name,
             group_name,
@@ -107,6 +107,8 @@ impl CloudwatchFuture {
 impl Future for CloudwatchFuture {
     type Output = Result<(), CloudwatchError>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep state transitions together")]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
             match &mut self.state {
@@ -159,7 +161,7 @@ impl Future for CloudwatchFuture {
 
                 State::CreateGroup(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(inner) => matches!(
@@ -172,7 +174,7 @@ impl Future for CloudwatchFuture {
                                 return Poll::Ready(Err(CloudwatchError::CreateGroup(err)));
                             }
                         }
-                    };
+                    }
 
                     info!(message = "Group created.", name = %self.client.group_name);
 
@@ -189,7 +191,7 @@ impl Future for CloudwatchFuture {
 
                 State::CreateStream(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(inner) => matches!(
@@ -202,7 +204,7 @@ impl Future for CloudwatchFuture {
                                 return Poll::Ready(Err(CloudwatchError::CreateStream(err)));
                             }
                         }
-                    };
+                    }
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
 
@@ -233,7 +235,7 @@ impl Future for CloudwatchFuture {
 
                 State::PutRetentionPolicy(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(error) => {
                             return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)));
                         }
@@ -248,8 +250,8 @@ impl Future for CloudwatchFuture {
     }
 }
 
-impl Client {
-    pub fn put_logs(
+impl RequestClient {
+    fn put_logs(
         &self,
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
@@ -268,7 +270,7 @@ impl Client {
                 .log_stream_name(stream_name)
                 .customize()
                 .mutate_request(move |req| {
-                    for (header, value) in headers.iter() {
+                    for (header, value) in &headers {
                         req.headers_mut()
                             .insert(header.inner().clone(), value.clone());
                     }
@@ -278,9 +280,7 @@ impl Client {
         })
     }
 
-    pub fn describe_stream(
-        &self,
-    ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
+    fn describe_stream(&self) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
@@ -294,7 +294,7 @@ impl Client {
         })
     }
 
-    pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
+    fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let kms_key = self.kms_key.clone();
@@ -311,7 +311,7 @@ impl Client {
         })
     }
 
-    pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
+    fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
@@ -326,7 +326,7 @@ impl Client {
         })
     }
 
-    pub fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+    fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
         let retention_days = self.retention_days;

@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct NatsTowerRequestConfigDefaults;
+pub(super) struct NatsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::None;
@@ -24,7 +24,7 @@ impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
 #[serde_with::serde_as]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct NatsHeaderConfig {
+pub(super) struct NatsHeaderConfig {
     /// A unique identifier for the message. Useful for deduplication.
     ///
     /// Can be a template that references fields in the event, e.g., `{{ event_id }}`.
@@ -35,7 +35,7 @@ pub struct NatsHeaderConfig {
 }
 
 impl NatsHeaderConfig {
-    pub fn build_headers(&self, event: &Event) -> HeaderMap {
+    pub(super) fn build_headers(&self, event: &Event) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
         if let Some(template) = &self.message_id
@@ -53,7 +53,7 @@ impl NatsHeaderConfig {
 #[serde_with::serde_as]
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
-pub struct JetStreamConfig {
+pub(super) struct JetStreamConfig {
     /// Whether to enable Jetstream.
     #[serde(default)]
     pub enabled: bool,
@@ -154,14 +154,14 @@ fn default_name() -> String {
 impl GenerateConfig for NatsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             auth: None,
             connection_name: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
             subject: Template::try_from("from.vector").unwrap(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
-            request: Default::default(),
+            request: TowerRequestConfig::default(),
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
@@ -237,7 +237,11 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
     }
 }
 
@@ -303,11 +307,11 @@ async fn healthcheck(
     config
         .connect(options, server_addresses)
         .map_ok(|_| ())
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
         .await
 }
 
-pub enum NatsPublisher {
+pub(super) enum NatsPublisher {
     Core(async_nats::Client),
     JetStream(async_nats::jetstream::Context),
 }
@@ -329,7 +333,7 @@ impl NatsPublisher {
                     })?;
                 client
                     .flush()
-                    .map_ok(|_| ())
+                    .map_ok(|()| ())
                     .map_err(|e| NatsError::PublishError {
                         source: Box::new(e),
                     })

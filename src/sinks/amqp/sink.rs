@@ -2,6 +2,7 @@
 //! event and sends it to `AMQP`.
 use lapin::BasicProperties;
 use serde::Serialize;
+use vector_lib::internal_event::emit;
 
 use super::{
     BuildError,
@@ -13,9 +14,9 @@ use super::{
 };
 use crate::sinks::prelude::*;
 
-/// Stores the event together with the rendered exchange and routing_key values.
+/// Stores the event together with the rendered exchange and `routing_key` values.
 /// This is passed into the `RequestBuilder` which then splits it out into the event
-/// and metadata containing the exchange and routing_key.
+/// and metadata containing the exchange and `routing_key`.
 /// This event needs to be created prior to building the request so we can filter out
 /// any events that error whilst rendering the templates.
 #[derive(Serialize)]
@@ -36,7 +37,7 @@ pub(super) struct AmqpSink {
 }
 
 impl AmqpSink {
-    pub(super) async fn new(
+    pub(super) fn new(
         config: AmqpSinkConfig,
         exchange: ConfinedTemplate,
         routing_key: Option<ConfinedTemplate>,
@@ -65,11 +66,11 @@ impl AmqpSink {
             .exchange
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("exchange"),
                     drop_event: true,
-                })
+                });
             })
             .ok()?;
 
@@ -78,18 +79,18 @@ impl AmqpSink {
             Some(key) => key
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error: missing_keys,
                         field: Some("routing_key"),
                         drop_event: true,
-                    })
+                    });
                 })
                 .ok()?,
         };
 
         let properties = match &self.properties {
             None => BasicProperties::default(),
-            Some(prop) => prop.build(&event)?,
+            Some(prop) => prop.build(&event),
         };
 
         Some(AmqpEvent {

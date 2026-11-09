@@ -10,6 +10,7 @@ pub struct Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn for_id(id: u64) -> Self {
         Self {
             id,

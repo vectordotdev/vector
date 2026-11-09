@@ -12,6 +12,11 @@ pub use gelf::GelfChunker;
 /// Chunking is an extension to the standard `Encoder` trait, allowing large encoded events to be split into multiple frames for transmission.
 pub trait Chunking {
     /// Chunks the input into frames.
+    ///
+    /// # Errors
+    ///
+    /// Implementations must return an error if the input cannot be split into frames within the
+    /// format's limits, for example when it would need more chunks than the format allows.
     fn chunk(&self, bytes: Bytes) -> Result<Vec<Bytes>, vector_common::Error>;
 }
 

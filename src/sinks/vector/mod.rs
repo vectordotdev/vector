@@ -26,8 +26,8 @@ pub enum VectorSinkError {
     #[snafu(display("Vector source unhealthy: {:?}", status))]
     Health { status: Option<&'static str> },
 
-    #[snafu(display("URL has no host."))]
-    NoHost,
+    #[snafu(display("URI `{uri}` must include a scheme and an authority."))]
+    NotAbsoluteUri { uri: String },
 }
 
 #[cfg(test)]
@@ -41,7 +41,7 @@ mod test {
     fn config_keepalive_rejects_zero() {
         for field in &["interval_secs", "timeout_secs"] {
             let result = toml::from_str::<super::VectorConfig>(&format!(
-                "address = \"127.0.0.1:6000\"\n[keepalive]\n{field} = 0"
+                "address = \"http://127.0.0.1:6000\"\n[keepalive]\n{field} = 0"
             ));
             assert!(result.is_err(), "{field} = 0 should be rejected");
         }
@@ -64,10 +64,12 @@ mod test {
 mod tests {
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{StreamExt, channel::mpsc};
-    use http::request::Parts;
-    use hyper::{
-        Method, Response, Server,
-        service::{make_service_fn, service_fn},
+    use http::{Method, Response, request::Parts};
+    use http_body_util::Full;
+    use hyper::service::service_fn;
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
     };
     use prost::Message;
     use std::sync::{
@@ -108,9 +110,8 @@ mod tests {
     async fn build_rejects_missing_address() {
         let config: VectorConfig = toml::from_str("").unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("missing address should fail"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("missing address should fail");
         };
 
         assert!(
@@ -133,9 +134,8 @@ mod tests {
         )
         .unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("address and routing should be mutually exclusive"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("address and routing should be mutually exclusive");
         };
 
         assert!(
@@ -155,9 +155,8 @@ mod tests {
         )
         .unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("routing without endpoints should fail"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("routing without endpoints should fail");
         };
 
         assert!(
@@ -232,10 +231,10 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -249,7 +248,7 @@ mod tests {
 
             TestType::DataVolume => {
                 run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS)
-                    .await
+                    .await;
             }
         }
 
@@ -311,17 +310,17 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -368,17 +367,17 @@ mod tests {
 
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -421,10 +420,10 @@ mod tests {
 
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -465,24 +464,24 @@ mod tests {
         let primary_service_attempts = Arc::clone(&primary_attempts);
         let (rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
             if primary_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::empty())
+                    .body(Full::default())
                     .unwrap()
             } else {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                     .unwrap()
             }
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -545,10 +544,10 @@ mod tests {
         let primary_service_attempts = Arc::clone(&primary_attempts);
         let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
             primary_service_attempts.fetch_add(1, Ordering::AcqRel);
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "14") // unavailable
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::empty())
+                .body(Full::default())
                 .unwrap()
         });
 
@@ -556,16 +555,16 @@ mod tests {
         let active_service_attempts = Arc::clone(&active_attempts);
         let (_rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
             if active_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                     .unwrap()
             } else {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::empty())
+                    .body(Full::default())
                     .unwrap()
             }
         });
@@ -574,10 +573,10 @@ mod tests {
         let next_service_attempts = Arc::clone(&next_attempts);
         let (_rx3, trigger3, server3) = build_test_server_generic(addr3, move || {
             next_service_attempts.fetch_add(1, Ordering::AcqRel);
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -625,16 +624,16 @@ mod tests {
         let primary_service_attempts = Arc::clone(&primary_attempts);
         let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
             if primary_service_attempts.fetch_add(1, Ordering::AcqRel) < 2 {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::empty())
+                    .body(Full::default())
                     .unwrap()
             } else {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                     .unwrap()
             }
         });
@@ -643,16 +642,16 @@ mod tests {
         let active_service_attempts = Arc::clone(&active_attempts);
         let (_rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
             if active_service_attempts.fetch_add(1, Ordering::AcqRel) == 0 {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                     .unwrap()
             } else {
-                hyper::Response::builder()
+                Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::empty())
+                    .body(Full::default())
                     .unwrap()
             }
         });
@@ -661,10 +660,10 @@ mod tests {
         let next_service_attempts = Arc::clone(&next_attempts);
         let (_rx3, trigger3, server3) = build_test_server_generic(addr3, move || {
             next_service_attempts.fetch_add(1, Ordering::AcqRel);
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -706,17 +705,17 @@ mod tests {
 
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_rx1, trigger1, server1) = build_test_server_generic(addr1, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "15") // data loss
                 .header("content-type", "application/grpc")
-                .body(tonic::body::empty_body())
+                .body(Full::default())
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -757,26 +756,39 @@ mod tests {
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
-        let hanging_service = make_service_fn(|_| async {
-            Ok::<_, crate::Error>(service_fn(|_req| async {
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                Ok::<_, crate::Error>(
-                    Response::builder()
-                        .header("grpc-status", "0") // OK
-                        .header("content-type", "application/grpc")
-                        .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
-                        .unwrap(),
-                )
-            }))
+        let listener = tokio::net::TcpListener::bind(addr1).await.unwrap();
+        let hanging_server = tokio::spawn(async move {
+            let mut connections = tokio::task::JoinSet::new();
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                while connections.try_join_next().is_some() {}
+                connections.spawn(async move {
+                    let service = service_fn(|_req| async {
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                        Ok::<_, std::convert::Infallible>(
+                            Response::builder()
+                                .header("grpc-status", "0") // OK
+                                .header("content-type", "application/grpc")
+                                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
+                                .unwrap(),
+                        )
+                    });
+                    if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await
+                    {
+                        tracing::debug!(message = "Test server connection closed.", %error);
+                    }
+                });
+            }
         });
-        let hanging_server = tokio::spawn(Server::bind(&addr1).serve(hanging_service));
 
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(Full::new(encode_body(&proto::PushEventsResponse {})))
                 .unwrap()
         });
 
@@ -820,28 +832,39 @@ mod tests {
 
         let attempts = Arc::new(AtomicUsize::new(0));
         let service_attempts = Arc::clone(&attempts);
-        let service = make_service_fn(move |_| {
-            let service_attempts = Arc::clone(&service_attempts);
-            async move {
-                Ok::<_, crate::Error>(service_fn(move |_req| {
-                    let attempt = service_attempts.fetch_add(1, Ordering::AcqRel);
-                    async move {
-                        if attempt == 0 {
-                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                        }
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let server = tokio::spawn(async move {
+            let mut connections = tokio::task::JoinSet::new();
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                while connections.try_join_next().is_some() {}
+                let service_attempts = Arc::clone(&service_attempts);
+                connections.spawn(async move {
+                    let service = service_fn(move |_req| {
+                        let attempt = service_attempts.fetch_add(1, Ordering::AcqRel);
+                        async move {
+                            if attempt == 0 {
+                                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                            }
 
-                        Ok::<_, crate::Error>(
-                            Response::builder()
-                                .header("grpc-status", "0") // OK
-                                .header("content-type", "application/grpc")
-                                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
-                                .unwrap(),
-                        )
+                            Ok::<_, std::convert::Infallible>(
+                                Response::builder()
+                                    .header("grpc-status", "0") // OK
+                                    .header("content-type", "application/grpc")
+                                    .body(Full::new(encode_body(&proto::PushEventsResponse {})))
+                                    .unwrap(),
+                            )
+                        }
+                    });
+                    if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await
+                    {
+                        tracing::debug!(message = "Test server connection closed.", %error);
                     }
-                }))
+                });
             }
         });
-        let server = tokio::spawn(Server::bind(&addr).serve(service));
 
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
@@ -902,10 +925,10 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (_rx, trigger, server) = build_test_server_generic(in_addr, move || {
-            hyper::Response::builder()
+            Response::builder()
                 .header("grpc-status", "7") // permission denied
                 .header("content-type", "application/grpc")
-                .body(tonic::body::empty_body())
+                .body(Full::default())
                 .unwrap()
         });
 
@@ -918,6 +941,29 @@ mod tests {
 
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+    }
+
+    #[tokio::test]
+    async fn healthcheck_rejects_override_uri_without_authority() {
+        let config: VectorConfig = toml::from_str(r#"address = "http://127.0.0.1:6000""#).unwrap();
+        let cx = SinkContext {
+            healthcheck: crate::config::SinkHealthcheckOptions {
+                uri: Some("/health".parse().unwrap()),
+                ..Default::default()
+            },
+            ..SinkContext::default()
+        };
+
+        let (_, healthcheck) = config.build(cx).await.unwrap();
+        let error = healthcheck.await.unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<VectorSinkError>(),
+                Some(VectorSinkError::NotAbsoluteUri { .. })
+            ),
+            "{error}"
+        );
     }
 
     async fn get_received(
@@ -951,14 +997,14 @@ mod tests {
 
             let mut events = Vec::with_capacity(req.events.len());
             for event in req.events {
-                let event: Event = event.into();
+                let event = Event::try_from(event).expect("encoded test event should decode");
                 let string = event
                     .as_log()
                     .get_message()
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                events.push(string)
+                events.push(string);
             }
 
             events
@@ -971,7 +1017,7 @@ mod tests {
     }
 
     // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
-    fn encode_body<T>(msg: T) -> Bytes
+    fn encode_body<T>(msg: &T) -> Bytes
     where
         T: prost::Message,
     {
@@ -981,6 +1027,8 @@ mod tests {
         // cannot write it yet since we don't know the size of the
         // encoded message
         buf.reserve(GRPC_HEADER_SIZE);
+        // SAFETY: The capacity for the complete header was reserved immediately above, and the
+        // header bytes are initialized before the buffer is read.
         unsafe {
             buf.advance_mut(GRPC_HEADER_SIZE);
         }
@@ -997,7 +1045,7 @@ mod tests {
             // compression flag, 0 means "no compression"
             buf.put_u8(0);
 
-            buf.put_u32(len as u32);
+            buf.put_u32(u32::try_from(len).expect("test message fits in the gRPC length field"));
         }
 
         buf.split_to(len + GRPC_HEADER_SIZE).freeze()

@@ -42,6 +42,7 @@ mod datadog_traces;
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
+mod disk_buffer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -57,10 +58,6 @@ mod exec;
     feature = "sources-file",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
-    feature = "sinks-aws_s3",
-    feature = "sinks-azure_blob",
-    feature = "sinks-gcp",
-    feature = "sinks-webhdfs",
 ))]
 mod file;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
@@ -202,6 +199,7 @@ pub(crate) use self::datadog_traces::*;
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
+pub(crate) use self::disk_buffer::*;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
@@ -214,6 +212,12 @@ pub(crate) use self::eventstoredb_metrics::*;
 pub(crate) use self::exec::*;
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 pub use self::expansion::*;
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+pub use self::file::FileInternalMetricsConfig;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes_logs",

@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use futures_util::StreamExt;
 use snafu::Snafu;
@@ -37,7 +38,7 @@ impl BuildError {
 /// reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
 /// connection backing off while ensuring a stable-but-quiet low-volume channel doesn't retain
 /// a backoff that a previous flapping period drove up to the cap.
-const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_secs(60);
+const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_mins(1);
 
 /// Whether a pub/sub session subscribes to an exact channel or a glob pattern.
 #[derive(Clone, Copy)]
@@ -144,7 +145,7 @@ where
                     None => RecvEvent::Disconnected,
                 }
             }
-            _ = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
+            () = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
             _ = &mut *shutdown => {
                 RecvEvent::Shutdown
             }
@@ -178,7 +179,7 @@ where
                     }
                     Err(error) => {
                         // Bad payload. We just log and keep going.
-                        emit!(RedisReceiveEventError::from(error));
+                        emit(RedisReceiveEventError::from(error));
                     }
                 }
             }
@@ -194,7 +195,7 @@ where
                 // Redis closed an established connection (e.g. server restart). Record
                 // it as a component error — so alerts fire even if the reconnect
                 // succeeds immediately — and reconnect in the outer loop.
-                emit!(RedisConnectionDroppedError);
+                emit(RedisConnectionDroppedError);
                 return SessionEnd::Disconnected;
             }
 
@@ -244,7 +245,7 @@ impl InputHandler {
     ) -> crate::Result<Source> {
         let client = self.client.clone();
         let key = self.key.clone();
-        let endpoint = connection_info.endpoint.to_string();
+        let endpoint = connection_info.endpoint.clone();
 
         // Initial connect + (P)SUBSCRIBE. Fail fast on *any* error, matching the source's
         // behavior before reconnect support was added: this surfaces a permanent
@@ -272,13 +273,13 @@ impl InputHandler {
                 // Obtain a live connection: reuse the pending one, or reconnect with backoff.
                 let mut pubsub_conn = match next_conn.take() {
                     Some(conn) => {
-                        emit!(RedisConnectionEstablished { reconnect: false });
+                        emit(RedisConnectionEstablished { reconnect: false });
                         conn
                     }
                     None => 'reconnect: loop {
                         let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
-                            _ = tokio::time::sleep(delay) => {}
+                            () = tokio::time::sleep(delay) => {}
                             _ = &mut shutdown => return Ok(()),
                         }
 
@@ -294,7 +295,7 @@ impl InputHandler {
 
                         match res {
                             Ok(conn) => {
-                                emit!(RedisConnectionEstablished { reconnect: true });
+                                emit(RedisConnectionEstablished { reconnect: true });
                                 break 'reconnect conn;
                             }
                             Err(err) => {
@@ -303,7 +304,7 @@ impl InputHandler {
                                 // already ruled out by the successful build-time connect, and
                                 // stopping here would drop the resilience this adds. The error
                                 // is recorded so metric-based alerts still fire.
-                                emit!(RedisConnectionError::from(err.into_source()));
+                                emit(RedisConnectionError::from(err.into_source()));
                                 // keep retrying; backoff advances on the next iteration.
                             }
                         }

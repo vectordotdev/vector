@@ -1,7 +1,3 @@
-// The `to_forget` mutex needs to be both a lock and a counter, so
-// clippy's warning that an AtomicUsize would work better is incorrect.
-#![allow(clippy::mutex_atomic)]
-
 use std::{
     future::Future,
     mem::{drop, replace},
@@ -18,6 +14,8 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 #[derive(Debug)]
 pub(super) struct ShrinkableSemaphore {
     semaphore: Arc<Semaphore>,
+    // This mutex is both a lock and a counter: it is held across several semaphore
+    // operations, so an `AtomicUsize` would not be enough.
     to_forget: Mutex<usize>,
 }
 

@@ -22,13 +22,8 @@ fn main() -> Result<()> {
         // Find the base component schema for the component type itself, which is analogous to
         // `SourceOuter`, `SinkOuter`, etc. We render the schema for that separately as it's meant
         // to be common across components of the same type, etc.
-        let base_component_schema = querier
-            .query()
-            .with_custom_attribute_kv(
-                constants::DOCS_META_COMPONENT_BASE_TYPE,
-                base_component_type,
-            )
-            .run_single()?;
+        let base_component_schema =
+            querier.root_map_value_schema(&format!("{}s", base_component_type.as_str()))?;
 
         debug!(
             "Got base component schema for component type '{}'.",

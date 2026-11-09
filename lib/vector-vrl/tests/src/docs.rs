@@ -112,12 +112,12 @@ fn examples_to_tests(
     Box::new(examples.into_iter().flat_map(move |(k, v)| {
         v.examples
             .into_iter()
-            .map(|example| test_from_cue_example(category, k.clone(), example))
+            .map(|example| test_from_cue_example(category, &k, example))
             .collect::<Vec<_>>()
     }))
 }
 
-fn test_from_cue_example(category: &'static str, name: String, example: Example) -> Test {
+fn test_from_cue_example(category: &'static str, name: &str, example: Example) -> Test {
     use vrl::value::Value;
 
     let Example {
@@ -130,7 +130,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip_test,
     } = example;
 
-    let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
+    let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name));
 
     let object = match input {
         Some(event) => {
@@ -139,12 +139,11 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         None => Value::Object(BTreeMap::default()),
     };
 
-    if returns.is_some() && output.is_some() {
-        panic!(
-            "example must either specify return or output, not both: {category}/{}",
-            &name
-        );
-    }
+    assert!(
+        !(returns.is_some() && output.is_some()),
+        "example must either specify return or output, not both: {category}/{}",
+        &name
+    );
 
     if let Some(output) = &output {
         let contains_metric_event = match &output {

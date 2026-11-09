@@ -50,6 +50,7 @@ async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, 
         .await
         .expect("open should not fail");
     let std_data_file = data_file.into_std().await;
+    // SAFETY: The test exclusively owns the file and mapping.
     let mut data_file_mmap =
         unsafe { MmapMut::map_mut(&std_data_file).expect("mmap should not fail") };
     drop(std_data_file);
@@ -59,6 +60,7 @@ async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, 
             BackedArchive::<_, Record>::from_backing(&mut data_file_mmap[record_start..record_end])
                 .expect("archive should not fail");
         let record = backed_record.get_archive_mut();
+        // SAFETY: Only the pinned checksum field is projected.
         let projected_checksum = unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
         *projected_checksum.get_mut() ^= 1 << 15;
     }
@@ -992,6 +994,7 @@ async fn writer_preserves_complete_last_record_with_invalid_checksum() {
             assert_eq!(expected_data_file_len, metadata.len());
 
             let std_data_file = data_file.into_std().await;
+            // SAFETY: The test exclusively owns the file and mapping.
             let record_mmap =
                 unsafe { MmapMut::map_mut(&std_data_file).expect("mmap should not fail") };
             drop(std_data_file);
@@ -1002,6 +1005,7 @@ async fn writer_preserves_complete_last_record_with_invalid_checksum() {
 
             // Just flip the 15th bit.  Should be enough. *shrug*
             {
+                // SAFETY: Only the pinned checksum field is projected.
                 let projected_checksum =
                     unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
                 let projected_checksum = projected_checksum.get_mut();
@@ -1107,6 +1111,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
             // up reporting that we missed a bunch of events, either because we skipped a file or
             // a bunch of writes never fully made it to disk.
             let writer_next_record_id = ledger.state().get_next_writer_record_id();
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()
@@ -1181,6 +1186,7 @@ async fn writer_fast_forwards_when_last_record_was_flushed_but_id_wasnt_incremen
             // a write made it to disk but that the process was stopped, or crashed, before it was
             // able to actually increment the writer next record ID, so a record ID will exist on
             // disk that it thinks should not exist, purely from the data we have in the ledger.
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()
@@ -1287,6 +1293,7 @@ async fn writer_recovers_durable_record_from_stale_next_file_checkpoint() {
             while ledger.get_current_writer_file_id() != checkpoint_writer_file_id {
                 ledger.state().increment_writer_file_id();
             }
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()
@@ -1362,6 +1369,7 @@ async fn writer_fast_forwards_valid_prefix_before_truncating_torn_tail() {
 
             // Model a crash after both records reached the data file but before either writer ID
             // was checkpointed, with the second record only partially surviving.
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()
@@ -1435,6 +1443,7 @@ async fn writer_truncates_complete_corrupt_record_proven_post_checkpoint() {
 
             // Model a crash after the frame reached disk but before its writer checkpoint advanced,
             // then corrupt the otherwise complete post-checkpoint frame.
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()
@@ -1488,6 +1497,7 @@ async fn writer_truncates_complete_corrupt_record_after_checkpointed_prefix() {
 
             // Keep only the first record in the durable checkpoint, then corrupt the complete
             // second frame. The first record's validated end ID proves where truncation belongs.
+            // SAFETY: The test exclusively mutates the checkpoint.
             unsafe {
                 ledger
                     .state()

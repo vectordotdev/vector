@@ -26,6 +26,19 @@ title = "Vector"
 contentDir = "content/en"
 weight = 1
 
+# Declaring any content mount drops Hugo's default one, so content/en is mounted explicitly.
+[[module.mounts]]
+source = "content/en"
+target = "content"
+lang = "en"
+
+# Active deprecation notices live in the repository root; see deprecation.d/README.md.
+[[module.mounts]]
+source = "../deprecation.d"
+target = "content/deprecations/active"
+lang = "en"
+excludeFiles = ["README.md"]
+
 [params]
 description = "A lightweight, ultra-fast tool for building observability pipelines"
 tagline = "Take control of your observability stack"

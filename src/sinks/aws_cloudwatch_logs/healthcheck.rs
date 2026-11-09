@@ -21,12 +21,17 @@ enum HealthcheckError {
     GroupNameMismatch { expected: String, name: String },
 }
 
-pub async fn healthcheck(
+pub(super) async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
     client: CloudwatchLogsClient,
 ) -> crate::Result<()> {
     let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
+
+    if config.group_name.is_dynamic() {
+        info!("Skipping healthcheck log group check: `group_name` is dynamic.");
+        return Ok(());
+    }
 
     // This will attempt to find the group name passed in and verify that
     // it matches the one that AWS sends back.
@@ -55,10 +60,7 @@ pub async fn healthcheck(
                 }
             }
             None => {
-                if config.group_name.is_dynamic() {
-                    info!("Skipping healthcheck log group check: `group_name` is dynamic.");
-                    Ok(())
-                } else if config.create_missing_group {
+                if config.create_missing_group {
                     info!(
                         "Skipping healthcheck log group check: `group_name` will be created if missing."
                     );

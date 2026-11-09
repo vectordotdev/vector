@@ -1,6 +1,7 @@
 //! Vector gRPC API client library
 //!
-//! This library provides a Rust client for the Vector gRPC observability API.
+//! This library provides a Rust client for the Vector gRPC observability API. It sends RPCs over
+//! Vector's shared HTTP/2 client, which uses OpenSSL for `https` URIs.
 //!
 //! # Example
 //!
@@ -9,7 +10,8 @@
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut client = Client::new("http://localhost:9999".parse().unwrap());
-//! client.connect().await?;
+//! // Sets up the transport; the first RPC opens the connection.
+//! client.connect()?;
 //!
 //! // Check health (standard gRPC health check)
 //! client.health().await?;
@@ -34,6 +36,14 @@ pub use error::{Error, Result};
 pub const RECONNECT_DELAY_MS: u64 = 5000;
 
 /// Re-export generated protobuf types
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate,
+    clippy::wildcard_imports,
+    reason = "Prost and Tonic generate these types, documentation, and imports"
+)]
 pub mod proto {
     pub mod event {
         tonic::include_proto!("event");

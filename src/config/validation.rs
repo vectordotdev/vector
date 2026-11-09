@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
-    transform::get_transform_output_ids,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder, enrichment_table_sinks,
+    enrichment_table_sources, transform::get_transform_output_ids,
 };
 
 /// Minimum value (exclusive) for EWMA alpha options.
@@ -58,7 +58,7 @@ fn validate_ewma_half_life_seconds(
 }
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
-pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     if config.provider.is_some()
         && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
     {
@@ -70,7 +70,9 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
+pub(super) fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(
+    names: I,
+) -> Result<(), Vec<String>> {
     let errors: Vec<_> = names
         .filter(|component_key| component_key.id().contains('.'))
         .map(|component_key| {
@@ -88,7 +90,9 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
     }
 }
 
-pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::items_after_statements, reason = "Helper relocation deferred")]
+pub(super) fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
     if !config.allow_empty {
@@ -164,7 +168,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
@@ -189,7 +193,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 }
 
 /// Validates that `*_ewma_alpha` values are within the valid range (0 < alpha < 1).
-pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
     if let Some(error) = validate_ewma_half_life_seconds(
@@ -212,9 +216,9 @@ pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
 /// To avoid collisions between `output` metric tags, check that a component
 /// does not have a named output with the name [`DEFAULT_OUTPUT`]
-pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
-    for (key, source) in config.sources.iter() {
+    for (key, source) in &config.sources {
         let outputs = source.inner.outputs(config.schema.log_namespace());
         if outputs
             .iter()
@@ -227,7 +231,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
     }
 
-    for (key, transform) in config.transforms.iter() {
+    for (key, transform) in &config.transforms {
         // Structural validation: reserved names, duplicate routes, invalid sample rates.
         // These checks run during config compilation. Transforms that need the schema/enrichment
         // context must implement validate_with_context(), called later in validate.rs.
@@ -255,7 +259,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
+pub(super) async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
     // We need to assert that Vector's data directory is located on a mountpoint that has enough
     // capacity to allow all sinks with disk buffers configured to be able to use up to their
     // maximum configured size without overrunning the total capacity.
@@ -345,7 +349,10 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     let mut errors = Vec::new();
 
     for (mountpoint, buffers) in mountpoint_buffer_mapping {
-        let buffer_max_size_total: u64 = buffers.iter().map(|usage| usage.max_size()).sum();
+        let buffer_max_size_total: u64 = buffers
+            .iter()
+            .map(vector_lib::buffers::config::DiskUsage::max_size)
+            .sum();
         let mountpoint_total_capacity = mountpoints
             .get(&mountpoint)
             .copied()
@@ -383,14 +390,11 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
         .await
 }
 
+#[must_use]
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let table_sources = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-        .collect::<Vec<_>>();
+    let table_sources = enrichment_table_sources(&config.enrichment_tables).collect::<Vec<_>>();
     let source_ids = config
         .sources
         .iter()
@@ -419,11 +423,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         .collect::<Vec<_>>()
     });
 
-    let table_sinks = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-        .collect::<Vec<_>>();
+    let table_sinks = enrichment_table_sinks(&config.enrichment_tables).collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms

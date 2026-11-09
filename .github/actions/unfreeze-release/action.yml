@@ -1,0 +1,126 @@
+name: Unfreeze master
+description: Revoke the release bot's temporary direct-push bypasses and disable the release freeze.
+inputs:
+  app-client-id:
+    description: Client ID of the vectordotdev-bot GitHub App, which requires Administration write permission.
+    required: true
+  app-private-key:
+    description: Private key of the vectordotdev-bot GitHub App.
+    required: true
+  freeze-ruleset-id:
+    description: Repository variable RELEASE_FREEZE_RULESET_ID (the vars context is unavailable in composite actions).
+    required: true
+  bot-bypass-ruleset-ids:
+    description: Repository variable RELEASE_FREEZE_BOT_BYPASS, comma-separated ruleset IDs (the vars context is unavailable in composite actions).
+    required: true
+runs:
+  using: composite
+  steps:
+    # Keep ruleset administration separate from tokens used to push release commits.
+    - name: Create Vector bot token for ruleset updates
+      id: bot-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        permission-administration: write
+        permission-contents: read
+
+    - name: Revoke bypasses and disable the freeze
+      id: close
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        BOT_APP_SLUG: ${{ steps.bot-token.outputs.app-slug }}
+        RELEASE_FREEZE_RULESET_ID: ${{ inputs.freeze-ruleset-id }}
+        RELEASE_FREEZE_BOT_BYPASS: ${{ inputs.bot-bypass-ruleset-ids }}
+      with:
+        github-token: ${{ steps.bot-token.outputs.token }}
+        script: |
+          if (process.env.BOT_APP_SLUG !== "vectordotdev-bot") {
+            throw new Error("Unfreezing master requires the vectordotdev-bot GitHub App.");
+          }
+          const { readRulesetIds, isBotActor, hasBotBypass, restrictsMasterUpdates, isReleasePolicy } =
+            require("./.github/actions/require-release-freeze/rulesets.js");
+          const { freezeId, bypassIds } = readRulesetIds(process.env);
+          const { data: app } = await github.request("GET /apps/{app_slug}", {
+            app_slug: process.env.BOT_APP_SLUG,
+          });
+          const { data: repository } = await github.request("GET /repos/{owner}/{repo}", context.repo);
+          // Resolve inherited rulesets, as activation does.
+          const getRuleset = async (id) => (await github.request(
+            "GET /repos/{owner}/{repo}/rulesets/{ruleset_id}",
+            { ...context.repo, ruleset_id: id, includes_parents: true },
+          )).data;
+
+          const freeze = await getRuleset(freezeId);
+          // A closed window is re-runnable, but leaked bypasses are still revoked.
+          const closed = freeze.enforcement === "disabled";
+          if (!closed && (freeze.enforcement !== "active" ||
+              !restrictsMasterUpdates(freeze, repository.default_branch))) {
+            throw new Error(`Ruleset ${freezeId} must be the active release freeze on ${repository.default_branch}, found ${freeze.enforcement}.`);
+          }
+
+          // Bypasses go first; disabling the freeze first leaves master open.
+          let revoked = 0;
+          for (const id of bypassIds) {
+            const ruleset = await getRuleset(id);
+            // Revoking an actor only reduces access, so an inactive release
+            // policy is cleaned up rather than blocking the closeout.
+            if (!isReleasePolicy(ruleset, repository.default_branch)) {
+              throw new Error(`Ruleset ${id} (${ruleset.name}) must be the master release policy; refusing to modify it.`);
+            }
+            const actors = ruleset.bypass_actors ?? [];
+            if (!actors.some((actor) => isBotActor(actor, app.id))) {
+              continue;
+            }
+            await github.request("PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+              ...context.repo,
+              ruleset_id: ruleset.id,
+              bypass_actors: actors.filter((actor) => !isBotActor(actor, app.id)),
+            });
+            core.info(`Revoked the release bypass on ruleset ${ruleset.id} (${ruleset.name}).`);
+            revoked += 1;
+          }
+
+          // Read the rulesets back instead of trusting the writes: a revocation
+          // that did not land must not be followed by an unfrozen master.
+          const readRulesets = async () => new Map((await Promise.all(
+            [freezeId, ...bypassIds].map(getRuleset),
+          )).map((ruleset) => [ruleset.id, ruleset]));
+          const assertRevoked = (rulesets) => {
+            const remaining = bypassIds
+              .filter((id) => hasBotBypass(rulesets.get(id), app.id))
+              .map((id) => `${id} (${rulesets.get(id).name})`);
+            if (remaining.length > 0) {
+              throw new Error(`${remaining.join(", ")} still grant the release bot direct pushes.`);
+            }
+          };
+          assertRevoked(await readRulesets());
+          if (closed) {
+            core.info(`Release freeze ${freezeId} is already disabled and the direct-push window is closed.`);
+            core.setOutput("summary", `Release freeze \`${freezeId}\` was already disabled; the direct-push window is closed.`);
+            return;
+          }
+
+          // Toggle enforcement only; the freeze keeps its own bypass actors.
+          await github.request("PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+            ...context.repo,
+            ruleset_id: freezeId,
+            enforcement: "disabled",
+          });
+          core.info(`Disabled release freeze ${freezeId} (${freeze.name}).`);
+
+          const { enforcement } = await getRuleset(freezeId);
+          if (enforcement !== "disabled") {
+            throw new Error(`Release freeze ${freezeId} is still ${enforcement}.`);
+          }
+          core.setOutput("summary", revoked === 0
+            ? `Disabled release freeze \`${freezeId}\`; no temporary release bot bypass was present.`
+            : `Disabled release freeze \`${freezeId}\` and revoked the temporary release bot bypass from ${revoked} ruleset(s).`);
+
+    - name: Record the closeout
+      if: steps.close.outputs.summary != ''
+      shell: bash
+      env:
+        SUMMARY: ${{ steps.close.outputs.summary }}
+      run: echo "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"

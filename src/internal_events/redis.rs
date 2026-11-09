@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct RedisReceiveEventError {
+pub(crate) struct RedisReceiveEventError {
     error: redis::RedisError,
     error_code: String,
 }
@@ -39,7 +39,7 @@ impl InternalEvent for RedisReceiveEventError {
 /// subscribe to its channel. The source backs off and retries, so this is a transient
 /// error rather than a fatal one.
 #[derive(Debug, NamedInternalEvent)]
-pub struct RedisConnectionError {
+pub(crate) struct RedisConnectionError {
     error: redis::RedisError,
     error_code: String,
 }
@@ -74,7 +74,7 @@ impl InternalEvent for RedisConnectionError {
 /// source reconnects automatically, but this records the drop as a component error so that
 /// metric-based alerts still fire even when the following reconnect succeeds immediately.
 #[derive(Debug, NamedInternalEvent)]
-pub struct RedisConnectionDroppedError;
+pub(crate) struct RedisConnectionDroppedError;
 
 impl InternalEvent for RedisConnectionDroppedError {
     fn emit(self) {
@@ -98,7 +98,7 @@ impl InternalEvent for RedisConnectionDroppedError {
 /// Emitted when the `redis` channel source (re)establishes its pub/sub subscription.
 /// `reconnect` distinguishes the first successful connect from a recovery after a drop.
 #[derive(Debug, NamedInternalEvent)]
-pub struct RedisConnectionEstablished {
+pub(crate) struct RedisConnectionEstablished {
     pub reconnect: bool,
 }
 

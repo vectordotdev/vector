@@ -1,4 +1,5 @@
 use std::{fmt, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use serde::Serialize;
 use vector_lib::event::{Metric, MetricValue};
@@ -14,7 +15,7 @@ use crate::{
     },
 };
 
-pub struct HecMetricsSink<S> {
+pub(super) struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
@@ -128,10 +129,9 @@ impl HecMetricsProcessedEventMetadata {
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
-            MetricValue::Counter { value } => Some(value),
-            MetricValue::Gauge { value } => Some(value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(SplunkInvalidMetricReceivedError {
+                emit(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
                     error: "Metric kind not supported.".into(),
@@ -142,9 +142,9 @@ impl HecMetricsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
 
-pub fn process_metric(
+pub(super) fn process_metric(
     metric: Metric,
     event_byte_size: usize,
     sourcetype: Option<&ConfinedTemplate>,
@@ -165,7 +165,7 @@ pub fn process_metric(
         match t.render_string(&metric) {
             Ok(s) => Some(Some(s)),
             Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -173,7 +173,7 @@ pub fn process_metric(
                 None
             }
             Err(error) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: false,

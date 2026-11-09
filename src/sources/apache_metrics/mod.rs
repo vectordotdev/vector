@@ -2,16 +2,20 @@ use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::uri::Scheme;
-use hyper::{Body, Request};
+use http::{Request, StatusCode, Uri, uri::Scheme};
+use http_body_util::BodyExt as _;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
+use vector_http::empty_body;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, internal_event::emit,
+    metric_tags,
+};
 
 use crate::{
     SourceSender,
-    config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -19,6 +23,7 @@ use crate::{
         HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
+    tls::MaybeTlsSettings,
 };
 
 mod parser;
@@ -48,10 +53,12 @@ pub struct ApacheMetricsConfig {
     namespace: String,
 }
 
+#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "apache".to_string()
 }
@@ -74,11 +81,12 @@ impl SourceConfig for ApacheMetricsConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|endpoint| endpoint.parse::<http::Uri>())
+            .map(|endpoint| endpoint.parse::<Uri>())
             .collect::<Result<Vec<_>, _>>()
             .context(super::UriParseSnafu)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+        let client = HttpClient::new(MaybeTlsSettings::Raw(()), &cx.proxy)?;
 
         Ok(apache_metrics(
             urls,
@@ -86,7 +94,7 @@ impl SourceConfig for ApacheMetricsConfig {
             namespace,
             cx.shutdown,
             cx.out,
-            cx.proxy,
+            client,
         ))
     }
 
@@ -105,7 +113,7 @@ trait UriExt {
     fn sanitized_authority(&self) -> String;
 }
 
-impl UriExt for http::Uri {
+impl UriExt for Uri {
     fn to_sanitized_string(&self) -> String {
         let mut s = String::new();
 
@@ -141,48 +149,52 @@ impl UriExt for http::Uri {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn apache_metrics(
-    urls: Vec<http::Uri>,
+    urls: Vec<Uri>,
     interval: Duration,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-    proxy: ProxyConfig,
+    client: HttpClient,
 ) -> super::Source {
-    Box::pin(async move {
+    crate::sources::source_with_error(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
             .map(move |url| {
-                let client = HttpClient::new(None, &proxy).expect("HTTPS initialization failed");
                 let sanitized_url = url.to_sanitized_string();
 
                 let request = Request::get(&url)
-                    .body(Body::empty())
+                    .body(empty_body())
                     .expect("error creating request");
 
                 let tags = metric_tags! {
-                    "endpoint" => sanitized_url.to_string(),
+                    "endpoint" => sanitized_url.clone(),
                     "host" => url.sanitized_authority(),
                 };
 
                 let namespace = namespace.clone();
-                client
-                    .send(request)
+                let client = client.clone();
+                let response = async move { client.send(request).await };
+                response
                     .map_err(crate::Error::from)
                     .and_then(|response| async {
                         let (header, body) = response.into_parts();
-                        let body = http_body::Body::collect(body).await?.to_bytes();
+                        let body = body.collect().await?.to_bytes();
                         Ok((header, body))
                     })
                     .into_stream()
                     .filter_map(move |response| {
                         ready(match response {
-                            Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                            Ok((header, body)) if header.status == StatusCode::OK => {
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(EndpointBytesReceived {
+                                emit(EndpointBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,
@@ -207,7 +219,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(ApacheMetricsParseError {
+                                            emit(ApacheMetricsParseError {
                                                 error: e,
                                                 endpoint: &sanitized_url,
                                             });
@@ -216,7 +228,7 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(ApacheMetricsEventsReceived {
+                                emit(ApacheMetricsEventsReceived {
                                     byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
@@ -224,9 +236,9 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(HttpClientHttpResponseError {
+                                emit(HttpClientHttpResponseError {
                                     code: header.status,
-                                    url: sanitized_url.to_owned(),
+                                    url: sanitized_url.clone(),
                                 });
                                 Some(stream::iter(vec![
                                     Metric::new(
@@ -240,9 +252,9 @@ fn apache_metrics(
                                 ]))
                             }
                             Err(error) => {
-                                emit!(HttpClientHttpError {
+                                emit(HttpClientHttpError {
                                     error,
-                                    url: sanitized_url.to_owned(),
+                                    url: sanitized_url.clone(),
                                 });
                                 Some(stream::iter(vec![
                                     Metric::new(
@@ -267,10 +279,10 @@ fn apache_metrics(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
-                Err(())
+                emit(StreamClosedError { count });
+                Err(error)
             }
         }
     })
@@ -278,22 +290,23 @@ fn apache_metrics(
 
 #[cfg(test)]
 mod test {
-    use hyper::{
-        Body, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use std::convert::Infallible;
+
+    use bytes::Bytes;
+    use http::Response;
+    use http_body_util::Full;
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
 
     use super::*;
     use crate::{
-        Error,
         config::SourceConfig,
+        event::Event,
         test_util::{
             addr::next_addr,
             collect_ready,
             components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-            wait_for_tcp,
+            http::spawn_blackhole_http_server,
         },
     };
 
@@ -304,12 +317,9 @@ mod test {
 
     #[tokio::test]
     async fn test_apache_up() {
-        let (_guard, in_addr) = next_addr();
-
-        let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(Response::new(Body::from(
-                    r"
+        let uri = spawn_blackhole_http_server(|_| async {
+            Ok::<_, Infallible>(Response::new(Full::new(Bytes::from_static(
+                r"
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -347,17 +357,12 @@ ConnsAsyncWriting: 0
 ConnsAsyncKeepAlive: 0
 ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
-                    ",
-                )))
-            }))
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", %error);
-            }
-        });
-        wait_for_tcp(in_addr).await;
+                    "
+                .as_bytes(),
+            ))))
+        })
+        .await;
+        let in_addr = uri.authority().unwrap();
 
         let config = ApacheMetricsConfig {
             endpoints: vec![format!("http://foo:bar@{in_addr}/metrics")],
@@ -373,48 +378,37 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         .await;
         let metrics = events
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => {
-                assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
 
-                match m.tags() {
-                    Some(tags) => {
-                        let endpoint = format!("http://{in_addr}/metrics");
-                        let host = in_addr.to_string();
-                        assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
-                        assert_eq!(tags.get("host"), Some(host.as_str()));
-                    }
-                    None => error!(message = "No tags for metric.", metric = ?m),
-                }
+            if let Some(tags) = m.tags() {
+                let endpoint = format!("http://{in_addr}/metrics");
+                let host = in_addr.to_string();
+                assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
+                assert_eq!(tags.get("host"), Some(host.as_str()));
+            } else {
+                error!(message = "No tags for metric.", metric = ?m);
             }
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 
     #[tokio::test]
     async fn test_apache_error() {
-        let (_guard, in_addr) = next_addr();
-
-        let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(
-                    Response::builder()
-                        .status(404)
-                        .body(Body::from("not found"))
-                        .unwrap(),
-                )
-            }))
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", %error);
-            }
-        });
-        wait_for_tcp(in_addr).await;
+        let uri = spawn_blackhole_http_server(|_| async {
+            Ok::<_, Infallible>(
+                Response::builder()
+                    .status(404)
+                    .body(Full::new(Bytes::from_static(b"not found")))
+                    .unwrap(),
+            )
+        })
+        .await;
+        let in_addr = uri.authority().unwrap();
 
         let (tx, rx) = SourceSender::new_test();
 
@@ -431,17 +425,17 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
         // we still publish `up=1` for bad status codes following the pattern of the Prometheus exporter:
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 }),
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 
@@ -465,14 +459,14 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 }),
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 });
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 }
