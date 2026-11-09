@@ -288,6 +288,8 @@ impl ResourceLog {
 ///   observed time as the event timestamp.
 /// - The request has one `ResourceLogs` and one `ScopeLogs` for the one record, so records
 ///   that shared a resource and scope in the original request are not grouped again.
+/// - A resource without attributes is not set, because the source does not decode it. An
+///   unset resource means that the resource is unknown.
 ///
 /// - Legacy namespace: the message field becomes the body and the timestamp field becomes
 ///   `time_unix_nano`. The fields written by the source (`attributes`, `resources`, `scope`,
@@ -396,7 +398,7 @@ fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceR
     let (resource, scope) = take_record_fields(&mut fields, &mut record);
     ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
-            resource: Some(resource),
+            resource: (!resource.attributes.is_empty()).then_some(resource),
             scope_logs: vec![ScopeLogs {
                 scope: Some(scope),
                 log_records: vec![record],
@@ -480,10 +482,12 @@ fn into_body(value: Value) -> Option<AnyValue> {
     (!value.is_null()).then(|| value.into())
 }
 
+/// Not `timestamp_nanos_opt`, whose `i64` ends in 2262: the OTLP `uint64` ends in 2554.
 fn timestamp_nanos(timestamp: &DateTime<Utc>) -> Option<u64> {
-    timestamp
-        .timestamp_nanos_opt()
-        .and_then(|nanos| u64::try_from(nanos).ok())
+    u64::try_from(timestamp.timestamp())
+        .ok()?
+        .checked_mul(1_000_000_000)?
+        .checked_add(u64::from(timestamp.timestamp_subsec_nanos()))
 }
 
 fn into_timestamp_nanos(value: Value) -> Result<u64, Value> {
@@ -562,13 +566,13 @@ mod tests {
     }
 
     fn request(
-        resource: Resource,
+        resource: Option<Resource>,
         scope: InstrumentationScope,
         record: LogRecord,
     ) -> ExportLogsServiceRequest {
         ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
-                resource: Some(resource),
+                resource,
                 scope_logs: vec![ScopeLogs {
                     scope: Some(scope),
                     log_records: vec![record],
@@ -583,10 +587,10 @@ mod tests {
     /// decoded event stores attributes in a sorted map.
     fn full_request() -> ExportLogsServiceRequest {
         request(
-            Resource {
+            Some(Resource {
                 attributes: vec![kv("service.name", string("api"))],
                 ..Default::default()
-            },
+            }),
             InstrumentationScope {
                 name: "lib".to_owned(),
                 version: "1.2.3".to_owned(),
@@ -628,7 +632,14 @@ mod tests {
     }
 
     fn round_trip(namespace: LogNamespace, schema: &LogSchema) {
-        let expected = full_request();
+        assert_round_trip(&full_request(), namespace, schema);
+    }
+
+    fn assert_round_trip(
+        expected: &ExportLogsServiceRequest,
+        namespace: LogNamespace,
+        schema: &LogSchema,
+    ) {
         let resource_logs = expected.resource_logs[0].clone();
         let scope_logs = resource_logs.scope_logs[0].clone();
         let log = ResourceLog {
@@ -639,7 +650,7 @@ mod tests {
         .into_event(namespace, schema, Utc::now())
         .into_log();
         assert_eq!(log.namespace(), namespace);
-        assert_eq!(encode_log_event(log, schema), expected);
+        assert_eq!(&encode_log_event(log, schema), expected);
     }
 
     #[test]
@@ -650,6 +661,37 @@ mod tests {
     #[test]
     fn decoded_vector_namespace_log_round_trips() {
         round_trip(LogNamespace::Vector, &LogSchema::default());
+    }
+
+    #[test]
+    fn decoded_log_without_resource_round_trips() {
+        let expected = request(
+            None,
+            InstrumentationScope::default(),
+            LogRecord {
+                time_unix_nano: 1,
+                observed_time_unix_nano: 2,
+                ..Default::default()
+            },
+        );
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            assert_round_trip(&expected, namespace, &LogSchema::default());
+        }
+    }
+
+    #[test]
+    fn native_legacy_log_encodes_timestamp_after_2262() {
+        // Later than the `i64` nanosecond range, in the `u64` range of OTLP.
+        let timestamp = DateTime::from_timestamp(10_000_000_000, 5).unwrap();
+        let mut log = LogEvent::from("message");
+        log.insert(event_path!("timestamp"), timestamp);
+        log.insert(event_path!("observed_timestamp"), timestamp);
+
+        let request = log_event_to_export_request(log);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.time_unix_nano, 10_000_000_000_000_000_005);
+        assert_eq!(record.observed_time_unix_nano, 10_000_000_000_000_000_005);
+        assert!(record.attributes.is_empty());
     }
 
     #[test]
@@ -859,7 +901,7 @@ mod tests {
         log.insert(event_path!("source_type"), "file");
 
         let expected = request(
-            Resource::default(),
+            None,
             InstrumentationScope::default(),
             LogRecord {
                 time_unix_nano: 1_700_000_000_000_000_000,
@@ -913,7 +955,7 @@ mod tests {
         assert_eq!(log.namespace(), LogNamespace::Vector);
 
         let expected = request(
-            Resource::default(),
+            None,
             InstrumentationScope::default(),
             LogRecord {
                 observed_time_unix_nano: 5,
