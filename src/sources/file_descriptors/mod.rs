@@ -1,4 +1,5 @@
 use std::io;
+use vector_lib::internal_event::{emit, register};
 
 use async_stream::stream;
 use bytes::Bytes;
@@ -127,11 +128,11 @@ async fn process_stream(
     hostname: Option<String>,
     log_namespace: LogNamespace,
 ) -> vector_lib::source_sender::SendResult {
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
+    let events_received = register(EventsReceived);
     let stream = receiver.inspect(|result| {
         if let Err(error) = result {
-            emit!(FileDescriptorReadError { error: &error });
+            emit(FileDescriptorReadError { error: &error });
         }
     });
     let stream = StreamReader::new(stream);
@@ -196,7 +197,7 @@ async fn process_stream(
         }
         Err(error) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
             Err(error)
         }
     }

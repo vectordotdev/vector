@@ -20,6 +20,7 @@
   <ul x-ref="list" class="mt-3 grid min-w-0 list-none gap-3 p-0">
     {{ range .entries }}
     {{ partial "releases/changelog-card.html" (dict
+      "id" .id
       "title" .what
       "body" .content
       "footer" (partial "deprecations/versions.html" .)

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 
@@ -62,7 +62,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

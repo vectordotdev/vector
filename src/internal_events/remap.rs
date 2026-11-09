@@ -1,6 +1,6 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage,
-    error_type,
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
+    error_stage, error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
@@ -27,7 +27,7 @@ impl InternalEvent for RemapMappingError {
         )
         .increment(1);
         if self.event_dropped {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
                 reason: "Mapping failed with event.",
             });
@@ -47,7 +47,7 @@ impl InternalEvent for RemapMappingAbort {
         debug!("Event mapping aborted.");
 
         if self.event_dropped {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "Event mapping aborted.",
             });

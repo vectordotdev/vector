@@ -1,4 +1,5 @@
 use std::{io, mem, time::Duration};
+use vector_lib::internal_event::emit;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
@@ -325,7 +326,7 @@ impl StreamBatchConfig<PubsubMessage> for PubsubBatcher {
         self.batch.finalizers.merge(message.finalizers);
 
         if self.batch.messages.is_empty() && payload_size >= self.settings.size_limit {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: message.json.len(),
                 max_length: self.settings.size_limit,
             });
@@ -484,7 +485,7 @@ where
             .filter_map(|request| {
                 future::ready(match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),

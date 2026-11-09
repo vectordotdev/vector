@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use http::{
@@ -60,7 +61,7 @@ impl KeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -86,7 +87,7 @@ impl Partitioner for KeyPartitioner {
             Some(template) => match template.render_string(item) {
                 Ok(s) => Some(s),
                 Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: true,
@@ -94,7 +95,7 @@ impl Partitioner for KeyPartitioner {
                     return None;
                 }
                 Err(error) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: false,

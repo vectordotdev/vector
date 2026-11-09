@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use vector_lib::{event::Event, lookup::lookup_v2::OptionalTargetPath};
+use vector_lib::{event::Event, internal_event::emit, lookup::lookup_v2::OptionalTargetPath};
 use vrl::value::{KeyString, Value};
 
 use crate::{
@@ -20,7 +20,7 @@ pub(super) fn make_pulsar_event(
     let topic = topic
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 field: Some("topic"),
                 drop_event: true,
                 error,
@@ -77,15 +77,15 @@ pub(super) fn get_properties(
                             if let Some(value_bytes) = value.as_bytes() {
                                 property_map.insert(key.clone(), value_bytes.clone());
                             } else {
-                                emit!(PulsarPropertyExtractionError {
-                                    property_field: path
+                                emit(PulsarPropertyExtractionError {
+                                    property_field: path,
                                 });
                             }
                         }
                         Some(property_map)
                     } else {
-                        emit!(PulsarPropertyExtractionError {
-                            property_field: path
+                        emit(PulsarPropertyExtractionError {
+                            property_field: path,
                         });
                         None
                     }

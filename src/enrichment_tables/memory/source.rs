@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -34,8 +35,8 @@ pub(crate) struct MemorySource {
 
 impl MemorySource {
     pub(crate) async fn run(mut self) -> Result<(), ()> {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
         let source_config = self
             .memory
             .config
@@ -129,7 +130,7 @@ impl MemorySource {
             bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
             if self.out.send_batch(events).await.is_err() {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
             }
 
             sent += count;
@@ -180,7 +181,7 @@ impl MemorySource {
             .await
             .is_err()
         {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
         }
     }
 }

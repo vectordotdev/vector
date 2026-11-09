@@ -15,7 +15,7 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{Duration, sleep};
 use tower::Service;
-use vector_lib::{configurable::configurable_component, emit};
+use vector_lib::{configurable::configurable_component, internal_event::emit};
 
 use crate::{
     common::backoff::ExponentialBackoff,
@@ -316,7 +316,7 @@ struct HealthSnapshot {
 }
 
 fn emit_active_endpoints(count: usize) {
-    emit!(EndpointsActive { count });
+    emit(EndpointsActive { count });
 }
 
 #[cfg(test)]
