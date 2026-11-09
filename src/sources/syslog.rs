@@ -1,27 +1,31 @@
 use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 use vector_lib::internal_event::{emit, register};
 
+use bytes::Bytes;
 use chrono::Utc;
-use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
-use tokio_util::udp::UdpFramed;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
-        decoding::{Deserializer, Framer},
+        OctetCountingDecoder, SyslogDeserializerConfig,
+        decoding::{Deserializer, Framer, format::Deserializer as FormatDeserializer},
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    internal_event::{
+        ByteSize, BytesReceived, ComponentEventsDropped, InternalEventHandle as _, Protocol,
+        UNINTENTIONAL,
+    },
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
 use vrl::{event_path, value::Value};
 
 #[cfg(unix)]
-use crate::sources::util::build_unix_stream_source;
+use crate::sources::util::{
+    build_unix_datagram_source_with_message_decoder, build_unix_stream_source,
+};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -35,7 +39,9 @@ use crate::{
     },
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
+    sources::util::net::{
+        SocketListenAddr, TcpNullAcker, TcpSource, UdpBatchReceiver, try_bind_udp_socket,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -120,6 +126,10 @@ pub enum Mode {
     ///
     /// For Unix datagram sockets, use the `socket` source instead.
     Unix(UnixOnly<UnixConfig>),
+
+    /// Listen on a Unix domain datagram socket.
+    #[serde(alias = "unix_dgram")]
+    UnixDatagram(UnixOnly<UnixDatagramConfig>),
 }
 
 /// Unix domain socket configuration for the `syslog` source.
@@ -137,6 +147,31 @@ pub struct UnixConfig {
     /// The file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
     socket_file_mode: Option<u32>,
+}
+
+/// Unix domain datagram socket configuration for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixDatagramConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// Unix file mode bits to be applied to the socket file.
+    socket_file_mode: Option<u32>,
+
+    /// The size of the receive buffer used for the listening socket.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    receive_buffer_bytes: Option<usize>,
+
+    /// Maximum memory used for payload buffers in one `recvmmsg` batch.
+    ///
+    /// The event count remains capped at 256. If omitted, payload buffers
+    /// are capped at 16 MiB per source.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    max_batch_bytes: Option<usize>,
 }
 
 impl SyslogConfig {
@@ -279,6 +314,44 @@ impl SourceConfig for SyslogConfig {
                     },
                 )
             }
+            Mode::UnixDatagram(config) => {
+                let (max_length, host_key, log_namespace, shutdown, out) = (
+                    self.max_length,
+                    host_key,
+                    log_namespace,
+                    cx.shutdown,
+                    cx.out,
+                );
+                config.on_unix(
+                    (max_length, host_key, log_namespace, shutdown, out),
+                    #[cfg(unix)]
+                    |config, (max_length, host_key, log_namespace, shutdown, out)| {
+                        let decoder =
+                            SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
+
+                        build_unix_datagram_source_with_message_decoder(
+                            config.path,
+                            config.socket_file_mode,
+                            max_length,
+                            config.receive_buffer_bytes,
+                            config.max_batch_bytes,
+                            decoder,
+                            log_namespace,
+                            true,
+                            move |events, host| {
+                                handle_events(
+                                    events,
+                                    &host_key,
+                                    host.map(Value::from),
+                                    log_namespace,
+                                );
+                            },
+                            shutdown,
+                            out,
+                        )
+                    },
+                )
+            }
         }
     }
 
@@ -298,7 +371,7 @@ impl SourceConfig for SyslogConfig {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
             Mode::Udp { address, .. } => vec![address.as_udp_resource()],
-            Mode::Unix(_) => vec![],
+            Mode::Unix(_) | Mode::UnixDatagram(_) => vec![],
         }
     }
 
@@ -344,10 +417,10 @@ impl TcpSource for SyslogTcpSource {
 #[must_use]
 pub fn udp(
     addr: SocketListenAddr,
-    _max_length: usize,
+    max_length: usize,
     host_key: Option<OwnedValuePath>,
     receive_buffer_bytes: Option<usize>,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
     mut out: SourceSender,
 ) -> super::Source {
@@ -367,6 +440,14 @@ pub fn udp(
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
+        let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
+            emit(SocketReceiveError {
+                mode: SocketMode::Udp,
+                error: &error,
+            });
+            super::SourceError::from(error)
+        })?;
+
         info!(
             message = "Listening.",
             addr = %addr,
@@ -374,55 +455,77 @@ pub fn udp(
         );
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
 
-        let mut stream = UdpFramed::new(
-            socket,
-            Decoder::new(
-                Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(
-                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                ),
-            ),
-        )
-        .take_until(shutdown)
-        .filter_map(|frame| {
-            let host_key = host_key.clone();
-            let bytes_received = bytes_received.clone();
-            async move {
-                match frame {
-                    Ok(((mut events, byte_size), received_from)) => {
+        loop {
+            let batch = tokio::select! {
+                received = receiver.recv_batch() => match received {
+                    Ok(batch) => batch,
+                    Err(error) => {
+                        emit(SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error,
+                        });
+                        continue;
+                    }
+                },
+                _ = &mut shutdown => return Ok(()),
+            };
+
+            if batch.is_empty() {
+                continue;
+            }
+
+            bytes_received.emit(ByteSize(batch.received_bytes()));
+            let mut output = Vec::with_capacity(batch.len());
+            for datagram in batch.iter() {
+                if datagram.truncated {
+                    warn!(
+                        message = "Discarding frame larger than max_length.",
+                        max_length
+                    );
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: 1,
+                        reason: "UDP datagram exceeded max_length.",
+                    });
+                    continue;
+                }
+
+                match parser.parse(Bytes::copy_from_slice(datagram.payload), log_namespace) {
+                    Ok(mut events) => {
                         let count = events.len();
-                        bytes_received.emit(ByteSize(byte_size));
                         emit(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
-                        let received_from = Value::from(received_from.ip().to_string());
+                        let received_from = Value::from(datagram.address.ip().to_string());
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
-                        Some(events.remove(0))
+                        output.extend(events);
                     }
                     Err(error) => {
                         emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
                         });
-                        None
                     }
                 }
             }
-        })
-        .boxed();
 
-        match out.send_event_stream(&mut stream).await {
-            Ok(()) => {
-                debug!("Finished sending.");
-                Ok(())
+            drop(batch);
+            if output.is_empty() {
+                continue;
             }
-            Err(error) => {
-                let (count, _) = stream.size_hint();
-                emit(StreamClosedError { count });
-                Err(error.into())
+
+            let count = output.len();
+            tokio::select! {
+                result = out.send_batch(output) => {
+                    if let Err(error) = result {
+                        emit(StreamClosedError { count });
+                        return Err(error.into());
+                    }
+                }
+                _ = &mut shutdown => return Ok(()),
             }
         }
     })

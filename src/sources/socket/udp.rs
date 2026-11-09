@@ -1,7 +1,9 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    pin::Pin,
+};
 use vector_lib::internal_event::{emit, register};
 
-use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -33,7 +35,7 @@ use crate::{
     sources::{
         Source,
         socket::SocketConfig,
-        util::net::{SocketListenAddr, try_bind_udp_socket},
+        util::net::{SocketListenAddr, UdpBatchReceiver, try_bind_udp_socket},
     },
 };
 
@@ -235,122 +237,126 @@ pub(super) fn udp(
             max_length = std::cmp::min(max_length, receive_buffer_bytes);
         }
 
+        // The receiver handles platform-specific over-length detection internally. Pass the
+        // configured limit unchanged so a datagram of `max_length + 1` is rejected.
+        let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
+            emit(SocketReceiveError {
+                mode: SocketMode::Udp,
+                error: &error,
+            });
+            SourceError::from(error)
+        })?;
+
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let legacy_host_key = config.host_key.clone().unwrap_or(default_host_key()).path;
+        let legacy_port_key = config.port_key.clone().path;
 
         info!(message = "Listening.", address = %config.address);
-        // We add 1 to the max_length in order to determine if the received data has been truncated.
-        let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
-            buf.resize(max_length + 1, 0);
-            tokio::select! {
-                recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = match recv {
-                        Ok(res) => res,
-                        Err(error) => {
-                            #[cfg(windows)]
-                            if let Some(err) = error.raw_os_error() {
-                                if err == 10040 {
-                                    // 10040 is the Windows error that the Udp message has exceeded max_length
-                                    warn!(
-                                        message = "Discarding frame larger than max_length.",
-                                        max_length = max_length
-                                    );
-                                    continue;
-                                }
+            let batch = tokio::select! {
+                received = receiver.recv_batch() => match received {
+                    Ok(batch) => batch,
+                    Err(error) => {
+                        #[cfg(windows)]
+                        if error.raw_os_error() == Some(10040) {
+                            warn!(
+                                message = "Discarding frame larger than max_length.",
+                                max_length
+                            );
+                            continue;
+                        }
+
+                        emit(SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error,
+                        });
+                        return Err(SourceError::from(error));
+                    }
+                },
+                _ = &mut shutdown => return Ok(()),
+            };
+
+            bytes_received.emit(ByteSize(batch.received_bytes()));
+            let mut output = Vec::with_capacity(batch.len());
+            for datagram in batch.iter() {
+                let address = datagram.address;
+                let source_host = address.ip().to_string();
+                let now = Utc::now();
+                let mut stream =
+                    DecoderFramedRead::new(datagram.payload, decoder.clone()).peekable();
+
+                while let Some(result) = stream.next().await {
+                    let last = Pin::new(&mut stream).peek().await.is_none();
+                    match result {
+                        Ok((mut events, _byte_size)) => {
+                            if last && datagram.truncated {
+                                // Keep complete frames at the start of the datagram, but discard
+                                // the final frame because it may have been cut at max_length.
+                                _ = events.pop();
+                                warn!(
+                                    message = "Discarding frame larger than max_length.",
+                                    max_length
+                                );
                             }
 
-                            emit(SocketReceiveError {
+                            if events.is_empty() {
+                                continue;
+                            }
+
+                            let count = events.len();
+                            emit(SocketEventsReceived {
                                 mode: SocketMode::Udp,
-                                error: &error
+                                byte_size: events.estimated_json_encoded_size_of(),
+                                count,
                             });
-                            return Err(SourceError::from(error));
-                       }
-                    };
 
-                    bytes_received.emit(ByteSize(byte_size));
-                    let payload = buf.split_to(byte_size);
-                    let truncated = byte_size == max_length + 1;
-                    let mut stream =
-                        DecoderFramedRead::new(payload.as_ref(), decoder.clone()).peekable();
-
-                    while let Some(result) = stream.next().await {
-                        let last = Pin::new(&mut stream).peek().await.is_none();
-                        match result {
-                            Ok((mut events, _byte_size)) => {
-                                if last && truncated {
-                                    // The last event in this payload was truncated, so we want to drop it.
-                                    _ = events.pop();
-                                    warn!(
-                                        message = "Discarding frame larger than max_length.",
-                                        max_length = max_length
+                            for event in &mut events {
+                                if let Event::Log(log) = event {
+                                    log_namespace.insert_standard_vector_source_metadata(
+                                        log,
+                                        SocketConfig::NAME,
+                                        now,
+                                    );
+                                    log_namespace.insert_source_metadata(
+                                        SocketConfig::NAME,
+                                        log,
+                                        legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                        path!("host"),
+                                        source_host.clone(),
+                                    );
+                                    log_namespace.insert_source_metadata(
+                                        SocketConfig::NAME,
+                                        log,
+                                        legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                        path!("port"),
+                                        address.port(),
                                     );
                                 }
-
-                                if events.is_empty() {
-                                    continue;
-                                }
-
-                                let count = events.len();
-                                emit(SocketEventsReceived {
-                                    mode: SocketMode::Udp,
-                                    byte_size: events.estimated_json_encoded_size_of(),
-                                    count,
-                                });
-
-                                let now = Utc::now();
-
-                                for event in &mut events {
-                                    if let Event::Log(log) = event {
-                                        log_namespace.insert_standard_vector_source_metadata(
-                                            log,
-                                            SocketConfig::NAME,
-                                            now,
-                                        );
-
-                                        let legacy_host_key = config
-                                            .host_key
-                                            .clone()
-                                            .unwrap_or(default_host_key())
-                                            .path;
-
-                                        log_namespace.insert_source_metadata(
-                                            SocketConfig::NAME,
-                                            log,
-                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("host"),
-                                            address.ip().to_string()
-                                        );
-
-                                        let legacy_port_key = config.port_key.clone().path;
-
-                                        log_namespace.insert_source_metadata(
-                                            SocketConfig::NAME,
-                                            log,
-                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("port"),
-                                            address.port()
-                                        );
-                                    }
-                                }
-
-                                tokio::select!{
-                                    result = out.send_batch(events) => {
-                                        if result.is_err() {
-                                            emit(StreamClosedError { count });
-                                            return Ok(())
-                                        }
-                                    }
-                                    _ = &mut shutdown => return Ok(()),
-                                }
                             }
-                            Err(error) => {
-                                // Error is logged by `vector_lib::codecs::Decoder`, no
-                                // further handling is needed here.
-                                if !error.can_continue() {
-                                    break;
-                                }
+                            output.extend(events);
+                        }
+                        Err(error) => {
+                            // Error is logged by `vector_lib::codecs::Decoder`, no further
+                            // handling is needed here.
+                            if !error.can_continue() {
+                                break;
                             }
                         }
+                    }
+                }
+            }
+
+            drop(batch);
+            if output.is_empty() {
+                continue;
+            }
+
+            let count = output.len();
+            tokio::select! {
+                result = out.send_batch(output) => {
+                    if result.is_err() {
+                        emit(StreamClosedError { count });
+                        return Ok(());
                     }
                 }
                 _ = &mut shutdown => return Ok(()),

@@ -1202,6 +1202,7 @@ mod test {
                 address,
                 vec![
                     "short line".to_string(),
+                    "123456789012".to_string(),
                     "test with a long line".to_string(),
                     "a short un".to_string(),
                 ],
@@ -1245,13 +1246,16 @@ mod test {
 
             send_lines_udp(
                 address,
-                vec!["test with, long line".to_string(), "short one".to_string()],
+                vec![
+                    "test, with a long line".to_string(),
+                    "short one".to_string(),
+                ],
             );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
                 events[0].as_log()[log_schema().message_key().unwrap().to_string()],
-                "test with".into()
+                "test".into()
             );
             assert_eq!(
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
