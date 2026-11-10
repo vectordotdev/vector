@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
 
 use regex::Regex;
 
@@ -10,99 +10,156 @@ fn slugify_text(input: &str) -> String {
     result.to_lowercase()
 }
 
-/// Expands the given possibly template-able `key_s` and `value_s`, and return the expanded owned pairs
-/// it would also insert the pairs into either `static_pairs` or `dynamic_pairs` depending on the template-ability of `key_s`.
-#[cfg(feature = "transforms-log_to_metric")]
-pub(crate) fn pair_expansion(
-    key_s: &str,
-    value_s: &str,
-    static_pairs: &mut HashMap<String, String>,
-    dynamic_pairs: &mut HashMap<String, String>,
-) -> Result<HashMap<String, String>, serde_json::Error> {
-    let mut expanded_pairs = HashMap::new();
-    pair_expansion_inner(
-        Cow::Borrowed(key_s),
-        Cow::Borrowed(value_s),
-        static_pairs,
-        dynamic_pairs,
-        Some(&mut expanded_pairs),
-    )?;
-    Ok(expanded_pairs)
+/// Whether a pair was supplied explicitly or produced by wildcard expansion.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PairOrigin {
+    Explicit,
+    Wildcard,
 }
 
-/// Expands a rendered pair directly into the destination maps. Unlike the
-/// allocation-returning helper, this consumes the rendered strings and does
-/// not build a second map for callers that only need the merged destinations.
-#[cfg(feature = "sinks-loki")]
-pub(crate) fn pair_expansion_into(
-    key_s: String,
-    value_s: String,
-    static_pairs: &mut HashMap<String, String>,
-    dynamic_pairs: &mut HashMap<String, String>,
-) -> Result<(), serde_json::Error> {
-    pair_expansion_inner(
-        Cow::Owned(key_s),
-        Cow::Owned(value_s),
-        static_pairs,
-        dynamic_pairs,
-        None,
-    )
+/// A failed wildcard expansion, retaining the rendered inputs for diagnostics.
+#[derive(Debug)]
+pub(crate) struct ExpansionError {
+    pub key: String,
+    pub value: String,
+    pub error: serde_json::Error,
 }
 
-fn pair_expansion_inner<'a>(
-    key_s: Cow<'a, str>,
-    value_s: Cow<'a, str>,
-    static_pairs: &mut HashMap<String, String>,
-    dynamic_pairs: &mut HashMap<String, String>,
-    mut expanded_pairs: Option<&mut HashMap<String, String>>,
-) -> Result<(), serde_json::Error> {
-    if let Some(opening_prefix) = key_s.strip_suffix('*') {
-        let output: serde_json::map::Map<String, serde_json::Value> =
-            serde_json::from_str(value_s.as_ref())?;
+/// Emits an owned pair, or expands a trailing wildcard using a JSON object's fields.
+///
+/// Explicit pairs are moved directly into the callback. Wildcard keys are
+/// normalized and null values are omitted. The caller owns collision handling:
+/// multiple object fields can normalize to the same key and are emitted in the
+/// JSON map's iteration order. Invalid input fails before any pairs are emitted.
+pub(crate) fn expand_pair(
+    key: String,
+    value: String,
+    mut emit: impl FnMut(PairOrigin, String, String),
+) -> Result<(), ExpansionError> {
+    let Some(prefix) = key.strip_suffix('*') else {
+        emit(PairOrigin::Explicit, key, value);
+        return Ok(());
+    };
 
-        // key_* -> key_one, key_two, key_three
-        // * -> one, two, three
-        for (k, v) in output {
-            let key = slugify_text(&format!("{opening_prefix}{k}"));
-            let val = Value::from(v).to_string_lossy().into_owned();
-            if val == "<null>" {
-                warn!("Encountered \"null\" value for dynamic pair. key: {key}");
-                continue;
-            }
-            if let Some(expanded_pairs) = expanded_pairs.as_deref_mut() {
-                if let Some(prev) = dynamic_pairs.insert(key.clone(), val.clone()) {
-                    warn!(
-                        "Encountered duplicated dynamic pair. \
-                                    key: {key}, value: {val:?}, discarded value: {prev:?}"
-                    );
-                }
-                expanded_pairs.insert(key, val);
-            } else {
-                match dynamic_pairs.entry(key) {
-                    std::collections::hash_map::Entry::Occupied(mut entry) => {
-                        warn!(
-                            "Encountered duplicated dynamic pair. \
-                                        key: {}, value: {val:?}, discarded value: {:?}",
-                            entry.key(),
-                            entry.get(),
-                        );
-                        entry.insert(val);
-                    }
-                    std::collections::hash_map::Entry::Vacant(entry) => {
-                        entry.insert(val);
-                    }
-                }
-            }
+    let output: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&value) {
+        Ok(output) => output,
+        Err(error) => return Err(ExpansionError { key, value, error }),
+    };
+
+    for (field, value) in output {
+        let key = slugify_text(&format!("{prefix}{field}"));
+        let value = Value::from(value).to_string_lossy().into_owned();
+        if value == "<null>" {
+            warn!(message = "Encountered \"null\" value for dynamic pair.", %key);
+            continue;
         }
-    } else {
-        let key_s = key_s.into_owned();
-        let value_s = value_s.into_owned();
-        if let Some(expanded_pairs) = expanded_pairs {
-            static_pairs.insert(key_s.clone(), value_s.clone());
-            expanded_pairs.insert(key_s, value_s);
-        } else {
-            static_pairs.insert(key_s, value_s);
-        }
+        emit(PairOrigin::Wildcard, key, value);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PairOrigin, expand_pair};
+
+    #[test]
+    fn explicit_pair_preserves_strings_without_copying() {
+        let key = String::from("Original*Key");
+        let value = String::from("not JSON");
+        let key_ptr = key.as_ptr();
+        let value_ptr = value.as_ptr();
+        let mut pairs = Vec::new();
+
+        expand_pair(key, value, |origin, key, value| {
+            assert_eq!(key.as_ptr(), key_ptr);
+            assert_eq!(value.as_ptr(), value_ptr);
+            pairs.push((origin, key, value));
+        })
+        .unwrap();
+
+        assert_eq!(
+            pairs,
+            vec![(
+                PairOrigin::Explicit,
+                "Original*Key".into(),
+                "not JSON".into()
+            )]
+        );
+    }
+
+    #[test]
+    fn wildcard_normalizes_keys_and_formats_values() {
+        let mut pairs = Vec::new();
+        expand_pair(
+            "Prefix_*".into(),
+            r#"{"Field.Name":"text","boolean":true,"number":42,"array":["one","two"],"object":{"nested":"value"},"null":null,"null_string":"<null>"}"#.into(),
+            |origin, key, value| pairs.push((origin, key, value)),
+        )
+        .unwrap();
+        pairs.sort_by(|a, b| a.1.cmp(&b.1));
+
+        assert_eq!(
+            pairs,
+            vec![
+                (
+                    PairOrigin::Wildcard,
+                    "prefix_array".into(),
+                    r#"["one","two"]"#.into()
+                ),
+                (PairOrigin::Wildcard, "prefix_boolean".into(), "true".into()),
+                (
+                    PairOrigin::Wildcard,
+                    "prefix_field_name".into(),
+                    "text".into()
+                ),
+                (PairOrigin::Wildcard, "prefix_number".into(), "42".into()),
+                (
+                    PairOrigin::Wildcard,
+                    "prefix_object".into(),
+                    r#"{"nested":"value"}"#.into()
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn wildcard_leaves_collision_handling_to_caller() {
+        let mut pairs = Vec::new();
+        expand_pair(
+            "*".into(),
+            r#"{"key-one":"first","key_one":"second"}"#.into(),
+            |origin, key, value| pairs.push((origin, key, value)),
+        )
+        .unwrap();
+
+        assert_eq!(
+            pairs,
+            vec![
+                (PairOrigin::Wildcard, "key_one".into(), "first".into()),
+                (PairOrigin::Wildcard, "key_one".into(), "second".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_object_emits_no_pairs() {
+        expand_pair("*".into(), "{}".into(), |_, _, _| {
+            panic!("empty object should not emit any pairs");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn invalid_wildcard_value_preserves_inputs_and_emits_no_pairs() {
+        for value in [r#"{"valid":1,"invalid":}"#, "[]", "null", "42", r#""text""#] {
+            let error = expand_pair("prefix_*".into(), value.into(), |_, _, _| {
+                panic!("invalid input should not emit any pairs");
+            })
+            .unwrap_err();
+
+            assert_eq!(error.key, "prefix_*");
+            assert_eq!(error.value, value);
+            assert!(!error.error.to_string().is_empty());
+        }
+    }
 }

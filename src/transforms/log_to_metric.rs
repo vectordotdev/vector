@@ -16,7 +16,7 @@ use vrl::{
 };
 
 use crate::{
-    common::expansion::pair_expansion,
+    common::expansion::{PairOrigin, expand_pair},
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput, schema::Definition,
@@ -434,8 +434,31 @@ fn render_tag_into(
         }
         Some(template) => match render_template(template, event) {
             Ok(value) => {
-                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags)
-                    .map_err(|error| TransformError::PairExpansionError { key, value, error })?;
+                // A wildcard object contributes at most one value per normalized
+                // key. Separate configured pairs can still add multiple values.
+                let mut expanded_pairs = HashMap::new();
+                expand_pair(key, value, |origin, key, value| match origin {
+                    PairOrigin::Explicit => {
+                        static_tags.insert(key.clone(), value.clone());
+                        result.insert(key, value);
+                    }
+                    PairOrigin::Wildcard => {
+                        if let Some(previous) = dynamic_tags.insert(key.clone(), value.clone()) {
+                            warn!(
+                                message = "Encountered duplicated dynamic pair.",
+                                %key,
+                                %value,
+                                discarded_value = %previous,
+                            );
+                        }
+                        expanded_pairs.insert(key, value);
+                    }
+                })
+                .map_err(|error| TransformError::PairExpansionError {
+                    key: error.key,
+                    value: error.value,
+                    error: error.error,
+                })?;
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
@@ -1408,6 +1431,36 @@ mod tests {
             assert!(value == Some("val1") || value == Some("val2"));
         }
     }
+    #[tokio::test]
+    async fn wildcard_tag_normalization_keeps_last_value_within_object() {
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+              - field: message
+                type: counter
+                tags:
+                  "*": "{{ dict }}"
+            "#,
+        );
+        let mut event = create_event("message", "I am log");
+        let dict = ObjectMap::from([
+            ("key-one".into(), Value::from("first")),
+            ("key_one".into(), Value::from("second")),
+        ]);
+        event.as_mut_log().insert(event_path!("dict"), dict);
+
+        let metric = Box::pin(do_transform(config, event))
+            .await
+            .unwrap()
+            .into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(
+            tags.iter_all().collect::<Vec<_>>(),
+            vec![("key_one", Some("second"))]
+        );
+    }
+
     #[tokio::test]
     async fn multi_value_tags_yaml() {
         // Have to use YAML to represent bare tags

@@ -12,7 +12,7 @@ use super::{
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
-    common::expansion::pair_expansion_into,
+    common::expansion::{PairOrigin, expand_pair},
     http::{HttpClient, get_http_scheme_from_uri},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
@@ -265,13 +265,29 @@ fn build_template_pair_map(
             value_template.render_string(event),
         ) {
             (Ok(key_s), Ok(value_s)) => {
-                let value_for_error = key_s.ends_with('*').then(|| value_s.clone());
-                if let Err(err) =
-                    pair_expansion_into(key_s, value_s, &mut static_map, &mut dynamic_map)
-                {
+                if let Err(error) = expand_pair(key_s, value_s, |origin, key, value| match origin {
+                    PairOrigin::Explicit => {
+                        static_map.insert(key, value);
+                    }
+                    PairOrigin::Wildcard => match dynamic_map.entry(key) {
+                        std::collections::hash_map::Entry::Occupied(mut entry) => {
+                            warn!(
+                                message = "Encountered duplicated dynamic pair.",
+                                key = %entry.key(),
+                                %value,
+                                discarded_value = %entry.get(),
+                            );
+                            entry.insert(value);
+                        }
+                        std::collections::hash_map::Entry::Vacant(entry) => {
+                            entry.insert(value);
+                        }
+                    },
+                }) {
                     warn!(
-                        value = %value_for_error.as_deref().unwrap_or(""),
-                        error = %err,
+                        key = %error.key,
+                        value = %error.value,
+                        error = %error.error,
                         "Failed to expand dynamic {pair_kind}."
                     );
                 }
