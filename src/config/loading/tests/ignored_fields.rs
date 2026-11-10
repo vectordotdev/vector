@@ -174,3 +174,21 @@ fn invalid_configurations_keep_their_error_without_deprecation_warnings() {
     );
     assert!(!logs.contains("DEPRECATED:"), "{logs}");
 }
+
+#[test]
+fn component_types_without_schema_skip_diagnostics() {
+    let mut value: Value = serde_yaml::from_str(CONFIG).unwrap();
+    assert_eq!(ignored_fields::component_type_without_schema(&value), None);
+
+    value["transforms"] = serde_json::json!({
+        "custom": {"type": "transform_without_schema", "inputs": ["files"], "unknown_option": 42}
+    });
+    assert_eq!(
+        ignored_fields::component_type_without_schema(&value),
+        Some("transform_without_schema")
+    );
+    assert_eq!(
+        ignored_fields::find(value.as_object().unwrap(), None),
+        Vec::<String>::new()
+    );
+}
