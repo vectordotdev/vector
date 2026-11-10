@@ -14,10 +14,16 @@ generated: components: sources: mqtt: configuration: {
 			When enabled (through this setting, the global setting, or because a
 			connected sink requires it), the QoS 1/2 acknowledgement for an
 			incoming publish is deferred until the resulting events have been
-			delivered to all connected sinks, giving at-least-once delivery. A
-			stable `client_id` must also be configured, however acknowledgements
-			end up enabled, so the MQTT session (and its unacknowledged messages)
-			can be resumed after a restart.
+			delivered to all connected sinks, giving at-least-once delivery. An
+			event that a sink rejects outright is acknowledged and dropped, with
+			an error logged, because redelivering it cannot succeed.
+
+			Acknowledgements require a stable `client_id`, so the MQTT session
+			(and its unacknowledged messages) can be resumed after a restart, and
+			a non-zero `keep_alive`. If either is missing, enabling
+			acknowledgements here is a configuration error; if they were enabled
+			only by the global setting or a connected sink, the source logs a
+			warning and runs without them.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 			"""

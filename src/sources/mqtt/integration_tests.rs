@@ -137,7 +137,7 @@ async fn mqtt_one_topic_happy() {
 }
 
 /// With end-to-end acknowledgements enabled, a message that is received but not
-/// successfully delivered (the sink rejects it) must not be acknowledged to the
+/// successfully delivered (the sink reports an error) must not be acknowledged to the
 /// broker, so the broker redelivers it. This proves the at-least-once guarantee
 /// added by the `acknowledgements` option: no data is lost when a downstream
 /// failure or crash occurs before the write is confirmed.
@@ -165,9 +165,9 @@ async fn mqtt_redelivers_unacknowledged_messages() {
     };
 
     // Phase 1: the first instance subscribes (creating the persistent session)
-    // and receives the message, but its sink rejects every event, so the source
+    // and receives the message, but its sink fails every event, so the source
     // never sends a PUBACK.
-    let (tx1, mut rx1) = SourceSender::new_test_finalize(EventStatus::Rejected);
+    let (tx1, mut rx1) = SourceSender::new_test_finalize(EventStatus::Errored);
     let config1 = make_config();
     let source1 = tokio::spawn(async move {
         config1
@@ -187,7 +187,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
         .await
         .unwrap();
 
-    // The first instance must actually receive (and reject) the message so that
+    // The first instance must actually receive (and fail) the message so that
     // it remains unacknowledged in the broker.
     let first = timeout(Duration::from_secs(5), rx1.next())
         .await
@@ -196,7 +196,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
     assert_eq!(message_body(&first), message);
     drop(first);
 
-    // Give the source a moment to observe the rejected status (and therefore
+    // Give the source a moment to observe the errored status (and therefore
     // skip the ack), then drop the connection without acknowledging.
     tokio::time::sleep(Duration::from_millis(200)).await;
     source1.abort();
@@ -281,7 +281,7 @@ async fn collect_expected_messages(
     }
 }
 
-/// A withheld ack (the sink rejects the message, so its PUBACK is never sent)
+/// A withheld ack (the sink fails the message, so its PUBACK is never sent)
 /// must force a reconnect on its own -- without an external trigger like a
 /// process restart or manual disconnect -- so the broker redelivers the
 /// still-unacknowledged publish. Otherwise a broker that only redelivers
@@ -307,7 +307,7 @@ async fn mqtt_forces_reconnect_after_withheld_ack() {
         ..MqttSourceConfig::default()
     };
 
-    // The first delivery attempt for any publish is rejected (withholding its
+    // The first delivery attempt for any publish errors (withholding its
     // ack); every attempt after that succeeds. So the only way a second
     // delivery of the same message shows up is a broker redelivery following
     // a reconnect the source must have forced itself.
@@ -823,4 +823,85 @@ async fn mqtt_drops_retransmissions_of_an_unacknowledged_publish() {
         .expect("timed out waiting for a delivery after the acknowledgement")
         .expect("source stream ended unexpectedly");
     assert_eq!(message_body(&next), "second");
+}
+
+/// A sink that rejects an event outright will never accept it, and MQTT has
+/// no negative acknowledgement to hand the message back with. Withholding
+/// the PUBACK would block every acknowledgement behind it and have the
+/// broker redeliver the same messages forever, so a rejected message is
+/// acknowledged and dropped (unlike an errored one, see
+/// `mqtt_redelivers_unacknowledged_messages`): a later instance resuming the
+/// same session must not receive it again.
+#[tokio::test]
+async fn mqtt_acknowledges_and_drops_rejected_messages() {
+    trace_init();
+
+    let topic = "source-rejected-test";
+    let client_id = format!("sourceRejectTest{}", random_string(6));
+    let message = random_string(32);
+
+    let make_config = || MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id.clone()),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    // Phase 1: the sink rejects every event.
+    let (tx1, mut rx1) = SourceSender::new_test_finalize(EventStatus::Rejected);
+    let config1 = make_config();
+    let source1 = tokio::spawn(async move {
+        config1
+            .build(SourceContext::new_test(tx1, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    // Wait for the subscription to be established before publishing.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client();
+    producer
+        .publish(topic, message.as_bytes(), PublishOptions::at_least_once())
+        .await
+        .unwrap();
+
+    let first = timeout(Duration::from_secs(5), rx1.next())
+        .await
+        .expect("timed out waiting for the delivery")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&first), message);
+    drop(first);
+
+    // Give the source time to observe the rejection and send the PUBACK.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    source1.abort();
+    drop(source1.await);
+
+    // Phase 2: a new instance resumes the same session. The message was
+    // acknowledged, so the broker has nothing to redeliver.
+    let (tx2, mut rx2) = SourceSender::new_test();
+    let config2 = make_config();
+    let source2 = tokio::spawn(async move {
+        config2
+            .build(SourceContext::new_test(tx2, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    assert!(
+        timeout(Duration::from_secs(3), rx2.next()).await.is_err(),
+        "a rejected message was redelivered instead of being acknowledged"
+    );
+
+    source2.abort();
 }

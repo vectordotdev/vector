@@ -67,10 +67,16 @@ pub struct MqttSourceConfig {
     /// When enabled (through this setting, the global setting, or because a
     /// connected sink requires it), the QoS 1/2 acknowledgement for an
     /// incoming publish is deferred until the resulting events have been
-    /// delivered to all connected sinks, giving at-least-once delivery. A
-    /// stable `client_id` must also be configured, however acknowledgements
-    /// end up enabled, so the MQTT session (and its unacknowledged messages)
-    /// can be resumed after a restart.
+    /// delivered to all connected sinks, giving at-least-once delivery. An
+    /// event that a sink rejects outright is acknowledged and dropped, with
+    /// an error logged, because redelivering it cannot succeed.
+    ///
+    /// Acknowledgements require a stable `client_id`, so the MQTT session
+    /// (and its unacknowledged messages) can be resumed after a restart, and
+    /// a non-zero `keep_alive`. If either is missing, enabling
+    /// acknowledgements here is a configuration error; if they were enabled
+    /// only by the global setting or a connected sink, the source logs a
+    /// warning and runs without them.
     ///
     /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
@@ -91,7 +97,8 @@ impl SourceConfig for MqttSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let acknowledgements =
+            self.resolve_acknowledgements(cx.do_acknowledgements(self.acknowledgements));
 
         let connector = self.build_connector(acknowledgements)?;
 
@@ -134,24 +141,58 @@ impl SourceConfig for MqttSourceConfig {
 }
 
 impl MqttSourceConfig {
-    fn build_connector(&self, acknowledgements: bool) -> Result<MqttConnector, MqttError> {
+    /// What this configuration lacks for end-to-end acknowledgements, if
+    /// anything.
+    const fn unmet_acknowledgement_requirement(&self) -> Option<ConfigurationError> {
         // End-to-end acknowledgements rely on resuming the MQTT session (and its
         // unacknowledged in-flight messages) after a restart, which is keyed by the
         // client ID. A generated/random client ID would start a fresh session and
-        // orphan those messages, silently breaking at-least-once — so require an
-        // explicit, stable client ID when acknowledgements are enabled.
-        if acknowledgements && self.common.client_id.is_none() {
-            return Err(ConfigurationError::AcknowledgementsRequireClientId)
-                .context(ConfigurationSnafu);
+        // orphan those messages, silently breaking at-least-once.
+        if self.common.client_id.is_none() {
+            return Some(ConfigurationError::AcknowledgementsRequireClientId);
         }
 
         // The ack machinery's liveness (detecting dead connections so unacked
         // messages get redelivered, and its retry timers making progress on a
         // quiet topic) depends on keep-alive traffic; `keep_alive = 0`
         // disables it entirely in rumqttc.
-        if acknowledgements && self.common.keep_alive == 0 {
-            return Err(ConfigurationError::AcknowledgementsRequireKeepAlive)
-                .context(ConfigurationSnafu);
+        if self.common.keep_alive == 0 {
+            return Some(ConfigurationError::AcknowledgementsRequireKeepAlive);
+        }
+
+        None
+    }
+
+    /// Whether the source runs with end-to-end acknowledgements, given that
+    /// the topology resolved them to `enabled` for it.
+    ///
+    /// Enabling them on the source itself with a requirement unmet is a
+    /// configuration error (`build_connector` reports it). But they can also
+    /// be switched on from outside, by the global option or a connected
+    /// sink, for a source that was configured without them in mind. Before
+    /// this source supported acknowledgements such a configuration ran, with
+    /// a warning, so it must keep running: fall back to no acknowledgements
+    /// and say so.
+    fn resolve_acknowledgements(&self, enabled: bool) -> bool {
+        if !enabled || self.acknowledgements.enabled() {
+            return enabled;
+        }
+
+        match self.unmet_acknowledgement_requirement() {
+            Some(reason) => {
+                warn!(
+                    message = "Acknowledgements are enabled for this `mqtt` source by a sink or the global option, but its configuration cannot support them; running without. Silent data loss could occur.",
+                    %reason,
+                );
+                false
+            }
+            None => true,
+        }
+    }
+
+    fn build_connector(&self, acknowledgements: bool) -> Result<MqttConnector, MqttError> {
+        if acknowledgements && let Some(error) = self.unmet_acknowledgement_requirement() {
+            return Err(error).context(ConfigurationSnafu);
         }
 
         // A SUBSCRIBE must carry at least one filter ([MQTT-3.8.3-3]), so with
@@ -307,6 +348,48 @@ mod test {
             ..Default::default()
         };
         assert!(config.build_connector(false).is_err());
+    }
+
+    // Acknowledgements can be switched on from outside the source (the
+    // global option, or a connected sink). A configuration that lacks what
+    // they need ran before this source supported them, so it must keep
+    // running -- without acknowledgements -- instead of failing to start
+    // after an upgrade. Asking for them on the source itself still fails.
+    #[test]
+    fn externally_enabled_acknowledgements_fall_back_when_unsupported() {
+        let no_client_id = MqttSourceConfig::default();
+        let no_keep_alive = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                keep_alive: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let supported = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        for config in [&no_client_id, &no_keep_alive] {
+            assert!(!config.resolve_acknowledgements(true));
+            assert!(!config.resolve_acknowledgements(false));
+            assert!(config.build_connector(false).is_ok());
+        }
+        assert!(supported.resolve_acknowledgements(true));
+        assert!(!supported.resolve_acknowledgements(false));
+
+        // Enabled on the source itself: not downgraded, so building reports
+        // the configuration error.
+        let explicit = MqttSourceConfig {
+            acknowledgements: true.into(),
+            ..Default::default()
+        };
+        assert!(explicit.resolve_acknowledgements(true));
+        assert!(explicit.build_connector(true).is_err());
     }
 
     // An invalid topic filter is a permanent configuration error and must
