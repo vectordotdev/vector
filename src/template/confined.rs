@@ -85,6 +85,18 @@ impl ConfinedTemplate {
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.inner.get_fields()
     }
+
+    /// Returns a reference to the original template source.
+    #[must_use]
+    pub const fn get_ref(&self) -> &str {
+        self.inner.get_ref()
+    }
+
+    /// Returns `true` if rendering depends on an event field or time.
+    #[must_use]
+    pub const fn is_dynamic(&self) -> bool {
+        self.inner.is_dynamic()
+    }
 }
 
 /// A template confined via [`UriTemplate::confine`], for HTTP/HTTPS URI fields.
