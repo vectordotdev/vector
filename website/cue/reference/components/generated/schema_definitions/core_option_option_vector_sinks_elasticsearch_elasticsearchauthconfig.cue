@@ -49,7 +49,7 @@ _schemaDefinitions: "core::option::Option<vector::sinks::elasticsearch::Elastics
 		required:      false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -71,7 +71,7 @@ _schemaDefinitions: "core::option::Option<vector::sinks::elasticsearch::Elastics
 		type: string: {
 			default: "default"
 			examples: [
-				"develop",
+				"develop"
 			]
 		}
 	}
@@ -87,7 +87,7 @@ _schemaDefinitions: "core::option::Option<vector::sinks::elasticsearch::Elastics
 		relevant_when: "strategy = \"aws\""
 		required:      false
 		type: string: examples: [
-			"us-west-2",
+			"us-west-2"
 		]
 	}
 	secret_access_key: {

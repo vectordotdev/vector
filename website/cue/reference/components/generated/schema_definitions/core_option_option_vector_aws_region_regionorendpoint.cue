@@ -14,7 +14,7 @@ _schemaDefinitions: "core::option::Option<vector::aws::region::RegionOrEndpoint>
 			"""
 		required: false
 		type: string: examples: [
-			"us-east-1",
+			"us-east-1"
 		]
 	}
 }

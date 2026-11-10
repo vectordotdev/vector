@@ -43,7 +43,7 @@ _schemaDefinitions: "vector::aws::auth::AwsAuthentication": object: options: {
 		required: false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -58,7 +58,7 @@ _schemaDefinitions: "vector::aws::auth::AwsAuthentication": object: options: {
 		type: string: {
 			default: "default"
 			examples: [
-				"develop",
+				"develop"
 			]
 		}
 	}
@@ -73,7 +73,7 @@ _schemaDefinitions: "vector::aws::auth::AwsAuthentication": object: options: {
 			"""
 		required: false
 		type: string: examples: [
-			"us-west-2",
+			"us-west-2"
 		]
 	}
 	secret_access_key: {

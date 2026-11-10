@@ -3,10 +3,10 @@ package metadata
 _schemaDefinitions: "derived::a92b0a9eb567f8513c87e07b": object: {
 	examples: [{
 		excludes: [
-			"dm-*",
+			"dm-*"
 		]
 		includes: [
-			"sda",
+			"sda"
 		]
 	}]
 	options: {
@@ -28,7 +28,7 @@ _schemaDefinitions: "derived::a92b0a9eb567f8513c87e07b": object: {
 			required: false
 			type: array: {
 				default: [
-					"*",
+					"*"
 				]
 				items: type: string: {}
 			}

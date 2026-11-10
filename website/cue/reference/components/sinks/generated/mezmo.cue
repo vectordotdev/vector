@@ -28,7 +28,7 @@ generated: components: sinks: mezmo: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"my-app",
+				"my-app"
 			]
 		}
 	}

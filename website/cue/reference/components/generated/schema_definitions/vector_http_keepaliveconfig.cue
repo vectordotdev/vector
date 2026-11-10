@@ -26,7 +26,7 @@ _schemaDefinitions: "vector::http::KeepaliveConfig": object: options: {
 		type: uint: {
 			default: 300
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}

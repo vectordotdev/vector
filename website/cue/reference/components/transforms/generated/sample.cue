@@ -116,7 +116,7 @@ generated: components: transforms: sample: configuration: {
 		required_one_of: ["rate", "ratio"]
 		required_one_of_group: "sampling_strategy"
 		type: float: examples: [
-			0.13,
+			0.13
 		]
 	}
 	ratio_field: {

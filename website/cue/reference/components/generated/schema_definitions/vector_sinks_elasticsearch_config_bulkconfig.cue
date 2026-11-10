@@ -29,7 +29,7 @@ _schemaDefinitions: "vector::sinks::elasticsearch::config::BulkConfig": object: 
 		description: "The default index to write events to if the template in `bulk.index` cannot be resolved"
 		required:    false
 		type: string: examples: [
-			"test-index",
+			"test-index"
 		]
 	}
 	version: {

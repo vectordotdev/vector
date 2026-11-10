@@ -14,7 +14,7 @@ generated: components: sources: nats: configuration: {
 			"""
 		required: true
 		type: string: examples: [
-			"vector",
+			"vector"
 		]
 	}
 	decoding: {
