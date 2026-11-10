@@ -31,7 +31,7 @@ static VALIDATOR: LazyLock<Option<Validator>> = LazyLock::new(|| {
         .map_err(|error| format!("{error:?}"))
         .and_then(|schema| serde_json::to_value(schema).map_err(|error| error.to_string()))
         .and_then(|mut schema| {
-            prepare_schema(&mut schema);
+            prepare_root_schema(&mut schema);
             jsonschema::validator_for(&schema).map_err(|error| error.to_string())
         });
     match result {
@@ -122,6 +122,18 @@ fn ignored_paths(validator: &Validator, value: &Value) -> Vec<String> {
     ignored.into_iter().collect()
 }
 
+fn prepare_root_schema(schema: &mut Value) {
+    // jsonschema treats legacy `definitions` as an annotation, retaining a copy of the
+    // whole definitions map alongside the compiled validators. Use the draft's `$defs`
+    // keyword only in this diagnostic schema; the published schema remains unchanged.
+    if let Some(object) = schema.as_object_mut()
+        && let Some(definitions) = object.remove("definitions")
+    {
+        object.insert("$defs".into(), definitions);
+    }
+    prepare_schema(schema);
+}
+
 fn prepare_schema(schema: &mut Value) {
     let Some(object) = schema.as_object_mut() else {
         return;
@@ -200,6 +212,9 @@ fn prepare_schema(schema: &mut Value) {
         }
     }
     if let Some(Value::String(reference)) = object.get_mut("$ref") {
+        if let Some(name) = reference.strip_prefix("#/definitions/") {
+            *reference = format!("#/$defs/{name}");
+        }
         // Rust generic type names in definition references contain characters forbidden in URIs.
         let mut url = url::Url::parse("https://vector.invalid/").expect("valid static schema URL");
         if let Some(fragment) = reference.strip_prefix('#') {
@@ -320,5 +335,54 @@ fn add_aliases(schema: &mut Map<String, Value>) {
                 .expect("allOf is an array")
                 .push(serde_json::json!({"anyOf": alternatives}));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{ignored_paths, prepare_root_schema};
+
+    #[test]
+    fn definitions_are_not_retained_as_annotations() {
+        let mut schema = json!({
+            "$schema": "https://json-schema.org/draft/2019-09/schema",
+            "$ref": "#/definitions/Config<alloc::string::String>",
+            "definitions": {
+                "Config<alloc::string::String>": {
+                    "type": "object",
+                    "properties": {
+                        "definitions": {"type": "string"},
+                        "$defs": {"type": "string"},
+                        "nested": {"$ref": "#/definitions/Nested"}
+                    },
+                    "additionalProperties": false
+                },
+                "Nested": {
+                    "type": "object",
+                    "properties": {
+                        "reference": {"const": "#/definitions/literal"}
+                    },
+                    "additionalProperties": false
+                }
+            }
+        });
+        prepare_root_schema(&mut schema);
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let value = json!({
+            "definitions": "ordinary property",
+            "$defs": "another ordinary property",
+            "nested": {"reference": "#/definitions/literal", "typo": true},
+            "typo": true
+        });
+        let evaluation = validator.evaluate(&value);
+        assert!(evaluation.flag().valid);
+        assert!(
+            evaluation
+                .iter_annotations()
+                .all(|annotation| { annotation.annotations.value().get("definitions").is_none() })
+        );
+        assert_eq!(ignored_paths(&validator, &value), ["/nested/typo", "/typo"]);
     }
 }
