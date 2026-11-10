@@ -1,8 +1,11 @@
+use std::io::Cursor;
+
 use super::Deserializer;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use smallvec::{SmallVec, smallvec};
+use serde::Deserialize;
+use smallvec::SmallVec;
 use vector_core::config::DataType;
 use vector_core::event::LogEvent;
 use vector_core::{
@@ -12,13 +15,18 @@ use vector_core::{
 };
 use vrl::prelude::Kind;
 
-/// Deserializer that builds `Event`s from a byte frame containing MsgPack.
+/// Deserializer that builds `Event`s from a byte frame containing `MessagePack`.
+///
+/// A frame may contain several concatenated `MessagePack` values (for example when the whole
+/// stream is buffered as a single frame). Every value is decoded until the frame is exhausted,
+/// and a top-level array is expanded into one event per element.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(Default)]
 pub struct MsgPackDeserializer;
 
 impl MsgPackDeserializer {
     /// Create a `MsgPackDeserializer` instance.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -31,11 +39,13 @@ pub struct MsgPackDeserializerConfig;
 
 impl MsgPackDeserializerConfig {
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -66,15 +76,22 @@ impl Deserializer for MsgPackDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let vrl_value: vrl::value::Value = rmp_serde::from_slice(&bytes)?;
-        let mut events: SmallVec<[Event; 1]> = if let vrl::value::Value::Array(array) = vrl_value {
-            array
-                .into_iter()
-                .map(|elem| Event::Log(LogEvent::from(elem)))
-                .collect()
-        } else {
-            smallvec![Event::Log(LogEvent::from(vrl_value))]
-        };
+        let len = bytes.len() as u64;
+        let mut deserializer = rmp_serde::Deserializer::new(Cursor::new(&bytes[..]));
+        let mut events: SmallVec<[Event; 1]> = SmallVec::new();
+
+        // Keep decoding until every byte of the frame has been consumed. A truncated or
+        // malformed trailing value surfaces as an error rather than being silently dropped.
+        while deserializer.position() < len {
+            match vrl::value::Value::deserialize(&mut deserializer)? {
+                vrl::value::Value::Array(array) => events.extend(
+                    array
+                        .into_iter()
+                        .map(|elem| Event::Log(LogEvent::from(elem))),
+                ),
+                value => events.push(Event::Log(LogEvent::from(value))),
+            }
+        }
         let events = match log_namespace {
             LogNamespace::Vector => events,
             LogNamespace::Legacy => {
@@ -106,7 +123,7 @@ mod tests {
     #[test]
     fn deserialize_msgpack() {
         let input = Bytes::from_static(b"\x81\xA3\x66\x6F\x6F\x7B");
-        let deserializer = MsgPackDeserializer::default();
+        let deserializer = MsgPackDeserializer;
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
@@ -133,10 +150,10 @@ mod tests {
     #[test]
     fn deserialize_non_object_vector_namespace() {
         let input = Bytes::from_static(b"\xC0");
-        let deserializer = MsgPackDeserializer::default();
+        let deserializer = MsgPackDeserializer;
 
         let namespace = LogNamespace::Vector;
-        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let events = deserializer.parse(input, namespace).unwrap();
         let mut events = events.into_iter();
 
         let event = events.next().unwrap();
@@ -150,7 +167,7 @@ mod tests {
     fn deserialize_msgpack_array() {
         let input =
             Bytes::from_static(b"\x92\x81\xA3\x66\x6F\x6F\x7B\x81\xA3\x62\x61\x72\xCD\x01\xC8");
-        let deserializer = MsgPackDeserializer::default();
+        let deserializer = MsgPackDeserializer;
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
             let mut events = events.into_iter();
@@ -185,9 +202,37 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_concatenated_msgpack_values() {
+        // {"foo": 123} followed by [{"bar": 456}, {"baz": 789}]
+        let input = Bytes::from_static(
+            b"\x81\xA3\x66\x6F\x6F\x7B\x92\x81\xA3\x62\x61\x72\xCD\x01\xC8\x81\xA3\x62\x61\x7A\xCD\x03\x15",
+        );
+        let deserializer = MsgPackDeserializer;
+
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let events = deserializer.parse(input.clone(), namespace).unwrap();
+            assert_eq!(events.len(), 3);
+            assert_eq!(events[0].as_log()["foo"], 123.into());
+            assert_eq!(events[1].as_log()["bar"], 456.into());
+            assert_eq!(events[2].as_log()["baz"], 789.into());
+        }
+    }
+
+    #[test]
+    fn deserialize_error_trailing_bytes() {
+        // A complete {"foo": 123} followed by a truncated map.
+        let input = Bytes::from_static(b"\x81\xA3\x66\x6F\x6F\x7B\x81\xA3\x66");
+        let deserializer = MsgPackDeserializer;
+
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            assert!(deserializer.parse(input.clone(), namespace).is_err());
+        }
+    }
+
+    #[test]
     fn deserialize_error_invalid_msgpack() {
         let input = Bytes::from_static(b"\x92\x81\xA3\x66");
-        let deserializer = MsgPackDeserializer::default();
+        let deserializer = MsgPackDeserializer;
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());

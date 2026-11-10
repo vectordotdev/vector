@@ -2938,7 +2938,6 @@ dependencies = [
  "rmp",
  "rmp-serde",
  "rstest 0.28.0",
- "rust_decimal",
  "serde",
  "serde_json",
  "serde_with",
