@@ -7,7 +7,6 @@ use derivative::Derivative;
 use serde::Deserialize;
 use smallvec::SmallVec;
 use vector_core::config::DataType;
-use vector_core::event::LogEvent;
 use vector_core::{
     config::{LogNamespace, log_schema},
     event::Event,
@@ -83,13 +82,15 @@ impl Deserializer for MsgPackDeserializer {
         // Keep decoding until every byte of the frame has been consumed. A truncated or
         // malformed trailing value surfaces as an error rather than being silently dropped.
         while deserializer.position() < len {
-            match vrl::value::Value::deserialize(&mut deserializer)? {
-                vrl::value::Value::Array(array) => {
+            // Decode through `serde_json::Value`, like the JSON decoder, so unsigned integers
+            // above `i64::MAX` are kept as decimal strings instead of being rounded to `f64`.
+            match serde_json::Value::deserialize(&mut deserializer)? {
+                serde_json::Value::Array(array) => {
                     for elem in array {
-                        events.push(value_to_event(elem, log_namespace)?);
+                        events.push(Event::from_json_value(elem, log_namespace)?);
                     }
                 }
-                value => events.push(value_to_event(value, log_namespace)?),
+                value => events.push(Event::from_json_value(value, log_namespace)?),
             }
         }
         let events = match log_namespace {
@@ -111,21 +112,6 @@ impl Deserializer for MsgPackDeserializer {
         };
 
         Ok(events)
-    }
-}
-
-/// Build a log event from a decoded value. The Legacy namespace requires an object root, so any
-/// other value is rejected, matching `Event::from_json_value`.
-fn value_to_event(
-    value: vrl::value::Value,
-    log_namespace: LogNamespace,
-) -> vector_common::Result<Event> {
-    match (log_namespace, value) {
-        (LogNamespace::Legacy, value @ vrl::value::Value::Object(_))
-        | (LogNamespace::Vector, value) => Ok(Event::Log(LogEvent::from(value))),
-        (LogNamespace::Legacy, _) => {
-            Err("Attempted to convert non-Object MessagePack into an Event.".into())
-        }
     }
 }
 
@@ -177,6 +163,23 @@ mod tests {
         assert_eq!(log["."], Value::Null);
 
         assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn deserialize_large_unsigned_integer_as_string() {
+        // {"id": 9223372036854775809, "max": 18446744073709551615, "small": 7}
+        let input = Bytes::from_static(
+            b"\x83\xA2id\xCF\x80\x00\x00\x00\x00\x00\x00\x01\xA3max\xCF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xA5small\xCF\x00\x00\x00\x00\x00\x00\x00\x07",
+        );
+        let deserializer = MsgPackDeserializer;
+
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let events = deserializer.parse(input.clone(), namespace).unwrap();
+            let log = events[0].as_log();
+            assert_eq!(log["id"], "9223372036854775809".into());
+            assert_eq!(log["max"], "18446744073709551615".into());
+            assert_eq!(log["small"], Value::Integer(7));
+        }
     }
 
     #[test]
