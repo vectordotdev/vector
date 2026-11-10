@@ -4,6 +4,6 @@ transforms:
     inputs:
       - my-source-or-transform-id
     delay_ms: 5000
-    measure_cpu_usage: false
     overflow_strategy: block
     queue_capacity: 500
+    measure_cpu_usage: false

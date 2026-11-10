@@ -57,7 +57,7 @@ generated: components: sources: kafka: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	decompression: {
 		description: """
@@ -213,7 +213,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "offset"
 			examples: [
-				"offset"
+				"offset",
 			]
 		}
 	}
@@ -271,7 +271,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "topic"
 			examples: [
-				"topic"
+				"topic",
 			]
 		}
 	}

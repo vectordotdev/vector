@@ -27,14 +27,14 @@ _schemaDefinitions: "core::option::Option<vector::kafka::KafkaSaslConfig>": obje
 		description: "The SASL password."
 		required:    false
 		type: string: examples: [
-			"password"
+			"password",
 		]
 	}
 	username: {
 		description: "The SASL username."
 		required:    false
 		type: string: examples: [
-			"username"
+			"username",
 		]
 	}
 }

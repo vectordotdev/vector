@@ -4,5 +4,5 @@ transforms:
     inputs:
       - my-source-or-transform-id
     interval_ms: 10000
-    measure_cpu_usage: false
     mode: Auto
+    measure_cpu_usage: false

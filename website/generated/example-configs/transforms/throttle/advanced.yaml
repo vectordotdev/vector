@@ -4,6 +4,6 @@ transforms:
     inputs:
       - my-source-or-transform-id
     key_field: "{{ message }}"
-    measure_cpu_usage: false
     threshold: 100
     window_secs: 1.0
+    measure_cpu_usage: false

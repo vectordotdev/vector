@@ -45,6 +45,11 @@ _schemaDefinitions: "codecs::decoding::DeserializerConfig": object: options: {
 
 				[json]: https://www.json.org/
 				"""
+			message_pack: """
+				Decodes the raw bytes as an [MessagePack][messagepack] message.
+
+				[messagepack]: https://msgpack.org/
+				"""
 			native: """
 				Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 

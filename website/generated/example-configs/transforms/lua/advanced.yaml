@@ -12,7 +12,6 @@ transforms:
           -- Very important! Emit the processed event.
           emit(event)
         end
-    measure_cpu_usage: false
     metric_tag_values: single
     search_dirs:
       - /etc/vector/lua
@@ -48,3 +47,4 @@ transforms:
       - handler: timer_handler
         interval_seconds: 2
     version: "2"
+    measure_cpu_usage: false
