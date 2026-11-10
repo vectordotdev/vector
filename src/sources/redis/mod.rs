@@ -570,6 +570,7 @@ mod integration_test {
             url: proxy.url.clone(),
             key: key.clone(),
             redis_key: None,
+            redis_channel: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(false),
@@ -698,6 +699,7 @@ mod integration_test {
             url: proxy.url,
             key: format!("test-key-{}", random_string(10)),
             redis_key: None,
+            redis_channel: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(false),
@@ -807,7 +809,7 @@ mod integration_test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Pchannel,
             list: None,
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: pattern.clone(),
             redis_key: None,
             redis_channel: Some(OptionalValuePath::from(owned_value_path!("channel"))),
@@ -828,7 +830,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut async_conn = client
             .get_multiplexed_async_connection()
             .await
@@ -879,13 +881,17 @@ mod integration_test {
 
         // Point the source at a dedicated database (db 1) so its pub/sub connection can be
         // identified unambiguously below; no other integration test uses this database.
+        // Derive it from redis_url() so it works whatever REDIS_URL points at.
         const RECONNECT_DB: u32 = 1;
-        let source_url = "redis://redis-primary:6379/1";
+        let source_url = match redis_url().rsplit_once('/') {
+            Some((host, _db)) => format!("{host}/{RECONNECT_DB}"),
+            None => format!("{}/{RECONNECT_DB}", redis_url()),
+        };
 
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Pchannel,
             list: None,
-            url: source_url.to_owned(),
+            url: source_url,
             key: pattern.clone(),
             redis_key: None,
             redis_channel: Some(OptionalValuePath::from(owned_value_path!("channel"))),
@@ -894,7 +900,7 @@ mod integration_test {
             log_namespace: Some(false),
         };
 
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut admin = client
             .get_multiplexed_async_connection()
             .await
