@@ -84,12 +84,12 @@ impl Deserializer for MsgPackDeserializer {
         // malformed trailing value surfaces as an error rather than being silently dropped.
         while deserializer.position() < len {
             match vrl::value::Value::deserialize(&mut deserializer)? {
-                vrl::value::Value::Array(array) => events.extend(
-                    array
-                        .into_iter()
-                        .map(|elem| Event::Log(LogEvent::from(elem))),
-                ),
-                value => events.push(Event::Log(LogEvent::from(value))),
+                vrl::value::Value::Array(array) => {
+                    for elem in array {
+                        events.push(value_to_event(elem, log_namespace)?);
+                    }
+                }
+                value => events.push(value_to_event(value, log_namespace)?),
             }
         }
         let events = match log_namespace {
@@ -113,6 +113,22 @@ impl Deserializer for MsgPackDeserializer {
         Ok(events)
     }
 }
+
+/// Build a log event from a decoded value. The Legacy namespace requires an object root, so any
+/// other value is rejected, matching `Event::from_json_value`.
+fn value_to_event(
+    value: vrl::value::Value,
+    log_namespace: LogNamespace,
+) -> vector_common::Result<Event> {
+    match (log_namespace, value) {
+        (LogNamespace::Legacy, value @ vrl::value::Value::Object(_))
+        | (LogNamespace::Vector, value) => Ok(Event::Log(LogEvent::from(value))),
+        (LogNamespace::Legacy, _) => {
+            Err("Attempted to convert non-Object MessagePack into an Event.".into())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use vector_core::config::log_schema;
@@ -161,6 +177,27 @@ mod tests {
         assert_eq!(log["."], Value::Null);
 
         assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn deserialize_error_non_object_legacy_namespace() {
+        let deserializer = MsgPackDeserializer;
+
+        // nil
+        assert!(
+            deserializer
+                .parse(Bytes::from_static(b"\xC0"), LogNamespace::Legacy)
+                .is_err()
+        );
+        // [{"foo": 123}, 1]
+        assert!(
+            deserializer
+                .parse(
+                    Bytes::from_static(b"\x92\x81\xA3\x66\x6F\x6F\x7B\x01"),
+                    LogNamespace::Legacy
+                )
+                .is_err()
+        );
     }
 
     #[test]
