@@ -626,7 +626,10 @@ printf '## 0.28.0\n- Release fixture\n'"#,
     fn assert_release_files(repo: &Path, version: &str) {
         let manifest: toml::Value =
             toml::from_str(&fs::read_to_string(repo.join("Cargo.toml")).unwrap()).unwrap();
-        assert_eq!(manifest["package"]["version"].as_str(), Some(version));
+        assert_eq!(
+            manifest["workspace"]["package"]["version"].as_str(),
+            Some(version)
+        );
         assert_eq!(
             manifest["workspace"]["dependencies"]["vrl"]["version"].as_str(),
             Some("0.28.0")
