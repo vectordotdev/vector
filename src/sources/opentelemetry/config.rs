@@ -33,7 +33,7 @@ use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType},
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
-    internal_event::{BytesReceived, EventsReceived, Protocol},
+    internal_event::{BytesReceived, EventsReceived, Protocol, register},
     lookup::{OwnedTargetPath, owned_value_path},
     opentelemetry::{
         logs::{
@@ -397,7 +397,7 @@ impl OpentelemetryConfig {
             );
         }
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let request_control = RequestControl::new(
             self.max_concurrent_requests.map(NonZeroUsize::get),
             self.request_timeout_secs.map(Duration::from_secs),
@@ -472,7 +472,7 @@ impl OpentelemetryConfig {
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
-        let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
+        let bytes_received = register(BytesReceived::from(Protocol::from(protocol)));
         let headers =
             build_param_matcher(&remove_duplicates(self.http.headers.clone(), "headers"))?;
 

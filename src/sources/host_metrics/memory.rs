@@ -10,7 +10,7 @@ use heim::memory::os::macos::MemoryExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use vector_lib::internal_event::CounterName;
-use vector_lib::{event::MetricTags, internal_event::GaugeName};
+use vector_lib::{event::MetricTags, internal_event::GaugeName, internal_event::emit};
 
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -100,7 +100,7 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load memory info.",
                     error,
                 });
@@ -145,7 +145,7 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load swap info.",
                     error,
                 });
@@ -167,7 +167,7 @@ impl HostMetrics {
         match result {
             Ok(stats) => record_vmstat_metrics(&stats, output),
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load vmstat info.",
                     error,
                 });

@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
+use vector_lib::internal_event::emit;
 use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
@@ -111,16 +112,16 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                                 value: Some(value_bytes.as_ref()),
                             });
                         } else {
-                            emit!(KafkaHeaderExtractionError {
-                                header_field: headers_key
+                            emit(KafkaHeaderExtractionError {
+                                header_field: headers_key,
                             });
                         }
                     }
                     return Some(owned_headers);
                 }
                 _ => {
-                    emit!(KafkaHeaderExtractionError {
-                        header_field: headers_key
+                    emit(KafkaHeaderExtractionError {
+                        header_field: headers_key,
                     });
                 }
             }

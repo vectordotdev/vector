@@ -12,6 +12,7 @@ use std::{
     thread::JoinHandle,
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use cuckoo_clock::{
@@ -478,8 +479,8 @@ impl CuckooMemoryTable {
                 } else {
                     filter.scan_and_update_full_partition(count, i)
                 };
-                emit!(MemoryEnrichmentTableTtlExpiredCount {
-                    count: expired as u64
+                emit(MemoryEnrichmentTableTtlExpiredCount {
+                    count: expired as u64,
                 });
                 scans_in_progress.fetch_sub(1, Ordering::AcqRel);
             }
@@ -489,16 +490,16 @@ impl CuckooMemoryTable {
         if self.cuckoo_config.concurrent_scanning {
             tokio::spawn(async move {
                 let _ = handles.join_all().await;
-                emit!(MemoryEnrichmentTableFlushed {
+                emit(MemoryEnrichmentTableFlushed {
                     new_objects_count: filter.get_item_count(),
-                    new_byte_size: filter.get_memory_usage()
+                    new_byte_size: filter.get_memory_usage(),
                 });
             });
         } else {
             let _ = handles.join_all().await;
-            emit!(MemoryEnrichmentTableFlushed {
+            emit(MemoryEnrichmentTableFlushed {
                 new_objects_count: filter.get_item_count(),
-                new_byte_size: filter.get_memory_usage()
+                new_byte_size: filter.get_memory_usage(),
             });
         }
     }
@@ -532,9 +533,9 @@ impl CuckooMemoryTable {
         for (k, value) in &value {
             if matches!(value, Value::Null) {
                 if self.filter.remove(k) {
-                    emit!(MemoryEnrichmentTableRemoved {
+                    emit(MemoryEnrichmentTableRemoved {
                         key: k,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                 }
 
@@ -595,14 +596,14 @@ impl CuckooMemoryTable {
             };
 
             if res.is_some_and(|r| r.matches_key(k, &self.filter)) {
-                emit!(MemoryEnrichmentTableInsertFailed {
+                emit(MemoryEnrichmentTableInsertFailed {
                     key: k,
-                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                 });
             } else {
-                emit!(MemoryEnrichmentTableInserted {
+                emit(MemoryEnrichmentTableInserted {
                     key: k,
-                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                 });
             }
         }
@@ -640,9 +641,9 @@ impl Table for CuckooMemoryTable {
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
                 if let Some(associated_data) = self.filter.get_associated_data(&key) {
-                    emit!(MemoryEnrichmentTableRead {
+                    emit(MemoryEnrichmentTableRead {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     let mut result = ObjectMap::from([
                         (KeyString::from("key"), Value::from(key)),
@@ -663,9 +664,9 @@ impl Table for CuckooMemoryTable {
                     }
                     Ok(vec![result])
                 } else {
-                    emit!(MemoryEnrichmentTableReadFailed {
+                    emit(MemoryEnrichmentTableReadFailed {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     Ok(Vec::default())
                 }
@@ -712,8 +713,8 @@ impl StreamSink<Event> for CuckooMemoryTable {
         reason = "Keep the existing branching and control flow during the lint rollout."
     )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let events_sent = register!(EventsSent::from(Output(None)));
-        let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
+        let events_sent = register(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("memory_enrichment_table".into())));
         let now = Instant::now();
         let scan_interval_duration = Duration::from_secs(self.config.scan_interval.into());
         let mut scan_interval = IntervalStream::new(interval_at(
@@ -766,7 +767,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     bytes_sent.emit(ByteSize(event_byte_size.get()));
 
                     if self.config.flush_interval.is_none() {
-                        emit!(MemoryEnrichmentTableFlushed {
+                        emit(MemoryEnrichmentTableFlushed {
                             new_objects_count: self.filter.get_item_count(),
                             new_byte_size: self.filter.get_memory_usage()
                         });
@@ -774,7 +775,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                 },
 
                 Some(_) = flush_interval.next() => {
-                    emit!(MemoryEnrichmentTableFlushed {
+                    emit(MemoryEnrichmentTableFlushed {
                         new_objects_count: self.filter.get_item_count(),
                         new_byte_size: self.filter.get_memory_usage()
                     });

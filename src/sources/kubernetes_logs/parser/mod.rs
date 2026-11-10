@@ -1,3 +1,4 @@
+use vector_lib::internal_event::emit;
 mod cri;
 mod docker;
 mod test_util;
@@ -44,8 +45,8 @@ impl FunctionTransform for Parser {
             ParserState::Uninitialized => {
                 let message_field = get_message_path(self.log_namespace);
                 let Some(message) = event.as_log().get(&message_field) else {
-                    emit!(KubernetesLogsFormatPickerEdgeCase {
-                        what: "got an event without a message"
+                    emit(KubernetesLogsFormatPickerEdgeCase {
+                        what: "got an event without a message",
                     });
                     return;
                 };
@@ -54,8 +55,8 @@ impl FunctionTransform for Parser {
                     Value::Bytes(bytes) => bytes,
                     Value::String(string) => string.as_bytes(),
                     _ => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event with non-bytes message"
+                        emit(KubernetesLogsFormatPickerEdgeCase {
+                            what: "got an event with non-bytes message",
                         });
                         return;
                     }

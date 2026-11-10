@@ -7,6 +7,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::emit;
 
 use http::{
     HeaderMap, HeaderName, HeaderValue,
@@ -176,12 +177,12 @@ impl WebSocketConnector {
         loop {
             match self.connect().await {
                 Ok(ws_stream) => {
-                    emit!(WebSocketConnectionEstablished {});
+                    emit(WebSocketConnectionEstablished {});
                     return ws_stream;
                 }
                 Err(error) => {
-                    emit!(WebSocketConnectionFailedError {
-                        error: Box::new(error)
+                    emit(WebSocketConnectionFailedError {
+                        error: Box::new(error),
                     });
                     time::sleep(backoff.next().unwrap()).await;
                 }
@@ -201,16 +202,16 @@ impl WebSocketConnector {
         loop {
             match time::timeout(timeout_duration, self.connect()).await {
                 Ok(Ok(ws_stream)) => {
-                    emit!(WebSocketConnectionEstablished {});
+                    emit(WebSocketConnectionEstablished {});
                     return ws_stream;
                 }
                 Ok(Err(error)) => {
-                    emit!(WebSocketConnectionFailedError {
-                        error: Box::new(error)
+                    emit(WebSocketConnectionFailedError {
+                        error: Box::new(error),
                     });
                 }
                 Err(_) => {
-                    emit!(WebSocketConnectionFailedError {
+                    emit(WebSocketConnectionFailedError {
                         error: Box::new(WebSocketError::ConnectionTimedOut),
                     });
                 }

@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     io::{self, Write},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
@@ -95,7 +96,7 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
                 }
             }
             _ => {
-                emit!(StatsdInvalidMetricError {
+                emit(StatsdInvalidMetricError {
                     value: metric.value(),
                     kind: metric.kind(),
                 });

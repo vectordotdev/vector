@@ -1,7 +1,7 @@
 use vector_lib::{
     config::clone_input_definitions,
     configurable::configurable_component,
-    internal_event::{Count, InternalEventHandle as _, Registered},
+    internal_event::{Count, InternalEventHandle as _, Registered, register},
 };
 
 use crate::{
@@ -85,7 +85,7 @@ impl Filter {
     pub fn new(condition: Condition) -> Self {
         Self {
             condition,
-            events_dropped: register!(FilterEventsDropped),
+            events_dropped: register(FilterEventsDropped),
         }
     }
 }
