@@ -6,8 +6,8 @@
 //! copy of that schema to collect the fields belonging to matching variants.
 
 use std::{
-    cell::LazyCell,
     collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
 };
 
 use jsonschema::Validator;
@@ -26,13 +26,10 @@ const IGNORED_FIELD: &str = "x-vector-ignored-field";
 const SERDE_IGNORED: &str = "serde::ignored";
 const SERDE_OPTIONAL_TAG: &str = "serde::optional_tag";
 
-/// Validator over the schema of every compiled-in component, built on first use.
-///
-/// It is large, so it is owned by a single load and freed with it rather than kept in a static.
-pub(super) type LazyValidator = LazyCell<Option<Validator>>;
+pub(super) type LazyValidator = LazyLock<Option<Validator>>;
 
 pub(super) fn validator() -> LazyValidator {
-    LazyCell::new(|| {
+    LazyLock::new(|| {
         let result = generate_root_schema::<ConfigBuilder>()
             .map_err(|error| format!("{error:?}"))
             .and_then(|schema| serde_json::to_value(schema).map_err(|error| error.to_string()))
