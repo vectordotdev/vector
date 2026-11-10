@@ -23,12 +23,14 @@ transform.
 For example, an `exec` source can now be configured to receive events via the
 `native_json` codec:
 
-```toml
-[sources.in]
-type = "exec"
-mode = "scheduled"
-command = ["./scrape.sh"]
-decoding.codec = "native_json"
+```yaml
+sources:
+  in:
+    type: "exec"
+    mode: "scheduled"
+    command: ["./scrape.sh"]
+    decoding:
+      codec: "native_json"
 ```
 
 If `scrape.sh` contained:
@@ -63,9 +65,9 @@ a `timestamp` key like:
 ```
 
 The specific JSON schema here is subject to change, but you can find an initial
-schema [here][cue schema]. The protobuf schema for the `native` codec is the
-same used in the `vector` source and sink, and the definition can be found
-[here][proto schema].
+[CUE schema][cue schema]. The protobuf schema for the `native` codec is the
+same used in the `vector` source and sink, and the definition can be found in the
+[proto schema][proto schema].
 
 We will be providing more thorough guidance for using each as the feature
 matures. One current limitation of the JSON-based native codec is that timestamp
@@ -82,24 +84,28 @@ deserialize directly to the same native representation within Vector.
 
 Example source configuration:
 
-```toml
-[sources.in]
-type = "kafka"
-bootstrap_servers = "localhost:9092"
-topics = ["vector"]
-decoding.codec = "native"
+```yaml
+sources:
+  in:
+    type: "kafka"
+    bootstrap_servers: "localhost:9092"
+    topics: ["vector"]
+    decoding:
+      codec: "native"
 ```
 
 This would allow an instance of Vector to receive events from another Vector
 instance that has a `kafka` sink configured like:
 
-```toml
-[sinks.out]
-type = "kafka"
-inputs = ["..."]
-bootstrap_servers = "localhost:9092"
-topic = "vector"
-encoding.codec = "native"
+```yaml
+sinks:
+  out:
+    type: "kafka"
+    inputs: ["..."]
+    bootstrap_servers: "localhost:9092"
+    topic: "vector"
+    encoding:
+      codec: "native"
 ```
 
 Note that the new `native` encoding option is not yet documented on sinks as we

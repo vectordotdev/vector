@@ -6,16 +6,20 @@ use sqlx::{
 use std::collections::HashMap;
 use tracing::{info, warn};
 use vector_lib::{
-    codecs::{JsonSerializerConfig, MetricTagValues, encoding::FramingConfig},
+    codecs::{
+        JsonSerializerConfig, MetricTagValues,
+        encoding::{FramingConfig, JsonSerializerOptions},
+    },
     event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value},
 };
+use vrl::event_path;
 // use vector_common::finalization::BatchStatus;
 use vector_common::sensitive_string::SensitiveString;
 
 use super::*;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::BatchConfig,
+    sinks::util::{BatchConfig, TowerRequestConfig},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_string, trace_init,
@@ -37,7 +41,7 @@ fn doris_address() -> String {
 fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    event.insert("host", "example.com");
+    event.insert(event_path!("host"), "example.com");
     (event.into(), receiver)
 }
 
@@ -50,7 +54,10 @@ fn assert_fields_match(
 ) {
     for field in fields {
         // Get field value from event
-        let event_value = event_log.get(*field).cloned().unwrap_or(Value::Null);
+        let event_value = event_log
+            .get(&vrl::path::parse_target_path(field).unwrap())
+            .cloned()
+            .unwrap_or(Value::Null);
 
         // Get field value from database row
         let db_value = db_row.get(*field).cloned().unwrap_or(DbValue::Null);
@@ -58,6 +65,7 @@ fn assert_fields_match(
         // Convert event value to string
         let event_str = match &event_value {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).to_string(),
+            Value::String(string) => string.to_string(),
             other => other.to_string(),
         };
         // Database value already has Display implementation, use directly
@@ -65,13 +73,13 @@ fn assert_fields_match(
 
         // Build error message
         let error_msg = if let Some(table) = table_name {
-            format!("Field '{}' mismatch in table {}", field, table)
+            format!("Field '{field}' mismatch in table {table}")
         } else {
-            format!("Field '{}' mismatch", field)
+            format!("Field '{field}' mismatch")
         };
 
         // Compare string representations
-        assert_eq!(event_str, db_str, "{}", error_msg);
+        assert_eq!(event_str, db_str, "{error_msg}");
     }
 }
 
@@ -84,7 +92,7 @@ struct DorisAuth {
 fn config_auth() -> DorisAuth {
     DorisAuth {
         user: "root".to_string(),
-        password: "".to_string(),
+        password: String::new(),
     }
 }
 
@@ -105,7 +113,7 @@ async fn insert_events() {
     let database = format!("test_db_{}_point", random_string(5).to_lowercase());
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
-    let client = DorisTestClient::new(doris_mysql_address_port()).await;
+    let client = DorisTestClient::new(doris_mysql_address_port());
     info!(
         message = "DorisTestClient created successfully, creating database...",
         internal_log_rate_limit = true
@@ -128,16 +136,16 @@ async fn insert_events() {
         log_request: true, // Explicitly enable for integration tests
         encoding: (
             Some(FramingConfig::NewlineDelimited),
-            JsonSerializerConfig::new(MetricTagValues::Full, Default::default()),
+            JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default()),
         )
             .into(),
         headers: default_headers(),
         batch,
         auth: Some(crate::http::Auth::Basic {
-            user: config_auth().user.clone(),
-            password: SensitiveString::from(config_auth().password.clone()),
+            user: config_auth().user,
+            password: SensitiveString::from(config_auth().password),
         }),
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         ..Default::default()
     };
 
@@ -174,9 +182,9 @@ enum DbValue {
 impl std::fmt::Display for DbValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DbValue::String(s) => write!(f, "{}", s),
-            DbValue::Integer(i) => write!(f, "{}", i),
-            DbValue::Float(fl) => write!(f, "{}", fl),
+            DbValue::String(s) => write!(f, "{s}"),
+            DbValue::Integer(i) => write!(f, "{i}"),
+            DbValue::Float(fl) => write!(f, "{fl}"),
             DbValue::Null => write!(f, "null"),
         }
     }
@@ -188,7 +196,7 @@ struct DorisTestClient {
 }
 
 impl DorisTestClient {
-    async fn new(query_address_port: (String, u16)) -> Self {
+    fn new(query_address_port: (String, u16)) -> Self {
         let auth = config_auth();
         let (host, port) = query_address_port;
 
@@ -227,7 +235,7 @@ impl DorisTestClient {
     async fn create_connection(&self) -> MySqlConnection {
         MySqlConnection::connect_with(&self.connect_options)
             .await
-            .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e))
+            .unwrap_or_else(|e| panic!("Failed to connect to database: {e}"))
     }
 
     /// Execute a query that doesn't return data (DDL/DML operations)
@@ -251,7 +259,7 @@ impl DorisTestClient {
             }
             Err(e) => {
                 // Handle specific ignorable errors
-                if self.is_ignorable_error(query, &e) {
+                if Self::is_ignorable_error(query, &e) {
                     warn!(
                         message = "Ignoring expected error for query.",
                         %query,
@@ -260,14 +268,14 @@ impl DorisTestClient {
                     );
                     return;
                 }
-                panic!("SQL query execution failed: {} - {}", query, e);
+                panic!("SQL query execution failed: {query} - {e}");
             }
         }
         // Connection is automatically closed when it goes out of scope
     }
 
     /// Check if an error can be safely ignored
-    fn is_ignorable_error(&self, query: &str, error: &sqlx::Error) -> bool {
+    fn is_ignorable_error(query: &str, error: &sqlx::Error) -> bool {
         let error_str = error.to_string();
         (query.starts_with("CREATE DATABASE") && error_str.contains("already exists"))
             || (query.starts_with("CREATE TABLE") && error_str.contains("already exists"))
@@ -287,7 +295,7 @@ impl DorisTestClient {
         // Connection is automatically closed when it goes out of scope
         conn.fetch_one(query)
             .await
-            .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e))
+            .unwrap_or_else(|e| panic!("{operation_name} failed: {query} - {e}"))
     }
 
     /// Execute a query that returns multiple rows
@@ -313,36 +321,35 @@ impl DorisTestClient {
 
     /// Create database using the common execute pattern
     async fn create_database(&self, database: &str) {
-        let query = format!("CREATE DATABASE IF NOT EXISTS {}", database);
+        let query = format!("CREATE DATABASE IF NOT EXISTS {database}");
         self.execute_query(&query).await;
     }
 
     /// Create table using the common execute pattern
     async fn create_table(&self, database: &str, table: &str, schema: &str) {
         let query = format!(
-            "CREATE TABLE IF NOT EXISTS {}.{} ({}) ENGINE=OLAP
+            "CREATE TABLE IF NOT EXISTS {database}.{table} ({schema}) ENGINE=OLAP
              DISTRIBUTED BY HASH(`host`) BUCKETS 1
-             PROPERTIES(\"replication_num\" = \"1\")",
-            database, table, schema
+             PROPERTIES(\"replication_num\" = \"1\")"
         );
         self.execute_query(&query).await;
     }
 
     /// Drop table using the common execute pattern
     async fn drop_table(&self, database: &str, table: &str) {
-        let query = format!("DROP TABLE IF EXISTS {}.{}", database, table);
+        let query = format!("DROP TABLE IF EXISTS {database}.{table}");
         self.execute_query(&query).await;
     }
 
     /// Drop database using the common execute pattern
     async fn drop_database(&self, database: &str) {
-        let query = format!("DROP DATABASE IF EXISTS {}", database);
+        let query = format!("DROP DATABASE IF EXISTS {database}");
         self.execute_query(&query).await;
     }
 
-    /// Count rows using the common fetch_one pattern
+    /// Count rows using the common `fetch_one` pattern
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
-        let query = format!("SELECT COUNT(*) FROM {}.{}", database, table);
+        let query = format!("SELECT COUNT(*) FROM {database}.{table}");
         let row = self.fetch_one_query(&query, "Counting rows").await;
 
         let count: i64 = row.get(0);
@@ -354,18 +361,17 @@ impl DorisTestClient {
         count
     }
 
-    /// Get column names using the common fetch_all pattern
+    /// Get column names using the common `fetch_all` pattern
     async fn get_column_names(&self, database: &str, table: &str) -> Vec<String> {
         let query = format!(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{}' ORDER BY ORDINAL_POSITION",
-            database, table
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{database}' AND TABLE_NAME = '{table}' ORDER BY ORDINAL_POSITION"
         );
 
         let rows = self.fetch_all_query(&query, "Getting column names").await;
         rows.iter().map(|row| row.get::<String, _>(0)).collect()
     }
 
-    /// Convert a database row value to DbValue enum
+    /// Convert a database row value to `DbValue` enum
     fn extract_db_value(row: &sqlx::mysql::MySqlRow, column_index: usize) -> DbValue {
         // Try different types in order of preference
         if let Ok(value) = row.try_get::<Option<String>, _>(column_index) {
@@ -390,7 +396,7 @@ impl DorisTestClient {
 
     /// Get first row data using the refactored helper methods
     async fn get_first_row(&self, database: &str, table: &str) -> HashMap<String, DbValue> {
-        let query = format!("SELECT * FROM {}.{} LIMIT 1", database, table);
+        let query = format!("SELECT * FROM {database}.{table} LIMIT 1");
 
         // Get column names and row data using helper methods
         let columns = self.get_column_names(database, table).await;

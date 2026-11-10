@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: aws_ecs_metrics
+    endpoint: http://169.254.170.2/v2
+    namespace: awsecs
+    scrape_interval_secs: 15
+    version: v2

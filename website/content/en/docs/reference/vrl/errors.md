@@ -64,17 +64,17 @@ of an infallible assignment.
 
 ##### Empty values
 
-Type | Empty value
-:----|:-----------
-String | `""`
-Integer | `0`
-Float | `0.0`
-Boolean | `false`
-Object | `{}`
-Array | `[]`
-Timestamp | `t'1970-01-01T00:00:00Z'` (Unix epoch)
-Regular expression | `r''`
-Null | `null`
+| Type | Empty value |
+| :---- | :----------- |
+| String | `""` |
+| Integer | `0` |
+| Float | `0.0` |
+| Boolean | `false` |
+| Object | `{}` |
+| Array | `[]` |
+| Timestamp | `t'1970-01-01T00:00:00Z'` (Unix epoch) |
+| Regular expression | `r''` |
+| Null | `null` |
 
 #### Coalescing
 

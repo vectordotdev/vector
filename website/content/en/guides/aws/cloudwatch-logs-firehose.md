@@ -64,7 +64,7 @@ without edits.
 # Update these
 export AWS_ACCOUNT_ID="111111111111" # your AWS account ID
 export AWS_REGION="us-east-1" # region that resources exist in
-export FIREHOSE_ACCESS_KEY="my secret key" # set to a secret value
+export FIREHOSE_ACCESS_KEY="$(openssl rand -hex 32)" # random letters and digits, safe to embed in JSON
 export VECTOR_ENDPOINT="https://example.com" # the endpoint where vector is deployed with the aws_kinesis_firehose source (see Configuring Vector below)
 
 # Update these if needed
@@ -79,33 +79,42 @@ export FIREHOSE_S3_BUCKET="firehose-${AWS_ACCOUNT_ID}" # a bucket to write event
 
 Let's take a look at the configuration we will be using:
 
-```toml title="vector.toml"
-[sources.firehose]
-  type = "aws_kinesis_firehose"
-  address = "0.0.0.0:8080" # the public URL will be set when configuring Firehose
-  access_key = "${FIREHOSE_ACCESS_KEY} # this will also be set when configuring Firehose
+```yaml title="vector.yaml"
+secret:
+  local:
+    type: "file"
+    path: "secrets.json" # written in "Deploying Vector" below
 
-[transforms.parse]
-  type = "remap"
-  inputs = ["firehose"]
-  drop_on_error = false
-  source = '''
-    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
-    . = unnest(parsed.log_events)
-    . = map_values(.) -> |value| {
-       event = del(value.log_events)
-       value |= event
-       message = del(.message)
-       . |= object!(parse_json!(message))
-    }
-  '''
+sources:
+  firehose:
+    type: "aws_kinesis_firehose"
+    address: "0.0.0.0:8080" # the public URL will be set when configuring Firehose
+    access_key: "SECRET[local.firehose_access_key]" # the value of FIREHOSE_ACCESS_KEY, also set when configuring Firehose
+    store_access_key: false
+
+transforms:
+  parse:
+    type: "remap"
+    inputs: ["firehose"]
+    drop_on_error: false
+    source: |
+      parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+      . = unnest(parsed.log_events)
+      . = map_values(.) -> |value| {
+         event = del(value.log_events)
+         value |= event
+         message = del(value.message)
+         value |= object!(parse_json!(message))
+      }
 
 # you may want to add more transforms here
 
-[sinks.console]
-  type = "console"
-  inputs = ["parse"]
-  encoding.codec = "json"
+sinks:
+  console:
+    type: "console"
+    inputs: ["parse"]
+    encoding:
+      codec: "json"
 ```
 
 This will configure `vector` to listen for Firehose messages on the configured
@@ -128,7 +137,20 @@ See their guide for more examples.
 ## Deploying Vector
 
 First, deploy vector with the [`aws_kinesis_firehose`][aws_kinesis_firehose] source. See example
-configuration above.
+configuration above. The configuration reads the access key from `secrets.json` through the
+[`file` secrets backend][secrets]. Write that file from `FIREHOSE_ACCESS_KEY`:
+
+```bash
+(
+  umask 077
+  cat > secrets.json <<EOF
+{"firehose_access_key": "${FIREHOSE_ACCESS_KEY:?Set FIREHOSE_ACCESS_KEY first}"}
+EOF
+)
+```
+
+A relative `path` is resolved against the directory Vector is started from. When running Vector as a
+service, use an absolute path.
 
 {{< info >}}
 Remember that the port must be publicly accessible and the endpoint must be
@@ -306,7 +328,6 @@ $ aws iam create-role \
 }
 EOF
 )
-`
 ```
 
 Now we will attach a policy to our role to let it publish to the Firehose
@@ -339,7 +360,7 @@ $ aws logs put-subscription-filter \
   --filter-name "Destination" \
   --filter-pattern "" \
   --destination-arn "arn:aws:firehose:${AWS_REGION}:${AWS_ACCOUNT_ID}:deliverystream/${FIREHOSE_DELIVERY_STREAM}" \
-  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole
+  --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole"
 ```
 
 {{< info >}}
@@ -350,18 +371,24 @@ delivery stream.
 ## Testing it out
 
 To make sure everything is wired up correctly, let's send some logs to the log
-group we've setup. We can use Vector for this too!
+group we've setup. We can use Vector for this too! Generate a test configuration
+from the variables set earlier:
 
 ```bash
-[sources.stdin]
-  type = "stdin"
-[sinks.cloudwatch]
-  type = "aws_cloudwatch_logs"
-  inputs = ["stdin"]
-  group_name = "${LOG_GROUP}"
-  stream_name = "test"
-  region = "us-east-1"
-  encoding.codec = "json"
+cat > test.yaml <<EOF
+sources:
+  stdin:
+    type: "stdin"
+sinks:
+  cloudwatch:
+    type: "aws_cloudwatch_logs"
+    inputs: ["stdin"]
+    group_name: "${LOG_GROUP:?Set LOG_GROUP first}"
+    stream_name: "test"
+    region: "${AWS_REGION:?Set AWS_REGION first}"
+    encoding:
+      codec: "json"
+EOF
 ```
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
@@ -377,7 +404,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --config config.toml
+flog -f json | vector --config test.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -450,14 +477,16 @@ send it as an HTTP request:
 
 The [`aws_kinesis_firehose`][aws_kinesis_firehose] source:
 
-```toml
-[sources.firehose]
-  type = "aws_kinesis_firehose"
-  address = "0.0.0.0:8080" # the public URL will be set in the Firehose config
-  access_key = "my secret key" # this will also be set in the Firehose config
+```yaml
+sources:
+  firehose:
+    type: "aws_kinesis_firehose"
+    address: "0.0.0.0:8080" # the public URL will be set in the Firehose config
+    access_key: "SECRET[local.firehose_access_key]" # the value of FIREHOSE_ACCESS_KEY, also set in the Firehose config
+    store_access_key: false
 ```
 
-will accept this request, decode the record (which is gzip'd and then base64 encoded), to produce an event that looks like:
+will accept this request, decode the record (which is gzip'ed and then base64 encoded), to produce an event that looks like:
 
 ```json
 {
@@ -479,21 +508,21 @@ can use a [`remap`][remap] transform and leverage the [`parse_aws_cloudwatch_log
 [`unnest`][unnest], [`map_values`][map_values], and [`parse_json`][parse_json]
 functions:
 
-```toml
-[transforms.parse]
-  type = "remap"
-  inputs = ["firehose"]
-  drop_on_error = false
-  source = '''
-    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
-    . = unnest(parsed.log_events)
-    . = map_values(.) -> |value| {
-       event = del(value.log_events)
-       value |= event
-       message = del(.message)
-       . |= object!(parse_json!(message))
-    }
-  '''
+```yaml
+transforms:
+  parse:
+    type: "remap"
+    inputs: ["firehose"]
+    drop_on_error: false
+    source: |
+      parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+      . = unnest(parsed.log_events)
+      . = map_values(.) -> |value| {
+         event = del(value.log_events)
+         value |= event
+         message = del(value.message)
+         value |= object!(parse_json!(message))
+      }
 ```
 
 Let's step through this program one function at a time.
@@ -586,8 +615,8 @@ iteration to finish up our processing.
 . = map_values(.) -> |value| {
    event = del(value.log_events)
    value |= event
-   message = del(.message)
-   . |= object!(parse_json!(message))
+   message = del(value.message)
+   value |= object!(parse_json!(message))
 }
 ```
 
@@ -661,3 +690,4 @@ Here are original events with all of the additional context!
 [parse_aws_cloudwatch_log_subscription_message]: /docs/reference/vrl/functions/#parse_json
 [parse_json]: /docs/reference/vrl/functions/#parse_json
 [remap]: /docs/reference/configuration/transforms/remap/
+[secrets]: /docs/reference/configuration/secrets/

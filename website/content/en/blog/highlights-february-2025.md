@@ -24,8 +24,8 @@ _In this blog post we want to highlight some recently added features and guides.
 * A new type of `enrichment_table`, called `memory`, was introduced! This table can also function as a sink and addresses several new use cases. See this
   [release highlight]({{< ref "/highlights/2025-02-24-memory_enrichment_table.md" >}}) for details.
 * The VRL function library keeps growing thanks to community contributions! You can read more:
-  * [0.21.0 Features]({{< ref "/releases/0.44.0/#new-features" >}})
-  * [0.20.0 Features]({{< ref "/releases/0.43.0/#new-features" >}})
+  * [0.21.0 Features]({{< ref "/releases/0.44.0/#vrl-new-features" >}})
+  * [0.20.0 Features]({{< ref "/releases/0.43.0/#vrl-new-features" >}})
 
 ### Guides
 
@@ -44,5 +44,5 @@ We supported generating a Vector config schema for a while. This guide demonstra
 popular IDEs in order to help with writing configs.
 
 We would love to this to VRL IDE support in the future. In the meantime, we would like to highlight
-this   [tree-sitter](https://github.com/tree-sitter/tree-sitter) plugin that was developed by https://github.com/belltoy. You can read more
-[here](https://github.com/vectordotdev/vrl/issues/964).
+this   [tree-sitter](https://github.com/tree-sitter/tree-sitter) plugin that was developed by https://github.com/belltoy. You can read more about it in the
+[VRL tree-sitter issue](https://github.com/vectordotdev/vrl/issues/964).

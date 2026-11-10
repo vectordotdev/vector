@@ -155,7 +155,7 @@ acquainted with Vector and VRL:
 where you can experiment with VRL.
 
 Some functions are currently unsupported on the playground. Functions that are currently not supported can be found with
-this [issue filter](https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3A+playground%22+wasm+compatible)
+this [issue filter](https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3Aplayground%22+wasm+compatible)
 {{< /info >}}
 
 ## The goals of VRL {#goals}
@@ -166,14 +166,14 @@ flexibility. This makes VRL ideal for critical, performance-sensitive
 infrastructure, like observability pipelines. To illustrate how we achieve these,
 below is a VRL feature matrix across these principles:
 
-| Feature                                       | Safety | Performance |
-| :-------------------------------------------- | :----- | :---------- |
-| [Compilation](#compilation)                   | ✅      | ✅           |
-| [Ergonomic safety](#ergonomic-safety)         | ✅      | ✅           |
-| [Fail safety](#fail-safety)                   | ✅      |             |
-| [Memory safety](#memory-safety)               | ✅      |             |
-| [Vector and Rust native](#vector-rust-native) | ✅      | ✅           |
-| [Statelessness](#stateless)                   | ✅      | ✅           |
+| Feature | Safety | Performance |
+| :-- | :----- | :---------- |
+| [Compilation](#compilation) | ✅ | ✅ |
+| [Ergonomic safety](#ergonomic-safety) | ✅ | ✅ |
+| [Fail safety](#fail-safety) | ✅ | |
+| [Memory safety](#memory-safety) | ✅ | |
+| [Vector and Rust native](#vector-rust-native) | ✅ | ✅ |
+| [Statelessness](#stateless) | ✅ | ✅ |
 
 ## Concepts
 

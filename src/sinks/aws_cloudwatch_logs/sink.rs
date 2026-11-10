@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-pub struct CloudwatchSink<S> {
+pub(super) struct CloudwatchSink<S> {
     pub batcher_settings: BatcherSettings,
     pub(super) request_builder: CloudwatchRequestBuilder,
     pub service: S,
@@ -49,7 +49,7 @@ where
                 let age_range = start..end;
                 future::ready(age_range.contains(&req.timestamp))
             })
-            .batched_partitioned(CloudwatchPartitioner, || {
+            .batched_partitioned(CloudwatchPartitioner, batcher_settings.timeout, |_| {
                 batcher_settings.as_byte_size_config()
             })
             .map(|(key, events)| {
@@ -70,7 +70,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct BatchCloudwatchRequest {
+pub(super) struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
     pub events: Vec<CloudwatchRequest>,
     metadata: RequestMetadata,

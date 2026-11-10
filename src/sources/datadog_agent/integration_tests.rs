@@ -15,6 +15,7 @@ use crate::{
     schema,
     test_util::{spawn_collect_n, wait_for_tcp},
 };
+use vrl::event_path;
 
 fn agent_address() -> String {
     std::env::var("AGENT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8181".to_owned())
@@ -39,13 +40,11 @@ async fn wait_for_healthy(address: String) {
     let start = SystemTime::now();
     while start
         .elapsed()
-        .map(|value| value.as_secs() < AGENT_TIMEOUT)
-        .unwrap_or(false)
+        .is_ok_and(|value| value.as_secs() < AGENT_TIMEOUT)
     {
         if reqwest::get(&address)
             .await
-            .map(|res| res.status().is_success())
-            .unwrap_or(false)
+            .is_ok_and(|res| res.status().is_success())
         {
             return;
         }
@@ -58,11 +57,11 @@ async fn wait_for_healthy(address: String) {
 }
 
 async fn wait_for_healthy_agent() {
-    wait_for_healthy(agent_health_address()).await
+    wait_for_healthy(agent_health_address()).await;
 }
 
 async fn wait_for_healthy_trace_agent() {
-    wait_for_healthy(trace_agent_health_address()).await
+    wait_for_healthy(trace_agent_health_address()).await;
 }
 
 #[tokio::test]
@@ -82,8 +81,9 @@ async fn wait_for_message() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
-        config.build(context).await.unwrap().await.unwrap()
+        let config: DatadogAgentConfig =
+            serde_json::from_value(DatadogAgentConfig::generate_config()).unwrap();
+        config.build(context).await.unwrap().await.unwrap();
     });
     let events = spawn_collect_n(
         async move {
@@ -100,10 +100,10 @@ async fn wait_for_message() {
     .await;
     assert_eq!(events.len(), 2);
     let event = events.first().unwrap().as_log();
-    let msg = event.get("message").unwrap().coerce_to_bytes();
+    let msg = event.get(event_path!("message")).unwrap().coerce_to_bytes();
     assert_eq!(msg, "hello world");
     let event = events.get(1).unwrap().as_log();
-    let msg = event.get("message").unwrap().coerce_to_bytes();
+    let msg = event.get(event_path!("message")).unwrap().coerce_to_bytes();
     assert_eq!(msg, "it's vector speaking");
 }
 
@@ -124,9 +124,9 @@ async fn wait_for_traces() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config_raw = "address = \"0.0.0.0:8081\"".to_string();
-        let config = toml::from_str::<DatadogAgentConfig>(config_raw.as_str()).unwrap();
-        config.build(context).await.unwrap().await.unwrap()
+        let config =
+            serde_yaml::from_str::<DatadogAgentConfig>("address: \"0.0.0.0:8081\"").unwrap();
+        config.build(context).await.unwrap().await.unwrap();
     });
     let events = spawn_collect_n(
         async move {
@@ -149,16 +149,29 @@ async fn wait_for_traces() {
 
     assert_eq!(events.len(), 1);
     let trace = events.first().unwrap().as_trace();
-    let spans = trace.get("spans").unwrap().as_array().unwrap();
+    let spans = trace
+        .get(vrl::event_path!("spans"))
+        .unwrap()
+        .as_array()
+        .unwrap();
     assert_eq!(spans.len(), 1);
     let span = spans.first().unwrap();
-    assert_eq!(span.get("name"), Some(&Value::from("a_name")));
-    assert_eq!(span.get("service"), Some(&Value::from("a_service")));
-    assert_eq!(span.get("resource"), Some(&Value::from("a_resource")));
-    assert_eq!(span.get("name"), Some(&Value::from("a_name")));
-    assert_eq!(span.get("trace_id"), Some(&Value::Integer(123)));
-    assert_eq!(span.get("span_id"), Some(&Value::Integer(456)));
-    assert_eq!(span.get("parent_id"), Some(&Value::Integer(789)));
+    assert_eq!(span.get(vrl::path!("name")), Some(&Value::from("a_name")));
+    assert_eq!(
+        span.get(vrl::path!("service")),
+        Some(&Value::from("a_service"))
+    );
+    assert_eq!(
+        span.get(vrl::path!("resource")),
+        Some(&Value::from("a_resource"))
+    );
+    assert_eq!(span.get(vrl::path!("name")), Some(&Value::from("a_name")));
+    assert_eq!(span.get(vrl::path!("trace_id")), Some(&Value::Integer(123)));
+    assert_eq!(span.get(vrl::path!("span_id")), Some(&Value::Integer(456)));
+    assert_eq!(
+        span.get(vrl::path!("parent_id")),
+        Some(&Value::Integer(789))
+    );
 }
 
 fn get_simple_trace() -> String {

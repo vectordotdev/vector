@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use vector_lib::{
     config::{LogNamespace, log_schema},
+    internal_event::emit,
     lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
     schema::meaning,
 };
@@ -9,7 +10,9 @@ use vrl::path::OwnedTargetPath;
 
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
-    internal_events::{SplunkEventTimestampInvalidType, SplunkEventTimestampMissing},
+    internal_events::{
+        SplunkEventTimestampInvalidType, SplunkEventTimestampMissing, TemplateRenderingError,
+    },
     sinks::{
         prelude::*,
         splunk_hec::common::{
@@ -18,18 +21,19 @@ use crate::{
         },
         util::processed_event::ProcessedEvent,
     },
+    template::ConfinedTemplate,
 };
 
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
 //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
 //       empty string to a `None` path internally.
-pub struct HecLogsSink<S> {
+pub(super) struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub indexed_fields: Vec<OwnedValuePath>,
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<String>,
@@ -38,10 +42,10 @@ pub struct HecLogsSink<S> {
     pub auto_extract_timestamp: bool,
 }
 
-pub struct HecLogData<'a> {
-    pub sourcetype: Option<&'a Template>,
-    pub source: Option<&'a Template>,
-    pub index: Option<&'a Template>,
+pub(super) struct HecLogData<'a> {
+    pub sourcetype: Option<&'a ConfinedTemplate>,
+    pub source: Option<&'a ConfinedTemplate>,
+    pub index: Option<&'a ConfinedTemplate>,
     pub indexed_fields: &'a [OwnedValuePath],
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<&'a String>,
@@ -71,7 +75,43 @@ where
         };
         let batch_settings = self.batch_settings;
 
+        // Clones for the confined-event pre-filter below.  Templates are also
+        // cloned into the EventPartitioner further down; both clones are needed
+        // because `EventPartitioner::partition` has no way to signal "drop this
+        // event" — a `None` key still sends the event without metadata.
+        let source_check = self.source.clone();
+        let sourcetype_check = self.sourcetype.clone();
+        let index_check = self.index.clone();
+
         input
+            // Pre-check partition templates for confinement violations
+            // BEFORE `process_log` mutates the event. `process_log` extracts
+            // and removes fields like `timestamp` from the event body, so
+            // running this check on the processed event turned a
+            // `Confined` render (e.g. `index: "idx-{{ timestamp }}"` with a
+            // `../../evil` value) into a `MissingKeys` render — the security
+            // drop was silently downgraded to "field missing", and the
+            // attack event shipped without an index.
+            //
+            // For the Raw endpoint a None partition key still routes to
+            // Splunk (without metadata), so we must drop here rather than
+            // inside `partition`. For the Event endpoint the metadata is
+            // embedded in the event body; a Confined render would silently
+            // omit the field, so we drop here for both endpoint types.
+            .filter_map(move |event| {
+                future::ready(
+                    if has_confined_partition_error(
+                        &event,
+                        source_check.as_ref(),
+                        sourcetype_check.as_ref(),
+                        index_check.as_ref(),
+                    ) {
+                        None
+                    } else {
+                        Some(event)
+                    },
+                )
+            })
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
                 if self.endpoint_target == EndpointTarget::Raw {
@@ -86,7 +126,8 @@ where
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
-                || batch_settings.as_byte_size_config(),
+                batch_settings.timeout,
+                |_| batch_settings.as_byte_size_config(),
             )
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -95,7 +136,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build HEC Logs request: {:?}.", e);
+                        error!("Failed to build HEC Logs request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),
@@ -120,6 +161,40 @@ where
     }
 }
 
+/// Returns `true` if any of the given partition templates produce a
+/// `Confined` render error for this event, emitting the appropriate internal
+/// event for each violation.  Used to pre-filter events before batching so
+/// that confinement violations result in event drops rather than silent
+/// metadata omission.
+fn has_confined_partition_error(
+    event: &Event,
+    source: Option<&ConfinedTemplate>,
+    sourcetype: Option<&ConfinedTemplate>,
+    index: Option<&ConfinedTemplate>,
+) -> bool {
+    let mut confined = false;
+    for (tpl, field) in [
+        (source, SOURCE_FIELD),
+        (sourcetype, SOURCETYPE_FIELD),
+        (index, INDEX_FIELD),
+    ] {
+        if let Some(error) = tpl
+            .and_then(|t| t.render_string(event).err())
+            .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
+        {
+            emit(TemplateRenderingError {
+                error,
+                field: Some(field),
+                // Count the drop once — subsequent violations on the same event
+                // should not increment ComponentEventsDropped again.
+                drop_event: !confined,
+            });
+            confined = true;
+        }
+    }
+    confined
+}
+
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub(super) struct Partitioned {
     pub(super) token: Option<Arc<str>>,
@@ -131,17 +206,17 @@ pub(super) struct Partitioned {
 
 #[derive(Default)]
 struct EventPartitioner {
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub host_key: Option<OptionalTargetPath>,
 }
 
 impl EventPartitioner {
     const fn new(
-        sourcetype: Option<Template>,
-        source: Option<Template>,
-        index: Option<Template>,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
         host_key: Option<OptionalTargetPath>,
     ) -> Self {
         Self {
@@ -159,11 +234,11 @@ impl Partitioner for EventPartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let emit_err = |error, field| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field),
                 drop_event: false,
-            })
+            });
         };
 
         let source = self.source.as_ref().and_then(|source| {
@@ -194,7 +269,7 @@ impl Partitioner for EventPartitioner {
             log_schema().host_key_target_path(),
         )
         .and_then(|path| item.event.get(&path))
-        .and_then(|value| value.as_str().map(|s| s.to_string()));
+        .and_then(|value| value.to_str_lossy().map(|s| s.to_string()));
 
         Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
@@ -227,7 +302,7 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 // determine the path for a field from one of the following use cases:
 // 1. user provided a path in the config settings
@@ -250,7 +325,7 @@ fn user_or_namespaced_path(
     }
 }
 
-pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
+pub(super) fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let mut log = event.into_log();
 
     let sourcetype = data
@@ -292,16 +367,21 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
                     if let Some(key) = data.timestamp_nanos_key {
                         log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                     }
-                    Some((ts.timestamp_millis() as f64) / 1000f64)
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        reason = "HEC timestamps use floating-point seconds."
+                    )]
+                    let time = (ts.timestamp_millis() as f64) / 1000f64;
+                    Some(time)
                 }
                 Some(value) => {
-                    emit!(SplunkEventTimestampInvalidType {
-                        r#type: value.kind_str()
+                    emit(SplunkEventTimestampInvalidType {
+                        r#type: value.kind_str(),
                     });
                     None
                 }
                 None => {
-                    emit!(SplunkEventTimestampMissing {});
+                    emit(SplunkEventTimestampMissing {});
                     None
                 }
             }
@@ -339,5 +419,43 @@ impl EventCount for HecProcessedEvent {
     fn event_count(&self) -> usize {
         // A HecProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+#[cfg(test)]
+mod pre_check_tests {
+    use super::*;
+    use crate::template::{ConfinementConfig, Template};
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
+    /// Regression for issue #25829: `process_log` extracts + removes fields
+    /// like `timestamp` from the event body. If the confinement pre-check
+    /// runs *after* `process_log`, an attacker-controlled `timestamp: "../..."`
+    /// value renders as `Confined` inside `process_log`, then the field is
+    /// removed, and the pre-check sees `MissingKeys` instead of `Confined` —
+    /// the attack event ships without an index. The check must run on the
+    /// original event before any mutation.
+    #[test]
+    fn confinement_detects_attack_before_process_log_mutates_event() {
+        let index_template = Template::try_from("idx-{{ timestamp }}")
+            .unwrap()
+            .confine(&ConfinementConfig::default(), "splunk_hec_logs", "index")
+            .unwrap();
+
+        // Attacker-controlled `timestamp` field with a traversal payload.
+        let mut log = LogEvent::from("attack payload");
+        log.insert(event_path!("timestamp"), "../../evil");
+        let event = Event::Log(log);
+
+        // Running the pre-check against the original event catches the
+        // `Confined` render before any downstream mutation gets a chance
+        // to convert it to `MissingKeys`.
+        assert!(has_confined_partition_error(
+            &event,
+            None,
+            None,
+            Some(&index_template),
+        ));
     }
 }

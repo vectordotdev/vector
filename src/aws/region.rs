@@ -15,12 +15,12 @@ pub struct RegionOrEndpoint {
 
     /// Custom endpoint for use with AWS-compatible services.
     #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
-    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 
 impl RegionOrEndpoint {
     /// Creates with the given region.
+    #[must_use]
     pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
@@ -37,6 +37,7 @@ impl RegionOrEndpoint {
     }
 
     /// Returns the endpoint.
+    #[must_use]
     pub fn endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }
@@ -56,7 +57,7 @@ mod tests {
     #[test]
     fn optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {"
             "})
             .is_ok()
         );
@@ -65,8 +66,8 @@ mod tests {
     #[test]
     fn region_optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {r#"
-            endpoint = "http://localhost:8080"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint: "http://localhost:8080"
         "#})
             .is_ok()
         );
@@ -75,8 +76,8 @@ mod tests {
     #[test]
     fn endpoint_optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {r#"
-            region = "us-east-1"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            region: "us-east-1"
         "#})
             .is_ok()
         );

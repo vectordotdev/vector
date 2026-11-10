@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.27.0": {
-	date:     "2023-01-12"
-	codename: ""
+	date: "2023-01-12"
 
 	whats_next: []
 
@@ -585,7 +584,7 @@ releases: "0.27.0": {
 		{sha: "323e48372c515fbcf43bd073da526b9489d82c57", date: "2023-01-04 21:56:49 UTC", description: "avoid duplicate span enter in message stream map", pr_number: 15653, scopes: ["file source"], type: "chore", breaking_change: false, author: "Toby Lawrence", files_count: 1, insertions_count: 0, deletions_count: 2},
 		{sha: "7e040435c8b61bf1518708bb85b9337160358ed5", date: "2023-01-04 20:44:27 UTC", description: "Use global timezone if configured", pr_number: 15740, scopes: ["remap transform"], type: "fix", breaking_change: false, author: "Jesse Szwedko", files_count: 2, insertions_count: 76, deletions_count: 16},
 		{sha: "506c1cd368c9278acd7422eb0e432cf123c966d5", date: "2023-01-04 23:07:20 UTC", description: "Add RFC for Reloading API", pr_number: 15562, scopes: [], type: "chore", breaking_change: false, author: "Luke Steensen", files_count: 2, insertions_count: 400, deletions_count: 97},
-		{sha: "4c898a4f5a5928ce1aa5c784603a2cb442184904", date: "2023-01-04 22:20:31 UTC", description: "Rmeove old soak tests", pr_number: 15814, scopes: ["dev"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 88, insertions_count: 0, deletions_count: 2453},
+		{sha: "4c898a4f5a5928ce1aa5c784603a2cb442184904", date: "2023-01-04 22:20:31 UTC", description: "Remove old soak tests", pr_number: 15814, scopes: ["dev"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 88, insertions_count: 0, deletions_count: 2453},
 		{sha: "0a86d9a920c6b0ef6839a6967b3dcf6c3f6544f6", date: "2023-01-05 07:43:43 UTC", description: "bump arc-swap from 1.5.1 to 1.6.0", pr_number: 15790, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 3, insertions_count: 4, deletions_count: 4},
 		{sha: "dc3faa1d9f1809b1d0e695139ec8ec95bc7a931e", date: "2023-01-05 01:55:24 UTC", description: "Add enhanced metric tag option to json and text encoders", pr_number: 15716, scopes: ["codecs"], type: "enhancement", breaking_change: false, author: "Bruce Guenter", files_count: 82, insertions_count: 1014, deletions_count: 314},
 		{sha: "8117034dc45043fa61990bfba3c6095f2fe353b8", date: "2023-01-05 05:36:17 UTC", description: "support enhanced metric tags", pr_number: 15639, scopes: ["datadog_agent source", "datadog_metrics sink"], type: "enhancement", breaking_change: true, author: "neuronull", files_count: 6, insertions_count: 139, deletions_count: 66},

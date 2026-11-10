@@ -1,11 +1,12 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 use crate::sources::fluent::DecodeError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct FluentMessageReceived {
+pub(crate) struct FluentMessageReceived {
     pub byte_size: u64,
 }
 
@@ -16,7 +17,7 @@ impl InternalEvent for FluentMessageReceived {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct FluentMessageDecodeError<'a> {
+pub(crate) struct FluentMessageDecodeError<'a> {
     pub error: &'a DecodeError,
     pub base64_encoded_message: String,
 }
@@ -31,7 +32,7 @@ impl InternalEvent for FluentMessageDecodeError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )

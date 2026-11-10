@@ -31,8 +31,8 @@ would not work with Splunk senders that required them.
 
 Now, you can configure the `splunk_hec` source to use the indexer acknowledgements protocol by configuring:
 
-```toml
-acknowledgements = true
+```yaml
+acknowledgements: true
 ```
 
 When enabled, responses to incoming requests will include an ID that can be used to query for acknowledgement status at the newly exposed `/services/collector/ack` endpoint ([learn more here][indexer how it works]). The acknowledgement status is wired into Vector's
@@ -51,8 +51,9 @@ acknowledgements][indexer] part of the HEC protocol.
 This has defaulted to on to provide higher guarantees, but can be disabled to
 restore the previous behavior by configuring:
 
-```toml
-acknowledgements.indexer_acknowledgements_enabled = false
+```yaml
+acknowledgements:
+  indexer_acknowledgements_enabled: false
 ```
 
 ## Passthrough Token Routing

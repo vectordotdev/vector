@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: pulsar
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: pulsar://127.0.0.1:6650
+    partition_key_field: message
+    producer_name: producer-name
+    topic: topic-1234

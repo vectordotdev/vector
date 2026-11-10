@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.8.0": {
-	date:     "2020-02-25"
-	codename: "A Wholesome Platter Of Features"
+releases: "0.8.0": {// A Wholesome Platter Of Features
+	date: "2020-02-25"
 
 	whats_next: []
 

@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: websocket
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    uri: ws://localhost:8080

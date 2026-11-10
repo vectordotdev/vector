@@ -1,0 +1,56 @@
+generator:
+  - http:
+      seed:
+        [
+          2,
+          3,
+          5,
+          7,
+          11,
+          13,
+          17,
+          19,
+          23,
+          29,
+          31,
+          37,
+          41,
+          43,
+          47,
+          53,
+          59,
+          61,
+          67,
+          71,
+          73,
+          79,
+          83,
+          89,
+          97,
+          101,
+          103,
+          107,
+          109,
+          113,
+          127,
+          131
+        ]
+      target_uri: "http://127.0.0.1:8282/"
+      throttle: all_out
+      maximum_block_size: "512 KiB"
+      parallel_connections: 20
+      method:
+        post:
+          maximum_prebuild_cache_size_bytes: "256 MiB"
+          variant:
+            templated_json:
+              template_path: "/etc/lading/templates/template.yaml"
+      headers: {}
+
+blackhole:
+  - http:
+      binding_addr: "0.0.0.0:8080"
+
+target_metrics:
+  - prometheus:
+      uri: "http://127.0.0.1:9090/metrics"

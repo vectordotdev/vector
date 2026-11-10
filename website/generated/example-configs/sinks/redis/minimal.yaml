@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: redis
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: redis://127.0.0.1:6379/0
+    key: syslog:{{ app }}

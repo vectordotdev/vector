@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: prometheus_remote_write
+    inputs:
+      - my-source-or-transform-id
+    endpoint: https://localhost:8087/api/v1/write

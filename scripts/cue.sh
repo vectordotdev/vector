@@ -16,7 +16,7 @@ list-docs-files() {
 }
 
 cmd_check() {
-  cargo vdev check docs
+  ${VDEV:-cargo vdev} check docs
 }
 
 cmd_list() {
@@ -24,7 +24,8 @@ cmd_list() {
 }
 
 cmd_fmt() {
-  list-docs-files | xargs cue fmt "$@"
+  # Ignore JSON-style cue files generated from VRL source code
+  list-docs-files | grep -v "${CUE_SOURCES}/reference/remap/functions/" | xargs cue fmt "$@"
 }
 
 cmd_vet() {

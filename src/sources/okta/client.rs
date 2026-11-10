@@ -4,22 +4,30 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::StreamExt as _;
 use futures_util::{FutureExt, Stream, stream};
-use http::Uri;
-use hyper::{Body, Request};
+use http::{
+    Request, Response, StatusCode, Uri,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
+    response::Parts,
+    uri::Scheme,
+};
+use http_body_util::BodyExt as _;
+use hyper::body::Incoming;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use tokio::sync::Mutex;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::Decoder as _;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        JsonDeserializerConfig, StreamDecodingError,
+        Decoder, DecodingConfig, JsonDeserializerConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LogNamespace, SourceOutput, proxy::ProxyConfig},
     configurable::configurable_component,
     event::Event,
+    internal_event::emit,
     json_size::JsonSize,
     shutdown::ShutdownSignal,
     tls::TlsConfig,
@@ -27,17 +35,17 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
-    http::{HttpClient, HttpError},
+    http::HttpClient,
     internal_events::{
-        DecoderDeserializeError, EndpointBytesReceived, HttpClientEventsReceived,
-        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
+        EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     sources,
     sources::util::http_client::{default_interval, default_timeout, warn_if_interval_too_low},
     tls::TlsSettings,
 };
+use vector_lib::codecs::internal_events::DecoderDeserializeError;
 
 /// Configuration for the `okta` source.
 #[serde_as]
@@ -74,7 +82,6 @@ pub struct OktaConfig {
     pub since: Option<u64>,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -86,8 +93,8 @@ pub struct OktaConfig {
 impl Default for OktaConfig {
     fn default() -> Self {
         Self {
-            domain: "".to_string(),
-            token: "".to_string(),
+            domain: String::new(),
+            token: String::new(),
             interval: default_interval(),
             timeout: default_timeout(),
             since: None,
@@ -138,7 +145,7 @@ impl SourceConfig for OktaConfig {
 
         url_parts.path_and_query = Some(path_and_query.parse()?);
         if url_parts.scheme.is_none() {
-            url_parts.scheme = Some(http::uri::Scheme::HTTPS);
+            url_parts.scheme = Some(Scheme::HTTPS);
         }
 
         let url = Uri::from_parts(url_parts).map_err(|_| {
@@ -154,7 +161,7 @@ impl SourceConfig for OktaConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
-        Ok(run(
+        Ok(crate::sources::source_with_error(run(
             url,
             tls,
             cx.proxy,
@@ -164,8 +171,7 @@ impl SourceConfig for OktaConfig {
             log_namespace,
             cx.shutdown,
             cx.out,
-        )
-        .boxed())
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -195,11 +201,9 @@ fn enrich_events(events: &mut Vec<Event>, log_namespace: LogNamespace) {
     }
 }
 
-type OktaRunResult =
-    Result<(http::response::Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
+type OktaRunResult = Result<(Parts, Bytes, Option<Uri>), Box<dyn std::error::Error + Send + Sync>>;
 
-type OktaTimeoutResult =
-    Result<Result<http::Response<Body>, HttpError>, tokio::time::error::Elapsed>;
+type OktaTimeoutResult = Result<Result<Response<Incoming>, HttpError>, tokio::time::error::Elapsed>;
 
 async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> OktaRunResult {
     let mut next: Option<Uri> = None;
@@ -211,16 +215,15 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 .get_all("link")
                 .iter()
                 .filter_map(|v| v.to_str().ok())
-                .filter_map(find_rel_next_link)
-                .next()
+                .find_map(find_rel_next_link)
                 .and_then(|next| Uri::try_from(next).ok())
             {
                 next = Some(next_url);
-            };
+            }
 
-            let body = http_body::Body::collect(body).await?.to_bytes();
+            let body = body.collect().await?.to_bytes();
 
-            emit!(EndpointBytesReceived {
+            emit(EndpointBytesReceived {
                 byte_size: body.len(),
                 protocol: "http",
                 endpoint: &url,
@@ -239,7 +242,7 @@ fn handle_response(
     url: String,
 ) -> Option<impl Stream<Item = Event> + Send + use<>> {
     match response {
-        Ok((header, body, _)) if header.status == hyper::StatusCode::OK => {
+        Ok((header, body, _)) if header.status == StatusCode::OK => {
             let mut buf = BytesMut::new();
             buf.extend_from_slice(&body);
             let mut events = decode_events(&mut buf, decoder);
@@ -249,7 +252,7 @@ fn handle_response(
                 events.estimated_json_encoded_size_of()
             };
 
-            emit!(HttpClientEventsReceived {
+            emit(HttpClientEventsReceived {
                 byte_size,
                 count: events.len(),
                 url,
@@ -264,14 +267,14 @@ fn handle_response(
             Some(stream::iter(events))
         }
         Ok((header, _, _)) => {
-            emit!(HttpClientHttpResponseError {
+            emit(HttpClientHttpResponseError {
                 code: header.status,
                 url,
             });
             None
         }
         Err(error) => {
-            emit!(HttpClientHttpError { error, url });
+            emit(HttpClientHttpError { error, url });
             None
         }
     }
@@ -295,7 +298,7 @@ async fn run(
     log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), crate::Error> {
     let url_mutex = Arc::new(Mutex::new(url.clone()));
     let decoder = DecodingConfig::new(
         FramingConfig::Bytes,
@@ -303,15 +306,17 @@ async fn run(
         log_namespace,
     )
     .build()
-    .map_err(|ref e| {
-        emit!(DecoderDeserializeError { error: e });
+    .inspect_err(|e| {
+        emit(DecoderDeserializeError { error: e });
     })?;
 
-    let client = HttpClient::new(tls, &proxy).map_err(|e| {
-        emit!(HttpClientHttpError {
-            error: Box::new(e),
-            url: url.to_string()
+    let client = HttpClient::new(tls.into(), &proxy).map_err(|e| {
+        let error: Arc<dyn std::error::Error + Send + Sync> = Arc::from(e);
+        emit(HttpClientHttpError {
+            error: Box::new(Arc::clone(&error)),
+            url: url.to_string(),
         });
+        crate::Error::from(error)
     })?;
 
     let mut stream = IntervalStream::new(tokio::time::interval(interval))
@@ -323,7 +328,7 @@ async fn run(
             let decoder = decoder.clone();
 
             async move {
-                stream::unfold((), move |_| {
+                stream::unfold((), move |()| {
                     let url_mutex = Arc::clone(&url_mutex);
                     let token = token.clone();
                     let decoder = decoder.clone();
@@ -336,10 +341,10 @@ async fn run(
                             let mut url_lock = url_mutex.lock().await;
                             let url = url_lock.to_string();
 
-                            let mut request = match Request::get(&url).body(Body::empty()) {
+                            let mut request = match Request::get(&url).body(empty_body()) {
                                 Ok(request) => request,
                                 Err(e) => {
-                                    emit!(HttpClientHttpError {
+                                    emit(HttpClientHttpError {
                                         error: e.into(),
                                         url: url.clone(),
                                     });
@@ -348,16 +353,9 @@ async fn run(
                             };
 
                             let headers = request.headers_mut();
-                            headers.insert(
-                                http::header::AUTHORIZATION,
-                                format!("SSWS {token}").parse().unwrap(),
-                            );
-                            headers
-                                .insert(http::header::ACCEPT, "application/json".parse().unwrap());
-                            headers.insert(
-                                http::header::CONTENT_TYPE,
-                                "application/json".parse().unwrap(),
-                            );
+                            headers.insert(AUTHORIZATION, format!("SSWS {token}").parse().unwrap());
+                            headers.insert(ACCEPT, "application/json".parse().unwrap());
+                            headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
 
                             let client = client.clone();
                             let response = tokio::time::timeout(timeout, client.send(request))
@@ -391,10 +389,10 @@ async fn run(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(_) => {
+        Err(error) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
+            emit(StreamClosedError { count });
+            Err(error.into())
         }
     }
 }
@@ -408,7 +406,7 @@ fn decode_events(buf: &mut BytesMut, mut decoder: Decoder) -> Vec<Event> {
             }
             Ok(None) => break,
             Err(error) => {
-                // Error is logged by `crate::codecs::Decoder`, no further
+                // Error is logged by `vector_lib::codecs::Decoder`, no further
                 // handling is needed here.
                 if !error.can_continue() {
                     break;

@@ -1,16 +1,16 @@
-use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
-use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::SourceAcknowledgementsConfig,
+    config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::emit,
 };
+use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
 use warp::{
     Filter,
     filters::{
@@ -21,17 +21,17 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decompress_body;
+use super::encoding::{capped_body, decompress_body};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -48,6 +48,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) {
     }
 
+    fn log_namespace(&self) -> LogNamespace;
+
+    fn name() -> &'static str;
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request body cannot be decoded into events.
     fn build_events(
         &self,
         body: Bytes,
@@ -56,10 +64,68 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Both namespaces use insert-if-empty semantics so auth enrichment never
+    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
+    /// `enrich_events` already populated.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
+    ///   all event types (Log, Metric, Trace).
+    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            match self.log_namespace() {
+                LogNamespace::Vector => {
+                    // metadata_mut() dispatches to Log, Metric, and Trace so every
+                    // decoded event type receives the auth enrichment fields.
+                    let meta = event.metadata_mut().value_mut();
+                    let source_name = Self::name();
+                    for (key, value) in &enrichment {
+                        let key_str = key.as_str();
+                        let name_part = vrl::path!(source_name);
+                        let key_part = vrl::path!(key_str);
+                        let full_path = name_part.concat(key_part);
+                        if meta.get(full_path.clone()).is_none() {
+                            meta.insert(full_path, value.clone());
+                        }
+                    }
+                }
+                LogNamespace::Legacy => {
+                    // Legacy enrichment targets the event body; only Log events have one.
+                    if let Event::Log(log) = event {
+                        for (key, value) in &enrichment {
+                            log.try_insert(
+                                (PathPrefix::Event, vrl::path!(key.as_str())),
+                                value.clone(),
+                            );
+                        }
+                    } else if !enrichment.is_empty() {
+                        warn!(
+                            message = "Auth metadata enrichment is not supported for trace/metric events in the legacy namespace and will be dropped. \
+                                       Switch this source to the Vector namespace (`log_namespace: true`) to enable it for all event types.",
+                            fields = ?enrichment.keys().collect::<Vec<_>>(),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content encoding is unsupported or decompression fails.
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -94,19 +160,19 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Options => warp::options().boxed(),
             };
 
-            // https://github.com/rust-lang/rust-clippy/issues/8148
-            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                filter = filter.and(warp::path(s.to_string())).boxed()
+                filter = filter.and(warp::path(s.to_string())).boxed();
             }
+            let body_filter = capped_body();
+
             let svc = filter
                 .and(warp::path::tail())
                 .and_then(move |tail: Tail| async move {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        emit!(HttpInternalError {
-                            message: "Path not found."
+                        emit(HttpInternalError {
+                            message: "Path not found.",
                         });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
@@ -118,7 +184,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
-                .and(warp::body::bytes())
+                .and(body_filter)
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
                 .and_then(
@@ -132,24 +198,28 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         let http_path = path.as_str();
                         let events = auth_matcher
                             .as_ref()
-                            .map_or(Ok(()), |a| {
+                            .map_or(Ok(None), |a| {
                                 a.handle_auth(
                                     addr.as_ref().map(|a| a.0).as_ref(),
                                     &headers,
                                     path.as_str(),
                                 )
                             })
-                            .and_then(|()| self.decode(encoding_header.as_deref(), body))
-                            .and_then(|body| {
-                                emit!(HttpBytesReceived {
+                            .and_then(|auth_enrichment| {
+                                self.decode(encoding_header.as_deref(), body)
+                                    .map(|body| (body, auth_enrichment))
+                            })
+                            .and_then(|(body, auth_enrichment)| {
+                                emit(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
                                 });
                                 self.build_events(body, &headers, &query_parameters, path.as_str())
+                                    .map(|events| (events, auth_enrichment))
                             })
-                            .map(|mut events| {
-                                emit!(HttpEventsReceived {
+                            .map(|(mut events, auth_enrichment)| {
+                                emit(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
@@ -166,6 +236,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         .as_ref(),
                                 );
 
+                                if let Some(enrichment) = auth_enrichment {
+                                    self.inject_auth_enrichment(&mut events, enrichment);
+                                }
+
                                 events
                             });
 
@@ -180,47 +254,47 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {r:?}")
+                    emit(HttpInternalError {
+                        message: &format!("Internal error: {r:?}"),
                     });
                     Err(r)
                 }
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let remote_addr = conn.peer_addr();
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            remote_addr,
-                        )
-                    }))
-                    .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
-
-                        request
-                    })
-                    .service(warp::service(routes.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.map_err(|err| {
-                error!("An error occurred: {:?}.", err);
-            })?;
-
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+            let listener = tls
+                .bind(&address)
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?
+                .with_keepalive(keepalive_settings.tcp_keepalive);
+
+            serve(
+                listener.accept_stream(),
+                cx.shutdown.map(|_| ()),
+                move |conn| {
+                    let remote_addr = conn.peer_addr();
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                remote_addr,
+                            )
+                        }))
+                        .map_request(move |mut request: http::Request<_>| {
+                            request.extensions_mut().insert(PeerAddr::new(remote_addr));
+
+                            request
+                        })
+                        .service(warp::service(routes.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -266,14 +340,14 @@ async fn handle_request(
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest::new(error.code(), error.message()));
+            emit(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

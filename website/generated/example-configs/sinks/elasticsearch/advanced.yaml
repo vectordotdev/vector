@@ -1,0 +1,19 @@
+sinks:
+  my_sink_id:
+    type: elasticsearch
+    inputs:
+      - my-source-or-transform-id
+    api_version: auto
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    doc_type: _doc
+    endpoints:
+      - http://10.24.32.122:9000
+    id_key: id
+    mode: bulk
+    opensearch_service_type: managed
+    pipeline: pipeline-name
+    query:
+      X-Powered-By: Vector
+    request_retry_partial: false
+    suppress_type_name: false

@@ -4,7 +4,7 @@ use lapin::options::ConfirmSelectOptions;
 use super::{config::AmqpSinkConfig, service::AmqpError};
 use crate::amqp::AmqpConfig;
 
-pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
+pub(super) type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 
 pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSinkChannels> {
     let max_channels = config.max_channels.try_into().map_err(|_| {
@@ -22,7 +22,7 @@ pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSin
         .max_size(max_channels)
         .runtime(deadpool::Runtime::Tokio1)
         .build()?;
-    debug!("AMQP channel pool created with max size: {}", max_channels);
+    debug!("AMQP channel pool created with max size: {max_channels}");
     Ok(channels)
 }
 
@@ -51,18 +51,21 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         channel: &mut Self::Type,
         _: &deadpool::managed::Metrics,
     ) -> deadpool::managed::RecycleResult<Self::Error> {
-        let state = channel.status().state();
-        if state == lapin::ChannelState::Connected {
+        let status = channel.status();
+        if status.connected() {
             Ok(())
         } else {
-            Err((AmqpError::ChannelClosed { state }).into())
+            Err((AmqpError::ChannelClosed {
+                status: status.clone(),
+            })
+            .into())
         }
     }
 }
 
 impl AmqpSinkChannelManager {
     /// Creates a new channel pool manager for the AMQP sink.
-    pub fn new(config: &AmqpConfig) -> Self {
+    pub(super) fn new(config: &AmqpConfig) -> Self {
         Self {
             config: config.clone(),
         }

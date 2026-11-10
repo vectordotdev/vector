@@ -1,0 +1,5 @@
+transforms:
+  my_transform_id:
+    type: incremental_to_absolute
+    inputs:
+      - my-source-or-transform-id

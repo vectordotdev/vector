@@ -1,0 +1,17 @@
+features:
+  - windows-event-log-integration-tests
+
+test_filter: "::windows_event_log::integration_tests::"
+
+runner:
+  env: {}
+
+matrix:
+  default: ["default"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sources/windows_event_log/**"
+  - "src/internal_events/windows_event_log.rs"
+  - "tests/integration/windows-event-log/**"

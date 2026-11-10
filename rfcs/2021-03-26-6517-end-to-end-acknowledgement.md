@@ -330,39 +330,39 @@ source handles acknowledgements.
 
 The above structure provides for several considerations:
 
-1.  This the minimum amount of data that can be added to the metadata to
+1. This the minimum amount of data that can be added to the metadata to
     fully support this feature, amounting to a single shared reference
     as the `Option` is optimized into the `Arc`.
 
-2.  The use of `Arc` reference counting for finalization prevents events
+2. The use of `Arc` reference counting for finalization prevents events
     from "escaping" without providing a status indication.
 
-3.  If a source does not need or is not configured to require
+3. If a source does not need or is not configured to require
     finalization, it will not contribute to the list of sources and so
     has no additional event overhead, and no additional allocations when
     the event is created.
 
-4.  Sending the finalization status to the source does not require any
+4. Sending the finalization status to the source does not require any
     lookups or topology traversal.
 
-5.  No additional work is required to handle dropped sources due to
+5. No additional work is required to handle dropped sources due to
     topology reconfiguration, other than the expected checking for a
     closed channel when sending.
 
 ## Drawbacks
 
-1.  This adds a base size overhead to each event, even for
+1. This adds a base size overhead to each event, even for
     configurations that do not support or require end-to-end
     acknowledgement.
 
 ## Alternatives
 
-1.  The set of sources could be stored in a more customary `Vec`. This
+1. The set of sources could be stored in a more customary `Vec`. This
     provides for merging multiple sources with a minimum of
     code. However, merged events already have other overhead, and it
     increases the data required for this array by an additional word.
 
-2.  The source could be stored as simply the unique identifier
+2. The source could be stored as simply the unique identifier
     string. This requires that all reporting of finalization status
     proceed through a dictionary lookup instead of simply sending it
     through a channel, increasing the run-time overhead.

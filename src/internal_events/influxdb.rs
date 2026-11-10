@@ -1,11 +1,11 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct InfluxdbEncodingError {
+pub(crate) struct InfluxdbEncodingError {
     pub error_message: &'static str,
     pub count: usize,
 }
@@ -20,15 +20,15 @@ impl InternalEvent for InfluxdbEncodingError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
-            reason
+            reason,
         });
     }
 }

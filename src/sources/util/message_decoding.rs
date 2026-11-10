@@ -1,6 +1,6 @@
 use std::iter;
 
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
@@ -12,10 +12,11 @@ use vector_lib::{
 };
 
 use crate::{
-    codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, Event},
 };
+use vector_lib::codecs::Decoder;
+use vrl::value::Value;
 
 pub fn decode_message<'a>(
     mut decoder: Decoder,
@@ -41,7 +42,7 @@ pub fn decode_message<'a>(
                             log,
                             schema.source_type_key(),
                             path!("source_type"),
-                            Bytes::from(source_type),
+                            Value::from_static_str(source_type),
                         );
                         match log_namespace {
                             LogNamespace::Vector => {
@@ -67,7 +68,7 @@ pub fn decode_message<'a>(
                     event
                 })),
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further handling
                     // is needed here.
                     if error.can_continue() {
                         continue;

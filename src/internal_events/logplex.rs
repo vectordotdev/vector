@@ -1,11 +1,12 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 use super::prelude::io_error_code;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HerokuLogplexRequestReceived<'a> {
+pub(crate) struct HerokuLogplexRequestReceived<'a> {
     pub msg_count: usize,
     pub frame_id: &'a str,
     pub drain_token: &'a str,
@@ -23,7 +24,7 @@ impl InternalEvent for HerokuLogplexRequestReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HerokuLogplexRequestReadError {
+pub(crate) struct HerokuLogplexRequestReadError {
     pub error: std::io::Error,
 }
 
@@ -37,7 +38,7 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,

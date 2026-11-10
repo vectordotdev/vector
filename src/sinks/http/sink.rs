@@ -1,14 +1,16 @@
 //! Implementation of the `http` sink.
 
 use std::collections::BTreeMap;
+use vector_lib::internal_event::emit;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::template::ConfinedUriTemplate;
 
 pub(super) struct HttpSink<S> {
     service: S,
-    uri: Template,
-    headers: BTreeMap<String, Template>,
+    uri: ConfinedUriTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
@@ -23,8 +25,8 @@ where
     /// Creates a new `HttpSink`.
     pub(super) const fn new(
         service: S,
-        uri: Template,
-        headers: BTreeMap<String, Template>,
+        uri: ConfinedUriTemplate,
+        headers: BTreeMap<String, ConfinedTemplate>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
@@ -43,9 +45,11 @@ where
         };
         input
             // Batch the input stream with size calculation based on the configured codec
-            .batched_partitioned(KeyPartitioner::new(self.uri, self.headers), || {
-                self.batch_settings.as_item_size_config(batch_sizer.clone())
-            })
+            .batched_partitioned(
+                KeyPartitioner::new(self.uri, self.headers),
+                self.batch_settings.timeout,
+                |_| self.batch_settings.as_item_size_config(batch_sizer.clone()),
+            )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             // Build requests with default concurrency limit.
             .request_builder(
@@ -56,7 +60,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -87,18 +91,18 @@ where
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Hash)]
-pub struct PartitionKey {
+pub(super) struct PartitionKey {
     pub uri: String,
     pub headers: BTreeMap<String, String>,
 }
 
 struct KeyPartitioner {
-    uri: Template,
-    headers: BTreeMap<String, Template>,
+    uri: ConfinedUriTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
 }
 
 impl KeyPartitioner {
-    const fn new(uri: Template, headers: BTreeMap<String, Template>) -> Self {
+    const fn new(uri: ConfinedUriTemplate, headers: BTreeMap<String, ConfinedTemplate>) -> Self {
         Self { uri, headers }
     }
 }
@@ -112,7 +116,7 @@ impl Partitioner for KeyPartitioner {
             .uri
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("uri"),
                     drop_event: true,
@@ -125,7 +129,7 @@ impl Partitioner for KeyPartitioner {
             let value = template
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("headers"),
                         drop_event: true,

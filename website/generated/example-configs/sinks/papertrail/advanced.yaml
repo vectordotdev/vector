@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: papertrail
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: logs.papertrailapp.com:12345
+    process: vector

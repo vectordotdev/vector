@@ -2,11 +2,9 @@ package metadata
 
 components: sources: docker_logs: {
 	title: "Docker"
-	alias: "docker"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
@@ -85,7 +83,6 @@ components: sources: docker_logs: {
 				container using [`exclude_containers`](#exclude_containers).
 				""",
 		]
-		notices: []
 	}
 
 	installation: {

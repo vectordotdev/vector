@@ -80,17 +80,18 @@ generated: components: sources: host_metrics: configuration: {
 
 						Only available on Linux.
 						"""
-					cpu:        "Metrics related to CPU utilization."
-					disk:       "Metrics related to disk I/O utilization."
-					filesystem: "Metrics related to filesystem space utilization."
-					host:       "Metrics related to the host."
-					load:       "Metrics related to the system load average."
-					memory:     "Metrics related to memory utilization."
-					network:    "Metrics related to network utilization."
-					process:    "Metrics related to Process utilization."
-					tcp:        "Metrics related to TCP connections."
+					cpu:         "Metrics related to CPU utilization."
+					disk:        "Metrics related to disk I/O utilization."
+					filesystem:  "Metrics related to filesystem space utilization."
+					host:        "Metrics related to the host."
+					load:        "Metrics related to the system load average."
+					memory:      "Metrics related to memory utilization."
+					network:     "Metrics related to network utilization."
+					process:     "Metrics related to Process utilization."
+					tcp:         "Metrics related to TCP connections."
+					temperature: "Metrics related to component temperatures."
 				}
-				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp"]
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp", "temperature"]
 			}
 		}
 	}
@@ -103,35 +104,7 @@ generated: components: sources: host_metrics: configuration: {
 				I/O utilization metrics.
 				"""
 			required: false
-			type: object: {
-				examples: [{
-					excludes: ["dm-*"]
-					includes: ["sda"]
-				}]
-				options: {
-					excludes: {
-						description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: items: type: string: {}
-					}
-					includes: {
-						description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: {
-							default: ["*"]
-							items: type: string: {}
-						}
-					}
-				}
-			}
+			type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 		}
 	}
 	filesystem: {
@@ -144,35 +117,7 @@ generated: components: sources: host_metrics: configuration: {
 					usage metrics.
 					"""
 				required: false
-				type: object: {
-					examples: [{
-						excludes: ["dm-*"]
-						includes: ["sda"]
-					}]
-					options: {
-						excludes: {
-							description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-							required: false
-							type: array: items: type: string: {}
-						}
-						includes: {
-							description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-							required: false
-							type: array: {
-								default: ["*"]
-								items: type: string: {}
-							}
-						}
-					}
-				}
+				type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 			}
 			filesystems: {
 				description: """
@@ -262,35 +207,7 @@ generated: components: sources: host_metrics: configuration: {
 				network utilization metrics.
 				"""
 			required: false
-			type: object: {
-				examples: [{
-					excludes: ["dm-*"]
-					includes: ["sda"]
-				}]
-				options: {
-					excludes: {
-						description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: items: type: string: {}
-					}
-					includes: {
-						description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: {
-							default: ["*"]
-							items: type: string: {}
-						}
-					}
-				}
-			}
+			type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 		}
 	}
 	process: {

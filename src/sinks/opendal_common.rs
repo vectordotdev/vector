@@ -1,4 +1,4 @@
-//! opendal_common provide real sink supports for all opendal based services.
+//! `opendal_common` provide real sink supports for all opendal based services.
 //!
 //! # TODO
 //!
@@ -9,6 +9,7 @@
 //! - Limitation
 
 use std::{fmt, task::Poll};
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use opendal::Operator;
@@ -18,7 +19,7 @@ use vector_lib::codecs::encoding::Framer;
 
 use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 
-/// OpenDalSink provides generic a service upon OpenDAL.
+/// `OpenDalSink` provides generic a service upon OpenDAL.
 ///
 /// # Notes
 ///
@@ -32,7 +33,7 @@ pub struct OpenDalSink<Svc> {
 }
 
 impl<Svc> OpenDalSink<Svc> {
-    /// Build a new OpenDalSink via given input
+    /// Build a new `OpenDalSink` via given input
     pub const fn new(
         service: Svc,
         request_builder: OpenDalRequestBuilder,
@@ -78,7 +79,9 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .batched_partitioned(partitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
                 // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
@@ -89,7 +92,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -103,7 +106,7 @@ where
     }
 }
 
-/// OpenDalService is just a simple wrapper of `opendal::Operator` to
+/// `OpenDalService` is just a simple wrapper of `opendal::Operator` to
 /// implement traits we needed.
 #[derive(Debug, Clone)]
 pub struct OpenDalService {
@@ -111,12 +114,13 @@ pub struct OpenDalService {
 }
 
 impl OpenDalService {
+    #[must_use]
     pub const fn new(op: Operator) -> OpenDalService {
         OpenDalService { op }
     }
 }
 
-/// OpenDalRequest is request will be handled by opendal services.
+/// `OpenDalRequest` is request will be handled by opendal services.
 ///
 /// It will carry all information that opendal needed, like payload and
 /// metadata.
@@ -143,7 +147,7 @@ impl Finalizable for OpenDalRequest {
     }
 }
 
-/// OpenDalMetadata carries metadata that opendal service needed to write.
+/// `OpenDalMetadata` carries metadata that opendal service needed to write.
 #[derive(Clone)]
 pub struct OpenDalMetadata {
     pub partition_key: String,
@@ -152,7 +156,7 @@ pub struct OpenDalMetadata {
     pub finalizers: EventFinalizers,
 }
 
-/// OpenDalRequestBuilder will collect and encode input events to build a
+/// `OpenDalRequestBuilder` will collect and encode input events to build a
 /// valid [`OpenDalRequest`].
 pub struct OpenDalRequestBuilder {
     pub encoder: (Transformer, Encoder<Framer>),
@@ -203,7 +207,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let name = uuid::Uuid::new_v4().to_string();
         let extension = self.compression.extension();
 
-        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, name, extension);
+        metadata.partition_key = format!("{}{name}.{extension}", metadata.partition_key);
 
         OpenDalRequest {
             metadata,
@@ -213,7 +217,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
     }
 }
 
-/// OpenDalResponse is the response returned by OpenDAL services.
+/// `OpenDalResponse` is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
     pub events_byte_size: GroupedCountByteSize,
@@ -264,7 +268,7 @@ impl Service<OpenDalRequest> for OpenDalService {
     }
 }
 
-/// OpenDalError is the error returned by opendal services.
+/// `OpenDalError` is the error returned by opendal services.
 ///
 /// # TODO
 ///

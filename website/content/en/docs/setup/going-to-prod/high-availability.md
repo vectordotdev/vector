@@ -53,23 +53,26 @@ We recommend routing dropped events immediately to a backup destination to prior
 
 The following is an example configuration that routes failed events from a `remap` transform to a `aws_s3` sink:
 
-```toml
-[sources.input]
-    type = "datadog_agent"
+```yaml
+sources:
+  input:
+    type: "datadog_agent"
 
-[transforms.parsing]
-    inputs = ["input"]
-    type = "remap"
-    reroute_dropped = true
-    source = "..."
+transforms:
+  parsing:
+    inputs: ["input"]
+    type: "remap"
+    reroute_dropped: true
+    source: "..."
 
-[sinks.analysis]
-    inputs = ["parsing"]
-    type = "datadog_logs"
+sinks:
+  analysis:
+    inputs: ["parsing"]
+    type: "datadog_logs"
 
-[sinks.backup]
-    inputs = ["**parsing.dropped**"] # dropped events from the `parsing` transform
-    type = "aws_s3"
+  backup:
+    inputs: ["parsing.dropped"] # dropped events from the `parsing` transform
+    type: "aws_s3"
 ```
 
 {{< info >}}

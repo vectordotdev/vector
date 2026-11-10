@@ -2,7 +2,12 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_lib::{configurable::configurable_component, metric_tags};
+#[cfg(unix)]
+use nix::sys::statvfs::statvfs;
+use vector_lib::{
+    configurable::configurable_component, internal_event::GaugeName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
@@ -45,6 +50,15 @@ fn example_mountpoints() -> FilterList {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_lossless,
+        clippy::cast_precision_loss,
+        reason = "Native inode counter widths differ across platforms; preserve conversion of filesystem counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
         match heim::disk::partitions().await {
@@ -67,7 +81,7 @@ impl HostMetrics {
                         self.config
                             .filesystem
                             .devices
-                            .contains_path(partition.device().map(|d| d.as_ref()))
+                            .contains_path(partition.device().map(AsRef::as_ref))
                             .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -85,7 +99,7 @@ impl HostMetrics {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                emit!(HostMetricsScrapeFilesystemError {
+                                emit(HostMetricsScrapeFilesystemError {
                                     message: "Failed to load partitions info.",
                                     mount_point: partition
                                         .mount_point()
@@ -93,7 +107,7 @@ impl HostMetrics {
                                         .unwrap_or("unknown")
                                         .to_string(),
                                     error,
-                                })
+                                });
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -110,30 +124,58 @@ impl HostMetrics {
                         tags.replace("device".into(), device.to_string_lossy().to_string());
                     }
                     output.gauge(
-                        "filesystem_free_bytes",
+                        GaugeName::FilesystemFreeBytes,
                         usage.free().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.gauge(
-                        "filesystem_total_bytes",
+                        GaugeName::FilesystemTotalBytes,
                         usage.total().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.gauge(
-                        "filesystem_used_bytes",
+                        GaugeName::FilesystemUsedBytes,
                         usage.used().get::<byte>() as f64,
                         tags.clone(),
                     );
                     #[cfg(not(windows))]
                     output.gauge(
-                        "filesystem_used_ratio",
-                        usage.ratio().get::<ratio>() as f64,
-                        tags,
+                        GaugeName::FilesystemUsedRatio,
+                        f64::from(usage.ratio().get::<ratio>()),
+                        tags.clone(),
                     );
+
+                    // inode metrics via a second statvfs call - heim's Usage wraps
+                    // libc::statvfs internally but doesn't expose inode fields
+                    // (f_files, f_ffree). the kernel caches statvfs for local
+                    // filesystems so the overhead is negligible, but network mounts
+                    // may pay a small extra cost.
+                    #[cfg(unix)]
+                    if let Ok(stat) = statvfs(partition.mount_point()) {
+                        let inodes_total = stat.files() as f64;
+                        let inodes_free = stat.files_free() as f64;
+                        let inodes_used = (inodes_total - inodes_free).max(0.0);
+                        let inodes_used_ratio = if inodes_total > 0.0 {
+                            inodes_used / inodes_total
+                        } else {
+                            0.0
+                        };
+
+                        output.gauge(GaugeName::FilesystemInodesTotal, inodes_total, tags.clone());
+                        output.gauge(GaugeName::FilesystemInodesFree, inodes_free, tags.clone());
+                        output.gauge(GaugeName::FilesystemInodesUsed, inodes_used, tags.clone());
+                        output.gauge(
+                            GaugeName::FilesystemInodesUsedRatio,
+                            inodes_used_ratio,
+                            tags,
+                        );
+                    }
+                    #[cfg(windows)]
+                    drop(tags);
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load partitions info.",
                     error,
                 });
@@ -159,19 +201,42 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .filesystem_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
-        assert!(metrics.len().is_multiple_of(4));
         assert!(all_gauges(&metrics));
 
-        // There are exactly three filesystem_* names
-        for name in &[
+        // Base metrics (these are always present)
+        let base_metrics = [
             "filesystem_free_bytes",
             "filesystem_total_bytes",
             "filesystem_used_bytes",
             "filesystem_used_ratio",
-        ] {
-            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
+        ];
+
+        // Each filesystem should have all 4 base metrics
+        let num_filesystems = count_name(&metrics, "filesystem_free_bytes");
+        assert!(num_filesystems > 0);
+        for name in &base_metrics {
+            assert_eq!(count_name(&metrics, name), num_filesystems, "name={name}");
+        }
+
+        // Inode metrics are present for filesystems that support statvfs
+        // (some virtual filesystems like /proc, /sys might not)
+        let inode_metrics = [
+            "filesystem_inodes_total",
+            "filesystem_inodes_free",
+            "filesystem_inodes_used",
+            "filesystem_inodes_used_ratio",
+        ];
+        let num_inode_total = count_name(&metrics, "filesystem_inodes_total");
+        assert!(
+            num_inode_total > 0,
+            "Expected at least one filesystem to report inode metrics"
+        );
+
+        // For filesystems that report inodes, all 4 inode metrics should be present
+        for name in &inode_metrics {
+            assert_eq!(count_name(&metrics, name), num_inode_total, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags
@@ -186,7 +251,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .filesystem_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 3 == 0);
         assert!(all_gauges(&metrics));
@@ -197,12 +262,7 @@ mod tests {
             "filesystem_total_bytes",
             "filesystem_used_bytes",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 3,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 3, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags
@@ -223,7 +283,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }
@@ -241,7 +301,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }
@@ -259,7 +319,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }

@@ -2,7 +2,7 @@
 
 [The current MVP](https://playground.vrl.dev/) for the VRL web
 playground utilizes WASM and runs the majority of the VRL stdlib,
-[except for six functions](https://github.com/vectordotdev/vector/issues?q=wasm+compatible+label%3A%22vrl%3A+playground%22+is%3Aopen).
+[except for six functions](https://github.com/vectordotdev/vector/issues?q=wasm+compatible+label%3A%22vrl%3Aplayground%22+is%3Aopen).
 Users can run VRL programs, share their programs online, and try
 sample event inputs. However, we would like to expand the MVP
 features which would require more planning and decision making.
@@ -90,7 +90,7 @@ making it an easier sell for users, or at the very least an easier demo to poten
 
 - Why should we not do this?
 We should not do this if the MVP playground is already enough and no longer needs more iteration,
-if we do not forsee making the playground more complex than it already is in the MVP, then the
+if we do not foresee making the playground more complex than it already is in the MVP, then the
 effort will not be useful.
 
 - What kind on ongoing burden does this place on the team?

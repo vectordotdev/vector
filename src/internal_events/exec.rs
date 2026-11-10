@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, emit,
+        error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -13,7 +13,7 @@ use vector_lib::{
 use super::prelude::io_error_code;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecEventsReceived<'a> {
+pub(crate) struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
     pub byte_size: JsonSize,
@@ -28,12 +28,12 @@ impl InternalEvent for ExecEventsReceived<'_> {
             command = %self.command,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
@@ -41,7 +41,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecFailedError<'a> {
+pub(crate) struct ExecFailedError<'a> {
     pub command: &'a str,
     pub error: std::io::Error,
 }
@@ -57,7 +57,7 @@ impl InternalEvent for ExecFailedError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "error_code" => io_error_code(&self.error),
@@ -68,7 +68,7 @@ impl InternalEvent for ExecFailedError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecTimeoutError<'a> {
+pub(crate) struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
     pub error: Elapsed,
@@ -85,7 +85,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
@@ -95,7 +95,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ExecCommandExecuted<'a> {
+pub(crate) struct ExecCommandExecuted<'a> {
     pub command: &'a str,
     pub exit_status: Option<i32>,
     pub exec_duration: Duration,
@@ -120,14 +120,14 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             elapsed_millis = %self.exec_duration.as_millis(),
         );
         counter!(
-            "command_executed_total",
+            CounterName::CommandExecutedTotal,
             "command" => self.command.to_owned(),
             "exit_status" => exit_status.clone(),
         )
         .increment(1);
 
         histogram!(
-            "command_execution_duration_seconds",
+            HistogramName::CommandExecutionDurationSeconds,
             "exit_status" => exit_status,
             "command" => self.command.to_owned(),
         )
@@ -135,7 +135,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
     }
 }
 
-pub enum ExecFailedToSignalChild {
+pub(crate) enum ExecFailedToSignalChild {
     #[cfg(unix)]
     SignalError(nix::errno::Errno),
     #[cfg(unix)]
@@ -148,40 +148,36 @@ pub enum ExecFailedToSignalChild {
 
 impl ExecFailedToSignalChild {
     fn to_error_code(&self) -> String {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => format!("errno_{err}"),
+            Self::SignalError(err) => format!("errno_{err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            Self::FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
             #[cfg(unix)]
-            NoPid => String::from("no_pid"),
+            Self::NoPid => String::from("no_pid"),
             #[cfg(windows)]
-            IoError(err) => err.to_string(),
+            Self::IoError(err) => err.to_string(),
         }
     }
 }
 
 impl std::fmt::Display for ExecFailedToSignalChild {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => write!(f, "errno: {err}"),
+            Self::SignalError(err) => write!(f, "errno: {err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
+            Self::FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
             #[cfg(unix)]
-            NoPid => write!(f, "child had no pid"),
+            Self::NoPid => write!(f, "child had no pid"),
             #[cfg(windows)]
-            IoError(err) => write!(f, "io error: {}", err),
+            Self::IoError(err) => write!(f, "io error: {err}"),
         }
     }
 }
 
 #[derive(NamedInternalEvent)]
-pub struct ExecFailedToSignalChildError<'a> {
+pub(crate) struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
     pub error: ExecFailedToSignalChild,
 }
@@ -196,7 +192,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
@@ -207,7 +203,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct ExecChannelClosedError;
+pub(crate) struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
     fn emit(self) {
@@ -218,14 +214,14 @@ impl InternalEvent for ExecChannelClosedError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            reason: exec_reason
+            reason: exec_reason,
         });
     }
 }

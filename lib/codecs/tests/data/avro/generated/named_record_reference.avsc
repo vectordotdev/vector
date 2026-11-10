@@ -1,0 +1,1 @@
+{"type":"record","name":"Outer","fields":[{"name":"first","type":{"type":"record","name":"Inner","fields":[{"name":"date","type":{"type":"int","logicalType":"date"}}]}},{"name":"second","type":"Inner"}]}

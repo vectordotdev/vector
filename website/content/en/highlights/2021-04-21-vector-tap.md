@@ -11,6 +11,8 @@ badges:
   domains: ["graphql", "cli", "observability"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Vector 0.13 introduces a new [`vector tap`][tap] subcommand that allows for
 tapping into the events flowing through Vector. This can be used to "live tail"
 events while troubleshooting incidents events or simply to debug your Vector
@@ -25,19 +27,22 @@ of this component.
 
 For example, given the configuration:
 
-```toml
-[api]
-  enabled =  true
-[sources.in]
-  type = "generator"
-  format = "shuffle"
-  interval = 1.0
-  lines = ["Hello World"]
-  sequence = true
+```yaml
+api:
+  enabled: true
 
-[sinks.out]
-  type = "blackhole"
-  inputs = ["in"]
+sources:
+  in:
+    type: "generator"
+    format: "shuffle"
+    interval: 1.0
+    lines: ["Hello World"]
+    sequence: true
+
+sinks:
+  out:
+    type: "blackhole"
+    inputs: ["in"]
 ```
 
 If you were to run `vector` and then, in another terminal, run `vector tap in`,

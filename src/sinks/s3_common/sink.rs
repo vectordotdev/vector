@@ -1,6 +1,6 @@
 use std::{fmt, hash::Hash};
 
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use super::partitioner::S3PartitionKey;
 use crate::sinks::prelude::*;
@@ -20,9 +20,9 @@ impl<Svc, RB, P> S3Sink<Svc, RB, P> {
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
-            partitioner,
             service,
             request_builder,
+            partitioner,
             batcher_settings,
         }
     }
@@ -47,13 +47,15 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .batched_partitioned(partitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

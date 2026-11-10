@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use snafu::Snafu;
 use vector_lib::{
     config::LegacyKey,
@@ -6,7 +8,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use super::transform::{Sample, SampleMode};
+use super::transform::{DynamicSampleFields, Sample, SampleMode};
 use crate::{
     conditions::AnyCondition,
     config::{
@@ -14,7 +16,7 @@ use crate::{
         TransformOutput,
     },
     schema,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::Transform,
 };
 
@@ -29,10 +31,40 @@ pub enum SampleError {
     #[snafu(display("Only non-zero numbers are allowed values for `rate`"))]
     InvalidRate,
 
+    #[snafu(display("Only one value can be provided for either 'rate' or 'ratio', but not both"))]
+    InvalidStaticConfiguration,
+
     #[snafu(display(
-        "Exactly one value must be provided for either 'rate' or 'ratio', but not both"
+        "Only one value can be provided for either 'ratio_field' or 'rate_field', but not both"
     ))]
-    InvalidConfiguration,
+    InvalidDynamicConfiguration,
+
+    #[snafu(display(
+        "Exactly one value must be provided for either 'rate' or 'ratio' to configure static sampling"
+    ))]
+    MissingStaticConfiguration,
+
+    #[snafu(display(
+        "'key_field' cannot be combined with 'ratio_field' or 'rate_field' because dynamic values can vary per event and break key-based coherence"
+    ))]
+    InvalidKeyFieldDynamicCombination,
+}
+
+/// Configuration of internal metrics for the Sample transform.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct SampleInternalMetricsConfig {
+    /// Whether or not to include the `group` tag on the `component_discarded_events_total`
+    /// internal metric.
+    ///
+    /// When enabled, adds a `group` tag containing the rendered `group_by` value.
+    /// Missing or unrenderable values use `None`.
+    ///
+    /// Note that this defaults to false because the `group` tag has potentially unbounded
+    /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
+    #[serde(default)]
+    pub include_group_tag: bool,
 }
 
 /// Configuration for the `sample` transform.
@@ -47,19 +79,34 @@ pub struct SampleConfig {
     ///
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped. This differs from `ratio` which allows more precise control over the number of events
-    /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 1500))]
+    /// retained and values greater than 1/2.
+    #[configurable(required_one_of = "sampling_strategy")]
     pub rate: Option<u64>,
 
-    /// The rate at which events are forwarded, expressed as a percentage
+    /// The rate at which events are forwarded, expressed as a percentage.
     ///
     /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
-    /// precision value and also the ability to retain values of greater than 50% of all events. It is
-    /// an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 0.13))]
+    /// precision value and also the ability to retain values of greater than 50% of all events.
+    #[configurable(required_one_of = "sampling_strategy", metadata(docs::examples = 0.13))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
+
+    /// The event field whose numeric value is used as the sampling ratio on a per-event basis.
+    ///
+    /// Accepts integer, floating point, or string values that parse as a number. The value must be
+    /// in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%). If the field is missing
+    /// or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `rate_field`.
+    pub ratio_field: Option<String>,
+
+    /// The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
+    ///
+    /// Accepts an integer, or a string that parses as a positive integer; floating point values
+    /// are rejected. The value must be a positive integer to be considered valid. If the field is
+    /// missing or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+    /// This option cannot be used together with `ratio_field`.
+    pub rate_field: Option<String>,
 
     /// The name of the field whose value is hashed to determine if the event should be
     /// sampled.
@@ -72,6 +119,8 @@ pub struct SampleConfig {
     ///
     /// This can be useful to, for example, ensure that all logs for a given transaction are
     /// sampled together, but that overall `1/N` transactions are sampled.
+    ///
+    /// This option cannot be combined with `ratio_field` or `rate_field`.
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
@@ -84,18 +133,60 @@ pub struct SampleConfig {
     ///
     /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
     /// sampled separately.
+    ///
+    /// This can also be used with `ratio_field` or `rate_field` to apply dynamic sampling
+    /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
-        docs::examples = "{{ hostname }}-{{ service }}"
+        docs::examples = "{{ hostname }}-{{ service }}",
+        docs::warnings = "Prefer grouping by fields with a small, stable set of values, such as \
+        `service` or `host`. When the template interpolates event content (for example \
+        `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new \
+        group: exceeding `max_state_bytes` then evicts the least recently used groups' sampling \
+        state."
     ))]
-    pub group_by: Option<Template>,
+    pub group_by: Option<UnconfinedTemplate>,
+
+    /// The maximum number of bytes of per-group sampling state that is retained.
+    ///
+    /// Each group is counted by the size of its rendered `group_by` value plus a fixed per-group
+    /// overhead for its sampling state and cache bookkeeping. When this limit is reached, the least
+    /// recently used groups' state is evicted. A group whose state alone exceeds this limit is
+    /// sampled but not retained.
+    #[serde(default = "default_max_state_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_state_bytes: NonZeroUsize,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
+
+    /// Configuration of internal metrics for the Sample transform.
+    #[serde(default)]
+    pub internal_metrics: SampleInternalMetricsConfig,
+}
+
+#[must_use]
+/// # Panics
+///
+/// Panics if the fixed non-zero default is changed to zero.
+pub const fn default_max_state_bytes() -> NonZeroUsize {
+    NonZeroUsize::new(128 * 1024 * 1024).expect("static non-zero number")
 }
 
 impl SampleConfig {
     fn sample_rate(&self) -> Result<SampleMode, SampleError> {
+        if self.ratio_field.is_some() && self.rate_field.is_some() {
+            return Err(SampleError::InvalidDynamicConfiguration);
+        }
+
+        if self.key_field.is_some() && (self.ratio_field.is_some() || self.rate_field.is_some()) {
+            return Err(SampleError::InvalidKeyFieldDynamicCombination);
+        }
+
+        if self.rate.is_some() && self.ratio.is_some() {
+            return Err(SampleError::InvalidStaticConfiguration);
+        }
+
         match (self.rate, self.ratio) {
             (None, Some(ratio)) => {
                 if ratio <= 0.0 {
@@ -111,20 +202,25 @@ impl SampleConfig {
                     Ok(SampleMode::new_rate(rate))
                 }
             }
-            _ => Err(SampleError::InvalidConfiguration),
+            (None, None) => Err(SampleError::MissingStaticConfiguration),
+            _ => Err(SampleError::InvalidStaticConfiguration),
         }
     }
 }
 
 impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             rate: None,
             ratio: Some(0.1),
+            ratio_field: None,
+            rate_field: None,
             key_field: None,
             group_by: None,
+            max_state_bytes: default_max_state_bytes(),
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         })
         .unwrap()
     }
@@ -134,29 +230,63 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Sample::new(
-            Self::NAME.to_string(),
-            self.sample_rate()?,
-            self.key_field.clone(),
-            self.group_by.clone(),
-            self.exclude
-                .as_ref()
-                .map(|condition| {
-                    condition.build(&context.enrichment_tables, &context.metrics_storage)
-                })
-                .transpose()?,
-            self.sample_rate_key.clone(),
-        )))
+        let sample_mode = self.sample_rate()?;
+        let exclude = self
+            .exclude
+            .as_ref()
+            .map(|condition| condition.build(&context.enrichment_tables, &context.metrics_storage))
+            .transpose()?;
+
+        let sample = if self.ratio_field.is_some() || self.rate_field.is_some() {
+            Sample::new_with_dynamic(
+                Self::NAME.to_string(),
+                sample_mode,
+                DynamicSampleFields {
+                    ratio_field: self.ratio_field.clone(),
+                    rate_field: self.rate_field.clone(),
+                },
+                self.group_by.clone(),
+                self.max_state_bytes.get(),
+                exclude,
+                self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
+            )
+        } else {
+            Sample::new(
+                Self::NAME.to_string(),
+                sample_mode,
+                self.key_field.clone(),
+                self.group_by.clone(),
+                self.max_state_bytes.get(),
+                exclude,
+                self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
+            )
+        };
+
+        Ok(Transform::function(sample))
     }
 
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         self.sample_rate()
             .map(|_| ())
             .map_err(|e| vec![e.to_string()])
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        if let Some(Err(e)) = self
+            .exclude
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            Err(vec![format!("exclude: {e}")])
+        } else {
+            Ok(())
+        }
     }
 
     fn outputs(
@@ -185,16 +315,134 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+#[must_use]
 pub fn default_sample_rate_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("sample_rate"))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::transforms::sample::config::SampleConfig;
+    use super::SampleInternalMetricsConfig;
+    use crate::{
+        config::TransformConfig,
+        transforms::sample::config::{SampleConfig, SampleError},
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
+    }
+
+    #[test]
+    fn internal_metrics_include_group_tag_defaults_to_false() {
+        let config =
+            serde_yaml::from_str::<SampleConfig>("ratio: 0.5\ninternal_metrics: {}\n").unwrap();
+        assert!(!config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
+    fn internal_metrics_include_group_tag_can_be_enabled() {
+        let config = serde_yaml::from_str::<SampleConfig>(
+            "ratio: 0.5\ninternal_metrics:\n  include_group_tag: true\n",
+        )
+        .unwrap();
+        assert!(config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
+    fn rejects_dynamic_ratio_only_configuration() {
+        let config = SampleConfig {
+            rate: None,
+            ratio: None,
+            ratio_field: Some("sample_rate".to_string()),
+            rate_field: None,
+            key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+            internal_metrics: SampleInternalMetricsConfig::default(),
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
+    }
+
+    #[test]
+    fn rejects_dynamic_rate_only_configuration() {
+        let config = SampleConfig {
+            rate: None,
+            ratio: None,
+            ratio_field: None,
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+            internal_metrics: SampleInternalMetricsConfig::default(),
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::MissingStaticConfiguration));
+    }
+
+    #[test]
+    fn validates_static_with_dynamic_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: None,
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+            internal_metrics: SampleInternalMetricsConfig::default(),
+        };
+
+        assert!(config.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn rejects_both_dynamic_fields_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_rate".to_string()),
+            rate_field: Some("sample_rate_n".to_string()),
+            key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+            internal_metrics: SampleInternalMetricsConfig::default(),
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(err, SampleError::InvalidDynamicConfiguration));
+    }
+
+    #[test]
+    fn rejects_key_field_with_dynamic_configuration() {
+        let config = SampleConfig {
+            rate: Some(10),
+            ratio: None,
+            ratio_field: Some("sample_ratio".to_string()),
+            rate_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
+            key_field: Some("trace_id".to_string()),
+            sample_rate_key: super::default_sample_rate_key(),
+            group_by: None,
+            exclude: None,
+            internal_metrics: SampleInternalMetricsConfig::default(),
+        };
+
+        let err = config.sample_rate().unwrap_err();
+        assert!(matches!(
+            err,
+            SampleError::InvalidKeyFieldDynamicCombination
+        ));
     }
 }

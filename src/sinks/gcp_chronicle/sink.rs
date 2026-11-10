@@ -1,4 +1,5 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use crate::sinks::{
     gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
@@ -48,7 +49,9 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .batched_partitioned(partitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
                 // thus no further `EventsDropped` event needs emitting at this stage.
@@ -58,7 +61,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

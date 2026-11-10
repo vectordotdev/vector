@@ -9,7 +9,8 @@ use tokio::sync::oneshot::{Sender, channel};
 use tower::Service;
 use vector_lib::{
     config::log_schema,
-    event::Event,
+    event::{Event, Value},
+    internal_event::emit,
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -62,18 +63,14 @@ impl Partitioner for EventPartitioner {
                 agent_version: t
                     .get(event_path!("agent_version"))
                     .map(|s| s.to_string_lossy().into_owned()),
-                target_tps: t
-                    .get(event_path!("target_tps"))
-                    .and_then(|tps| tps.as_integer()),
-                error_tps: t
-                    .get(event_path!("error_tps"))
-                    .and_then(|tps| tps.as_integer()),
+                target_tps: t.get(event_path!("target_tps")).and_then(Value::as_integer),
+                error_tps: t.get(event_path!("error_tps")).and_then(Value::as_integer),
             },
         }
     }
 }
 
-pub struct TracesSink<S> {
+pub(super) struct TracesSink<S> {
     service: S,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
@@ -88,7 +85,7 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
@@ -108,17 +105,19 @@ where
         let batch_settings = self.batch_settings;
 
         input
-            .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
+            .batched_partitioned(EventPartitioner, batch_settings.timeout, |_| {
+                batch_settings.as_byte_size_config()
+            })
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
                         let (error_message, error_reason, dropped_events) = e.into_parts();
-                        emit!(DatadogTracesEncodingError {
+                        emit(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
-                            dropped_events: dropped_events as usize,
+                            dropped_events,
                         });
                         None
                     }

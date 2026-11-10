@@ -1,0 +1,19 @@
+data_dir: "/tmp/"
+
+sources:
+  agent:
+    type: "datadog_agent"
+    address: "0.0.0.0:8181"
+    multiple_outputs: true
+    enabled_data_types: ["logs"]
+    store_api_key: false
+
+sinks:
+  dd:
+    inputs:
+      - "agent.logs"
+    type: "datadog_logs"
+    default_api_key: "unused"
+    endpoint: "http://fakeintake-vector:80"
+    batch:
+      timeout_secs: 1

@@ -1,0 +1,16 @@
+sinks:
+  my_sink_id:
+    type: influxdb_logs
+    inputs:
+      - my-source-or-transform-id
+    bucket: vector-bucket
+    endpoint: http://localhost:8086
+    host_key: hostname
+    measurement: vector-logs
+    message_key: text
+    org: my-org
+    source_type_key: source
+    tags:
+      - field1
+    token: ${INFLUXDB_TOKEN}
+    version: "2"
