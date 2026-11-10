@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
+use std::{io, net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
@@ -489,6 +489,17 @@ pub fn udp(
             bytes_received.emit(ByteSize(batch.received_bytes()));
             let mut output = Vec::with_capacity(batch.len());
             for datagram in batch.iter() {
+                if datagram.ancillary_truncated {
+                    let error = io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "UDP ancillary data was truncated",
+                    );
+                    emit(SocketReceiveError {
+                        mode: SocketMode::Udp,
+                        error: &error,
+                    });
+                    continue;
+                }
                 if datagram.truncated {
                     emit(SocketOversizedDatagram {
                         mode: SocketMode::Udp,
@@ -585,8 +596,13 @@ fn enrich_syslog_event(
         );
     }
 
-    let parsed_hostname = log
-        .get(event_path!("hostname"))
+    let parsed_hostname = log_namespace
+        .get_source_metadata(
+            SyslogConfig::NAME,
+            log,
+            path!("hostname"),
+            path!("hostname"),
+        )
         .map(|hostname| Value::from(hostname.coerce_to_bytes()));
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
@@ -657,7 +673,7 @@ mod test {
         log_namespace: LogNamespace,
     ) -> Option<Event> {
         let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
-        let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
+        let mut events = parser.parse(bytes, log_namespace).ok()?;
         handle_events(
             &mut events,
             &Some(owned_value_path!(host_key)),
@@ -1050,6 +1066,31 @@ mod test {
             )
             .unwrap(),
             expected
+        );
+    }
+
+    #[test]
+    fn vector_namespace_prefers_parsed_hostname_over_sender_ip() {
+        let event = event_from_bytes(
+            "host",
+            Some(Value::from("192.0.2.1")),
+            Bytes::from_static(b"<13>1 2026-11-10T00:00:00Z parsed-host app - - - message"),
+            LogNamespace::Vector,
+        )
+        .unwrap();
+        let metadata = event.as_log().metadata().value();
+
+        assert_eq!(
+            metadata.get(path!("syslog", "hostname")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "host")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "source_ip")),
+            Some(&Value::from("192.0.2.1"))
         );
     }
 

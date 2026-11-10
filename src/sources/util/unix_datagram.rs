@@ -21,6 +21,7 @@ use vector_lib::{
         ByteSize, BytesReceived, ComponentEventsDropped, InternalEventHandle as _, Protocol,
         UNINTENTIONAL,
     },
+    source_sender::chunk_size_events,
 };
 
 #[cfg(target_os = "linux")]
@@ -435,10 +436,11 @@ pub fn build_unix_datagram_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
+    // Framing limits exclude the trailing delimiter, so retain one additional byte for it.
     Ok(build_unix_datagram_source_inner(
         listen_path,
         socket_file_mode,
-        max_length,
+        max_length.saturating_add(1),
         None,
         None,
         DatagramDecoder::Framed(Box::new(decoder)),
@@ -590,6 +592,7 @@ async fn listen(
             crate::sources::SourceError::from(error)
         })?;
     let bytes_received = register(BytesReceived::from(Protocol::UNIX));
+    let send_batch_size = chunk_size_events().max(1);
     loop {
         let batch = tokio::select! {
             batch_result = receiver.recv_batch() => batch_result.map_err(|error| {
@@ -605,6 +608,7 @@ async fn listen(
         let received_byte_size = (0..batch.len())
             .map(|index| batch.received_size(index))
             .sum();
+        bytes_received.emit(ByteSize(received_byte_size));
         for index in 0..batch.len() {
             if batch.truncated(index) {
                 emit(SocketOversizedDatagram {
@@ -639,7 +643,7 @@ async fn listen(
             None
         };
 
-        let mut output = SmallVec::<[Event; 1]>::new();
+        let mut output = Vec::with_capacity(batch.len().min(send_batch_size));
         match &decoder {
             DatagramDecoder::Framed(decoder) => {
                 for index in 0..batch.len() {
@@ -650,14 +654,28 @@ async fn listen(
                         DecoderFramedRead::new(batch.payload(index), decoder.as_ref().clone());
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok((events, _byte_size)) => append_events(
-                                events,
-                                received_from
-                                    .as_ref()
-                                    .and_then(|values| values[index].clone()),
-                                &handle_events,
-                                &mut output,
-                            ),
+                            Ok((events, _byte_size)) => {
+                                append_events(
+                                    events,
+                                    received_from
+                                        .as_ref()
+                                        .and_then(|values| values[index].clone()),
+                                    &handle_events,
+                                    &mut output,
+                                );
+                                while output.len() >= send_batch_size {
+                                    if !send_buffered_events(
+                                        &mut out,
+                                        &mut shutdown,
+                                        &mut output,
+                                        send_batch_size,
+                                    )
+                                    .await
+                                    {
+                                        return Ok(());
+                                    }
+                                }
+                            }
                             Err(error) => {
                                 emit(SocketReceiveError {
                                     mode: SocketMode::Unix,
@@ -700,7 +718,21 @@ async fn listen(
                         .collect();
                     for frame in frames {
                         match parser.parse(frame, *log_namespace) {
-                            Ok(events) => append_events(events, None, &handle_events, &mut output),
+                            Ok(events) => {
+                                append_events(events, None, &handle_events, &mut output);
+                                while output.len() >= send_batch_size {
+                                    if !send_buffered_events(
+                                        &mut out,
+                                        &mut shutdown,
+                                        &mut output,
+                                        send_batch_size,
+                                    )
+                                    .await
+                                    {
+                                        return Ok(());
+                                    }
+                                }
+                            }
                             Err(error) => emit(SocketReceiveError {
                                 mode: SocketMode::Unix,
                                 error: &error,
@@ -715,14 +747,28 @@ async fn listen(
                         match parser
                             .parse(Bytes::copy_from_slice(batch.payload(index)), *log_namespace)
                         {
-                            Ok(events) => append_events(
-                                events,
-                                received_from
-                                    .as_ref()
-                                    .and_then(|values| values[index].clone()),
-                                &handle_events,
-                                &mut output,
-                            ),
+                            Ok(events) => {
+                                append_events(
+                                    events,
+                                    received_from
+                                        .as_ref()
+                                        .and_then(|values| values[index].clone()),
+                                    &handle_events,
+                                    &mut output,
+                                );
+                                while output.len() >= send_batch_size {
+                                    if !send_buffered_events(
+                                        &mut out,
+                                        &mut shutdown,
+                                        &mut output,
+                                        send_batch_size,
+                                    )
+                                    .await
+                                    {
+                                        return Ok(());
+                                    }
+                                }
+                            }
                             Err(error) => {
                                 emit(SocketReceiveError {
                                     mode: SocketMode::Unix,
@@ -735,25 +781,10 @@ async fn listen(
             }
         }
 
-        bytes_received.emit(ByteSize(received_byte_size));
-        if output.is_empty() {
-            continue;
-        }
-
-        let count = output.len();
-        emit(SocketEventsReceived {
-            mode: SocketMode::Unix,
-            byte_size: output.estimated_json_encoded_size_of(),
-            count,
-        });
-        tokio::select! {
-            result = out.send_batch(output) => {
-                if result.is_err() {
-                    emit(StreamClosedError { count });
-                    return Ok(());
-                }
+        while !output.is_empty() {
+            if !send_buffered_events(&mut out, &mut shutdown, &mut output, send_batch_size).await {
+                return Ok(());
             }
-            _ = &mut shutdown => return Ok(()),
         }
     }
 }
@@ -766,6 +797,36 @@ fn append_events(
 ) {
     handle_events(events.as_mut(), received_from);
     output.extend(events);
+}
+
+async fn send_buffered_events(
+    out: &mut SourceSender,
+    shutdown: &mut ShutdownSignal,
+    output: &mut Vec<Event>,
+    max_events: usize,
+) -> bool {
+    let split_at = output.len().min(max_events);
+    let remainder = output.split_off(split_at);
+    let events = std::mem::replace(output, remainder);
+    let count = events.len();
+    debug_assert!(count > 0);
+
+    emit(SocketEventsReceived {
+        mode: SocketMode::Unix,
+        byte_size: events.estimated_json_encoded_size_of(),
+        count,
+    });
+    tokio::select! {
+        result = out.send_batch(events) => {
+            if result.is_err() {
+                emit(StreamClosedError { count });
+                false
+            } else {
+                true
+            }
+        }
+        _ = shutdown => false,
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]

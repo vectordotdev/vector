@@ -27,14 +27,13 @@ const UDP_RECEIVE_BUFFER_SIZE: usize = 65_536;
 #[cfg(target_os = "linux")]
 const UDP_GRO: libc::c_int = 104;
 #[cfg(target_os = "linux")]
-#[allow(clippy::cast_possible_truncation)]
-const UDP_GRO_CONTROL_LEN: usize =
-    // SAFETY: `CMSG_SPACE` only calculates a buffer size from the supplied value.
-    unsafe { libc::CMSG_SPACE(mem::size_of::<libc::c_ushort>() as libc::c_uint) as usize };
+// Leave room for UDP_GRO together with ancillary data enabled on inherited sockets, such as
+// timestamps, packet information, and receive-queue overflow counters.
+const UDP_CONTROL_LEN: usize = 512;
 #[cfg(target_os = "linux")]
-const UDP_GRO_CONTROL_WORDS: usize = UDP_GRO_CONTROL_LEN.div_ceil(mem::size_of::<usize>());
+const UDP_CONTROL_WORDS: usize = UDP_CONTROL_LEN.div_ceil(mem::size_of::<usize>());
 #[cfg(target_os = "linux")]
-type UdpGroControl = [usize; UDP_GRO_CONTROL_WORDS];
+type UdpControl = [usize; UDP_CONTROL_WORDS];
 
 /// A received UDP datagram.
 #[derive(Clone, Copy, Debug)]
@@ -42,6 +41,7 @@ pub struct UdpDatagram<'a> {
     pub address: SocketAddr,
     pub payload: &'a [u8],
     pub truncated: bool,
+    pub ancillary_truncated: bool,
 }
 
 /// A batch of received UDP datagrams.
@@ -165,8 +165,9 @@ impl FallbackUdpBatchReceiver {
         let mut datagrams = SmallVec::new();
         datagrams.push(UdpDatagram {
             address,
-            payload: &self.buffer[..byte_size.min(self.max_datagram_size)],
+            payload: &self.buffer[..byte_size],
             truncated: byte_size > self.max_datagram_size,
+            ancillary_truncated: false,
         });
         Ok(UdpBatch::new(datagrams, byte_size))
     }
@@ -177,7 +178,7 @@ struct LinuxUdpBatchReceiver {
     socket: AsyncFd<StdUdpSocket>,
     max_datagram_size: usize,
     addresses: [libc::sockaddr_storage; UDP_BATCH_SIZE],
-    controls: [UdpGroControl; UDP_BATCH_SIZE],
+    controls: [UdpControl; UDP_BATCH_SIZE],
     buffers: Vec<Box<[u8]>>,
 }
 
@@ -200,7 +201,7 @@ impl LinuxUdpBatchReceiver {
                 // SAFETY: `sockaddr_storage` is an output buffer that the kernel initializes.
                 unsafe { mem::zeroed() }
             }),
-            controls: [[0; UDP_GRO_CONTROL_WORDS]; UDP_BATCH_SIZE],
+            controls: [[0; UDP_CONTROL_WORDS]; UDP_BATCH_SIZE],
             buffers: (0..UDP_BATCH_SIZE)
                 .map(|_| vec![0; UDP_RECEIVE_BUFFER_SIZE].into_boxed_slice())
                 .collect(),
@@ -230,6 +231,15 @@ impl LinuxUdpBatchReceiver {
                 sockaddr_to_socket_addr(&self.addresses[message], header.msg_hdr.msg_namelen)?;
             let received_len = (header.msg_len as usize).min(self.buffers[message].len());
             let payload = &self.buffers[message][..received_len];
+            if (header.msg_hdr.msg_flags & libc::MSG_CTRUNC) != 0 {
+                datagrams.push(UdpDatagram {
+                    address,
+                    payload: &[],
+                    truncated: false,
+                    ancillary_truncated: true,
+                });
+                continue;
+            }
             let segment_size = udp_gro_segment_size(&header.msg_hdr).unwrap_or(received_len);
             let truncated = header.msg_len as usize > self.buffers[message].len()
                 || (header.msg_hdr.msg_flags & libc::MSG_TRUNC) != 0;
@@ -259,7 +269,7 @@ struct ReceivedMessages {
 fn try_recvmmsg(
     socket: &StdUdpSocket,
     addresses: &mut [libc::sockaddr_storage; UDP_BATCH_SIZE],
-    controls: &mut [UdpGroControl; UDP_BATCH_SIZE],
+    controls: &mut [UdpControl; UDP_BATCH_SIZE],
     buffers: &mut [Box<[u8]>],
 ) -> io::Result<ReceivedMessages> {
     let mut iovecs: [libc::iovec; UDP_BATCH_SIZE] = std::array::from_fn(|_| {
@@ -283,7 +293,7 @@ fn try_recvmmsg(
             msg_iov: &raw mut iovecs[index],
             msg_iovlen: 1,
             msg_control: controls[index].as_mut_ptr().cast(),
-            msg_controllen: UDP_GRO_CONTROL_LEN,
+            msg_controllen: UDP_CONTROL_LEN,
             msg_flags: 0,
         };
     }
@@ -345,15 +355,14 @@ fn udp_gro_segment_size(header: &libc::msghdr) -> Option<usize> {
             && control_ref.cmsg_len
                 >= unsafe {
                     // SAFETY: `CMSG_LEN` only calculates a length from the supplied value.
-                    libc::CMSG_LEN(mem::size_of::<libc::c_ushort>() as libc::c_uint) as usize
+                    libc::CMSG_LEN(mem::size_of::<libc::c_int>() as libc::c_uint) as usize
                 }
         {
             // SAFETY: the level, type, and length checks above establish that the control
-            // payload contains a `c_ushort`; unaligned reads are permitted explicitly.
-            let segment_size = unsafe {
-                ptr::read_unaligned(libc::CMSG_DATA(control).cast::<libc::c_ushort>()) as usize
-            };
-            return (segment_size != 0).then_some(segment_size);
+            // payload contains a `c_int`; unaligned reads are permitted explicitly.
+            let segment_size =
+                unsafe { ptr::read_unaligned(libc::CMSG_DATA(control).cast::<libc::c_int>()) };
+            return usize::try_from(segment_size).ok().filter(|size| *size != 0);
         }
         // SAFETY: `control` is the current element in the valid ancillary-data chain.
         control = unsafe { libc::CMSG_NXTHDR(header, control) };
@@ -375,16 +384,18 @@ fn split_udp_payload<'a>(
             address,
             payload,
             truncated: receive_truncated,
+            ancillary_truncated: false,
         });
         return;
     }
 
     for segment in payload.chunks(segment_size.max(1)) {
-        let payload_len = segment.len().min(max_datagram_size);
+        let payload_len = segment.len().min(max_datagram_size.saturating_add(1));
         datagrams.push(UdpDatagram {
             address,
             payload: &segment[..payload_len],
             truncated: receive_truncated || segment.len() > max_datagram_size,
+            ancillary_truncated: false,
         });
     }
 }
@@ -463,15 +474,15 @@ pub async fn try_bind_udp_socket(
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
-    use std::{collections::HashSet, mem, net::SocketAddr, ptr, time::Duration};
+    use std::{collections::HashSet, mem, net::SocketAddr, os::fd::AsRawFd, ptr, time::Duration};
 
     use nix::libc;
     use smallvec::SmallVec;
     use tokio::{net::UdpSocket, time::timeout};
 
     use super::{
-        UDP_BATCH_SIZE, UDP_GRO, UDP_GRO_CONTROL_LEN, UDP_GRO_CONTROL_WORDS, UdpBatchReceiver,
-        UdpDatagram, split_udp_payload, udp_gro_segment_size,
+        UDP_BATCH_SIZE, UDP_CONTROL_LEN, UDP_CONTROL_WORDS, UDP_GRO, UdpBatchReceiver, UdpDatagram,
+        split_udp_payload, udp_gro_segment_size,
     };
 
     #[tokio::test]
@@ -532,8 +543,36 @@ mod tests {
         let batch = receiver.recv_batch().await.unwrap();
         let datagram = batch.iter().next().unwrap();
         assert!(datagram.truncated);
-        assert_eq!(datagram.payload, b"paylo");
+        assert_eq!(datagram.payload, b"payloa");
+        assert!(!datagram.ancillary_truncated);
         assert_eq!(batch.received_bytes(), 7);
+    }
+
+    #[tokio::test]
+    async fn recvmmsg_preserves_payload_with_timestamp_ancillary_data() {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let enabled: libc::c_int = 1;
+        // SAFETY: `enabled` is live for the call and its size matches the supplied option length.
+        let result = unsafe {
+            libc::setsockopt(
+                socket.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_TIMESTAMPNS,
+                (&raw const enabled).cast(),
+                mem::size_of_val(&enabled) as libc::socklen_t,
+            )
+        };
+        assert_eq!(result, 0, "failed to enable SO_TIMESTAMPNS");
+
+        let address = socket.local_addr().unwrap();
+        let mut receiver = UdpBatchReceiver::from_socket(socket, 64).unwrap();
+        let sender = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sender.send_to(b"timestamped", address).await.unwrap();
+
+        let batch = receiver.recv_batch().await.unwrap();
+        let datagram = batch.iter().next().unwrap();
+        assert_eq!(datagram.payload, b"timestamped");
+        assert!(!datagram.ancillary_truncated);
     }
 
     #[test]
@@ -587,26 +626,23 @@ mod tests {
 
     #[test]
     fn reads_gro_segment_size_control_message() {
-        let mut control = [0usize; UDP_GRO_CONTROL_WORDS];
+        let mut control = [0usize; UDP_CONTROL_WORDS];
         // SAFETY: all fields consumed by the CMSG macros are initialized immediately below.
         let mut header: libc::msghdr = unsafe { mem::zeroed() };
         header.msg_control = control.as_mut_ptr().cast();
-        header.msg_controllen = UDP_GRO_CONTROL_LEN;
+        header.msg_controllen = UDP_CONTROL_LEN;
 
         // SAFETY: `header` describes the live `control` buffer with its exact length.
         let control_header = unsafe { libc::CMSG_FIRSTHDR(&raw const header) };
         assert!(!control_header.is_null());
         // SAFETY: `control_header` points into `control`, and the buffer was sized with
-        // `CMSG_SPACE` for the `c_ushort` written here.
+        // `CMSG_SPACE` for the native integer written here.
         unsafe {
             (*control_header).cmsg_level = libc::SOL_UDP;
             (*control_header).cmsg_type = UDP_GRO;
             (*control_header).cmsg_len =
-                libc::CMSG_LEN(mem::size_of::<libc::c_ushort>() as libc::c_uint) as usize;
-            ptr::write_unaligned(
-                libc::CMSG_DATA(control_header).cast::<libc::c_ushort>(),
-                1_200,
-            );
+                libc::CMSG_LEN(mem::size_of::<libc::c_int>() as libc::c_uint) as usize;
+            ptr::write_unaligned(libc::CMSG_DATA(control_header).cast::<libc::c_int>(), 1_200);
         }
 
         assert_eq!(udp_gro_segment_size(&header), Some(1_200));

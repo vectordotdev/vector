@@ -1,4 +1,5 @@
 use std::{
+    io,
     net::{Ipv4Addr, SocketAddr},
     pin::Pin,
 };
@@ -17,6 +18,7 @@ use vector_lib::{
     configurable::configurable_component,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+    source_sender::chunk_size_events,
 };
 
 use super::default_host_key;
@@ -248,6 +250,7 @@ pub(super) fn udp(
         })?;
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let send_batch_size = chunk_size_events().max(1);
         let legacy_host_key = config.host_key.clone().unwrap_or(default_host_key()).path;
         let legacy_port_key = config.port_key.clone().path;
 
@@ -280,8 +283,19 @@ pub(super) fn udp(
             };
 
             bytes_received.emit(ByteSize(batch.received_bytes()));
-            let mut output = Vec::with_capacity(batch.len());
+            let mut output = Vec::with_capacity(batch.len().min(send_batch_size));
             for datagram in batch.iter() {
+                if datagram.ancillary_truncated {
+                    let error = io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "UDP ancillary data was truncated",
+                    );
+                    emit(SocketReceiveError {
+                        mode: SocketMode::Udp,
+                        error: &error,
+                    });
+                    continue;
+                }
                 if datagram.truncated {
                     emit(SocketOversizedDatagram {
                         mode: SocketMode::Udp,
@@ -341,7 +355,15 @@ pub(super) fn udp(
                                     );
                                 }
                             }
-                            output.extend(events);
+                            for event in events {
+                                output.push(event);
+                                if output.len() >= send_batch_size
+                                    && !send_buffered_events(&mut out, &mut shutdown, &mut output)
+                                        .await
+                                {
+                                    return Ok(());
+                                }
+                            }
                         }
                         Err(error) => {
                             // Error is logged by `vector_lib::codecs::Decoder`, no further
@@ -359,16 +381,31 @@ pub(super) fn udp(
                 continue;
             }
 
-            let count = output.len();
-            tokio::select! {
-                result = out.send_batch(output) => {
-                    if result.is_err() {
-                        emit(StreamClosedError { count });
-                        return Ok(());
-                    }
-                }
-                _ = &mut shutdown => return Ok(()),
+            if !send_buffered_events(&mut out, &mut shutdown, &mut output).await {
+                return Ok(());
             }
         }
     })
+}
+
+async fn send_buffered_events(
+    out: &mut SourceSender,
+    shutdown: &mut ShutdownSignal,
+    output: &mut Vec<Event>,
+) -> bool {
+    let events = std::mem::take(output);
+    let count = events.len();
+    debug_assert!(count > 0);
+
+    tokio::select! {
+        result = out.send_batch(events) => {
+            if result.is_err() {
+                emit(StreamClosedError { count });
+                false
+            } else {
+                true
+            }
+        }
+        _ = shutdown => false,
+    }
 }

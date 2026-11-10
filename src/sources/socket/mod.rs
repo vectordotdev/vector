@@ -1263,16 +1263,13 @@ mod test {
 
             send_lines_udp(
                 address,
-                vec![
-                    "test, with a long line".to_string(),
-                    "short one".to_string(),
-                ],
+                vec!["test with, long line".to_string(), "short one".to_string()],
             );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
                 events[0].as_log()[log_schema().message_key().unwrap().to_string()],
-                "test".into()
+                "test with".into()
             );
             assert_eq!(
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
@@ -1315,6 +1312,21 @@ mod test {
             );
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn udp_flushes_large_decoded_datagram_in_bounded_batches() {
+        let event_count = vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS + 1;
+        let (tx, rx) = SourceSender::new_test();
+        let (_, address) = next_addr();
+        let mut config = UdpConfig::from_address(address.into());
+        config.framing = Some(NewlineDelimitedDecoderConfig::new().into());
+        let address = init_udp_with_config(tx, config).await;
+
+        send_packets_udp(address, [Bytes::from("x\n".repeat(event_count))]);
+
+        let events = collect_n(rx, event_count).await;
+        assert_eq!(events.len(), event_count);
     }
 
     #[tokio::test]
@@ -1864,6 +1876,40 @@ mod test {
             );
         })
         .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_allows_delimiter_after_maximum_frame() {
+        let (tx, rx) = SourceSender::new_test();
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
+        let mut config = UnixConfig::new(in_path);
+        config.framing = Some(NewlineDelimitedDecoderConfig::new_with_max_length(5).into());
+        let path = init_unix_with_config(tx, false, false, config).await;
+
+        send_packets_unix_datagram(path, [Bytes::from_static(b"hello\n")]).await;
+
+        let events = collect_n(rx, 1).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "hello".into()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_flushes_large_decoded_datagram_in_bounded_batches() {
+        let event_count = vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS + 1;
+        let (tx, rx) = SourceSender::new_test();
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
+        let mut config = UnixConfig::new(in_path);
+        config.framing = Some(NewlineDelimitedDecoderConfig::new().into());
+        let path = init_unix_with_config(tx, false, false, config).await;
+
+        send_packets_unix_datagram(path, [Bytes::from("x\n".repeat(event_count))]).await;
+
+        let events = collect_n(rx, event_count).await;
+        assert_eq!(events.len(), event_count);
     }
 
     #[cfg(unix)]
