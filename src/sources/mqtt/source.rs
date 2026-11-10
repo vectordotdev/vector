@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     time::Duration,
 };
 
@@ -47,6 +47,16 @@ const FORCED_RECONNECT_COOLDOWN: Duration = Duration::from_secs(30);
 /// bound keeps an acknowledgement that never gets written from holding the
 /// reconnect back.
 const FORCED_RECONNECT_ACK_FLUSH_GRACE: Duration = Duration::from_secs(5);
+
+/// The least time between two retransmissions of a publish, both arriving
+/// after its acknowledgement was issued, for them to mean the
+/// acknowledgement never reached the broker (see `InFlightPublishes`). A
+/// broker retransmits on an interval of seconds, so retransmissions this far
+/// apart were sent on separate intervals with no acknowledgement in between.
+/// Ones closer together were sent earlier and read here in one burst (for
+/// example after downstream backpressure kept the connection from being
+/// polled), and say nothing about an acknowledgement issued since.
+const LOST_ACK_RETRANSMISSION_GAP: Duration = Duration::from_secs(1);
 
 /// How long to wait before sending a (re)subscribe again while filters are
 /// still unconfirmed: after the broker rejected some (SUBACK failure return
@@ -490,10 +500,20 @@ type SubscribeResults = FuturesUnordered<
 /// withheld stays in flight until the reconnect that redelivers it; a
 /// reconnect forgets everything, since the broker redelivers what is
 /// unacknowledged (with DUP set) under fresh state.
+///
+/// rumqttc's report is not proof the PUBACK reached the broker. It can lose
+/// an acknowledgement it accepted, before reporting it (its event loop is
+/// not cancel-safe where it takes a control request while replaying
+/// requests after a reconnect) or after (it reports the PUBACK before
+/// writing it, and a write into a backed-up socket can be cancelled). The
+/// broker then keeps the message in flight and keeps retransmitting it. So
+/// in both states a retransmission that keeps coming after the
+/// acknowledgement was issued (see `LOST_ACK_RETRANSMISSION_GAP`) means it
+/// was lost, and only a reconnect recovers the broker's in-flight slot.
 #[derive(Debug, Default)]
 struct InFlightPublishes {
     in_flight: HashMap<u16, InFlightPublish>,
-    acknowledged: HashSet<u16>,
+    acknowledged: HashMap<u16, RetransmissionsAfterAck>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -501,9 +521,32 @@ struct InFlightPublish {
     /// The acknowledgement was handed to rumqttc and is not reported
     /// written yet.
     ack_issued: bool,
-    /// The broker retransmitted the publish after its acknowledgement was
-    /// issued.
-    retransmitted_after_ack: bool,
+    retransmissions_after_ack: RetransmissionsAfterAck,
+}
+
+/// When the broker first retransmitted a publish after its acknowledgement
+/// was issued, if it has.
+#[derive(Clone, Copy, Debug, Default)]
+struct RetransmissionsAfterAck {
+    first_at: Option<tokio::time::Instant>,
+}
+
+impl RetransmissionsAfterAck {
+    /// Records a retransmission. One can simply have crossed the
+    /// acknowledgement on the wire, or overtaken one still queued; one that
+    /// follows it a retry interval later means the acknowledgement was lost.
+    fn record(&mut self, now: tokio::time::Instant) -> Admission {
+        match self.first_at {
+            Some(first_at) if now.duration_since(first_at) >= LOST_ACK_RETRANSMISSION_GAP => {
+                Admission::RetransmissionAckLost
+            }
+            Some(_) => Admission::Retransmission,
+            None => {
+                self.first_at = Some(now);
+                Admission::Retransmission
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -513,31 +556,22 @@ enum Admission {
     /// A retransmission of a publish that is still in flight or was already
     /// acknowledged: drop it.
     Retransmission,
-    /// A second retransmission since the acknowledgement was issued, with
-    /// rumqttc still not reporting it written. One can overtake an
-    /// acknowledgement that is merely queued; a second, a broker retry
-    /// interval later, means it was lost inside rumqttc (its event loop is
-    /// not cancel-safe at the point where it takes a control request while
-    /// replaying requests after a reconnect). Only a reconnect recovers the
-    /// broker's in-flight slot: drop this copy and force one.
+    /// A retransmission showing that the publish's acknowledgement never
+    /// reached the broker: drop it and force a reconnect.
     RetransmissionAckLost,
 }
 
 impl InFlightPublishes {
-    fn admit(&mut self, packet_id: u16, dup: bool) -> Admission {
+    fn admit(&mut self, packet_id: u16, dup: bool, now: tokio::time::Instant) -> Admission {
         if let Some(in_flight) = self.in_flight.get_mut(&packet_id) {
             if !in_flight.ack_issued {
                 return Admission::Retransmission;
             }
-            if in_flight.retransmitted_after_ack {
-                return Admission::RetransmissionAckLost;
-            }
-            in_flight.retransmitted_after_ack = true;
-            return Admission::Retransmission;
+            return in_flight.retransmissions_after_ack.record(now);
         }
 
-        if dup && self.acknowledged.contains(&packet_id) {
-            return Admission::Retransmission;
+        if dup && let Some(retransmissions) = self.acknowledged.get_mut(&packet_id) {
+            return retransmissions.record(now);
         }
 
         self.acknowledged.remove(&packet_id);
@@ -560,10 +594,11 @@ impl InFlightPublishes {
             .any(|in_flight| in_flight.ack_issued)
     }
 
-    /// The acknowledgement for `packet_id` was written.
+    /// rumqttc reported the acknowledgement for `packet_id` written.
     fn release(&mut self, packet_id: u16) {
-        if self.in_flight.remove(&packet_id).is_some() {
-            self.acknowledged.insert(packet_id);
+        if let Some(in_flight) = self.in_flight.remove(&packet_id) {
+            self.acknowledged
+                .insert(packet_id, in_flight.retransmissions_after_ack);
         }
     }
 
@@ -973,7 +1008,11 @@ impl MqttSource {
                                 // A retransmission of a publish that is
                                 // still in flight, or already acknowledged,
                                 // is dropped; see `InFlightPublishes`.
-                                match in_flight_publishes.admit(publish.pkid, publish.dup) {
+                                match in_flight_publishes.admit(
+                                    publish.pkid,
+                                    publish.dup,
+                                    tokio::time::Instant::now(),
+                                ) {
                                     Admission::New => {
                                         registration = Some(AckRegistration {
                                             finalizer,
@@ -1211,10 +1250,12 @@ impl MqttSource {
     ///   connection is dropped, and with manual acks everything unacked is
     ///   redelivered: duplicates, never loss. Master blocks the same way.
     /// - rumqttc can lose an acknowledgement it accepted if `poll()` is
-    ///   cancelled at one await while it replays requests after a
-    ///   reconnect. A broker that retransmits makes this visible and it is
-    ///   recovered by a forced reconnect (see `InFlightPublishes`); one that
-    ///   doesn't keeps the message in flight until the next reconnect.
+    ///   cancelled at one of two awaits: while it replays requests after a
+    ///   reconnect, or while it writes the PUBACK into a backed-up socket
+    ///   (after already reporting it). A broker that retransmits makes this
+    ///   visible and it is recovered by a forced reconnect (see
+    ///   `InFlightPublishes`); one that doesn't keeps the message in flight
+    ///   until the next reconnect.
     fn handle_connection_lost(
         &self,
         connection: &mut rumqttc::EventLoop,
@@ -1518,18 +1559,24 @@ mod tests {
     #[test]
     fn in_flight_publishes_refuse_retransmissions_while_in_flight() {
         let mut in_flight = InFlightPublishes::default();
+        let now = tokio::time::Instant::now();
 
-        assert_eq!(in_flight.admit(5, false), Admission::New);
-        assert_eq!(in_flight.admit(6, true), Admission::New);
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-        assert_eq!(in_flight.admit(5, false), Admission::Retransmission);
-        assert_eq!(in_flight.admit(6, true), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, false, now), Admission::New);
+        assert_eq!(in_flight.admit(6, true, now), Admission::New);
+        assert_eq!(in_flight.admit(5, true, now), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, false, now), Admission::Retransmission);
+        assert_eq!(in_flight.admit(6, true, now), Admission::Retransmission);
+
+        // Before the ack is issued, retransmissions say nothing about it,
+        // however long they keep coming.
+        let later = now + LOST_ACK_RETRANSMISSION_GAP * 10;
+        assert_eq!(in_flight.admit(5, true, later), Admission::Retransmission);
 
         // A reconnect redelivers everything unacked (with DUP set) under
         // fresh state.
         in_flight.clear();
-        assert_eq!(in_flight.admit(5, true), Admission::New);
-        assert_eq!(in_flight.admit(6, true), Admission::New);
+        assert_eq!(in_flight.admit(5, true, later), Admission::New);
+        assert_eq!(in_flight.admit(6, true, later), Admission::New);
     }
 
     // A retransmission the broker sent just before our PUBACK reached it is
@@ -1542,56 +1589,87 @@ mod tests {
     // publish per id is ever in flight, in either arrival order.
     #[test]
     fn in_flight_publishes_drop_a_retransmission_that_crossed_the_ack() {
+        let now = tokio::time::Instant::now();
+
         // Late retransmission first, then the id is reused.
         let mut in_flight = InFlightPublishes::default();
-        assert_eq!(in_flight.admit(5, false), Admission::New);
+        assert_eq!(in_flight.admit(5, false, now), Admission::New);
         in_flight.ack_issued(5);
         in_flight.release(5);
 
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, true, now), Admission::Retransmission);
         assert!(!in_flight.has_unwritten_acks());
-        assert_eq!(in_flight.admit(5, false), Admission::New);
+        assert_eq!(in_flight.admit(5, false, now), Admission::New);
         // The reused id is in flight again: its own retransmissions drop.
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, true, now), Admission::Retransmission);
 
         // Reuse first, then the previous message's late retransmission:
         // indistinguishable from a retransmission of the new one, and
         // dropped all the same.
         in_flight.ack_issued(5);
         in_flight.release(5);
-        assert_eq!(in_flight.admit(5, false), Admission::New);
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, false, now), Admission::New);
+        assert_eq!(in_flight.admit(5, true, now), Admission::Retransmission);
 
         // An id never seen on this connection is new even with DUP set:
         // that is how a resumed session redelivers.
-        assert_eq!(in_flight.admit(9, true), Admission::New);
+        assert_eq!(in_flight.admit(9, true, now), Admission::New);
     }
 
-    // rumqttc can lose an acknowledgement it accepted (its event loop is not
-    // cancel-safe where it takes a control request while replaying requests
-    // after a reconnect), and never reports it written. The broker keeps the
-    // message in flight and keeps retransmitting it. One retransmission can
-    // simply overtake an ack that is still queued; a second one means the
-    // ack is gone, and only a reconnect frees the broker's in-flight slot.
+    // rumqttc can lose an acknowledgement it accepted: before reporting it
+    // written (its event loop is not cancel-safe where it takes a control
+    // request while replaying requests after a reconnect), or after (it
+    // reports the PUBACK before writing it, and the write can be cancelled).
+    // Either way the broker keeps the message in flight and retransmits it
+    // every retry interval. One retransmission after the ack was issued can
+    // simply have crossed it; another a retry interval later means the ack
+    // is gone, and only a reconnect frees the broker's in-flight slot.
+    // Retransmissions read in one burst (sent earlier, read together after
+    // the connection went unpolled for a while) prove nothing.
     #[test]
     fn in_flight_publishes_detect_a_lost_acknowledgement() {
+        let t0 = tokio::time::Instant::now();
+        let burst = t0 + Duration::from_millis(1);
+        let next_interval = t0 + LOST_ACK_RETRANSMISSION_GAP;
+
+        for reported_written in [false, true] {
+            let mut in_flight = InFlightPublishes::default();
+            assert_eq!(in_flight.admit(5, false, t0), Admission::New);
+            in_flight.ack_issued(5);
+            assert!(in_flight.has_unwritten_acks());
+            if reported_written {
+                in_flight.release(5);
+                assert!(!in_flight.has_unwritten_acks());
+            }
+
+            assert_eq!(
+                in_flight.admit(5, true, t0),
+                Admission::Retransmission,
+                "reported_written={reported_written}"
+            );
+            assert_eq!(
+                in_flight.admit(5, true, burst),
+                Admission::Retransmission,
+                "a burst is not evidence; reported_written={reported_written}"
+            );
+            assert_eq!(
+                in_flight.admit(5, true, next_interval),
+                Admission::RetransmissionAckLost,
+                "reported_written={reported_written}"
+            );
+        }
+
+        // The evidence carries over when the ack is reported written
+        // between two retransmissions.
         let mut in_flight = InFlightPublishes::default();
-
-        assert_eq!(in_flight.admit(5, false), Admission::New);
-        // Retransmissions before the ack is issued say nothing about it.
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-        assert!(!in_flight.has_unwritten_acks());
-
+        assert_eq!(in_flight.admit(5, false, t0), Admission::New);
         in_flight.ack_issued(5);
-        assert!(in_flight.has_unwritten_acks());
-        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-        assert_eq!(in_flight.admit(5, true), Admission::RetransmissionAckLost);
-
-        // Once written, there is nothing unwritten left to wait for.
+        assert_eq!(in_flight.admit(5, true, t0), Admission::Retransmission);
         in_flight.release(5);
-        assert!(!in_flight.has_unwritten_acks());
+        assert_eq!(
+            in_flight.admit(5, true, next_interval),
+            Admission::RetransmissionAckLost
+        );
     }
 
     // A forced reconnect waits for acknowledgements already issued for
@@ -1747,7 +1825,7 @@ mod tests {
             let mut resubscribe_retry_at = Some(now + Duration::from_secs(5));
             let mut buffered_publishes: Vec<BufferedPublish> = Vec::new();
             let mut in_flight_publishes = InFlightPublishes::default();
-            in_flight_publishes.admit(2, false);
+            in_flight_publishes.admit(2, false, now);
 
             // What `poll()` runs internally before returning a connection
             // error.
