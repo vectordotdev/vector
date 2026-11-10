@@ -13,10 +13,8 @@ tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 * You have logs in [AWS CloudWatch Logs][AWS CloudWatch Logs] that you'd like to
   consume.
 * You are able to deploy Vector with a publicly exposed HTTPS endpoint.
-* You have [jq] installed, to write the Firehose access key to a secrets file.
 
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
-[jq]: https://jqlang.org/
 {{< /requirement >}}
 
 If you use [AWS CloudWatch Logs][AWS CloudWatch Logs] on Amazon Web Services
@@ -66,7 +64,7 @@ without edits.
 # Update these
 export AWS_ACCOUNT_ID="111111111111" # your AWS account ID
 export AWS_REGION="us-east-1" # region that resources exist in
-export FIREHOSE_ACCESS_KEY="my secret key" # set to a secret value
+export FIREHOSE_ACCESS_KEY="$(openssl rand -hex 32)" # random letters and digits, safe to embed in JSON
 export VECTOR_ENDPOINT="https://example.com" # the endpoint where vector is deployed with the aws_kinesis_firehose source (see Configuring Vector below)
 
 # Update these if needed
@@ -145,9 +143,9 @@ configuration above. The configuration reads the access key from `secrets.json` 
 ```bash
 (
   umask 077
-  jq -n \
-    --arg key "${FIREHOSE_ACCESS_KEY:?Set FIREHOSE_ACCESS_KEY first}" \
-    '{firehose_access_key: $key}' > secrets.json
+  cat > secrets.json <<EOF
+{"firehose_access_key": "${FIREHOSE_ACCESS_KEY:?Set FIREHOSE_ACCESS_KEY first}"}
+EOF
 )
 ```
 
