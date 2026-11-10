@@ -23,7 +23,7 @@
       <div>
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2) }}
-          <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecated configuration and features are retained for at least one minor release before they are eligible for removal.</p>
+          <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecations become eligible for removal two minor versions after their announcement.</p>
         </div>
 
         {{ partial "deprecations/list.html" (dict "entries" $pending "sort_by" "deprecation version") }}
