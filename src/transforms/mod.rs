@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 pub mod dedupe;
+pub mod partitioned;
 pub mod reduce;
 #[cfg(feature = "transforms-impl-sample")]
 pub mod sample;

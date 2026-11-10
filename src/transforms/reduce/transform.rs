@@ -5,7 +5,7 @@ use std::{
 };
 use vector_lib::internal_event::emit;
 
-use futures::Stream;
+use futures::{Stream, StreamExt as _, stream::BoxStream};
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
@@ -20,6 +20,7 @@ use crate::{
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
+        partitioned::KeyedTransform,
         reduce::{
             config::ReduceConfig,
             merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
@@ -269,6 +270,19 @@ impl Reduce {
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+        let discriminant = self.key(&event);
+        self.transform_one_with_key(emitter, discriminant, event);
+    }
+
+    /// Like [`Self::transform_one`], for an event whose `discriminant` was already computed.
+    ///
+    /// Conditions are compiled read-only, so evaluating them can't change the `discriminant`.
+    fn transform_one_with_key(
+        &mut self,
+        emitter: &mut Emitter<Event>,
+        discriminant: Discriminant,
+        event: Event,
+    ) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -280,7 +294,6 @@ impl Reduce {
         };
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
@@ -332,6 +345,32 @@ impl TaskTransform<Event> for Reduce {
     }
 }
 
+impl KeyedTransform for Reduce {
+    type Key = Discriminant;
+
+    fn key(&self, event: &Event) -> Discriminant {
+        Discriminant::from_log_event(event.as_log(), &self.group_by)
+    }
+
+    fn transform_keyed(
+        self: Box<Self>,
+        input: BoxStream<'static, (Discriminant, Event)>,
+    ) -> BoxStream<'static, Event> {
+        let flush_period = self.flush_period;
+        map_with_expiration(
+            self,
+            input,
+            flush_period,
+            |me, (discriminant, event), emitter| {
+                me.transform_one_with_key(emitter, discriminant, event);
+            },
+            |me, emitter| me.flush_into(emitter),
+            |me, emitter| me.flush_all_into(emitter),
+        )
+        .boxed()
+    }
+}
+
 pub fn construct_output_stream(
     reduce: Box<Reduce>,
     input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -362,7 +401,7 @@ mod test {
     use crate::config::TransformContext;
     use std::sync::Arc;
 
-    use indoc::indoc;
+    use indoc::{formatdoc, indoc};
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -370,13 +409,62 @@ mod test {
     use vrl::event_path;
     use vrl::value::Kind;
 
+    use std::collections::BTreeMap;
+
+    use futures::stream;
+    use vector_lib::event::{EventArray, EventContainer as _};
+
     use super::*;
     use crate::{
         config::{OutputId, TransformConfig, schema, schema::Definition},
         event::{LogEvent, Value},
         test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
+        transforms::{Transform, test::create_topology},
     };
+
+    /// Receives `N` reduced events, sorted by `message`: groups reduced by different shards can be
+    /// emitted in any order.
+    async fn recv_sorted_by_message<const N: usize>(
+        out: &mut mpsc::Receiver<Event>,
+    ) -> [LogEvent; N] {
+        let mut events = Vec::with_capacity(N);
+        for _ in 0..N {
+            events.push(out.recv().await.expect("a reduced event").into_log());
+        }
+        events.sort_by_key(|event| event["message"].to_string_lossy().into_owned());
+        events
+            .try_into()
+            .unwrap_or_else(|_| unreachable!("exactly N events were received"))
+    }
+
+    /// Builds the transform from `config` and runs `events` through it until they are all flushed.
+    async fn run(config: &ReduceConfig, events: Vec<Event>) -> Vec<LogEvent> {
+        let Transform::Task(task) = config
+            .build(&TransformContext::default())
+            .await
+            .expect("the config is valid")
+        else {
+            unreachable!("reduce builds a task transform");
+        };
+
+        task.transform(stream::iter(events).map(EventArray::from).boxed())
+            .flat_map(|events| stream::iter(events.into_events()))
+            .map(Event::into_log)
+            .collect()
+            .await
+    }
+
+    /// The reduced events of each group, in output order.
+    fn per_group(events: Vec<LogEvent>) -> BTreeMap<String, Vec<LogEvent>> {
+        let mut groups = BTreeMap::<String, Vec<LogEvent>>::new();
+        for event in events {
+            let group = event
+                .get(event_path!("request_id"))
+                .map_or_else(String::new, |id| id.to_string_lossy().into_owned());
+            groups.entry(group).or_default().push(event);
+        }
+        groups
+    }
 
     #[tokio::test]
     async fn reduce_from_condition() {
@@ -459,15 +547,13 @@ mod test {
                 tx.send(event).await.unwrap();
             }
 
-            let output_1 = out.recv().await.unwrap().into_log();
+            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
             for definition in schema_definitions.values() {
                 definition.assert_valid_for_event(&output_1.clone().into());
             }
-
-            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
@@ -612,12 +698,10 @@ mod test {
             e_5.insert(event_path!("test_end"), "yep");
             tx.send(e_5.into()).await.unwrap();
 
-            let output_1 = out.recv().await.unwrap().into_log();
+            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
-
-            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
@@ -831,12 +915,10 @@ mod test {
             e_6.insert(event_path!("test_end"), "yep");
             tx.send(e_6.into()).await.unwrap();
 
-            let output_1 = out.recv().await.unwrap().into_log();
+            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
             assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
             assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
             assert_eq!(output_1.metadata(), &metadata_1);
-
-            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
             assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
             assert_eq!(output_2.metadata(), &metadata_2);
@@ -1041,5 +1123,46 @@ mod test {
             assert_eq!(out.recv().await, None);
         }))
         .await;
+    }
+
+    #[tokio::test]
+    async fn partitioned_reduce_matches_a_single_reduce() {
+        let config = |concurrency: usize| {
+            serde_yaml::from_str::<ReduceConfig>(&formatdoc! {"
+                group_by:
+                  - request_id
+                ends_when:
+                  type: vrl
+                  source: exists(.end)
+                max_events: 4
+                merge_strategies:
+                  message: concat_newline
+                  counter: sum
+                concurrency: {concurrency}
+            "})
+            .expect("the config is valid")
+        };
+
+        // Many interleaved groups, some events without `request_id`, and groups ended both by
+        // `ends_when` and by `max_events`. The order-sensitive `concat_newline` checks that each
+        // group still sees its events in arrival order.
+        let events: Vec<Event> = (0..600_i64)
+            .map(|i| {
+                let mut event = LogEvent::from(format!("event {i}"));
+                event.insert(event_path!("counter"), i);
+                if i % 17 != 0 {
+                    event.insert(event_path!("request_id"), (i * 7 % 23).to_string());
+                }
+                if i % 11 == 0 {
+                    event.insert(event_path!("end"), true);
+                }
+                event.into()
+            })
+            .collect();
+
+        let single = run(&config(1), events.clone()).await;
+        let partitioned = run(&config(4), events).await;
+
+        assert_eq!(per_group(partitioned), per_group(single));
     }
 }
