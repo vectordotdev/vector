@@ -1,3 +1,3 @@
 Added MessagePack decoder codec `message_pack`.
 
-authors: Keuin
+authors: Keuin byronwolfman
