@@ -135,6 +135,12 @@ cli: {
 	}
 
 	_core_config_options: {
+		"data-dir": {
+			description: env_vars.VECTOR_DATA_DIR.description
+			type:        "string"
+			env_var:     "VECTOR_DATA_DIR"
+			example:     "vector --data-dir ./state --config vector.yaml"
+		}
 		"config": {
 			_short:      "c"
 			description: env_vars.VECTOR_CONFIG.description
@@ -302,6 +308,7 @@ cli: {
 
 			flags: _default_flags & _core_flags
 			options: {
+				"data-dir": _core_config_options["data-dir"]
 				"config-toml": {
 					description: env_vars.VECTOR_CONFIG_TOML.description
 					type:        "string"
@@ -474,6 +481,7 @@ cli: {
 			} & _core_flags
 
 			options: {
+				"data-dir": _core_config_options["data-dir"]
 				"config-yaml": {
 					description: """
 						Any number of Vector config files to validate.
@@ -589,6 +597,24 @@ cli: {
 					never:  "Disable ANSI terminal formatting."
 				}
 			}
+		}
+		VECTOR_DATA_DIR: {
+			description: """
+				Optionally override the global `data_dir` before configuration files are merged.
+				The `--data-dir` CLI option takes precedence over `VECTOR_DATA_DIR`, which takes
+				precedence over configuration-file values. If neither is set, Vector uses the
+				configured `data_dir` or its default.
+
+				This is a global option, accepted before or after a subcommand. For example,
+				`vector validate --data-dir ./state vector.yaml` or
+				`VECTOR_DATA_DIR=./state vector validate vector.yaml` uses `./state` without
+				editing the configuration. The override is retained through configuration reloads
+				and Windows service installation. When installing a Windows service, relative
+				overrides are resolved against the installer's working directory and stored as
+				absolute paths. Validation still checks whether the directory is usable unless
+				the relevant environment checks are disabled.
+				"""
+			type: string: default: null
 		}
 		VECTOR_CONFIG: {
 			description: """
