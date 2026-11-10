@@ -12,6 +12,7 @@ fn slugify_text(input: &str) -> String {
 
 /// Expands the given possibly template-able `key_s` and `value_s`, and return the expanded owned pairs
 /// it would also insert the pairs into either `static_pairs` or `dynamic_pairs` depending on the template-ability of `key_s`.
+#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) fn pair_expansion(
     key_s: &str,
     value_s: &str,
@@ -29,9 +30,10 @@ pub(crate) fn pair_expansion(
     Ok(expanded_pairs)
 }
 
-/// Expands a rendered pair directly into the destination maps. Unlike
-/// [`pair_expansion`], this consumes the rendered strings and does not build a
-/// second map for callers that only need the merged destinations.
+/// Expands a rendered pair directly into the destination maps. Unlike the
+/// allocation-returning helper, this consumes the rendered strings and does
+/// not build a second map for callers that only need the merged destinations.
+#[cfg(feature = "sinks-loki")]
 pub(crate) fn pair_expansion_into(
     key_s: String,
     value_s: String,
