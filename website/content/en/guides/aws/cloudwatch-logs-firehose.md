@@ -482,7 +482,7 @@ sources:
   firehose:
     type: "aws_kinesis_firehose"
     address: "0.0.0.0:8080" # the public URL will be set in the Firehose config
-    access_key: "my secret key" # this will also be set in the Firehose config
+    access_key: "SECRET[local.firehose_access_key]" # the value of FIREHOSE_ACCESS_KEY, also set in the Firehose config
     store_access_key: false
 ```
 
