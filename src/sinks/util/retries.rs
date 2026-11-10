@@ -233,7 +233,7 @@ where
                         self.logic.on_retriable_error(expected);
                         warn!(
                             message = "Retrying after error.",
-                            %expected,
+                            error = %expected,
                             retry_attempt = self.retry_attempt.saturating_add(1),
                         );
                         Some(self.build_retry())
@@ -458,6 +458,16 @@ mod tests {
             assert!(event["fields"]["reason"].is_null(), "{case}");
             assert!(event["fields"]["error"].is_null(), "{case}");
         }
+    }
+
+    #[tokio::test]
+    async fn retriable_error_warnings_preserve_error_field() {
+        let events = error_retry_log_events(1);
+        let retry_events = events_with_message(&events, "Retrying after error.");
+
+        assert_eq!(retry_events.len(), 1);
+        assert_eq!(retry_events[0]["fields"]["error"], "error");
+        assert!(retry_events[0]["fields"]["expected"].is_null());
     }
 
     #[tokio::test]
