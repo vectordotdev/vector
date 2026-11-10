@@ -856,7 +856,11 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
         let mut buffer = Vec::with_capacity(self.metrics.len());
         if self.all_metrics {

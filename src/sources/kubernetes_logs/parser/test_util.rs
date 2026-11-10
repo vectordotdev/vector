@@ -68,9 +68,10 @@ where
 {
     for (message, expected) in cases {
         let input = loader(message);
-        let mut parser = (builder)();
+        let parser = (builder)();
+        let mut parser_state = parser.new_state();
         let mut output = OutputBuffer::default();
-        parser.transform(&mut output, input);
+        parser.transform(&mut parser_state, &mut output, input);
 
         let actual = output.into_events().collect::<Vec<_>>();
 

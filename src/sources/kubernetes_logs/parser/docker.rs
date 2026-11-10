@@ -38,7 +38,11 @@ impl Docker {
 }
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log, self.log_namespace) {
             emit(KubernetesLogsDockerFormatParseError { error: &err });
@@ -339,10 +343,10 @@ pub(super) mod tests {
         let cases = invalid_cases();
 
         for bytes in cases {
-            let mut parser = Docker::new(LogNamespace::Vector);
+            let parser = Docker::new(LogNamespace::Vector);
             let input = LogEvent::from(value!(bytes));
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input.into());
+            parser.transform(&mut (), &mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {output:?}");
         }
@@ -355,10 +359,10 @@ pub(super) mod tests {
         let cases = invalid_cases();
 
         for bytes in cases {
-            let mut parser = Docker::new(LogNamespace::Legacy);
+            let parser = Docker::new(LogNamespace::Legacy);
             let input = LogEvent::from(bytes);
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input.into());
+            parser.transform(&mut (), &mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {output:?}");
         }

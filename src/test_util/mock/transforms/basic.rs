@@ -71,7 +71,11 @@ struct BasicTransform {
 }
 
 impl FunctionTransform for BasicTransform {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 if let Some(message_key) = crate::config::log_schema().message_key_target_path() {

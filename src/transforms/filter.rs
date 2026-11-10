@@ -91,7 +91,11 @@ impl Filter {
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, event: Event) {
         let (result, event) = self.condition.check(event);
         if result {
             output.push(event);

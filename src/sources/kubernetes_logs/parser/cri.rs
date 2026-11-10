@@ -40,7 +40,11 @@ impl Cri {
 }
 
 impl FunctionTransform for Cri {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, mut event: Event) {
         let message_path = get_message_path(self.log_namespace);
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
