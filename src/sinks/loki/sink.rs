@@ -12,7 +12,7 @@ use super::{
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
-    common::expansion::pair_expansion,
+    common::expansion::pair_expansion_into,
     http::{HttpClient, get_http_scheme_from_uri},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
@@ -170,11 +170,32 @@ pub(super) struct EventEncoder {
     key_partitioner: KeyPartitioner,
     transformer: Transformer,
     encoder: Encoder<()>,
-    labels: HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    labels: TemplatePairMap,
     remove_label_fields: bool,
-    structured_metadata: HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    structured_metadata: TemplatePairMap,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
+}
+
+#[derive(Clone, Default)]
+struct TemplatePairMap {
+    configured: HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    scalar: Option<Vec<(String, UnconfinedTemplate)>>,
+}
+
+impl From<HashMap<ConfinedTemplate, UnconfinedTemplate>> for TemplatePairMap {
+    fn from(configured: HashMap<ConfinedTemplate, UnconfinedTemplate>) -> Self {
+        let scalar = configured
+            .keys()
+            .all(|key| !key.is_dynamic() && !key.get_ref().ends_with('*'))
+            .then(|| {
+                configured
+                    .iter()
+                    .map(|(key, value)| (key.get_ref().to_owned(), value.clone()))
+                    .collect()
+            });
+        Self { configured, scalar }
+    }
 }
 
 /// Returns `true` if a `TemplateRenderingError` is a confinement violation.
@@ -185,32 +206,71 @@ const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
     )
 }
 
+/// Returns `true` when a label value template cannot render because its event
+/// field is absent. Loki labels are optional per event, so callers omit that
+/// label rather than report a template failure.
+const fn is_missing_value(err: &crate::template::TemplateRenderingError) -> bool {
+    matches!(
+        err,
+        crate::template::TemplateRenderingError::MissingKeys { .. }
+    )
+}
+
 /// Renders a map of template key-value pairs into a resolved `Vec<(String, String)>`.
 ///
 /// `key_kind` / `value_kind` are used in `TemplateRenderingError` field names.
 /// `pair_kind` is used in warning messages (e.g. `"label"` or `"structured_metadata"`).
 /// Returns `Err(())` if a key template triggers a confinement violation.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep template rendering and its error cases together."
+)]
 fn build_template_pair_map(
-    pairs: &HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    pairs: &TemplatePairMap,
     key_kind: &str,
     value_kind: &str,
     pair_kind: &str,
+    omit_missing_values: bool,
     event: &Event,
 ) -> Result<Vec<(String, String)>, ()> {
-    let mut static_map: HashMap<String, String> = HashMap::new();
-    let mut dynamic_map: HashMap<String, String> = HashMap::new();
+    if let Some(pairs) = &pairs.scalar {
+        let mut output = Vec::with_capacity(pairs.len());
+        for (key, value_template) in pairs {
+            match value_template.render_string(event) {
+                Ok(value) => output.push((key.clone(), value)),
+                // Static Loki label keys may describe optional event fields. A
+                // missing value means that this label is absent for this event;
+                // it is not a template failure and must not disable the scalar
+                // label fast path.
+                Err(error) if omit_missing_values && is_missing_value(&error) => {}
+                Err(error) => emit(TemplateRenderingError {
+                    field: Some(
+                        format!("{value_kind} \"{value_template}\" with {key_kind} \"{key}\"")
+                            .as_str(),
+                    ),
+                    drop_event: false,
+                    error,
+                }),
+            }
+        }
+        return Ok(output);
+    }
 
-    for (key_template, value_template) in pairs {
+    let mut static_map: HashMap<String, String> = HashMap::with_capacity(pairs.configured.len());
+    let mut dynamic_map: HashMap<String, String> = HashMap::with_capacity(pairs.configured.len());
+
+    for (key_template, value_template) in &pairs.configured {
         match (
             key_template.render_string(event),
             value_template.render_string(event),
         ) {
             (Ok(key_s), Ok(value_s)) => {
+                let value_for_error = key_s.ends_with('*').then(|| value_s.clone());
                 if let Err(err) =
-                    pair_expansion(&key_s, &value_s, &mut static_map, &mut dynamic_map)
+                    pair_expansion_into(key_s, value_s, &mut static_map, &mut dynamic_map)
                 {
                     warn!(
-                        value = %value_s,
+                        value = %value_for_error.as_deref().unwrap_or(""),
                         error = %err,
                         "Failed to expand dynamic {pair_kind}."
                     );
@@ -259,28 +319,36 @@ fn build_template_pair_map(
                 }
             }
             (Ok(_), Err(val_err)) => {
-                emit(TemplateRenderingError {
-                    field: Some(
-                        format!(
-                            "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
-                        )
-                        .as_str(),
-                    ),
-                    drop_event: false,
-                    error: val_err,
-                });
+                if !(omit_missing_values && is_missing_value(&val_err)) {
+                    emit(TemplateRenderingError {
+                        field: Some(
+                            format!(
+                                "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
+                            )
+                            .as_str()
+                        ),
+                        drop_event: false,
+                        error: val_err,
+                    });
+                }
             }
         }
     }
 
-    for (k, v) in static_map {
-        if let Some(discarded_v) = dynamic_map.insert(k.clone(), v.clone()) {
-            warn!(
-                key = %k,
-                value = %v,
-                discarded_value = %discarded_v,
-                "Static {pair_kind} overrides dynamic {pair_kind}."
-            );
+    for (key, value) in static_map {
+        match dynamic_map.entry(key) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                warn!(
+                    key = %entry.key(),
+                    value = %value,
+                    discarded_value = %entry.get(),
+                    "Static {pair_kind} overrides dynamic {pair_kind}."
+                );
+                entry.insert(value);
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
         }
     }
 
@@ -300,13 +368,21 @@ impl EventEncoder {
     /// confined value — the caller must drop the event as an intentional
     /// security discard (matches the `tenant_id` contract).
     fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
-        build_template_pair_map(&self.labels, "label_key", "label_value", "label", event)
+        build_template_pair_map(
+            &self.labels,
+            "label_key",
+            "label_value",
+            "label",
+            true,
+            event,
+        )
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
         if self.remove_label_fields {
             let paths: Vec<OwnedTargetPath> = self
                 .labels
+                .configured
                 .values()
                 .filter_map(UnconfinedTemplate::get_fields)
                 .flatten()
@@ -322,6 +398,7 @@ impl EventEncoder {
             "structured_metadata_key",
             "structured_metadata_value",
             "structured_metadata",
+            false,
             event,
         )
     }
@@ -330,6 +407,7 @@ impl EventEncoder {
         if self.remove_structured_metadata_fields {
             let paths: Vec<OwnedTargetPath> = self
                 .structured_metadata
+                .configured
                 .values()
                 .filter_map(UnconfinedTemplate::get_fields)
                 .flatten()
@@ -532,8 +610,8 @@ impl LokiSink {
                 key_partitioner: KeyPartitioner::new(validated.tenant_id),
                 transformer: validated.transformer,
                 encoder,
-                labels: validated.labels,
-                structured_metadata: validated.structured_metadata,
+                labels: validated.labels.into(),
+                structured_metadata: validated.structured_metadata.into(),
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
@@ -688,8 +766,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels: HashMap::default(),
-            structured_metadata: HashMap::default(),
+            labels: HashMap::default().into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -729,8 +807,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels,
-            structured_metadata: HashMap::default(),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -764,6 +842,70 @@ mod tests {
     }
 
     #[test]
+    fn encoder_omits_missing_scalar_label() {
+        let labels = HashMap::from([
+            (
+                confined_label("required"),
+                unconfined_value("{{ present }}"),
+            ),
+            (confined_label("optional"), unconfined_value("{{ absent }}")),
+        ]);
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+        };
+        assert!(encoder.labels.scalar.is_some());
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("present"), "value");
+
+        let record = encoder.encode_event(event).unwrap();
+        assert_eq!(
+            record.labels,
+            vec![("required".to_string(), "value".to_string())]
+        );
+    }
+
+    #[test]
+    fn encoder_omits_missing_dynamic_label_value() {
+        let labels = HashMap::from([
+            (confined_label("required"), unconfined_value("value")),
+            (
+                confined_label("{{ label_name }}"),
+                unconfined_value("{{ absent }}"),
+            ),
+        ]);
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+        };
+        assert!(encoder.labels.scalar.is_none());
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event
+            .as_mut_log()
+            .insert(event_path!("label_name"), "optional");
+
+        let record = encoder.encode_event(event).unwrap();
+        assert_eq!(
+            record.labels,
+            vec![("required".to_string(), "value".to_string())]
+        );
+    }
+
+    #[test]
     fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
@@ -780,8 +922,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels,
-            structured_metadata: HashMap::default(),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -826,8 +968,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels,
-            structured_metadata: HashMap::default(),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -863,8 +1005,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels,
-            structured_metadata: HashMap::default(),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -886,8 +1028,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels: HashMap::default(),
-            structured_metadata: HashMap::default(),
+            labels: HashMap::default().into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: true,
@@ -917,8 +1059,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels,
-            structured_metadata: HashMap::default(),
+            labels: labels.into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: true,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -952,8 +1094,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels: HashMap::default(),
-            structured_metadata,
+            labels: HashMap::default().into(),
+            structured_metadata: structured_metadata.into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
@@ -1007,8 +1149,8 @@ mod tests {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Transformer::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
-            labels: HashMap::default(),
-            structured_metadata: HashMap::default(),
+            labels: HashMap::default().into(),
+            structured_metadata: HashMap::default().into(),
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,

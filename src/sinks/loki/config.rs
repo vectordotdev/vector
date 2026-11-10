@@ -57,6 +57,7 @@ pub struct LokiConfig {
     /// A set of labels that are attached to each batch of events.
     ///
     /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
+    /// Labels whose value templates reference missing event fields are omitted.
     ///
     /// Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
     /// objects into multiple labels. See [Label expansion][label_expansion] for more information.
