@@ -175,6 +175,48 @@ pub struct LogToMetric {
     pub all_metrics: bool,
 }
 
+#[derive(Debug, Clone)]
+struct CompiledLogToMetric {
+    inner: LogToMetric,
+    tags: Vec<CompiledTags>,
+}
+
+impl From<LogToMetric> for CompiledLogToMetric {
+    fn from(inner: LogToMetric) -> Self {
+        let tags = inner
+            .metrics
+            .iter()
+            .map(|config| CompiledTags::new(config.tags.as_ref()))
+            .collect();
+        Self { inner, tags }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum CompiledTags {
+    Scalar(Vec<(String, TagConfig)>),
+    Fallback,
+}
+
+impl CompiledTags {
+    fn new(tags: Option<&IndexMap<UnconfinedTemplate, TagConfig>>) -> Self {
+        match tags {
+            Some(tags)
+                if tags
+                    .keys()
+                    .all(|key| !key.is_dynamic() && !key.get_ref().ends_with('*')) =>
+            {
+                Self::Scalar(
+                    tags.iter()
+                        .map(|(key, value)| (key.get_ref().to_owned(), value.clone()))
+                        .collect(),
+                )
+            }
+            _ => Self::Fallback,
+        }
+    }
+}
+
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
@@ -198,10 +240,12 @@ impl GenerateConfig for LogToMetricConfig {
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(LogToMetric {
-            metrics: self.metrics.clone().unwrap_or_default(),
-            all_metrics: self.all_metrics.unwrap_or_default(),
-        }))
+        Ok(Transform::function(CompiledLogToMetric::from(
+            LogToMetric {
+                metrics: self.metrics.clone().unwrap_or_default(),
+                all_metrics: self.all_metrics.unwrap_or_default(),
+            },
+        )))
     }
 
     fn input(&self) -> Input {
@@ -276,8 +320,26 @@ fn render_template(template: &UnconfinedTemplate, event: &Event) -> Result<Strin
 
 fn render_tags(
     tags: Option<&IndexMap<UnconfinedTemplate, TagConfig>>,
+    compiled_tags: Option<&CompiledTags>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
+    if let Some(CompiledTags::Scalar(tags)) = compiled_tags {
+        let mut result = MetricTags::default();
+        for (name, config) in tags {
+            match config {
+                TagConfig::Plain(template) => {
+                    render_scalar_tag_into(event, name, template.as_ref(), &mut result)?;
+                }
+                TagConfig::Multi(templates) => {
+                    for template in templates {
+                        render_scalar_tag_into(event, name, template.as_ref(), &mut result)?;
+                    }
+                }
+            }
+        }
+        return Ok(result.as_option());
+    }
+
     let mut static_tags: HashMap<String, String> = HashMap::new();
     let mut dynamic_tags: HashMap<String, String> = HashMap::new();
     Ok(match tags {
@@ -321,6 +383,29 @@ fn render_tags(
             result.as_option()
         }
     })
+}
+
+fn render_scalar_tag_into(
+    event: &Event,
+    name: &str,
+    value_template: Option<&UnconfinedTemplate>,
+    result: &mut MetricTags,
+) -> Result<(), TransformError> {
+    match value_template {
+        None => result.insert(name.to_owned(), TagValue::Bare),
+        Some(template) => match render_template(template, event) {
+            Ok(value) => result.insert(name.to_owned(), value),
+            Err(TransformError::TemplateRenderingError(error)) => {
+                emit(crate::internal_events::TemplateRenderingError {
+                    error,
+                    drop_event: false,
+                    field: Some(template.get_ref()),
+                });
+            }
+            Err(error) => return Err(error),
+        },
+    }
+    Ok(())
 }
 
 fn render_tag_into(
@@ -371,7 +456,11 @@ fn render_tag_into(
     clippy::too_many_lines,
     reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
 )]
-fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
+fn to_metric_with_config(
+    config: &MetricConfig,
+    compiled_tags: Option<&CompiledTags>,
+    event: &Event,
+) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
@@ -416,7 +505,7 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
         .map(|namespace| render_template(namespace, event))
         .transpose()?;
 
-    let tags = render_tags(config.tags.as_ref(), event)?;
+    let tags = render_tags(config.tags.as_ref(), compiled_tags, event)?;
 
     let (kind, value) = match &config.metric {
         MetricTypeConfig::Counter(counter) => {
@@ -870,97 +959,129 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
 
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        // Metrics are "all or none" for a specific log. If a single fails, none are produced.
-        let mut buffer = Vec::with_capacity(self.metrics.len());
-        if self.all_metrics {
-            match to_metrics(&event) {
-                Ok(metric) => {
-                    output.push(Event::Metric(metric));
-                }
-                Err(err) => match err {
-                    TransformError::MetricValueError { path, path_value } => {
-                        emit(MetricMetadataInvalidFieldValueError {
-                            field: path.as_ref(),
-                            field_value: path_value.as_ref(),
-                        });
-                    }
-                    TransformError::PathNotFound { path } => {
-                        emit(ParserMissingFieldError::<DROP_EVENT> {
-                            field: path.as_ref(),
-                        });
-                    }
-                    TransformError::ParseError { path, kind } => {
-                        emit(MetricMetadataParseError {
-                            field: path.as_ref(),
-                            kind: &kind.to_string(),
-                        });
-                    }
-                    TransformError::MetricDetailsNotFound => {
-                        emit(MetricMetadataMetricDetailsNotFoundError {});
-                    }
-                    TransformError::PairExpansionError { key, value, error } => {
-                        emit(PairExpansionError {
-                            key: &key,
-                            value: &value,
-                            drop_event: true,
-                            error,
-                        });
-                    }
-                    _ => {}
-                },
-            }
-        } else {
-            for config in &self.metrics {
-                match to_metric_with_config(config, &event) {
-                    Ok(metric) => {
-                        buffer.push(Event::Metric(metric));
-                    }
-                    Err(err) => {
-                        match err {
-                            TransformError::PathNull { path } => {
-                                emit(LogToMetricFieldNullError {
-                                    field: path.as_ref(),
-                                });
-                            }
-                            TransformError::PathNotFound { path } => {
-                                emit(ParserMissingFieldError::<DROP_EVENT> {
-                                    field: path.as_ref(),
-                                });
-                            }
-                            TransformError::ParseFloatError { path, error } => {
-                                emit(LogToMetricParseFloatError {
-                                    field: path.as_ref(),
-                                    error,
-                                });
-                            }
-                            TransformError::TemplateRenderingError(error) => {
-                                emit(crate::internal_events::TemplateRenderingError {
-                                    error,
-                                    drop_event: true,
-                                    field: None,
-                                });
-                            }
-                            TransformError::PairExpansionError { key, value, error } => {
-                                emit(PairExpansionError {
-                                    key: &key,
-                                    value: &value,
-                                    drop_event: true,
-                                    error,
-                                });
-                            }
-                            _ => {}
-                        }
-                        // early return to prevent the partial buffer from being sent
-                        return;
-                    }
-                }
-            }
-        }
+        transform_log_to_metric(
+            output,
+            &event,
+            self.all_metrics,
+            self.metrics.len(),
+            self.metrics.iter().map(|config| (config, None)),
+        );
+    }
+}
 
-        // Metric generation was successful, publish them all.
-        for event in buffer {
-            output.push(event);
+impl FunctionTransform for CompiledLogToMetric {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        transform_log_to_metric(
+            output,
+            &event,
+            self.inner.all_metrics,
+            self.inner.metrics.len(),
+            self.inner
+                .metrics
+                .iter()
+                .zip(&self.tags)
+                .map(|(config, tags)| (config, Some(tags))),
+        );
+    }
+}
+
+fn transform_log_to_metric<'a>(
+    output: &mut OutputBuffer,
+    event: &Event,
+    all_metrics: bool,
+    metrics_len: usize,
+    metrics: impl IntoIterator<Item = (&'a MetricConfig, Option<&'a CompiledTags>)>,
+) {
+    // Metrics are "all or none" for a specific log. If a single fails, none are produced.
+    let mut buffer = Vec::with_capacity(metrics_len);
+    if all_metrics {
+        match to_metrics(event) {
+            Ok(metric) => {
+                output.push(Event::Metric(metric));
+            }
+            Err(err) => match err {
+                TransformError::MetricValueError { path, path_value } => {
+                    emit(MetricMetadataInvalidFieldValueError {
+                        field: path.as_ref(),
+                        field_value: path_value.as_ref(),
+                    });
+                }
+                TransformError::PathNotFound { path } => {
+                    emit(ParserMissingFieldError::<DROP_EVENT> {
+                        field: path.as_ref(),
+                    });
+                }
+                TransformError::ParseError { path, kind } => {
+                    emit(MetricMetadataParseError {
+                        field: path.as_ref(),
+                        kind: &kind.to_string(),
+                    });
+                }
+                TransformError::MetricDetailsNotFound => {
+                    emit(MetricMetadataMetricDetailsNotFoundError {});
+                }
+                TransformError::PairExpansionError { key, value, error } => {
+                    emit(PairExpansionError {
+                        key: &key,
+                        value: &value,
+                        drop_event: true,
+                        error,
+                    });
+                }
+                _ => {}
+            },
         }
+    } else {
+        for (config, compiled_tags) in metrics {
+            match to_metric_with_config(config, compiled_tags, event) {
+                Ok(metric) => {
+                    buffer.push(Event::Metric(metric));
+                }
+                Err(err) => {
+                    match err {
+                        TransformError::PathNull { path } => {
+                            emit(LogToMetricFieldNullError {
+                                field: path.as_ref(),
+                            });
+                        }
+                        TransformError::PathNotFound { path } => {
+                            emit(ParserMissingFieldError::<DROP_EVENT> {
+                                field: path.as_ref(),
+                            });
+                        }
+                        TransformError::ParseFloatError { path, error } => {
+                            emit(LogToMetricParseFloatError {
+                                field: path.as_ref(),
+                                error,
+                            });
+                        }
+                        TransformError::TemplateRenderingError(error) => {
+                            emit(crate::internal_events::TemplateRenderingError {
+                                error,
+                                drop_event: true,
+                                field: None,
+                            });
+                        }
+                        TransformError::PairExpansionError { key, value, error } => {
+                            emit(PairExpansionError {
+                                key: &key,
+                                value: &value,
+                                drop_event: true,
+                                error,
+                            });
+                        }
+                        _ => {}
+                    }
+                    // early return to prevent the partial buffer from being sent
+                    return;
+                }
+            }
+        }
+    }
+
+    // Metric generation was successful, publish them all.
+    for event in buffer {
+        output.push(event);
     }
 }
 
@@ -1128,7 +1249,7 @@ mod tests {
             .and_then(|metrics| metrics.first())
             .expect("test config should contain one metric");
 
-        let Ok(metric) = to_metric_with_config(metric_config, &event) else {
+        let Ok(metric) = to_metric_with_config(metric_config, None, &event) else {
             panic!("configured metric should be created");
         };
 
