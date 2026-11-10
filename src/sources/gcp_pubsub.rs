@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::DateTime;
 use derivative::Derivative;
@@ -19,7 +20,7 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Code, Request, Status, body::BoxBody, metadata::MetadataValue};
+use tonic::{Code, Request, Status, body::Body as TonicBody, metadata::MetadataValue};
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     byte_size_of::ByteSizeOf,
@@ -68,7 +69,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
-#[allow(warnings, clippy::clone_on_ref_ptr)]
+#[allow(warnings, unreachable_pub, clippy::clone_on_ref_ptr)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
@@ -313,8 +314,8 @@ impl SourceConfig for PubsubConfig {
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(protocol)),
+            events_received: register(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| {
@@ -367,7 +368,7 @@ impl_generate_config_from_default!(PubsubConfig);
 
 #[derive(Clone)]
 struct PubsubSource {
-    client: Http2Client<BoxBody>,
+    client: Http2Client<TonicBody>,
     origin: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
@@ -478,7 +479,7 @@ impl PubsubSource {
         let mut request = Request::new(self.request_stream(ack_ids_receiver));
         if let Some(token) = self.auth.make_token() {
             let Ok(authorization) = MetadataValue::try_from(&token) else {
-                emit!(GcpPubsubStreamingPullError {
+                emit(GcpPubsubStreamingPullError {
                     error: Status::new(
                         Code::FailedPrecondition,
                         "Invalid token text returned by GCP",
@@ -498,9 +499,9 @@ impl PubsubSource {
                 Err(error) => {
                     // The pooled transport connects on the first request, not at construction.
                     if is_connect_error(&error) {
-                        emit!(GcpPubsubConnectError { error });
+                        emit(GcpPubsubConnectError { error });
                     } else {
-                        emit!(GcpPubsubStreamingPullError { error });
+                        emit(GcpPubsubStreamingPullError { error });
                     }
                     return State::RetryDelay;
                 }
@@ -634,7 +635,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -739,7 +740,7 @@ fn translate_error(error: tonic::Status) -> State {
         debug!("Stream reset by server.");
         State::RetryNow
     } else {
-        emit!(GcpPubsubReceiveError { error });
+        emit(GcpPubsubReceiveError { error });
         State::RetryDelay
     }
 }
@@ -1038,7 +1039,9 @@ mod tests {
         source.abort();
     }
 
-    #[tokio::test(start_paused = true)]
+    // Real TLS I/O cannot advance with Tokio's paused clock. Auto-advancing the
+    // timeout can otherwise expire before the operating system services the retry.
+    #[tokio::test]
     async fn connection_failures_keep_error_event_and_retry_delay() {
         use crate::test_util::components::{COMPONENT_TESTS_ERROR, init_test};
         use tokio::{io::AsyncReadExt as _, time::Instant};

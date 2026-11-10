@@ -2,6 +2,7 @@ use async_nats::jetstream::consumer::PullConsumer;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::ResultExt;
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
@@ -27,7 +28,7 @@ use crate::{
 };
 
 /// The outcome of processing a single NATS message.
-pub enum ProcessingStatus {
+pub(super) enum ProcessingStatus {
     /// The message payload was fully decoded and sent downstream.
     Success,
     /// A non-recoverable error occurred while decoding the payload.
@@ -39,7 +40,7 @@ pub enum ProcessingStatus {
 /// Processes a single NATS message, sending decoded events downstream.
 ///
 /// This function contains the common logic for both Core and JetStream NATS.
-pub async fn process_message(
+pub(super) async fn process_message(
     msg: &async_nats::Message,
     config: &NatsSourceConfig,
     decoder: &Decoder,
@@ -85,7 +86,7 @@ pub async fn process_message(
                 });
 
                 if let Err(error) = out.send_batch(events).await {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     return ProcessingStatus::ChannelClosed(error);
                 }
             }
@@ -129,7 +130,7 @@ pub(crate) async fn create_consumer_stream(
         .context(MessagesSnafu)
 }
 
-pub async fn run_nats_jetstream(
+pub(super) async fn run_nats_jetstream(
     config: NatsSourceConfig,
     connection: async_nats::Client,
     initial_messages: async_nats::jetstream::consumer::pull::Stream,
@@ -138,8 +139,8 @@ pub async fn run_nats_jetstream(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> vector_lib::source_sender::SendResult {
-    let events_received = register!(EventsReceived);
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::TCP));
     let mut backoff = ExponentialBackoff::default().max_delay(std::time::Duration::from_secs(30));
 
     let js_config = config
@@ -224,7 +225,7 @@ pub async fn run_nats_jetstream(
     }
 }
 
-pub async fn run_nats_core(
+pub(super) async fn run_nats_core(
     config: NatsSourceConfig,
     _connection: async_nats::Client,
     mut subscriber: async_nats::Subscriber,
@@ -233,8 +234,8 @@ pub async fn run_nats_core(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> vector_lib::source_sender::SendResult {
-    let events_received = register!(EventsReceived);
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::TCP));
 
     loop {
         tokio::select! {
@@ -279,7 +280,7 @@ pub async fn run_nats_core(
     Ok(())
 }
 
-pub async fn create_subscription(
+pub(super) async fn create_subscription(
     config: &NatsSourceConfig,
 ) -> Result<(async_nats::Client, async_nats::Subscriber), BuildError> {
     let nc = config.connect().await?;

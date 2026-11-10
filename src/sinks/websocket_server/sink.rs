@@ -3,6 +3,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use vector_lib::internal_event::{emit, register};
 
 use super::{
     WebSocketListenerSinkConfig,
@@ -54,7 +55,7 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
-pub struct WebSocketListenerSink {
+pub(super) struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -67,7 +68,10 @@ pub struct WebSocketListenerSink {
 
 impl WebSocketListenerSink {
     #[cfg(test)]
-    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: WebSocketListenerSinkConfig,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         Self::from_validated(config, &validated, tls, cx)
@@ -279,13 +283,13 @@ impl WebSocketListenerSink {
         .await
         .map_err(|err| {
             debug!("Error during websocket handshake: {err}");
-            emit!(WebSocketListenerConnectionFailedError {
+            emit(WebSocketListenerConnectionFailedError {
                 error: Box::new(err),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         })?;
 
-        let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
+        let _open_token = open_gauge.open(|count| emit(ConnectionOpen { count }));
 
         // Insert the write part of this peer to the peer map.
         let (tx, rx) = unbounded();
@@ -296,8 +300,8 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WebSocketListenerSendError {
-                            error: Box::new(error)
+                        emit(WebSocketListenerSendError {
+                            error: Box::new(error),
                         });
                     }
                 },
@@ -306,9 +310,9 @@ impl WebSocketListenerSink {
             debug!("WebSocket connection established: {addr}");
 
             peers.insert(addr, tx);
-            emit!(WebSocketListenerConnectionEstablished {
+            emit(WebSocketListenerConnectionEstablished {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -335,9 +339,9 @@ impl WebSocketListenerSink {
         });
         let forward_data_to_client = rx
             .map(|message| {
-                emit!(WebSocketListenerMessageSent {
+                emit(WebSocketListenerMessageSent {
                     message_size: message.len(),
-                    extra_tags: extra_tags.clone()
+                    extra_tags: extra_tags.clone(),
                 });
                 Ok(message)
             })
@@ -349,8 +353,8 @@ impl WebSocketListenerSink {
             .factor_first()
             .0
         {
-            emit!(WebSocketListenerSendError {
-                error: Box::new(error)
+            emit(WebSocketListenerSendError {
+                error: Box::new(error),
             });
         }
 
@@ -358,9 +362,9 @@ impl WebSocketListenerSink {
             let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
-            emit!(WebSocketListenerConnectionShutdown {
+            emit(WebSocketListenerConnectionShutdown {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -374,8 +378,8 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
-        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
         let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
@@ -438,8 +442,8 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
                     let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WebSocketListenerSendError {
-                                error: Box::new(error)
+                            emit(WebSocketListenerSendError {
+                                error: Box::new(error),
                             });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));

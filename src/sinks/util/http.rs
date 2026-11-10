@@ -22,6 +22,7 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::EventStatus,
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     stream::{DriverResponse, batcher::limiter::ItemBatchSize},
 };
@@ -87,7 +88,7 @@ mod status_code_vec {
     use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 
     /// Deserializes a [`Vec<StatusCode>`]
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -99,7 +100,10 @@ mod status_code_vec {
     }
 
     /// Serializes a [`Vec<StatusCode>`]
-    pub fn serialize<S>(status_codes: &[StatusCode], serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(
+        status_codes: &[StatusCode],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -568,7 +572,7 @@ where
             let request = request_builder
                 .build(request)
                 .inspect_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })
                 .map_err(HttpError::from)?;
             #[cfg(feature = "aws-core")]
@@ -607,7 +611,7 @@ where
     B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
-        emit!(EndpointBytesSent {
+        emit(EndpointBytesSent {
             byte_size,
             protocol,
             endpoint,

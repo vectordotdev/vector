@@ -8,7 +8,7 @@ use serde_json::Value;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LegacyKey,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
     json_size::JsonSize,
     lookup::{event_path, path},
 };
@@ -136,7 +136,7 @@ pub(crate) fn decode_llmobs_body(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let envelope: Vec<LLMObsEnvelopeItem> = serde_json::from_slice::<LLMObsEnvelope>(&body)
         .map_err(|error| {
-            emit!(DatadogAgentJsonParseError { error: &error });
+            emit(DatadogAgentJsonParseError { error: &error });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Error parsing JSON: {error:?}"),

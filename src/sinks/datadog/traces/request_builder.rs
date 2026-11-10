@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(crate) enum RequestBuilderError {
     #[snafu(display(
         "Building an APM stats request payload failed ({}, {})",
         message,
@@ -51,7 +51,7 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    pub fn into_parts(self) -> (&'static str, String, usize) {
+    pub(crate) fn into_parts(self) -> (&'static str, String, usize) {
         match self {
             Self::FailedToBuild {
                 message,
@@ -66,7 +66,7 @@ impl RequestBuilderError {
     }
 }
 
-pub struct DatadogTracesRequestBuilder {
+pub(super) struct DatadogTracesRequestBuilder {
     api_key: Arc<str>,
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
@@ -77,7 +77,7 @@ pub struct DatadogTracesRequestBuilder {
 }
 
 impl DatadogTracesRequestBuilder {
-    pub const fn new(
+    pub(super) const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
@@ -96,7 +96,7 @@ impl DatadogTracesRequestBuilder {
     }
 }
 
-pub struct DDTracesMetadata {
+pub(crate) struct DDTracesMetadata {
     pub api_key: Arc<str>,
     pub endpoint: DatadogTracesEndpoint,
     pub finalizers: EventFinalizers,
@@ -185,7 +185,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 /// * `payload`                  - Compressed and encoded bytes to send.
 /// * `compression`              - `Compression` used to reference the Content-Encoding header.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
-pub fn build_request(
+pub(crate) fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
     payload: Bytes,
     compression: Compression,

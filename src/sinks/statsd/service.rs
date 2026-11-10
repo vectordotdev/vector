@@ -10,7 +10,7 @@ use vector_lib::{
 
 /// Generalized request for sending metrics to a `StatsD` endpoint.
 #[derive(Clone, Debug)]
-pub struct StatsdRequest {
+pub(super) struct StatsdRequest {
     pub payload: Vec<u8>,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -38,7 +38,7 @@ impl MetaDescriptive for StatsdRequest {
 // I/O errors when sending the request. Primarily, this type shuttles the metadata around the
 // request -- events sent, bytes sent, etc -- that is required by `Driver`.
 #[derive(Debug)]
-pub struct StatsdResponse {
+pub(super) struct StatsdResponse {
     metadata: RequestMetadata,
 }
 
@@ -59,7 +59,7 @@ impl DriverResponse for StatsdResponse {
 }
 
 #[derive(Clone)]
-pub struct StatsdService<T> {
+pub(super) struct StatsdService<T> {
     transport: T,
 }
 
@@ -68,7 +68,7 @@ impl<T> StatsdService<T> {
     ///
     /// The `transport` service is responsible for sending the actual encoded requests to the downstream
     /// endpoint.
-    pub const fn from_transport(transport: T) -> Self {
+    pub(super) const fn from_transport(transport: T) -> Self {
         Self { transport }
     }
 }
