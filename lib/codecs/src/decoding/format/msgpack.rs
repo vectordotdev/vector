@@ -5,6 +5,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use ordered_float::NotNan;
+use serde::Deserialize;
 use smallvec::SmallVec;
 use vector_core::config::DataType;
 use vector_core::event::LogEvent;
@@ -89,13 +90,15 @@ impl Deserializer for MsgPackDeserializer {
         }
 
         let len = bytes.len() as u64;
-        let mut cursor = Cursor::new(&bytes[..]);
+        // Read through `rmp_serde` rather than `rmpv::decode::read_value`, which silently maps
+        // the reserved `0xC1` marker to nil.
+        let mut deserializer = rmp_serde::Deserializer::new(Cursor::new(&bytes[..]));
         let mut events: SmallVec<[Event; 1]> = SmallVec::new();
 
         // Keep decoding until every byte of the frame has been consumed. A truncated or
         // malformed trailing value surfaces as an error rather than being silently dropped.
-        while cursor.position() < len {
-            match rmpv::decode::read_value(&mut cursor)? {
+        while deserializer.position() < len {
+            match rmpv::Value::deserialize(&mut deserializer)? {
                 rmpv::Value::Array(array) => {
                     for elem in array {
                         events.push(value_to_event(convert_value(elem)?, log_namespace)?);
@@ -441,6 +444,22 @@ mod tests {
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());
+        }
+    }
+
+    #[test]
+    fn deserialize_error_reserved_marker() {
+        let deserializer = MsgPackDeserializer;
+
+        // 0xC1 at the top level, nested in a map ({"x": 0xC1}), and inside an array.
+        for input in [&b"\xC1"[..], b"\x81\xA1x\xC1", b"\x92\x81\xA1x\x01\xC1"] {
+            for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+                assert!(
+                    deserializer
+                        .parse(Bytes::copy_from_slice(input), namespace)
+                        .is_err()
+                );
+            }
         }
     }
 
