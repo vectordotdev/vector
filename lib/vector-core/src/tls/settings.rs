@@ -450,7 +450,7 @@ fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
 }
 
 impl TlsConfig {
-    fn load_authorities(&self) -> Result<Vec<X509>> {
+    pub fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {

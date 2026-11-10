@@ -25,7 +25,8 @@ use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
 use vector_http::{empty_body, full_body};
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, event::Event, json_size::JsonSize, shutdown::ShutdownSignal,
+    EstimatedJsonEncodedSizeOf, event::Event, internal_event::emit, json_size::JsonSize,
+    shutdown::ShutdownSignal,
 };
 
 use crate::{
@@ -272,7 +273,7 @@ pub(crate) async fn call<
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = body.collect().await?.to_bytes();
-                    emit!(EndpointBytesReceived {
+                    emit(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
                         endpoint: endpoint.as_str(),
@@ -298,10 +299,10 @@ pub(crate) async fn call<
                                     events.estimated_json_encoded_size_of()
                                 };
 
-                                emit!(HttpClientEventsReceived {
+                                emit(HttpClientEventsReceived {
                                     byte_size,
                                     count: events.len(),
-                                    url: url.to_string()
+                                    url: url.to_string(),
                                 });
 
                                 // We'll enrich after receiving the events so
@@ -313,16 +314,16 @@ pub(crate) async fn call<
                         }
                         Ok((header, _)) => {
                             context.on_http_response_error(&url, &header);
-                            emit!(HttpClientHttpResponseError {
+                            emit(HttpClientHttpResponseError {
                                 code: header.status,
                                 url: url.to_string(),
                             });
                             None
                         }
                         Err(error) => {
-                            emit!(HttpClientHttpError {
+                            emit(HttpClientHttpError {
                                 error,
-                                url: url.to_string()
+                                url: url.to_string(),
                             });
                             None
                         }
@@ -341,7 +342,7 @@ pub(crate) async fn call<
         }
         Err(error) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
             Err(error)
         }
     }

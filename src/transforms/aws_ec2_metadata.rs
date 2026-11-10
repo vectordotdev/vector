@@ -20,6 +20,7 @@ use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     cpu_time::spawn_timed,
+    internal_event::emit,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -235,7 +236,7 @@ impl TransformConfig for Ec2Metadata {
             if required {
                 return Err(error);
             }
-            emit!(AwsEc2MetadataRefreshError { error });
+            emit(AwsEc2MetadataRefreshError { error });
         }
 
         // The metadata-refresh loop runs as its own tokio task, so the main
@@ -397,10 +398,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(()) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshError { error });
+                    emit(AwsEc2MetadataRefreshError { error });
                 }
             }
 

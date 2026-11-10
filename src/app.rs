@@ -10,6 +10,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
+use vector_lib::internal_event::emit;
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -151,8 +152,8 @@ impl ApplicationConfig {
             ));
             match api_server {
                 Ok(server) => {
-                    emit!(ApiStarted {
-                        addr: server.addr()
+                    emit(ApiStarted {
+                        addr: server.addr(),
                     });
                     Some(server)
                 }
@@ -294,7 +295,7 @@ impl Application {
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
-        emit!(VectorStarted);
+        emit(VectorStarted);
         handle.spawn(heartbeat::heartbeat());
 
         let Self {
@@ -488,7 +489,7 @@ async fn reload_config_from_result(
         },
         Err(errors) => {
             handle_config_errors(errors);
-            emit!(VectorConfigLoadError);
+            emit(VectorConfigLoadError);
             None
         }
     }
@@ -539,10 +540,10 @@ impl FinishedApplication {
         mut signal_rx: SignalRx,
         clean_shutdown: bool,
     ) -> ExitStatus {
-        emit!(VectorStopping);
+        emit(VectorStopping);
         tokio::select! {
             drained = topology_controller.stop() => {
-                emit!(VectorStopped);
+                emit(VectorStopped);
                 if clean_shutdown && drained {
                     info!("All components shut down gracefully.");
                 }
@@ -561,7 +562,7 @@ impl FinishedApplication {
 
     fn quit() -> ExitStatus {
         // It is highly unlikely that this event will exit from topology.
-        emit!(VectorQuit);
+        emit(VectorQuit);
         ExitStatus::from_raw({
             #[cfg(windows)]
             {

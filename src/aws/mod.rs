@@ -1,4 +1,5 @@
 //! Shared functionality for the AWS components.
+use vector_lib::internal_event::emit;
 pub mod auth;
 pub(crate) mod http_client;
 pub mod region;
@@ -506,7 +507,7 @@ where
     /// Calls the inner HTTP connector and emits common telemetry.
     /// Does not emit `AwsBytesSent` telemetry.
     fn call_inner(&self, req: HttpRequest) -> HttpConnectorFuture {
-        emit!(AboutToSendHttpRequest { request: &req });
+        emit(AboutToSendHttpRequest { request: &req });
 
         let fut: HttpConnectorFuture = self.http.call(req);
 
@@ -517,13 +518,13 @@ where
 
             match &result {
                 Ok(response) => {
-                    emit!(GotHttpResponse {
+                    emit(GotHttpResponse {
                         response,
-                        roundtrip
+                        roundtrip,
                     });
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning { error, roundtrip });
+                    emit(GotHttpWarning { error, roundtrip });
                 }
             }
 
@@ -562,7 +563,7 @@ where
             {
                 let byte_size = bytes_sent.load(Ordering::Relaxed);
 
-                emit!(AwsBytesSent {
+                emit(AwsBytesSent {
                     byte_size,
                     region: Some(region),
                 });

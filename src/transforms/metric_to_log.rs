@@ -7,6 +7,7 @@ use vector_lib::{
     codecs::MetricTagValues,
     config::LogNamespace,
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{PathPrefix, event_path, owned_value_path, path},
 };
 use vrl::{
@@ -298,7 +299,7 @@ impl MetricToLog {
             metric.reduce_tags_to_single();
         }
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogSerializeError { error }))
+            .map_err(|error| emit(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {

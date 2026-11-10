@@ -2,6 +2,7 @@
 
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use vector_lib::internal_event::emit;
 
 pub(super) struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
@@ -54,7 +55,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -110,7 +111,7 @@ impl KeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
