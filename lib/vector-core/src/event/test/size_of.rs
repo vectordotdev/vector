@@ -151,12 +151,13 @@ fn log_operation_maintains_size() {
         .quickcheck(inner as fn(Vec<Action>, LogEvent) -> TestResult);
 }
 
-/// Insertion, or removal when `value` is `None`, at a nested path drawn from a small set of keys
+/// Insertion, or removal with optional pruning when `value` is `None`, at a nested path drawn from a small set of keys
 /// and indices so that actions often hit existing fields.
 #[derive(Debug, Clone)]
 struct JsonSizeAction {
     path: OwnedValuePath,
     value: Option<Value>,
+    prune: bool,
     /// Keeps a clone of the event alive during the action, so that the mutation copies the
     /// shared inner value.
     shared: bool,
@@ -174,6 +175,7 @@ impl Arbitrary for JsonSizeAction {
         Self {
             path: segments.into(),
             value: bool::arbitrary(g).then(|| Value::arbitrary(g)),
+            prune: bool::arbitrary(g),
             shared: bool::arbitrary(g),
         }
     }
@@ -190,7 +192,7 @@ fn log_operation_maintains_estimated_json_size() {
             let path = (PathPrefix::Event, &action.path);
             match action.value {
                 Some(value) => _ = log_event.insert(path, value),
-                None => _ = log_event.remove(path),
+                None => _ = log_event.remove_prune(path, action.prune),
             }
             drop(shared);
 
