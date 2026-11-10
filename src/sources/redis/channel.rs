@@ -21,7 +21,7 @@ use crate::{
 enum BuildError {
     #[snafu(display("Failed to create connection: {}", source))]
     Connection { source: redis::RedisError },
-    #[snafu(display("Failed to subscribe to channel: {}", source))]
+    #[snafu(display("Failed to subscribe: {}", source))]
     Subscribe { source: redis::RedisError },
 }
 
