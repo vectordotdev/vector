@@ -21,7 +21,7 @@ use crate::{
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct GreptimeDBMetricsConfig {
+pub(super) struct GreptimeDBMetricsConfig {
     /// The [GreptimeDB database][database] name to connect.
     ///
     /// Default to `public`, the default database of GreptimeDB.
@@ -109,7 +109,7 @@ impl SinkConfig for GreptimeDBMetricsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedGreptimeDBMetrics {
+pub(super) struct ValidatedGreptimeDBMetrics {
     batch_settings: BatcherSettings,
     use_new_naming: bool,
 }

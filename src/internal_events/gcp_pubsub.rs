@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubConnectError {
+pub(crate) struct GcpPubsubConnectError {
     pub error: tonic::Status,
 }
 
@@ -29,7 +29,7 @@ impl InternalEvent for GcpPubsubConnectError {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubStreamingPullError {
+pub(crate) struct GcpPubsubStreamingPullError {
     pub error: tonic::Status,
 }
 
@@ -54,7 +54,7 @@ impl InternalEvent for GcpPubsubStreamingPullError {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubReceiveError {
+pub(crate) struct GcpPubsubReceiveError {
     pub error: tonic::Status,
 }
 

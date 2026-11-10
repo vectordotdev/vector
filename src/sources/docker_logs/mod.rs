@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bollard::{
     Docker,
@@ -272,10 +273,11 @@ impl SourceConfig for DockerLogsConfig {
         let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
-            Ok(tokio::select! {
+            tokio::select! {
                 () = fut => {}
                 _ = shutdown => {}
-            })
+            }
+            Ok(())
         }))
     }
 
@@ -633,7 +635,7 @@ impl DockerLogsSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
+                            emit(DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
                             let id = ContainerId::new(id.clone());
 
@@ -666,7 +668,7 @@ impl DockerLogsSource {
                             }
                         }
                         Some(Err(error)) => {
-                            emit!(DockerLogsCommunicationError {
+                            emit(DockerLogsCommunicationError {
                                 error,
                                 container_id: None,
                             });
@@ -757,14 +759,14 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(DockerLogsTimestampParseError {
+                    Err(error) => emit(DockerLogsTimestampParseError {
                         error,
-                        container_id: id.as_str()
+                        container_id: id.as_str(),
                     }),
                 },
-                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+                Err(error) => emit(DockerLogsContainerMetadataFetchError {
                     error,
-                    container_id: id.as_str()
+                    container_id: id.as_str(),
                 }),
             }
 
@@ -799,8 +801,8 @@ impl EventStreamBuilder {
         );
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        emit!(DockerLogsContainerWatch {
-            container_id: info.id.as_str()
+        emit(DockerLogsContainerWatch {
+            container_id: info.id.as_str(),
         });
 
         // Create event streamer
@@ -808,7 +810,7 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
-        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        let bytes_received = register(BytesReceived::from(Protocol::HTTP));
 
         let mut error = None;
         let events_stream = stream
@@ -828,16 +830,16 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(DockerLogsLoggingDriverUnsupportedError {
+                                emit(DockerLogsLoggingDriverUnsupportedError {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
                                 Err(ErrorPersistence::Permanent)
                             }
                             _ => {
-                                emit!(DockerLogsCommunicationError {
+                                emit(DockerLogsCommunicationError {
                                     error,
-                                    container_id: Some(info.id.as_str())
+                                    container_id: Some(info.id.as_str()),
                                 });
                                 Err(ErrorPersistence::Transient)
                             }
@@ -876,13 +878,13 @@ impl EventStreamBuilder {
             });
             self.out.send_event_stream(&mut stream).await.map_err(|_| {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
             })
         };
 
         // End of stream
-        emit!(DockerLogsContainerUnwatch {
-            container_id: info.id.as_str()
+        emit(DockerLogsContainerUnwatch {
+            container_id: info.id.as_str(),
         });
 
         let result = match (result, error) {
@@ -1106,9 +1108,9 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(DockerLogsTimestampParseError {
+                emit(DockerLogsTimestampParseError {
                     error,
-                    container_id: self.id.as_str()
+                    container_id: self.id.as_str(),
                 });
                 // So continue normally but without a timestamp.
                 None
@@ -1294,10 +1296,10 @@ impl ContainerLogInfo {
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
-        emit!(DockerLogsEventsReceived {
+        emit(DockerLogsEventsReceived {
             byte_size: log.estimated_json_encoded_size_of(),
             container_id: self.id.as_str(),
-            container_name: &self.metadata.name_str
+            container_name: &self.metadata.name_str,
         });
 
         Some(log)
@@ -1371,7 +1373,9 @@ fn line_agg_adapter(
         (stream, message, log)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
-    line_agg_out.map(move |(_, message, mut log, _)| {
+    line_agg_out.map(move |aggregated| {
+        let message = aggregated.line;
+        let mut log = aggregated.initial_context;
         match log_namespace {
             LogNamespace::Vector => log.insert(&vrl::path::OwnedTargetPath::event_root(), message),
             LogNamespace::Legacy => log.insert(

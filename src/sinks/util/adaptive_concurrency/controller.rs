@@ -6,14 +6,13 @@ use std::{
 
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
-use vector_lib::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{InternalEventHandle as _, Registered, register};
 use vector_lib::stats::{EwmaVar, Mean, MeanVariance};
 
 use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
-    http::HttpError,
     internal_events::{
         AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
         AdaptiveConcurrencyLimitData, AdaptiveConcurrencyObservedRtt,
@@ -86,10 +85,10 @@ impl<L> Controller<L> {
             })),
             #[cfg(test)]
             stats: Arc::new(Mutex::new(ControllerStatistics::default())),
-            limit: register!(AdaptiveConcurrencyLimit),
-            in_flight: register!(AdaptiveConcurrencyInFlight),
-            observed_rtt: register!(AdaptiveConcurrencyObservedRtt),
-            averaged_rtt: register!(AdaptiveConcurrencyAveragedRtt),
+            limit: register(AdaptiveConcurrencyLimit),
+            in_flight: register(AdaptiveConcurrencyInFlight),
+            observed_rtt: register(AdaptiveConcurrencyObservedRtt),
+            averaged_rtt: register(AdaptiveConcurrencyAveragedRtt),
         }
     }
 
@@ -296,9 +295,6 @@ where
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
-                } else if error.downcast_ref::<HttpError>().is_some() {
-                    // HTTP protocol-level errors are not backpressure
-                    false
                 } else {
                     warn!(
                         message = "Unhandled error response.",

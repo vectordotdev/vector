@@ -13,14 +13,14 @@ use super::{
 };
 
 /// Parser for converting Windows Event Log events to Vector `LogEvents`
-pub struct EventLogParser {
+pub(super) struct EventLogParser {
     config: WindowsEventLogConfig,
     log_namespace: LogNamespace,
 }
 
 impl EventLogParser {
     /// Create a new parser with the given configuration and resolved namespace
-    pub fn new(config: &WindowsEventLogConfig, log_namespace: LogNamespace) -> Self {
+    pub(super) fn new(config: &WindowsEventLogConfig, log_namespace: LogNamespace) -> Self {
         Self {
             config: config.clone(),
             log_namespace,
@@ -32,7 +32,10 @@ impl EventLogParser {
         clippy::needless_pass_by_value,
         reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn parse_event(&self, event: WindowsEvent) -> Result<LogEvent, WindowsEventLogError> {
+    pub(super) fn parse_event(
+        &self,
+        event: WindowsEvent,
+    ) -> Result<LogEvent, WindowsEventLogError> {
         let mut log_event = LogEvent::default();
 
         // Set core fields based on log namespace

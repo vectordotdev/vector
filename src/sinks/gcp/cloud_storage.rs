@@ -2,11 +2,12 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http_1::header::{HeaderName, HeaderValue};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_common::sensitive_string::SensitiveString;
 use vector_lib::{
     TimeZone,
     codecs::encoding::Framer,
@@ -23,8 +24,8 @@ use crate::{
         ValidatedSink,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{client_v1::HttpClient, get_http_scheme_from_uri},
+    gcp::{GcpAuthenticator, GcpCredentialsConfig, Scope},
+    http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
         Healthcheck, VectorSink,
@@ -46,6 +47,7 @@ use crate::{
     template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+use tracing::warn;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -194,7 +196,15 @@ pub struct GcsSinkConfig {
     request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
-    auth: GcpAuthConfig,
+    auth: GcpCredentialsConfig,
+
+    /// An [API key][gcp_api_key].
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
+    #[configurable(
+        deprecated = "API keys are not supported by Google Cloud Storage; use `credentials_path` or default GCE credentials instead."
+    )]
+    api_key: Option<SensitiveString>,
 
     tls: Option<TlsConfig>,
 
@@ -235,7 +245,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         batch: BatchConfig::default(),
         endpoint: default_endpoint(),
         request: TowerRequestConfig::default(),
-        auth: GcpAuthConfig::default(),
+        auth: GcpCredentialsConfig::default(),
+        api_key: Option::default(),
         tls: Option::default(),
         acknowledgements: AcknowledgementsConfig::default(),
         timezone: Option::default(),
@@ -295,9 +306,19 @@ impl ValidatedSink for GcsSinkConfig {
         validated: &ValidatedGcsSink,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.api_key.is_some() {
+            warn!(
+                "DEPRECATED: The `api_key` option is deprecated and not supported by Google Cloud Storage. See https://vector.dev/deprecations/#gcp_cloud_storage_api_key for migration instructions."
+            );
+        }
+
         let ValidatedGcsSink { base_url, .. } = validated;
 
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let auth = self
+            .auth
+            .build(Scope::DevStorageReadWrite, self.api_key.as_ref())
+            .await?;
+
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
@@ -585,19 +606,19 @@ mod tests {
 
         let context = SinkContext::default();
 
-        let tls = TlsSettings::default();
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
         let client = HttpClient::new(tls.into(), context.proxy())
             .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::new(mock_endpoint.clone()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+                HttpEndpoint::new(mock_endpoint).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 &context,
                 &validated,
@@ -613,7 +634,8 @@ mod tests {
         let (_guard, addr) = next_addr();
 
         let context = SinkContext::default();
-        let client = HttpClient::new(TlsSettings::default().into(), context.proxy())
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
+        let client = HttpClient::new(tls.into(), context.proxy())
             .expect("should not fail to create HTTP client");
         let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).expect("valid mock endpoint");
         let config = GcsSinkConfig {
