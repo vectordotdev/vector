@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -23,7 +22,8 @@ use vector_common::{
 };
 use vrl::{
     event_path, owned_value_path,
-    path::{BorrowedSegment, OwnedTargetPath, PathParseError, ValuePath, parse_target_path},
+    path::{OwnedTargetPath, PathParseError, ValuePath, parse_target_path},
+    value::ValueSlot,
 };
 
 use super::{
@@ -75,104 +75,86 @@ impl Inner {
         &self.fields
     }
 
-    /// Inserts `value` at `path`. When the parent object of the target already exists, the JSON
-    /// size cache is updated from the inserted and replaced values instead of being invalidated.
+    /// Inserts `value` at `path`, updating the JSON size cache from the written and replaced
+    /// values instead of invalidating it.
     fn insert<'a>(&mut self, path: impl ValuePath<'a>, value: Value) -> Option<Value> {
         self.size_cache.store(None);
-        let cached = self.json_encoded_size_cache.take();
-        let Some((size, parent)) =
-            cached.and_then(|size| Some((size, ParentObject::find(&self.fields, &path)?)))
-        else {
+        let Some(size) = self.json_encoded_size_cache.take() else {
             return self.fields.insert(path, value);
         };
 
-        let value_size = value.estimated_json_encoded_size_of();
-        let previous = self.fields.insert(path, value);
-        let (added, removed) = match &previous {
-            Some(previous) => (
-                value_size.get(),
-                previous.estimated_json_encoded_size_of().get(),
-            ),
-            None => (parent.inserted_member_size(value_size), 0),
-        };
-        self.update_json_size(size, added, removed);
+        let mut change = None;
+        let previous = self.fields.insert_with_hook(path, value, |slot, written| {
+            change = written_size_change(slot, written);
+        });
+        self.update_json_size(size, change);
         previous
     }
 
-    /// Removes the value at `path`. When the parent object of the target exists and is not
-    /// pruned, the JSON size cache is updated from the removed value instead of being invalidated.
+    /// Removes the value at `path`, updating the JSON size cache from the removed values instead
+    /// of invalidating it.
     fn remove<'a>(&mut self, path: impl ValuePath<'a>, prune: bool) -> Option<Value> {
         self.size_cache.store(None);
-        let cached = self.json_encoded_size_cache.take();
-        let Some((size, parent)) = cached
-            .filter(|_| !prune)
-            .and_then(|size| Some((size, ParentObject::find(&self.fields, &path)?)))
-        else {
+        let Some(size) = self.json_encoded_size_cache.take() else {
             return self.fields.remove(path, prune);
         };
 
-        let previous = self.fields.remove(path, prune);
-        let removed = previous.as_ref().map_or(0, |previous| {
-            parent.removed_member_size(previous.estimated_json_encoded_size_of())
+        let mut removed = Some(0);
+        let previous = self.fields.remove_with_hook(path, prune, |slot| {
+            removed = removed
+                .zip(removed_size(slot))
+                .map(|(total, size)| total + size);
         });
-        self.update_json_size(size, 0, removed);
+        self.update_json_size(size, removed.map(|removed| (0, removed)));
         previous
     }
 
-    fn update_json_size(&self, size: NonZeroJsonSize, added: usize, removed: usize) {
-        let size = (JsonSize::from(size).get() + added)
-            .checked_sub(removed)
-            .and_then(|size| NonZeroJsonSize::new(JsonSize::new(size)));
+    /// Applies an `(added, removed)` size change to the cache, or leaves it invalidated when the
+    /// change is unknown.
+    fn update_json_size(&self, size: NonZeroJsonSize, change: Option<(usize, usize)>) {
+        let size = change.and_then(|(added, removed)| {
+            (JsonSize::from(size).get() + added)
+                .checked_sub(removed)
+                .and_then(|size| NonZeroJsonSize::new(JsonSize::new(size)))
+        });
         self.json_encoded_size_cache.store(size);
     }
 }
 
-/// Object holding the member targeted by a path.
-struct ParentObject<'a> {
-    key: Cow<'a, str>,
-    len: usize,
+/// Returns the `(added, removed)` JSON size change of writing `written` into `slot`.
+fn written_size_change(slot: ValueSlot<'_>, written: &Value) -> Option<(usize, usize)> {
+    let written = written.estimated_json_encoded_size_of();
+    match (slot.current(), slot) {
+        (Some(current), _) => Some((
+            written.get(),
+            current.estimated_json_encoded_size_of().get(),
+        )),
+        (None, ValueSlot::Field { object, key }) => {
+            let separator = if object.is_empty() { 0 } else { COMMA_SIZE };
+            Some((
+                estimated_json_encoded_member_size(key, written) + separator,
+                0,
+            ))
+        }
+        // Writing out of the bounds of an array pads it with nulls.
+        (None, _) => None,
+    }
 }
 
-impl<'a> ParentObject<'a> {
-    /// Only succeeds when all segments of `path` but the last resolve to existing containers and
-    /// the last one is a field of an existing object, i.e. when inserting or removing at `path`
-    /// adds, replaces or removes exactly one object member.
-    fn find(root: &Value, path: &impl ValuePath<'a>) -> Option<Self> {
-        let mut segments = path.segment_iter().peekable();
-        let mut current = root;
-        while let Some(segment) = segments.next() {
-            let is_last = segments.peek().is_none();
-            current = match (segment, current) {
-                (BorrowedSegment::Field(key), Value::Object(map)) if is_last => {
-                    return Some(Self {
-                        key,
-                        len: map.len(),
-                    });
-                }
-                (BorrowedSegment::Field(key), Value::Object(map)) => map.get(key.as_ref())?,
-                (BorrowedSegment::Index(index), Value::Array(array)) if !is_last => {
-                    // Negative indices count from the end, as in `Value::insert`.
-                    let index = match usize::try_from(index) {
-                        Ok(index) => index,
-                        Err(_) => array.len().checked_sub(index.unsigned_abs())?,
-                    };
-                    array.get(index)?
-                }
-                _ => return None,
-            };
+/// Returns the JSON size removed along with the value in `slot`.
+fn removed_size(slot: ValueSlot<'_>) -> Option<usize> {
+    let current = slot.current()?.estimated_json_encoded_size_of();
+    match slot {
+        ValueSlot::Field { object, key } => {
+            let separator = if object.len() > 1 { COMMA_SIZE } else { 0 };
+            Some(estimated_json_encoded_member_size(key, current) + separator)
         }
-        None
-    }
-
-    fn inserted_member_size(&self, value_size: JsonSize) -> usize {
-        let separator = if self.len > 0 { COMMA_SIZE } else { 0 };
-        estimated_json_encoded_member_size(&self.key, value_size) + separator
-    }
-
-    /// `self.len` is the length before removal.
-    fn removed_member_size(&self, value_size: JsonSize) -> usize {
-        let separator = if self.len > 1 { COMMA_SIZE } else { 0 };
-        estimated_json_encoded_member_size(&self.key, value_size) + separator
+        ValueSlot::Index { array, .. } => {
+            let separator = if array.len() > 1 { COMMA_SIZE } else { 0 };
+            Some(current.get() + separator)
+        }
+        // Removing the root leaves an empty container or null in its place.
+        ValueSlot::Root(_) => None,
     }
 }
 
@@ -1064,22 +1046,31 @@ mod test {
 
     #[test]
     fn json_size_cache_is_updated_incrementally() {
-        let mut log =
-            LogEvent::from(value!({"a": 1, "nested": {"empty": {}, "b": [1, {"c": true}]}}));
+        let mut log = LogEvent::from(value!({
+            "a": 1,
+            "nested": {"empty": {}, "b": [1, {"c": true}]},
+            "obj": {"x": 1},
+        }));
         let cases = [
-            ("a", Some(value!("replaced"))),
-            ("new", Some(value!({"x": [1, 2]}))),
-            ("nested.empty.first", Some(value!(1))),
-            ("nested.b[1].d", Some(value!("d"))),
-            ("nested.b[-1].e", Some(value!(2.5))),
-            ("a", None),
-            ("nested.empty.first", None),
-            ("nested.b[1].c", None),
-            ("missing", None),
+            ("a", Some(value!("replaced")), false),
+            ("new", Some(value!({"x": [1, 2]})), false),
+            ("nested.empty.first", Some(value!(1)), false),
+            ("nested.b[1].d", Some(value!("d")), false),
+            ("nested.b[-1].e", Some(value!(2.5)), false),
+            ("nested.b[0]", Some(value!(2)), false),
+            ("missing.x.y", Some(value!(1)), false),
+            ("a.x", Some(value!(1)), false),
+            ("a", None, false),
+            ("nested.empty.first", None, false),
+            ("nested.b[1].c", None, false),
+            ("nested.b[0]", None, false),
+            ("missing", None, false),
+            ("obj.x", None, true),
+            (".", Some(value!({"root": 1})), false),
         ];
 
-        for (path, value) in cases {
-            apply_with_cached_json_size(&mut log, path, value, false);
+        for (path, value, prune) in cases {
+            apply_with_cached_json_size(&mut log, path, value, prune);
             let cached = log.inner.json_encoded_size_cache.load().map(JsonSize::from);
             assert_eq!(
                 cached,
@@ -1090,18 +1081,16 @@ mod test {
     }
 
     #[test]
-    fn json_size_cache_is_invalidated_without_parent_object() {
-        let mut log = LogEvent::from(value!({"a": "str", "array": [1], "obj": {"x": 1}}));
+    fn json_size_cache_is_invalidated_when_change_is_unknown() {
+        let mut log = LogEvent::from(value!({"array": [1]}));
         let cases = [
-            ("missing.x", Some(value!(1))),
-            ("a.x", Some(value!(1))),
-            ("array[0]", Some(value!(2))),
-            ("obj.x", None),
-            (".", Some(value!({}))),
+            ("array[3]", Some(value!(2))),
+            ("array[-6]", Some(value!(2))),
+            (".", None),
         ];
 
         for (path, value) in cases {
-            apply_with_cached_json_size(&mut log, path, value, true);
+            apply_with_cached_json_size(&mut log, path, value, false);
             assert_eq!(log.inner.json_encoded_size_cache.load(), None, "{path}");
         }
     }
