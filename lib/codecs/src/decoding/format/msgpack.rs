@@ -82,6 +82,12 @@ impl Deserializer for MsgPackDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
+        // An empty frame is not valid MessagePack. Report it rather than silently producing no
+        // events. An empty array (`0x90`) is still valid and yields no events.
+        if bytes.is_empty() {
+            return Err("Empty frame is not valid MessagePack".into());
+        }
+
         let len = bytes.len() as u64;
         let mut cursor = Cursor::new(&bytes[..]);
         let mut events: SmallVec<[Event; 1]> = SmallVec::new();
@@ -435,6 +441,27 @@ mod tests {
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             assert!(deserializer.parse(input.clone(), namespace).is_err());
+        }
+    }
+
+    #[test]
+    fn deserialize_error_empty_frame() {
+        let deserializer = MsgPackDeserializer;
+
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            assert!(deserializer.parse(Bytes::new(), namespace).is_err());
+        }
+    }
+
+    #[test]
+    fn deserialize_empty_array() {
+        let deserializer = MsgPackDeserializer;
+
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let events = deserializer
+                .parse(Bytes::from_static(b"\x90"), namespace)
+                .unwrap();
+            assert!(events.is_empty());
         }
     }
 }
