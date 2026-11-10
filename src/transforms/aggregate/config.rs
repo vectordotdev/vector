@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, event::MetricValue};
 
 use super::Aggregate;
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -37,7 +37,7 @@ pub struct AggregateConfig {
 
 /// Settings for event-time aggregation windows.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct EventTimeConfig {
     /// Grace period for late-arriving events, in milliseconds.
@@ -46,13 +46,28 @@ pub struct EventTimeConfig {
     /// `bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
     /// event-time window. That cutoff is enforced when events are recorded, not only when a
     /// periodic flush runs. Once a bucket is emitted it is closed permanently; any later
-    /// events whose timestamp falls inside it are dropped and counted via
-    /// `component_discarded_events_total`.
+    /// events whose timestamp falls inside it are handled according to `late_events`.
     ///
     /// Set to 0 for strict ordering (no late events allowed).
     #[serde(default)]
     #[configurable(metadata(docs::examples = 0, docs::examples = 5000, docs::examples = 30000))]
     pub allowed_lateness_ms: u64,
+
+    /// How to handle events that arrive after their bucket's cutoff.
+    ///
+    /// - `drop` (default) discards the event and increments `component_discarded_events_total`
+    /// - `forward` skips aggregation and forwards the event downstream unchanged, optionally
+    ///   restricted to `metric_types`
+    ///
+    /// Forwarded events keep their original timestamp, so they can share a timestamp with the
+    /// aggregate emitted for their bucket. Sinks that overwrite values for an identical timestamp,
+    /// such as the Datadog Metrics sink, may then replace the aggregate with the late value.
+    /// Sinks that convert absolute metrics to deltas, such as the Datadog Metrics sink, treat a
+    /// late absolute counter or histogram as a reset and reset their baseline, inflating the
+    /// next delta. Forwarded events also carry their raw value, not a count or delta, in `count`
+    /// and `diff` modes.
+    #[serde(default)]
+    pub late_events: LateEvents,
 
     /// How to handle events with missing timestamps.
     ///
@@ -83,6 +98,7 @@ impl Default for EventTimeConfig {
     fn default() -> Self {
         Self {
             allowed_lateness_ms: 0,
+            late_events: LateEvents::default(),
             missing_timestamp: MissingTimestamp::Drop,
             max_future_ms: default_max_future_ms(),
         }
@@ -101,6 +117,87 @@ pub enum MissingTimestamp {
 
     /// Use the current system time as the event timestamp.
     UseSystemTime,
+}
+
+/// Settings for metrics that arrive after their bucket's cutoff in event-time mode.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LateEvents {
+    /// The late event handling strategy to use.
+    #[serde(default)]
+    pub strategy: LateEventsStrategy,
+
+    /// Metric types that may be forwarded.
+    ///
+    /// When set, a late event is forwarded only if its type is listed and it is incremental; all
+    /// other late events are dropped and counted via `component_discarded_events_total`.
+    /// Requiring incremental events keeps late absolute counters and histograms from resetting
+    /// the baseline of sinks that convert absolute metrics to deltas. The rule applies to every
+    /// type, so absolute gauges are dropped too; gauges are usually absolute, so listing `gauge`
+    /// rarely forwards anything. When unset, every late event is forwarded.
+    ///
+    /// Only valid when `strategy` is `forward`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(docs::examples = "distribution", docs::examples = "sketch"))]
+    pub metric_types: Option<Vec<MetricType>>,
+}
+
+/// Strategy for metrics that arrive after their bucket's cutoff in event-time mode.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[configurable(description = "The late event handling strategy to use.")]
+#[serde(rename_all = "snake_case")]
+pub enum LateEventsStrategy {
+    /// Drop the event and count it via `component_discarded_events_total`.
+    #[default]
+    Drop,
+
+    /// Skip aggregation and forward the event downstream unchanged.
+    Forward,
+}
+
+/// A metric value type, used to select which late events are forwarded.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[configurable(description = "A metric value type.")]
+#[serde(rename_all = "snake_case")]
+pub enum MetricType {
+    /// A `counter` metric.
+    Counter,
+
+    /// A `gauge` metric.
+    Gauge,
+
+    /// A `set` metric.
+    Set,
+
+    /// A `distribution` metric.
+    Distribution,
+
+    /// An `aggregated_histogram` metric.
+    AggregatedHistogram,
+
+    /// An `aggregated_summary` metric.
+    AggregatedSummary,
+
+    /// A `sketch` metric.
+    Sketch,
+}
+
+impl MetricType {
+    /// Returns the type of the given metric value.
+    pub(crate) const fn of(value: &MetricValue) -> Self {
+        match value {
+            MetricValue::Counter { .. } => Self::Counter,
+            MetricValue::Gauge { .. } => Self::Gauge,
+            MetricValue::Set { .. } => Self::Set,
+            MetricValue::Distribution { .. } => Self::Distribution,
+            MetricValue::AggregatedHistogram { .. } => Self::AggregatedHistogram,
+            MetricValue::AggregatedSummary { .. } => Self::AggregatedSummary,
+            MetricValue::Sketch { .. } => Self::Sketch,
+        }
+    }
 }
 
 pub(crate) const fn default_max_future_ms() -> u64 {

@@ -1,5 +1,6 @@
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
 use crate::sinks::{aws_s_s::retry::SSRetryLogic, prelude::*};
+use vector_lib::internal_event::emit;
 
 #[derive(Clone)]
 pub(super) struct SSSink<C, E>
@@ -43,7 +44,7 @@ where
             )
             .filter_map(|req| async move {
                 req.map_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })
                 .ok()
             })

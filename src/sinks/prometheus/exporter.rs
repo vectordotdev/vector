@@ -8,6 +8,7 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
@@ -23,7 +24,7 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::oneshot;
 use tower::ServiceBuilder;
-use tower_http_1::compression::CompressionLayer;
+use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -261,7 +262,7 @@ struct MetricMetadata {
 }
 
 impl MetricMetadata {
-    pub fn new(expiration_window: Duration) -> Self {
+    fn new(expiration_window: Duration) -> Self {
         Self {
             expiration_window,
             expires_at: Instant::now() + expiration_window,
@@ -269,14 +270,14 @@ impl MetricMetadata {
     }
 
     /// Resets the expiration deadline.
-    pub fn refresh(&mut self) {
+    fn refresh(&mut self) {
         self.expires_at = Instant::now() + self.expiration_window;
     }
 
     /// Whether or not the referenced metric has expired yet.
     ///
     /// A zero expiration window means expiration is disabled, so the metric never expires.
-    pub fn has_expired(&self, now: Instant) -> bool {
+    fn has_expired(&self, now: Instant) -> bool {
         !self.expiration_window.is_zero() && now >= self.expires_at
     }
 }
@@ -298,7 +299,7 @@ struct MetricRef {
 
 impl MetricRef {
     /// Creates a `MetricRef` based on the given `Metric`.
-    pub fn from_metric(metric: &Metric) -> Self {
+    fn from_metric(metric: &Metric) -> Self {
         // Either the buckets for an aggregated histogram, or the quantiles for an aggregated summary.
         let bounds = match metric.value() {
             MetricValue::AggregatedHistogram { buckets, .. } => {
@@ -462,8 +463,8 @@ impl PrometheusExporter {
         }
 
         let handler = Handler {
-            bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
-            events_sent: register!(EventsSent::from(Output(None))),
+            bytes_sent: register(BytesSent::from(Protocol::HTTP)),
+            events_sent: register(EventsSent::from(Output(None))),
             default_namespace: self.config.default_namespace.clone(),
             buckets: self.config.buckets.clone().into(),
             quantiles: self.config.quantiles.clone().into(),
@@ -610,7 +611,7 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
                 &metric,
                 self.config.default_namespace.as_deref(),
             ) {
-                emit!(PrometheusInvalidMetricError {});
+                emit(PrometheusInvalidMetricError {});
                 finalizers.update_status(EventStatus::Rejected);
                 continue;
             }
@@ -1157,7 +1158,7 @@ mod tests {
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply_v1(&mut request);
+            client_auth_config.apply(&mut request);
         }
 
         let proxy = ProxyConfig::default();
@@ -1209,11 +1210,14 @@ mod tests {
         )));
     }
 
-    pub fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
+    pub(super) fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
         create_metric(name, MetricValue::Gauge { value })
     }
 
-    pub fn create_metric_set(name: Option<String>, values: Vec<&'static str>) -> (String, Event) {
+    pub(super) fn create_metric_set(
+        name: Option<String>,
+        values: Vec<&'static str>,
+    ) -> (String, Event) {
         create_metric(
             name,
             MetricValue::Set {

@@ -8,10 +8,11 @@ use futures::future::BoxFuture;
 use http::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
-use tower_http_1::decompression::Decompression;
+use tower_http::decompression::Decompression;
 use vector_http::full_body;
 use vector_lib::{
     ByteSizeOf,
+    internal_event::emit,
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
@@ -72,7 +73,7 @@ impl MetaDescriptive for ElasticsearchRequest {
 /// Sends bulk requests through the shared native HTTP client.
 ///
 /// Bulk requests may need asynchronous AWS signing with a service-specific payload hash, so
-/// this service builds requests itself instead of using the generic `http_v1::HttpService`.
+/// this service builds requests itself instead of using the generic `http::HttpService`.
 /// It requests and decodes compressed responses.
 #[derive(Clone)]
 pub struct ElasticsearchService {
@@ -157,7 +158,7 @@ impl HttpRequestBuilder {
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(auth) => {
-                    auth.apply_v1(&mut request);
+                    auth.apply(&mut request);
                 }
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
@@ -218,7 +219,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
                 .build_request(req)
                 .await
                 .inspect_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })?;
             let byte_size = request.body().len();
 
@@ -228,7 +229,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
             let response = service.call(request.map(full_body)).await?;
 
             if response.status().is_success() {
-                emit!(EndpointBytesSent {
+                emit(EndpointBytesSent {
                     byte_size,
                     protocol: &protocol,
                     endpoint: &endpoint,

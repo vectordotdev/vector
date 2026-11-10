@@ -20,6 +20,7 @@ use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     cpu_time::spawn_timed,
+    internal_event::emit,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -235,7 +236,7 @@ impl TransformConfig for Ec2Metadata {
             if required {
                 return Err(error);
             }
-            emit!(AwsEc2MetadataRefreshError { error });
+            emit(AwsEc2MetadataRefreshError { error });
         }
 
         // The metadata-refresh loop runs as its own tokio task, so the main
@@ -370,7 +371,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         client: HttpClient,
         host: Uri,
         keys: Keys,
@@ -397,10 +398,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(()) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshError { error });
+                    emit(AwsEc2MetadataRefreshError { error });
                 }
             }
 
@@ -408,7 +409,7 @@ impl MetadataClient {
         }
     }
 
-    pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
+    pub(crate) async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
         if let Some((token, next_refresh)) = self.token.clone() {
             // If the next refresh is greater (in the future) than
             // the current time we can return the token since its still valid
@@ -445,7 +446,7 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+    pub(crate) async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         self.get_metadata(&DYNAMIC_DOCUMENT)
             .await?
             .map(|body| {
@@ -460,7 +461,7 @@ impl MetadataClient {
         clippy::too_many_lines,
         reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+    pub(crate) async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
@@ -669,7 +670,7 @@ fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
 }
 
 impl Keys {
-    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+    pub(crate) fn new(namespace: Option<OptionalTargetPath>) -> Self {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {

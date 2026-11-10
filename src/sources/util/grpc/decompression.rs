@@ -7,6 +7,7 @@ use std::{
     sync::LazyLock,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::write::GzDecoder;
@@ -18,7 +19,7 @@ use http_body_util::{
     channel::{Channel, Sender},
 };
 use tokio::{pin, select};
-use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
+use tonic::{Status, body::Body as TonicBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
@@ -104,7 +105,7 @@ enum CompressionScheme {
 }
 
 impl CompressionScheme {
-    fn from_encoding_header(req: &Request<BoxBody>) -> Result<Option<Self>, Status> {
+    fn from_encoding_header(req: &Request<TonicBody>) -> Result<Option<Self>, Status> {
         req.headers()
             .get(GRPC_ENCODING_HEADER)
             .map(|s| {
@@ -548,10 +549,10 @@ async fn drive_request<B, F, E>(
     inner: F,
     bytes_received: Registered<BytesReceived>,
     scheme: Option<CompressionScheme>,
-) -> Result<Response<BoxBody>, E>
+) -> Result<Response<TonicBody>, E>
 where
     B: Body<Data = Bytes> + Unpin,
-    F: Future<Output = Result<Response<BoxBody>, E>>,
+    F: Future<Output = Result<Response<TonicBody>, E>>,
     E: std::fmt::Display,
 {
     let body_decompression = drive_body_decompression(source, destination, scheme);
@@ -588,12 +589,12 @@ where
             bytes_received.emit(ByteSize(body_bytes_received));
         }
         Ok(res) => {
-            emit!(GrpcError {
-                error: format!("Received {}", res.status())
+            emit(GrpcError {
+                error: format!("Received {}", res.status()),
             });
         }
         Err(error) => {
-            emit!(GrpcError { error: &error });
+            emit(GrpcError { error: &error });
         }
     }
 
@@ -618,13 +619,13 @@ pub struct DecompressionAndMetrics<S> {
     bytes_received: Registered<BytesReceived>,
 }
 
-impl<S> Service<Request<BoxBody>> for DecompressionAndMetrics<S>
+impl<S> Service<Request<TonicBody>> for DecompressionAndMetrics<S>
 where
-    S: Service<Request<BoxBody>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    S: Service<Request<TonicBody>, Response = Response<TonicBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::fmt::Display,
 {
-    type Response = Response<BoxBody>;
+    type Response = Response<TonicBody>;
     type Error = S::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -632,11 +633,11 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, req: Request<TonicBody>) -> Self::Future {
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
             Err(status) => {
-                emit!(GrpcInvalidCompressionSchemeError { status: &status });
+                emit(GrpcInvalidCompressionSchemeError { status: &status });
                 Box::pin(async move { Ok(status.into_http()) })
             }
 
@@ -654,7 +655,7 @@ where
                 if scheme.is_some() {
                     req_parts.headers.remove(GRPC_ENCODING_HEADER);
                 }
-                let mapped_req = Request::from_parts(req_parts, decompressed_body.boxed_unsync());
+                let mapped_req = Request::from_parts(req_parts, TonicBody::new(decompressed_body));
 
                 let inner = self.inner.call(mapped_req);
 
@@ -700,7 +701,7 @@ impl<S> Layer<S> for DecompressionAndMetricsLayer {
     fn layer(&self, inner: S) -> Self::Service {
         DecompressionAndMetrics {
             inner,
-            bytes_received: register!(BytesReceived::from(Protocol::from("grpc"))),
+            bytes_received: register(BytesReceived::from(Protocol::from("grpc"))),
         }
     }
 }
@@ -867,7 +868,7 @@ mod tests {
             .collect()
     }
 
-    fn accept_encoding(response: &Response<BoxBody>) -> Option<&str> {
+    fn accept_encoding(response: &Response<TonicBody>) -> Option<&str> {
         response
             .headers()
             .get(GRPC_ACCEPT_ENCODING_HEADER)
@@ -1104,12 +1105,12 @@ mod tests {
     fn body_error_becomes_grpc_error_response() {
         let source = full_body(grpc_header(false, max_decompressed_size_bytes() + 1));
         let (destination, _decompressed) = decompressed_body_channel();
-        let inner = futures::future::pending::<Result<Response<BoxBody>, Infallible>>();
+        let inner = futures::future::pending::<Result<Response<TonicBody>, Infallible>>();
         let mut request = task::spawn(drive_request(
             source,
             destination,
             inner,
-            register!(BytesReceived::from(Protocol::from("grpc"))),
+            register(BytesReceived::from(Protocol::from("grpc"))),
             None,
         ));
 

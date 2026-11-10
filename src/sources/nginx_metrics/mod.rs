@@ -13,7 +13,10 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_http::empty_body;
-use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, internal_event::emit,
+    metric_tags,
+};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -138,16 +141,16 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(NginxMetrics::collect)).await;
-                emit!(CollectionCompleted {
+                emit(CollectionCompleted {
                     start,
-                    end: Instant::now()
+                    end: Instant::now(),
                 });
 
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
                 let count = metrics.len();
 
                 if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     return Err(error);
                 }
             }
@@ -213,10 +216,10 @@ impl NginxMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
-        emit!(NginxMetricsEventsReceived {
+        emit(NginxMetricsEventsReceived {
             count: metrics.len(),
             byte_size,
-            endpoint: &self.endpoint
+            endpoint: &self.endpoint,
         });
 
         metrics
@@ -224,12 +227,12 @@ impl NginxMetrics {
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
         let response = self.get_nginx_response().await.map_err(|error| {
-            emit!(NginxMetricsRequestError {
+            emit(NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
             });
         })?;
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size: response.len(),
             protocol: "http",
             endpoint: &self.endpoint,
@@ -237,7 +240,7 @@ impl NginxMetrics {
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {
-                emit!(NginxMetricsStubStatusParseError {
+                emit(NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
                 });
@@ -257,7 +260,7 @@ impl NginxMetrics {
     async fn get_nginx_response(&self) -> crate::Result<Bytes> {
         let mut request = Request::get(&self.endpoint).body(empty_body())?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         let response = self.http_client.send(request).await?;

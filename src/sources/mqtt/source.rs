@@ -7,7 +7,7 @@ use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
     finalizer::OrderedFinalizer,
-    internal_event::EventsReceived,
+    internal_event::{EventsReceived, emit, register},
     lookup::path,
 };
 
@@ -15,7 +15,7 @@ use crate::{
     SourceSender,
     common::mqtt::MqttConnector,
     event::{BatchNotifier, BatchStatus, Event},
-    internal_events::{EndpointBytesReceived, StreamClosedError},
+    internal_events::{EndpointBytesReceived, MqttSubscribeError, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
     sources::{SourceError, mqtt::MqttSourceConfig, util},
@@ -376,13 +376,6 @@ fn warn_session_not_resumed() {
     );
 }
 
-fn warn_resubscribe_failed() {
-    warn!(
-        message = "Failed to queue MQTT re-subscribe request after reconnect; will retry while connected.",
-        internal_log_rate_limit = true,
-    );
-}
-
 fn warn_forcing_reconnect_after_suppressed_ack() {
     warn!(
         message = "An MQTT publish was not delivered and its acknowledgement was withheld; forcing a reconnect so the broker redelivers it.",
@@ -439,7 +432,7 @@ impl PendingAcks {
     }
 }
 
-pub struct MqttSource {
+pub(super) struct MqttSource {
     connector: MqttConnector,
     decoder: Decoder,
     log_namespace: LogNamespace,
@@ -463,7 +456,7 @@ impl MqttSource {
         clippy::unnecessary_wraps,
         reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub fn new(
+    pub(super) fn new(
         connector: MqttConnector,
         decoder: Decoder,
         log_namespace: LogNamespace,
@@ -483,7 +476,7 @@ impl MqttSource {
         clippy::too_many_lines,
         reason = "One select! loop over the connection, ack stream and timers; its arms already delegate to helpers."
     )]
-    pub async fn run(
+    pub(super) async fn run(
         self,
         mut out: SourceSender,
         shutdown: ShutdownSignal,
@@ -916,26 +909,24 @@ impl MqttSource {
     }
 
     fn try_subscribe(&self, client: &rumqttc::AsyncClient) -> bool {
-        let queued = self.subscribe(client).is_ok();
-        if !queued {
-            warn_resubscribe_failed();
+        match self.subscribe(client) {
+            Ok(()) => true,
+            Err(error) => {
+                emit(MqttSubscribeError { error });
+                false
+            }
         }
-        queued
     }
 
-    fn subscribe(&self, client: &rumqttc::AsyncClient) -> Result<(), ()> {
+    fn subscribe(&self, client: &rumqttc::AsyncClient) -> Result<(), rumqttc::ClientError> {
         match &self.config.topic {
-            OneOrMany::One(topic) => client
-                .try_subscribe(topic, SUBSCRIPTION_QOS)
-                .map_err(|_| ()),
-            OneOrMany::Many(topics) => client
-                .try_subscribe_many(
-                    topics
-                        .iter()
-                        .cloned()
-                        .map(|topic| SubscribeFilter::new(topic, SUBSCRIPTION_QOS)),
-                )
-                .map_err(|_| ()),
+            OneOrMany::One(topic) => client.try_subscribe(topic, SUBSCRIPTION_QOS),
+            OneOrMany::Many(topics) => client.try_subscribe_many(
+                topics
+                    .iter()
+                    .cloned()
+                    .map(|topic| SubscribeFilter::new(topic, SUBSCRIPTION_QOS)),
+            ),
         }
     }
 
@@ -957,12 +948,12 @@ impl MqttSource {
         finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
         connection_generation: u64,
     ) {
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
             endpoint: &self.config.common.host,
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
 
         let ack_decision = publish_ack_decision(finalizer.is_some(), publish.qos);
         if ack_decision.warn_unsupported_qos {
@@ -1011,7 +1002,7 @@ impl MqttSource {
                     );
                 }
             }
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
         }
     }
 

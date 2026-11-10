@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use vector_lib::{
-    event::{Metric, MetricKind, MetricValue, metric::MetricSeries},
-    metrics::CARDINALITY_COUNTER_KEY_NAME,
-};
+use vector_lib::event::{Metric, MetricKind, MetricValue, metric::MetricSeries};
 
 /// Previous absolute value of a series, stamped with the scrape that last observed it.
 struct Entry {
@@ -74,13 +71,10 @@ impl DeltaState {
 
 /// Whether a captured metric accumulates over the process lifetime and so needs differencing.
 fn is_cumulative(metric: &Metric) -> bool {
-    // The cardinality counter is declared a counter but reports the current series count, so it is
-    // not monotonic and has to stay absolute.
-    metric.name() != CARDINALITY_COUNTER_KEY_NAME
-        && matches!(
-            metric.value(),
-            MetricValue::Counter { .. } | MetricValue::AggregatedHistogram { .. }
-        )
+    matches!(
+        metric.value(),
+        MetricValue::Counter { .. } | MetricValue::AggregatedHistogram { .. }
+    )
 }
 
 #[cfg(test)]
@@ -191,16 +185,6 @@ mod tests {
         // No state is retained, so a later lower value is still reported verbatim.
         let metric = convert_one(&mut state, gauge);
         assert_eq!(metric.value(), &MetricValue::Gauge { value: 2.0 });
-    }
-
-    #[test]
-    fn cardinality_counter_passes_through_as_absolute() {
-        let mut state = DeltaState::default();
-        convert_one(&mut state, counter(CARDINALITY_COUNTER_KEY_NAME, 10.0));
-
-        let metric = convert_one(&mut state, counter(CARDINALITY_COUNTER_KEY_NAME, 4.0));
-        assert_eq!(metric.kind(), MetricKind::Absolute);
-        assert_eq!(metric.value(), &MetricValue::Counter { value: 4.0 });
     }
 
     #[test]

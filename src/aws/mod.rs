@@ -1,4 +1,5 @@
 //! Shared functionality for the AWS components.
+use vector_lib::internal_event::emit;
 pub mod auth;
 pub(crate) mod http_client;
 pub mod region;
@@ -294,14 +295,14 @@ enum SigningError {
 ///
 /// Panics if the access key ID, region, or service name contains characters that are not valid
 /// in an HTTP header value, such as a newline.
-pub async fn sign_request_v1(
+pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    sign_request_v1_at(
+    sign_request_at(
         service_name,
         request,
         credentials_provider,
@@ -327,11 +328,11 @@ fn signable_headers<'a>(
         .collect()
 }
 
-/// Signs `request` like [`sign_request_v1`], taking the signing time from `signing_time`.
+/// Signs `request` like [`sign_request`], taking the signing time from `signing_time`.
 ///
 /// `signing_time` is called after the credentials are provided, so a slow credential lookup
 /// does not make the signature's `x-amz-date` stale.
-async fn sign_request_v1_at(
+async fn sign_request_at(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
@@ -506,7 +507,7 @@ where
     /// Calls the inner HTTP connector and emits common telemetry.
     /// Does not emit `AwsBytesSent` telemetry.
     fn call_inner(&self, req: HttpRequest) -> HttpConnectorFuture {
-        emit!(AboutToSendHttpRequest { request: &req });
+        emit(AboutToSendHttpRequest { request: &req });
 
         let fut: HttpConnectorFuture = self.http.call(req);
 
@@ -517,13 +518,13 @@ where
 
             match &result {
                 Ok(response) => {
-                    emit!(GotHttpResponse {
+                    emit(GotHttpResponse {
                         response,
-                        roundtrip
+                        roundtrip,
                     });
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning { error, roundtrip });
+                    emit(GotHttpWarning { error, roundtrip });
                 }
             }
 
@@ -562,7 +563,7 @@ where
             {
                 let byte_size = bytes_sent.load(Ordering::Relaxed);
 
-                emit!(AwsBytesSent {
+                emit(AwsBytesSent {
                     byte_size,
                     region: Some(region),
                 });
@@ -620,7 +621,7 @@ mod tests {
 
     use aws_credential_types::Credentials;
     use http_body_util::{BodyExt, Full};
-    use hyper_1::body::Incoming;
+    use hyper::body::Incoming;
     use tokio::{io::AsyncReadExt, net::TcpListener, sync::mpsc};
 
     use super::*;
@@ -789,7 +790,7 @@ mod tests {
     /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
     /// credentials, region, and service, and leave the URI unchanged.
     #[tokio::test]
-    async fn sign_request_v1_signs_with_fixed_time() {
+    async fn sign_request_signs_with_fixed_time() {
         const SERVICE_NAME: &str = "example-service";
         const URI: &str =
             "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
@@ -805,7 +806,7 @@ mod tests {
             .body(Bytes::from_static(BODY))
             .expect("valid request");
 
-        sign_request_v1_at(
+        sign_request_at(
             SERVICE_NAME,
             &mut request,
             &credentials_provider,

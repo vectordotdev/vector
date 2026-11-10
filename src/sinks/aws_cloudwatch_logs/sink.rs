@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-pub struct CloudwatchSink<S> {
+pub(super) struct CloudwatchSink<S> {
     pub batcher_settings: BatcherSettings,
     pub(super) request_builder: CloudwatchRequestBuilder,
     pub service: S,
@@ -70,7 +70,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct BatchCloudwatchRequest {
+pub(super) struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
     pub events: Vec<CloudwatchRequest>,
     metadata: RequestMetadata,

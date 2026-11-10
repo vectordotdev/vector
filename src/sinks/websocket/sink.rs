@@ -23,13 +23,13 @@ use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::encoding::Serializer,
-    emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        emit, register,
     },
 };
 
-pub struct WebSocketSink {
+pub(super) struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,
@@ -96,13 +96,13 @@ impl WebSocketSink {
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
         if let Err(error) = ws_sink.send(Message::Ping(PING)).await {
-            emit!(WebSocketConnectionError { error });
+            emit(WebSocketConnectionError { error });
             return Err(());
         }
         let mut last_pong = Instant::now();
 
-        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
@@ -168,9 +168,9 @@ impl WebSocketSink {
 
             if let Err(error) = result {
                 if is_closed(&error) {
-                    emit!(WebSocketConnectionShutdown);
+                    emit(WebSocketConnectionShutdown);
                 } else {
-                    emit!(WebSocketConnectionError { error });
+                    emit(WebSocketConnectionError { error });
                 }
                 return Err(());
             }
@@ -191,7 +191,7 @@ impl StreamSink<Event> for WebSocketSink {
             pin_mut!(ws_sink);
             pin_mut!(ws_stream);
 
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
 
             if self
                 .handle_events(&mut input, &mut ws_stream, &mut ws_sink)

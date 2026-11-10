@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     io::{self, Write},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
@@ -19,7 +20,7 @@ use crate::{
 /// `Infallible`. This type exists to bridge that gap, acting as a marker type for "we emit no
 /// errors" while supporting the trait bounds on `Encoder<T>::Error`.
 #[derive(Debug)]
-pub struct InfallibleIo;
+pub(super) struct InfallibleIo;
 
 impl From<io::Error> for InfallibleIo {
     fn from(_: io::Error) -> Self {
@@ -34,7 +35,7 @@ pub(super) struct StatsdEncoder {
 
 impl StatsdEncoder {
     /// Creates a new `StatsdEncoder` with the given default namespace, if any.
-    pub const fn new(default_namespace: Option<String>) -> Self {
+    pub(super) const fn new(default_namespace: Option<String>) -> Self {
         Self { default_namespace }
     }
 }
@@ -95,7 +96,7 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
                 }
             }
             _ => {
-                emit!(StatsdInvalidMetricError {
+                emit(StatsdInvalidMetricError {
                     value: metric.value(),
                     kind: metric.kind(),
                 });
