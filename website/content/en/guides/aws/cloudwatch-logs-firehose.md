@@ -391,8 +391,6 @@ sinks:
 EOF
 ```
 
-The shell expands the variables when writing `test.yaml`, so Vector reads the actual values.
-
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
 [AWS Authentication][aws_auth] section for this sink to see how to configure the
 AWS credentials Vector will need to write to AWS.
