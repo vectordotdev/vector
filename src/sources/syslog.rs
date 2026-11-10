@@ -289,14 +289,7 @@ impl SourceConfig for SyslogConfig {
                     (max_length, host_key, log_namespace, shutdown, out),
                     #[cfg(unix)]
                     |config, (max_length, host_key, log_namespace, shutdown, out)| {
-                        let decoder = Decoder::new(
-                            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
-                                max_length,
-                            )),
-                            Deserializer::Syslog(
-                                SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                            ),
-                        );
+                        let decoder = syslog_stream_decoder(max_length, log_namespace);
 
                         build_unix_stream_source(
                             config.path,
@@ -389,6 +382,14 @@ struct SyslogTcpSource {
     log_namespace: LogNamespace,
 }
 
+fn syslog_stream_decoder(max_length: usize, log_namespace: LogNamespace) -> Decoder {
+    Decoder::new(
+        Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(max_length)),
+        Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
+    )
+    .with_log_namespace(log_namespace)
+}
+
 impl TcpSource for SyslogTcpSource {
     type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
@@ -396,10 +397,7 @@ impl TcpSource for SyslogTcpSource {
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        Decoder::new(
-            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
-        )
+        syslog_stream_decoder(self.max_length, self.log_namespace)
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
@@ -1079,6 +1077,37 @@ mod test {
         )
         .unwrap();
         let metadata = event.as_log().metadata().value();
+
+        assert_eq!(
+            metadata.get(path!("syslog", "hostname")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "host")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "source_ip")),
+            Some(&Value::from("192.0.2.1"))
+        );
+    }
+
+    #[test]
+    fn namespaced_stream_decoder_preserves_parsed_hostname() {
+        let source = SyslogTcpSource {
+            max_length: 1024,
+            host_key: Some(owned_value_path!("host")),
+            log_namespace: LogNamespace::Vector,
+        };
+        let (mut events, _) = source
+            .decoder()
+            .deserializer_parse(Bytes::from_static(
+                b"<13>1 2026-11-10T00:00:00Z parsed-host app - - - message",
+            ))
+            .unwrap();
+
+        source.handle_events(&mut events, "192.0.2.1:514".parse().unwrap());
+        let metadata = events[0].as_log().metadata().value();
 
         assert_eq!(
             metadata.get(path!("syslog", "hostname")),
