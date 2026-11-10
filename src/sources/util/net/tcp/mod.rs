@@ -350,7 +350,21 @@ async fn handle_stream<T>(
 
     tokio::pin!(connection_close_timeout);
 
+    // Without TLS, nothing is buffered before the first read. With TLS, the first read does not
+    // wait, in case the TLS layer kept data from the handshake.
+    let mut before_first_read = reader.get_ref().get_ref().get_ref().ssl_stream().is_none();
+
     loop {
+        // If the last read found no more data, wait until the socket has data before taking a
+        // permit. Otherwise idle connections take turns holding the permits and starve the
+        // connections that have data to read.
+        let idle_socket = if before_first_read || reader.is_inner_pending() {
+            reader.get_ref().get_ref().get_ref().get_ref()
+        } else {
+            None
+        };
+        let first_read = std::mem::take(&mut before_first_read);
+
         let mut permit = tokio::select! {
             () = &mut tripwire => break,
             Some(()) = &mut connection_close_timeout  => {
@@ -365,7 +379,22 @@ async fn handle_stream<T>(
                 }
                 None
             },
-            permit = request_limiter.acquire() => {
+            permit = async {
+                if let Some(socket) = idle_socket {
+                    if first_read {
+                        // Tokio marks a newly accepted socket as readable before any data arrives,
+                        // so the first wait uses `peek`, which returns once data or the end of the
+                        // stream arrives and consumes no data.
+                        _ = socket.peek(&mut [0; 1]).await;
+                    } else {
+                        // Later waits do not use `peek`, because it would clear a pending error
+                        // (such as a reset) that the next read must see. An error from `readable`
+                        // is also returned by the next read.
+                        _ = socket.readable().await;
+                    }
+                }
+                request_limiter.acquire().await
+            } => {
                 Some(permit)
             }
             else => break,
@@ -383,7 +412,8 @@ async fn handle_stream<T>(
             },
             () = &mut timeout => {
                 // This connection is currently holding a permit, but has not received data for some time. Release
-                // the permit to let another connection try
+                // the permit to let another connection try. The next iteration waits for new data before it takes a
+                // permit again.
                 continue;
             }
             res = reader.next() => {
@@ -506,5 +536,411 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
         // Connection hasn't yet been established so we are done here.
         debug!("Closing connection that hasn't yet been fully established.");
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        net::SocketAddr,
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
+    use bytes::{Bytes, BytesMut};
+    use futures::StreamExt;
+    use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+    use smallvec::SmallVec;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWrite, AsyncWriteExt},
+        net::TcpStream,
+        task::JoinHandle,
+        time::{Instant, sleep, timeout},
+    };
+    use tokio_util::codec::Decoder;
+    use vector_lib::{
+        config::{LogNamespace, SourceAcknowledgementsConfig},
+        event::{Event, EventStatus},
+        source_sender::SourceSender,
+        tls::{MaybeTlsSettings, TlsEnableableConfig},
+    };
+
+    use super::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+    use crate::{
+        config::{ComponentKey, SourceContext},
+        sources::SourceError,
+        test_util::{addr::next_addr, wait_for_tcp},
+    };
+
+    /// A newline-delimited TCP source that counts the frames it decodes.
+    #[derive(Clone, Default)]
+    struct CountingSource {
+        decoded: Arc<AtomicUsize>,
+        send_acks: bool,
+    }
+
+    #[derive(Clone)]
+    struct CountingDecoder {
+        inner: vector_lib::codecs::Decoder,
+        decoded: Arc<AtomicUsize>,
+    }
+
+    impl CountingDecoder {
+        fn count<T>(&self, frame: Option<T>) -> Option<T> {
+            if frame.is_some() {
+                self.decoded.fetch_add(1, Ordering::Relaxed);
+            }
+            frame
+        }
+    }
+
+    impl Decoder for CountingDecoder {
+        type Item = <vector_lib::codecs::Decoder as Decoder>::Item;
+        type Error = <vector_lib::codecs::Decoder as Decoder>::Error;
+
+        fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+            let frame = self.inner.decode(src)?;
+            Ok(self.count(frame))
+        }
+
+        fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+            let frame = self.inner.decode_eof(src)?;
+            Ok(self.count(frame))
+        }
+    }
+
+    /// Answers each delivered batch with `ack\n` when enabled, like the `fluent` and `logstash`
+    /// protocols answer each request.
+    struct LineAcker(bool);
+
+    impl TcpSourceAcker for LineAcker {
+        fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
+            (self.0 && ack == TcpSourceAck::Ack).then(|| Bytes::from_static(b"ack\n"))
+        }
+    }
+
+    impl TcpSource for CountingSource {
+        type Error = vector_lib::codecs::decoding::Error;
+        type Item = SmallVec<[Event; 1]>;
+        type Decoder = CountingDecoder;
+        type Acker = LineAcker;
+
+        fn decoder(&self) -> Self::Decoder {
+            CountingDecoder {
+                inner: vector_lib::codecs::Decoder::default(),
+                decoded: Arc::clone(&self.decoded),
+            }
+        }
+
+        fn build_acker(&self, _item: &[Self::Item]) -> Self::Acker {
+            LineAcker(self.send_acks)
+        }
+    }
+
+    async fn start_source(
+        source: CountingSource,
+        tls: bool,
+        cx: SourceContext,
+    ) -> (SocketAddr, JoinHandle<Result<(), SourceError>>) {
+        let tls = if tls {
+            MaybeTlsSettings::from_config(Some(&TlsEnableableConfig::test_config()), true).unwrap()
+        } else {
+            MaybeTlsSettings::Raw(())
+        };
+        let acknowledgements = SourceAcknowledgementsConfig::from(source.send_acks);
+        let (guard, addr) = next_addr();
+        let server = source
+            .run(
+                SocketListenAddr::SocketAddr(addr),
+                None,
+                Duration::from_secs(1),
+                tls,
+                None,
+                None,
+                None,
+                None,
+                None,
+                cx,
+                acknowledgements,
+                None,
+                None,
+                "test",
+                LogNamespace::Legacy,
+            )
+            .unwrap();
+        let handle = tokio::spawn(server);
+        wait_for_tcp(addr).await;
+        drop(guard);
+        (addr, handle)
+    }
+
+    type Client = Pin<Box<dyn AsyncWrite + Send>>;
+
+    async fn connect(addr: SocketAddr, tls: bool) -> Client {
+        let stream = TcpStream::connect(addr).await.unwrap();
+        if !tls {
+            return Box::pin(stream);
+        }
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+        connector.set_verify(SslVerifyMode::NONE);
+        let ssl = connector
+            .build()
+            .configure()
+            .unwrap()
+            .into_ssl("localhost")
+            .unwrap();
+        let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
+        Pin::new(&mut stream).connect().await.unwrap();
+        Box::pin(stream)
+    }
+
+    async fn assert_idle_connections_do_not_starve_busy_connection(tls: bool) {
+        const IDLE_CONNECTIONS: usize = 64;
+        const LINES: usize = 30;
+
+        let (tx, mut rx) = SourceSender::new_test();
+        let (addr, _source) = start_source(
+            CountingSource::default(),
+            tls,
+            SourceContext::new_test(tx, None),
+        )
+        .await;
+
+        let mut idle = Vec::with_capacity(IDLE_CONNECTIONS);
+        for _ in 0..IDLE_CONNECTIONS {
+            idle.push(connect(addr, tls).await);
+        }
+
+        let mut busy = connect(addr, tls).await;
+        busy.write_all(b"first\n").await.unwrap();
+        timeout(Duration::from_secs(10), rx.next())
+            .await
+            .expect("first line was not received")
+            .unwrap();
+
+        // Each line is sent after the previous event arrived, so each line needs a new permit.
+        timeout(Duration::from_secs(1), async {
+            for i in 0..LINES {
+                busy.write_all(format!("line {i}\n").as_bytes())
+                    .await
+                    .unwrap();
+                rx.next().await.unwrap();
+            }
+        })
+        .await
+        .expect("idle connections starved the busy connection");
+    }
+
+    #[tokio::test]
+    async fn idle_connections_do_not_starve_busy_connection() {
+        assert_idle_connections_do_not_starve_busy_connection(false).await;
+    }
+
+    #[tokio::test]
+    async fn idle_tls_connections_do_not_starve_busy_connection() {
+        assert_idle_connections_do_not_starve_busy_connection(true).await;
+    }
+
+    #[tokio::test]
+    async fn new_idle_connections_do_not_delay_busy_connection() {
+        const IDLE_CONNECTIONS: usize = 64;
+
+        let (tx, mut rx) = SourceSender::new_test();
+        let (addr, _source) = start_source(
+            CountingSource::default(),
+            false,
+            SourceContext::new_test(tx, None),
+        )
+        .await;
+
+        // These connections were just opened and send nothing.
+        let mut idle = Vec::with_capacity(IDLE_CONNECTIONS);
+        for _ in 0..IDLE_CONNECTIONS {
+            idle.push(TcpStream::connect(addr).await.unwrap());
+        }
+
+        let mut busy = TcpStream::connect(addr).await.unwrap();
+        busy.write_all(b"line\n").await.unwrap();
+        timeout(Duration::from_millis(150), rx.next())
+            .await
+            .expect("new idle connections delayed the busy connection")
+            .unwrap();
+    }
+
+    async fn assert_reads_buffered_frames(tls: bool) {
+        // More frames than fit in one `ReadyFrames` batch, in a single small write, so that one
+        // read from the socket returns several batches.
+        const LINES: usize = 3_000;
+
+        let (tx, rx) = SourceSender::new_test();
+        let (addr, _source) = start_source(
+            CountingSource::default(),
+            tls,
+            SourceContext::new_test(tx, None),
+        )
+        .await;
+
+        let mut client = connect(addr, tls).await;
+        client.write_all(&b"x\n".repeat(LINES)).await.unwrap();
+        client.flush().await.unwrap();
+
+        // The client keeps the connection open and sends nothing else, so the socket does not
+        // become readable again. Frames left in the read buffers must still be read.
+        let events = timeout(Duration::from_secs(10), rx.take(LINES).collect::<Vec<_>>())
+            .await
+            .expect("buffered frames were not read");
+        assert_eq!(events.len(), LINES);
+        drop(client);
+    }
+
+    #[tokio::test]
+    async fn reads_buffered_frames_without_new_data() {
+        assert_reads_buffered_frames(false).await;
+    }
+
+    #[tokio::test]
+    async fn reads_buffered_tls_frames_without_new_data() {
+        assert_reads_buffered_frames(true).await;
+    }
+
+    #[tokio::test]
+    async fn decoding_stays_limited_under_backpressure() {
+        const OUTPUT_BUFFER: usize = 1;
+
+        // The limiter never has fewer than two permits.
+        let max_permits = vector_lib::num_threads().max(2);
+        let connections = OUTPUT_BUFFER + max_permits + 16;
+
+        let source = CountingSource::default();
+        let decoded = Arc::clone(&source.decoded);
+        // The output is never read, so the source stays under backpressure.
+        let (tx, _rx) = SourceSender::new_test_sender_with_options(OUTPUT_BUFFER, None);
+        let (addr, _source) = start_source(source, false, SourceContext::new_test(tx, None)).await;
+
+        let mut clients = Vec::with_capacity(connections);
+        for _ in 0..connections {
+            let mut client = connect(addr, false).await;
+            client.write_all(b"event\n").await.unwrap();
+            clients.push(client);
+        }
+        sleep(Duration::from_secs(1)).await;
+
+        // Only connections that hold a permit may decode, so the decoded frames fit in the
+        // output buffer plus one frame per permit.
+        let decoded = decoded.load(Ordering::Relaxed);
+        assert!(decoded > 0, "no frame was decoded");
+        assert!(
+            decoded <= OUTPUT_BUFFER + max_permits,
+            "decoded {decoded} frames from {connections} connections with at most {max_permits} permits"
+        );
+    }
+
+    #[tokio::test]
+    async fn acknowledges_batches_after_connection_was_idle() {
+        let source = CountingSource {
+            send_acks: true,
+            ..Default::default()
+        };
+        let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        tokio::spawn(async move { while rx.next().await.is_some() {} });
+        let (addr, _source) = start_source(source, false, SourceContext::new_test(tx, None)).await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        for i in 0..3 {
+            // Let the connection go idle before each line.
+            sleep(Duration::from_millis(50)).await;
+            stream
+                .write_all(format!("line {i}\n").as_bytes())
+                .await
+                .unwrap();
+            let mut ack = [0; 4];
+            timeout(Duration::from_secs(5), stream.read_exact(&mut ack))
+                .await
+                .expect("batch was not acknowledged")
+                .unwrap();
+            assert_eq!(&ack, b"ack\n");
+        }
+    }
+
+    #[tokio::test]
+    async fn closes_idle_connection_when_client_closes() {
+        let (tx, _rx) = SourceSender::new_test();
+        let (addr, _source) = start_source(
+            CountingSource::default(),
+            false,
+            SourceContext::new_test(tx, None),
+        )
+        .await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        // Let the connection go idle.
+        sleep(Duration::from_millis(100)).await;
+        stream.shutdown().await.unwrap();
+
+        // The source reads the end of the stream and closes the connection.
+        let read = timeout(Duration::from_secs(5), stream.read(&mut [0; 1]))
+            .await
+            .expect("connection was not closed");
+        assert_eq!(read.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn drops_partial_frame_when_idle_connection_is_reset() {
+        let (tx, mut rx) = SourceSender::new_test();
+        let (addr, _source) = start_source(
+            CountingSource::default(),
+            false,
+            SourceContext::new_test(tx, None),
+        )
+        .await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream.write_all(b"partial").await.unwrap();
+        // Let the source read the partial frame and go idle, then reset the connection.
+        sleep(Duration::from_millis(100)).await;
+        socket2::SockRef::from(&stream)
+            .set_linger(Some(Duration::ZERO))
+            .unwrap();
+        drop(stream);
+
+        // The reset is reported as an error, so the partial frame is not decoded as an event.
+        assert!(
+            timeout(Duration::from_millis(500), rx.next())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn shuts_down_with_idle_connections() {
+        let key = ComponentKey::from("shuts_down_with_idle_connections");
+        let (tx, _rx) = SourceSender::new_test();
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&key, tx);
+        let (addr, source) = start_source(CountingSource::default(), false, cx).await;
+
+        let mut idle = Vec::new();
+        for _ in 0..8 {
+            idle.push(TcpStream::connect(addr).await.unwrap());
+        }
+        // Let the connections go idle.
+        sleep(Duration::from_millis(100)).await;
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(&key, deadline);
+
+        // On shutdown the source closes the write half of each connection right away, well
+        // before `shutdown_timeout_secs` (one second here) forces the connections closed.
+        for mut stream in idle {
+            let read = timeout(Duration::from_millis(500), stream.read(&mut [0; 1]))
+                .await
+                .expect("connection was not closed on shutdown");
+            assert_eq!(read.unwrap(), 0);
+        }
+        assert!(shutdown_complete.await);
+        source.await.unwrap().unwrap();
     }
 }
