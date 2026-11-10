@@ -1,3 +1,3 @@
-Reduced memory retained by the ignored configuration field checker by avoiding a duplicate copy of its schema definitions.
+Reduced memory retained by ignored configuration field diagnostics by using shorter schema definition references.
 
 authors: pront

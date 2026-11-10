@@ -123,9 +123,9 @@ fn ignored_paths(validator: &Validator, value: &Value) -> Vec<String> {
 }
 
 fn prepare_root_schema(schema: &mut Value) {
-    // jsonschema treats legacy `definitions` as an annotation, retaining a copy of the
-    // whole definitions map alongside the compiled validators. Use the draft's `$defs`
-    // keyword only in this diagnostic schema; the published schema remains unchanged.
+    // Use the draft's `$defs` keyword for shorter diagnostic schema reference paths.
+    // This also avoids retaining definitions as annotations with older jsonschema
+    // releases; newer releases already recognize the legacy `definitions` keyword.
     if let Some(object) = schema.as_object_mut()
         && let Some(definitions) = object.remove("definitions")
     {
