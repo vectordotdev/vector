@@ -1898,6 +1898,65 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
+    async fn unix_datagram_honors_framing_oversized_action() {
+        for (method, options, delimiter) in [
+            ("newline_delimited", "", "\n"),
+            ("character_delimited", "    delimiter: ','\n", ","),
+        ] {
+            for action in ["truncate", "drop"] {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("framing.sock");
+                let config: SocketConfig = serde_yaml::from_str(&format!(
+                    "mode: unix_datagram\npath: '{}'\nframing:\n  method: {method}\n  {method}:\n    max_length: 5\n    oversized_action: {action}\n{options}",
+                    path.display()
+                ))
+                .unwrap();
+                let (out, mut output) = SourceSender::new_test();
+                let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+                let mut context = SourceContext::new_test(out, None);
+                context.shutdown = shutdown;
+                let mut source = config.build(context).await.unwrap();
+                assert!(futures::poll!(&mut source).is_pending());
+                let source = tokio::spawn(source);
+                let sender = UnixDatagram::unbound().unwrap();
+                sender.connect(&path).unwrap();
+                sender
+                    .send(format!("hello world{delimiter}").as_bytes())
+                    .await
+                    .unwrap();
+                sender
+                    .send(format!("ok{delimiter}").as_bytes())
+                    .await
+                    .unwrap();
+
+                let expected: &[&str] = if action == "truncate" {
+                    &["hello", "ok"]
+                } else {
+                    &["ok"]
+                };
+                for &message in expected {
+                    let event = timeout(Duration::from_secs(5), output.next())
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(
+                        event.as_log()[log_schema().message_key().unwrap().to_string()],
+                        message.into()
+                    );
+                }
+                stop.cancel();
+                timeout(Duration::from_secs(5), source)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+                assert!(output.next().await.is_none());
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
     async fn unix_datagram_flushes_large_decoded_datagram_in_bounded_batches() {
         let event_count = vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS + 1;
         let (tx, rx) = SourceSender::new_test();

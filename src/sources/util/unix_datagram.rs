@@ -614,14 +614,16 @@ async fn listen(
                 emit(SocketOversizedDatagram {
                     mode: SocketMode::Unix,
                 });
-                warn!(
-                    message = "Discarding Unix datagram larger than max_length.",
-                    max_length
-                );
-                emit(ComponentEventsDropped::<UNINTENTIONAL> {
-                    count: 1,
-                    reason: "Unix datagram exceeded max_length.",
-                });
+                if matches!(&decoder, DatagramDecoder::Message(..)) {
+                    warn!(
+                        message = "Discarding Unix datagram larger than max_length.",
+                        max_length
+                    );
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: 1,
+                        reason: "Unix datagram exceeded max_length.",
+                    });
+                }
             }
         }
         let received_from = if batch.captures_peer_address() {
@@ -647,9 +649,8 @@ async fn listen(
         match &decoder {
             DatagramDecoder::Framed(decoder) => {
                 for index in 0..batch.len() {
-                    if batch.truncated(index) {
-                        continue;
-                    }
+                    // Framing limits apply to individual frames, not entire datagrams.
+                    // Let the framer apply its drop/truncate action to the retained prefix.
                     let mut stream =
                         DecoderFramedRead::new(batch.payload(index), decoder.as_ref().clone());
                     while let Some(result) = stream.next().await {

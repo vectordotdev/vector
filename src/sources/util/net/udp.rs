@@ -89,14 +89,16 @@ enum UdpBatchReceiverInner {
 
 /// A UDP receiver that yields one or more datagrams at a time.
 ///
-/// Linux uses `recvmmsg` and enables UDP GRO. Other platforms retain the single-datagram Tokio
-/// receive path.
+/// Linux uses `recvmmsg` and supports UDP GRO. Other platforms retain the single-datagram Tokio
+/// receive path. GRO is only enabled explicitly for exclusively owned sockets.
 pub struct UdpBatchReceiver {
     inner: UdpBatchReceiverInner,
 }
 
 impl UdpBatchReceiver {
     /// Creates a batched receiver from a Tokio UDP socket.
+    ///
+    /// Leaves the socket's GRO setting unchanged, including on inherited sockets.
     ///
     /// # Errors
     ///
@@ -126,6 +128,16 @@ impl UdpBatchReceiver {
                 )),
             })
         }
+    }
+
+    /// Attempts to enable UDP GRO on an exclusively owned socket.
+    ///
+    /// Do not call this for inherited or shared sockets: GRO remains enabled on duplicated
+    /// descriptors after this receiver closes. If GRO is unavailable, batching still works.
+    #[cfg(target_os = "linux")]
+    pub fn enable_gro(&self) {
+        let UdpBatchReceiverInner::Linux(inner) = &self.inner;
+        _ = enable_udp_gro(inner.socket.get_ref());
     }
 
     /// Receives the next nonempty batch of UDP datagrams.
@@ -187,9 +199,6 @@ impl LinuxUdpBatchReceiver {
     fn from_socket(socket: UdpSocket, max_datagram_size: usize) -> io::Result<Self> {
         let socket = socket.into_std()?;
         socket.set_nonblocking(true)?;
-
-        // UDP_GRO was added in Linux 5.0. If it is unavailable, recvmmsg batching still works.
-        _ = enable_udp_gro(&socket);
 
         // SAFETY: `StdUdpSocket` owns a stable, valid descriptor for its entire lifetime.
         let socket = unsafe { AsyncFd::register(socket) }?;
@@ -474,7 +483,14 @@ pub async fn try_bind_udp_socket(
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
-    use std::{collections::HashSet, mem, net::SocketAddr, os::fd::AsRawFd, ptr, time::Duration};
+    use std::{
+        collections::HashSet,
+        mem,
+        net::{SocketAddr, UdpSocket as StdUdpSocket},
+        os::fd::AsRawFd,
+        ptr,
+        time::Duration,
+    };
 
     use nix::libc;
     use smallvec::SmallVec;
@@ -484,6 +500,62 @@ mod tests {
         UDP_BATCH_SIZE, UDP_CONTROL_LEN, UDP_CONTROL_WORDS, UDP_GRO, UdpBatchReceiver, UdpDatagram,
         split_udp_payload, udp_gro_segment_size,
     };
+
+    fn gro_setting(socket: &StdUdpSocket) -> std::io::Result<libc::c_int> {
+        let mut flag: libc::c_int = 0;
+        let mut option_size = libc::socklen_t::try_from(mem::size_of_val(&flag)).unwrap();
+        // SAFETY: both output pointers describe live, correctly sized integer values.
+        let result = unsafe {
+            libc::getsockopt(
+                socket.as_raw_fd(),
+                libc::SOL_UDP,
+                UDP_GRO,
+                (&raw mut flag).cast(),
+                &raw mut option_size,
+            )
+        };
+        if result == 0 {
+            Ok(flag)
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
+    }
+
+    #[tokio::test]
+    async fn recvmmsg_preserves_gro_on_shared_sockets() {
+        for enabled in [false, true] {
+            let owner = StdUdpSocket::bind("127.0.0.1:0").unwrap();
+            owner.set_nonblocking(true).unwrap();
+            match gro_setting(&owner) {
+                Ok(flag) => assert_eq!(flag, 0),
+                Err(error) if error.raw_os_error() == Some(libc::ENOPROTOOPT) => return,
+                Err(error) => panic!("could not inspect UDP_GRO: {error}"),
+            }
+            if enabled {
+                super::enable_udp_gro(&owner).unwrap();
+            }
+            let inherited = UdpSocket::from_std(owner.try_clone().unwrap()).unwrap();
+            let receiver = UdpBatchReceiver::from_socket(inherited, 64).unwrap();
+            assert_eq!(gro_setting(&owner).unwrap(), libc::c_int::from(enabled));
+            drop(receiver);
+            // The descriptor retained by the socket owner must keep its original setting.
+            assert_eq!(gro_setting(&owner).unwrap(), libc::c_int::from(enabled));
+        }
+    }
+
+    #[tokio::test]
+    async fn recvmmsg_can_enable_gro_on_owned_sockets() {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let receiver = UdpBatchReceiver::from_socket(socket, 64).unwrap();
+        let super::UdpBatchReceiverInner::Linux(inner) = &receiver.inner;
+        match gro_setting(inner.socket.get_ref()) {
+            Ok(flag) => assert_eq!(flag, 0),
+            Err(error) if error.raw_os_error() == Some(libc::ENOPROTOOPT) => return,
+            Err(error) => panic!("could not inspect UDP_GRO: {error}"),
+        }
+        receiver.enable_gro();
+        assert_eq!(gro_setting(inner.socket.get_ref()).unwrap(), 1);
+    }
 
     #[tokio::test]
     async fn recvmmsg_receives_multiple_datagrams() {

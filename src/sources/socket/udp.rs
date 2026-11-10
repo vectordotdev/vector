@@ -248,6 +248,10 @@ pub(super) fn udp(
             });
             SourceError::from(error)
         })?;
+        #[cfg(target_os = "linux")]
+        if matches!(config.address, SocketListenAddr::SocketAddr(_)) {
+            receiver.enable_gro();
+        }
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
         let send_batch_size = chunk_size_events().max(1);

@@ -449,6 +449,10 @@ pub fn udp(
             });
             super::SourceError::from(error)
         })?;
+        #[cfg(target_os = "linux")]
+        if matches!(addr, SocketListenAddr::SocketAddr(_)) {
+            receiver.enable_gro();
+        }
 
         info!(
             message = "Listening.",
