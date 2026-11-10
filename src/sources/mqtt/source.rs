@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     time::Duration,
 };
 
@@ -65,8 +65,6 @@ const RESUBSCRIBE_RETRY_DELAY: Duration = Duration::from_secs(30);
 struct FinalizerEntry {
     publish: Publish,
     connection_generation: u64,
-    /// Which use of the packet id this entry is; see `InFlightPublishes`.
-    in_flight_token: u64,
 }
 
 /// What `process_message` needs to register a publish for a deferred
@@ -75,7 +73,6 @@ struct FinalizerEntry {
 struct AckRegistration<'a> {
     finalizer: &'a OrderedFinalizer<FinalizerEntry>,
     connection_generation: u64,
-    in_flight_token: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -462,41 +459,45 @@ type SubscribeResults = FuturesUnordered<
     >,
 >;
 
-/// The manual-ack publishes received on the current connection whose
-/// acknowledgement has not been written yet, by packet id.
+/// The packet ids of the manual-ack publishes received on the current
+/// connection: those whose acknowledgement has not been written yet, and
+/// those already acknowledged.
 ///
 /// A broker may retransmit an unacknowledged QoS 1/2 publish on the same
 /// connection (EMQX does, on its retry interval), with the DUP flag set
-/// ([MQTT-3.3.1-1]). It is the same message under the same packet id, and
-/// its first copy is already on its way to the sinks, so the retransmission
-/// is dropped. Processing it would register a second acknowledgement for
-/// that packet id: once the first is sent the second is stale, and rumqttc
-/// either rejects it (tearing down the connection, see
-/// `handle_connection_lost`) or, if the broker has reused the id by then,
-/// acknowledges a newer publish before it was delivered.
+/// ([MQTT-3.3.1-1]). It is the same message under the same packet id, so it
+/// must not be processed again: that would register a second
+/// acknowledgement for the id, and the broker frees the id on the first.
+/// rumqttc rejects a second one that finds the id free (tearing down the
+/// connection, see `handle_connection_lost`); one that finds the id reused
+/// acknowledges a newer publish before it was delivered. Two cases:
 ///
-/// Each admitted publish gets a token, and only the holder of an id's
-/// current token may acknowledge it. That covers the one case where two
-/// publishes under one id are both in flight: a retransmission that crossed
-/// our PUBACK on the wire arrives after the id was released and is admitted
-/// as new (nothing distinguishes it), and the broker, having received the
-/// PUBACK, then reuses the id for a new message. The new message (no DUP
-/// flag) takes the id over, so the stale copy never sends the PUBACK that
-/// the broker would read as acknowledging the new one.
+/// - The id is still in flight (its acknowledgement is not written yet):
+///   any publish carrying it is a retransmission. The broker cannot have
+///   reused an id it has seen no acknowledgement for.
+/// - The id was acknowledged on this connection: a publish carrying it with
+///   DUP set is a retransmission the broker sent before our PUBACK reached
+///   it, read after the id was released here. The broker has its
+///   acknowledgement, so this copy needs none. A publish without DUP is the
+///   broker reusing the id for a new message.
 ///
-/// An id is released when a second acknowledgement for it would be valid
-/// again: when rumqttc reports the PUBACK written (QoS 1), or when the
-/// broker's PUBREL arrives (QoS 2). An id whose ack is withheld stays here
-/// until the reconnect that redelivers it.
+/// So at most one publish per packet id is ever in flight, and each sends
+/// exactly one acknowledgement.
+///
+/// An id moves from in flight to acknowledged when a second acknowledgement
+/// for it would be valid again: when rumqttc reports the PUBACK written
+/// (QoS 1), or when the broker's PUBREL arrives (QoS 2). An id whose ack is
+/// withheld stays in flight until the reconnect that redelivers it; a
+/// reconnect forgets everything, since the broker redelivers what is
+/// unacknowledged (with DUP set) under fresh state.
 #[derive(Debug, Default)]
 struct InFlightPublishes {
-    by_packet_id: HashMap<u16, InFlightPublish>,
-    next_token: u64,
+    in_flight: HashMap<u16, InFlightPublish>,
+    acknowledged: HashSet<u16>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct InFlightPublish {
-    token: u64,
     /// The acknowledgement was handed to rumqttc and is not reported
     /// written yet.
     ack_issued: bool,
@@ -507,9 +508,10 @@ struct InFlightPublish {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Admission {
-    /// A new publish; the token identifies this use of the packet id.
-    New(u64),
-    /// A retransmission of a publish still in flight: drop it.
+    /// A new publish: process it and register its acknowledgement.
+    New,
+    /// A retransmission of a publish that is still in flight or was already
+    /// acknowledged: drop it.
     Retransmission,
     /// A second retransmission since the acknowledgement was issued, with
     /// rumqttc still not reporting it written. One can overtake an
@@ -523,7 +525,7 @@ enum Admission {
 
 impl InFlightPublishes {
     fn admit(&mut self, packet_id: u16, dup: bool) -> Admission {
-        if dup && let Some(in_flight) = self.by_packet_id.get_mut(&packet_id) {
+        if let Some(in_flight) = self.in_flight.get_mut(&packet_id) {
             if !in_flight.ack_issued {
                 return Admission::Retransmission;
             }
@@ -534,45 +536,40 @@ impl InFlightPublishes {
             return Admission::Retransmission;
         }
 
-        let token = self.next_token;
-        self.next_token += 1;
-        self.by_packet_id.insert(
-            packet_id,
-            InFlightPublish {
-                token,
-                ack_issued: false,
-                retransmitted_after_ack: false,
-            },
-        );
-        Admission::New(token)
+        if dup && self.acknowledged.contains(&packet_id) {
+            return Admission::Retransmission;
+        }
+
+        self.acknowledged.remove(&packet_id);
+        self.in_flight.insert(packet_id, InFlightPublish::default());
+        Admission::New
     }
 
-    /// Whether the publish holding `token` may acknowledge `packet_id`, and
-    /// if so records the acknowledgement as issued. `false` means a newer
-    /// publish has taken the id over.
-    fn begin_ack(&mut self, packet_id: u16, token: u64) -> bool {
-        match self.by_packet_id.get_mut(&packet_id) {
-            Some(in_flight) if in_flight.token == token => {
-                in_flight.ack_issued = true;
-                true
-            }
-            _ => false,
+    /// The acknowledgement for `packet_id` was handed to rumqttc (or queued
+    /// for it in `PendingAcks`).
+    fn ack_issued(&mut self, packet_id: u16) {
+        if let Some(in_flight) = self.in_flight.get_mut(&packet_id) {
+            in_flight.ack_issued = true;
         }
     }
 
     /// Acknowledgements issued but not reported written yet.
     fn has_unwritten_acks(&self) -> bool {
-        self.by_packet_id
+        self.in_flight
             .values()
             .any(|in_flight| in_flight.ack_issued)
     }
 
+    /// The acknowledgement for `packet_id` was written.
     fn release(&mut self, packet_id: u16) {
-        self.by_packet_id.remove(&packet_id);
+        if self.in_flight.remove(&packet_id).is_some() {
+            self.acknowledged.insert(packet_id);
+        }
     }
 
     fn clear(&mut self) {
-        self.by_packet_id.clear();
+        self.in_flight.clear();
+        self.acknowledged.clear();
     }
 }
 
@@ -836,11 +833,8 @@ impl MqttSource {
                             status,
                             entry.connection_generation,
                         );
-                        // Only the current holder of the packet id may
-                        // acknowledge it; see `InFlightPublishes`.
-                        if decision.should_ack
-                            && in_flight_publishes.begin_ack(entry.publish.pkid, entry.in_flight_token)
-                        {
+                        if decision.should_ack {
+                            in_flight_publishes.ack_issued(entry.publish.pkid);
                             if status == BatchStatus::Rejected {
                                 error!(
                                     message = "An MQTT message was rejected by a sink and has been dropped; it is acknowledged to the broker because redelivering it cannot succeed.",
@@ -976,20 +970,19 @@ impl MqttSource {
                             if let Some(finalizer) = finalizer.as_ref()
                                 && publish_ack_decision(self.acknowledgements, publish.qos).defer_ack
                             {
-                                // A retransmission of a publish whose ack is
-                                // still outstanding is dropped; see
-                                // `InFlightPublishes`.
+                                // A retransmission of a publish that is
+                                // still in flight, or already acknowledged,
+                                // is dropped; see `InFlightPublishes`.
                                 match in_flight_publishes.admit(publish.pkid, publish.dup) {
-                                    Admission::New(in_flight_token) => {
+                                    Admission::New => {
                                         registration = Some(AckRegistration {
                                             finalizer,
                                             connection_generation: protocol_state.connection_generation,
-                                            in_flight_token,
                                         });
                                     }
                                     Admission::Retransmission => {
                                         debug!(
-                                            message = "Dropping an MQTT publish retransmitted while its acknowledgement is still pending.",
+                                            message = "Dropping a retransmitted MQTT publish that is already in flight or acknowledged.",
                                             packet_id = publish.pkid,
                                             internal_log_rate_limit = true,
                                         );
@@ -1356,7 +1349,6 @@ impl MqttSource {
                         FinalizerEntry {
                             publish,
                             connection_generation: registration.connection_generation,
-                            in_flight_token: registration.in_flight_token,
                         },
                         receiver,
                     );
@@ -1518,71 +1510,62 @@ mod tests {
 
     // A broker may retransmit an unacknowledged publish on the same
     // connection. Processing it would register a second ack for one packet
-    // id; once the first is sent, the second is stale -- rumqttc rejects it
-    // (tearing down the connection) or, if the broker reused the id, it
-    // acknowledges a newer publish early. So a retransmission (DUP set) is
-    // refused until the id is released, after which the id denotes a new
-    // publish.
+    // id; the broker frees the id on the first, so the second is stale --
+    // rumqttc rejects it (tearing down the connection) or, if the broker
+    // reused the id, it acknowledges a newer publish early. While an id is
+    // in flight every publish carrying it is a retransmission, with or
+    // without DUP: the broker cannot reuse an id it has seen no ack for.
     #[test]
-    fn in_flight_publishes_refuse_retransmissions_until_released() {
+    fn in_flight_publishes_refuse_retransmissions_while_in_flight() {
         let mut in_flight = InFlightPublishes::default();
 
-        let Admission::New(first) = in_flight.admit(5, false) else {
-            panic!("a new publish must be admitted");
-        };
-        assert!(matches!(in_flight.admit(6, false), Admission::New(_)));
+        assert_eq!(in_flight.admit(5, false), Admission::New);
+        assert_eq!(in_flight.admit(6, true), Admission::New);
         assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
-
-        // PUBACK written (QoS 1) or PUBREL received (QoS 2): the id is free.
-        assert!(in_flight.begin_ack(5, first));
-        in_flight.release(5);
-        assert!(matches!(in_flight.admit(5, false), Admission::New(token) if token != first));
+        assert_eq!(in_flight.admit(5, false), Admission::Retransmission);
         assert_eq!(in_flight.admit(6, true), Admission::Retransmission);
 
         // A reconnect redelivers everything unacked (with DUP set) under
         // fresh state.
         in_flight.clear();
-        assert!(matches!(in_flight.admit(5, true), Admission::New(_)));
-        assert!(matches!(in_flight.admit(6, true), Admission::New(_)));
+        assert_eq!(in_flight.admit(5, true), Admission::New);
+        assert_eq!(in_flight.admit(6, true), Admission::New);
     }
 
-    // The one way two publishes under one packet id are both in flight: a
-    // retransmission crosses our PUBACK on the wire, so it arrives after the
-    // id was released and is admitted as new; the broker, having received
-    // the PUBACK, then reuses the id for a new message. The stale copy must
-    // not acknowledge -- the broker would read its PUBACK as acknowledging
-    // the new message, which would then be lost if it failed -- and the new
-    // message must not be dropped as a "retransmission".
+    // A retransmission the broker sent just before our PUBACK reached it is
+    // read after the id was released here. It must not be processed as a
+    // new publish: the broker already has its ack and may reuse the id at
+    // once, so an ack sent for the late copy -- whenever it is sent -- would
+    // acknowledge the NEXT message under that id before it was delivered,
+    // losing it on a later failure. The late copy is recognised by its DUP
+    // flag and dropped; the reusing message (no DUP) is new. So at most one
+    // publish per id is ever in flight, in either arrival order.
     #[test]
-    fn in_flight_publishes_only_the_latest_holder_of_an_id_acknowledges() {
+    fn in_flight_publishes_drop_a_retransmission_that_crossed_the_ack() {
+        // Late retransmission first, then the id is reused.
         let mut in_flight = InFlightPublishes::default();
-
-        let Admission::New(original) = in_flight.admit(5, false) else {
-            panic!("a new publish must be admitted");
-        };
-        assert!(in_flight.begin_ack(5, original));
+        assert_eq!(in_flight.admit(5, false), Admission::New);
+        in_flight.ack_issued(5);
         in_flight.release(5);
 
-        // The crossed retransmission, then the new message reusing the id.
-        let Admission::New(crossed) = in_flight.admit(5, true) else {
-            panic!("a retransmission after release is indistinguishable from a new publish");
-        };
-        let Admission::New(reused) = in_flight.admit(5, false) else {
-            panic!("a publish without DUP is new even while the id is in flight");
-        };
-
-        assert!(
-            !in_flight.begin_ack(5, crossed),
-            "stale holder must not ack"
-        );
+        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
         assert!(!in_flight.has_unwritten_acks());
-        assert!(in_flight.begin_ack(5, reused));
-        assert!(in_flight.has_unwritten_acks());
+        assert_eq!(in_flight.admit(5, false), Admission::New);
+        // The reused id is in flight again: its own retransmissions drop.
+        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
 
-        // Once the id is released nobody holds it.
+        // Reuse first, then the previous message's late retransmission:
+        // indistinguishable from a retransmission of the new one, and
+        // dropped all the same.
+        in_flight.ack_issued(5);
         in_flight.release(5);
-        assert!(!in_flight.begin_ack(5, reused));
-        assert!(!in_flight.has_unwritten_acks());
+        assert_eq!(in_flight.admit(5, false), Admission::New);
+        assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+
+        // An id never seen on this connection is new even with DUP set:
+        // that is how a resumed session redelivers.
+        assert_eq!(in_flight.admit(9, true), Admission::New);
     }
 
     // rumqttc can lose an acknowledgement it accepted (its event loop is not
@@ -1595,16 +1578,20 @@ mod tests {
     fn in_flight_publishes_detect_a_lost_acknowledgement() {
         let mut in_flight = InFlightPublishes::default();
 
-        let Admission::New(token) = in_flight.admit(5, false) else {
-            panic!("a new publish must be admitted");
-        };
+        assert_eq!(in_flight.admit(5, false), Admission::New);
         // Retransmissions before the ack is issued say nothing about it.
         assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
         assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
+        assert!(!in_flight.has_unwritten_acks());
 
-        assert!(in_flight.begin_ack(5, token));
+        in_flight.ack_issued(5);
+        assert!(in_flight.has_unwritten_acks());
         assert_eq!(in_flight.admit(5, true), Admission::Retransmission);
         assert_eq!(in_flight.admit(5, true), Admission::RetransmissionAckLost);
+
+        // Once written, there is nothing unwritten left to wait for.
+        in_flight.release(5);
+        assert!(!in_flight.has_unwritten_acks());
     }
 
     // A forced reconnect waits for acknowledgements already issued for
@@ -1792,7 +1779,8 @@ mod tests {
             assert!(!forced_reconnect.disconnect_sent());
             assert!(forced_reconnect.cooldown_until.is_some());
             assert_eq!(resubscribe_retry_at, None);
-            assert!(in_flight_publishes.by_packet_id.is_empty());
+            assert!(in_flight_publishes.in_flight.is_empty());
+            assert!(in_flight_publishes.acknowledged.is_empty());
             assert_eq!(finalizer.is_some(), acknowledgements);
 
             // rumqttc's replay queue (private since rumqttc-v4-next, so
