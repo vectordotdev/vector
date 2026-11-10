@@ -7,6 +7,7 @@ use vector_http::empty_body;
 use vector_lib::{
     config::proxy::ProxyConfig,
     event::EventRef,
+    internal_event::emit,
     lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath},
 };
 
@@ -15,14 +16,13 @@ use super::{
     service::{HttpRequestBuilder, MetadataFields},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{
             SinkBatchSettings,
-            http::HttpRequest,
-            http_v1::{HttpService, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpService, HttpServiceRequestBuilder},
         },
     },
     template::ConfinedTemplate,
@@ -193,10 +193,10 @@ pub fn render_template_string<'a>(
     template
         .render_string(event)
         .map_err(|error| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field_name),
-                drop_event: false
+                drop_event: false,
             });
         })
         .ok()

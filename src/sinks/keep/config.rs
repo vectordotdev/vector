@@ -14,13 +14,12 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,
@@ -31,7 +30,7 @@ pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
 /// Configuration for the `keep` sink.
 #[configurable_component(sink("keep", "Deliver log events to Keep."))]
 #[derive(Clone, Debug)]
-pub struct KeepConfig {
+pub(super) struct KeepConfig {
     /// Keeps endpoint to send logs to
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
@@ -104,7 +103,7 @@ impl SinkConfig for KeepConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedKeep {
+pub(super) struct ValidatedKeep {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     request_limits: TowerRequestSettings,

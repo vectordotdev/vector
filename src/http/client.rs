@@ -1,19 +1,17 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tracing::Instrument;
 use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{
-        AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestV1Telemetry,
-        HttpResponseV1Telemetry,
-    },
+    internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
     tls::MaybeTlsSettings,
 };
 
@@ -83,12 +81,7 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
-            {
-                let telemetry = HttpRequestV1Telemetry::new(&request);
-                emit!(AboutToSendHttpRequest {
-                    request: &telemetry
-                });
-            }
+            emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
@@ -96,17 +89,16 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    let telemetry = HttpResponseV1Telemetry::new(&response);
-                    emit!(GotHttpResponse {
-                        response: &telemetry,
-                        roundtrip
+                    emit(GotHttpResponse {
+                        response: &response,
+                        roundtrip,
                     });
                     Ok(response)
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning {
+                    emit(GotHttpWarning {
                         error: &error,
-                        roundtrip
+                        roundtrip,
                     });
                     Err(error)
                 }
@@ -134,5 +126,36 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
         request
             .headers_mut()
             .insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::{
+        HeaderValue, Request,
+        header::{ACCEPT_ENCODING, USER_AGENT},
+    };
+
+    use super::default_request_headers;
+
+    #[test]
+    fn default_request_headers_are_added() {
+        let user_agent = HeaderValue::from_static("vector");
+        let mut request = Request::post("http://example.com").body(()).unwrap();
+        default_request_headers(&mut request, &user_agent);
+        assert_eq!(request.headers()[ACCEPT_ENCODING], "identity");
+        assert_eq!(request.headers()[USER_AGENT], user_agent);
+    }
+
+    #[test]
+    fn default_request_headers_do_not_overwrite() {
+        let mut request = Request::post("http://example.com")
+            .header(ACCEPT_ENCODING, "gzip")
+            .header(USER_AGENT, "foo")
+            .body(())
+            .unwrap();
+        default_request_headers(&mut request, &HeaderValue::from_static("vector"));
+        assert_eq!(request.headers()[ACCEPT_ENCODING], "gzip");
+        assert_eq!(request.headers()[USER_AGENT], "foo");
     }
 }

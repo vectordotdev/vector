@@ -15,11 +15,8 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
-#![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
 pub mod config;
 pub mod event;
@@ -71,21 +68,6 @@ pub(crate) fn opt_float_eq(l_value: Option<f64>, r_value: Option<f64>) -> bool {
         (None, None) => true,
         _ => false,
     }
-}
-
-// These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {
-        vector_lib::internal_event::emit($event)
-    };
-}
-
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_lib::internal_event::register($event)
-    };
 }
 
 pub use span_fields::SpanField;

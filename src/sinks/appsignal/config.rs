@@ -17,15 +17,14 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
             BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
 };
@@ -144,7 +143,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedAppsignal {
+pub(super) struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
@@ -209,7 +208,7 @@ async fn healthcheck(
     }
 }
 
-pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+pub(super) fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
     Ok(endpoint.append_path(path)?)
 }
 

@@ -19,7 +19,7 @@ use tokio::sync::watch;
 use vector_http::{HttpError, empty_body};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::{config::ProxyConfig, http::client_v1::HttpClient, tls::MaybeTlsSettings};
+use crate::{config::ProxyConfig, http::HttpClient, tls::MaybeTlsSettings};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -28,6 +28,8 @@ const SERVICE_ACCOUNT_TOKEN_URL: &str =
 const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
 
 const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
+
+const GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -51,7 +53,7 @@ pub enum GcpError {
     #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text: {}", source))]
-    GetTokenBytes { source: hyper_1::Error },
+    GetTokenBytes { source: hyper::Error },
     #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
     #[snafu(display("Failed to parse OAuth token JSON: {}", source))]
@@ -62,6 +64,47 @@ pub enum GcpError {
     BuildHttpClient { source: crate::Error },
 }
 
+/// Configuration for GCP credentials and authentication.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct GcpCredentialsConfig {
+    /// Path to a [service account][gcp_service_account_credentials] credentials JSON file.
+    ///
+    /// If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
+    /// is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
+    /// service if running on a GCE instance.
+    ///
+    /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+    pub credentials_path: Option<String>,
+
+    /// Skip all authentication handling. For use with integration tests only.
+    #[serde(default, skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
+    pub skip_authentication: bool,
+}
+
+impl GcpCredentialsConfig {
+    /// # Errors
+    /// Returns an error if credentials are invalid or token retrieval fails.
+    pub async fn build(
+        &self,
+        scope: Scope,
+        api_key: Option<&SensitiveString>,
+    ) -> crate::Result<GcpAuthenticator> {
+        Ok(if self.skip_authentication {
+            GcpAuthenticator::None
+        } else {
+            let gap = std::env::var(GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR).ok();
+            let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
+            match (creds_path, api_key) {
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
+                (None, None) => GcpAuthenticator::new_implicit().await?,
+            }
+        })
+    }
+}
+
 /// Configuration of the authentication strategy for interacting with GCP services.
 // TODO: We're duplicating the "either this or that" verbiage for each field because this struct gets flattened into the
 // component config types, which means all that's carried over are the fields, not the type itself.
@@ -69,6 +112,8 @@ pub enum GcpError {
 // Seems like we really really have it as a nested field -- i.e. `auth.api_key` -- which is a closer fit to how we do
 // similar things in configuration (TLS, framing, decoding, etc.). Doing so would let us embed the type itself, and
 // hoist up the common documentation bits to the docs for the type rather than the fields.
+// NOTE: For new GCP components, consider using `GcpCredentialsConfig` instead. Not all GCP services
+// support API keys (e.g., Cloud Storage); see issue reference: https://github.com/vectordotdev/vector/issues/20927.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
@@ -109,7 +154,7 @@ impl GcpAuthConfig {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
         } else {
-            let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+            let gap = std::env::var(GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR).ok();
             let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
             match (&creds_path, &self.api_key) {
                 (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,

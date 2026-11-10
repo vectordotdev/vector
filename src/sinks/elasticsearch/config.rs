@@ -6,6 +6,7 @@ use std::{
 use futures::{FutureExt, TryFutureExt};
 use vector_lib::{
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{event_path, lookup_v2::ConfigValuePath},
     schema::Requirement,
     stream::BatcherSettings,
@@ -485,7 +486,7 @@ impl DataStreamMode {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -498,7 +499,7 @@ impl DataStreamMode {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -511,7 +512,7 @@ impl DataStreamMode {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -633,7 +634,7 @@ where
             template
                 .check_confinement(&s)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some(field),
                         drop_event: true,
@@ -641,7 +642,7 @@ where
                 })
                 .ok()?;
             if !is_valid_data_stream_component(&s, field) {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: crate::template::TemplateRenderingError::Confined {
                         rendered_preview: crate::template::confined_preview(&s),
                         rendered_len: s.len(),

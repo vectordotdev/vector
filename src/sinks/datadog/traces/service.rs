@@ -17,15 +17,15 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::retries::{RetryAction, RetryLogic},
     },
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct TraceApiRetry;
+pub(super) struct TraceApiRetry;
 
 impl RetryLogic for TraceApiRetry {
     type Error = HttpError;
@@ -59,7 +59,7 @@ impl RetryLogic for TraceApiRetry {
 }
 
 #[derive(Debug, Clone)]
-pub struct TraceApiRequest {
+pub(crate) struct TraceApiRequest {
     pub body: Bytes,
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
@@ -74,7 +74,7 @@ impl TraceApiRequest {
     /// # Errors
     ///
     /// Returns an error if a header name or value is invalid.
-    pub fn into_http_request(self) -> http::Result<Request<Bytes>> {
+    pub(crate) fn into_http_request(self) -> http::Result<Request<Bytes>> {
         let mut request = Request::post(self.uri);
         for (k, v) in &self.headers {
             request = request.header(k, v);
@@ -100,7 +100,7 @@ impl MetaDescriptive for TraceApiRequest {
 }
 
 #[derive(Debug)]
-pub struct TraceApiResponse {
+pub(super) struct TraceApiResponse {
     status_code: StatusCode,
     body: Bytes,
     byte_size: GroupedCountByteSize,
@@ -133,12 +133,12 @@ impl DriverResponse for TraceApiResponse {
 /// composed within a Tower "stack", such that we can easily and transparently
 /// provide retries, concurrency limits, rate limits, and more.
 #[derive(Debug, Clone)]
-pub struct TraceApiService {
+pub(super) struct TraceApiService {
     client: HttpClient,
 }
 
 impl TraceApiService {
-    pub const fn new(client: HttpClient) -> Self {
+    pub(super) const fn new(client: HttpClient) -> Self {
         Self { client }
     }
 }
@@ -163,7 +163,7 @@ impl Service<TraceApiRequest> for TraceApiService {
             let uncompressed_size = request.uncompressed_size;
             let http_request = request
                 .into_http_request()
-                .context(HTTPV1RequestBuilderSnafu)
+                .context(HTTPRequestBuilderSnafu)
                 .map_err(crate::Error::from)?;
 
             let response = client.send(http_request.map(full_body)).await?;

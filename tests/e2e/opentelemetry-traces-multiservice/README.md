@@ -116,7 +116,8 @@ cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
 To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
 
 In CI, a Vector-team member can submit a PR review starting with
-`/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit.
+`/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit, or
+`/ci-run-e2e-trace-model` to also run the [Datadog Agent trace test](../datadog-traces/README.md).
 Comments, “run all” commands, automatic PR CI, and schedules do not trigger it.
 
 Read the results on the CI job's summary page. Download the

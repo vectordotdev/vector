@@ -3,6 +3,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use vector_lib::internal_event::{emit, register};
 
 use super::{
     WebSocketListenerSinkConfig,
@@ -33,11 +34,12 @@ use futures::{
     future, pin_mut,
     stream::BoxStream,
 };
-use http_0::StatusCode;
+use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    Message,
+    Message, Utf8Bytes,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::WebSocketConfig,
 };
 use tokio_util::codec::Encoder as _;
 use url::Url;
@@ -53,7 +55,7 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
-pub struct WebSocketListenerSink {
+pub(super) struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -66,7 +68,10 @@ pub struct WebSocketListenerSink {
 
 impl WebSocketListenerSink {
     #[cfg(test)]
-    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: WebSocketListenerSinkConfig,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         Self::from_validated(config, &validated, tls, cx)
@@ -266,17 +271,25 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {err}");
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                });
-            })?;
+        // tungstenite allocates `read_buffer_size` bytes up front for each connection (default
+        // 128 KiB). This sink can serve many clients that send only small acks, so keep the 4 KiB
+        // read buffer of earlier tungstenite releases.
+        let ws_config = WebSocketConfig::default().read_buffer_size(4096);
+        let ws_stream = tokio_tungstenite::accept_hdr_async_with_config(
+            stream,
+            header_callback,
+            Some(ws_config),
+        )
+        .await
+        .map_err(|err| {
+            debug!("Error during websocket handshake: {err}");
+            emit(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone(),
+            });
+        })?;
 
-        let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
+        let _open_token = open_gauge.open(|count| emit(ConnectionOpen { count }));
 
         // Insert the write part of this peer to the peer map.
         let (tx, rx) = unbounded();
@@ -287,8 +300,8 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WebSocketListenerSendError {
-                            error: Box::new(error)
+                        emit(WebSocketListenerSendError {
+                            error: Box::new(error),
                         });
                     }
                 },
@@ -297,9 +310,9 @@ impl WebSocketListenerSink {
             debug!("WebSocket connection established: {addr}");
 
             peers.insert(addr, tx);
-            emit!(WebSocketListenerConnectionEstablished {
+            emit(WebSocketListenerConnectionEstablished {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -326,9 +339,9 @@ impl WebSocketListenerSink {
         });
         let forward_data_to_client = rx
             .map(|message| {
-                emit!(WebSocketListenerMessageSent {
+                emit(WebSocketListenerMessageSent {
                     message_size: message.len(),
-                    extra_tags: extra_tags.clone()
+                    extra_tags: extra_tags.clone(),
                 });
                 Ok(message)
             })
@@ -340,8 +353,8 @@ impl WebSocketListenerSink {
             .factor_first()
             .0
         {
-            emit!(WebSocketListenerSendError {
-                error: Box::new(error)
+            emit(WebSocketListenerSendError {
+                error: Box::new(error),
             });
         }
 
@@ -349,9 +362,9 @@ impl WebSocketListenerSink {
             let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
-            emit!(WebSocketListenerConnectionShutdown {
+            emit(WebSocketListenerConnectionShutdown {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -365,8 +378,8 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
-        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
         let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
@@ -408,7 +421,12 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        let bytes = bytes.freeze();
+                        let text = match Utf8Bytes::try_from(bytes.clone()) {
+                            Ok(text) => text,
+                            Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                        };
+                        Message::Text(text)
                     };
                     let message_len = message.len();
 
@@ -424,8 +442,8 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
                     let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WebSocketListenerSendError {
-                                error: Box::new(error)
+                            emit(WebSocketListenerSendError {
+                                error: Box::new(error),
                             });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));

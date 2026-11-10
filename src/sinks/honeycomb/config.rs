@@ -12,13 +12,12 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,
@@ -29,7 +28,7 @@ pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     /// Honeycomb's endpoint to send logs to
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
@@ -113,7 +112,7 @@ impl SinkConfig for HoneycombConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedHoneycomb {
+pub(super) struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
     request_limits: TowerRequestSettings,

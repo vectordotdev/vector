@@ -1,4 +1,5 @@
 use std::{io, mem, time::Duration};
+use vector_lib::internal_event::emit;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
@@ -12,17 +13,19 @@ use vector_lib::stream::batcher::BatchConfig as StreamBatchConfig;
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::LargeEventDroppedError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             HttpEndpoint,
             encoding::Encoder as SinkEncoder,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -323,7 +326,7 @@ impl StreamBatchConfig<PubsubMessage> for PubsubBatcher {
         self.batch.finalizers.merge(message.finalizers);
 
         if self.batch.messages.is_empty() && payload_size >= self.settings.size_limit {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: message.json.len(),
                 max_length: self.settings.size_limit,
             });
@@ -434,7 +437,7 @@ impl HttpServiceRequestBuilder<()> for PubsubServiceRequestBuilder {
         let mut request = Request::post(self.uri.clone())
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
         self.auth.apply(&mut request);
 
         Ok(request)
@@ -482,7 +485,7 @@ where
             .filter_map(|request| {
                 future::ready(match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),

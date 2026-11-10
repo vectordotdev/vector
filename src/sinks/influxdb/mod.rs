@@ -17,8 +17,8 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
-    sinks::{HTTPV1RequestBuilderSnafu, util::HttpEndpoint},
+    http::HttpClient,
+    sinks::{HTTPRequestBuilderSnafu, util::HttpEndpoint},
 };
 
 pub(in crate::sinks) enum Field {
@@ -260,7 +260,7 @@ impl InfluxDbWriteRequest {
             .header("Content-Type", "text/plain")
             .header("Authorization", self.authorization.as_str())
             .body(body)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
 }
@@ -487,24 +487,24 @@ pub mod test_util {
         (measurement, tags, fields.to_string(), ts)
     }
 
-    fn client() -> reqwest_13::Client {
+    fn client() -> reqwest::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        reqwest_13::Client::builder()
+        reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .unwrap()
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest_13::Response {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
             .get(
-                reqwest_13::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                reqwest::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
                     .unwrap(),
             )
             .send()
@@ -560,7 +560,7 @@ pub mod test_util {
         body.insert("bucket", BUCKET);
         body.insert("token", TOKEN);
 
-        let client = reqwest_13::Client::builder()
+        let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
@@ -897,7 +897,7 @@ mod tests {
 mod integration_tests {
     use crate::{
         config::ProxyConfig,
-        http::client_v1::HttpClient,
+        http::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},

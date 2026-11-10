@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 # gRPC
 tonic.workspace = true
+tonic-prost.workspace = true
 tonic-health.workspace = true
 prost.workspace = true
 prost-types.workspace = true
@@ -33,7 +34,7 @@ vector-core = { path = "../vector-core", default-features = false }
 vector-http = { path = "../vector-http" }
 
 [build-dependencies]
-tonic-build.workspace = true
+tonic-prost-build.workspace = true
 prost-build.workspace = true
 
 [dev-dependencies]

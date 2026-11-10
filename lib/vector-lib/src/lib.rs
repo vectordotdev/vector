@@ -20,10 +20,9 @@ pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;
 pub use vector_core::compile_vrl;
 pub use vector_core::{
-    EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
-    ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
-    register_extra_span_field, samples, schema, serde, sink, source, source_sender, tcp, tls,
-    transform, utilization,
+    EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, event, fanout, ipallowlist,
+    latency, metric_tags, metrics, partition, quantiles, register_extra_span_field, samples,
+    schema, serde, sink, source, source_sender, tcp, tls, transform, utilization,
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
@@ -44,6 +43,8 @@ pub mod config {
 
 #[cfg(feature = "opentelemetry")]
 pub mod opentelemetry {
+    #[cfg(feature = "typed-trace")]
+    pub use opentelemetry_proto::typed_trace;
     pub use opentelemetry_proto::{common, logs, metrics, proto, spans};
 }
 

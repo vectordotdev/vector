@@ -20,15 +20,14 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -42,7 +41,7 @@ enum HealthcheckError {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct StackdriverTowerRequestConfigDefaults;
+pub(super) struct StackdriverTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
@@ -356,7 +355,7 @@ impl ValidatedSink for StackdriverConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedStackdriverLogs {
+pub(super) struct ValidatedStackdriverLogs {
     encoder: StackdriverLogsEncoder,
     batch_settings: BatcherSettings,
 }
