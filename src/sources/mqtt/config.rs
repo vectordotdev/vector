@@ -154,6 +154,13 @@ impl MqttSourceConfig {
                 .context(ConfigurationSnafu);
         }
 
+        // A SUBSCRIBE must carry at least one filter ([MQTT-3.8.3-3]), so with
+        // none configured the subscribe can never be sent: a running source
+        // that receives nothing.
+        if self.topic.clone().to_vec().is_empty() {
+            return Err(ConfigurationError::NoTopicFilters).context(ConfigurationSnafu);
+        }
+
         // An invalid filter is a permanent configuration error: rumqttc
         // queues the SUBSCRIBE without validating it, so it would otherwise
         // only surface at runtime as the broker rejecting (or dropping) the
@@ -288,6 +295,18 @@ mod test {
         assert!(config.build_connector(true).is_err());
         // Without acknowledgements, disabling keep-alive stays allowed.
         assert!(config.build_connector(false).is_ok());
+    }
+
+    // With no topic filter there is nothing to subscribe to; rumqttc rejects
+    // an empty SUBSCRIBE every time it is queued, so this must fail at build
+    // time instead of leaving a connected source that receives nothing.
+    #[test]
+    fn an_empty_topic_list_fails_at_build() {
+        let config = MqttSourceConfig {
+            topic: OneOrMany::Many(vec![]),
+            ..Default::default()
+        };
+        assert!(config.build_connector(false).is_err());
     }
 
     // An invalid topic filter is a permanent configuration error and must

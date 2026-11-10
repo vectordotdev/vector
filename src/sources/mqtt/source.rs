@@ -1,6 +1,13 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::Duration,
+};
 
-use futures::{StreamExt, stream::BoxStream};
+use futures::{
+    FutureExt, StreamExt,
+    future::BoxFuture,
+    stream::{BoxStream, FuturesUnordered},
+};
 use itertools::Itertools;
 use rumqttc::{ConnectionError, Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
@@ -310,9 +317,7 @@ struct BufferedPublish {
 /// Empties rumqttc's buffer of parsed-but-unyielded packets from a dead
 /// connection, returning its publishes in arrival order.
 ///
-/// Everything else in the buffer is stale control traffic and is dropped;
-/// most importantly a `SubAck`, which would otherwise be yielded after the
-/// next `ConnAck` and falsely confirm the new connection's (re)subscribe.
+/// Everything else in the buffer is stale control traffic and is dropped.
 ///
 /// The publishes are held by this source rather than left in the buffer for
 /// two reasons: rumqttc would yield them after the next `ConnAck` tagged as
@@ -344,10 +349,6 @@ fn take_buffered_publishes(
 struct SubscriptionTracker {
     /// Filters not yet granted in the broker's session, in configured order.
     unconfirmed: Vec<String>,
-    /// The filters carried by the SUBSCRIBE awaiting its SUBACK, in the
-    /// order sent, which per [MQTT-3.9.3-1] is the order of the SUBACK's
-    /// return codes.
-    in_flight: Vec<String>,
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -363,47 +364,18 @@ impl SubscriptionTracker {
     /// subscribe, and whenever a `ConnAck` reports a fresh session.
     fn reset<'a>(&mut self, filters: impl Iterator<Item = &'a str>) {
         self.unconfirmed = filters.map(str::to_owned).collect();
-        self.in_flight.clear();
     }
 
-    /// The connection carrying the in-flight SUBSCRIBE is gone; its SUBACK
-    /// will never arrive. Granted filters stay granted (they live in the
-    /// session, which may be resumed); `reset` handles a lost session.
-    fn on_connection_lost(&mut self) {
-        self.in_flight.clear();
-    }
-
-    /// The filters the next SUBSCRIBE must carry, recorded as in flight.
-    fn begin_subscribe(&mut self) -> &[String] {
-        self.in_flight.clone_from(&self.unconfirmed);
-        &self.in_flight
-    }
-
-    /// Matches a SUBACK's return codes to the in-flight SUBSCRIBE.
-    ///
-    /// Returns `None`, changing nothing, for a SUBACK that cannot belong to
-    /// it: one arriving with no SUBSCRIBE in flight, or carrying a different
-    /// number of return codes than the SUBSCRIBE had filters
-    /// ([MQTT-3.8.4-5] requires one per filter). rumqttc replays a SUBSCRIBE
-    /// that was queued but unsent when its connection died, so the new
-    /// connection can see a SUBACK for that replay as well as for the
-    /// SUBSCRIBE issued on its `ConnAck`. The replay carries the same filter
-    /// list unless the session was lost in between, in which case the new
-    /// SUBSCRIBE carries every filter and the replay a strict subset --
-    /// matching that SUBACK positionally would credit its return codes to
-    /// the wrong filters.
+    /// Applies the SUBACK for a SUBSCRIBE that carried `filters`. Its return
+    /// codes are in the SUBSCRIBE's filter order ([MQTT-3.9.3-1]), and
+    /// rumqttc has already checked there is exactly one per filter.
     fn on_suback(
         &mut self,
+        filters: Vec<String>,
         return_codes: &[rumqttc::SubscribeReasonCode],
-    ) -> Option<SubAckOutcome> {
-        if self.in_flight.is_empty() || self.in_flight.len() != return_codes.len() {
-            return None;
-        }
+    ) -> SubAckOutcome {
         let mut outcome = SubAckOutcome::default();
-        for (filter, return_code) in std::mem::take(&mut self.in_flight)
-            .into_iter()
-            .zip(return_codes)
-        {
+        for (filter, return_code) in filters.into_iter().zip(return_codes) {
             match return_code {
                 rumqttc::SubscribeReasonCode::Success(qos) => {
                     self.unconfirmed
@@ -414,7 +386,68 @@ impl SubscriptionTracker {
             }
         }
         outcome.all_confirmed = self.unconfirmed.is_empty();
-        Some(outcome)
+        outcome
+    }
+}
+
+/// The SUBSCRIBE requests rumqttc currently holds for this source, each
+/// resolving to the filters it carried and its outcome.
+///
+/// These are rumqttc's tracked subscribes, used so this source never has to
+/// guess which SUBSCRIBE a SUBACK answers or whether a request survived a
+/// reconnect. rumqttc matches each SUBACK to its SUBSCRIBE by packet id, and
+/// owns the request until it resolves:
+/// - It replays a SUBSCRIBE that has no SUBACK yet (sent or not) on the next
+///   connection when the session is resumed. Queueing another one then would
+///   make the broker deliver the retained messages twice, so a reconnect
+///   with a request still outstanding sends nothing.
+/// - It drops them when the broker starts a fresh session, and they die with
+///   the `EventLoop` when a forced reconnect replaces it. `run` discards
+///   them here in both cases and subscribes again.
+type SubscribeResults = FuturesUnordered<
+    BoxFuture<
+        'static,
+        (
+            Vec<String>,
+            Result<rumqttc::SubAck, rumqttc::SubscribeNoticeError>,
+        ),
+    >,
+>;
+
+/// The packet ids of the manual-ack publishes received on the current
+/// connection whose acknowledgement has not been sent yet.
+///
+/// A broker may retransmit an unacknowledged QoS 1/2 publish on the same
+/// connection (EMQX does, on its retry interval). It is the same message
+/// under the same packet id, and its first copy is already on its way to the
+/// sinks, so the retransmission is dropped. Processing it would register a
+/// second acknowledgement for that packet id: once the first is sent the
+/// second is stale, and rumqttc either rejects it (tearing down the
+/// connection, see `handle_connection_lost`) or, if the broker has reused
+/// the id by then, acknowledges a newer publish before it was delivered.
+///
+/// An id is released at the point rumqttc itself starts treating a publish
+/// with that id as new: when the PUBACK is written (QoS 1), or when the
+/// broker's PUBREL arrives (QoS 2). An id whose ack is withheld stays here
+/// until the reconnect that redelivers it.
+#[derive(Debug, Default)]
+struct InFlightPublishes {
+    packet_ids: HashSet<u16>,
+}
+
+impl InFlightPublishes {
+    /// Records a newly received publish. Returns `false` for a
+    /// retransmission of one that is still in flight.
+    fn admit(&mut self, packet_id: u16) -> bool {
+        self.packet_ids.insert(packet_id)
+    }
+
+    fn release(&mut self, packet_id: u16) {
+        self.packet_ids.remove(&packet_id);
+    }
+
+    fn clear(&mut self) {
+        self.packet_ids.clear();
     }
 }
 
@@ -514,14 +547,21 @@ pub(super) struct MqttSource {
 /// Queues a SUBSCRIBE for the filters still unconfirmed. Returns whether it
 /// was queued; a failure (rumqttc's request channel is full) is retried by
 /// the caller while connected.
-fn try_subscribe(client: &rumqttc::AsyncClient, subscriptions: &mut SubscriptionTracker) -> bool {
-    let filters = subscriptions
-        .begin_subscribe()
+fn try_subscribe(
+    client: &rumqttc::AsyncClient,
+    subscriptions: &SubscriptionTracker,
+    subscribe_results: &SubscribeResults,
+) -> bool {
+    let filters = subscriptions.unconfirmed.clone();
+    let request = filters
         .iter()
         .cloned()
         .map(|filter| SubscribeFilter::new(filter, SUBSCRIPTION_QOS));
-    match client.try_subscribe_many(filters) {
-        Ok(()) => true,
+    match client.try_subscribe_many_tracked(request) {
+        Ok(notice) => {
+            subscribe_results.push(async move { (filters, notice.wait_async().await) }.boxed());
+            true
+        }
         Err(error) => {
             emit(MqttSubscribeError { error });
             false
@@ -534,7 +574,7 @@ struct ConnectionAuxState<'a> {
     forced_reconnect: &'a mut ForcedReconnectSchedule,
     resubscribe_retry_at: &'a mut Option<tokio::time::Instant>,
     buffered_publishes: &'a mut Vec<BufferedPublish>,
-    subscriptions: &'a mut SubscriptionTracker,
+    in_flight_publishes: &'a mut InFlightPublishes,
 }
 
 impl MqttSource {
@@ -605,6 +645,10 @@ impl MqttSource {
         // `SubscriptionTracker`.
         let mut subscriptions = SubscriptionTracker::default();
         subscriptions.reset(self.subscribed_topics());
+        let mut subscribe_results = SubscribeResults::new();
+
+        // See `InFlightPublishes`. Unused when acknowledgements are disabled.
+        let mut in_flight_publishes = InFlightPublishes::default();
 
         // Publishes rumqttc had buffered but this source hadn't yet processed
         // when their connection died, in arrival order. Whether the
@@ -623,7 +667,11 @@ impl MqttSource {
 
             let actions = protocol_state.loop_actions();
             if actions.retry_resubscribe && !draining {
-                protocol_state.on_resubscribe_result(try_subscribe(&client, &mut subscriptions));
+                protocol_state.on_resubscribe_result(try_subscribe(
+                    &client,
+                    &subscriptions,
+                    &subscribe_results,
+                ));
             }
 
             // Retry deferred PUBACKs while connected (the event loop below drains the
@@ -695,7 +743,62 @@ impl MqttSource {
                         && protocol_state.pending_resubscribe
                         && !forced_reconnect.disconnect_sent()
                     {
-                        protocol_state.on_resubscribe_result(try_subscribe(&client, &mut subscriptions));
+                        protocol_state.on_resubscribe_result(try_subscribe(
+                    &client,
+                    &subscriptions,
+                    &subscribe_results,
+                ));
+                    }
+                },
+                // A SUBSCRIBE resolved. A SUBACK only confirms the broker
+                // *processed* it; each return code says whether the matching
+                // topic filter was actually granted. A rejected filter
+                // (failure code 0x80, e.g. an ACL denial) must not count as
+                // subscribed -- keep retrying it (and only it, see
+                // `SubscriptionTracker`), paced by `RESUBSCRIBE_RETRY_DELAY`.
+                Some((filters, result)) = subscribe_results.next(), if !subscribe_results.is_empty() => {
+                    match result {
+                        Ok(suback) => {
+                            let outcome = subscriptions.on_suback(filters, &suback.return_codes);
+                            for (topic, qos) in &outcome.granted {
+                                if self.acknowledgements
+                                    && !publish_supports_end_to_end_acknowledgements(*qos)
+                                {
+                                    warn!(
+                                        message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
+                                        topic,
+                                        ?qos,
+                                        internal_log_rate_limit = true,
+                                    );
+                                }
+                            }
+                            for topic in &outcome.rejected {
+                                error!(
+                                    message = "MQTT broker rejected the subscription; will retry.",
+                                    topic,
+                                    internal_log_rate_limit = true,
+                                );
+                            }
+                            if outcome.all_confirmed {
+                                protocol_state.on_suback();
+                                resubscribe_retry_at = None;
+                            } else {
+                                resubscribe_retry_at = Some(
+                                    tokio::time::Instant::now() + RESUBSCRIBE_RETRY_DELAY,
+                                );
+                            }
+                        }
+                        // rumqttc gave up the request without a SUBACK. The
+                        // cases it does that in (fresh session, replaced
+                        // event loop) are handled where they happen, so this
+                        // is only a backstop: if nothing else is outstanding,
+                        // let the loop queue the subscribe again.
+                        Err(error) => {
+                            debug!(message = "MQTT subscribe request was dropped before its SUBACK.", %error);
+                            if subscribe_results.is_empty() {
+                                protocol_state.on_resubscribe_result(false);
+                            }
+                        }
                     }
                 },
                 mqtt_event = connection.poll() => {
@@ -710,67 +813,34 @@ impl MqttSource {
                     // AtLeastOnce).
                     match mqtt_event {
                         Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
-                            self.process_message(
-                                publish,
-                                &mut out,
-                                finalizer
-                                    .as_ref()
-                                    .map(|finalizer| (finalizer, protocol_state.connection_generation)),
-                            ).await;
-                        }
-                        Ok(MqttEvent::Incoming(Incoming::SubAck(suback))) => {
-                            // A SUBACK only confirms the broker *processed* the
-                            // (re)subscribe; each return code says whether the
-                            // matching topic filter was actually granted. A
-                            // rejected filter (failure code 0x80, e.g. an ACL
-                            // denial) must not count as subscribed -- keep
-                            // retrying it (and only it, see
-                            // `SubscriptionTracker`), paced by
-                            // `RESUBSCRIBE_RETRY_DELAY`.
-                            //
-                            // A SUBACK that doesn't belong to the in-flight
-                            // SUBSCRIBE confirms nothing. If a subscribe is
-                            // still outstanding, arm the retry so a broker
-                            // answering with a malformed SUBACK can't leave
-                            // it waiting forever; a matching SUBACK that
-                            // confirms everything disarms it again.
-                            match subscriptions.on_suback(&suback.return_codes) {
-                                Some(outcome) => {
-                                    for (topic, qos) in &outcome.granted {
-                                        if self.acknowledgements
-                                            && !publish_supports_end_to_end_acknowledgements(*qos)
-                                        {
-                                            warn!(
-                                                message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
-                                                topic,
-                                                ?qos,
-                                                internal_log_rate_limit = true,
-                                            );
-                                        }
-                                    }
-                                    for topic in &outcome.rejected {
-                                        error!(
-                                            message = "MQTT broker rejected the subscription; will retry.",
-                                            topic,
-                                            internal_log_rate_limit = true,
-                                        );
-                                    }
-                                    if outcome.all_confirmed {
-                                        protocol_state.on_suback();
-                                        resubscribe_retry_at = None;
-                                    } else {
-                                        resubscribe_retry_at = Some(
-                                            tokio::time::Instant::now() + RESUBSCRIBE_RETRY_DELAY,
-                                        );
-                                    }
-                                }
-                                None if protocol_state.pending_resubscribe => {
-                                    resubscribe_retry_at.get_or_insert_with(|| {
-                                        tokio::time::Instant::now() + RESUBSCRIBE_RETRY_DELAY
-                                    });
-                                }
-                                None => {}
+                            // A retransmission of a publish whose ack is
+                            // still outstanding is dropped; see
+                            // `InFlightPublishes`.
+                            let defers_ack =
+                                publish_ack_decision(self.acknowledgements, publish.qos).defer_ack;
+                            if defers_ack && !in_flight_publishes.admit(publish.pkid) {
+                                debug!(
+                                    message = "Dropping an MQTT publish retransmitted while its acknowledgement is still pending.",
+                                    packet_id = publish.pkid,
+                                    internal_log_rate_limit = true,
+                                );
+                            } else {
+                                self.process_message(
+                                    publish,
+                                    &mut out,
+                                    finalizer
+                                        .as_ref()
+                                        .map(|finalizer| (finalizer, protocol_state.connection_generation)),
+                                ).await;
                             }
+                        }
+                        // The acknowledgement for this packet id is on its
+                        // way, so the next publish carrying it is a new one.
+                        Ok(MqttEvent::Outgoing(rumqttc::Outgoing::PubAck(packet_id))) => {
+                            in_flight_publishes.release(packet_id);
+                        }
+                        Ok(MqttEvent::Incoming(Incoming::PubRel(pubrel))) => {
+                            in_flight_publishes.release(pubrel.pkid);
                         }
                         // A (re)connected session resumes here; the broker will
                         // redeliver any unacknowledged publishes, so drop deferred
@@ -789,9 +859,13 @@ impl MqttSource {
                             if actions.recreate_finalizer {
                                 (finalizer, ack_stream) = self.new_finalizer(&shutdown);
                             }
-                            // A fresh session holds none of our subscriptions.
+                            in_flight_publishes.clear();
+                            // A fresh session holds none of our subscriptions,
+                            // and rumqttc dropped the SUBSCRIBE requests it
+                            // held for the old one (see `SubscribeResults`).
                             if !connack.session_present {
                                 subscriptions.reset(self.subscribed_topics());
+                                subscribe_results.clear();
                             }
                             // Publishes buffered but unprocessed when the previous
                             // connection died (see `handle_connection_lost`),
@@ -819,11 +893,17 @@ impl MqttSource {
                                     .await;
                             }
                             if actions.resubscribe {
-                                protocol_state.on_resubscribe_result(try_subscribe(&client, &mut subscriptions));
+                                // A SUBSCRIBE still outstanding from the
+                                // previous connection is replayed by rumqttc
+                                // on this one; sending another would make the
+                                // broker deliver retained messages twice.
+                                let queued = !subscribe_results.is_empty()
+                                    || try_subscribe(&client, &subscriptions, &subscribe_results);
+                                protocol_state.on_resubscribe_result(queued);
                             }
                             // A retry the previous connection had scheduled no
-                            // longer applies; this connection's subscribe was
-                            // just issued above (or is already confirmed).
+                            // longer applies; this connection's subscribe is
+                            // outstanding (or already confirmed).
                             resubscribe_retry_at = None;
                         }
                         // Connection lost: `poll()` already called
@@ -839,7 +919,7 @@ impl MqttSource {
                                     forced_reconnect: &mut forced_reconnect,
                                     resubscribe_retry_at: &mut resubscribe_retry_at,
                                     buffered_publishes: &mut buffered_publishes,
-                                    subscriptions: &mut subscriptions,
+                                    in_flight_publishes: &mut in_flight_publishes,
                                 },
                                 &shutdown,
                             );
@@ -852,6 +932,10 @@ impl MqttSource {
                             // else ends polling this way.
                             if matches!(error, ConnectionError::RequestsDone) {
                                 (client, connection) = self.connector.connect();
+                                // The requests the old event loop held are
+                                // gone with it; the next ConnAck subscribes
+                                // again if anything is still unconfirmed.
+                                subscribe_results.clear();
                             }
                         }
                         _ => {}
@@ -884,7 +968,10 @@ impl MqttSource {
     ///   next connection *except* `PubAck`/`PubRec`, whose packet ids belong
     ///   to the dead connection. This source relies on that instead of
     ///   scrubbing the queue (pinned by `connection_lost_scrubs_the_rumqttc_seam`,
-    ///   so an upgrade that starts replaying acks fails a test).
+    ///   so an upgrade that starts replaying acks fails a test). A SUBSCRIBE
+    ///   with no SUBACK yet is among the replayed requests, which is why a
+    ///   reconnect with one outstanding sends no new one (see
+    ///   `SubscribeResults`; pinned by the same test).
     /// - `session_present = false`: `reset_session_state` rebuilds
     ///   `MqttState` wholesale and fails tracked requests.
     ///
@@ -922,7 +1009,7 @@ impl MqttSource {
     ///   source never sends; if it could be set, it would gate the request
     ///   path and starve acks -- a reminder for any future publish path.
     /// - Outbound packet-id allocation: used only for SUBSCRIBE here, and
-    ///   nothing matches on SUBSCRIBE packet ids.
+    ///   rumqttc matches each SUBACK to its SUBSCRIBE itself.
     ///
     /// Residual risks that cannot be closed at this layer (documented so
     /// they're a decision, not an oversight):
@@ -949,7 +1036,7 @@ impl MqttSource {
             forced_reconnect,
             resubscribe_retry_at,
             buffered_publishes,
-            subscriptions,
+            in_flight_publishes,
         } = aux;
 
         let actions = protocol_state.on_disconnect();
@@ -969,7 +1056,7 @@ impl MqttSource {
                 self.acknowledgements,
             ));
         }
-        subscriptions.on_connection_lost();
+        in_flight_publishes.clear();
         // The reconnect any scheduled forced-disconnect was asking for has
         // now happened; no need to send another once reconnected.
         forced_reconnect.cancel();
@@ -1172,11 +1259,13 @@ mod tests {
         use rumqttc::SubscribeReasonCode::{Failure, Success};
 
         let mut tracker = tracker(&["a", "denied", "c"]);
-        assert_eq!(tracker.begin_subscribe(), ["a", "denied", "c"]);
+        let request = tracker.unconfirmed.clone();
+        assert_eq!(request, ["a", "denied", "c"]);
 
-        let outcome = tracker
-            .on_suback(&[Success(QoS::AtLeastOnce), Failure, Success(QoS::AtMostOnce)])
-            .unwrap();
+        let outcome = tracker.on_suback(
+            request,
+            &[Success(QoS::AtLeastOnce), Failure, Success(QoS::AtMostOnce)],
+        );
         assert_eq!(
             outcome,
             SubAckOutcome {
@@ -1190,10 +1279,11 @@ mod tests {
         );
 
         // The retry carries only the rejected filter, and its single return
-        // code is matched to that filter rather than to the first configured
+        // code is applied to that filter rather than to the first configured
         // one.
-        assert_eq!(tracker.begin_subscribe(), ["denied"]);
-        let outcome = tracker.on_suback(&[Success(QoS::AtLeastOnce)]).unwrap();
+        let request = tracker.unconfirmed.clone();
+        assert_eq!(request, ["denied"]);
+        let outcome = tracker.on_suback(request, &[Success(QoS::AtLeastOnce)]);
         assert_eq!(
             outcome,
             SubAckOutcome {
@@ -1204,55 +1294,114 @@ mod tests {
         );
     }
 
-    // What the broker's session holds decides what must be resent. A
-    // connection lost before the SUBACK leaves the unconfirmed set alone (a
-    // resumed session keeps the granted filters, and the retry resends the
-    // rest); a fresh session holds nothing, so everything is resent.
+    // A fresh session holds none of the filters, so everything is resent,
+    // including what an earlier SUBACK had granted. A SUBACK is applied to
+    // the filters its own SUBSCRIBE carried, so one resolving late (rumqttc
+    // replays an unanswered SUBSCRIBE when the session is resumed) cannot be
+    // credited to the filters of a different request.
     #[test]
     fn subscription_tracker_follows_the_session() {
         use rumqttc::SubscribeReasonCode::{Failure, Success};
 
         let mut tracker = tracker(&["a", "b"]);
-        tracker.begin_subscribe();
-        tracker.on_suback(&[Success(QoS::AtLeastOnce), Failure]);
+        let first = tracker.unconfirmed.clone();
+        tracker.on_suback(first, &[Success(QoS::AtLeastOnce), Failure]);
+        assert_eq!(tracker.unconfirmed, ["b"]);
 
-        // Connection lost with the retry in flight: its SUBACK never comes,
-        // and one that shows up anyway confirms nothing.
-        tracker.begin_subscribe();
-        tracker.on_connection_lost();
-        assert_eq!(tracker.on_suback(&[Success(QoS::AtLeastOnce)]), None);
-        assert_eq!(tracker.begin_subscribe(), ["b"]);
-
-        // Fresh session: the granted filter is gone too.
         tracker.reset(["a", "b"].into_iter());
-        assert_eq!(tracker.begin_subscribe(), ["a", "b"]);
-    }
-
-    // rumqttc replays a SUBSCRIBE that was queued but unsent when its
-    // connection died. If the session was lost in between, that replay
-    // carries fewer filters than the SUBSCRIBE issued on the new ConnAck, and
-    // its SUBACK must not be matched positionally against the new one's
-    // filters: here that would mark "a" confirmed on the strength of a return
-    // code that was really about "b". The mismatched SUBACK is ignored and
-    // the in-flight SUBSCRIBE keeps waiting for its own.
-    #[test]
-    fn subscription_tracker_ignores_a_suback_for_a_different_subscribe() {
-        use rumqttc::SubscribeReasonCode::{Failure, Success};
-
-        let mut tracker = tracker(&["a", "b"]);
-        tracker.begin_subscribe();
-
-        // SUBACK for a replayed single-filter SUBSCRIBE.
-        assert_eq!(tracker.on_suback(&[Success(QoS::AtLeastOnce)]), None);
         assert_eq!(tracker.unconfirmed, ["a", "b"]);
 
-        // The in-flight SUBSCRIBE's own SUBACK still resolves normally.
-        let outcome = tracker
-            .on_suback(&[Failure, Success(QoS::AtLeastOnce)])
-            .unwrap();
-        assert_eq!(outcome.rejected, ["a"]);
+        // A SUBACK for a request that carried only "b".
+        let outcome = tracker.on_suback(vec!["b".to_owned()], &[Success(QoS::AtLeastOnce)]);
         assert!(!outcome.all_confirmed);
-        assert_eq!(tracker.begin_subscribe(), ["a"]);
+        assert_eq!(tracker.unconfirmed, ["a"]);
+    }
+
+    // A broker may retransmit an unacknowledged publish on the same
+    // connection. Processing it would register a second ack for one packet
+    // id; once the first is sent, the second is stale -- rumqttc rejects it
+    // (tearing down the connection) or, if the broker reused the id, it
+    // acknowledges a newer publish early. So a retransmission is refused
+    // until the id is released, after which the id denotes a new publish.
+    #[test]
+    fn in_flight_publishes_refuse_retransmissions_until_released() {
+        let mut in_flight = InFlightPublishes::default();
+
+        assert!(in_flight.admit(5));
+        assert!(in_flight.admit(6));
+        assert!(!in_flight.admit(5), "retransmission while unacked");
+
+        // PUBACK written (QoS 1) or PUBREL received (QoS 2): the id is free.
+        in_flight.release(5);
+        assert!(in_flight.admit(5), "the broker reused the id");
+        assert!(!in_flight.admit(6));
+
+        // A reconnect redelivers everything unacked under fresh state.
+        in_flight.clear();
+        assert!(in_flight.admit(5));
+        assert!(in_flight.admit(6));
+    }
+
+    // `InFlightPublishes` releases a packet id on the events a REAL rumqttc
+    // state emits, so this pins that library contract: a manual-ack publish
+    // is yielded again if the broker retransmits it before the ack, and the
+    // ack yields `Outgoing::PubAck` (QoS 1) while the broker's PUBREL is
+    // yielded as `Incoming::PubRel` (QoS 2). An upgrade that stops emitting
+    // either would leave ids unreleased -- every later publish reusing one
+    // would be dropped as a retransmission -- so it must fail here instead.
+    #[test]
+    fn rumqttc_emits_the_events_that_release_in_flight_packet_ids() {
+        let mut options = rumqttc::MqttOptions::new("in-flight-test", ("localhost", 1883));
+        options.set_ack_mode(rumqttc::AckMode::Manual);
+        let (_client, mut connection) = rumqttc::AsyncClient::builder(options).capacity(8).build();
+        let state = &mut connection.state;
+
+        let qos1 = publish(5);
+        let mut qos2 = publish(6);
+        qos2.qos = QoS::ExactlyOnce;
+
+        // QoS 1: the publish, a retransmission before the ack, then the ack.
+        state
+            .handle_incoming_packet(Incoming::Publish(qos1.clone()))
+            .unwrap();
+        state
+            .handle_incoming_packet(Incoming::Publish(qos1.clone()))
+            .unwrap();
+        state
+            .handle_outgoing_packet(rumqttc::Request::PubAck(rumqttc::PubAck::new(5)))
+            .unwrap();
+        // A second ack for the same id is what the retransmission would have
+        // queued; rumqttc rejects it, which tears down the connection.
+        assert!(
+            state
+                .handle_outgoing_packet(rumqttc::Request::PubAck(rumqttc::PubAck::new(5)))
+                .is_err()
+        );
+
+        // QoS 2: the publish, its PUBREC, then the broker's PUBREL.
+        state
+            .handle_incoming_packet(Incoming::Publish(qos2))
+            .unwrap();
+        state
+            .handle_outgoing_packet(rumqttc::Request::PubRec(rumqttc::PubRec::new(6)))
+            .unwrap();
+        state
+            .handle_incoming_packet(Incoming::PubRel(rumqttc::PubRel::new(6)))
+            .unwrap();
+
+        let events = Vec::from(std::mem::take(&mut state.events));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| **event == MqttEvent::Incoming(Incoming::Publish(qos1.clone())))
+                .count(),
+            2,
+            "the retransmission must reach the source to be dropped there"
+        );
+        assert!(events.contains(&MqttEvent::Outgoing(rumqttc::Outgoing::PubAck(5))));
+        assert!(events.contains(&MqttEvent::Incoming(Incoming::PubRel(
+            rumqttc::PubRel::new(6)
+        ))));
     }
 
     // The disconnect scrub exercised end-to-end against a REAL rumqttc
@@ -1306,7 +1455,12 @@ mod tests {
             client
                 .try_manual_ack(rumqttc::ManualAck::PubAck(rumqttc::PubAck::new(2)))
                 .unwrap();
-            client.try_subscribe("topic", QoS::AtLeastOnce).unwrap();
+            let _notice = client
+                .try_subscribe_many_tracked([SubscribeFilter::new(
+                    "topic".to_owned(),
+                    QoS::AtLeastOnce,
+                )])
+                .unwrap();
 
             // Vector-side per-connection state, all armed.
             let mut protocol_state = ProtocolState {
@@ -1323,9 +1477,8 @@ mod tests {
             forced_reconnect.schedule(now);
             let mut resubscribe_retry_at = Some(now + Duration::from_secs(5));
             let mut buffered_publishes: Vec<BufferedPublish> = Vec::new();
-            let mut subscriptions = SubscriptionTracker::default();
-            subscriptions.reset(source.subscribed_topics());
-            subscriptions.begin_subscribe();
+            let mut in_flight_publishes = InFlightPublishes::default();
+            in_flight_publishes.admit(2);
 
             // What `poll()` runs internally before returning a connection
             // error.
@@ -1340,13 +1493,13 @@ mod tests {
                     forced_reconnect: &mut forced_reconnect,
                     resubscribe_retry_at: &mut resubscribe_retry_at,
                     buffered_publishes: &mut buffered_publishes,
-                    subscriptions: &mut subscriptions,
+                    in_flight_publishes: &mut in_flight_publishes,
                 },
                 &shutdown,
             );
 
-            // Vector-side state: disconnected, same generation, the in-flight
-            // SUBSCRIBE forgotten, every per-connection schedule
+            // Vector-side state: disconnected, same generation, in-flight
+            // packet ids forgotten, every per-connection schedule
             // cancelled -- except the reconnect-rate cooldown, which
             // deliberately survives so a suppression right after the
             // reconnect is still paced.
@@ -1357,8 +1510,7 @@ mod tests {
             assert!(!forced_reconnect.disconnect_sent());
             assert!(forced_reconnect.cooldown_until.is_some());
             assert_eq!(resubscribe_retry_at, None);
-            assert!(subscriptions.in_flight.is_empty());
-            assert_eq!(subscriptions.unconfirmed, ["vector"]);
+            assert!(in_flight_publishes.packet_ids.is_empty());
             assert_eq!(finalizer.is_some(), acknowledgements);
 
             // rumqttc's replay queue (private since rumqttc-v4-next, so

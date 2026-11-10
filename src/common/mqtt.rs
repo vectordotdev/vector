@@ -109,6 +109,9 @@ pub enum ConfigurationError {
         "`keep_alive` must be at least 1 second when `acknowledgements` are enabled: with keep-alive disabled, a silently dead connection is never detected on a quiet topic, and unacknowledged messages would never be redelivered."
     ))]
     AcknowledgementsRequireKeepAlive,
+    /// No topic filter provided
+    #[snafu(display("At least one MQTT topic filter must be configured in `topic`."))]
+    NoTopicFilters,
     /// Invalid topic filter provided
     #[snafu(display(
         "`{topic}` is not a valid MQTT topic filter: `#` must be the last, standalone level and `+` must occupy a whole level."

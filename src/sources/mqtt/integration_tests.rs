@@ -752,3 +752,75 @@ async fn mqtt_resubscribes_after_session_loss() {
     })
     .await;
 }
+
+/// A broker may retransmit an unacknowledged QoS 1 publish on the same
+/// connection; EMQX does so on its retry interval, which the integration
+/// environment shortens to 2 seconds. With acknowledgements enabled the
+/// source withholds the PUBACK until the event is delivered, so a slow sink
+/// makes that happen. The retransmission is the same message and must not be
+/// processed again: besides duplicating the event, it would queue a second
+/// PUBACK for the same packet id, which rumqttc rejects once the first is
+/// sent, tearing down the connection.
+#[tokio::test]
+async fn mqtt_drops_retransmissions_of_an_unacknowledged_publish() {
+    trace_init();
+
+    let topic = "source-retransmission-test";
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(format!("sourceRetransmit{}", random_string(6))),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    // Events from this sender are only finalized when dropped, so holding
+    // one keeps its PUBACK pending.
+    let (tx, mut rx) = SourceSender::new_test();
+    tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    // Wait for the subscription to be established before publishing.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client();
+    producer
+        .publish(topic, "first".as_bytes(), PublishOptions::at_least_once())
+        .await
+        .unwrap();
+
+    let held = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("timed out waiting for the first delivery")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&held), "first");
+
+    // Hold the event across at least two broker retry intervals.
+    assert!(
+        timeout(Duration::from_secs(5), rx.next()).await.is_err(),
+        "a retransmission of the unacknowledged publish was forwarded again"
+    );
+
+    // Delivering the event sends its PUBACK. The connection must still be
+    // healthy and the next message must flow.
+    drop(held);
+    producer
+        .publish(topic, "second".as_bytes(), PublishOptions::at_least_once())
+        .await
+        .unwrap();
+    let next = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("timed out waiting for a delivery after the acknowledgement")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&next), "second");
+}
