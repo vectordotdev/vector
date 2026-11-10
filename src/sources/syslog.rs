@@ -540,14 +540,10 @@ pub fn udp(
             }
 
             let count = output.len();
-            tokio::select! {
-                result = out.send_batch(output) => {
-                    if let Err(error) = result {
-                        emit(StreamClosedError { count });
-                        return Err(error.into());
-                    }
-                }
-                _ = &mut shutdown => return Ok(()),
+            // Drain decoded events during graceful shutdown. The topology enforces the deadline.
+            if let Err(error) = out.send_batch(output).await {
+                emit(StreamClosedError { count });
+                return Err(error.into());
             }
         }
     })
@@ -1458,6 +1454,76 @@ mod test {
             assert_eq!(output_messages, input_messages);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_drains_backpressured_batch() {
+        use std::sync::Arc;
+
+        use tokio::sync::Notify;
+        use vector_lib::{event::EventContainer, source_sender::PostProcessor};
+
+        struct NotifyOnSend(Notify);
+
+        impl PostProcessor for NotifyOnSend {
+            fn process_log(&self, _: &mut LogEvent) {
+                self.0.notify_one();
+            }
+        }
+
+        let (mut out, mut output) = SourceSender::new_test_sender_with_options(1, None);
+        out.send_event(crate::event::LogEvent::from("buffered"))
+            .await
+            .unwrap();
+        let sending = Arc::new(NotifyOnSend(Notify::new()));
+        out.set_post_processor(&(Arc::clone(&sending) as Arc<dyn PostProcessor>));
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let (_guard, address) = next_addr();
+        let config = SyslogConfig::from_mode(Mode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        });
+        let mut context = SourceContext::new_test(out, None);
+        context.shutdown = shutdown;
+        let mut source = config.build(context).await.unwrap();
+        assert!(futures::poll!(&mut source).is_pending());
+        let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sender
+            .send_to(
+                b"<13>1 2026-11-10T03:00:00Z host app - - - pending",
+                address,
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::select! {
+                result = &mut source => panic!("source exited before sending: {result:?}"),
+                () = sending.0.notified() => {},
+            }
+        })
+        .await
+        .unwrap();
+
+        stop.cancel();
+        assert!(futures::poll!(&mut source).is_pending());
+        output.next().await.unwrap();
+        let (result, events) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(source, async {
+                output
+                    .into_stream()
+                    .flat_map(|item| futures::stream::iter(item.events.into_events()))
+                    .collect::<Vec<_>>()
+                    .await
+            })
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "pending".into()
+        );
     }
 
     #[tokio::test]

@@ -358,8 +358,7 @@ pub(super) fn udp(
                             for event in events {
                                 output.push(event);
                                 if output.len() >= send_batch_size
-                                    && !send_buffered_events(&mut out, &mut shutdown, &mut output)
-                                        .await
+                                    && !send_buffered_events(&mut out, &mut output).await
                                 {
                                     return Ok(());
                                 }
@@ -381,31 +380,103 @@ pub(super) fn udp(
                 continue;
             }
 
-            if !send_buffered_events(&mut out, &mut shutdown, &mut output).await {
+            if !send_buffered_events(&mut out, &mut output).await {
                 return Ok(());
             }
         }
     })
 }
 
-async fn send_buffered_events(
-    out: &mut SourceSender,
-    shutdown: &mut ShutdownSignal,
-    output: &mut Vec<Event>,
-) -> bool {
+async fn send_buffered_events(out: &mut SourceSender, output: &mut Vec<Event>) -> bool {
     let events = std::mem::take(output);
     let count = events.len();
     debug_assert!(count > 0);
 
-    tokio::select! {
-        result = out.send_batch(events) => {
-            if result.is_err() {
-                emit(StreamClosedError { count });
-                false
-            } else {
-                true
-            }
+    // Drain decoded events during graceful shutdown. The topology enforces the deadline.
+    if out.send_batch(events).await.is_err() {
+        emit(StreamClosedError { count });
+        false
+    } else {
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use futures::StreamExt;
+    use tokio::{
+        net::UdpSocket,
+        sync::Notify,
+        time::{Duration, timeout},
+    };
+    use vector_lib::{
+        event::{EventContainer, LogEvent},
+        source_sender::PostProcessor,
+    };
+
+    use super::*;
+    use crate::config::{SourceConfig, SourceContext};
+
+    struct NotifyOnSend(Notify);
+
+    impl PostProcessor for NotifyOnSend {
+        fn process_log(&self, _: &mut LogEvent) {
+            self.0.notify_one();
         }
-        _ = shutdown => false,
+    }
+
+    #[tokio::test]
+    async fn shutdown_drains_backpressured_batch() {
+        let (mut out, mut output) = SourceSender::new_test_sender_with_options(1, None);
+        out.send_event(crate::event::LogEvent::from("buffered"))
+            .await
+            .unwrap();
+        let sending = Arc::new(NotifyOnSend(Notify::new()));
+        out.set_post_processor(&(Arc::clone(&sending) as Arc<dyn PostProcessor>));
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let (_guard, address) = crate::test_util::addr::next_addr();
+        let config = SocketConfig::from(UdpConfig::from_address(address.into()));
+        let mut context = SourceContext::new_test(out, None);
+        context.shutdown = shutdown;
+        let mut source = config.build(context).await.unwrap();
+        // Poll once to bind the socket before sending.
+        assert!(futures::poll!(&mut source).is_pending());
+        let sender = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sender.send_to(b"pending", address).await.unwrap();
+        timeout(Duration::from_secs(5), async {
+            tokio::select! {
+                result = &mut source => panic!("source exited before sending: {result:?}"),
+                () = sending.0.notified() => {},
+            }
+        })
+        .await
+        .unwrap();
+
+        stop.cancel();
+        assert!(futures::poll!(&mut source).is_pending());
+        // Free the occupied output slot only after shutdown has been observed.
+        output.next().await.unwrap();
+        let (result, events) = timeout(Duration::from_secs(5), async {
+            tokio::join!(source, async {
+                output
+                    .into_stream()
+                    .flat_map(|item| futures::stream::iter(item.events.into_events()))
+                    .collect::<Vec<_>>()
+                    .await
+            })
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[crate::config::log_schema()
+                .message_key()
+                .unwrap()
+                .to_string()],
+            "pending".into()
+        );
     }
 }

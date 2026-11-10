@@ -664,13 +664,8 @@ async fn listen(
                                     &mut output,
                                 );
                                 while output.len() >= send_batch_size {
-                                    if !send_buffered_events(
-                                        &mut out,
-                                        &mut shutdown,
-                                        &mut output,
-                                        send_batch_size,
-                                    )
-                                    .await
+                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
+                                        .await
                                     {
                                         return Ok(());
                                     }
@@ -721,13 +716,8 @@ async fn listen(
                             Ok(events) => {
                                 append_events(events, None, &handle_events, &mut output);
                                 while output.len() >= send_batch_size {
-                                    if !send_buffered_events(
-                                        &mut out,
-                                        &mut shutdown,
-                                        &mut output,
-                                        send_batch_size,
-                                    )
-                                    .await
+                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
+                                        .await
                                     {
                                         return Ok(());
                                     }
@@ -757,13 +747,8 @@ async fn listen(
                                     &mut output,
                                 );
                                 while output.len() >= send_batch_size {
-                                    if !send_buffered_events(
-                                        &mut out,
-                                        &mut shutdown,
-                                        &mut output,
-                                        send_batch_size,
-                                    )
-                                    .await
+                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
+                                        .await
                                     {
                                         return Ok(());
                                     }
@@ -782,7 +767,7 @@ async fn listen(
         }
 
         while !output.is_empty() {
-            if !send_buffered_events(&mut out, &mut shutdown, &mut output, send_batch_size).await {
+            if !send_buffered_events(&mut out, &mut output, send_batch_size).await {
                 return Ok(());
             }
         }
@@ -801,7 +786,6 @@ fn append_events(
 
 async fn send_buffered_events(
     out: &mut SourceSender,
-    shutdown: &mut ShutdownSignal,
     output: &mut Vec<Event>,
     max_events: usize,
 ) -> bool {
@@ -816,24 +800,105 @@ async fn send_buffered_events(
         byte_size: events.estimated_json_encoded_size_of(),
         count,
     });
-    tokio::select! {
-        result = out.send_batch(events) => {
-            if result.is_err() {
-                emit(StreamClosedError { count });
-                false
-            } else {
-                true
-            }
-        }
-        _ = shutdown => false,
+    // Drain decoded events during graceful shutdown. The topology enforces the deadline.
+    if out.send_batch(events).await.is_err() {
+        emit(StreamClosedError { count });
+        false
+    } else {
+        true
     }
 }
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
-    use tokio::net::UnixDatagram;
+    use std::sync::Arc;
 
-    use super::{UnixDatagramBatchReceiver, bind_unix_datagram, unnamed_socket_host};
+    use futures::StreamExt;
+    use tokio::net::UnixDatagram;
+    use tokio::{
+        sync::Notify,
+        time::{Duration, timeout},
+    };
+    use vector_lib::{
+        codecs::BytesDeserializerConfig, config::LogNamespace, event::EventContainer,
+    };
+
+    use super::{
+        DatagramDecoder, UnixDatagramBatchReceiver, bind_unix_datagram, listen, unnamed_socket_host,
+    };
+    use crate::{SourceSender, shutdown::ShutdownSignal};
+
+    #[tokio::test]
+    async fn shutdown_drains_backpressured_batch() {
+        for framed in [false, true] {
+            for capture_peer_address in [false, true] {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("receiver");
+                let socket = UnixDatagram::bind(&path).unwrap();
+                let sender = UnixDatagram::bind(directory.path().join("sender")).unwrap();
+                sender.connect(&path).unwrap();
+
+                let (mut out, mut output) = SourceSender::new_test_sender_with_options(1, None);
+                out.send_event(crate::event::LogEvent::from("buffered"))
+                    .await
+                    .unwrap();
+                let processing = Arc::new(Notify::new());
+                let notify = Arc::clone(&processing);
+                let decoder = if framed {
+                    DatagramDecoder::Framed(Box::default())
+                } else {
+                    DatagramDecoder::Message(
+                        Box::new(BytesDeserializerConfig::new().build()),
+                        LogNamespace::Legacy,
+                    )
+                };
+                let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+                let mut source = Box::pin(listen(
+                    socket,
+                    1024,
+                    None,
+                    decoder,
+                    capture_peer_address,
+                    shutdown,
+                    move |_, _| notify.notify_one(),
+                    out,
+                ));
+                sender.send(b"pending").await.unwrap();
+                timeout(Duration::from_secs(5), async {
+                    tokio::select! {
+                        result = &mut source => panic!("source exited before decoding: {result:?}"),
+                        () = processing.notified() => {},
+                    }
+                })
+                .await
+                .unwrap();
+
+                stop.cancel();
+                assert!(futures::poll!(&mut source).is_pending());
+                output.next().await.unwrap();
+                let (result, events) = timeout(Duration::from_secs(5), async {
+                    tokio::join!(source, async {
+                        output
+                            .into_stream()
+                            .flat_map(|item| futures::stream::iter(item.events.into_events()))
+                            .collect::<Vec<_>>()
+                            .await
+                    })
+                })
+                .await
+                .unwrap();
+                result.unwrap();
+                assert_eq!(events.len(), 1);
+                assert_eq!(
+                    events[0].as_log()[crate::config::log_schema()
+                        .message_key()
+                        .unwrap()
+                        .to_string()],
+                    "pending".into()
+                );
+            }
+        }
+    }
 
     #[tokio::test]
     async fn rebinds_abandoned_unix_datagram_socket() {
@@ -844,8 +909,8 @@ mod tests {
         let sender = UnixDatagram::unbound().unwrap();
         sender.send_to(b"resumed", &path).await.unwrap();
         let mut buffer = [0; 32];
-        let received = receiver.recv(&mut buffer).await.unwrap();
-        assert_eq!(&buffer[..received], b"resumed");
+        let byte_size = receiver.recv(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..byte_size], b"resumed");
     }
 
     #[tokio::test]
@@ -860,8 +925,8 @@ mod tests {
         let sender = UnixDatagram::unbound().unwrap();
         sender.send_to(b"original", &path).await.unwrap();
         let mut buffer = [0; 32];
-        let received = receiver.recv(&mut buffer).await.unwrap();
-        assert_eq!(&buffer[..received], b"original");
+        let byte_size = receiver.recv(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..byte_size], b"original");
     }
 
     #[tokio::test]

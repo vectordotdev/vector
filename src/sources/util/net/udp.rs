@@ -559,7 +559,7 @@ mod tests {
                 libc::SOL_SOCKET,
                 libc::SO_TIMESTAMPNS,
                 (&raw const enabled).cast(),
-                mem::size_of_val(&enabled) as libc::socklen_t,
+                libc::socklen_t::try_from(mem::size_of_val(&enabled)).unwrap(),
             )
         };
         assert_eq!(result, 0, "failed to enable SO_TIMESTAMPNS");
@@ -641,7 +641,8 @@ mod tests {
             (*control_header).cmsg_level = libc::SOL_UDP;
             (*control_header).cmsg_type = UDP_GRO;
             (*control_header).cmsg_len =
-                libc::CMSG_LEN(mem::size_of::<libc::c_int>() as libc::c_uint) as usize;
+                libc::CMSG_LEN(libc::c_uint::try_from(mem::size_of::<libc::c_int>()).unwrap())
+                    as usize;
             ptr::write_unaligned(libc::CMSG_DATA(control_header).cast::<libc::c_int>(), 1_200);
         }
 
