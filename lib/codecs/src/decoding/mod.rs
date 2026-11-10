@@ -549,7 +549,7 @@ impl DeserializerConfig {
             ) => "text/plain",
             #[cfg(feature = "syslog")]
             (DeserializerConfig::Syslog(_), _) => "text/plain",
-            (DeserializerConfig::MessagePack, _) => "application/octet-stream",
+            (DeserializerConfig::MessagePack, _) => "application/msgpack",
         }
     }
 }
