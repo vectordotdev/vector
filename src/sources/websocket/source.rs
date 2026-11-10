@@ -433,7 +433,7 @@ impl PingManager {
         tokio::select! {
             res = ws_sink.send(self.message.clone()) => {
                 if let Err(error) = res {
-                    emit!(WebSocketSendError { error: &error });
+                    emit(WebSocketSendError { error: &error });
                     return Err(WebSocketSourceError::Tungstenite { source: error });
                 }
             }
