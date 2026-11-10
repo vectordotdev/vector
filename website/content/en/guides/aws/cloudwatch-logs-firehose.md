@@ -373,9 +373,11 @@ delivery stream.
 ## Testing it out
 
 To make sure everything is wired up correctly, let's send some logs to the log
-group we've setup. We can use Vector for this too!
+group we've setup. We can use Vector for this too! Generate a test configuration
+from the variables set earlier:
 
-```yaml
+```bash
+cat > test.yaml <<EOF
 sources:
   stdin:
     type: "stdin"
@@ -383,12 +385,15 @@ sinks:
   cloudwatch:
     type: "aws_cloudwatch_logs"
     inputs: ["stdin"]
-    group_name: "/test/vector" # the same value as LOG_GROUP
+    group_name: "${LOG_GROUP:?Set LOG_GROUP first}"
     stream_name: "test"
-    region: "us-east-1"
+    region: "${AWS_REGION:?Set AWS_REGION first}"
     encoding:
       codec: "json"
+EOF
 ```
+
+The shell expands the variables when writing `test.yaml`, so Vector reads the actual values.
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
 [AWS Authentication][aws_auth] section for this sink to see how to configure the
@@ -403,7 +408,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-flog -f json | vector --config config.yaml
+flog -f json | vector --config test.yaml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
