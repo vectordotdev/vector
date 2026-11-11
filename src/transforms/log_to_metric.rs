@@ -817,10 +817,11 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     {
         for (key, value) in el {
             match value {
-                Value::Array(arr) if !arr.is_empty() => {
-                    for arr_el in arr {
-                        tags.insert(key.to_string(), bytes_to_str(arr_el));
-                    }
+                Value::Array(arr) => {
+                    tags.set_multi_value(
+                        key.to_string(),
+                        arr.iter().map(|v| TagValue::from(bytes_to_str(v))),
+                    );
                 }
                 _ => {
                     tags.insert(key.to_string(), bytes_to_str(value));
@@ -2404,14 +2405,17 @@ mod tests {
             .into_metric();
         let tags = metric.tags().expect("Metric should have tags");
 
-        assert_eq!(
-            tags.iter_all().collect::<Vec<_>>(),
+        let mut expected_tags = MetricTags::default();
+        expected_tags.set_multi_value(
+            "key".to_string(),
             vec![
-                ("env", None),
-                ("host", Some("localhost")),
-                ("key", Some("value1")),
-                ("key", Some("value2")),
-            ]
+                TagValue::Value("value1".to_string()),
+                TagValue::Value("value2".to_string()),
+            ],
         );
+        expected_tags.set_multi_value("env".to_string(), vec![]);
+        expected_tags.insert("host".to_string(), "localhost".to_string());
+
+        assert_eq!(tags.to_owned(), expected_tags);
     }
 }
