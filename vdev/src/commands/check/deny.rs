@@ -21,6 +21,16 @@ pub struct Cli {
     /// Checkout of the base revision. Only fail on errors that this checkout does not also have.
     #[arg(long, value_name = "DIR")]
     base_dir: Option<PathBuf>,
+
+    /// Lints to allow. All other warnings are errors. Pass an empty value to allow none.
+    #[arg(
+        short = 'A',
+        long,
+        value_name = "LINT",
+        value_delimiter = ',',
+        default_values = ["duplicate", "source-not-allowed"]
+    )]
+    allow: Vec<String>,
 }
 
 impl Cli {
@@ -63,13 +73,13 @@ impl Cli {
         bail!("This change adds cargo deny errors. Run `make check-deny` for details.")
     }
 
-    fn args<'a>(&self, format: &'a str) -> [&'a str; 8] {
+    fn args<'a>(&'a self, format: &'a str) -> Vec<&'a str> {
         let check = if self.licenses_only {
             "licenses"
         } else {
             "all"
         };
-        [
+        let mut args = vec![
             "deny",
             "--log-level",
             "error",
@@ -78,7 +88,13 @@ impl Cli {
             "--all-features",
             "check",
             check,
-        ]
+            "--deny",
+            "warnings",
+        ];
+        for lint in self.allow.iter().filter(|lint| !lint.is_empty()) {
+            args.extend(["--allow", lint]);
+        }
+        args
     }
 
     /// Run `cargo deny` in `dir` and return its errors.

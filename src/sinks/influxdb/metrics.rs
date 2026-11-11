@@ -206,7 +206,7 @@ impl ValidatedSink for InfluxDbConfig {
             tags: self.tags.clone(),
             quantiles: self.quantiles.clone(),
         };
-        let service = HttpService::new(client, request_builder).with_response_decompression();
+        let service = HttpService::new(client, request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 self.request.into_settings(),
