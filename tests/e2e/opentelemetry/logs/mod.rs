@@ -27,7 +27,7 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
                 LOGS_REQUEST_MESSAGE_TYPE,
                 line,
             )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .map_err(|e| format!("Line {}: {e}", line_num + 1))?
             .resource_logs,
         );
     }
@@ -142,14 +142,14 @@ fn vector_sink_otel_sink_logs_match() {
     );
 }
 
-#[test]
-fn vector_component_received_events_total_counts_individual_log_records() {
-    // This test verifies that when use_otlp_decoding is enabled, the
+#[tokio::test]
+async fn vector_component_received_events_total_counts_individual_log_records() {
+    // This test verifies that when OTLP preservation is enabled, the
     // component_received_events_total metric counts individual log records
     // within OTLP batches, not the number of batch requests.
     // This ensures consistency with other Vector sources and with the same
-    // OpenTelemetry source when use_otlp_decoding is disabled.
+    // OpenTelemetry source when native conversion is enabled.
     use crate::opentelemetry::assert_component_received_events_total;
 
-    assert_component_received_events_total("logs", EXPECTED_LOG_COUNT);
+    assert_component_received_events_total(EXPECTED_LOG_COUNT).await;
 }

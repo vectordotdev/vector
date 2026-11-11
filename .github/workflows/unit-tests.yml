@@ -22,7 +22,7 @@ on:
         required: false
         type: string
       coverage:
-        description: "Collect code coverage (sets COVERAGE=true for make targets)"
+        description: "Collect workspace coverage (requires ci-coverage-tools from coverage.yml)"
         required: false
         type: boolean
         default: false
@@ -61,12 +61,13 @@ env:
 jobs:
   tests:
     name: Tests
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -80,6 +81,7 @@ jobs:
           datadog-ci: ${{ !inputs.coverage }}
           protoc: true
           libsasl2: true
+          cargo-cache: true
 
       - name: Run tests
         run: |
@@ -92,16 +94,8 @@ jobs:
             fi
           }
 
-          # Mirror the Makefile's OS-based default: `default-msvc` on Windows,
-          # `default` elsewhere. Keep in sync with the FEATURES defaults in Makefile.
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then
-            DEFAULT_FEATURES="default-msvc"
-          else
-            DEFAULT_FEATURES="default"
-          fi
-
           if [[ "${{ inputs.default }}" == "true" ]]; then
-            FEATURES="${DEFAULT_FEATURES}"
+            FEATURES="default"
           else
             FEATURES=""
           fi
@@ -131,16 +125,34 @@ jobs:
         if: ${{ !inputs.coverage && always() }}
         run: scripts/upload-test-results.sh
 
-      - name: Generate lcov report
+      - name: Download coverage tooling
+        if: ${{ inputs.coverage }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools
+
+      - name: Use workflow coverage tooling
         if: ${{ inputs.coverage }}
         run: |
-          make coverage-report
-          # Normalize absolute source paths to relative so they merge cleanly with
-          # coverage from the containerized integration tests (which use SF:src/...).
-          sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
+          chmod +x "$RUNNER_TEMP/coverage-tools/vdev"
+          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
 
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - name: Generate and seal workspace coverage
+        if: ${{ inputs.coverage }}
+        run: |
+          # Explicit selection is needed for libraries in a non-virtual workspace.
+          # Use the workflow's command even if the tested ref has an older Makefile.
+          mkdir -p target/coverage-unit
+          cargo llvm-cov report --package '*' --lcov --output-path target/coverage-unit/lcov.info
+          vdev build coverage seal \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --artifact coverage-unit --directory target/coverage-unit
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ inputs.coverage }}
         with:
           name: coverage-unit
-          path: lcov.info
+          path: target/coverage-unit/
+          if-no-files-found: error
+          overwrite: true

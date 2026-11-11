@@ -1,9 +1,9 @@
-use std::io::Read;
+use std::collections::HashMap;
+use vector_lib::internal_event::{emit, register};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::Utc;
-use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use vector_common::constants::GZIP_MAGIC;
@@ -19,7 +19,10 @@ use vector_lib::{
     lookup::{PathPrefix, metadata_path, path},
     source_sender::SendError,
 };
-use vrl::compiler::SecretTarget;
+use vrl::{
+    compiler::SecretTarget,
+    value::{KeyString, ObjectMap, Value},
+};
 use warp::reject;
 
 use super::{
@@ -35,7 +38,11 @@ use crate::{
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
-    sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
+    sources::{
+        aws_kinesis_firehose::AwsKinesisFirehoseConfig,
+        http_server::HttpConfigParamKind,
+        util::decompression::{CappedDecoder, is_decompressed_size_limit_error},
+    },
 };
 
 #[derive(Clone)]
@@ -47,17 +54,25 @@ pub(super) struct Context {
     pub(super) bytes_received: Registered<BytesReceived>,
     pub(super) out: SourceSender,
     pub(super) log_namespace: LogNamespace,
+    pub(super) common_attributes: Vec<HttpConfigParamKind>,
 }
 
-/// Publishes decoded events from the FirehoseRequest to the pipeline
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+/// Publishes decoded events from the `FirehoseRequest` to the pipeline
 pub(super) async fn firehose(
     request_id: String,
     source_arn: String,
+    common_attributes: HashMap<String, String>,
     request: FirehoseRequest,
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let log_namespace = context.log_namespace;
-    let events_received = register!(EventsReceived);
+    let events_received = register(EventsReceived);
+    let common_attributes_map =
+        build_common_attributes_map(&context.common_attributes, &common_attributes);
 
     for record in request.records {
         let bytes = decode_record(&record, context.compression)
@@ -95,7 +110,7 @@ pub(super) async fn firehose(
                                 log,
                                 log_schema().source_type_key(),
                                 path!("source_type"),
-                                Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
+                                Value::from_static_str(AwsKinesisFirehoseConfig::NAME),
                             );
                             // This handles the transition from the original timestamp logic. Originally the
                             // `timestamp_key` was always populated by the `request.timestamp` time.
@@ -115,22 +130,32 @@ pub(super) async fn firehose(
                                         );
                                     }
                                 }
-                            };
+                            }
 
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("request_id"))),
                                 path!("request_id"),
-                                request_id.to_owned(),
+                                request_id.clone(),
                             );
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
                                 path!("source_arn"),
-                                source_arn.to_owned(),
+                                source_arn.clone(),
                             );
+
+                            if !common_attributes_map.is_empty() {
+                                log_namespace.insert_source_metadata(
+                                    AwsKinesisFirehoseConfig::NAME,
+                                    log,
+                                    Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
+                                    path!("common_attributes"),
+                                    common_attributes_map.clone(),
+                                );
+                            }
 
                             if context.store_access_key
                                 && let Some(access_key) = &request.access_key
@@ -146,7 +171,7 @@ pub(super) async fn firehose(
                     match context.out.send_batch(events).await {
                         Ok(()) => (),
                         Err(SendError::Closed) => {
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             let error = RequestError::ShuttingDown {
                                 request_id: request_id.clone(),
                             };
@@ -217,15 +242,23 @@ fn decode_record(
 
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
-        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
-            compression: compression.to_owned(),
-        }),
+        Compression::Gzip => {
+            decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu { compression })
+        }
         Compression::Auto => {
             if is_gzip(&buf) {
                 decode_gzip(&buf[..]).or_else(|error| {
-                    emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                    // An exceeded size cap means the magic bytes really were gzip and the payload
+                    // is oversized, so reject it. Only fall back to forwarding the raw bytes when
+                    // auto-detection guessed wrong (valid-looking magic, but not actually gzip).
+                    if is_decompressed_size_limit_error(&error) {
+                        return Err(error).with_context(|_| DecompressionSnafu {
+                            compression: Compression::Gzip,
+                        });
+                    }
+                    emit(AwsKinesisFirehoseAutomaticRecordDecodeError {
                         compression: Compression::Gzip,
-                        error
+                        error,
                     });
                     Ok(Bytes::from(buf))
                 })
@@ -248,12 +281,44 @@ fn is_gzip(data: &[u8]) -> bool {
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
-    let mut decoded = Vec::new();
+    // Cap the decompressed output so a gzip-bomb record cannot drive unbounded allocation.
+    CappedDecoder::gzip(data).decompress().map(Bytes::from)
+}
 
-    let mut gz = MultiGzDecoder::new(data);
-    gz.read_to_end(&mut decoded)?;
+fn build_common_attributes_map(
+    common_attributes_config: &[HttpConfigParamKind],
+    common_attributes: &HashMap<String, String>,
+) -> ObjectMap {
+    let mut common_attributes_map = ObjectMap::new();
 
-    Ok(Bytes::from(decoded))
+    for common_attribute_config in common_attributes_config {
+        match common_attribute_config {
+            HttpConfigParamKind::Exact(common_attribute_name) => {
+                let value = common_attributes
+                    .get(common_attribute_name)
+                    .map(String::as_bytes);
+                common_attributes_map.insert(
+                    KeyString::from(common_attribute_name.to_owned()),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+            HttpConfigParamKind::Glob(common_attribute_pattern) => {
+                for common_attribute_name in common_attributes.keys() {
+                    if common_attribute_pattern.matches(common_attribute_name) {
+                        let value = common_attributes
+                            .get(common_attribute_name)
+                            .map(String::as_bytes);
+                        common_attributes_map.insert(
+                            KeyString::from(common_attribute_name.to_owned()),
+                            Value::from(value.map(Bytes::copy_from_slice)),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    common_attributes_map
 }
 
 #[cfg(test)]

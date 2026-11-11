@@ -9,7 +9,6 @@ components: transforms: reduce: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
@@ -22,7 +21,6 @@ components: transforms: reduce: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.reduce.configuration

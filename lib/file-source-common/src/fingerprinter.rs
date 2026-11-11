@@ -5,13 +5,13 @@ use std::{
     time,
 };
 
-use async_compression::tokio::bufread::GzipDecoder;
 use crc::Crc;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
+use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
@@ -71,7 +71,7 @@ impl SupportedCompressionAlgorithms {
         vec![SupportedCompressionAlgorithms::Gzip]
     }
 
-    fn magic_header_bytes(&self) -> &'static [u8] {
+    fn magic_header_bytes(self) -> &'static [u8] {
         match self {
             SupportedCompressionAlgorithms::Gzip => GZIP_MAGIC,
         }
@@ -128,7 +128,7 @@ impl UncompressedReader for UncompressedReaderImpl {
         // To support new compression algorithms, add them below
         match Self::check(fp).await? {
             Some(SupportedCompressionAlgorithms::Gzip) => Ok(Box::new(BufReader::new(
-                GzipDecoder::new(BufReader::new(fp)),
+                gzip_multiple_decoder(BufReader::new(fp)),
             ))),
             // No compression, or read the raw bytes
             None => Ok(Box::new(BufReader::new(fp))),
@@ -145,6 +145,12 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
     let mut skipped_bytes = 0;
     while skipped_bytes < n {
         let chunk = reader.fill_buf().await?;
+        if chunk.is_empty() {
+            return Err(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                "header is incomplete",
+            ));
+        }
         let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
         skipped_bytes += bytes_to_skip;
@@ -153,6 +159,7 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
 }
 
 impl Fingerprinter {
+    #[must_use]
     pub fn new(
         strategy: FingerprintStrategy,
         max_line_length: usize,
@@ -170,7 +177,7 @@ impl Fingerprinter {
 
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
-        use FileFingerprint::*;
+        use FileFingerprint::{DevInode, FirstLinesChecksum};
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
@@ -204,10 +211,10 @@ impl Fingerprinter {
     ) -> Option<FileFingerprint> {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
-                if !metadata.is_dir() {
-                    self.fingerprint(path).await.map(Some)
-                } else {
+                if metadata.is_dir() {
                     Ok(None)
+                } else {
+                    self.fingerprint(path).await.map(Some)
                 }
             }
             Err(e) => Err(e),
@@ -235,7 +242,7 @@ impl Fingerprinter {
                     _ => {
                         emitter.emit_file_fingerprint_read_error(path, error);
                     }
-                };
+                }
                 // For scenarios other than UnexpectedEOF, remove the path from the small files map.
                 known_small_files.remove(&path.to_path_buf());
             })
@@ -264,9 +271,8 @@ async fn fingerprinter_read_until(
                 if count <= 1 {
                     total_read += pos + 1;
                     break 'main;
-                } else {
-                    count -= 1;
                 }
+                count -= 1;
             }
         }
         total_read += read;
@@ -365,7 +371,7 @@ mod test {
                 file,
                 b"hello world "
                     .iter()
-                    .cloned()
+                    .copied()
                     .cycle()
                     .clone()
                     .take(amount)
@@ -539,6 +545,42 @@ mod test {
     }
 
     #[tokio::test]
+    async fn incomplete_header_can_be_retried_after_append() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 4,
+                lines: 1,
+            },
+            64,
+            false,
+        );
+
+        for contents in [b"".as_slice(), b"hdr"] {
+            fs::write(&path, contents).unwrap();
+            assert_eq!(
+                fingerprinter.fingerprint(&path).await.unwrap_err().kind(),
+                std::io::ErrorKind::UnexpectedEof
+            );
+        }
+
+        // Finish the header and append a complete record to the same file.
+        let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
+        file.write_all(b"!record\n").unwrap();
+        let fingerprint = fingerprinter.fingerprint(&path).await.unwrap();
+        // The expected checksum includes only the record, not its header.
+        assert_eq!(
+            fingerprint,
+            super::FileFingerprint::FirstLinesChecksum(
+                super::FINGERPRINT_CRC.checksum(b"record\n")
+            )
+        );
+    }
+
+    #[tokio::test]
     async fn test_first_two_lines_checksum_fingerprint_with_headers() {
         let max_line_length = 64;
         let mut fingerprinter = Fingerprinter::new(
@@ -666,7 +708,7 @@ mod test {
             panic!();
         }
 
-        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
 
         fn emit_file_deleted(&self, _: &Path) {}
 

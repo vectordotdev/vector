@@ -1,8 +1,17 @@
 use vector_vrl_category::Category;
 use vrl::prelude::*;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn remove_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     ctx.target_mut().remove_secret(key_str.as_ref());
     Ok(Value::Null)
 }

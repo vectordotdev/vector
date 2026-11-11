@@ -8,7 +8,7 @@ use super::{
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub struct RedisService {
+pub(super) struct RedisService {
     pub(super) conn: RedisConnection,
     pub(super) data_type: super::DataType,
 }
@@ -50,14 +50,16 @@ impl Service<RedisRequest> for RedisService {
                 },
                 super::DataType::SortedSet(method) => match method {
                     SortedSetMethod::ZAdd => {
+                        // https://github.com/vectordotdev/vector/issues/23659
+                        #[allow(
+                            clippy::cast_precision_loss,
+                            reason = "Preserve Redis score rounding."
+                        )]
+                        let score = kv.score.unwrap_or(0) as f64;
                         if count > 1 {
-                            pipe.atomic().zadd(
-                                kv.key,
-                                kv.value.as_ref(),
-                                kv.score.unwrap_or(0) as f64,
-                            );
+                            pipe.atomic().zadd(kv.key, kv.value.as_ref(), score);
                         } else {
-                            pipe.zadd(kv.key, kv.value.as_ref(), kv.score.unwrap_or(0) as f64);
+                            pipe.zadd(kv.key, kv.value.as_ref(), score);
                         }
                     }
                 },
@@ -94,7 +96,7 @@ impl Service<RedisRequest> for RedisService {
     }
 }
 
-pub struct RedisResponse {
+pub(super) struct RedisResponse {
     pub event_status: Vec<bool>,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,

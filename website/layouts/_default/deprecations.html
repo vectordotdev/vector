@@ -1,0 +1,56 @@
+{{ define "title" }}
+{{ .Title }} | Vector documentation
+{{ end }}
+
+{{ define "main" }}
+{{ $entries := partialCached "deprecations/entries.html" . }}
+{{ $pending := $entries.active }}
+{{ $enacted := $entries.enacted }}
+{{ $latest := index site.Data.docs.versions 0 }}
+
+<div class="deprecations-layout relative max-w-3xl lg:max-w-6xl mx-auto px-6 lg:px-8 mt-16">
+  <main aria-label="Deprecations" class="min-w-0 md:px-0 pb-32">
+    <div class="mb-4 md:mb-6">
+      {{ partial "breadcrumb.html" . }}
+    </div>
+
+    <div class="pb-1 md:pb-2 lg:pb-3">
+      {{ partial "hero.html" . }}
+    </div>
+
+    <div id="page-content" data-pagefind-body data-toc-headings="#active-deprecations,#past-deprecations,.changelog-card" class="mt-10">
+      {{ if gt (len $pending) 0 }}
+      <div>
+        <div class="prose dark:prose-invert max-w-none">
+          {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2) }}
+          <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecations become eligible for removal two minor versions after their announcement.</p>
+        </div>
+
+        {{ partial "deprecations/list.html" (dict "entries" $pending "sort_by" "deprecation version") }}
+      </div>
+      {{ end }}
+
+      {{ if gt (len $enacted) 0 }}
+      <div class="mt-12">
+        <div class="prose dark:prose-invert max-w-none">
+          {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2) }}
+          <p>These features have been removed from Vector as of version <strong>v{{ $latest }}</strong>.</p>
+        </div>
+
+        {{ partial "deprecations/list.html" (dict "entries" $enacted "sort_by" "removal version" "class" "opacity-75") }}
+      </div>
+      {{ end }}
+
+      {{ if and (eq (len $pending) 0) (eq (len $enacted) 0) }}
+      <p class="text-gray-500 dark:text-gray-400">No deprecations at this time.</p>
+      {{ end }}
+    </div>
+  </main>
+
+  <div class="hidden min-w-0 lg:block">
+    <aside aria-label="Table of contents" class="deprecations-toc sticky top-6">
+      {{ partial "toc.html" . }}
+    </aside>
+  </div>
+</div>
+{{ end }}

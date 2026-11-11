@@ -1,0 +1,31 @@
+[package]
+name = "vector-http"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+arc-swap.workspace = true
+bytes.workspace = true
+http = { version = "1.0", default-features = false, features = ["std"] }
+http-body = { version = "1", default-features = false }
+http-body-util = { version = "0.1", default-features = false }
+hyper = { version = "1", default-features = false, features = ["client", "http1", "http2"] }
+hyper-openssl = { version = "0.10", default-features = false, features = ["client-legacy"] }
+hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
+openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
+percent-encoding = { version = "2.3.1", default-features = false, features = ["alloc"] }
+rand.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
+tower = { version = "0.5.2", default-features = false }
+tracing.workspace = true
+url = { version = "2.5.4", default-features = false }
+vector-core = { path = "../vector-core" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["io-util", "macros", "test-util"] }

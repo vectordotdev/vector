@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct S3RequestOptions {
+pub(super) struct S3RequestOptions {
     pub bucket: String,
     pub filename_time_format: String,
     pub filename_append_uuid: bool,
@@ -97,11 +97,10 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         let extension = self
             .filename_extension
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| self.compression.extension().into());
+            .as_deref()
+            .unwrap_or_else(|| self.compression.extension());
 
-        s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
+        s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, extension);
 
         S3Request {
             body: payload.into_payload(),

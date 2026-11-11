@@ -114,17 +114,21 @@ Options MUST NOT support polymorphism:
 
 For example:
 
-```toml
-buffer.type = "memory"
-buffer.memory.max_events = 10_000
+```yaml
+buffer:
+  type: "memory"
+  memory:
+    max_events: 10000
 ```
 
 The above configures a Vector memory buffer which can be switched to disk as
 well:
 
-```toml
-buffer.type = "disk"
-buffer.disk.max_bytes = 1_000_000_000
+```yaml
+buffer:
+  type: "disk"
+  disk:
+    max_bytes: 1000000000
 ```
 
 [component specification]: component.md

@@ -27,24 +27,10 @@ impl InternalEvent for BufferCreated {
                 "stage" => stage.clone(),
             )
             .set(self.max_size_events as f64);
-            // DEPRECATED: buffer-bytes-events-metrics
-            gauge!(
-                GaugeName::BufferMaxEventSize,
-                "buffer_id" => self.buffer_id.clone(),
-                "stage" => stage.clone(),
-            )
-            .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
                 GaugeName::BufferMaxSizeBytes,
-                "buffer_id" => self.buffer_id.clone(),
-                "stage" => stage.clone(),
-            )
-            .set(self.max_size_bytes as f64);
-            // DEPRECATED: buffer-bytes-events-metrics
-            gauge!(
-                GaugeName::BufferMaxByteSize,
                 "buffer_id" => self.buffer_id,
                 "stage" => stage,
             )
@@ -79,13 +65,6 @@ impl InternalEvent for BufferEventsReceived {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferEvents,
-            "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_count as f64);
         gauge!(
             GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
@@ -95,13 +74,6 @@ impl InternalEvent for BufferEventsReceived {
         gauge!(
             GaugeName::BufferSizeBytes,
             "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_byte_size as f64);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferByteSize,
-            "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);
@@ -133,13 +105,6 @@ impl InternalEvent for BufferEventsSent {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferEvents,
-            "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_count as f64);
         gauge!(
             GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
@@ -149,13 +114,6 @@ impl InternalEvent for BufferEventsSent {
         gauge!(
             GaugeName::BufferSizeBytes,
             "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_byte_size as f64);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferByteSize,
-            "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);
@@ -214,13 +172,6 @@ impl InternalEvent for BufferEventsDropped {
             "intentional" => intentional_str,
         )
         .increment(self.byte_size);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferEvents,
-            "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_count as f64);
         gauge!(
             GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
@@ -230,13 +181,6 @@ impl InternalEvent for BufferEventsDropped {
         gauge!(
             GaugeName::BufferSizeBytes,
             "buffer_id" => self.buffer_id.clone(),
-            "stage" => self.idx.to_string()
-        )
-        .set(self.total_byte_size as f64);
-        // DEPRECATED: buffer-bytes-events-metrics
-        gauge!(
-            GaugeName::BufferByteSize,
-            "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);

@@ -5,12 +5,14 @@ use vector_lib::{
 
 /// Emitted when rows are successfully loaded into Doris.
 #[derive(Debug, NamedInternalEvent)]
-pub struct DorisRowsLoaded {
+pub(crate) struct DorisRowsLoaded {
     pub loaded_rows: i64,
     pub load_bytes: i64,
 }
 
 impl InternalEvent for DorisRowsLoaded {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
         trace!(
             message = "Doris rows loaded successfully.",
@@ -28,11 +30,13 @@ impl InternalEvent for DorisRowsLoaded {
 
 /// Emitted when rows are filtered by Doris during loading.
 #[derive(Debug, NamedInternalEvent)]
-pub struct DorisRowsFiltered {
+pub(crate) struct DorisRowsFiltered {
     pub filtered_rows: i64,
 }
 
 impl InternalEvent for DorisRowsFiltered {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
         warn!(
             message = "Doris rows filtered during loading.",

@@ -3,11 +3,12 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use vector_lib::internal_event::{emit, register};
 
 use super::{
     WebSocketListenerSinkConfig,
     buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+    config::{ExtraMetricTagsConfig, SubProtocolConfig, ValidatedWebSocketListenerSink},
 };
 use crate::{
     codecs::{Encoder, Transformer},
@@ -22,6 +23,9 @@ use crate::{
         websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
     },
 };
+
+#[cfg(test)]
+use crate::config::ValidatedSink;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -33,11 +37,11 @@ use futures::{
 use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    Message,
+    Message, Utf8Bytes,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::WebSocketConfig,
 };
 use tokio_util::codec::Encoder as _;
-use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -47,11 +51,11 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
     },
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
-pub struct WebSocketListenerSink {
+pub(super) struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -63,20 +67,36 @@ pub struct WebSocketListenerSink {
 }
 
 impl WebSocketListenerSink {
-    pub fn new(config: WebSocketListenerSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    #[cfg(test)]
+    pub(super) fn new(
+        config: WebSocketListenerSinkConfig,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
+        let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
+        Self::from_validated(config, &validated, tls, cx)
+    }
+
+    /// Constructs the sink from the validated state, performing only the
+    /// context-dependent work: building the auth matcher from the enrichment
+    /// tables / metrics storage.
+    pub(crate) fn from_validated(
+        config: WebSocketListenerSinkConfig,
+        validated: &ValidatedWebSocketListenerSink,
+        tls: MaybeTlsSettings,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let auth = config
             .auth
             .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             tls,
             address: config.address,
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             auth,
             extra_tags_config: config.internal_metrics.extra_tags,
@@ -129,24 +149,26 @@ impl WebSocketListenerSink {
         let open_gauge = OpenGauge::new();
 
         while let Ok(stream) = listener.accept().await {
-            tokio::spawn(
-                Self::handle_connection(
-                    auth.clone(),
-                    message_buffering.clone(),
-                    subprotocol.clone(),
-                    Arc::clone(&peers),
-                    Arc::clone(&client_checkpoints),
-                    Arc::clone(&buffer),
-                    stream,
-                    extra_tags_config.clone(),
-                    open_gauge.clone(),
-                )
-                .in_current_span(),
-            );
+            crate::spawn_in_current_span(Self::handle_connection(
+                auth.clone(),
+                message_buffering.clone(),
+                subprotocol.clone(),
+                Arc::clone(&peers),
+                Arc::clone(&client_checkpoints),
+                Arc::clone(&buffer),
+                stream,
+                extra_tags_config.clone(),
+                open_gauge.clone(),
+            ));
         }
     }
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the connection lifecycle together."
+    )]
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
@@ -161,7 +183,7 @@ impl WebSocketListenerSink {
         // Base url for parsing request URLs that may be relative
         let base_url = Url::parse("ws://localhost").ok();
         let addr = stream.peer_addr();
-        debug!("Incoming TCP connection from: {}", addr);
+        debug!("Incoming TCP connection from: {addr}");
 
         let mut extra_tags: Vec<(String, String)> = extra_tags_config
             .iter()
@@ -190,7 +212,7 @@ impl WebSocketListenerSink {
                         .lock()
                         .expect("mutex poisoned")
                         .get(&key)
-                        .cloned()
+                        .copied()
                 }),
             );
             let Some(auth) = auth else {
@@ -243,23 +265,31 @@ impl WebSocketListenerSink {
                     let mut response = ErrorResponse::default();
                     *response.status_mut() = StatusCode::UNAUTHORIZED;
                     *response.body_mut() = Some(message.message().to_string());
-                    debug!("Websocket handshake auth validation failed: {}", message);
+                    debug!("Websocket handshake auth validation failed: {message}");
                     Err(response)
                 }
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {}", err);
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                })
-            })?;
+        // tungstenite allocates `read_buffer_size` bytes up front for each connection (default
+        // 128 KiB). This sink can serve many clients that send only small acks, so keep the 4 KiB
+        // read buffer of earlier tungstenite releases.
+        let ws_config = WebSocketConfig::default().read_buffer_size(4096);
+        let ws_stream = tokio_tungstenite::accept_hdr_async_with_config(
+            stream,
+            header_callback,
+            Some(ws_config),
+        )
+        .await
+        .map_err(|err| {
+            debug!("Error during websocket handshake: {err}");
+            emit(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone(),
+            });
+        })?;
 
-        let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
+        let _open_token = open_gauge.open(|count| emit(ConnectionOpen { count }));
 
         // Insert the write part of this peer to the peer map.
         let (tx, rx) = unbounded();
@@ -270,19 +300,19 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WebSocketListenerSendError {
-                            error: Box::new(error)
+                        emit(WebSocketListenerSendError {
+                            error: Box::new(error),
                         });
                     }
                 },
             );
 
-            debug!("WebSocket connection established: {}", addr);
+            debug!("WebSocket connection established: {addr}");
 
             peers.insert(addr, tx);
-            emit!(WebSocketListenerConnectionEstablished {
+            emit(WebSocketListenerConnectionEstablished {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -309,9 +339,9 @@ impl WebSocketListenerSink {
         });
         let forward_data_to_client = rx
             .map(|message| {
-                emit!(WebSocketListenerMessageSent {
+                emit(WebSocketListenerMessageSent {
                     message_size: message.len(),
-                    extra_tags: extra_tags.clone()
+                    extra_tags: extra_tags.clone(),
                 });
                 Ok(message)
             })
@@ -323,18 +353,18 @@ impl WebSocketListenerSink {
             .factor_first()
             .0
         {
-            emit!(WebSocketListenerSendError {
-                error: Box::new(error)
-            })
+            emit(WebSocketListenerSendError {
+                error: Box::new(error),
+            });
         }
 
         {
             let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
-            emit!(WebSocketListenerConnectionShutdown {
+            emit(WebSocketListenerConnectionShutdown {
                 client_count: peers.len(),
-                extra_tags: extra_tags.clone()
+                extra_tags: extra_tags.clone(),
             });
         }
 
@@ -343,16 +373,16 @@ impl WebSocketListenerSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for WebSocketListenerSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<Event, SinkError> for WebSocketListenerSink {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
-        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("websocket".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
-        let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
+        let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
 
         let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
@@ -360,19 +390,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
 
-        tokio::spawn(
-            Self::handle_connections(
-                self.auth,
-                self.message_buffering.clone(),
-                self.subprotocol.clone(),
-                Arc::clone(&peers),
-                self.extra_tags_config,
-                Arc::clone(&client_checkpoints),
-                Arc::clone(&message_buffer),
-                listener,
-            )
-            .in_current_span(),
-        );
+        crate::spawn_in_current_span(Self::handle_connections(
+            self.auth,
+            self.message_buffering.clone(),
+            self.subprotocol.clone(),
+            Arc::clone(&peers),
+            self.extra_tags_config,
+            Arc::clone(&client_checkpoints),
+            Arc::clone(&message_buffer),
+            listener,
+        ));
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();
@@ -394,7 +421,12 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        let bytes = bytes.freeze();
+                        let text = match Utf8Bytes::try_from(bytes.clone()) {
+                            Ok(text) => text,
+                            Err(_) => String::from_utf8_lossy(&bytes).into_owned().into(),
+                        };
+                        Message::Text(text)
                     };
                     let message_len = message.len();
 
@@ -410,8 +442,8 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WebSocketListenerSendError {
-                                error: Box::new(error)
+                            emit(WebSocketListenerSendError {
+                                error: Box::new(error),
                             });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));
@@ -423,7 +455,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     // Error is handled by `Encoder`.
                     finalizers.update_status(EventStatus::Errored);
                 }
-            };
+            }
         }
 
         Ok(())
@@ -666,12 +698,12 @@ mod tests {
                 address,
                 ..Default::default()
             },
-            SinkContext::default(),
+            &SinkContext::default(),
         )
         .unwrap();
 
         run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             stream::once(ready(event)),
             &SINK_TAGS,
         )
@@ -822,10 +854,10 @@ mod tests {
     where
         S: Stream<Item = Event> + Send + 'static,
     {
-        let sink = WebSocketListenerSink::new(config, SinkContext::default()).unwrap();
+        let sink = WebSocketListenerSink::new(config, &SinkContext::default()).unwrap();
 
         let compliance_assertion = tokio::spawn(run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             events,
             &SINK_TAGS,
         ));
@@ -877,17 +909,17 @@ mod tests {
                 .collect()
                 .await;
 
-            pairs.iter().for_each(|(msg, expected)| {
+            for (msg, expected) in &pairs {
                 let mut base_msg = serde_json::from_str::<Value>(
                     &msg.as_ref().unwrap().clone().into_text().unwrap(),
                 )
                 .unwrap();
                 // Removing message_id from message, since it is not part of the event
-                base_msg.remove("message_id", true);
+                base_msg.remove(vrl::path!("message_id"), true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);
-            });
+            }
 
             if ack {
                 for (msg, _) in pairs {
@@ -895,7 +927,8 @@ mod tests {
                 }
             }
 
-            let _ = tx.close().await;
+            // Error is ignored since it only fails if the channel is already closed.
+            tx.close().await.ok();
         })
     }
 
@@ -917,9 +950,10 @@ mod tests {
                 found_metrics = true;
             }
         }
-        if !found_metrics {
-            panic!("Websocket server didn't emit any of the metrics that use extra tags!");
-        }
+        assert!(
+            found_metrics,
+            "Websocket server didn't emit any of the metrics that use extra tags!"
+        );
     }
 
     fn build_test_event_channel() -> (UnboundedSender<Event>, UnboundedReceiver<Event>) {

@@ -7,7 +7,7 @@ use vector_lib::{
 use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct NginxMetricsEventsReceived<'a> {
+pub(crate) struct NginxMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
@@ -35,7 +35,7 @@ impl InternalEvent for NginxMetricsEventsReceived<'_> {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct NginxMetricsRequestError<'a> {
+pub(crate) struct NginxMetricsRequestError<'a> {
     pub error: crate::Error,
     pub endpoint: &'a str,
 }

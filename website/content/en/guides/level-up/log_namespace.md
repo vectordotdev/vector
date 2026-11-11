@@ -23,6 +23,12 @@ If you encounter any issues please [report them here](https://github.com/vectord
 
 {{< /requirement >}}
 
+{{< warning >}}
+Enabling log namespacing does not work when disk buffers are used. Avoid combining
+`schema.log_namespace: true` with disk buffers until
+[#18574](https://github.com/vectordotdev/vector/issues/18574) is resolved.
+{{< /warning >}}
+
 ## Background
 
 Vector traditionally stored metadata (like `host`, `timestamp`, and `source_type`) as top-level
@@ -107,7 +113,7 @@ The `text` encoder only encodes the value that `log_schema.message_key` points t
 Sample output from the `text_console` sink:
 
 ```text
-{"host":"localhost","message":"Hello World!","service":"vector","source_type":"demo_logs","timestamp":"2025-05-01T19:06:12.227425Z"}
+Hello World!
 ```
 
 The `json` encoder passes the **whole** log to Serde JSON for encoding.
@@ -117,13 +123,7 @@ Sample output from the `json_console` sink:
 ```json
 {
   "host": "localhost",
-  "message": {
-    "host": "localhost",
-    "message": "Hello World!",
-    "service": "vector",
-    "source_type": "demo_logs",
-    "timestamp": "2025-05-01T19:06:12.227425Z"
-  },
+  "message": "Hello World!",
   "service": "vector",
   "source_type": "demo_logs",
   "timestamp": "2025-05-01T19:06:12.227425Z"
@@ -216,7 +216,9 @@ If you're considering migrating from legacy mode (`log_namespace = false`) to Ve
 
 ### VRL Updates
 
-VRL scripts that reference metadata fields will need to be updated to use the metadata accessor syntax:
+VRL scripts that reference metadata fields will need to be updated to use the metadata accessor syntax.
+Source metadata such as `host` lives under the source type (for example, `%demo_logs`).
+The `%vector` namespace, which holds `ingest_timestamp` and `source_type`, is read-only:
 
 **Legacy mode:**
 
@@ -228,8 +230,7 @@ VRL scripts that reference metadata fields will need to be updated to use the me
 **Vector namespace mode:**
 
 ```coffee
-%vector.host = "new-host"
-%vector.ingest_timestamp = now()
+%demo_logs.host = "new-host"
 ```
 
 ### Sink Behavior Differences

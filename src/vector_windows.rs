@@ -11,6 +11,8 @@ use windows_service::{
     service_dispatcher,
 };
 
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{app::Application, signal::SignalTo};
 
 const SERVICE_NAME: &str = "vector";
@@ -21,6 +23,7 @@ const ERROR: u32 = 121;
 
 pub mod service_control {
     use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
+    use vector_lib::internal_event::emit;
 
     use snafu::ResultExt;
     use windows_service::{
@@ -121,11 +124,14 @@ pub mod service_control {
                 "stop" => Ok(ControlAction::Stop {
                     stop_timeout: Duration::from_secs(10),
                 }),
-                _ => Err(format!("invalid option {} for ControlAction", s)),
+                _ => Err(format!("invalid option {s} for ControlAction")),
             }
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the requested Windows service operation fails.
     pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
             ControlAction::Start => start_service(service_def),
@@ -147,12 +153,12 @@ pub mod service_control {
             && service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString]).context(ServiceSnafu)?;
-            emit!(WindowsServiceStart {
+            emit(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: false,
             });
         } else {
-            emit!(WindowsServiceStart {
+            emit(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: true,
             });
@@ -181,7 +187,7 @@ pub mod service_control {
             handle_service_exit_code(service_status.exit_code);
         }
 
-        emit!(WindowsServiceStop {
+        emit(WindowsServiceStop {
             name: &*service_def.name.to_string_lossy(),
             already_stopped,
         });
@@ -213,8 +219,8 @@ pub mod service_control {
         handle_service_exit_code(service_status.exit_code);
 
         service.start(&[] as &[OsString]).context(ServiceSnafu)?;
-        emit!(WindowsServiceRestart {
-            name: &*service_def.name.to_string_lossy()
+        emit(WindowsServiceRestart {
+            name: &*service_def.name.to_string_lossy(),
         });
         Ok(())
     }
@@ -241,7 +247,7 @@ pub mod service_control {
             .create_service(&service_info, ServiceAccess::empty())
             .context(ServiceSnafu)?;
 
-        emit!(WindowsServiceInstall {
+        emit(WindowsServiceInstall {
             name: &*service_def.name.to_string_lossy(),
         });
 
@@ -264,7 +270,7 @@ pub mod service_control {
         let service_status = service.query_status().context(ServiceSnafu)?;
         if service_status.current_state != ServiceState::Stopped {
             service.stop().context(ServiceSnafu)?;
-            emit!(WindowsServiceStop {
+            emit(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
             });
@@ -280,7 +286,7 @@ pub mod service_control {
 
         service.delete().context(ServiceSnafu)?;
 
-        emit!(WindowsServiceUninstall {
+        emit(WindowsServiceUninstall {
             name: &*service_def.name.to_string_lossy(),
         });
         Ok(())
@@ -297,7 +303,7 @@ pub mod service_control {
         let service = service_manager
             .open_service(&service_def.name, access)
             .map_err(|e| {
-                emit!(WindowsServiceDoesNotExistError {
+                emit(WindowsServiceDoesNotExistError {
                     name: &*service_def.name.to_string_lossy(),
                 });
                 e
@@ -316,8 +322,8 @@ pub mod service_control {
             ServiceExitCode::ServiceSpecific(ec) => {
                 warn!(message = "Service stopped with error.", exit_code = ec);
             }
-            _ => {}
-        };
+            ServiceExitCode::Win32(_) => {}
+        }
     }
 
     fn poll_state(
@@ -376,13 +382,16 @@ fn win_main(arguments: Vec<OsString>) {
     if let Err(_e) = run_service(arguments) {}
 }
 
+/// # Errors
+///
+/// Returns an error if the Windows service dispatcher cannot start.
 pub fn run() -> Result<i32> {
     service_dispatcher::start(SERVICE_NAME, ffi_service_main).map(|()| 0_i32)
     // Always returns 0 exit code as errors are handled by the service dispatcher.
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    match Application::prepare_start(Default::default()) {
+    match Application::prepare_start(ExtraContext::default()) {
         Ok((runtime, app)) => {
             let signal_tx = app.signals.handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {

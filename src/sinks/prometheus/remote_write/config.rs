@@ -1,34 +1,35 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use snafu::prelude::*;
+use http::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
+use vector_http::full_body;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
 use super::{
-    service::{RemoteWriteService, build_request},
+    service::{CustomHeaders, RemoteWriteService, build_request},
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
-        UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
+            HttpEndpoint,
             auth::Auth,
-            http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
+            http::{RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },
+    template::ConfinementConfig,
 };
 
 /// The batch config for remote write.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
-pub struct RemoteWriteBatchConfig {
-    #[configurable(derived)]
+pub(crate) struct RemoteWriteBatchConfig {
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
@@ -46,12 +47,13 @@ pub struct RemoteWriteBatchConfig {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct RemoteWriteConfig {
+pub(crate) struct RemoteWriteConfig {
     /// The endpoint to send data to.
     ///
     /// The endpoint should include the scheme and the path to write to.
     #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
-    pub endpoint: String,
+    #[derivative(Default(value = "default_endpoint()"))]
+    pub endpoint: HttpEndpoint,
 
     /// The default namespace for any metrics sent.
     ///
@@ -62,28 +64,23 @@ pub struct RemoteWriteConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[configurable(metadata(docs::examples = "service"))]
-    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_histogram_buckets")]
-    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_summary_quantiles")]
-    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: RemoteWriteBatchConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RemoteWriteRequestConfig,
 
@@ -94,7 +91,6 @@ pub struct RemoteWriteConfig {
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "my-domain"))]
-    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
@@ -102,21 +98,16 @@ pub struct RemoteWriteConfig {
     ///
     /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
-    #[cfg(feature = "aws-config")]
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
+    #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -124,19 +115,23 @@ pub struct RemoteWriteConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_compression")]
     #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_compression() -> Compression {
     Compression::Snappy
+}
+
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://localhost:8087/api/v1/write").unwrap()
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
@@ -145,7 +140,7 @@ impl_generate_config_from_default!(RemoteWriteConfig);
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
-pub struct RemoteWriteRequestConfig {
+pub(crate) struct RemoteWriteRequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
 
@@ -167,19 +162,43 @@ fn remote_write_headers_examples() -> BTreeMap<String, String> {
     ])
 }
 
+/// Validates the custom headers, keeping the sorted order of the shared `validate_headers`.
 fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
-    let headers = crate::sinks::util::http::validate_headers(headers)?;
+) -> crate::Result<CustomHeaders> {
+    crate::sinks::util::http::validate_headers(headers)?
+        .into_iter()
+        .map(
+            |(name, value)| -> crate::Result<(HeaderName, HeaderValue)> {
+                let name = name.inner().clone();
+                if configures_auth && name == AUTHORIZATION {
+                    return Err(
+                        "Authorization header can not be used with defined auth options".into(),
+                    );
+                }
+                Ok((name, value))
+            },
+        )
+        .collect()
+}
 
-    for name in headers.keys() {
-        if configures_auth && name.inner() == AUTHORIZATION {
-            return Err("Authorization header can not be used with defined auth options".into());
-        }
+/// Validates that `aws.region` is set when AWS authentication is selected.
+///
+/// Mirrors the check in `build`.
+#[cfg(feature = "aws-core")]
+fn validate_aws_region(
+    auth: Option<&PrometheusRemoteWriteAuth>,
+    aws: Option<&crate::aws::RegionOrEndpoint>,
+) -> crate::Result<()> {
+    if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
+        && aws
+            .and_then(crate::aws::region::RegionOrEndpoint::region)
+            .is_none()
+    {
+        return Err(Errors::AwsRegionRequired.into());
     }
-
-    Ok(headers)
+    Ok(())
 }
 
 #[async_trait::async_trait]
@@ -189,19 +208,70 @@ impl SinkConfig for RemoteWriteConfig {
         &self.acknowledgements
     }
 
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ValidatedRemoteWrite {
+    tenant_id: Option<ConfinedTemplate>,
+    validated_headers: CustomHeaders,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for RemoteWriteConfig {
+    type Validated = ValidatedRemoteWrite;
+
+    fn validate(&self) -> crate::Result<ValidatedRemoteWrite> {
+        let tenant_id = self
+            .tenant_id
+            .clone()
+            .map(|template| {
+                template.confine(&self.confinement, RemoteWriteConfig::NAME, "tenant_id")
+            })
+            .transpose()?;
+
+        let validated_headers = validate_headers(&self.request.headers, self.auth.is_some())?;
+        let batch_settings = self
+            .batch
+            .batch_settings
+            .validate()?
+            .into_batcher_settings()?;
+
+        #[cfg(feature = "aws-core")]
+        validate_aws_region(self.auth.as_ref(), self.aws.as_ref())?;
+
+        Ok(ValidatedRemoteWrite {
+            tenant_id,
+            validated_headers,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedRemoteWrite,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedRemoteWrite {
+            tenant_id,
+            validated_headers,
+            batch_settings,
+        } = validated;
+
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.tower.into_settings();
-        let validated_headers = Arc::new(validate_headers(
-            &self.request.headers,
-            self.auth.is_some(),
-        )?);
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
 
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let auth = match &self.auth {
             Some(PrometheusRemoteWriteAuth::Basic { user, password }) => {
@@ -217,12 +287,13 @@ impl SinkConfig for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = self
+                let Some(region) = self
                     .aws
                     .as_ref()
-                    .map(|config| config.region())
-                    .ok_or(Errors::AwsRegionRequired)?
-                    .ok_or(Errors::AwsRegionRequired)?;
+                    .and_then(crate::aws::region::RegionOrEndpoint::region)
+                else {
+                    unreachable!("aws.region validated by validate() when AWS auth is selected")
+                };
                 Some(Auth::Aws {
                     credentials_provider: aws_auth
                         .credentials_provider(region.clone(), cx.proxy(), self.tls.as_ref())
@@ -233,6 +304,7 @@ impl SinkConfig for RemoteWriteConfig {
             None => None,
         };
 
+        let endpoint = self.endpoint.as_uri().clone();
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
             None => endpoint.clone(),
@@ -243,7 +315,7 @@ impl SinkConfig for RemoteWriteConfig {
             healthcheck_endpoint,
             self.compression,
             auth.clone(),
-            Arc::clone(&validated_headers),
+            Arc::clone(validated_headers),
         )
         .boxed();
 
@@ -252,7 +324,7 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             auth,
             compression: self.compression,
-            headers: validated_headers,
+            headers: Arc::clone(validated_headers),
         };
         let service = ServiceBuilder::new()
             .settings(
@@ -262,26 +334,17 @@ impl SinkConfig for RemoteWriteConfig {
             .service(service);
 
         let sink = RemoteWriteSink {
-            tenant_id: self.tenant_id.clone(),
+            tenant_id: tenant_id.clone(),
             compression: self.compression,
             aggregate: self.batch.aggregate,
-            batch_settings: self
-                .batch
-                .batch_settings
-                .validate()?
-                .into_batcher_settings()?,
+            batch_settings: *batch_settings,
             buckets,
             quantiles,
             default_namespace,
             expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::metric()
     }
 }
 
@@ -290,23 +353,162 @@ async fn healthcheck(
     endpoint: Uri,
     compression: Compression,
     auth: Option<Auth>,
-    headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    headers: CustomHeaders,
 ) -> crate::Result<()> {
-    let body = bytes::Bytes::new();
     let request = build_request(
-        http::Method::GET,
+        Method::GET,
         &endpoint,
         compression,
-        body,
+        bytes::Bytes::new(),
         None,
-        auth,
-        headers,
+        auth.as_ref(),
+        &headers,
     )
     .await?;
-    let response = client.send(request).await?;
+    let response = client.send(request.map(full_body)).await?;
 
     match response.status() {
-        http::StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+        StatusCode::OK => Ok(()),
+        other => Err(HealthcheckError::unexpected_status(other).into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoteWriteConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(
+            result.is_err(),
+            "bare tenant_id template with no literal prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(result.is_ok(), "opt-out must allow bare tenant_id template");
+    }
+
+    #[test]
+    fn confinement_prefixed_tenant_id_locks_org_prefix() {
+        use crate::event::{Event, LogEvent};
+        use vrl::event_path;
+        let template = Template::try_from("team-{{ org }}").unwrap();
+        let config = ConfinementConfig::default();
+        let confined = template
+            .confine(&config, "prometheus_remote_write", "tenant_id")
+            .unwrap();
+        let mut event = LogEvent::default();
+        event.insert(event_path!("org"), "other-tenant-entirely");
+        let rendered = confined.render_string(&Event::Log(event)).unwrap();
+        assert!(
+            rendered.starts_with("team-"),
+            "operator-controlled prefix must be preserved in rendered tenant_id"
+        );
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            tenant_id: Some("team-{{ org }}".try_into().unwrap()),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            config.endpoint.to_string(),
+            "http://localhost:8087/api/v1/write"
+        );
+        assert!(validated.tenant_id.is_some());
+        assert!(validated.validated_headers.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        // The config field is `HttpEndpoint`, whose type-level validation rejects
+        // relative endpoints at load time, so `validate()` never sees them.
+        assert!(
+            HttpEndpoint::parse("/api/v1/write").is_err(),
+            "a relative endpoint must be rejected"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_authority() {
+        // HttpEndpoint rejects endpoints without a host at load time.
+        assert!(
+            HttpEndpoint::parse("https:///api/v1/write").is_err(),
+            "an endpoint without a host must be rejected"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_aws_auth_without_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::default()),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "AWS auth without aws.region must be rejected by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_aws_auth_with_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::with_region("us-east-1".to_string())),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "AWS auth with aws.region must be accepted by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_non_aws_auth_without_region() {
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Basic {
+                user: "user".to_string(),
+                password: "password".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "non-AWS auth without aws.region must be accepted by validate()"
+        );
     }
 }

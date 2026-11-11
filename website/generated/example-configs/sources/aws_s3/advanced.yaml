@@ -1,0 +1,8 @@
+sources:
+  my_source_id:
+    type: aws_s3
+    compression: auto
+    endpoint: http://127.0.0.0:5000/path/to/service
+    force_path_style: true
+    region: us-east-1
+    request_payer: requester

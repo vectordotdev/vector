@@ -1,4 +1,5 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
+use vector_lib::internal_event::{emit, register};
 
 use aws_sdk_sqs::{
     Client as SqsClient,
@@ -7,7 +8,6 @@ use aws_sdk_sqs::{
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
-use tracing_futures::Instrument;
 use vector_lib::{
     config::LogNamespace,
     finalizer::UnorderedFinalizer,
@@ -31,7 +31,7 @@ const MAX_BATCH_SIZE: i32 = 10;
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 #[derive(Clone)]
-pub struct SqsSource {
+pub(super) struct SqsSource {
     pub client: SqsClient,
     pub queue_url: String,
     pub decoder: Decoder,
@@ -44,25 +44,22 @@ pub struct SqsSource {
 }
 
 impl SqsSource {
-    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub(super) async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
             let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
-            tokio::spawn(
-                async move {
-                    while let Some((status, receipts)) = ack_stream.next().await {
-                        if status == BatchStatus::Delivered {
-                            delete_messages(client.clone(), receipts, queue_url.clone()).await;
-                        }
+            crate::spawn_in_current_span(async move {
+                while let Some((status, receipts)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        delete_messages(client.clone(), receipts, queue_url.clone()).await;
                     }
                 }
-                .in_current_span(),
-            );
+            });
             Arc::new(finalizer)
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
 
         for _ in 0..self.concurrency {
             let source = self.clone();
@@ -70,19 +67,16 @@ impl SqsSource {
             let mut out = out.clone();
             let finalizer = finalizer.clone();
             let events_received = events_received.clone();
-            task_handles.push(tokio::spawn(
-                async move {
-                    let finalizer = finalizer.as_ref();
-                    pin!(shutdown);
-                    loop {
-                        select! {
-                            _ = &mut shutdown => break,
-                            _ = source.run_once(&mut out, finalizer, events_received.clone()) => {},
-                        }
+            task_handles.push(crate::spawn_in_current_span(async move {
+                let finalizer = finalizer.as_ref();
+                pin!(shutdown);
+                loop {
+                    select! {
+                        _ = &mut shutdown => break,
+                        () = source.run_once(&mut out, finalizer, events_received.clone()) => {},
                     }
                 }
-                .in_current_span(),
-            ));
+            }));
         }
 
         // Wait for all of the processes to finish.  If any one of them panics, we resume
@@ -97,6 +91,10 @@ impl SqsSource {
         Ok(())
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn run_once(
         &self,
         out: &mut SourceSender,
@@ -119,7 +117,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                emit(SqsMessageReceiveError { error: &err });
                 return;
             }
         };
@@ -127,12 +125,12 @@ impl SqsSource {
         if let Some(messages) = receive_message_output.messages {
             let byte_size = messages
                 .iter()
-                .map(|message| message.body().map(|body| body.len()).unwrap_or(0))
+                .map(|message| message.body().map_or(0, str::len))
                 .sum();
-            emit!(EndpointBytesReceived {
+            emit(EndpointBytesReceived {
                 byte_size,
                 protocol: "http",
-                endpoint: &self.queue_url
+                endpoint: &self.queue_url,
             });
 
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
@@ -146,7 +144,7 @@ impl SqsSource {
                     if let Some(receipt_handle) = message.receipt_handle {
                         receipts_to_ack.push(receipt_handle);
                     }
-                    let timestamp = get_timestamp(&message.attributes);
+                    let timestamp = get_timestamp(message.attributes.as_ref());
                     // Error is logged by `vector_lib::codecs::Decoder`, no further handling
                     // is needed here.
                     let decoded = util::decode_message(
@@ -177,21 +175,21 @@ impl SqsSource {
                                     receipts_to_ack,
                                     self.queue_url.clone(),
                                 )
-                                .await
+                                .await;
                             }
                         }
                     }
                 }
-                Err(_) => emit!(StreamClosedError { count }),
+                Err(_) => emit(StreamClosedError { count }),
             }
         }
     }
 }
 
 fn get_timestamp(
-    attributes: &Option<HashMap<MessageSystemAttributeName, String>>,
+    attributes: Option<&HashMap<MessageSystemAttributeName, String>>,
 ) -> Option<DateTime<Utc>> {
-    attributes.as_ref().and_then(|attributes| {
+    attributes.and_then(|attributes| {
         let sent_time_str = attributes.get(&MessageSystemAttributeName::SentTimestamp)?;
         Some(
             Utc.timestamp_millis_opt(i64::from_str(sent_time_str).ok()?)
@@ -215,7 +213,7 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(SqsMessageDeleteError { error: &err });
+            emit(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -258,7 +256,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Vector,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -266,7 +264,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(".")
+                .get(vrl::event_path!())
                 .unwrap()
                 .to_string_lossy(),
             message
@@ -311,7 +309,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Legacy,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -344,9 +342,9 @@ mod tests {
         )]);
 
         assert_eq!(
-            get_timestamp(&Some(attributes)),
+            get_timestamp(Some(&attributes)),
             Some(
-                Utc.timestamp_millis_opt(1636408546018)
+                Utc.timestamp_millis_opt(1_636_408_546_018)
                     .single()
                     .expect("invalid timestamp")
             )

@@ -12,7 +12,7 @@ use ratatui::{
     widgets::ListState,
 };
 use regex::Regex;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use vector_common::config::ComponentKey;
@@ -54,12 +54,11 @@ pub enum EventType {
     /// Throughput values already normalized to per-second by the server
     SentEventsThroughputs(Vec<SentEventsMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     AllocatedBytes(Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
     ConnectionUpdated(ConnectionStatus),
-    Ui(UiEventType),
 }
 
 #[derive(Debug)]
@@ -104,6 +103,7 @@ pub enum ConnectionStatus {
 }
 
 impl ConnectionStatus {
+    #[must_use]
     pub fn as_ui_spans(&self) -> Vec<Span<'_>> {
         match self {
             Self::Pending => vec![Span::styled(
@@ -132,7 +132,7 @@ pub struct State {
     pub ui: UiState,
     /// Set to `true` once we receive the first `AllocatedBytes` event,
     /// indicating the connected Vector instance has allocation tracing active.
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub allocation_tracing_active: bool,
     /// All metrics registered on the connected Vector instance, populated once
     /// per connection via `GetCapabilities`.
@@ -153,7 +153,7 @@ pub enum SortColumn {
     BytesOut = 9,
     BytesOutTotal = 10,
     Errors = 11,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     MemoryUsed = 12,
 }
 
@@ -166,6 +166,7 @@ pub enum FilterColumn {
 }
 
 impl SortColumn {
+    #[must_use]
     pub fn matches_header(&self, header: &str) -> bool {
         match self {
             SortColumn::Id => header == columns::ID,
@@ -176,11 +177,12 @@ impl SortColumn {
             SortColumn::EventsOut | SortColumn::EventsOutTotal => header == columns::EVENTS_OUT,
             SortColumn::BytesOut | SortColumn::BytesOutTotal => header == columns::BYTES_OUT,
             SortColumn::Errors => header == columns::ERRORS,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             SortColumn::MemoryUsed => header == columns::MEMORY_USED,
         }
     }
 
+    #[must_use]
     pub fn items() -> Vec<&'static str> {
         vec![
             columns::ID,
@@ -195,13 +197,14 @@ impl SortColumn {
             columns::BYTES_OUT,
             columns::BYTES_OUT_TOTAL,
             columns::ERRORS,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             columns::MEMORY_USED,
         ]
     }
 }
 
 impl FilterColumn {
+    #[must_use]
     pub fn matches_header(&self, header: &str) -> bool {
         match self {
             FilterColumn::Id => header == columns::ID,
@@ -210,6 +213,7 @@ impl FilterColumn {
         }
     }
 
+    #[must_use]
     pub fn items() -> Vec<&'static str> {
         vec![columns::ID, columns::KIND, columns::TYPE]
     }
@@ -229,7 +233,7 @@ impl From<usize> for SortColumn {
             9 => SortColumn::BytesOut,
             10 => SortColumn::BytesOutTotal,
             11 => SortColumn::Errors,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             12 => SortColumn::MemoryUsed,
             _ => SortColumn::Id,
         }
@@ -309,7 +313,7 @@ pub struct FilterMenuState {
 impl Default for FilterMenuState {
     fn default() -> Self {
         Self {
-            input: Default::default(),
+            input: String::new(),
             column_selection: ListState::default().with_selected(Some(0)),
         }
     }
@@ -318,12 +322,14 @@ impl Default for FilterMenuState {
 impl UiState {
     /// Returns the height of components display box in rows, based on provided [`Size`].
     /// Calculates by deducting rows used for header and footer.
+    #[must_use]
     pub fn components_box_height(area: Size) -> u16 {
         // Currently hardcoded (10 is the number of rows the header and footer take up)
         area.height.saturating_sub(10)
     }
 
     /// Returns the maximum scroll value
+    #[must_use]
     pub fn max_scroll(area: Size, components_count: usize) -> usize {
         components_count.saturating_sub(Self::components_box_height(area).into())
     }
@@ -340,6 +346,11 @@ impl UiState {
 
     /// Changes current scroll by provided diff in pages. Uses [`Size`] to limit scroll,
     /// and to calculate number of rows a page contains.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Vector targets have pointers wide enough to represent terminal dimensions."
+    )]
     pub fn scroll_page(&mut self, diff: isize, area: Size, components_count: usize) {
         self.scroll(
             diff * (Self::components_box_height(area) as isize),
@@ -350,6 +361,7 @@ impl UiState {
 }
 
 impl State {
+    #[must_use]
     pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
@@ -358,7 +370,7 @@ impl State {
             ui: UiState::default(),
             sort_state: SortState::default(),
             filter_state: FilterState::default(),
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             allocation_tracing_active: false,
             available_metrics: Vec::new(),
         }
@@ -380,13 +392,15 @@ impl State {
             .pattern
             .as_ref()
             .map(|r| r.as_str().to_string())
-            .unwrap_or("".to_string());
+            .unwrap_or_default();
     }
 }
 
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
-pub type StateRx = mpsc::Receiver<State>;
+pub type UiEventRx = mpsc::Receiver<UiEventType>;
+pub type UiEventTx = mpsc::Sender<UiEventType>;
+pub type StateRx = watch::Receiver<State>;
 
 #[derive(Debug, Clone, Default)]
 pub struct OutputMetrics {
@@ -417,7 +431,7 @@ pub struct ComponentRow {
     pub sent_bytes_throughput_sec: i64,
     pub sent_events_total: i64,
     pub sent_events_throughput_sec: i64,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub allocated_bytes: i64,
     pub errors: i64,
 }
@@ -425,135 +439,163 @@ pub struct ComponentRow {
 impl ComponentRow {
     /// Note, we ignore `outputs` if it only contains [`DEFAULT_OUTPUT`] to avoid
     /// redundancy with information shown in the overall component row
+    #[must_use]
     pub fn has_displayable_outputs(&self) -> bool {
         self.outputs.len() > 1
             || (self.outputs.len() == 1 && !self.outputs.contains_key(DEFAULT_OUTPUT))
     }
 }
 
-/// Takes the receiver `EventRx` channel, and returns a `StateRx` state receiver. This
+/// Takes the receiver `EventRx` and `UiEventRx` channels, and returns a `StateRx` state receiver. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
-    let (tx, rx) = mpsc::channel(20);
+/// UI and other events are handled separately, to ensure one doesn't block the other.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing dashboard layout and event handling together during the lint rollout."
+)]
+pub fn updater(mut event_rx: EventRx, mut ui_event_rx: UiEventRx, mut state: State) -> StateRx {
+    let (tx, rx) = watch::channel(state.clone());
 
     tokio::spawn(async move {
-        while let Some(event_type) = event_rx.recv().await {
-            match event_type {
-                EventType::InitializeState(new_state) => {
-                    let old_state = state;
-                    state = new_state;
-                    // Keep filters, sort and UI states
-                    state.filter_state = old_state.filter_state;
-                    state.sort_state = old_state.sort_state;
-                    state.ui = old_state.ui;
-                }
-                EventType::ReceivedBytesTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_total = v;
-                        }
-                    }
-                }
-                EventType::ReceivedBytesThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::ReceivedEventsTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_total = v;
-                        }
-                    }
-                }
-                EventType::ReceivedEventsThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::SentBytesTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_total = v;
-                        }
-                    }
-                }
-                EventType::SentBytesThroughputs(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_throughput_sec = v;
-                        }
-                    }
-                }
-                EventType::SentEventsTotals(rows) => {
-                    for m in rows {
-                        if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_total = m.total;
-                            for (id, v) in m.outputs {
-                                r.outputs
-                                    .entry(id)
-                                    .or_insert_with(OutputMetrics::default)
-                                    .sent_events_total = v;
+        loop {
+            tokio::select! {
+                biased;
+
+                // Higher priority for UI events, to prevent visible freezes
+                Some(event_type) = ui_event_rx.recv() => {
+                    handle_ui_event(event_type, &mut state);
+                },
+
+                ev = event_rx.recv() => {
+                    if let Some(event_type) = ev {
+                        match event_type {
+                            EventType::InitializeState(new_state) => {
+                                let old_state = state;
+                                state = new_state;
+                                // Keep filters, sort and UI states
+                                state.filter_state = old_state.filter_state;
+                                state.sort_state = old_state.sort_state;
+                                state.ui = old_state.ui;
+                            }
+                            EventType::ReceivedBytesTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_bytes_total = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedBytesThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_bytes_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedEventsTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_events_total = v;
+                                    }
+                                }
+                            }
+                            EventType::ReceivedEventsThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.received_events_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::SentBytesTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.sent_bytes_total = v;
+                                    }
+                                }
+                            }
+                            EventType::SentBytesThroughputs(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.sent_bytes_throughput_sec = v;
+                                    }
+                                }
+                            }
+                            EventType::SentEventsTotals(rows) => {
+                                for m in rows {
+                                    if let Some(r) = state.components.get_mut(&m.key) {
+                                        r.sent_events_total = m.total;
+                                        for (id, v) in m.outputs {
+                                            r.outputs
+                                                .entry(id)
+                                                .or_insert_with(OutputMetrics::default)
+                                                .sent_events_total = v;
+                                        }
+                                    }
+                                }
+                            }
+                            EventType::SentEventsThroughputs(rows) => {
+                                for m in rows {
+                                    if let Some(r) = state.components.get_mut(&m.key) {
+                                        r.sent_events_throughput_sec = m.total;
+                                        for (id, v) in m.outputs {
+                                            r.outputs
+                                                .entry(id)
+                                                .or_insert_with(OutputMetrics::default)
+                                                .sent_events_throughput_sec = v;
+                                        }
+                                    }
+                                }
+                            }
+                            EventType::ErrorsTotals(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.errors = v;
+                                    }
+                                }
+                            }
+                            #[cfg(unix)]
+                            EventType::AllocatedBytes(rows) => {
+                                for (key, v) in rows {
+                                    if let Some(r) = state.components.get_mut(&key) {
+                                        r.allocated_bytes = v;
+                                    }
+                                }
+                            }
+                            EventType::ComponentAdded(c) => {
+                                _ = state.components.insert(c.key.clone(), c);
+                            }
+                            EventType::ComponentRemoved(key) => {
+                                _ = state.components.remove(&key);
+                            }
+                            EventType::ConnectionUpdated(status) => {
+                                state.connection_status = status;
+                            }
+                            EventType::UptimeChanged(uptime) => {
+                                state.uptime = Duration::from_secs_f64(uptime);
                             }
                         }
+                    } else {
+                        break;
                     }
-                }
-                EventType::SentEventsThroughputs(rows) => {
-                    for m in rows {
-                        if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_throughput_sec = m.total;
-                            for (id, v) in m.outputs {
-                                r.outputs
-                                    .entry(id)
-                                    .or_insert_with(OutputMetrics::default)
-                                    .sent_events_throughput_sec = v;
-                            }
-                        }
-                    }
-                }
-                EventType::ErrorsTotals(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.errors = v;
-                        }
-                    }
-                }
-                #[cfg(feature = "allocation-tracing")]
-                EventType::AllocatedBytes(rows) => {
-                    for (key, v) in rows {
-                        if let Some(r) = state.components.get_mut(&key) {
-                            r.allocated_bytes = v;
-                        }
-                    }
-                }
-                EventType::ComponentAdded(c) => {
-                    _ = state.components.insert(c.key.clone(), c);
-                }
-                EventType::ComponentRemoved(key) => {
-                    _ = state.components.remove(&key);
-                }
-                EventType::ConnectionUpdated(status) => {
-                    state.connection_status = status;
-                }
-                EventType::UptimeChanged(uptime) => {
-                    state.uptime = Duration::from_secs_f64(uptime);
-                }
-                EventType::Ui(ui_event_type) => handle_ui_event(ui_event_type, &mut state),
+                },
+
             }
 
             // Send updated map to listeners
-            _ = tx.send(state.clone()).await;
+            _ = tx.send(state.clone());
         }
     });
 
     rx
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "UI events are consumed once by the state updater."
+)]
 fn handle_ui_event(event: UiEventType, state: &mut State) {
     match event {
         UiEventType::Scroll(diff, area) => {
@@ -588,7 +630,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
         UiEventType::SortByColumn(col) => state.sort_state.column = Some(col),
         UiEventType::SortConfirmation => {
             if let Some(selected) = state.ui.sort_menu_state.selected() {
-                state.sort_state.column = Some(selected.into())
+                state.sort_state.column = Some(selected.into());
             }
             state.ui.sort_visible = false;
         }
@@ -630,7 +672,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
                 state.filter_state.pattern = Regex::new(&state.ui.filter_menu_state.input).ok();
             }
             if let Some(selected) = state.ui.filter_menu_state.column_selection.selected() {
-                state.filter_state.column = selected.into()
+                state.filter_state.column = selected.into();
             }
             state.ui.filter_visible = false;
         }

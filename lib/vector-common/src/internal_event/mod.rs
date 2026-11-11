@@ -6,6 +6,7 @@ pub mod component_events_timed_out;
 mod events_received;
 mod events_sent;
 pub mod metric_name;
+mod metric_value;
 mod optional_tag;
 mod prelude;
 pub mod service;
@@ -21,6 +22,7 @@ pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};
 pub use metric_name::{CounterName, GaugeName, HistogramName, InternalMetricKind, all_metrics};
+pub use metric_value::LossyF64;
 pub use metrics::SharedString;
 pub use optional_tag::OptionalTag;
 pub use prelude::{error_stage, error_type};
@@ -146,13 +148,13 @@ impl From<Protocol> for SharedString {
 ///     }
 /// );
 ///
-/// let handle = register!(Event { event_field: "message" });
+/// let handle = register(Event { event_field: "message" });
 ///
 /// handle.emit(DataType(123));
 /// ```
 ///
 /// In this example, the first set of fields describes the data required to register the event. This
-/// is what would be used by the `register!` macro. For example, `register!(Event { event_field:
+/// is what would be used by the `register` function. For example, `register(Event { event_field:
 /// "something" })`. The second set of fields describes the data required to store the registered
 /// handle, namely the `Counter`s and `Gauge`s that record the handle from `metrics` as well as any
 /// associated data for emitting traces or debug messages, followed by an initialization assignment
@@ -190,7 +192,7 @@ macro_rules! registered_event {
         $(fn register($fixed_name:ident: $fixed_tags:ty, $tags_name:ident: $tags:ty)
             $register_body:block)?
     ) => {
-        pastey::paste!{
+        $crate::pastey::paste! {
             #[derive(Clone)]
             pub struct [<$event Handle>] {
                 $( $field: $type, )*

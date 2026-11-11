@@ -19,6 +19,14 @@ fn generate_config() {
     crate::test_util::test_generate_config::<CloudWatchMetricsSinkConfig>();
 }
 
+#[test]
+fn prepares_valid_config() {
+    let config = config();
+    let validated = config.validate().expect("preparation should succeed");
+    assert_eq!(validated.storage_resolution.get("bytes_out"), Some(&1));
+    assert_eq!(validated.batch.size.events, 20);
+}
+
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
@@ -56,7 +64,7 @@ async fn encode_events_basic_counter() {
         .with_timestamp(Some(
             Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
                 .single()
-                .and_then(|t| t.with_nanosecond(123456789))
+                .and_then(|t| t.with_nanosecond(123_456_789))
                 .expect("invalid timestamp"),
         )),
         Metric::new(
@@ -68,7 +76,7 @@ async fn encode_events_basic_counter() {
         .with_timestamp(Some(
             Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
                 .single()
-                .and_then(|t| t.with_nanosecond(123456789))
+                .and_then(|t| t.with_nanosecond(123_456_789))
                 .expect("invalid timestamp"),
         )),
     ];

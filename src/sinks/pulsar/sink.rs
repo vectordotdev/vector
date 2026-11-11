@@ -27,7 +27,7 @@ pub(crate) struct PulsarSink {
     encoder: Encoder<()>,
     service: PulsarService<TokioExecutor>,
     config: PulsarSinkConfig,
-    topic_template: Template,
+    topic_template: ConfinedTemplate,
 }
 
 /// Stores the event together with the extracted keys, topics, etc.
@@ -55,7 +55,7 @@ impl ByteSizeOf for PulsarEvent {
     fn allocated_bytes(&self) -> usize {
         self.event.size_of()
             + self.topic.size_of()
-            + self.key.as_ref().map_or(0, |bytes| bytes.size_of())
+            + self.key.as_ref().map_or(0, vector_lib::ByteSizeOf::size_of)
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
@@ -71,30 +71,33 @@ impl EstimatedJsonEncodedSizeOf for PulsarEvent {
     }
 }
 
-pub(crate) async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
+pub(crate) async fn healthcheck(
+    config: PulsarSinkConfig,
+    topic_template: ConfinedTemplate,
+) -> crate::Result<()> {
     let client = config.create_pulsar_client().await?;
-    let topic = config.topic.render_string(&LogEvent::from_str_legacy(""))?;
-    client.lookup_topic(topic).await?;
+    let topic = topic_template.render_string(&LogEvent::from_str_legacy(""))?;
+    Box::pin(client.lookup_topic(topic)).await?;
     Ok(())
 }
 
 impl PulsarSink {
     pub(crate) fn new(
-        client: Pulsar<TokioExecutor>,
+        client: &Pulsar<TokioExecutor>,
         config: PulsarSinkConfig,
+        topic_template: ConfinedTemplate,
     ) -> crate::Result<Self> {
         let producer_opts = config.build_producer_options();
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
-        let topic_template = config.topic.clone();
 
         Ok(PulsarSink {
-            config,
             transformer,
             encoder,
             service,
+            config,
             topic_template,
         })
     }
@@ -118,7 +121,7 @@ impl PulsarSink {
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 request
-                    .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))
+                    .map_err(|e| error!("Failed to build Pulsar request: {e:?}."))
                     .ok()
             })
             .into_driver(service)

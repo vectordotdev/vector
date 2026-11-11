@@ -40,10 +40,12 @@ generator:
       target_uri: "http://127.0.0.1:4318/v1/logs"
       bytes_per_second: "100 Mb"
       parallel_connections: 5
+      maximum_block_size: "8 Mb"
       method:
         post:
           maximum_prebuild_cache_size_bytes: "8 Mb"
-          variant: "opentelemetry_logs"
+          variant:
+            opentelemetry_logs: {}
 
 blackhole:
   - tcp:

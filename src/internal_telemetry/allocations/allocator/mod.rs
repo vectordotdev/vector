@@ -5,7 +5,7 @@ mod tracer;
 mod tracing;
 mod tracing_allocator;
 
-pub use self::{
+pub(crate) use self::{
     token::{AllocationGroupId, AllocationGroupToken},
     tracer::Tracer,
     tracing::AllocationLayer,
@@ -19,9 +19,11 @@ pub use self::{
 /// avoids reentrantly tracing (de)allocations, this method provides a way to do so from _outside_
 /// of the `GlobalAlloc` codepath.
 #[inline(always)]
-pub fn without_allocation_tracing<F>(f: F)
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::inline_always, reason = "Retain hot-path inlining")]
+pub(crate) fn without_allocation_tracing<F>(f: F)
 where
     F: FnOnce(),
 {
-    with_suspended_allocation_group(f)
+    with_suspended_allocation_group(f);
 }

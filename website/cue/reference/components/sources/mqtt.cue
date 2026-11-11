@@ -28,7 +28,6 @@ components: sources: mqtt: {
 	}
 
 	classes: {
-		commonly_used: false
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
 		development:   "beta"
@@ -48,7 +47,6 @@ components: sources: mqtt: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.mqtt.configuration

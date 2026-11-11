@@ -12,7 +12,6 @@ components: transforms: route: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
@@ -25,7 +24,6 @@ components: transforms: route: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.route.configuration

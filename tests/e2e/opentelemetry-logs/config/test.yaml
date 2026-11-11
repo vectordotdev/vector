@@ -14,7 +14,7 @@ runner:
 
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use
-  collector_version: ["latest"]
+  collector_version: ["0.157.0"]
   vector_config: ["vector_default.yaml", "vector_otlp.yaml"]
 
 # Only trigger this integration test if relevant OTEL source/sink files change
@@ -23,4 +23,5 @@ paths:
   - "src/sinks/opentelemetry/**"
   - "src/internal_events/opentelemetry_*"
   - "tests/e2e/opentelemetry-logs/**"
+  - "tests/e2e/opentelemetry-common/**"
   - "lib/codecs/src/**/otlp.rs"

@@ -10,7 +10,9 @@ pub mod serializer;
 mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
 pub use config::{EncodingConfig, EncodingConfigWithFraming, SinkType};
-pub use encoder::{BatchEncoder, BatchOutput, BatchSerializer, Encoder, EncoderKind};
+#[cfg(feature = "arrow")]
+pub use encoder::{BatchEncoder, BatchOutput, BatchSerializer};
+pub use encoder::{Encoder, EncoderKind};
 #[cfg(feature = "arrow")]
 pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
@@ -21,8 +23,7 @@ pub use format::{
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, ProtoBatchEncodingError, ProtoBatchSerializer,
-    ProtoBatchSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
+    NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
     ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
     TextSerializerConfig,
 };
@@ -41,7 +42,9 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
-pub use serializer::{BatchSerializerConfig, Serializer, SerializerConfig};
+#[cfg(feature = "arrow")]
+pub use serializer::BatchSerializerConfig;
+pub use serializer::{Serializer, SerializerConfig};
 pub use transformer::{TimestampFormat, Transformer};
 
 /// An error that occurred while building an encoder.

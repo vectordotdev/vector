@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: prometheus_scrape
+    endpoints:
+      - http://localhost:9090/metrics

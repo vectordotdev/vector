@@ -2,7 +2,7 @@ use std::{fmt::Display, io};
 
 use super::buffer::compression::CompressionLevel;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ZstdCompressionLevel(i32);
 
 impl From<CompressionLevel> for ZstdCompressionLevel {
@@ -12,7 +12,7 @@ impl From<CompressionLevel> for ZstdCompressionLevel {
             CompressionLevel::Default => zstd::DEFAULT_COMPRESSION_LEVEL,
             CompressionLevel::Best => 21,
             CompressionLevel::Fast => 1,
-            CompressionLevel::Val(v) => v.clamp(1, 21) as i32,
+            CompressionLevel::Val(v) => v.clamp(1, 21).cast_signed(),
         };
         ZstdCompressionLevel(val)
     }
@@ -29,11 +29,21 @@ pub struct ZstdEncoder<W: io::Write> {
 }
 
 impl<W: io::Write> ZstdEncoder<W> {
+    /// Creates a compression encoder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the encoder cannot be initialized.
     pub fn new(writer: W, level: ZstdCompressionLevel) -> io::Result<Self> {
         let encoder = zstd::Encoder::new(writer, level.0)?;
         Ok(Self { inner: encoder })
     }
 
+    /// Finishes compression and returns the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if finalizing the compressed stream fails.
     pub fn finish(self) -> io::Result<W> {
         self.inner.finish()
     }

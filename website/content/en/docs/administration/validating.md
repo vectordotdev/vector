@@ -31,6 +31,13 @@ files, including:
 1. That all of the [sources], [transforms], and [sinks] include all required fields.
 2. All fields are of the proper type.
 
+### Ignored fields
+
+Vector warns about fields discarded during deserialization, including misspelled settings
+and fields belonging to a different enum variant. These warnings include field paths without
+printing their values. Correct the settings before a future release rejects them; see the
+[migration notice](/deprecations/#ignored-configuration-fields).
+
 ### Topology checks
 
 These checks verify that the configuration file contains a valid topology:
@@ -65,7 +72,7 @@ the [`--skip-healthchecks`][skip_healthchecks] flag:
 vector validate --skip-healthchecks /etc/vector/vector.yaml
 ```
 
-**Note:** The configured `data_dir` must still be writeable.
+**Note:** The configured `data_dir` must still be writable.
 
 [components]: /components
 [no_environment]: /docs/reference/cli/#validate-no-environment

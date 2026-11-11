@@ -5,13 +5,13 @@
 
 #![deny(warnings)]
 #![deny(clippy::all)]
-#![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use pastey; // Exported so that registered_event! doesn't need pastey in other crates
 pub use vector_common_macros::NamedInternalEvent;
 
 #[cfg(feature = "btreemap")]
@@ -25,6 +25,10 @@ pub mod json_size;
 pub mod config;
 
 pub mod constants;
+
+pub mod cpu_time;
+
+pub mod decompression;
 
 #[cfg(feature = "conversion")]
 pub use vrl::compiler::TimeZone;
@@ -44,6 +48,8 @@ pub use event_data_eq::EventDataEq;
 #[cfg(any(test, feature = "test"))]
 pub mod event_test_util;
 
+pub mod extra_context;
+
 pub mod finalization;
 pub mod finalizer;
 pub use finalizer::EmptyStream;
@@ -54,12 +60,15 @@ pub mod internal_event;
 
 pub mod request_metadata;
 
+pub mod sampling;
+
 pub mod shutdown;
 
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
 
 pub mod atomic;
+pub mod compression;
 pub mod stats;
 pub mod trigger;
 
@@ -130,3 +139,56 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// Vector's basic result type, defined in terms of [`Error`] and generic over
 /// `T`.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Spawn a future on the current tokio runtime, propagating the current tracing span into the
+/// spawned task.  This ensures that any logs or internal metrics emitted by the task retain the
+/// component tags (`component_id`, `component_kind`, `component_type`) of the caller.
+///
+/// Prefer this over `tokio::spawn(future.in_current_span())` to keep call sites concise.
+#[track_caller]
+pub fn spawn_in_current_span<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    use tracing::Instrument as _;
+    tokio::spawn(task.in_current_span())
+}
+
+/// Spawn a task with the given name. The name is only used if
+/// built with [`tokio_unstable`][tokio_unstable].
+///
+/// [tokio_unstable]: https://docs.rs/tokio/latest/tokio/#unstable-features
+#[track_caller]
+pub fn spawn_named<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+    _name: &str,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    #[cfg(tokio_unstable)]
+    return tokio::task::Builder::new()
+        .name(_name)
+        .spawn(task)
+        .expect("tokio task should spawn");
+
+    #[cfg(not(tokio_unstable))]
+    tokio::spawn(task)
+}
+
+/// Returns an estimate of the number of recommended threads that Vector should spawn.
+pub fn num_threads() -> usize {
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            tracing::warn!(
+                message = "Failed to determine available parallelism for thread count, defaulting to 1.",
+                %error
+            );
+            std::num::NonZeroUsize::MIN
+        }
+    };
+    usize::from(count)
+}

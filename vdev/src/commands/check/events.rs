@@ -375,21 +375,28 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw
-/// source slice of an impl block (which preserves comments and original
-/// formatting that `to_token_stream` strips).
+/// `emit(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
+/// block (which preserves comments and original formatting that `to_token_stream` strips).
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
+    Regex::new(r"(?:emit|register)\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
 });
 
-/// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
+fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
+    let mut receiver = call.receiver.as_ref();
+    while let syn::Expr::Paren(paren) = receiver {
+        receiver = &paren.expr;
+    }
+    call.method == "emit_with_group"
+        && matches!(receiver, syn::Expr::Struct(event)
+            if event.path.segments.last().is_some_and(|segment| segment.ident == "ComponentEventsDropped"))
+}
+
+/// `emit(EventName)` / `register(Path::EventName)` use-counting regex,
 /// applied to the raw file text so it sees calls nested inside other macros
 /// (e.g. `tokio::select!`) that `syn` does not descend into.
 static RE_USES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?:^|[^A-Za-z0-9_])(?:emit!?|register!?)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)",
-    )
-    .unwrap()
+    Regex::new(r"(?:^|[^A-Za-z0-9_])(?:emit|register)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)")
+        .unwrap()
 });
 
 /// Locator for `tracing` log-macro calls (`trace!(`, `debug!(`, `info!(`,
@@ -426,6 +433,10 @@ fn normalize_value(s: &str) -> String {
 /// fragment a `registered_event!` field. `>` only decrements when there is a
 /// matching `<`, so the `>` in `key => value` tag pairs (used by `counter!`
 /// args) doesn't underflow.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from byte-iterator over ASCII delimiters, always char boundaries"
+)]
 fn split_comma_args(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth: i32 = 0;
@@ -688,7 +699,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         let trait_name = node
             .trait_
             .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
+            .and_then(|(path, _)| path.segments.last())
             .map(|s| s.ident.to_string());
         let event_name = match &*node.self_ty {
             Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),
@@ -717,10 +728,8 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
                 event.skip.validity_check |= raw_block.contains("## skip check-validity-events ##");
 
                 match trait_name {
-                    "InternalEvent" => {
-                        if !registers_inside {
-                            event.internal_impl = true;
-                        }
+                    "InternalEvent" if !registers_inside => {
+                        event.internal_impl = true;
                     }
                     "RegisterInternalEvent" => {
                         event.register_impl = Some(event_name.clone());
@@ -746,6 +755,18 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         visit::visit_item_impl(self, node);
     }
 
+    fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
+        if is_grouped_drop_call(node)
+            && let Some(ctx) = self.impl_stack.last()
+        {
+            self.events
+                .entry(ctx.event_name.clone())
+                .or_default()
+                .emits_component_events_dropped = true;
+        }
+        visit::visit_expr_method_call(self, node);
+    }
+
     fn visit_macro(&mut self, node: &'ast syn::Macro) {
         let name = node
             .path
@@ -754,8 +775,8 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        // Use-counting, ComponentEventsDropped detection, and the
-        // log-message format check all run via a separate raw-source pass
+        // Use-counting, emit/register ComponentEventsDropped detection, and
+        // the log-message format check run via a separate raw-source pass
         // because `syn` does not descend into the bodies of arbitrary
         // `tokio::select!` / `cfg_if!` / etc. macro invocations.
 
@@ -765,12 +786,12 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             match name.as_str() {
                 "trace" | "debug" | "info" | "warn" | "error" => {
                     let parsed = parse_log_args(&node.tokens.to_string());
-                    let event = self.events.entry(ctx.event_name.clone()).or_default();
+                    let event = self.events.entry(ctx.event_name).or_default();
                     event.add_log(&name, &parsed.message, parsed.parameters);
                 }
                 "counter" | "gauge" | "histogram" => {
                     if let Some(metric) = parse_metric_args(&name, &node.tokens) {
-                        let event = self.events.entry(ctx.event_name.clone()).or_default();
+                        let event = self.events.entry(ctx.event_name).or_default();
                         event.add_metric(&metric.ty, &metric.name, metric.tags);
                     }
                 }
@@ -788,6 +809,10 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
 impl Scanner<'_> {
     /// Parse a `registered_event!` invocation's tokens to extract the event
     /// name, members, handle metrics, and emit-block log calls.
+    #[expect(
+        clippy::string_slice,
+        reason = "indices from find() on ASCII patterns or match_paren_end(), always char boundaries"
+    )]
     fn handle_registered_event(&mut self, mac: &syn::Macro) {
         let raw = mac.tokens.to_string();
         // Event name: first ident.
@@ -874,6 +899,9 @@ impl Scanner<'_> {
             // Component-events-dropped emission.
             if expr.contains("emit ! (ComponentEventsDropped")
                 || expr.contains("register ! (ComponentEventsDropped")
+                || syn::parse_str::<syn::Expr>(expr).is_ok_and(|expr| {
+                    matches!(expr, syn::Expr::MethodCall(call) if is_grouped_drop_call(&call))
+                })
             {
                 event.emits_component_events_dropped = true;
             }
@@ -913,6 +941,10 @@ impl Scanner<'_> {
 /// Operates on the raw source rather than via the AST so that log calls
 /// nested inside opaque outer macros (`tokio::select!`, `cfg_if!`, …) are
 /// also covered — those bodies are not visited by `syn`.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from regex .end() and match_paren_end(), always char boundaries"
+)]
 fn format_check_log_messages(text: &str, path_str: &str) -> Vec<String> {
     let mut reports = Vec::new();
     for caps in RE_LOG_CALL_OPEN.captures_iter(text) {
@@ -1019,6 +1051,10 @@ fn match_paren_end(s: &str) -> Option<usize> {
 }
 
 /// Split a `{ ... }` block off the front of `s`, returning `(inside, rest)`.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from byte-iterator over ASCII '{' '}', always char boundaries"
+)]
 fn split_brace_block(s: &str) -> (&str, &str) {
     if !s.starts_with('{') {
         return ("", s);
@@ -1122,7 +1158,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
 
     let mut scanner = Scanner {
         events,
-        path_str: path_str.clone(),
+        path_str,
         in_internal_events_dir: in_internal_events,
         skip_dropped_for_file: skip_dropped,
         text: &text,
@@ -1241,8 +1277,62 @@ mod tests {
     fn split_comma_args_respects_angle_brackets() {
         // A `registered_event!` handle field with a generic type containing a
         // comma must not be split at the comma inside `<...>`.
-        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
+        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register(X)";
         assert_eq!(split_comma_args(input), vec![input.to_string()]);
+    }
+
+    fn scan_dropped_event(body: &str) -> Event {
+        let source = format!(
+            "struct TestEventsDropped; impl InternalEvent for TestEventsDropped {{ fn emit(self) {{ {body} }} }}"
+        );
+        let file = syn::parse_file(&source).expect("parse event");
+        let mut events = HashMap::new();
+        Scanner {
+            events: &mut events,
+            path_str: "src/internal_events/test.rs".into(),
+            in_internal_events_dir: true,
+            skip_dropped_for_file: false,
+            text: &source,
+            impl_stack: Vec::new(),
+        }
+        .visit_file(&file);
+        let mut event = events.remove("TestEventsDropped").expect("scanned event");
+        event.uses = 1;
+        event
+    }
+
+    #[test]
+    fn recognizes_component_events_dropped_emit_with_group() {
+        for body in [
+            r#"ComponentEventsDropped::<INTENTIONAL> { count: 1, reason: "discarded" }
+                .emit_with_group(group);"#,
+            r#"(vector_lib::internal_event::ComponentEventsDropped::<INTENTIONAL> {
+                count: 1, reason: "discarded",
+            }).emit_with_group(group);"#,
+        ] {
+            let event = scan_dropped_event(body);
+            assert!(event.emits_component_events_dropped, "{body}");
+            assert!(run("TestEventsDropped", event).is_empty());
+        }
+    }
+
+    #[test]
+    fn unrelated_group_calls_do_not_bypass_dropped_event_validation() {
+        for body in [
+            "// ComponentEventsDropped\nother.emit_with_group(group);",
+            "let _: Option<ComponentEventsDropped> = None; other.emit_with_group(group);",
+            r#"let _ = "ComponentEventsDropped { count: 1 }.emit_with_group(group)";
+                other.emit_with_group(group);"#,
+            "let _ = ComponentEventsDropped { count: 1 }; other.emit_with_group(group);",
+        ] {
+            let event = scan_dropped_event(body);
+            assert!(!event.emits_component_events_dropped, "{body}");
+            let reports = run("TestEventsDropped", event);
+            assert!(reports.iter().any(|report| report.contains("MUST log")));
+            assert!(reports.iter().any(|report| report.contains(&format!(
+                "This event MUST increment counter \"{METRIC_NAME_EVENTS_DROPPED}\"."
+            ))));
+        }
     }
 
     #[test]
@@ -1335,10 +1425,12 @@ mod tests {
 
     #[test]
     fn format_check_skips_non_literal_messages() {
-        // `error!(?err, "Plain text.")` — literal is fine, no report.
-        let src = r#"fn _f() { error!(?err, "Plain text."); }"#;
-        let reports = format_check_log_messages(src, "fixture.rs");
-        assert!(reports.is_empty(), "expected no reports, got: {reports:?}");
+        let source = r#"fn example() {
+            error!(message = reason, error_type = err);
+            warn!(reason);
+            info!(?err, "Plain text.");
+        }"#;
+        assert!(format_check_log_messages(source, "fixture.rs").is_empty());
     }
 
     #[test]
@@ -1362,49 +1454,29 @@ mod tests {
         assert!(p.parameters.contains(&"protocol".to_string()));
     }
 
-    fn check(message: &str) -> (bool, bool) {
-        // Replicates the gating in `format_check_log_messages` for a literal message.
-        let is_capitalized = message.starts_with('{')
-            || !message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_alphabetic())
-            || message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_uppercase());
-        let has_trailing_period = message.ends_with('}') || message.ends_with('.');
-        (is_capitalized, has_trailing_period)
-    }
-
     #[test]
-    fn message_format_capital_period_pass() {
-        assert_eq!(check("Hello there."), (true, true));
-    }
-
-    #[test]
-    fn message_format_lowercase_first_fails() {
-        let (cap, _) = check("hello there.");
-        assert!(!cap);
-    }
-
-    #[test]
-    fn message_format_no_period_fails() {
-        let (_, period) = check("Hello there");
-        assert!(!period);
-    }
-
-    #[test]
-    fn message_format_interpolation_passes() {
-        // `{...}` at start or end is fine — we can't see what it expands to.
-        assert_eq!(check("{count} dropped."), (true, true));
-        assert_eq!(check("Dropped {count}"), (true, true));
-    }
-
-    #[test]
-    fn message_format_non_alpha_first_passes() {
-        // E.g. starts with a number — no capitalisation requirement.
-        assert_eq!(check("42 things happened."), (true, true));
+    fn checks_literal_message_format() {
+        for (message, capital, period) in [
+            ("Hello there.", true, true),
+            ("hello there.", false, true),
+            ("Hello there", true, false),
+            ("hello there", false, false),
+            ("{count} dropped.", true, true),
+            ("Dropped {count}", true, true),
+            ("42 things happened.", true, true),
+        ] {
+            let source = format!("fn example() {{ info!({message:?}); }}");
+            let reports = format_check_log_messages(&source, "fixture.rs");
+            let mut expected = Vec::new();
+            if !capital {
+                expected
+                    .push("    Message must start with a capital. (`info` call on fixture.rs:1)");
+            }
+            if !period {
+                expected.push("    Message must end with a period. (`info` call on fixture.rs:1)");
+            }
+            assert_eq!(reports, expected, "{message}");
+        }
     }
 
     // ---- validate_event branch coverage --------------------------------

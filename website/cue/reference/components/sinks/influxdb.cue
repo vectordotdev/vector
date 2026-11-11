@@ -41,7 +41,6 @@ components: sinks: _influxdb: {
 		}
 		consistency: {
 			category:    "Persistence"
-			common:      true
 			description: "Sets the write consistency for the point for InfluxDB 1."
 			groups: ["v1"]
 			required: false
@@ -77,7 +76,6 @@ components: sinks: _influxdb: {
 		}
 		password: {
 			category:    "Auth"
-			common:      true
 			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
@@ -88,7 +86,6 @@ components: sinks: _influxdb: {
 		}
 		retention_policy_name: {
 			category:    "Persistence"
-			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
@@ -108,7 +105,6 @@ components: sinks: _influxdb: {
 		}
 		username: {
 			category:    "Auth"
-			common:      true
 			description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
