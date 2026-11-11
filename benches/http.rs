@@ -1,24 +1,32 @@
-use std::net::SocketAddr;
+use std::{convert::Infallible, net::SocketAddr};
 
+use bytes::Bytes;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group};
-use futures::TryFutureExt;
-use hyper::{
-    Body, Response, Server,
-    service::{make_service_fn, service_fn},
+use http::Response;
+use http_body_util::Empty;
+use hyper::service::service_fn;
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
 };
-use tokio::runtime::Runtime;
+use tokio::{net::TcpListener, runtime::Runtime};
 use vector::{
-    Error, config,
+    config,
     sinks::{
         self,
         util::{BatchConfig, Compression},
     },
     sources,
-    template::Template,
+    template::UriTemplate,
     test_util::{addr::next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
 };
 use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn benchmark_http(c: &mut Criterion) {
     let num_lines: usize = 1_000;
     let line_size: usize = 100;
@@ -32,7 +40,7 @@ fn benchmark_http(c: &mut Criterion) {
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
-    for compression in [Compression::None, Compression::gzip_default()].iter() {
+    for compression in &[Compression::None, Compression::gzip_default()] {
         group.bench_with_input(
             BenchmarkId::new("compression", compression),
             compression,
@@ -51,17 +59,17 @@ fn benchmark_http(c: &mut Criterion) {
                             "out",
                             &["in"],
                             sinks::http::config::HttpSinkConfig {
-                                uri: Template::try_from(out_addr.to_string()).unwrap(),
+                                uri: UriTemplate::try_from(format!("http://{out_addr}")).unwrap(),
                                 compression: *compression,
                                 method: Default::default(),
-                                auth: Default::default(),
-                                payload_prefix: Default::default(),
-                                payload_suffix: Default::default(),
+                                auth: Option::default(),
+                                payload_prefix: String::default(),
+                                payload_suffix: String::default(),
                                 batch,
                                 encoding: (None::<FramingConfig>, TextSerializerConfig::default())
                                     .into(),
                                 request: Default::default(),
-                                tls: Default::default(),
+                                tls: Option::default(),
                                 acknowledgements: Default::default(),
                                 retry_strategy: Default::default(),
                                 confinement: Default::default(),
@@ -82,10 +90,10 @@ fn benchmark_http(c: &mut Criterion) {
                             let lines = random_lines(line_size).take(num_lines);
                             send_lines(in_addr, lines).await.unwrap();
                             topology.stop().await;
-                        })
+                        });
                     },
                     BatchSize::PerIteration,
-                )
+                );
             },
         );
     }
@@ -95,17 +103,22 @@ fn benchmark_http(c: &mut Criterion) {
 
 fn serve(addr: SocketAddr) -> Runtime {
     let rt = runtime();
+    let listener = rt.block_on(TcpListener::bind(addr)).unwrap();
     rt.spawn(async move {
-        let make_service = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_req| async {
-                Ok::<_, Error>(Response::new(Body::empty()))
-            }))
-        });
-
-        Server::bind(&addr)
-            .serve(make_service)
-            .map_err(|e| panic!("{}", e))
-            .await
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                // Connection errors do not stop the server.
+                _ = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(
+                        TokioIo::new(stream),
+                        service_fn(|_req| async {
+                            Ok::<_, Infallible>(Response::new(Empty::<Bytes>::new()))
+                        }),
+                    )
+                    .await;
+            });
+        }
     });
     rt
 }

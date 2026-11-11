@@ -1,6 +1,10 @@
 use anyhow::Result;
 
-use crate::{app, commands::fmt::PRETTIER_EXTENSIONS, utils::git::git_ls_files};
+use crate::{
+    app,
+    commands::{fmt::PRETTIER_EXTENSIONS, style},
+    utils::{git::git_ls_files, paths::prettier},
+};
 
 /// Check that all files are formatted properly
 #[derive(clap::Args, Debug)]
@@ -9,8 +13,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        info!("Checking style (trailing spaces, line endings)...");
-        app::exec("scripts/check-style.sh", ["--all"], true)?;
+        app::set_repo_dir()?;
+        style::check_all()?;
 
         info!("Checking Rust formatting...");
         app::exec("cargo", ["fmt", "--", "--check"], true)?;
@@ -21,11 +25,10 @@ impl Cli {
                 continue;
             }
             info!("Checking prettier formatting for {ext} files...");
-            let args: Vec<&str> = ["--ignore-path", ".prettierignore", "--check"]
+            let args = ["--check"]
                 .into_iter()
-                .chain(files.iter().map(String::as_str))
-                .collect();
-            app::exec("prettier", &args, true)?;
+                .chain(files.iter().map(String::as_str));
+            prettier(args, true)?;
         }
 
         Ok(())

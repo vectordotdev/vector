@@ -1,10 +1,6 @@
-// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
-use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
@@ -14,7 +10,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
+    variants::disk_v2::{self, DiskBufferUsageSnapshot, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -43,6 +39,22 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
+    /// Whether this backend can only persist items satisfying [`Bufferable::is_fully_encodable`].
+    ///
+    /// In-memory stages hold the in-memory representation and have no wire format, so they can
+    /// accept any item regardless of its nesting depth. Disk stages encode to protobuf on write
+    /// and cannot.
+    ///
+    /// Callers use this to avoid assuming a stage is constrained: an item that one stage cannot
+    /// encode may be perfectly storable by another, so the check must be asked of the specific
+    /// stage rather than applied to every topology.
+    pub(crate) fn requires_encodable_items(&self) -> bool {
+        match self {
+            Self::InMemory(_) => false,
+            Self::DiskV2(_) => true,
+        }
+    }
+
     pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
             Self::InMemory(tx) => tx
@@ -51,7 +63,24 @@ where
                 .map(|()| TryWriteOutcome::Written)
                 .map_err(Into::into),
             Self::DiskV2(writer) => {
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
                 let mut writer = writer.lock().await;
+
+                let Some(item) = item.filter_unencodable() else {
+                    // The whole item was filtered out (e.g. every sub-item over the
+                    // protobuf nesting budget). Report the drop directly via the
+                    // ledger's usage handle so it shows up in the disk-v2 stage's
+                    // `received` / `dropped` metrics — `BufferSender` does not carry
+                    // its own handle for backends that `provides_instrumentation()`.
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(TryWriteOutcome::Dropped);
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
 
                 writer.write_record_outcome(item).await.map_err(|e| {
                     // Record-level failures that can never succeed (a record too large to encode
@@ -75,6 +104,26 @@ where
                 .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
+
+                // Filtering here is unconditional and independent of current occupancy.
+                // Whether an unencodable item should be dropped or handed to an overflow
+                // stage is a `WhenFull` policy decision, so it is made in `BufferSender`
+                // before the item ever reaches this backend: `WhenFull::Overflow` diverts
+                // items failing `is_fully_encodable` straight to the overflow stage, and
+                // anything arriving here is therefore expected to be persistable. Keeping
+                // the filter unconditional means a given item is treated the same at 99%
+                // full as at 100% full.
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
+                let Some(item) = item.filter_unencodable() else {
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(TryWriteOutcome::Dropped);
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
 
                 writer.try_write_record(item).await.map_err(|e| {
                     // Record-level failures that can never succeed (a record too large to encode
@@ -105,10 +154,21 @@ where
         }
     }
 
+    #[must_use]
     pub fn capacity(&self) -> Option<usize> {
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
             Self::DiskV2(_) => None,
+        }
+    }
+
+    fn usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
+        match self {
+            Self::InMemory(_) => Some(DiskBufferUsageSnapshot {
+                event_count: 0,
+                byte_size: 0,
+            }),
+            Self::DiskV2(writer) => writer.try_lock().ok().map(|writer| writer.usage_snapshot()),
         }
     }
 }
@@ -162,21 +222,25 @@ impl UsageAccounting {
 /// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
 /// `SenderAdapter` instances instead... which would let us get rid of the boxing and
 /// `#[async_recursion]` stuff.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
+    // `overflow` is self-referential, so formatting it via a plain placeholder would make
+    // derive_more infer `Option<Box<BufferSender<T>>>: Debug`, overflowing (E0275). A method-call
+    // expression skips bound inference while formatting the same value.
+    #[debug("{:?}", overflow.as_ref())]
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     send_duration: Option<Registered<BufferSendDuration>>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     custom_instrumentation: Option<Arc<dyn BufferInstrumentation<T>>>,
 }
 
 impl<T: Bufferable> BufferSender<T> {
     /// Creates a new [`BufferSender`] wrapping the given channel sender.
+    #[must_use]
     pub fn new(base: SenderAdapter<T>, when_full: WhenFull) -> Self {
         Self {
             base,
@@ -189,6 +253,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Creates a new [`BufferSender`] wrapping the given channel sender and overflow sender.
+    #[must_use]
     pub fn with_overflow(base: SenderAdapter<T>, overflow: BufferSender<T>) -> Self {
         Self {
             base,
@@ -224,6 +289,20 @@ impl<T: Bufferable> BufferSender<T> {
     /// Configures this sender to invoke a custom instrumentation hook.
     pub fn with_custom_instrumentation(&mut self, instrumentation: impl BufferInstrumentation<T>) {
         self.custom_instrumentation = Some(Arc::new(instrumentation));
+    }
+
+    /// Returns the aggregate approximate usage of all disk stages in this buffer topology.
+    ///
+    /// Returns `None` rather than waiting if any disk writer is currently busy.
+    #[must_use]
+    pub fn disk_usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
+        let mut usage = self.base.usage_snapshot()?;
+        if let Some(overflow) = self.overflow.as_ref() {
+            let overflow_usage = overflow.disk_usage_snapshot()?;
+            usage.event_count = usage.event_count.saturating_add(overflow_usage.event_count);
+            usage.byte_size = usage.byte_size.saturating_add(overflow_usage.byte_size);
+        }
+        Some(usage)
     }
 }
 
@@ -263,20 +342,47 @@ impl<T: Bufferable> BufferSender<T> {
                 TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
-            WhenFull::Overflow => match self.base.try_send(item).await? {
-                TryWriteOutcome::Written => UsageAccounting::Accepted,
-                TryWriteOutcome::Full(item) => {
+            WhenFull::Overflow => {
+                // An item the base stage can never encode is routed to the overflow stage
+                // intact, whatever the current occupancy. Deciding this here, rather than
+                // letting the backend filter it, is what makes the behaviour
+                // state-independent: previously an over-nested item was pruned while the
+                // disk had room and forwarded whole once the disk reported full, so the
+                // same item took different paths at 99% and 100%.
+                //
+                // The check is gated on the base stage actually having a wire-format
+                // constraint. A memory stage overflowing to disk can store an over-nested
+                // item perfectly well, so diverting it past memory would send an item the
+                // base could have kept to a stage that must drop it.
+                if self.base.requires_encodable_items() && !item.is_fully_encodable() {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
                         .send(item, send_reference)
                         .await?;
                     UsageAccounting::NotAccepted
+                } else {
+                    match self.base.try_send(item).await? {
+                        TryWriteOutcome::Written => UsageAccounting::Accepted,
+                        TryWriteOutcome::Full(item) => {
+                            self.overflow
+                                .as_mut()
+                                .unwrap_or_else(|| unreachable!("overflow must exist"))
+                                .send(item, send_reference)
+                                .await?;
+                            UsageAccounting::NotAccepted
+                        }
+                        TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+                    }
                 }
-                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
-            },
+            }
         };
 
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `was_dropped`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
         {
@@ -299,5 +405,47 @@ impl<T: Bufferable> BufferSender<T> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    use tempfile::tempdir;
+    use tracing::Span;
+
+    use super::SenderAdapter;
+    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
+        let config = BufferConfig::Chained(vec![
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()),
+                when_full: WhenFull::Overflow,
+            },
+            BufferType::DiskV2 {
+                max_size: NonZeroU64::new(268_435_488).unwrap(),
+                when_full: WhenFull::Block,
+            },
+        ]);
+        let data_dir = tempdir().unwrap();
+        let (sender, _receiver) = config
+            .build::<SizedRecord>(
+                Some(data_dir.path().to_path_buf()),
+                "busy".into(),
+                Span::none(),
+            )
+            .await
+            .unwrap();
+        let overflow = sender.overflow.as_ref().unwrap();
+        let writer = match &overflow.base {
+            SenderAdapter::DiskV2(writer) => writer,
+            SenderAdapter::InMemory(_) => unreachable!(),
+        };
+        let _guard = writer.lock().await;
+
+        assert_eq!(sender.disk_usage_snapshot(), None);
     }
 }

@@ -1,9 +1,12 @@
 use std::ffi::OsStr;
 
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
-use vector_lib::configurable::configurable_component;
 #[cfg(target_os = "linux")]
 use vector_lib::metric_tags;
+use vector_lib::{
+    configurable::configurable_component,
+    internal_event::{CounterName, GaugeName},
+};
 
 use super::{FilterList, HostMetrics, default_all_processes, example_processes};
 
@@ -17,13 +20,17 @@ pub struct ProcessConfig {
     processes: FilterList,
 }
 
-const RUNTIME: &str = "process_runtime";
-const CPU_USAGE: &str = "process_cpu_usage";
-const MEMORY_USAGE: &str = "process_memory_usage";
-const MEMORY_VIRTUAL_USAGE: &str = "process_memory_virtual_usage";
+const RUNTIME_TOTAL: CounterName = CounterName::ProcessRuntimeTotal;
+const CPU_USAGE: GaugeName = GaugeName::ProcessCpuUsage;
+const MEMORY_USAGE: GaugeName = GaugeName::ProcessMemoryUsage;
+const MEMORY_VIRTUAL_USAGE: GaugeName = GaugeName::ProcessMemoryVirtualUsage;
 
 impl HostMetrics {
-    pub async fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    pub fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
@@ -53,7 +60,7 @@ impl HostMetrics {
                 process.virtual_memory() as f64,
                 tags(),
             );
-            output.counter(RUNTIME, process.run_time() as f64, tags());
+            output.counter(RUNTIME_TOTAL, process.run_time() as f64, tags());
         }
     }
 }
@@ -66,10 +73,8 @@ mod tests {
     #[tokio::test]
     async fn generates_process_metrics() {
         let mut buffer = MetricsBuffer::new(None);
-        HostMetrics::new(HostMetricsConfig::default())
-            .process_metrics(&mut buffer)
-            .await;
-        let metrics = buffer.metrics;
+        HostMetrics::new(HostMetricsConfig::default()).process_metrics(&mut buffer);
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
 
         // All metrics are named process_*
@@ -83,5 +88,26 @@ mod tests {
         assert_eq!(count_tag(&metrics, "pid"), metrics.len());
         assert_eq!(count_tag(&metrics, "name"), metrics.len());
         assert_eq!(count_tag(&metrics, "command"), metrics.len());
+    }
+
+    #[test]
+    fn emits_process_runtime_total_without_legacy_name() {
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default()).process_metrics(&mut buffer);
+        let metrics = buffer.into_metrics();
+
+        assert!(
+            metrics
+                .iter()
+                .any(|metric| metric.name() == "process_runtime_total"),
+            "expected at least one process_runtime_total counter"
+        );
+        // The legacy `process_runtime` name was removed in 0.62.0.
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.name() == "process_runtime"),
+            "the legacy process_runtime counter must not be emitted"
+        );
     }
 }

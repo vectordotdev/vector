@@ -18,6 +18,7 @@ use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUT
 use crate::{
     config::{
         EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     enrichment_tables::memory::{
         bloom_table::{BloomMemoryConfig, BloomMemoryTable},
@@ -65,25 +66,20 @@ pub struct MemoryConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
     /// Configuration of internal metrics
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
     /// Configuration for source functionality.
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
     /// Field in the incoming value used as the TTL override.
-    #[configurable(derived)]
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
     /// Behavior for memory table state on configuration reload.
-    #[configurable(derived)]
     #[serde(default)]
     pub reload_behavior: ReloadBehavior,
 
     /// Set to make the table act as a probabilistic filter instead of storing original values. This
     /// will prevent reading values from the table - found keys will have empty value.
-    #[configurable(derived)]
     #[serde(default)]
     pub filter: Option<TableFilter>,
 
@@ -122,7 +118,7 @@ pub struct MemorySourceConfig {
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub export_batch_size: Option<u64>,
     /// If set to true, all data will be removed from cache after exporting.
-    /// Only valid if used as a source and export_interval > 0
+    /// Only valid if used as a source and `export_interval` is greater than 0.
     ///
     /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
@@ -175,7 +171,7 @@ impl Default for MemoryConfig {
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
             ttl_field: OptionalValuePath::none(),
-            reload_behavior: Default::default(),
+            reload_behavior: ReloadBehavior::default(),
             filter: None,
         }
     }
@@ -186,7 +182,7 @@ const fn default_ttl() -> u64 {
 }
 
 const fn default_scan_interval() -> NonZeroU64 {
-    unsafe { NonZeroU64::new_unchecked(30) }
+    NonZeroU64::new(30).expect("the default scan interval is nonzero")
 }
 
 impl MemoryConfig {
@@ -255,6 +251,35 @@ impl MemoryConfig {
                 .clone())
         }
     }
+
+    fn validate_filter(&self) -> crate::Result<()> {
+        match &self.filter {
+            Some(TableFilter::Cuckoo(_)) if self.source_config.is_some() => {
+                return Err("Source functionality is not supported for cuckoo filter".into());
+            }
+            Some(TableFilter::Bloom(_)) if self.source_config.is_some() => {
+                return Err("Source functionality is not supported for bloom filter".into());
+            }
+            Some(TableFilter::Bloom(_))
+                if self.ttl_field.path.is_some() || self.ttl != default_ttl() =>
+            {
+                return Err("TTL functionality is not supported for bloom filter.".into());
+            }
+            Some(TableFilter::Bloom(_)) if self.scan_interval != default_scan_interval() => {
+                return Err("`scan_interval` has no effect for bloom filter.".into());
+            }
+            Some(TableFilter::Bloom(bloom)) => {
+                let filter_size = bloom.filter_size();
+                if let Some(max_byte_size) = self.max_byte_size
+                    && filter_size > max_byte_size
+                {
+                    return Err(format!("Configured bloom filter is larger ({filter_size}) than defined `max_byte_size` ({max_byte_size}). Reduce the size of bloom filter or increase or remove `max_byte_size`.").into());
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
 }
 
 impl EnrichmentTableConfig for MemoryConfig {
@@ -263,25 +288,12 @@ impl EnrichmentTableConfig for MemoryConfig {
         _globals: &crate::config::GlobalOptions,
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        self.validate_filter()?;
         match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
-                if self.source_config.is_some() {
-                    return Err("Source functionality is not supported for cuckoo filter".into());
-                }
                 Ok(Box::new(self.get_or_build_cuckoo(prev_state).await?))
             }
-            Some(TableFilter::Bloom(_)) => {
-                if self.source_config.is_some() {
-                    return Err("Source functionality is not supported for bloom filter".into());
-                }
-                if self.ttl_field.path.is_some() || self.ttl != default_ttl() {
-                    return Err("TTL functionality is not supported for bloom filter.".into());
-                }
-                if self.scan_interval != default_scan_interval() {
-                    return Err("`scan_interval` has no effect for bloom filter.".into());
-                }
-                Ok(Box::new(self.get_or_build_bloom(prev_state).await?))
-            }
+            Some(TableFilter::Bloom(_)) => Ok(Box::new(self.get_or_build_bloom(prev_state).await?)),
             None => Ok(Box::new(self.get_or_build_memory(prev_state).await)),
         }
     }
@@ -318,7 +330,29 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[async_trait]
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for MemoryConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        self.validate_filter()?;
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
                 VectorSink::from_event_streamsink(self.get_or_build_cuckoo(None).await?)
@@ -331,14 +365,6 @@ impl SinkConfig for MemoryConfig {
 
         Ok((sink, future::ok(()).boxed()))
     }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
-    }
 }
 
 #[async_trait]
@@ -349,7 +375,7 @@ impl SourceConfig for MemoryConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             memory.as_source(cx.shutdown, cx.out, log_namespace).run(),
         ))
     }
@@ -368,8 +394,7 @@ impl SourceConfig for MemoryConfig {
         if self
             .source_config
             .as_ref()
-            .map(|c| c.export_expired_items)
-            .unwrap_or_default()
+            .is_some_and(|c| c.export_expired_items)
         {
             vec![
                 SourceOutput::new_maybe_logs(DataType::Log, schema_definition.clone()),
@@ -389,6 +414,11 @@ impl SourceConfig for MemoryConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl std::fmt::Debug for MemoryConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MemoryConfig")
@@ -401,3 +431,64 @@ impl std::fmt::Debug for MemoryConfig {
 }
 
 impl_generate_config_from_default!(MemoryConfig);
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use crate::config::ValidatedSink;
+    use crate::enrichment_tables::memory::bloom_table::BloomMemoryConfig;
+
+    use super::*;
+
+    fn bloom_filter() -> TableFilter {
+        TableFilter::Bloom(BloomMemoryConfig {
+            max_entries: NonZeroUsize::new(1000).unwrap(),
+        })
+    }
+
+    #[test]
+    fn validate_rejects_incompatible_filter_combinations() {
+        // Source functionality is not supported for bloom filter.
+        let config = MemoryConfig {
+            filter: Some(bloom_filter()),
+            source_config: Some(MemorySourceConfig {
+                export_interval: None,
+                export_batch_size: None,
+                remove_after_export: false,
+                export_expired_items: false,
+                source_key: "source".to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // TTL functionality is not supported for bloom filter.
+        let config = MemoryConfig {
+            filter: Some(bloom_filter()),
+            ttl_field: OptionalValuePath::new("ttl"),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // `scan_interval` has no effect for bloom filter.
+        let config = MemoryConfig {
+            filter: Some(bloom_filter()),
+            scan_interval: NonZeroU64::new(60).unwrap(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // A bloom filter larger than `max_byte_size` fails validation.
+        let config = MemoryConfig {
+            filter: Some(bloom_filter()),
+            max_byte_size: Some(1),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // A valid config passes validation.
+        let config = MemoryConfig::default();
+        assert!(config.validate().is_ok());
+    }
+}

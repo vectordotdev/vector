@@ -20,7 +20,7 @@ administration: interfaces: dpkg: {
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
 			install: #"""
-				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector_{version}-1_{arch}.deb && \
+				curl --proto '=https' --tlsv1.2 -O https://install.datadoghq.com/vector/{version}/vector_{version}-1_{arch}.deb && \
 					sudo dpkg -i vector_{version}-1_{arch}.deb
 				"""#
 			uninstall: "sudo dpkg -r vector"

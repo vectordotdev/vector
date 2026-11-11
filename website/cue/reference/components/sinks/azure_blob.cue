@@ -63,7 +63,6 @@ components: sinks: azure_blob: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.azure_blob.configuration

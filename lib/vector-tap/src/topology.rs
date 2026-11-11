@@ -35,6 +35,7 @@ impl TapResource {
     ///
     /// Keys are all components that have at least one output (sources and transforms).
     /// The port value is `None` for the default output and `Some(name)` for named ports.
+    #[must_use]
     pub fn output_ports_by_component(&self) -> HashMap<&ComponentKey, Vec<Option<&str>>> {
         let mut map: HashMap<&ComponentKey, Vec<Option<&str>>> = HashMap::new();
         for tap_output in self.outputs.keys() {

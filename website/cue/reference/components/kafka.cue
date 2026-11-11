@@ -36,7 +36,6 @@ components: _kafka: {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

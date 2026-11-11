@@ -58,7 +58,9 @@ impl Eq for Discriminant {}
 fn value_eq(this: &Value, other: &Value) -> bool {
     match (this, other) {
         // Trivial.
-        (Value::Bytes(this), Value::Bytes(other)) => this.eq(other),
+        (Value::Bytes(_) | Value::String(_), Value::Bytes(_) | Value::String(_)) => {
+            this.as_bytes() == other.as_bytes()
+        }
         (Value::Boolean(this), Value::Boolean(other)) => this.eq(other),
         (Value::Integer(this), Value::Integer(other)) => this.eq(other),
         (Value::Timestamp(this), Value::Timestamp(other)) => this.eq(other),
@@ -127,6 +129,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
     match value {
         // Trivial.
         Value::Bytes(val) => val.hash(hasher),
+        Value::String(val) => val.as_bytes().hash(hasher),
         Value::Regex(val) => val.as_bytes_slice().hash(hasher),
         Value::Boolean(val) => val.hash(hasher),
         Value::Integer(val) => val.hash(hasher),
@@ -209,6 +212,34 @@ mod tests {
 
         assert_eq!(discriminant_1, discriminant_2);
         assert_eq!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn strings_and_bytes_have_equal_discriminants() {
+        let string = Value::from("café");
+        let bytes = Value::Bytes("café".into());
+        let pairs = [
+            (string.clone(), bytes.clone()),
+            (
+                Value::Array(vec![string.clone()]),
+                Value::Array(vec![bytes.clone()]),
+            ),
+            (
+                Value::Object(ObjectMap::from([("key".into(), string)])),
+                Value::Object(ObjectMap::from([("key".into(), bytes)])),
+            ),
+        ];
+        for (string, bytes) in pairs {
+            let left = Discriminant {
+                values: vec![Some(string)],
+            };
+            let right = Discriminant {
+                values: vec![Some(bytes)],
+            };
+            assert_eq!(left, right);
+            assert_eq!(right, left);
+            assert_eq!(hash(left), hash(right));
+        }
     }
 
     #[test]

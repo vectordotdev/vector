@@ -61,7 +61,6 @@ components: sinks: splunk_hec_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.splunk_hec_metrics.configuration

@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEcsMetricsEventsReceived<'a> {
+pub(crate) struct AwsEcsMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
@@ -36,7 +36,7 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEcsMetricsParseError<'a> {
+pub(crate) struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,
     pub endpoint: &'a str,
     pub body: Cow<'a, str>,

@@ -53,7 +53,6 @@ components: sources: heroku_logs: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

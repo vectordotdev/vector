@@ -23,3 +23,7 @@ yarn-error.log
 # Generated HTML reports for Lighthouse
 reports/lighthouse.html
 .hugo-classes
+
+# Playwright reports and failure artifacts
+playwright-report/
+test-results/

@@ -1,26 +1,25 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusParseError<'a> {
+pub(crate) struct PrometheusParseError<'a> {
     pub error: ParserError,
     pub url: http::Uri,
     pub body: Cow<'a, str>,
 }
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(
@@ -44,11 +43,13 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusRemoteWriteParseError {
+pub(crate) struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit(self) {
         error!(
@@ -67,25 +68,22 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusNormalizationError;
+pub(crate) struct PrometheusInvalidMetricError;
 
-impl InternalEvent for PrometheusNormalizationError {
+impl InternalEvent for PrometheusInvalidMetricError {
     fn emit(self) {
-        let normalization_reason = "Prometheus metric normalization failed.";
+        let reason = "Prometheus metric contains a line break in an identifier.";
         error!(
-            message = normalization_reason,
-            error_type = error_type::CONVERSION_FAILED,
+            message = reason,
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONVERSION_FAILED,
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: normalization_reason
-        });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

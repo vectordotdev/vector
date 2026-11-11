@@ -1,10 +1,9 @@
 use crate::sinks::{
-    doris::{DorisConfig, common::DorisCommon, request_builder::DorisRequestBuilder},
-    prelude::*,
-    util::http::HttpRequest,
+    doris::request_builder::DorisRequestBuilder, prelude::*, util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
-pub struct DorisSink<S> {
+pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     request_builder: DorisRequestBuilder,
@@ -19,25 +18,20 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub fn new(service: S, config: &DorisConfig, common: &DorisCommon) -> crate::Result<Self> {
-        let batch_settings = config.batch.into_batcher_settings()?;
-        let database =
-            config
-                .database
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "database")?;
-        let table =
-            config
-                .table
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "table")?;
-        Ok(DorisSink {
+    pub(super) const fn new(
+        service: S,
+        batch_settings: BatcherSettings,
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
+        request_builder: DorisRequestBuilder,
+    ) -> Self {
+        DorisSink {
             batch_settings,
             service,
-            request_builder: common.request_builder.clone(),
+            request_builder,
             database,
             table,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -55,7 +49,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -83,14 +77,14 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct DorisPartitionKey {
+pub(super) struct DorisPartitionKey {
     pub database: String,
     pub table: String,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct DorisKeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -105,7 +99,7 @@ impl DorisKeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,

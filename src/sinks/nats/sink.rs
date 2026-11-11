@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use vector_lib::internal_event::emit;
 
 use snafu::ResultExt;
 
@@ -30,7 +31,7 @@ impl NatsSink {
             .subject
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("subject"),
                     drop_event: true,
@@ -44,8 +45,9 @@ impl NatsSink {
     pub(super) async fn new(
         config: NatsSinkConfig,
         subject: ConfinedTemplate,
+        server_addresses: Vec<async_nats::ServerAddr>,
     ) -> Result<Self, NatsError> {
-        let publisher = Arc::new(config.publisher().await?);
+        let publisher = Arc::new(config.publisher(server_addresses).await?);
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
@@ -85,7 +87,7 @@ impl NatsSink {
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build NATS request: {:?}.", e);
+                        error!("Failed to build NATS request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

@@ -68,7 +68,7 @@ pub enum JitterMode {
     /// strategy.
     ///
     /// Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-    /// of creating accidental denial of service (DoS) conditions against your own systems when
+    /// of creating accidental denial of service (`DoS`) conditions against your own systems when
     /// many clients are recovering from a failure state.
     #[default]
     Full,
@@ -109,7 +109,13 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     }
 
     fn add_full_jitter(d: Duration) -> Duration {
-        let jitter = (rand::random::<u64>() % (d.as_millis() as u64)) + 1;
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve jitter conversion."
+        )]
+        let millis = d.as_millis() as u64;
+        let jitter = (rand::random::<u64>() % millis) + 1;
         Duration::from_millis(jitter)
     }
 
@@ -245,14 +251,17 @@ impl Future for RetryPolicyFuture {
 }
 
 impl<Request> RetryAction<Request> {
+    #[must_use]
     pub const fn is_retryable(&self) -> bool {
         matches!(self, RetryAction::Retry(_) | RetryAction::RetryPartial(_))
     }
 
+    #[must_use]
     pub const fn is_not_retryable(&self) -> bool {
         matches!(self, RetryAction::DontRetry(_))
     }
 
+    #[must_use]
     pub const fn is_successful(&self) -> bool {
         matches!(self, RetryAction::Successful)
     }
@@ -426,10 +435,8 @@ mod tests {
             // Check if the backoff is within the expected range, considering the jitter
             assert!(
                 !backoff.is_zero() && backoff <= upper_bound,
-                "Attempt {}: Expected backoff to be within 0 and {:?}, got {:?}",
-                i + 1,
-                upper_bound,
-                backoff
+                "Attempt {}: Expected backoff to be within 0 and {upper_bound:?}, got {backoff:?}",
+                i + 1
             );
 
             policy.advance();

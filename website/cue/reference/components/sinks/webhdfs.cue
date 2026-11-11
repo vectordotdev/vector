@@ -39,7 +39,6 @@ components: sinks: webhdfs: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.webhdfs.configuration

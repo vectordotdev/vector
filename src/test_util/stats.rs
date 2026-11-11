@@ -29,12 +29,20 @@ pub struct Histogram {
 impl Histogram {
     pub fn add(&mut self, index: usize, amount: f64) {
         if self.totals.len() <= index {
-            self.totals
-                .extend((self.totals.len()..index + 1).map(|_| 0.0));
+            self.totals.extend((self.totals.len()..=index).map(|_| 0.0));
         }
         self.totals[index] += amount;
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Histogram indices retain their existing floating-point conversion. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    ///
+    /// # Panics
+    ///
+    /// Panics if nonempty statistics are missing their minimum or maximum.
+    #[must_use]
     pub fn stats(&self) -> Option<HistogramStats> {
         let (min, max, mode, sum) = self.totals.iter().enumerate().fold(
             (None, None, None, WeightedSum::default()),
@@ -80,7 +88,7 @@ impl Display for Histogram {
     }
 }
 
-/// A TimeHistogram is a Histogram where the weights are equal to the
+/// A `TimeHistogram` is a Histogram where the weights are equal to the
 /// length of time since the last item was added. Time between the start
 /// of the program and the first `add` is ignored.
 #[derive(Clone, Debug, Default)]
@@ -112,7 +120,7 @@ impl Display for TimeHistogram {
     }
 }
 
-/// A LevelTimeHistogram is a convenience wrapper for a TimeHistogram
+/// A `LevelTimeHistogram` is a convenience wrapper for a `TimeHistogram`
 /// where the index is treated as a level which may be adjusted up or
 /// down instead of being handled directly.
 #[derive(Clone, Debug, Default)]
@@ -124,10 +132,11 @@ pub struct LevelTimeHistogram {
 impl LevelTimeHistogram {
     pub fn adjust(&mut self, adjustment: isize, instant: Instant) -> usize {
         self.histogram.add(self.level, instant);
-        self.level = ((self.level as isize) + adjustment) as usize;
+        self.level = (self.level.cast_signed() + adjustment).cast_unsigned();
         self.level
     }
 
+    #[must_use]
     pub const fn level(&self) -> usize {
         self.level
     }
@@ -157,6 +166,7 @@ pub struct VariableHistogram {
 }
 
 impl VariableHistogram {
+    #[must_use]
     pub fn new(upper_limits: &[f64]) -> Self {
         let mut buckets = upper_limits.iter().map(|v| (*v, 0)).collect::<Vec<_>>();
 
@@ -172,7 +182,7 @@ impl VariableHistogram {
     }
 
     pub fn record(&mut self, value: f64) {
-        for (bound, count) in self.buckets.iter_mut() {
+        for (bound, count) in &mut self.buckets {
             if value <= *bound {
                 *count += 1;
                 break;
@@ -189,14 +199,17 @@ impl VariableHistogram {
         }
     }
 
+    #[must_use]
     pub const fn count(&self) -> u64 {
         self.count
     }
 
+    #[must_use]
     pub const fn sum(&self) -> f64 {
         self.sum
     }
 
+    #[must_use]
     pub fn buckets(&self) -> Vec<Bucket> {
         self.buckets
             .iter()
@@ -208,7 +221,7 @@ impl VariableHistogram {
     }
 }
 
-/// A WeightedSum contains an averaging mechanism that accepts a varying
+/// A `WeightedSum` contains an averaging mechanism that accepts a varying
 /// weight at each point to be averaged, and biases the mean based on
 /// those weights.
 #[derive(Clone, Copy, Debug, Default)]
@@ -234,6 +247,7 @@ impl WeightedSum {
         self.min = Some(opt_min(self.min, value));
     }
 
+    #[must_use]
     pub fn mean(&self) -> Option<f64> {
         if self.weights == 0.0 {
             None
@@ -242,6 +256,11 @@ impl WeightedSum {
         }
     }
 
+    ///
+    /// # Panics
+    ///
+    /// Panics if nonempty statistics are missing their minimum or maximum.
+    #[must_use]
     pub fn stats(&self) -> Option<WeightedSumStats> {
         self.mean().map(|mean| WeightedSumStats {
             mean,
@@ -266,7 +285,6 @@ impl Display for WeightedSum {
 
 fn opt_max(opt: Option<f64>, value: f64) -> f64 {
     match opt {
-        None => value,
         Some(s) if s > value => s,
         _ => value,
     }
@@ -274,13 +292,12 @@ fn opt_max(opt: Option<f64>, value: f64) -> f64 {
 
 fn opt_min(opt: Option<f64>, value: f64) -> f64 {
     match opt {
-        None => value,
         Some(s) if s < value => s,
         _ => value,
     }
 }
 
-/// A TimeWeightedSum is a wrapper around WeightedSum that keeps track
+/// A `TimeWeightedSum` is a wrapper around `WeightedSum` that keeps track
 /// of the last Instant a value was observed, and uses the duration
 /// since that last observance to weight the added value.
 #[derive(Clone, Copy, Debug, Default)]

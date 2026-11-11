@@ -6,4 +6,4 @@ sinks:
     encoding:
       codec: json
     group_name: group-name
-    stream_name: "{{ host }}"
+    stream_name: stream-{{ host }}

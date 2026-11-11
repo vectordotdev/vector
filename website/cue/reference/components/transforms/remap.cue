@@ -30,7 +30,6 @@ components: transforms: "remap": {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.remap.configuration
@@ -106,7 +105,7 @@ components: transforms: "remap": {
 
 				Field | Access | Specific restrictions (if any)
 				:-----|:-------|:------------------------------
-				`type` | Read only |
+				`type` | Read/write | You can set `type` to either `counter` or `gauge`, but only on a metric that is currently a counter or a gauge. The value and kind are kept.
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
 				`name` | Read/write |
 				`timestamp` | Read/write/delete | You can only assign a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).

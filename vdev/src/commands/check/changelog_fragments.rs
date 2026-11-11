@@ -2,25 +2,21 @@
 //! small markdown files together into a bigger markdown file; whatever renders safely in
 //! a fragment renders identically in the guide. PR review handles content quality.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use semver::Version;
 
 use crate::commands::changelog::{
-    is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections, slugify,
+    FRAGMENT_TYPES, FragmentType, is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections,
+    slugify,
 };
-use crate::utils::{git, paths};
+use crate::utils::{cargo::CargoToml, deprecation, git, paths};
 
 const CHANGELOG_DIR: &str = "changelog.d";
 const DEFAULT_MAX_FRAGMENTS: usize = 1000;
 
-/// Allowed changelog fragment types.
-///
-/// NOTE: keep this list in sync with `vdev/src/commands/release/generate_cue.rs`
-/// and `changelog.d/README.md`.
-const FRAGMENT_TYPES: &[&str] = &["breaking", "security", "feature", "enhancement", "fix"];
-
-/// Validate changelog fragments added on this branch/PR.
+/// Validate changelog fragments or a new deprecation announcement on this branch/PR.
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -49,15 +45,18 @@ impl Cli {
         // Schema validation, on the other hand, must see M (modified) fragments too.
         let is_real_fragment =
             |p: &PathBuf| p.file_name().and_then(|s| s.to_str()) != Some("README.md");
-        let added_real: Vec<PathBuf> = diff_fragments(&self.merge_base, "A")?
+        let added_real: Vec<PathBuf> = diff_fragments(&self.merge_base, "A", CHANGELOG_DIR)?
             .into_iter()
             .filter(is_real_fragment)
             .collect();
-        if added_real.is_empty() {
+        if added_real.is_empty()
+            && !has_added_deprecation_announcement(&repo_root, &self.merge_base)?
+        {
             bail!(
                 "No changelog fragments detected. \
-                 If no changes necessitate user-facing explanations, add the 'no-changelog' label. \
-                 Otherwise, add fragments to {CHANGELOG_DIR}/ (see {CHANGELOG_DIR}/README.md)."
+                 Add a fragment to {CHANGELOG_DIR}/ (see {CHANGELOG_DIR}/README.md). \
+                 For a deprecation announcement, add a valid new notice to deprecation.d/ instead \
+                 (see docs/DEPRECATION_POLICY.md)."
             );
         }
         if added_real.len() > self.max_fragments {
@@ -69,7 +68,7 @@ impl Cli {
         }
 
         // Every touched fragment (added or modified) must pass the schema check.
-        let modified: Vec<PathBuf> = diff_fragments(&self.merge_base, "M")?
+        let modified: Vec<PathBuf> = diff_fragments(&self.merge_base, "M", CHANGELOG_DIR)?
             .into_iter()
             .filter(is_real_fragment)
             .collect();
@@ -94,21 +93,82 @@ impl Cli {
         // time rather than at release time (when a partial CUE may already exist).
         validate_breaking_anchor_set(&changelog_dir)?;
 
-        info!("changelog additions are valid.");
+        info!("Release announcement requirement is satisfied.");
         Ok(())
     }
 }
 
-/// Load every `*.breaking.md` in `changelog.d/`, compute its anchor (explicit override or
-/// slugified title), and verify the resulting set is non-empty, well-formed, and unique.
+/// A new active notice is the announcement required by the deprecation policy.
+/// Validate it before accepting it, and do not waive the changelog for removals.
+fn has_added_deprecation_announcement(repo_root: &Path, merge_base: &str) -> Result<bool> {
+    let added = diff_fragments(merge_base, "A", deprecation::DEPRECATION_DIR)?;
+    if !added
+        .iter()
+        .any(|path| is_deprecation_notice(path, deprecation::DEPRECATION_DIR))
+    {
+        return Ok(false);
+    }
+
+    let notices = deprecation::read_all(repo_root)?;
+    let current = CargoToml::load_from(&repo_root.join("Cargo.toml"))?;
+    let current = Version::parse(&current.package.version)?;
+    // Release pages match the full version, with development suffixes removed.
+    let release = Version::new(current.major, current.minor, current.patch);
+    let has_announcement = notices.active.iter().any(|notice| {
+        notice.deprecated_since.0 == release
+            && added.contains(&Path::new(deprecation::DEPRECATION_DIR).join(&notice.filename))
+    });
+    if !has_announcement {
+        return Ok(false);
+    }
+
+    // Diff the directories separately so an enactment is seen as a deletion and
+    // addition even when Git detects it as a rename across the two directories.
+    let removed = diff_fragments(merge_base, "D", deprecation::DEPRECATION_DIR)?;
+    let enacted = diff_fragments(merge_base, "A", deprecation::ENACTED_DIR)?;
+    Ok(!removed
+        .iter()
+        .any(|path| is_deprecation_notice(path, deprecation::DEPRECATION_DIR))
+        && !enacted
+            .iter()
+            .any(|path| is_deprecation_notice(path, deprecation::ENACTED_DIR)))
+}
+
+fn is_deprecation_notice(path: &Path, directory: &str) -> bool {
+    path.parent() == Some(Path::new(directory))
+        && path.file_name().is_some_and(|name| name != "README.md")
+        && path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+}
+
+/// Load every fragment in `changelog.d/` whose type is flagged `breaking`, compute its anchor
+/// (explicit override or slugified title), and verify the resulting set is non-empty,
+/// well-formed, and unique.
 fn validate_breaking_anchor_set(changelog_dir: &std::path::Path) -> Result<()> {
     let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for entry in std::fs::read_dir(changelog_dir)? {
         let path = entry?.path();
         let name = match path.file_name().and_then(|s| s.to_str()) {
-            Some(n) if n.ends_with(".breaking.md") => n.to_string(),
+            Some(n) => n.to_string(),
             _ => continue,
         };
+        // Only breaking fragments carry an upgrade-guide anchor. Select them via the
+        // canonical type metadata rather than the literal `.breaking.md` suffix, so a
+        // renamed or added type with `breaking: true` is covered too. Require the full
+        // `<name>.<type>.md` shape first so editor backups or disabled files such as
+        // `foo.breaking.md.bak` are skipped, matching release generation.
+        let parts: Vec<&str> = name.split('.').collect();
+        if parts.len() != 3 || parts[2] != "md" {
+            continue;
+        }
+        let fragment_type = parts[1];
+        let Some(entry) = FRAGMENT_TYPES.iter().find(|t| t.name == fragment_type) else {
+            continue;
+        };
+        if !entry.breaking {
+            continue;
+        }
         let content = std::fs::read_to_string(&path)?;
         let body_before_authors = content
             .rsplit_once("\nauthors: ")
@@ -130,11 +190,11 @@ fn validate_breaking_anchor_set(changelog_dir: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-/// `git diff --name-only --diff-filter=<filter> --merge-base <merge_base> changelog.d`
+/// `git diff --name-only --diff-filter=<filter> --merge-base <merge_base> -- <directory>`
 ///
 /// `filter` is a `git diff` `--diff-filter` value: `A` for added-only, `M` for
 /// modified-only, `AM` for both, etc.
-fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
+fn diff_fragments(merge_base: &str, filter: &str, directory: &str) -> Result<Vec<PathBuf>> {
     let filter_arg = format!("--diff-filter={filter}");
     let out = git::run_and_check_output(&[
         "diff",
@@ -142,7 +202,8 @@ fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
         &filter_arg,
         "--merge-base",
         merge_base,
-        CHANGELOG_DIR,
+        "--",
+        directory,
     ])?;
     Ok(out
         .lines()
@@ -151,7 +212,7 @@ fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
-fn validate_filename(filename: &str) -> Result<&'static str> {
+fn validate_filename(filename: &str) -> Result<&'static FragmentType> {
     let parts: Vec<&str> = filename.split('.').collect();
     if parts.len() != 3 {
         bail!(
@@ -159,19 +220,27 @@ fn validate_filename(filename: &str) -> Result<&'static str> {
         );
     }
     let fragment_type = parts[1];
-    let Some(known) = FRAGMENT_TYPES.iter().find(|t| **t == fragment_type) else {
+    let Some(known) = FRAGMENT_TYPES.iter().find(|t| t.name == fragment_type) else {
         bail!(
             "invalid fragment filename '{filename}': fragment type must be one of ({}).",
-            FRAGMENT_TYPES.join("|")
+            FRAGMENT_TYPES
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+                .join("|")
         );
     };
     if parts[2] != "md" {
         bail!("invalid fragment filename '{filename}': extension must be markdown (.md).");
     }
-    Ok(*known)
+    Ok(known)
 }
 
-fn validate_contents(path: &std::path::Path, filename: &str, fragment_type: &str) -> Result<()> {
+fn validate_contents(
+    path: &std::path::Path,
+    filename: &str,
+    fragment_type: &FragmentType,
+) -> Result<()> {
     let content = std::fs::read_to_string(path)?;
     // Match generate_cue.rs, which reads `lines().last()` verbatim: the authors
     // line must be the last line, no trailing blank lines allowed.
@@ -211,7 +280,7 @@ fn validate_contents(path: &std::path::Path, filename: &str, fragment_type: &str
         );
     }
 
-    if fragment_type == "breaking" {
+    if fragment_type.breaking {
         validate_breaking_fragment(&content, filename)?;
     }
 
@@ -265,7 +334,7 @@ fn validate_breaking_fragment(content: &str, filename: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indoc::{formatdoc, indoc};
+    use indoc::formatdoc;
 
     /// Build a full breaking-fragment file body from the given title line and section content.
     fn wrap(title_line: &str, summary: &str, migration: &str) -> String {
@@ -285,118 +354,42 @@ mod tests {
     }
 
     #[test]
-    fn valid_breaking_fragment() {
-        let raw = wrap(
-            "# Env var interpolation disabled {#env-var}",
-            "Off by default now.",
-            "Pass the flag.",
+    fn valid_breaking_fragments() {
+        for (title, migration) in [
+            (
+                "# Env var interpolation disabled {#env-var}",
+                "Pass the flag.",
+            ),
+            ("# A change", ""),
+        ] {
+            let raw = wrap(title, "Off by default now.", migration);
+            validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
+        }
+    }
+
+    #[test]
+    fn parser_errors_include_the_fragment_filename() {
+        let error =
+            validate_breaking_fragment("not a breaking fragment", "x.breaking.md").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid breaking fragment 'x.breaking.md': first line must be an H1 title (`# ...`)"
         );
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn valid_without_anchor() {
-        let raw = wrap("# A change", "Change happened.", "N/A");
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn missing_title() {
-        let raw = indoc! {"
-            not an H1 line
-
-            ## Summary
-
-            x
-
-            ## Migration
-
-            N/A
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("H1 title"), "{err}");
-    }
-
-    #[test]
-    fn empty_title() {
-        let raw = wrap("# ", "x", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("title must not be empty"), "{err}");
-    }
-
-    #[test]
-    fn missing_summary_header() {
-        let raw = indoc! {"
-            # x
-
-            ## Migration
-
-            N/A
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("`## Summary`"), "{err}");
-    }
-
-    #[test]
-    fn missing_migration_header() {
-        let raw = indoc! {"
-            # x
-
-            ## Summary
-
-            y
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("`## Migration`"), "{err}");
-    }
-
-    #[test]
-    fn empty_summary_section() {
-        let raw = wrap("# x", "", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(
-            err.to_string().contains("Summary` must not be empty"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn empty_migration_section_is_allowed() {
-        // Fragments may leave `## Migration` empty (nothing for the user to do).
-        let raw = wrap("# x", "y", "");
-        validate_breaking_fragment(&raw, "x.breaking.md").unwrap();
-    }
-
-    #[test]
-    fn wrong_section_order() {
-        let raw = indoc! {"
-            # x
-
-            ## Migration
-
-            do this
-
-            ## Summary
-
-            hi
-
-            authors: pront
-        "};
-        let err = validate_breaking_fragment(raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("must come before"), "{err}");
     }
 
     #[test]
     fn bad_anchor() {
-        let raw = wrap("# x {#Not Valid!}", "y", "N/A");
-        let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
-        assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        for anchor in [
+            "Not Valid!",
+            "vrl-changelog",
+            "vector-changelog",
+            "bug-fixes",
+            "upgrade-guide-bug-fixes",
+        ] {
+            let raw = wrap(&format!("# x {{#{anchor}}}"), "y", "N/A");
+            let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
+            assert!(err.to_string().contains("kebab-case slug"), "{err}");
+        }
     }
 
     #[test]
@@ -404,5 +397,50 @@ mod tests {
         let raw = wrap("# TODO one-line title", "y", "N/A");
         let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
         assert!(err.to_string().contains("placeholder 'TODO'"), "{err}");
+    }
+
+    #[test]
+    fn breaking_anchor_set_rejects_invalid_anchor() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("bad.breaking.md"),
+            wrap("# One change {#Not Valid!}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        let err = validate_breaking_anchor_set(tmp.path()).unwrap_err();
+        assert!(err.to_string().contains("kebab-case slug"), "{err}");
+    }
+
+    #[test]
+    fn breaking_anchor_set_rejects_duplicate_anchors() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("one.breaking.md"),
+            wrap("# One change {#shared}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        std::fs::write(
+            tmp.path().join("two.breaking.md"),
+            wrap("# Two change {#shared}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        let err = validate_breaking_anchor_set(tmp.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("duplicate upgrade-guide anchor"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn breaking_anchor_set_skips_unrelated_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A non-breaking fragment must not be anchor-checked, even with a breaking-shaped body.
+        std::fs::write(
+            tmp.path().join("not_breaking.fix.md"),
+            wrap("# One change {#Not Valid!}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("foo.breaking.md.bak"), "not a fragment").unwrap();
+        assert!(validate_breaking_anchor_set(tmp.path()).is_ok());
     }
 }

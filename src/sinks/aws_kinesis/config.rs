@@ -30,24 +30,18 @@ pub struct KinesisSinkBaseConfig {
     pub stream_name: String,
 
     #[serde(flatten)]
-    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
@@ -55,7 +49,6 @@ pub struct KinesisSinkBaseConfig {
     #[serde(default)]
     pub request_retry_partial: bool,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -71,16 +64,21 @@ pub struct KinesisSinkBaseConfig {
 }
 
 impl KinesisSinkBaseConfig {
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
+    #[must_use]
     pub const fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
 }
 
-/// Builds an aws_kinesis sink.
+/// Builds an AWS Kinesis sink.
+///
+/// # Errors
+/// Returns an error if the configured serializer cannot be built.
 pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
     partition_key_field: Option<ConfigValuePath>,

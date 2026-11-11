@@ -17,7 +17,7 @@ use base64::{Engine, prelude::BASE64_URL_SAFE};
 use bytes::Bytes;
 use itertools::Itertools;
 use vector_lib::{config::LogNamespace, configurable::configurable_component};
-use warp::http::HeaderMap;
+use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
@@ -27,7 +27,6 @@ use crate::{
     },
     event::Event,
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, http::HttpMethod},
@@ -48,17 +47,13 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:9091"))]
     address: SocketAddr,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -96,7 +91,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             self.address,
             "",
             HttpMethod::Post,
-            http::StatusCode::OK,
+            StatusCode::OK,
             false,
             self.tls.as_ref(),
             self.auth.as_ref(),
@@ -150,7 +145,7 @@ impl HttpSource for PushgatewaySource {
         parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled()).map_err(
             |error| {
                 ErrorMessage::new(
-                    http::StatusCode::UNPROCESSABLE_ENTITY,
+                    StatusCode::UNPROCESSABLE_ENTITY,
                     format!("Failed to parse metrics body: {error}"),
                 )
             },
@@ -161,7 +156,7 @@ impl HttpSource for PushgatewaySource {
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
     if !path.starts_with("/metrics/job") {
         return Err(ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            StatusCode::BAD_REQUEST,
             "Path must begin with '/metrics/job'".to_owned(),
         ));
     }
@@ -181,7 +176,7 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> 
         .map(|mut c| {
             c.next().zip(c.next()).ok_or_else(|| {
                 ErrorMessage::new(
-                    http::StatusCode::BAD_REQUEST,
+                    StatusCode::BAD_REQUEST,
                     "Request path must have an even number of segments to form grouping key"
                         .to_string(),
                 )
@@ -214,12 +209,12 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
         // An empty job label isn't valid, so return an error if that's the key
         if stripped_key == "job" {
             return Err(ErrorMessage::new(
-                http::StatusCode::BAD_REQUEST,
+                StatusCode::BAD_REQUEST,
                 "Job must not have an empty value".to_owned(),
             ));
         }
 
-        return Ok((stripped_key.to_owned(), "".to_owned()));
+        return Ok((stripped_key.to_owned(), String::new()));
     }
 
     // The Prometheus Pushgateway has a fairly permissive base64 implementation
@@ -239,14 +234,14 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
 
     let decoded_bytes = BASE64_URL_SAFE.decode(padded_value).map_err(|_| {
         ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            StatusCode::BAD_REQUEST,
             format!("Grouping key invalid - invalid base64 value for key {k}: {v}"),
         )
     })?;
 
     let decoded = String::from_utf8(decoded_bytes).map_err(|_| {
         ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
+            StatusCode::BAD_REQUEST,
             format!("Grouping key invalid - invalid UTF-8 in decoded base64 value for key {k}"),
         )
     })?;
@@ -371,6 +366,10 @@ mod test {
     async fn test_whole_request_happy_path_https() {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (_guard, address) = test_util::addr::next_addr();
@@ -395,13 +394,7 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!(
-                "{}://{}:{}/{}",
-                proto,
-                address.ip(),
-                address.port(),
-                push_path
-            );
+            let push_url = format!("{proto}://{}:{}/{push_path}", address.ip(), address.port());
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs
@@ -457,7 +450,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(

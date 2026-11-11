@@ -1,6 +1,6 @@
 {{ $date := .Date | dateFormat "January 2, 2006" }}
 {{ $noindex := .Params.noindex }}
-<div{{ if not $noindex }} id="page-content"{{ end }}>
+<div{{ if not $noindex }} id="page-content" data-pagefind-body{{ end }}>
   <div class="mb-4 md:mb-6">
     {{ partial "breadcrumb.html" . }}
   </div>

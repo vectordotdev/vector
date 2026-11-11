@@ -15,11 +15,16 @@ pub struct Framework {
 
 impl Framework {
     /// Create a new [`Framework`] powered by the passed interface.
+    #[must_use]
     pub fn new(interface: Interface) -> Self {
         Self { interface }
     }
 
     /// Deploy a Helm chart into a cluster.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if temporary configuration files cannot be written or chart deployment fails.
     pub async fn helm_chart(
         &self,
         namespace: &str,
@@ -42,6 +47,10 @@ impl Framework {
     }
 
     /// Create a new namespace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn namespace(
         &self,
         config: namespace::Config,
@@ -52,6 +61,10 @@ impl Framework {
     }
 
     /// Create a new test `Pod`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn test_pod(
         &self,
         config: test_pod::Config,
@@ -63,6 +76,10 @@ impl Framework {
 
     /// Initialize log lookup for a particular `resource` in a particular
     /// `namespace`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `kubectl` process cannot be spawned.
     pub fn logs(&self, namespace: &str, resource: &str) -> Result<Reader> {
         log_lookup(&self.interface.kubectl_command, namespace, resource)
     }
@@ -70,12 +87,20 @@ impl Framework {
     /// Exec a `tail -f` command reading the specified `file` within
     /// a `Container` in a `Pod` of a specified `resource` at the specified
     /// `namespace`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `kubectl` process cannot be spawned.
     pub fn exec_tail(&self, namespace: &str, resource: &str, file: &str) -> Result<Reader> {
         exec_tail(&self.interface.kubectl_command, namespace, resource, file)
     }
 
     /// Initialize port forward for a particular `resource` in a particular
     /// `namespace` with a particular pair of local/resource ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `kubectl` process cannot be spawned.
     pub fn port_forward(
         &self,
         namespace: &str,
@@ -92,8 +117,12 @@ impl Framework {
         )
     }
 
-    /// Execute a `kubectl --version` command returning a K8sVersion Struct
+    /// Execute a `kubectl --version` command returning a `K8sVersion` Struct
     /// containing all version information  of the running Kubernetes test cluster.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the version command cannot be run or its output is invalid JSON.
     pub async fn kubernetes_version(&self) -> Result<kubernetes_version::K8sVersion> {
         kubernetes_version::get(&self.interface.kubectl_command).await
     }
@@ -101,6 +130,10 @@ impl Framework {
     /// Wait for a set of `resources` in a specified `namespace` to achieve
     /// `wait_for` state.
     /// Use `extra` to pass additional arguments to `kubectl`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn wait<'a>(
         &self,
         namespace: &str,
@@ -121,6 +154,10 @@ impl Framework {
     /// Wait for a set of `resources` in any namespace to achieve `wait_for`
     /// state.
     /// Use `extra` to pass additional arguments to `kubectl`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn wait_all_namespaces<'a>(
         &self,
         resources: impl IntoIterator<Item = &'a str>,
@@ -138,6 +175,10 @@ impl Framework {
 
     /// Wait for a rollout of a `resource` to complete.
     /// Use `extra` to pass additional arguments to `kubectl`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn wait_for_rollout<'a>(
         &self,
         namespace: &str,
@@ -148,7 +189,11 @@ impl Framework {
     }
 
     /// Trigger a restart for a rollout of a `resource`.
-    /// Use `extr
+    /// Use `extra` to pass additional arguments to `kubectl`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn restart_rollout<'a>(
         &self,
         namespace: &str,
@@ -169,12 +214,20 @@ impl Framework {
     }
 
     /// Sets a label on all nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if labeling fails or the command output is not valid UTF-8.
     pub async fn label_nodes(&self, label: &str) -> Result<String> {
         pod::label_nodes(&self.interface.kubectl_command, label).await
     }
 
     /// Return the Vector pod that is deployed on the same node as the given pod. We want to make
     /// sure we are scanning the Vector instance that is deployed with the test pod.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either the test pod node or the corresponding Vector pod cannot be found.
     pub async fn get_vector_pod_with_pod(
         &self,
         pod_namespace: &str,

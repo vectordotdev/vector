@@ -48,7 +48,6 @@ components: sources: socket: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

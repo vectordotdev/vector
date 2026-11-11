@@ -5,7 +5,7 @@ use std::{
 };
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 
 use crate::config::{ConfigBuilder, Format, format};
 
@@ -24,6 +24,11 @@ pub struct Opts {
     pub(crate) output_format: Format,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 fn check_paths(opts: &Opts) -> Result<(), String> {
     let in_metadata = fs::metadata(&opts.input_path)
         .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", &opts.input_path));
@@ -52,6 +57,11 @@ fn check_paths(opts: &Opts) -> Result<(), String> {
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     if let Err(e) = check_paths(opts) {
         #[allow(clippy::print_stderr)]
@@ -71,11 +81,13 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
 
         match convert_config(&opts.input_path, &opts.output_path, opts.output_format) {
-            Ok(_) => exitcode::OK,
+            Ok(()) => exitcode::OK,
             Err(errors) => {
                 #[allow(clippy::print_stderr)]
                 {
-                    errors.iter().for_each(|e| eprintln!("{}", e.red()));
+                    for error in errors {
+                        eprintln!("{}", error.red());
+                    }
                 }
                 exitcode::SOFTWARE
             }
@@ -95,7 +107,9 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
             Err(errors) => {
                 #[allow(clippy::print_stderr)]
                 {
-                    errors.iter().for_each(|e| eprintln!("{}", e.red()));
+                    for error in errors {
+                        eprintln!("{}", error.red());
+                    }
                 }
                 exitcode::SOFTWARE
             }
@@ -103,6 +117,11 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 fn convert_config(
     input_path: &Path,
     output_path: &Path,
@@ -111,15 +130,14 @@ fn convert_config(
     if output_path.exists() {
         return Err(vec![format!("Output path {output_path:?} exists")]);
     }
-    let input_format = match Format::from_str(
+    let Ok(input_format) = Format::from_str(
         input_path
             .extension()
             .unwrap_or_else(|| panic!("Failed to get extension for: {input_path:?}"))
             .to_str()
             .unwrap_or_else(|| panic!("Failed to convert OsStr to &str for: {input_path:?}")),
-    ) {
-        Ok(format) => format,
-        Err(_) => return Ok(()), // skip irrelevant files
+    ) else {
+        return Ok(()); // skip irrelevant files
     };
 
     if input_format == output_format {
@@ -133,8 +151,7 @@ fn convert_config(
     let file_contents = fs::read_to_string(input_path).map_err(|e| vec![e.to_string()])?;
     let builder: ConfigBuilder = format::deserialize(&file_contents, input_format)?;
     let config = builder.build()?;
-    let output_string =
-        format::serialize(&config, output_format).map_err(|e| vec![e.to_string()])?;
+    let output_string = format::serialize(&config, output_format).map_err(|e| vec![e])?;
     fs::write(output_path, output_string).map_err(|e| vec![e.to_string()])?;
 
     #[allow(clippy::print_stdout)]
@@ -144,6 +161,11 @@ fn convert_config(
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 fn walk_dir_and_convert(
     input_path: &Path,
     output_dir: &Path,

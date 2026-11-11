@@ -2,7 +2,7 @@ use serde_json::Value;
 use vector_config_common::{
     constants,
     human_friendly::generate_human_friendly_string,
-    schema::{visit::Visitor, *},
+    schema::{Map, Schema, SchemaObject, SchemaSettings, visit, visit::Visitor},
 };
 
 /// A visitor that generates a human-friendly name for enum variants and fields as metadata.
@@ -28,6 +28,7 @@ use vector_config_common::{
 pub struct GenerateHumanFriendlyNameVisitor;
 
 impl GenerateHumanFriendlyNameVisitor {
+    #[must_use]
     pub fn from_settings(_: &SchemaSettings) -> Self {
         Self
     }

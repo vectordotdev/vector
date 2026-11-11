@@ -24,7 +24,7 @@ fn pulsar_host() -> String {
 }
 
 fn pulsar_address(scheme: &str, port: u16) -> String {
-    format!("{}://{}:{}", scheme, pulsar_host(), port)
+    format!("{scheme}://{}:{port}", pulsar_host())
 }
 
 async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
@@ -73,7 +73,7 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
 
     assert_sink_compliance(&SINK_TAGS, async move {
         let sink = PulsarSink::new(
-            pulsar,
+            &pulsar,
             cnf.clone(),
             topic
                 .clone()
@@ -109,7 +109,7 @@ async fn pulsar_happy() {
         ..Default::default()
     };
 
-    pulsar_happy_reuse(cnf).await
+    pulsar_happy_reuse(cnf).await;
 }
 
 #[tokio::test]
@@ -125,5 +125,5 @@ async fn pulsar_happy_tls() {
         ..Default::default()
     };
 
-    pulsar_happy_reuse(cnf).await
+    pulsar_happy_reuse(cnf).await;
 }

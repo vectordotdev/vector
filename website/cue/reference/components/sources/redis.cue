@@ -49,7 +49,6 @@ components: sources: redis: {
 
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

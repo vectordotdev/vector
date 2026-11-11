@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    EventRef, FixedOffset, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, Utc, Value,
+    log_schema, parse_target_path,
+};
 
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -42,8 +45,7 @@ impl ParsedStrftime {
 
     fn is_dynamic(&self) -> bool {
         self.0.iter().any(|item| match item {
-            Item::Fixed(_) => true,
-            Item::Numeric(_, _) => true,
+            Item::Fixed(_) | Item::Numeric(_, _) => true,
             Item::Error
             | Item::Space(_)
             | Item::OwnedSpace(_)
@@ -65,8 +67,7 @@ impl ParsedStrftime {
                 Item::Space(space) => space.len(),
                 Item::OwnedSpace(space) => space.len(),
                 Item::Error => 0,
-                Item::Numeric(_, _) => 2,
-                Item::Fixed(_) => 2,
+                Item::Numeric(_, _) | Item::Fixed(_) => 2,
             })
             .sum()
     }

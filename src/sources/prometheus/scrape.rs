@@ -1,25 +1,26 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use futures_util::FutureExt;
-use http::{Uri, response::Parts};
+use http::{StatusCode, Uri, response::Parts, uri::Scheme};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
+};
 
 use super::parser;
 use crate::{
     Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    http::{Auth, QueryParameters},
+    http::{Auth, HttpClient, QueryParameters},
     internal_events::PrometheusParseError,
     sources::{
         self,
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-                default_interval, default_timeout, warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
+                build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
             },
         },
     },
@@ -88,14 +89,21 @@ pub struct PrometheusScrapeConfig {
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    #[configurable(derived)]
+    /// Headers to apply to the scrape requests.
+    ///
+    /// One or more values for the same header can be provided.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and its value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_example()"))]
+    headers: HashMap<String, Vec<String>>,
+
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -105,6 +113,12 @@ fn query_example() -> serde_json::Value {
             "{job=\"somejob\"}",
             "{__name__=~\"job:.*\"}"
         ]
+    })
+}
+
+fn headers_example() -> serde_json::Value {
+    serde_json::json!({
+        "X-My-Header": ["value1", "value2"]
     })
 }
 
@@ -118,6 +132,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             tls: None,
             auth: None,
         })
@@ -136,6 +151,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let headers = build_headers(&self.headers)?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
@@ -149,15 +165,19 @@ impl SourceConfig for PrometheusScrapeConfig {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: HashMap::new(),
+            headers,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
-            tls,
-            proxy: cx.proxy.clone(),
+            client: HttpClient::new(tls.into(), &cx.proxy)?,
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
+        Ok(crate::sources::source_with_error(call(
+            inputs,
+            builder,
+            cx.out,
+            HttpMethod::Get,
+        )))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -207,19 +227,19 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
                 "{}:{}",
                 url.host().unwrap_or_default(),
                 url.port_u16().unwrap_or_else(|| match url.scheme() {
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+                    Some(scheme) if scheme == &Scheme::HTTP => 80,
+                    Some(scheme) if scheme == &Scheme::HTTPS => 443,
                     _ => 0,
                 })
             );
             InstanceInfo {
-                tag: tag.to_string(),
+                tag: tag.clone(),
                 instance,
                 honor_label: self.honor_labels,
             }
         });
         let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
-            tag: tag.to_string(),
+            tag: tag.clone(),
             endpoint: url.to_string(),
             honor_label: self.honor_labels,
         });
@@ -291,7 +311,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                         endpoint = %url,
                     );
                 }
-                emit!(PrometheusParseError {
+                emit(PrometheusParseError {
                     error,
                     url: url.clone(),
                     body,
@@ -302,7 +322,7 @@ impl HttpClientContext for PrometheusScrapeContext {
     }
 
     fn on_http_response_error(&self, url: &Uri, header: &Parts) {
-        if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+        if header.status == StatusCode::NOT_FOUND && url.path() == "/" {
             // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
             warn!(
                 message = NOT_FOUND_NO_PATH,
@@ -314,23 +334,25 @@ impl HttpClientContext for PrometheusScrapeContext {
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
-    use http_body::Body as _;
-    use hyper::{
-        Body, Client, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use std::convert::Infallible;
+
+    use http::Response;
+    use http_body_util::{BodyExt as _, Empty, Full};
+    use hyper_util::{client::legacy::Client, rt::TokioExecutor};
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
+    use vector_lib::event::Metric;
     use warp::Filter;
 
     use super::*;
     use crate::{
-        Error, config,
+        config::{self, AcknowledgementsConfig},
         http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             addr::next_addr,
             components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+            http::spawn_blackhole_http_server,
             start_topology, trace_init, wait_for_tcp,
         },
     };
@@ -344,23 +366,33 @@ mod test {
     async fn test_prometheus_sets_headers() {
         let (_guard, in_addr) = next_addr();
 
-        let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
-            r#"
+        let dummy_endpoint = warp::path!("metrics")
+            .and(warp::header::exact("Accept", "application/openmetrics-text"))
+            .and(warp::header::exact("X-My-Header", "custom-value"))
+            .map(|| {
+                r#"
                     promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
                     "#
-        });
+            });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::from([
+                (
+                    "Accept".to_string(),
+                    vec!["application/openmetrics-text".to_string()],
+                ),
+                ("X-My-Header".to_string(), vec!["custom-value".to_string()]),
+            ]),
             auth: None,
             tls: None,
         };
@@ -388,13 +420,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -407,10 +440,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         for metric in metrics {
             assert_eq!(
@@ -440,13 +470,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -459,10 +490,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         for metric in metrics {
             assert_eq!(
@@ -506,13 +534,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -525,10 +554,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<vector_lib::event::Metric> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<Metric> = events.into_iter().map(Event::into_metric).collect();
         let metric = &metrics[0];
 
         assert_eq!(metric.name(), "metric_label");
@@ -561,7 +587,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -582,6 +608,7 @@ mod test {
                     ]),
                 ),
             ]),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -594,10 +621,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         let expected = HashMap::from([
             (
@@ -625,16 +649,18 @@ mod test {
 
     // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn test_prometheus_routing() {
         trace_init();
-        let (_in_guard, in_addr) = next_addr();
         let (_out_guard, out_addr) = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(Response::new(Body::from(
-                    r#"
+        let in_uri = spawn_blackhole_http_server(|_| async {
+            Ok::<_, Infallible>(Response::new(Full::new(Bytes::from_static(
+                r#"
                     # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
                     # TYPE promhttp_metric_handler_requests_total counter
                     promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
@@ -661,27 +687,23 @@ mod test {
                     rpc_duration_seconds{code="200",quantile="0.99"} 76656 1612411516789
                     rpc_duration_seconds_sum{code="200"} 1.7560473e+07 1612411516789
                     rpc_duration_seconds_count{code="200"} 2693 1612411516789
-                    "#,
-                )))
-            }))
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", %error);
-            }
-        });
-        wait_for_tcp(in_addr).await;
+                    "#
+                .as_bytes(),
+            ))))
+        })
+        .await;
+        let in_addr = in_uri.authority().unwrap();
 
         let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{in_addr}")],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
                 query: HashMap::new(),
+                headers: HashMap::new(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
                 tls: None,
@@ -701,14 +723,15 @@ mod test {
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(3),
                 suppress_timestamp: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
             },
         );
 
         let (topology, _) = start_topology(config.build().unwrap(), false).await;
         sleep(Duration::from_secs(1)).await;
 
-        let response = Client::new()
+        let response = Client::builder(TokioExecutor::new())
+            .build_http::<Empty<Bytes>>()
             .get(format!("http://{out_addr}/metrics").parse().unwrap())
             .await
             .unwrap();
@@ -776,6 +799,7 @@ mod integration_tests {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -788,10 +812,7 @@ mod integration_tests {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         let find_metric = |name: &str| {
             metrics

@@ -144,6 +144,9 @@ make check-fmt
 make check-clippy
 make check-generated-docs
 
+# Lint GitHub Actions workflows.
+make check-actionlint
+
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
 make check-docs
@@ -163,6 +166,10 @@ relevant to your PR. This command is defined in the
 [Makefile](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
 
 ### GitHub Pull Requests
+
+Please see [Community response expectations](COMMUNITY_RESPONSE_EXPECTATIONS.md)
+for information about how maintainers prioritize pull requests, issues, and
+discussions.
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
 
@@ -197,6 +204,9 @@ the label 'no-changelog' to your PR. When in doubt, consult the vector team
 for guidance. The details on how to add a changelog entry for your PR are
 outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
+For a new deprecation announcement, follow the [deprecation policy](docs/DEPRECATION_POLICY.md)
+and add a notice to `deprecation.d/` instead.
+
 ### CI
 
 Currently, Vector uses GitHub Actions to run tests. The workflows are defined in
@@ -208,14 +218,6 @@ GitHub Actions is responsible for releasing updated versions of Vector through
 various channels.
 
 #### Testing
-
-##### Skipping tests
-
-Tests are run for all changes except those that have the label:
-
-```text
-ci-condition: skip
-```
 
 ##### Daily tests
 
@@ -273,9 +275,6 @@ cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
 make check-generated-docs
-# Generate the code documentation for the Vector project.
-# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
-cd rust-doc && make docs
 ```
 
 ### Updating licences

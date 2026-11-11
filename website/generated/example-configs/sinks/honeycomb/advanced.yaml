@@ -6,4 +6,4 @@ sinks:
     api_key: ${HONEYCOMB_API_KEY}
     compression: zstd
     dataset: my-honeycomb-dataset
-    endpoint: https://api.honeycomb.io
+    endpoint: https://api.honeycomb.io/

@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http::header::AUTHORIZATION;
-use hyper::StatusCode;
+use http::{StatusCode, header::AUTHORIZATION};
 use indoc::indoc;
 use vector_lib::event::{
     BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue,
@@ -11,7 +10,10 @@ use crate::{
     config::SinkConfig,
     sinks::{
         appsignal::config::AppsignalConfig,
-        util::test::{build_test_server_status, load_sink},
+        util::{
+            HttpEndpoint,
+            test::{build_test_server_status, load_sink},
+        },
     },
     test_util::{
         addr::next_addr,
@@ -32,7 +34,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     let (mut config, cx) = load_sink::<AppsignalConfig>(config.as_str()).unwrap();
     let (_guard, addr) = next_addr();
     // Set the endpoint to a local server so we can fetch the sent events later
-    config.endpoint = format!("http://{addr}");
+    config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -85,7 +87,7 @@ async fn metrics_real_endpoint() {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: index as f64,
+                        value: f64::from(index),
                     },
                 ))
             })
@@ -107,14 +109,14 @@ async fn metrics_shape() {
                     format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: index as f64,
+                        value: f64::from(index),
                     },
                 )),
                 Event::Metric(Metric::new(
                     format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: (index + index) as f64,
+                        value: f64::from(index + index),
                     },
                 )),
             ]
@@ -124,7 +126,7 @@ async fn metrics_shape() {
     let (expected, rx) = start_test(events).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
-    for val in output.iter() {
+    for val in &output {
         assert_eq!(
             val.0.headers.get("Content-Type").unwrap(),
             "application/json"
@@ -178,7 +180,7 @@ async fn logs_shape() {
     let (expected, rx) = start_test(events).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
-    for val in output.iter() {
+    for val in &output {
         assert_eq!(
             val.0.headers.get("Content-Type").unwrap(),
             "application/json"

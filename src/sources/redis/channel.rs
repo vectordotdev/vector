@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use futures_util::StreamExt;
 use snafu::Snafu;
@@ -37,7 +38,7 @@ impl BuildError {
 /// reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
 /// connection backing off while ensuring a stable-but-quiet low-volume channel doesn't retain
 /// a backoff that a previous flapping period drove up to the cap.
-const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_secs(60);
+const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_mins(1);
 
 /// Defines how a pub/sub "session" ended.
 ///
@@ -53,6 +54,10 @@ enum SessionEnd {
 }
 
 impl InputHandler {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     /// Build the Redis `channel` source.
     ///
     /// The initial connect + SUBSCRIBE happens at build time (as the source did before this
@@ -65,10 +70,6 @@ impl InputHandler {
         mut self,
         connection_info: ConnectionInfo,
     ) -> crate::Result<Source> {
-        let client = self.client.clone();
-        let channel = self.key.clone();
-        let endpoint = connection_info.endpoint.to_string();
-
         /// Open a pubsub connection and SUBSCRIBE to `channel`.
         /// Returns a ready `PubSub` on success.
         async fn connect_and_subscribe(
@@ -132,7 +133,7 @@ impl InputHandler {
                             None => RecvEvent::Disconnected,
                         }
                     }
-                    _ = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
+                    () = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
                     _ = &mut *shutdown => {
                         RecvEvent::Shutdown
                     }
@@ -157,7 +158,7 @@ impl InputHandler {
                         }
                         Err(error) => {
                             // Bad payload. We just log and keep going.
-                            emit!(RedisReceiveEventError::from(error));
+                            emit(RedisReceiveEventError::from(error));
                         }
                     },
 
@@ -172,7 +173,7 @@ impl InputHandler {
                         // Redis closed an established connection (e.g. server restart). Record
                         // it as a component error — so alerts fire even if the reconnect
                         // succeeds immediately — and reconnect in the outer loop.
-                        emit!(RedisConnectionDroppedError);
+                        emit(RedisConnectionDroppedError);
                         return SessionEnd::Disconnected;
                     }
 
@@ -183,6 +184,10 @@ impl InputHandler {
                 }
             }
         }
+
+        let client = self.client.clone();
+        let channel = self.key.clone();
+        let endpoint = connection_info.endpoint.clone();
 
         // Initial connect + SUBSCRIBE. Fail fast on *any* error, matching the source's
         // behavior before reconnect support was added: this surfaces a permanent
@@ -210,13 +215,13 @@ impl InputHandler {
                 // Obtain a live connection: reuse the pending one, or reconnect with backoff.
                 let mut pubsub_conn = match next_conn.take() {
                     Some(conn) => {
-                        emit!(RedisConnectionEstablished { reconnect: false });
+                        emit(RedisConnectionEstablished { reconnect: false });
                         conn
                     }
                     None => 'reconnect: loop {
                         let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
-                            _ = tokio::time::sleep(delay) => {}
+                            () = tokio::time::sleep(delay) => {}
                             _ = &mut shutdown => return Ok(()),
                         }
 
@@ -232,7 +237,7 @@ impl InputHandler {
 
                         match res {
                             Ok(conn) => {
-                                emit!(RedisConnectionEstablished { reconnect: true });
+                                emit(RedisConnectionEstablished { reconnect: true });
                                 break 'reconnect conn;
                             }
                             Err(err) => {
@@ -241,7 +246,7 @@ impl InputHandler {
                                 // already ruled out by the successful build-time connect, and
                                 // stopping here would drop the resilience this adds. The error
                                 // is recorded so metric-based alerts still fire.
-                                emit!(RedisConnectionError::from(err.into_source()));
+                                emit(RedisConnectionError::from(err.into_source()));
                                 // keep retrying; backoff advances on the next iteration.
                             }
                         }

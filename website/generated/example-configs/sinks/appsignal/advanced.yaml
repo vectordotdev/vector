@@ -4,5 +4,5 @@ sinks:
     inputs:
       - my-source-or-transform-id
     compression: gzip
-    endpoint: https://appsignal-endpoint.net
+    endpoint: https://appsignal-endpoint.net/
     push_api_key: 00000000-0000-0000-0000-000000000000

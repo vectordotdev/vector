@@ -33,7 +33,7 @@ fn measurement(payload: Payload) {
     let events = payload.events;
 
     for event in events {
-        filter.transform(&mut output, event)
+        filter.transform(&mut output, event);
     }
 }
 
@@ -57,14 +57,14 @@ fn filter(c: &mut Criterion) {
             || setup(total_events, Condition::AlwaysFail),
             measurement,
             BatchSize::SmallInput,
-        )
+        );
     });
     group.bench_function("transform/always_pass", |b| {
         b.iter_batched(
             || setup(total_events, Condition::AlwaysPass),
             measurement,
             BatchSize::SmallInput,
-        )
+        );
     });
 }
 
@@ -72,7 +72,7 @@ criterion_group!(
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_secs(10))
-        .measurement_time(Duration::from_secs(180))
+        .measurement_time(Duration::from_mins(3))
         // degree of noise to ignore in measurements, here 1%
         .noise_threshold(0.01)
         // likelihood of noise registering as difference, here 5%

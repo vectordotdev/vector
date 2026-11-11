@@ -20,6 +20,7 @@ pub struct RegionOrEndpoint {
 
 impl RegionOrEndpoint {
     /// Creates with the given region.
+    #[must_use]
     pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
@@ -36,6 +37,7 @@ impl RegionOrEndpoint {
     }
 
     /// Returns the endpoint.
+    #[must_use]
     pub fn endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }

@@ -1,41 +1,152 @@
 import { autocomplete } from "@algolia/autocomplete-js";
-import Typesense from "typesense";
 import React, { createElement, Fragment, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
-// // Algolia search
-// const appId = process.env.ALGOLIA_APP_ID
-const apiKey = process.env.TYPESENSE_PUBLIC_API_KEY;
-const indexName = process.env.TYPESENSE_INDEX;
-const host = process.env.TYPESENSE_HOST;
-// const searchClient = algoliasearch(appId, apiKey)
+declare global {
+  interface Window {
+    loadExactSearch?: () => Promise<ExactSearchRecord[]>;
+    loadPagefind?: () => Promise<any>;
+  }
+}
 
-let searchClient = new Typesense.Client({
-  apiKey: apiKey,
-  nearestNode: {
-    host: `${host}.a1.typesense.net`,
-    port: 443,
-    protocol: "https"
-  },
-  nodes: [
-    {
-      host: `${host}-1.a1.typesense.net`,
-      port: 443,
-      protocol: "https"
-    },
-    {
-      host: `${host}-2.a1.typesense.net`,
-      port: 443,
-      protocol: "https"
-    },
-    {
-      host: `${host}-3.a1.typesense.net`,
-      port: 443,
-      protocol: "https"
+type PagefindHit = {
+  category: string;
+  content: string;
+  title: string;
+  url: string;
+};
+
+type ExactSearchRecord = PagefindHit & {
+  aliases: string[];
+};
+
+const pagefindCategories = {
+  blog: "Blog",
+  docs: "Documentation",
+  guides: "Guides",
+  highlights: "Highlights",
+  releases: "Release notes"
+};
+
+const configurationCategories = {
+  api: "API",
+  "global-options": "Global options",
+  "pipeline-components": "Pipeline components",
+  schema: "Schema",
+  secrets: "Secrets",
+  sinks: "Sinks",
+  sources: "Sources",
+  transforms: "Transforms"
+};
+
+let pagefindModule: Promise<any> | undefined;
+let exactSearchIndex: Promise<ExactSearchRecord[]> | undefined;
+const minVrlPrefixLength = 3;
+
+const normalizeSearchTerm = (value: string) =>
+  value.trim().toLocaleLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+
+const exactSearchResults = async (query: string): Promise<PagefindHit[]> => {
+  if (!window.loadExactSearch) {
+    return [];
+  }
+
+  exactSearchIndex ??= window.loadExactSearch().catch((error) => {
+    exactSearchIndex = undefined;
+    throw error;
+  });
+  const normalizedQuery = normalizeSearchTerm(query);
+  const records = await exactSearchIndex;
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  return records
+    .filter((record) =>
+      record.aliases.some((alias) => {
+        const normalizedAlias = normalizeSearchTerm(alias);
+        const exactMatch = normalizedAlias === normalizedQuery;
+        const vrlPrefixMatch =
+          record.category === "VRL function" &&
+          normalizedQuery.length >= minVrlPrefixLength &&
+          normalizedAlias.startsWith(normalizedQuery);
+
+        return exactMatch || vrlPrefixMatch;
+      })
+    )
+    .map(({ aliases: _, ...record }) => record);
+};
+
+const getPagefind = async () => {
+  if (!window.loadPagefind) {
+    throw new Error("Pagefind is unavailable.");
+  }
+
+  pagefindModule ??= window.loadPagefind().catch((error) => {
+    pagefindModule = undefined;
+    throw error;
+  });
+  return pagefindModule;
+};
+
+const pagefindCategory = (url: string) => {
+  const resultUrl = new URL(url, window.location.origin);
+  const path = resultUrl.pathname.split("/").filter(Boolean);
+
+  if (path.slice(0, 3).join("/") === "docs/reference/configuration") {
+    if (/^#enrichment[-_]tables(?:[._-]|$)/.test(resultUrl.hash)) {
+      return "Enrichment tables";
     }
-  ],
-  connectionTimeoutSeconds: 2
-});
+
+    return configurationCategories[path[3]] ?? "Documentation";
+  }
+
+  return pagefindCategories[path[0]] ?? "Website";
+};
+
+const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
+  const pagefind = await getPagefind();
+  const search = await pagefind.debouncedSearch(query);
+
+  if (!search) {
+    return [];
+  }
+
+  return Promise.all(
+    search.results.slice(0, 10).map(async (result) => {
+      const data = await result.data();
+      const subResult = data.sub_results[0];
+      const url = subResult?.url ?? data.url;
+
+      return {
+        category: pagefindCategory(url),
+        content: subResult?.excerpt ?? data.excerpt ?? "",
+        title: subResult?.title ?? data.meta.title ?? data.url,
+        url
+      };
+    })
+  );
+};
+
+const searchResults = async (query: string): Promise<PagefindHit[]> => {
+  const recoverResults = async (results: Promise<PagefindHit[]>, source: string) => {
+    try {
+      return await results;
+    } catch (error) {
+      console.warn(`${source} search is unavailable.`, error);
+      return [];
+    }
+  };
+  const [exactResults, rankedResults] = await Promise.all([
+    recoverResults(exactSearchResults(query), "Exact"),
+    recoverResults(pagefindResults(query), "Pagefind")
+  ]);
+  const exactPages = new Set(exactResults.map((result) => result.url.split("#")[0]));
+  const otherResults = rankedResults.filter((result) => !exactPages.has(result.url.split("#")[0]));
+
+  return [...exactResults, ...otherResults].slice(0, 10);
+};
 
 const CommandIcon: React.FC = ({ children }) => {
   return (
@@ -47,42 +158,13 @@ const CommandIcon: React.FC = ({ children }) => {
   );
 };
 
-const Chevron: React.FC = () => {
+const PagefindResult = ({ hit }: { hit: PagefindHit }) => {
   return (
-    <svg className="h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  );
-};
-
-const Result = ({ hit, components, category }) => {
-  const hierarchy = hit.document.hierarchy.concat(hit.document.title);
-  const isRootPage = hierarchy.length < 1;
-
-  return (
-    <a href={hit.document.itemUrl}>
-      <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">{category}</div>
+    <a href={hit.url}>
+      <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">{hit.category}</div>
       <div className="p-2 block">
-        <div className="text-gray-800 text-md mb-1 font-medium leading-relaxed ">
-          {!isRootPage &&
-            hierarchy.map((t, i) => (
-              <span key={`${hit.document.itemUrl}-${t}`}>
-                <span className="w-2 h-2 inline" key={`${t.itemUrl}`}>
-                  {t}
-                </span>
-                {i < hierarchy.length - 1 && (
-                  <span className="inline ml-1 mr-1">
-                    <Chevron />
-                  </span>
-                )}
-              </span>
-            ))}
-          {isRootPage && <components.Highlight hit={hit} attribute="title" />}
-        </div>
-        <p className="text-gray-600 text-sm">
-          {hit.content && <span dangerouslySetInnerHTML={{ __html: hit.content }} />}
-          {!hit.content && <span style={{ wordBreak: "break-word" }}>{hit.document.itemUrl}</span>}
-        </p>
+        <div className="text-gray-800 text-md mb-1 font-medium leading-relaxed">{hit.title}</div>
+        <p className="text-gray-600 text-sm" dangerouslySetInnerHTML={{ __html: hit.content }} />
       </div>
     </a>
   );
@@ -164,61 +246,19 @@ const Search = () => {
       openOnFocus={false}
       detachedMediaQuery=""
       defaultActiveItemId={0}
+      placeholder="Search"
       getSources={({ query }) => [
         {
           sourceId: "queryResults",
           async getItems() {
-            const results = (query) =>
-              searchClient
-                .collections("vector_docs")
-                .documents()
-                .search({
-                  q: query,
-                  preset: "vector_docs_search",
-                  exhaustive_search: true,
-                  highlight_fields: "content",
-                  highlight_full_fields: "content"
-                })
-                .then((result) => {
-                  // order the hits by page group
-                  // const hits = result.hits.sort((a, b) => (a.document.pageTitle < b.document.pageTitle ? -1 : 1))
-
-                  // add page as category if there are duplicates
-                  const hitsWithCategory = result.hits.map((h, i) => {
-                    const prev = result.hits[i - 1] as any;
-                    const title = h.document.pageTitle;
-
-                    // if no previous hit is in this category
-                    if (!prev) {
-                      return { ...h, category: title };
-                    }
-
-                    // skip if there is already one in this category
-                    if (prev && prev.document.pageTitle === title) {
-                      return h;
-                    }
-
-                    // add category if needed
-                    if (prev && prev.document.pageTitle !== title) {
-                      return { ...h, category: title };
-                    }
-
-                    return h;
-                  });
-                  return hitsWithCategory;
-                });
-            return await results(query);
+            return searchResults(query);
           },
           getItemUrl({ item }) {
-            return item.document.itemUrl;
+            return item.url;
           },
           templates: {
-            item({ item, components }) {
-              const highlight =
-                (item.highlights.length && item.highlights.find((h) => h.field === "content" || {}).value) ||
-                item.document["content"];
-              item["content"] = highlight;
-              return <Result hit={item} components={components} category={item.category} />;
+            item({ item }) {
+              return <PagefindResult hit={item} />;
             },
             noResults() {
               return "No results found.";

@@ -19,8 +19,8 @@ macro_rules! assert_event_data_eq {
                     "assertion failed: {}\n\n{}\n",
                     $message,
                     similar_asserts::SimpleDiff::from_str(
-                        format!("{:#?}", left).as_str(),
-                        format!("{:#?}", right).as_str(),
+                        format!("{left:#?}").as_str(),
+                        format!("{right:#?}").as_str(),
                         "left",
                         "right"
                     ),

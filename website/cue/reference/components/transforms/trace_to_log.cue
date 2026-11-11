@@ -11,7 +11,7 @@ components: transforms: trace_to_log: {
 		"""
 
 	classes: {
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -23,7 +23,6 @@ components: transforms: trace_to_log: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.trace_to_log.configuration

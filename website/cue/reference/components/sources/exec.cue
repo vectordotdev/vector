@@ -31,7 +31,6 @@ components: sources: exec: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

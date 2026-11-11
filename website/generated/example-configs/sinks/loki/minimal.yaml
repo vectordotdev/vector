@@ -7,7 +7,6 @@ sinks:
       codec: json
     endpoint: http://localhost:3100
     labels:
-      '"*"': "{{ metadata }}"
-      '"pod_labels_*"': "{{ kubernetes.pod_labels }}"
+      event_{{ event_field }}: value_{{ some_other_event_field }}
+      pod_labels_*: "{{ kubernetes.pod_labels }}"
       source: vector
-      "{{ event_field }}": "{{ some_other_event_field }}"

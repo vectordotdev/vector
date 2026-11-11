@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 ARG HUGO_VERSION=0.154.5
-ARG CUE_VERSION=0.16.1
+ARG CUE_VERSION=0.17.1
 ARG NODE_VERSION=24
 
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
@@ -39,4 +39,4 @@ ENTRYPOINT ["/bin/bash", "-lc", \
    cd /app/website && \
    yarn && \
    cp -f ../Cargo.lock data/cargo-lock.toml && \
-   hugo server --bind 0.0.0.0 --port 1313 --buildDrafts --buildFuture --environment development"]
+   make serve-development SERVER_BIND=0.0.0.0 SERVER_PORT=1313"]

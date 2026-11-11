@@ -50,7 +50,6 @@ components: sinks: mezmo: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.mezmo.configuration

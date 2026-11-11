@@ -70,6 +70,8 @@ where
     S: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Map").field("inner", &self.inner).finish()
+        f.debug_struct("Map")
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
     }
 }

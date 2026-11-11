@@ -1,9 +1,9 @@
 # Rust Style Guide for Vector
 
-> **Note:
-** This is a draft document primarily intended for AI agents (like Claude) to understand Vector's Rust coding conventions. These guidelines help ensure consistent code generation and modifications.
-
-This document outlines Rust coding conventions and patterns for Vector development.
+Vector enforces Rust style mechanically wherever practical. Use `make fmt` to apply `rustfmt`,
+and use `make check-clippy` to enforce the workspace Clippy lints configured in
+[`Cargo.toml`](../Cargo.toml). This guide documents additional project conventions and patterns
+that automated tooling does not fully capture.
 
 ## Import Statements (`use`)
 
@@ -34,7 +34,29 @@ fn my_function() {
 **Organization:**
 
 - Group imports: `std` → external crates → internal (`crate::`)
-- Use `rustfmt` to automatically organize them: `make fmt`
+
+**Trait imports:**
+
+When importing a trait only to use its methods, import it as `_`. This makes the intent explicit
+without introducing a name that is otherwise unused:
+
+```rust
+use std::io::Write as _;
+
+use futures::StreamExt as _;
+```
+
+Keep a named import when the trait is also referenced by name, such as in a trait bound, an `impl`
+block, a trait object, or a fully qualified method call.
+
+## Unit tests
+
+Unit tests for a type live in the same source file as that type (`#[cfg(test)] mod tests` at
+the bottom of the file) unless they exercise behavior that spans multiple modules. Cross-module
+tests belong with the composing type, not in a catch-all tests file for the crate.
+
+That `tests` submodule may instead live in its own file if the tests grow too large: declare
+`#[cfg(test)] mod tests;` in the type's file and put the tests in the corresponding `tests.rs`.
 
 ## Logging Style
 
@@ -59,26 +81,6 @@ warn!("Failed to merge value: {}.", err);  // Don't do this
 - Use `error` (not `e` or `err`) for error values
 - Prefer Display over Debug: `%error` not `?error`
 - Key/value pairs provide structured logging
-
-## String Formatting
-
-Prefer inline variable syntax in format strings (Rust 1.58+).
-
-**Correct:**
-
-```rust
-format!("Error: {err}");
-println!("Processing {count} items");
-```
-
-**Incorrect:**
-
-```rust
-format!("Error: {}", err);      // Unnecessary positional argument
-println!("Processing {} items", count);
-```
-
-**Why:** Inline syntax is more readable and reduces mistakes with argument ordering.
 
 ## Panics
 
