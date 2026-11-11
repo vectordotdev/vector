@@ -8,7 +8,7 @@ components: transforms: incremental_to_absolute: {
 		"""
 
 	classes: {
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
 	}
