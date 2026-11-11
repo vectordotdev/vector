@@ -14,6 +14,7 @@ use crate::{
     SourceSender,
     config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
+    test_util::mock::MockConfigData,
 };
 
 /// Configuration for the `test_basic` sink.
@@ -33,6 +34,10 @@ pub struct BasicSinkConfig {
 
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
+
+    /// Extra data retained for configuration-loading assertions.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub extra: MockConfigData,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
@@ -53,6 +58,7 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: None,
+            extra: MockConfigData::DEFAULT,
         }
     }
 
@@ -63,6 +69,7 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: Some(data.into()),
+            extra: MockConfigData::DEFAULT,
         }
     }
 

@@ -13,20 +13,18 @@ fn existing_boolean_shorthands_match_generated_schema() {
             "/acknowledgements",
             false,
         ),
-        #[cfg(feature = "sinks-console")]
         (
             "sink acknowledgements",
             json!({"sinks": {"out": {
-                "type": "console", "inputs": [], "encoding": {"codec": "json"}, "acknowledgements": null
+                "type": "test_basic", "inputs": [], "acknowledgements": null
             }}}),
             "/sinks/out/acknowledgements",
             false,
         ),
-        #[cfg(feature = "sinks-console")]
         (
             "healthcheck",
             json!({"sinks": {"out": {
-                "type": "console", "inputs": [], "encoding": {"codec": "json"}, "healthcheck": null
+                "type": "test_basic", "inputs": [], "healthcheck": null
             }}}),
             "/sinks/out/healthcheck",
             false,

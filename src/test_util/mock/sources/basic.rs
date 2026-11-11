@@ -20,7 +20,10 @@ use vector_lib::{
     source_sender::SourceSenderItem,
 };
 
-use crate::config::{SourceConfig, SourceContext};
+use crate::{
+    config::{SourceConfig, SourceContext},
+    test_util::mock::MockConfigData,
+};
 
 /// Configuration for the `test_basic` source.
 #[configurable_component(source("test_basic", "Test (basic)."))]
@@ -41,6 +44,10 @@ pub struct BasicSourceConfig {
 
     /// Meaningless field that only exists for triggering config diffs during topology reloading.
     data: Option<String>,
+
+    /// Extra data retained for configuration-loading assertions.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub extra: MockConfigData,
 }
 
 impl Default for BasicSourceConfig {
@@ -53,6 +60,7 @@ impl Default for BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
+            extra: MockConfigData::DEFAULT,
         }
     }
 }
@@ -68,6 +76,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
+            extra: MockConfigData::DEFAULT,
         }
     }
 
@@ -79,6 +88,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: Some(data.into()),
+            extra: MockConfigData::DEFAULT,
         }
     }
 
@@ -92,6 +102,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
+            extra: MockConfigData::DEFAULT,
         }
     }
 

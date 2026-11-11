@@ -20,6 +20,9 @@ use self::{
     transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
 
+mod config;
+pub use self::config::MockConfigData;
+
 pub mod sinks;
 pub mod sources;
 pub mod transforms;
