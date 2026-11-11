@@ -1,1 +1,3 @@
-Stop dropping syslog messages containing invalid UTF-8 at the framing layer and killing the sender's TCP connection. `OctetCountingDecoder` (the default framer of the `syslog` source) now passes raw bytes through in both the octet-counting branch and the newline-delimited fallback; invalid UTF-8 is handled by the deserializer, which replaces invalid sequences with U+FFFD (`lossy`, the existing default of the syslog deserializer).
+Messages that are not valid UTF-8 no longer fail `octet_counting`, the framing the `syslog` source uses, in either its octet-counted or newline-delimited mode. UTF-8 handling is now done by the configured deserializer. `syslog` decoding replaces invalid sequences with U+FFFD by default (`lossy`). Because framing no longer errors, the `syslog` source no longer closes a connection that carried a non UTF-8 message. Previously the framing error ended the connection, losing every message after it on that connection.
+
+authors: yackushevas
