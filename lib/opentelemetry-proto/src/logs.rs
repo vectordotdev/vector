@@ -428,11 +428,30 @@ fn take_legacy_fields(mut log: LogEvent, schema: &LogSchema, record: &mut LogRec
     ]
     .map(|path| path.filter(|(prefix, path)| log.contains((*prefix, &**path))));
     let mut invalid_metadata_timestamp = None;
+    // Pending paths whose value is an empty object or array because the values in it were
+    // removed. Pruning removes such a value, so its own removal gives no result.
+    let mut emptied = [false; 4];
     while let Some(index) = next_removal(&pending) {
         let Some((prefix, path)) = pending[index].take() else {
             break;
         };
-        let removed = log.remove_prune((prefix, &*path), true);
+        let removed =
+            remove_below_pending(&mut log, (prefix, &*path), &pending).filter(|_| !emptied[index]);
+        for (other_index, other) in pending.iter_mut().enumerate() {
+            let Some((other_prefix, other_path)) = other.as_ref() else {
+                continue;
+            };
+            if *other_prefix != prefix || !path.segments.starts_with(&other_path.segments) {
+                continue;
+            }
+            if other_path.segments.len() == path.segments.len() {
+                // The same path has no value now. Removing it would remove the array element
+                // that moved to the same index.
+                *other = None;
+            } else if is_empty_collection(log.get((prefix, &**other_path))) {
+                emptied[other_index] = true;
+            }
+        }
         match index {
             0 => record.body = removed.and_then(into_body),
             3 => invalid_metadata_timestamp = removed,
@@ -652,6 +671,44 @@ fn next_removal(pending: &[Option<FieldPath<'_>>]) -> Option<usize> {
         }
     }
     first
+}
+
+/// Remove the value at `path` and the objects and arrays that this leaves empty, but not a
+/// pending path that contains `path`, or the ancestors of that pending path. Removing them
+/// can remove the pending value or move the array element that the pending path points to.
+fn remove_below_pending(
+    log: &mut LogEvent,
+    (prefix, path): (PathPrefix, &OwnedValuePath),
+    pending: &[Option<FieldPath<'_>>],
+) -> Option<Value> {
+    let removed = log.remove((prefix, path))?;
+    let floor = pending
+        .iter()
+        .flatten()
+        .filter(|(other_prefix, other)| {
+            *other_prefix == prefix
+                && other.segments.len() < path.segments.len()
+                && path.segments.starts_with(&other.segments)
+        })
+        .map(|(_, other)| other.segments.len())
+        .max()
+        .unwrap_or(0);
+    for depth in (floor + 1..path.segments.len()).rev() {
+        let ancestor = (prefix, &path.segments[..depth]);
+        if !is_empty_collection(log.get(ancestor)) {
+            break;
+        }
+        log.remove(ancestor);
+    }
+    Some(removed)
+}
+
+fn is_empty_collection(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Object(map)) => map.is_empty(),
+        Some(Value::Array(array)) => array.is_empty(),
+        _ => false,
+    }
 }
 
 fn into_body(value: Value) -> Option<AnyValue> {
@@ -1248,6 +1305,60 @@ mod tests {
                 }),
             )]
         );
+    }
+
+    fn keep_payload() -> Vec<KeyValue> {
+        vec![kv(
+            "payload",
+            PBValue::ArrayValue(ArrayValue {
+                values: vec![AnyValue {
+                    value: Some(string("keep")),
+                }],
+            }),
+        )]
+    }
+
+    #[test]
+    fn native_legacy_log_keeps_array_element_after_emptied_message() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(payload_index(0)));
+        schema.set_source_type_key(Some(payload_index(0).with_field_appended("source_type")));
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("payload"),
+            Value::Array(vec![
+                Value::from(ObjectMap::from([("source_type".into(), "file".into())])),
+                "keep".into(),
+            ]),
+        );
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        // Only the marker was in the message.
+        assert_eq!(record.body, None);
+        assert_eq!(record.attributes, keep_payload());
+    }
+
+    #[test]
+    fn native_legacy_log_keeps_array_element_after_shared_schema_path() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(payload_index(0)));
+        schema.set_source_type_key(Some(payload_index(0)));
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("payload"),
+            Value::Array(vec!["hello".into(), "keep".into()]),
+        );
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(
+            record.body,
+            Some(AnyValue {
+                value: Some(string("hello")),
+            })
+        );
+        assert_eq!(record.attributes, keep_payload());
     }
 
     #[test]
