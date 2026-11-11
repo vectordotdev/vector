@@ -309,7 +309,7 @@ impl ResourceLog {
 /// a marker at the configured metadata path takes precedence over the matching event field.
 /// If that metadata is absent, the event field is treated as the marker for sources that
 /// write it there. A timestamp at a metadata timestamp key that OTLP cannot represent is
-/// sent as an attribute at the same path, unless an event field is at that path.
+/// sent as an attribute at the same path, unless that replaces event data.
 #[must_use]
 pub fn log_event_to_export_request(log: LogEvent) -> ExportLogsServiceRequest {
     encode_log_event(log, log_schema())
@@ -411,20 +411,22 @@ fn take_legacy_fields(mut log: LogEvent, schema: &LogSchema, record: &mut LogRec
     // A metadata timestamp that OTLP cannot represent is sent as an attribute, because
     // the metadata is not sent. A timestamp inside the message stays in the body.
     let invalid_metadata_timestamp_path = metadata_timestamp_path
-        .filter(|path| metadata_time.is_none() && log.contains(*path))
+        .filter(|_| metadata_time.is_none())
         .map(|path| resolve_indexes(&log, path.prefix, &path.path))
         .filter(|path| {
             message_path
                 .as_ref()
                 .is_none_or(|message| locate(path, message) != Location::Inside)
         });
-    // The message is the first entry.
+    // The message is the first entry. A path without a value is not removed: after an earlier
+    // removal prunes an array element, it can point to a value that moved there.
     let mut pending = [
         message_path,
         source_type_path,
         timestamp_path,
         invalid_metadata_timestamp_path,
-    ];
+    ]
+    .map(|path| path.filter(|(prefix, path)| log.contains((*prefix, &**path))));
     let mut invalid_metadata_timestamp = None;
     while let Some(index) = next_removal(&pending) {
         let Some((prefix, path)) = pending[index].take() else {
@@ -438,10 +440,10 @@ fn take_legacy_fields(mut log: LogEvent, schema: &LogSchema, record: &mut LogRec
         }
     }
     let (mut fields, _) = log.into_parts();
-    // An event field at the same path is user data and is not replaced.
+    // Existing event data at the path or at an ancestor of it is not replaced.
     if let Some(value) = invalid_metadata_timestamp
         && let Some(path) = schema.timestamp_key()
-        && !fields.contains(path)
+        && is_vacant(&fields, path)
     {
         fields.insert(path, value);
     }
@@ -533,6 +535,34 @@ fn take<'a, T>(
             None
         }
     }
+}
+
+/// Whether inserting at `path` in `value` adds a value without replacing or moving an
+/// existing value. Missing objects and arrays are created, and an index after the end of an
+/// array fills the gap with nulls.
+fn is_vacant(mut value: &Value, path: &OwnedValuePath) -> bool {
+    for segment in &path.segments {
+        let next = match (value, segment) {
+            (Value::Object(map), OwnedSegment::Field(field)) => map.get(field),
+            (Value::Array(array), &OwnedSegment::Index(index)) => match usize::try_from(index) {
+                Ok(index) => array.get(index),
+                // A negative index before the start would move the existing elements.
+                Err(_) => match index
+                    .checked_add_unsigned(array.len())
+                    .and_then(|index| usize::try_from(index).ok())
+                {
+                    Some(index) => array.get(index),
+                    None => return false,
+                },
+            },
+            _ => return false,
+        };
+        match next {
+            Some(next) => value = next,
+            None => return true,
+        }
+    }
+    false
 }
 
 type FieldPath<'a> = (PathPrefix, Cow<'a, OwnedValuePath>);
@@ -998,6 +1028,25 @@ mod tests {
     }
 
     #[test]
+    fn native_legacy_log_keeps_event_ancestor_of_invalid_metadata_timestamp() {
+        let mut schema = LogSchema::default();
+        schema.set_timestamp_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "payload",
+            "timestamp"
+        ))));
+        let mut log = LogEvent::default();
+        log.insert(
+            schema.timestamp_key_target_path().unwrap(),
+            Utc.timestamp_nanos(-1),
+        );
+        log.insert(event_path!("payload"), "keep");
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.attributes, vec![kv("payload", string("keep"))]);
+    }
+
+    #[test]
     fn decoded_legacy_log_with_metadata_timestamp_key_round_trips() {
         // The source writes the timestamp to the event root even with a metadata key.
         round_trip(LogNamespace::Legacy, &metadata_timestamp_key_schema());
@@ -1145,6 +1194,57 @@ mod tests {
                             value: Some(string("keep")),
                         },
                     ],
+                }),
+            )]
+        );
+    }
+
+    #[test]
+    fn native_legacy_log_keeps_array_element_after_pruned_element() {
+        let field_in_first = |field: &str| {
+            OwnedTargetPath::event(OwnedValuePath {
+                segments: vec![
+                    OwnedSegment::field("payload"),
+                    OwnedSegment::Index(0),
+                    OwnedSegment::field(field),
+                ],
+            })
+        };
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(field_in_first("message")));
+        schema.set_source_type_key(Some(field_in_first("source_type")));
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("payload"),
+            Value::Array(vec![
+                Value::from(ObjectMap::from([("message".into(), "hello".into())])),
+                Value::from(ObjectMap::from([(
+                    "source_type".into(),
+                    "user-data".into(),
+                )])),
+            ]),
+        );
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(
+            record.body,
+            Some(AnyValue {
+                value: Some(string("hello")),
+            })
+        );
+        // Removing the message prunes the first element, so the second element moves to
+        // index 0. The source type path had no value, so the moved element is kept.
+        assert_eq!(
+            record.attributes,
+            vec![kv(
+                "payload",
+                PBValue::ArrayValue(ArrayValue {
+                    values: vec![AnyValue {
+                        value: Some(PBValue::KvlistValue(KeyValueList {
+                            values: vec![kv("source_type", string("user-data"))],
+                        })),
+                    }],
                 }),
             )]
         );
