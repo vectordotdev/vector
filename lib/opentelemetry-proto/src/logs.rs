@@ -308,13 +308,14 @@ impl ResourceLog {
 /// `attributes` is used. Vector's source type marker is not sent. In the Legacy namespace,
 /// a marker at the configured metadata path takes precedence over the matching event field.
 /// If that metadata is absent, the event field is treated as the marker for sources that
-/// write it there.
+/// write it there. A timestamp at a metadata timestamp key that OTLP cannot represent is
+/// sent as an attribute at the same path, unless an event field is at that path.
 #[must_use]
 pub fn log_event_to_export_request(log: LogEvent) -> ExportLogsServiceRequest {
     encode_log_event(log, log_schema())
 }
 
-fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceRequest {
+fn encode_log_event(log: LogEvent, schema: &LogSchema) -> ExportLogsServiceRequest {
     let mut record = LogRecord::default();
 
     let mut fields = match log.namespace() {
@@ -346,69 +347,7 @@ fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceR
             .unwrap_or_default();
             fields
         }
-        LogNamespace::Legacy => {
-            // Read timestamps before removing a message that may contain them. The
-            // opentelemetry source ignores the timestamp key's metadata prefix, so
-            // prefer metadata but retain the event-root fallback.
-            let metadata_time = schema
-                .timestamp_key_target_path()
-                .filter(|path| path.prefix == PathPrefix::Metadata)
-                .and_then(|path| log.get(path))
-                .and_then(Value::as_timestamp)
-                .and_then(timestamp_nanos);
-            let event_time = schema
-                .timestamp_key()
-                .filter(|_| metadata_time.is_none())
-                .and_then(|path| log.get((PathPrefix::Event, path)))
-                .and_then(Value::as_timestamp)
-                .and_then(timestamp_nanos);
-            // The message, the source type marker, and the timestamp can share an array, for
-            // example as `.payload[0]` and `.payload[1]`. Remove them in an order that does not
-            // move the values that are still to be removed.
-            let message_path = schema
-                .message_key_target_path()
-                .map(|path| resolve_indexes(&log, path.prefix, &path.path));
-            // A marker at the configured metadata path leaves the event field as user data.
-            // Otherwise, remove the root marker for Legacy sources that ignore the prefix.
-            let source_type_path = schema.source_type_key_target_path().map(|path| {
-                let prefix = if path.prefix == PathPrefix::Event || log.contains(path) {
-                    path.prefix
-                } else {
-                    PathPrefix::Event
-                };
-                resolve_indexes(&log, prefix, &path.path)
-            });
-            // A timestamp inside the message stays in the body.
-            let timestamp_path = schema
-                .timestamp_key()
-                .filter(|_| event_time.is_some())
-                .map(|path| resolve_indexes(&log, PathPrefix::Event, path))
-                .filter(|path| {
-                    message_path
-                        .as_ref()
-                        .is_none_or(|message| locate(path, message) != Location::Inside)
-                });
-            // The message is the first entry.
-            let mut pending = [message_path, source_type_path, timestamp_path];
-            while let Some(index) = next_removal(&pending) {
-                let Some((prefix, path)) = pending[index].take() else {
-                    break;
-                };
-                let removed = log.remove_prune((prefix, &*path), true);
-                if index == 0 {
-                    record.body = removed.and_then(into_body);
-                }
-            }
-            let (mut fields, _) = log.into_parts();
-            record.time_unix_nano = metadata_time.or(event_time).unwrap_or_default();
-            record.observed_time_unix_nano = take(
-                &mut fields,
-                path!(OBSERVED_TIMESTAMP_KEY),
-                into_timestamp_nanos,
-            )
-            .unwrap_or_default();
-            fields
-        }
+        LogNamespace::Legacy => take_legacy_fields(log, schema, &mut record),
     };
 
     let (resource, scope) = take_record_fields(&mut fields, &mut record);
@@ -423,6 +362,97 @@ fn encode_log_event(mut log: LogEvent, schema: &LogSchema) -> ExportLogsServiceR
             schema_url: String::new(),
         }],
     }
+}
+
+/// Move the body and timestamps of a Legacy event into `record` and return the other fields.
+fn take_legacy_fields(mut log: LogEvent, schema: &LogSchema, record: &mut LogRecord) -> Value {
+    // Read timestamps before removing a message that may contain them. The
+    // opentelemetry source ignores the timestamp key's metadata prefix, so
+    // prefer metadata but retain the event-root fallback.
+    let metadata_timestamp_path = schema
+        .timestamp_key_target_path()
+        .filter(|path| path.prefix == PathPrefix::Metadata);
+    let metadata_time = metadata_timestamp_path
+        .and_then(|path| log.get(path))
+        .and_then(Value::as_timestamp)
+        .and_then(timestamp_nanos);
+    let event_time = schema
+        .timestamp_key()
+        .filter(|_| metadata_time.is_none())
+        .and_then(|path| log.get((PathPrefix::Event, path)))
+        .and_then(Value::as_timestamp)
+        .and_then(timestamp_nanos);
+    // The message, the source type marker, and the timestamp can share an array, for
+    // example as `.payload[0]` and `.payload[1]`. Remove them in an order that does not
+    // move the values that are still to be removed.
+    let message_path = schema
+        .message_key_target_path()
+        .map(|path| resolve_indexes(&log, path.prefix, &path.path));
+    // A marker at the configured metadata path leaves the event field as user data.
+    // Otherwise, remove the root marker for Legacy sources that ignore the prefix.
+    let source_type_path = schema.source_type_key_target_path().map(|path| {
+        let prefix = if path.prefix == PathPrefix::Event || log.contains(path) {
+            path.prefix
+        } else {
+            PathPrefix::Event
+        };
+        resolve_indexes(&log, prefix, &path.path)
+    });
+    // A timestamp inside the message stays in the body.
+    let timestamp_path = schema
+        .timestamp_key()
+        .filter(|_| event_time.is_some())
+        .map(|path| resolve_indexes(&log, PathPrefix::Event, path))
+        .filter(|path| {
+            message_path
+                .as_ref()
+                .is_none_or(|message| locate(path, message) != Location::Inside)
+        });
+    // A metadata timestamp that OTLP cannot represent is sent as an attribute, because
+    // the metadata is not sent. A timestamp inside the message stays in the body.
+    let invalid_metadata_timestamp_path = metadata_timestamp_path
+        .filter(|path| metadata_time.is_none() && log.contains(*path))
+        .map(|path| resolve_indexes(&log, path.prefix, &path.path))
+        .filter(|path| {
+            message_path
+                .as_ref()
+                .is_none_or(|message| locate(path, message) != Location::Inside)
+        });
+    // The message is the first entry.
+    let mut pending = [
+        message_path,
+        source_type_path,
+        timestamp_path,
+        invalid_metadata_timestamp_path,
+    ];
+    let mut invalid_metadata_timestamp = None;
+    while let Some(index) = next_removal(&pending) {
+        let Some((prefix, path)) = pending[index].take() else {
+            break;
+        };
+        let removed = log.remove_prune((prefix, &*path), true);
+        match index {
+            0 => record.body = removed.and_then(into_body),
+            3 => invalid_metadata_timestamp = removed,
+            _ => {}
+        }
+    }
+    let (mut fields, _) = log.into_parts();
+    // An event field at the same path is user data and is not replaced.
+    if let Some(value) = invalid_metadata_timestamp
+        && let Some(path) = schema.timestamp_key()
+        && !fields.contains(path)
+    {
+        fields.insert(path, value);
+    }
+    record.time_unix_nano = metadata_time.or(event_time).unwrap_or_default();
+    record.observed_time_unix_nano = take(
+        &mut fields,
+        path!(OBSERVED_TIMESTAMP_KEY),
+        into_timestamp_nanos,
+    )
+    .unwrap_or_default();
+    fields
 }
 
 /// Move the namespace-independent OTLP fields from `fields` into `record` and return the
@@ -943,6 +973,27 @@ mod tests {
         assert_eq!(
             record.attributes,
             vec![kv("timestamp", string("root field"))]
+        );
+    }
+
+    #[test]
+    fn native_legacy_log_keeps_invalid_metadata_timestamp_as_attribute() {
+        let schema = metadata_timestamp_key_schema();
+        let mut log = LogEvent::from("disk full");
+        // Before the epoch, so not in the OTLP `uint64` range.
+        log.insert(
+            schema.timestamp_key_target_path().unwrap(),
+            Utc.timestamp_nanos(-1),
+        );
+        log.insert(event_path!("timestamp"), Utc.timestamp_nanos(5));
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        // The event-root fallback supplies `time_unix_nano`.
+        assert_eq!(record.time_unix_nano, 5);
+        assert_eq!(
+            record.attributes,
+            vec![kv("timestamp", string("1969-12-31T23:59:59.999999999Z"))]
         );
     }
 
