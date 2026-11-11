@@ -511,6 +511,7 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
 const TLS_CLIENT_METADATA_SUBJECT_KEY: &str = "subject";
 const TLS_CLIENT_METADATA_SUBJECT_ALTNAMES_KEY: &str = "subject_altnames";
 
+#[must_use]
 pub fn build_tls_client_metadata(certificate_metadata: &CertificateMetadata) -> ObjectMap {
     let mut metadata = ObjectMap::new();
     metadata.insert(
