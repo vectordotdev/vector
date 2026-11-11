@@ -1,6 +1,6 @@
-//! Coverage for streaming request bodies on the native transports and the AWS SDK transport:
-//! data frames sent before the body ends, trailers, size hints and the end of the stream, body
-//! errors, cancellation, and backpressure.
+//! Coverage for streaming request bodies on the native transports, the AWS SDK transport, and
+//! the HTTP client of the AWS service clients: data frames sent before the body ends, trailers,
+//! size hints and the end of the stream, body errors, cancellation, and backpressure.
 
 use std::{
     sync::{
@@ -36,6 +36,8 @@ use crate::{
     config::ProxyConfig,
     tls::{TEST_PEM_CA_PATH, TlsConfig},
 };
+#[cfg(feature = "aws-core")]
+use aws_config::Region;
 #[cfg(feature = "aws-core")]
 use aws_smithy_runtime_api::client::http::{HttpClient as _, HttpConnector as _};
 
@@ -79,9 +81,16 @@ enum Transport {
     H2Alpn,
     /// HTTP/2 with prior knowledge through [`Http2Client`].
     H2c,
-    /// HTTP/1.1 through the AWS SDK transport.
+    /// HTTP/1.1 through the AWS SDK transport alone.
     #[cfg(feature = "aws-core")]
     Aws,
+    /// HTTP/1.1 through the HTTP client of the AWS service clients, which wraps the AWS SDK
+    /// transport and counts the bytes sent.
+    #[cfg(feature = "aws-core")]
+    AwsService,
+    /// HTTP/2 negotiated with ALPN through the HTTP client of the AWS service clients.
+    #[cfg(feature = "aws-core")]
+    AwsServiceH2Alpn,
 }
 
 impl Transport {
@@ -90,22 +99,35 @@ impl Transport {
             Self::H2Alpn | Self::H2c => Version::HTTP_2,
             Self::Http1 => Version::HTTP_11,
             #[cfg(feature = "aws-core")]
-            Self::Aws => Version::HTTP_11,
+            Self::Aws | Self::AwsService => Version::HTTP_11,
+            #[cfg(feature = "aws-core")]
+            Self::AwsServiceH2Alpn => Version::HTTP_2,
+        }
+    }
+
+    const fn negotiates_h2(self) -> bool {
+        match self {
+            Self::H2Alpn => true,
+            #[cfg(feature = "aws-core")]
+            Self::AwsServiceH2Alpn => true,
+            _ => false,
         }
     }
 
     async fn spawn_server(self) -> (TestServer, mpsc::UnboundedReceiver<Received>) {
-        let tls = match self {
-            Self::H2Alpn => server_tls_with_alpn(false, Some(vec!["h2".to_owned()])),
-            _ => no_tls(),
+        let tls = if self.negotiates_h2() {
+            server_tls_with_alpn(false, Some(vec!["h2".to_owned()]))
+        } else {
+            no_tls()
         };
         spawn_receiving_server(tls).await
     }
 
     fn uri(self, server: &TestServer) -> String {
-        match self {
-            Self::H2Alpn => server.https_uri(),
-            _ => server.http_uri(),
+        if self.negotiates_h2() {
+            server.https_uri()
+        } else {
+            server.http_uri()
         }
     }
 
@@ -119,11 +141,7 @@ impl Transport {
         match self {
             Self::Http1 | Self::H2Alpn => {
                 let tls = match self {
-                    Self::H2Alpn => client_tls(TlsConfig {
-                        ca_file: Some(TEST_PEM_CA_PATH.into()),
-                        alpn_protocols: Some(vec!["h2".to_owned()]),
-                        ..Default::default()
-                    }),
+                    Self::H2Alpn => client_tls(h2_alpn_tls()),
                     _ => no_tls(),
                 };
                 let client = HttpClient::new(tls, &proxy).unwrap();
@@ -148,13 +166,19 @@ impl Transport {
                 })
             }
             #[cfg(feature = "aws-core")]
-            Self::Aws => {
-                let connector = SdkHttpClient::new(no_tls(), &proxy)
-                    .unwrap()
-                    .http_connector(
-                        &HttpConnectorSettings::default(),
-                        &test_runtime_components(),
-                    );
+            Self::Aws | Self::AwsService | Self::AwsServiceH2Alpn => {
+                let settings = HttpConnectorSettings::default();
+                let components = test_runtime_components();
+                let connector = if matches!(self, Self::Aws) {
+                    SdkHttpClient::new(no_tls(), &proxy)
+                        .unwrap()
+                        .http_connector(&settings, &components)
+                } else {
+                    let tls = self.negotiates_h2().then(h2_alpn_tls);
+                    crate::aws::service_http_client(&proxy, tls.as_ref(), Region::new("us-east-1"))
+                        .unwrap()
+                        .http_connector(&settings, &components)
+                };
                 let request = HttpRequest::try_from(request.map(SdkBody::from_body_1_x)).unwrap();
                 tokio::spawn(async move {
                     connector
@@ -165,6 +189,15 @@ impl Transport {
                 })
             }
         }
+    }
+}
+
+/// Client TLS settings that trust the test CA and offer only HTTP/2.
+fn h2_alpn_tls() -> TlsConfig {
+    TlsConfig {
+        ca_file: Some(TEST_PEM_CA_PATH.into()),
+        alpn_protocols: Some(vec!["h2".to_owned()]),
+        ..Default::default()
     }
 }
 
@@ -224,6 +257,11 @@ async fn status(response: JoinHandle<Result<StatusCode, String>>) -> Result<Stat
 #[case::h2_alpn(Transport::H2Alpn)]
 #[case::h2c(Transport::H2c)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn)
+)]
 #[tokio::test]
 async fn streams_data_frames_before_the_body_ends(#[case] transport: Transport) {
     let (server, mut received) = transport.spawn_server().await;
@@ -265,6 +303,11 @@ async fn streams_data_frames_before_the_body_ends(#[case] transport: Transport) 
 #[case::h2_alpn(Transport::H2Alpn)]
 #[case::h2c(Transport::H2c)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn)
+)]
 #[tokio::test]
 async fn sends_trailers_after_the_data(#[case] transport: Transport) {
     let (server, mut received) = transport.spawn_server().await;
@@ -296,6 +339,11 @@ async fn sends_trailers_after_the_data(#[case] transport: Transport) {
 #[case::h2_alpn(Transport::H2Alpn)]
 #[case::h2c(Transport::H2c)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn)
+)]
 #[tokio::test]
 async fn frames_bodies_by_their_size_hint(#[case] transport: Transport) {
     let (server, mut received) = transport.spawn_server().await;
@@ -332,6 +380,11 @@ async fn frames_bodies_by_their_size_hint(#[case] transport: Transport) {
 #[case::h2_alpn(Transport::H2Alpn)]
 #[case::h2c(Transport::H2c)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn)
+)]
 #[tokio::test]
 async fn body_error_fails_the_request(#[case] transport: Transport) {
     let (server, mut received) = transport.spawn_server().await;
@@ -361,6 +414,11 @@ async fn body_error_fails_the_request(#[case] transport: Transport) {
 #[case::h2_alpn(Transport::H2Alpn)]
 #[case::h2c(Transport::H2c)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn)
+)]
 #[tokio::test]
 async fn cancelled_request_releases_its_body(#[case] transport: Transport) {
     let (server, mut received) = transport.spawn_server().await;
@@ -392,6 +450,11 @@ async fn cancelled_request_releases_its_body(#[case] transport: Transport) {
 #[case::h2_alpn(Transport::H2Alpn, 8 << 20)]
 #[case::h2c(Transport::H2c, 8 << 20)]
 #[cfg_attr(feature = "aws-core", case::aws(Transport::Aws, 64 << 20))]
+#[cfg_attr(feature = "aws-core", case::aws_service(Transport::AwsService, 64 << 20))]
+#[cfg_attr(
+    feature = "aws-core",
+    case::aws_service_h2_alpn(Transport::AwsServiceH2Alpn, 8 << 20)
+)]
 #[tokio::test]
 async fn stops_polling_the_body_while_the_server_does_not_read(
     #[case] transport: Transport,
