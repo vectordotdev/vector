@@ -198,6 +198,7 @@ const STDERR: &str = "stderr";
 const STREAM_KEY: &str = "stream";
 const PID_KEY: &str = "pid";
 const COMMAND_KEY: &str = "command";
+const HOST_KEY: &str = "host";
 
 impl_generate_config_from_default!(ExecConfig);
 
@@ -298,9 +299,9 @@ impl SourceConfig for ExecConfig {
                         .host_key()
                         .map_or(OwnedValuePath::root(), Clone::clone),
                 )),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST_KEY),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
@@ -707,7 +708,7 @@ fn handle_event(
                 ExecConfig::NAME,
                 log,
                 log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-                path!("host"),
+                path!(HOST_KEY),
                 hostname.clone(),
             );
         }

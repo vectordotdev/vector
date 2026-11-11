@@ -204,8 +204,7 @@ impl ValidatedSink for MezmoConfig {
                 password: SensitiveString::default(),
             },
         };
-        let service =
-            HttpService::new(client.clone(), service_request_builder).with_response_decompression();
+        let service = HttpService::new(client.clone(), service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings.clone(),
