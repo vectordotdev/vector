@@ -756,8 +756,9 @@ mod tests {
 
         drop(source);
 
-        assert!(
-            !event_test_util::contains_name_once("Error").is_ok(),
+        assert_eq!(
+            event_test_util::contains_name_count("Error"),
+            0,
             "Unexpected component error"
         );
     }
