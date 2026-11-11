@@ -602,6 +602,10 @@ fn same_stem_files_preserve_nested_contributions() {
 
 #[test]
 #[cfg(feature = "sources-demo_logs")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keep the format-quoting cases with their shared assertions"
+)]
 fn interpolated_scalars_follow_format_quoting() {
     struct Case {
         name: &'static str,
@@ -616,25 +620,55 @@ fn interpolated_scalars_follow_format_quoting() {
         Case {
             name: "YAML plain placeholders and a field alias",
             format: Format::Yaml,
-            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    batch_interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
+            template: indoc! {r"
+                sources:
+                  demo:
+                    type: demo_logs
+                    format: json
+                    count: @COUNT@
+                    batch_interval: @INTERVAL@
+                    log_namespace: @BOOL@
+            "},
             accepted: true,
         },
         Case {
             name: "YAML quoted placeholders",
             format: Format::Yaml,
-            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: '@COUNT@'\n    interval: '@INTERVAL@'\n    log_namespace: '@BOOL@'\n",
+            template: indoc! {r"
+                sources:
+                  demo:
+                    type: demo_logs
+                    format: json
+                    count: '@COUNT@'
+                    interval: '@INTERVAL@'
+                    log_namespace: '@BOOL@'
+            "},
             accepted: true,
         },
         Case {
             name: "TOML unquoted placeholders",
             format: Format::Toml,
-            template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = @COUNT@\ninterval = @INTERVAL@\nlog_namespace = @BOOL@\n",
+            template: indoc! {r"
+                [sources.demo]
+                type = 'demo_logs'
+                format = 'json'
+                count = @COUNT@
+                interval = @INTERVAL@
+                log_namespace = @BOOL@
+            "},
             accepted: false,
         },
         Case {
             name: "TOML quoted placeholders",
             format: Format::Toml,
-            template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = '@COUNT@'\ninterval = '@INTERVAL@'\nlog_namespace = '@BOOL@'\n",
+            template: indoc! {r"
+                [sources.demo]
+                type = 'demo_logs'
+                format = 'json'
+                count = '@COUNT@'
+                interval = '@INTERVAL@'
+                log_namespace = '@BOOL@'
+            "},
             accepted: true,
         },
         Case {

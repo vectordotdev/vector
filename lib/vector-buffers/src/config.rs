@@ -200,6 +200,7 @@ impl DiskUsage {
 #[serde(rename_all = "snake_case")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryBufferSize {
+    // Try max_size before the default max_events form so an explicit byte limit is coerced.
     // Doc string is duplicated here as a workaround due to a name collision with the `max_size`
     // field with the DiskV2 variant of `BufferType`.
     /// The maximum allowed amount of allocated memory the buffer can hold.
@@ -208,7 +209,6 @@ pub enum MemoryBufferSize {
     MaxSize(#[configurable(metadata(docs::type_unit = "bytes"))] NonZeroUsize),
 
     /// The maximum number of events allowed in the buffer.
-    // Try an explicit byte limit before the default event-count form during coercion.
     #[configurable(metadata(serde::optional_tag = "max_events"))]
     MaxEvents(#[serde(default = "memory_buffer_default_max_events")] NonZeroUsize),
 }

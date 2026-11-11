@@ -153,6 +153,7 @@ impl<'a> ValueCoercer<'a> {
         self.tree = Some(tree.clone());
         let mut value = tree.latest();
         let result = self.coerce_field(&mut value, self.schema);
+        // Clear the retained tree before propagating coercion errors.
         let tree = self
             .tree
             .take()
