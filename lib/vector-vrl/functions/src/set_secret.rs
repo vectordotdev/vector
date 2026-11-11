@@ -31,7 +31,7 @@ impl Function for SetSecret {
         "set_secret"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         "Sets the given secret in the event."
     }
 

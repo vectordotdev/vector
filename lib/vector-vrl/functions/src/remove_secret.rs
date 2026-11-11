@@ -24,7 +24,7 @@ impl Function for RemoveSecret {
         "remove_secret"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         "Removes a secret from an event."
     }
 

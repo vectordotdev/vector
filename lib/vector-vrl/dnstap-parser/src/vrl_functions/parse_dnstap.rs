@@ -33,7 +33,7 @@ impl Function for ParseDnstap {
         "parse_dnstap"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         "Parses the `value` as base64 encoded DNSTAP data."
     }
 

@@ -51,7 +51,7 @@ impl Function for GetVectorMetric {
         "get_vector_metric"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         const_str::concat!(
             "Searches internal Vector metrics by name and optionally by tags. Returns the first matching metric.\n\n",
             crate::VECTOR_METRICS_EXPLAINER

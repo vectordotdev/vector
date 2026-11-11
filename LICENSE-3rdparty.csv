@@ -251,7 +251,7 @@ dirs-next,https://github.com/xdg-rs/dirs,MIT OR Apache-2.0,The @xdg-rs members
 dirs-sys-next,https://github.com/xdg-rs/dirs/tree/master/dirs-sys,MIT OR Apache-2.0,The @xdg-rs members
 dispatch2,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,"Mads Marquart <mads@marquart.dk>, Mary <mary@mary.zone>"
 displaydoc,https://github.com/yaahc/displaydoc,MIT OR Apache-2.0,Jane Lusby <jlusby@yaah.dev>
-dns-lookup,https://github.com/keeperofdakeys/dns-lookup,MIT OR Apache-2.0,Josh Driver <keeperofdakeys@gmail.com>
+dns-lookup,https://github.com/keeperofdakeys/dns-lookup,MIT OR Apache-2.0,The dns-lookup Authors
 doc-comment,https://github.com/GuillaumeGomez/doc-comment,MIT,Guillaume Gomez <guillaume1.gomez@gmail.com>
 document-features,https://github.com/slint-ui/document-features,MIT OR Apache-2.0,Slint Developers <info@slint.dev>
 domain,https://github.com/nlnetlabs/domain,BSD-3-Clause,NLnet Labs <dns-team@nlnetlabs.nl>
@@ -573,7 +573,6 @@ outref,https://github.com/Nugine/outref,MIT,The outref Authors
 owo-colors,https://github.com/owo-colors/owo-colors,MIT,jam1garner <8260240+jam1garner@users.noreply.github.com>
 p256,https://github.com/RustCrypto/elliptic-curves/tree/master/p256,Apache-2.0 OR MIT,RustCrypto Developers
 p384,https://github.com/RustCrypto/elliptic-curves/tree/master/p384,Apache-2.0 OR MIT,"RustCrypto Developers, Frank Denis <github@pureftpd.org>"
-pad,https://github.com/ogham/rust-pad,MIT,Ben S <ogham@bsago.me>
 palette,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
 palette_derive,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
 palette_math,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
@@ -982,6 +981,8 @@ zerovec,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Devel
 zerovec-derive,https://github.com/unicode-org/icu4x,Unicode-3.0,Manish Goregaokar <manishsmail@gmail.com>
 zlib-rs,https://github.com/trifectatechfoundation/zlib-rs,Zlib,The zlib-rs Authors
 zmij,https://github.com/dtolnay/zmij,MIT,David Tolnay <dtolnay@gmail.com>
+zstd,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>
 zstd,https://github.com/gyscos/zstd-rs,MIT,Alexandre Bury <alexandre.bury@gmail.com>
+zstd-safe,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>
 zstd-safe,https://github.com/gyscos/zstd-rs,MIT OR Apache-2.0,Alexandre Bury <alexandre.bury@gmail.com>
-zstd-sys,https://github.com/gyscos/zstd-rs,MIT OR Apache-2.0,Alexandre Bury <alexandre.bury@gmail.com>
+zstd-sys,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>
