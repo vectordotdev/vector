@@ -83,9 +83,11 @@ The access log should show an HTTP 200 response. Now we have a working baseline 
 ```yaml
 api:
   enabled: true
+  address: "127.0.0.1:8686"
 ```
 
-The API lets `vector top` and `vector tap` connect to this Vector process.
+`vector top` and `vector tap` require the [API](/docs/reference/api/#enable-local-inspection).
+It is disabled by default and has no authentication. Keep it inaccessible to untrusted clients.
 
 #### Sources
 

@@ -112,7 +112,7 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_logs: Option<bool>,
 
-    /// If this is set to `true`, metrics (beta) are not accepted by the component.
+    /// If this is set to `true`, metrics are not accepted by the component.
     #[configurable(
         deprecated = "This option has been deprecated, use `enabled_data_types` instead."
     )]
@@ -134,10 +134,10 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_llmobs: Option<bool>,
 
-    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
+    /// If this is set to `true`, logs, metrics, and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
+    /// For a source component named `agent`, the received logs, metrics, and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
     /// sent to `agent.apm_stats`.
@@ -196,7 +196,7 @@ pub enum DatadogAgentDataType {
     /// Logs.
     Logs,
 
-    /// Metrics (beta).
+    /// Metrics.
     Metrics,
 
     /// Traces (alpha).

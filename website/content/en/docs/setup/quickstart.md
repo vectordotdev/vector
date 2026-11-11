@@ -208,6 +208,43 @@ Now you should have a series of JSON-formatted events, something like this:
 
 We can see that Vector has parsed the Syslog message and created a structured event containing all of the Syslog fields. All with one line of Vector's remap language. This example is just the beginning of Vector's capabilities. You can receive logs and events from dozens of sources. You can use Vector and remap to change data, add fields to decorate data, convert logs into metrics, drop fields, and dozens of other tasks you use daily to process your observability data. You can then route and output your events to dozens of destinations.
 
+## Validate and test your changes
+
+[Validate the configuration](/docs/administration/validating/) without environment or connectivity checks:
+
+```shell
+vector validate --no-environment ./vector.yaml
+```
+
+Run `vector validate ./vector.yaml` in the deployment environment to check component requirements and available sink health checks.
+
+Use [unit tests](/docs/reference/configuration/unit-tests/) to check transform output.
+Test source ingestion and sink delivery separately. Add a `tests` section to the Syslog configuration:
+
+```yaml
+tests:
+  - name: Parse a Syslog event
+    inputs:
+      - insert_at: remap_syslog
+        type: log
+        log_fields:
+          message: "<14>1 2026-01-01T00:00:00Z example-host example-app 123 ID47 - hello"
+    outputs:
+      - extract_from: remap_syslog
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.hostname, "example-host")
+              assert_eq!(.appname, "example-app")
+              assert_eq!(.message, "hello")
+```
+
+Run the test after editing the transform, or in CI:
+
+```shell
+vector test ./vector.yaml
+```
+
 ## What's next?
 
 We're just scratching the surface in this post. To get your hands dirty with Vector check out:
@@ -215,6 +252,7 @@ We're just scratching the surface in this post. To get your hands dirty with Vec
 * All of Vector's [sources][sources], [transforms][transforms], and [sinks][sinks].
 * The [Vector Remap Language][vrl], the heart of data processing in Vector.
 * More details on [component configuration][config] in Vector.
+* [Inspect a running pipeline](/guides/developer/debugging/#vector-tools) with `vector top` and `vector tap`.
 * Finally, [deploying Vector][deployment] to launch Vector in your production environment.
 
 [components]: /components
