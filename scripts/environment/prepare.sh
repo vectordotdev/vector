@@ -357,6 +357,16 @@ run_privileged_with_timeout() {
   fi
 }
 
+apt_get() {
+  # Keep ARM64's platform policy: older Ubuntu images use ports.ubuntu.com
+  # without fallback mirrors, so they need different retry settings.
+  if [[ "$(uname -m)" == "aarch64" ]]; then
+    run_privileged_with_timeout apt-get "$@"
+  else
+    run_privileged_with_timeout apt-get --config-file "${SCRIPT_DIR}/apt.conf" "$@"
+  fi
+}
+
 install_system_packages() {
   local os
   os=$(uname -s)
@@ -387,26 +397,9 @@ install_system_packages() {
         return 1
       fi
 
-      # Keep CI's download policy global without changing developer machines.
-      if [[ "${CI:-}" == "true" ]]; then
-        run_privileged_with_timeout tee /etc/apt/apt.conf.d/99-vector-ci > /dev/null <<'EOF'
-Acquire::Retries "5";
-Acquire::http::Timeout "30";
-Acquire::https::Timeout "30";
-EOF
-      fi
-
-      # GitHub's Azure mirror intermittently fails DNS resolution even while the
-      # public Ubuntu archives are available. Keep the existing public fallbacks.
-      local mirrors=/etc/apt/apt-mirrors.txt
-      if [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" && -f "$mirrors" ]] &&
-        grep -q '^https://archive\.ubuntu\.com/ubuntu/' "$mirrors"; then
-        run_privileged_with_timeout sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' "$mirrors"
-      fi
-
       # Do not silently reuse stale indexes when any repository failed to update.
-      run_privileged_with_timeout apt-get update --error-on=any
-      run_privileged_with_timeout apt-get install -y --no-install-recommends "${packages[@]}"
+      apt_get update --error-on=any
+      apt_get install -y --no-install-recommends "${packages[@]}"
       ;;
     Darwin)
       local packages=()
