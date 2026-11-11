@@ -71,7 +71,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector,Observability Pipelines"
+          team: "Vector,Observability Pipelines,Single Machine Performance"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -96,6 +96,8 @@ jobs:
       checkout_ref: ${{ github.event.review.commit_id }}
 
   integration-tests:
+    # Skip the matrix for commands that do not target integration tests instead of starting no-op jobs.
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-all')
     needs:
       - prep-pr
       - build-test-runner
@@ -192,7 +194,10 @@ jobs:
 
   e2e-tests:
     # The dedicated command also starts with the ordinary opentelemetry-traces command.
-    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: |
+      github.repository == 'vectordotdev/vector'
+      && (startsWith(github.event.review.body, '/ci-run-e2e') || startsWith(github.event.review.body, '/ci-run-all'))
+      && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
@@ -350,7 +355,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector,Observability Pipelines"
+          team: "Vector,Observability Pipelines,Single Machine Performance"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR review) Submit PR result as success
