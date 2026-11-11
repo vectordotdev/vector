@@ -257,6 +257,11 @@ impl OctetCountingDecoder {
                     Some(pos) => {
                         src.advance(pos + 1);
                         self.newline_discarding = false;
+                        // Loop back through the length check: the bytes after
+                        // the discarded frame may already be an oversized
+                        // partial tail that must not wait for more reads.
+                        self.newline_scan_pos = 0;
+                        continue;
                     }
                     None => src.advance(src.len()),
                 }
@@ -608,6 +613,53 @@ mod tests {
         assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
         assert!(decoder.newline_discarding);
         assert_eq!(Ok(None), decoder.decode_eof(&mut buffer).map_err(|_| false));
+    }
+
+    #[test]
+    fn non_octet_decode_rechecks_tail_after_leaving_discard_mode() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+        let mut buffer = BytesMut::with_capacity(4200);
+
+        // Enter discard mode with an unterminated oversized frame.
+        buffer.put(&vec![b'x'; 100][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(decoder.newline_discarding);
+
+        // The frame's newline followed by another oversized partial tail:
+        // leaving discard mode must re-check the tail in the same call
+        // instead of buffering it while waiting for more reads.
+        buffer.put(&b"tail\n"[..]);
+        buffer.put(&vec![b'y'; 4096][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(buffer.is_empty());
+        assert!(decoder.newline_discarding);
+
+        // Framing resumes once the discarded tail's newline arrives.
+        buffer.put(&b"tail2\n<57>ok\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>ok".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+    }
+
+    #[test]
+    fn non_octet_decode_exits_discard_on_trailing_newline() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+
+        // Enter discard mode, then receive only the frame's newline: the
+        // decoder leaves discard mode with an empty buffer and keeps waiting.
+        let mut buffer = BytesMut::from(&vec![b'x'; 100][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        buffer.put(&b"\n"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(buffer.is_empty());
+        assert!(!decoder.newline_discarding);
+
+        buffer.put(&b"<57>ok\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>ok".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
     }
 
     #[test]
