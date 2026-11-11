@@ -69,15 +69,8 @@ impl AmqpConfig {
             Some(tls) => {
                 let cert_chain = Self::build_ca_cert(tls)?;
 
-                let identity = if let Some(identity) = &tls.key_file {
-                    let der = tokio::fs::read(identity.to_owned()).await?;
-                    Some(OwnedIdentity::PKCS12 {
-                        der,
-                        password: tls.key_pass.clone().unwrap_or_else(String::default),
-                    })
-                } else {
-                    None
-                };
+                let identity = Self::build_identity(tls)?;
+
                 let tls_config = OwnedTLSConfig {
                     identity,
                     cert_chain,
@@ -112,12 +105,28 @@ impl AmqpConfig {
         };
         Ok(cert_chain)
     }
+
+    fn build_identity(
+        tls: &TlsConfig,
+    ) -> Result<Option<OwnedIdentity>, Box<dyn Error + Send + Sync>> {
+        match tls.load_identity()? {
+            Some(identity_store) => {
+                let password = tls.key_pass.clone().unwrap_or_default();
+                let der = identity_store.to_pkcs12(&password)?;
+                Ok(Some(OwnedIdentity::PKCS12 { der, password }))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_INTERMEDIATE_CA_PATH};
+    use crate::tls::{
+        TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH,
+        TEST_PEM_INTERMEDIATE_CA_PATH,
+    };
     use openssl::x509::X509;
     use vector_lib::tls::TlsConfig;
 
@@ -199,5 +208,78 @@ mod tests {
             .expect("returned string must be a valid parseable X509 PEM");
 
         assert!(parsed_cert.subject_name().entries().count() > 0);
+    }
+
+    #[test]
+    fn build_identity_store() {
+        let tls = TlsConfig {
+            ca_file: Some(TEST_PEM_INTERMEDIATE_CA_PATH.into()),
+            crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+            key_pass: Some("valid-password".into()),
+            ..Default::default()
+        };
+
+        let identity = AmqpConfig::build_identity(&tls).expect("failed to build OwnerIdentity");
+
+        let Some(OwnedIdentity::PKCS12 { der, password }) = identity else {
+            panic!("expected OwnedIdentity::PKCS12")
+        };
+
+        let pkcs_12 = openssl::pkcs12::Pkcs12::from_der(&der)
+            .expect("payload must be a valid DER-encoded PKCS#12 archive");
+
+        let parsed_archive = pkcs_12
+            .parse2(&password)
+            .expect("PKCS#12 archive must decrypt cleanly with the actual password");
+
+        assert!(
+            parsed_archive.cert.is_some(),
+            "archive must contain client certificate"
+        );
+        assert!(
+            parsed_archive.pkey.is_some(),
+            "archive must contain private key"
+        );
+        assert_eq!(
+            parsed_archive.ca.map_or(0, |stack| stack.len()),
+            2,
+            "archive must contain two intermediate CA"
+        );
+    }
+
+    #[test]
+    fn build_identity_fails_with_wrong_password() {
+        let tls = TlsConfig {
+            ca_file: Some(TEST_PEM_INTERMEDIATE_CA_PATH.into()),
+            crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+            key_pass: Some("some-password".into()),
+            ..Default::default()
+        };
+
+        let identity = AmqpConfig::build_identity(&tls).expect("failed to build identity");
+
+        let Some(OwnedIdentity::PKCS12 { der, .. }) = identity else {
+            panic!("expected OwnedIdentity::PKCS12")
+        };
+
+        let pkcs_12 = openssl::pkcs12::Pkcs12::from_der(&der)
+            .expect("payload must be a valid DER-encoded PKCS#12 archive");
+
+        assert!(
+            pkcs_12.parse2("definitely-wrong-password").is_err(),
+            "PKCS#12 archive must fail decryption with an incorrect password"
+        );
+    }
+
+    #[test]
+    fn build_identity_disabled_when_no_certs() {
+        let tls = TlsConfig::default();
+        let identity = AmqpConfig::build_identity(&tls).expect("should succeed");
+        assert!(
+            identity.is_none(),
+            "identity must be None if certs are omitted"
+        );
     }
 }
