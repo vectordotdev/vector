@@ -453,7 +453,7 @@ impl PingManager {
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU64;
-    use vector_lib::codecs::decoding::JsonDeserializerConfig;
+    use vector_lib::{codecs::decoding::JsonDeserializerConfig, event_test_util};
 
     use futures::{StreamExt, sink::SinkExt};
     use tokio::{net::TcpListener, pin, time::Duration};
@@ -472,6 +472,7 @@ mod tests {
         config::{SourceConfig, SourceContext},
         sources::websocket::config::{PongMessage, WebSocketConfig},
         test_util::{
+            self,
             addr::next_addr,
             components::{
                 SOURCE_TAGS, run_and_assert_source_compliance, run_and_assert_source_error,
@@ -731,6 +732,7 @@ mod tests {
         config.ping_message = Some("ping".to_string());
         config.pong_message = Some(PongMessage::Simple("pong".to_string()));
 
+        test_util::components::init_test();
         let (tx, _) = SourceSender::new_test();
         let context = SourceContext::new_test(tx, None);
 
@@ -753,6 +755,11 @@ mod tests {
         }
 
         drop(source);
+
+        assert!(
+            !event_test_util::contains_name_once("Error").is_ok(),
+            "Unexpected component error"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
