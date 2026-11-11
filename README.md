@@ -26,9 +26,8 @@ pipeline that puts you in control of your observability data.
 all your logs and metrics to any vendors you want today and any other
 vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
 data enrichment, and data security where you need it, not where it is most
-convenient for your vendors. Vector is 100% open source under the
-[Mozilla Public License 2.0](https://github.com/vectordotdev/vector/blob/master/LICENSE).
-The complete source code and all features are publicly available.
+convenient for your vendors. Vector is 100% open source, the complete source code
+and all features are publicly available.
 
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
