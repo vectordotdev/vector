@@ -357,16 +357,6 @@ run_privileged_with_timeout() {
   fi
 }
 
-apt_get() {
-  # Keep ARM64's platform policy: older Ubuntu images use ports.ubuntu.com
-  # without fallback mirrors, so they need different retry settings.
-  if [[ "$(uname -m)" == "aarch64" ]]; then
-    run_privileged_with_timeout apt-get "$@"
-  else
-    run_privileged_with_timeout apt-get --config-file "${SCRIPT_DIR}/apt.conf" "$@"
-  fi
-}
-
 install_system_packages() {
   local os
   os=$(uname -s)
@@ -398,8 +388,8 @@ install_system_packages() {
       fi
 
       # Do not silently reuse stale indexes when any repository failed to update.
-      apt_get update --error-on=any
-      apt_get install -y --no-install-recommends "${packages[@]}"
+      run_privileged_with_timeout apt-get update --error-on=any
+      run_privileged_with_timeout apt-get install -y --no-install-recommends "${packages[@]}"
       ;;
     Darwin)
       local packages=()
