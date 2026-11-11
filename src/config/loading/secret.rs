@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     sync::LazyLock,
 };
 
@@ -14,7 +13,8 @@ use crate::{
     config::{
         SecretBackend,
         loading::{
-            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            deserialize_config_map,
+            loader::{ConfigLoader, ConfigScope, LoadMode, ParsedInputs},
             representation::ConfigMap,
         },
     },
@@ -34,6 +34,8 @@ use crate::{
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
 
+pub(super) const SECRET_KEY: &str = "secret";
+
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct SecretBackendOuter {
@@ -49,12 +51,67 @@ pub struct SecretBackendLoader {
     interpolate_env: bool,
 }
 
+impl ConfigLoader for SecretBackendLoader {
+    const MODE: LoadMode = LoadMode::SecretBackends;
+
+    fn visit_string(&mut self, value: &str) {
+        collect_secret_keys(value, &mut self.secret_keys);
+    }
+
+    fn merge(&mut self, mut map: ConfigMap, _scope: ConfigScope) -> Result<(), Vec<String>> {
+        if let Some(backends) = map.remove(SECRET_KEY) {
+            let additional =
+                deserialize_config_map::<SecretBackendOuter>(ConfigMap::from_iter([(
+                    SECRET_KEY.to_owned(),
+                    backends,
+                )]))?;
+            self.backends.extend(additional.secret);
+        }
+        Ok(())
+    }
+}
+
 impl SecretBackendLoader {
     /// Sets whether to interpolate environment variables in the config.
     #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
+    }
+
+    /// Loads secret backends and discovers secret references from configuration paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading, parsing, interpolating, or merging
+    /// configuration, or deserializing secret backends.
+    pub fn load_from_paths(self, paths: &[super::ConfigPath]) -> Result<Self, Vec<String>> {
+        self.load(ParsedInputs::from_paths(paths))
+    }
+
+    /// Loads secret backends and discovers secret references from a configuration reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading, parsing, or interpolating the input,
+    /// or deserializing secret backends.
+    pub fn load_from_input(
+        self,
+        input: impl std::io::Read,
+        format: super::Format,
+    ) -> Result<Self, Vec<String>> {
+        self.load(ParsedInputs::from_input(input, format))
+    }
+
+    fn load(self, mut inputs: ParsedInputs) -> Result<Self, Vec<String>> {
+        inputs.interpolate_environment(self.interpolate_env);
+        self.load_prepared(&inputs)
+    }
+
+    /// Discovers secrets from the same environment-expanded snapshot used by the builder.
+    pub(crate) fn load_prepared(mut self, inputs: &ParsedInputs) -> Result<Self, Vec<String>> {
+        inputs.load_into(&mut self)?;
+        Ok(self)
     }
 
     /// Retrieve secrets from backends.
@@ -107,29 +164,6 @@ impl Default for SecretBackendLoader {
             secret_keys: HashMap::new(),
             interpolate_env: super::env_var_interpolation_enabled(),
         }
-    }
-}
-
-impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input, self.interpolate_env)?;
-        // Collect secret placeholders just after env var processing
-        collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok(config_string)
-    }
-
-    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if map.contains_key("secret") {
-            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
-            self.backends.extend(additional.secret);
-        }
-        Ok(())
-    }
-}
-
-impl Loader<SecretBackendLoader> for SecretBackendLoader {
-    fn take(self) -> SecretBackendLoader {
-        self
     }
 }
 
@@ -239,6 +273,44 @@ mod tests {
         collect_secret_keys, collect_secret_keys_from_map, interpolate,
         interpolate_config_map_with_secrets,
     };
+
+    #[test]
+    fn assembly_observes_overwritten_secrets_but_not_shadowed_folders() {
+        const FIRST: &str = indoc! {"
+            value: SECRET[backend.first]
+        "};
+        const SECOND: &str = indoc! {"
+            value: SECRET[backend.second]
+        "};
+        const INLINE: &str = indoc! {"
+            source: SECRET[backend.inline]
+        "};
+        const SHADOWED: &str = indoc! {"
+            value: SECRET[backend.shadowed]
+        "};
+        let directory = tempfile::tempdir().unwrap();
+        let transforms = directory.path().join("transforms");
+        let shadowed = transforms.join("mapper/source");
+        std::fs::create_dir_all(&shadowed).unwrap();
+        std::fs::write(directory.path().join("fragment.yaml"), FIRST).unwrap();
+        std::fs::write(directory.path().join("fragment.yml"), SECOND).unwrap();
+        std::fs::write(transforms.join("mapper.yaml"), INLINE).unwrap();
+        std::fs::write(shadowed.join("ignored.yaml"), SHADOWED).unwrap();
+
+        let loader = super::SecretBackendLoader::default()
+            .load_from_paths(&[crate::config::ConfigPath::Dir(directory.path().to_owned())])
+            .unwrap();
+        assert_eq!(
+            loader.secret_keys,
+            HashMap::from([(
+                "backend".into(),
+                ["first", "second", "inline"]
+                    .map(str::to_owned)
+                    .into_iter()
+                    .collect(),
+            )])
+        );
+    }
 
     #[test]
     fn tree_secret_collection_and_interpolation_agree() {
