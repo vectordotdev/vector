@@ -29,10 +29,10 @@ use crate::{
     test_util::{
         addr::next_addr,
         components::{
-            HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
-            run_and_assert_source_compliance_advanced,
+            COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_compliance_advanced, run_and_assert_source_error,
         },
-        http::spawn_authenticated_http_proxy,
+        http::{SlowBody, spawn_authenticated_http_proxy, spawn_slow_body_http_server},
         test_generate_config, wait_for_tcp,
     },
 };
@@ -89,6 +89,48 @@ impl ValidatableComponent for HttpClientConfig {
 }
 
 register_validatable_component!(HttpClientConfig);
+
+/// Runs the source against an endpoint whose response body doesn't finish within the timeout, and
+/// asserts that the request fails with an error instead of staying open.
+async fn run_slow_body_error(body: SlowBody) {
+    let uri = spawn_slow_body_http_server(body).await;
+
+    let events = run_and_assert_source_error(
+        HttpClientConfig {
+            endpoint: uri.to_string(),
+            interval: INTERVAL,
+            timeout: TIMEOUT,
+            query: HashMap::new(),
+            decoding: default_decoding(),
+            framing: default_framing_message_based(),
+            headers: HashMap::new(),
+            method: HttpMethod::Get,
+            body: None,
+            tls: None,
+            auth: None,
+            log_namespace: None,
+        },
+        Duration::from_secs(3),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+
+    assert!(events.is_empty());
+}
+
+/// The timeout must also cover reading the response body: an endpoint that sends the response
+/// headers and then stalls the body must not hold the request open.
+#[tokio::test]
+async fn timeout_covers_stalled_response_body() {
+    run_slow_body_error(SlowBody::Stall).await;
+}
+
+/// The timeout applies to the whole request, not to each read: a body that arrives in quick
+/// pieces but takes longer than the timeout overall must still time out.
+#[tokio::test]
+async fn timeout_covers_slow_response_body() {
+    run_slow_body_error(SlowBody::Trickle(Duration::from_millis(100))).await;
+}
 
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
