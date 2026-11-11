@@ -285,6 +285,7 @@ impl WebSocketSource {
                     Ok(temp) => {
                         if let Err(err) = tokio::fs::write(temp.path(), last_message_id).await {
                             error!(message = "Persisting last received message id failed.", %err);
+                            return;
                         }
                         if let Err(err) = temp.persist(path) {
                             error!(message = "Persisting last received message id failed.", %err);
