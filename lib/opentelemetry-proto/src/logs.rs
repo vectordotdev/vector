@@ -651,8 +651,8 @@ fn locate((prefix, path): &FieldPath<'_>, (other_prefix, other): &FieldPath<'_>)
 }
 
 /// The index of a pending path whose removal does not move or remove the value at any other
-/// pending path. If there is no such path (for example, when two paths are the same), the
-/// first pending path is used.
+/// pending path. Pending paths that are the same as it are not checked, because they are not
+/// removed after it. If there is no such path, the first pending path is used.
 fn next_removal(pending: &[Option<FieldPath<'_>>]) -> Option<usize> {
     let mut first = None;
     for (index, path) in pending.iter().enumerate() {
@@ -663,7 +663,8 @@ fn next_removal(pending: &[Option<FieldPath<'_>>]) -> Option<usize> {
         let disturbs_other = pending.iter().enumerate().any(|(other_index, other)| {
             other_index != index
                 && other.as_ref().is_some_and(|other| {
-                    matches!(locate(path, other), Location::Before | Location::Contains)
+                    other != path
+                        && matches!(locate(path, other), Location::Before | Location::Contains)
                 })
         });
         if !disturbs_other {
@@ -1358,6 +1359,34 @@ mod tests {
                 value: Some(string("hello")),
             })
         );
+        assert_eq!(record.attributes, keep_payload());
+    }
+
+    #[test]
+    fn native_legacy_log_removes_shared_schema_path_before_earlier_element() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(payload_index(0)));
+        schema.set_source_type_key(Some(payload_index(1)));
+        schema.set_timestamp_key(Some(payload_index(1)));
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("payload"),
+            Value::Array(vec![
+                "hello".into(),
+                Utc.timestamp_nanos(5).into(),
+                "keep".into(),
+            ]),
+        );
+
+        let request = encode_log_event(log, &schema);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(
+            record.body,
+            Some(AnyValue {
+                value: Some(string("hello")),
+            })
+        );
+        assert_eq!(record.time_unix_nano, 5);
         assert_eq!(record.attributes, keep_payload());
     }
 
