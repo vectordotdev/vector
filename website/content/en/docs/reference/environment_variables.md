@@ -5,7 +5,7 @@ weight: 5
 tags: ["env", "environment variables", "interpolation"]
 ---
 
-**Environment variable interpolation is disabled by default** (since v0.57.0). Enable it when starting Vector:
+**Environment variable interpolation is disabled by default** (since v0.57.0). To enable it, start Vector with the `--dangerously-allow-env-var-interpolation` flag:
 
 ```shell
 vector --config vector.yaml --dangerously-allow-env-var-interpolation
@@ -99,20 +99,21 @@ environment variable example.
 
 ## Security Restrictions
 
-Only enable interpolation when you control the environment. Substituted values can still
-change file paths, destinations, or embedded VRL code; Vector does not escape them for those uses.
+Enable interpolation only when you control the environment. Vector doesn't escape substituted
+values, so they can change file paths, destinations, or embedded VRL code.
 
 Configuration must be valid before substitution:
 
 - Quote placeholders in TOML, JSON, and YAML flow collections, for example `inputs: ["${SOURCE}"]`.
-- Quoted placeholders also work for numeric and boolean fields, such as `count: "${MY_COUNT}"`;
+- Quoted placeholders also work for numeric and boolean fields, such as `count: "${MY_COUNT}"`.
   Vector converts the string to the field's type.
-- Keys, table headers, and comments are not interpolated. Use a separate placeholder for each array element.
+- Keys, table headers, and comments are not interpolated.
+- Use a separate placeholder for each array element.
 
-Multiline values are supported within strings, but cannot insert configuration blocks.
-For that, preprocess the file with a tool such as `envsubst` and inspect the result before
-starting Vector. `envsubst` supports `$VAR` and `${VAR}`, but not Vector's default or
-required-variable syntax.
+Multi-line values work within strings but can't insert configuration blocks.
+To insert configuration blocks, preprocess the file with a tool such as `envsubst` and inspect
+the result before starting Vector. `envsubst` supports `$VAR` and `${VAR}`, but not Vector's
+default or required-variable syntax, such as `${VAR:-default}` or `${VAR:?err}`.
 
 ```shell
 # config_template.yaml

@@ -4,7 +4,7 @@ deprecated_since: "0.57.0"
 removed_in: "0.62.0"
 ---
 
-Vector now parses configuration files before substituting `${VAR}` and
+As of 0.62.0, Vector parses configuration files before substituting `${VAR}` and
 `SECRET[backend.key]` references. Substituted values cannot change the configuration
 structure.
 
