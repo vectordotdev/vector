@@ -21,7 +21,7 @@ use self::{
 };
 
 mod config;
-pub use self::config::MockConfigData;
+pub use self::config::TestComponentData;
 
 pub mod sinks;
 pub mod sources;

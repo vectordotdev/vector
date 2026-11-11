@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use super::super::{ConfigBuilderLoader, SecretBackendLoader, SourceLoader};
 use crate::{
     config::{ComponentKey, ConfigPath, Format},
-    test_util::mock::MockConfigData,
+    test_util::mock::TestComponentData,
 };
 
 #[test]
@@ -23,7 +23,7 @@ fn secrets_cannot_inject_configuration_structure() {
     let secret = "\"\ninteger: 999\ninjected: [a, b]\n";
     let input = indoc! {r"
         sources:
-          mock:
+          test_source:
             type: test_basic
             extra:
               strings: ['SECRET[backend.line]']
@@ -31,7 +31,7 @@ fn secrets_cannot_inject_configuration_structure() {
         sinks:
           out:
             type: test_basic
-            inputs: [mock]
+            inputs: [test_source]
             extra:
               strings: ['SECRET[backend.line]']
               integer: 'SECRET[backend.count]'
@@ -44,8 +44,8 @@ fn secrets_cannot_inject_configuration_structure() {
         .load_from_input(input.as_bytes(), Format::Yaml)
         .unwrap();
     for extra in [
-        MockConfigData::from_config(&builder.sources[&ComponentKey::from("mock")]),
-        MockConfigData::from_config(&builder.sinks[&ComponentKey::from("out")]),
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]),
+        TestComponentData::from_config(&builder.sinks[&ComponentKey::from("out")]),
     ] {
         assert_eq!(extra.strings, [secret]);
         assert_eq!(extra.integer, Some(42));
@@ -136,7 +136,7 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
           backend:
             type: file
         sources:
-          mock:
+          test_source:
             type: test_basic
             extra:
               integer: 43
@@ -148,7 +148,7 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
           backend:
             path: ""
         sources:
-          mock:
+          test_source:
             extra:
               integer: SECRET[backend.count]
         proxy:
@@ -189,7 +189,8 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
         .load_from_paths(&paths)
         .unwrap();
     assert!(builder.global.proxy.enabled);
-    let extra = MockConfigData::from_config(&builder.sources[&ComponentKey::from("mock")]);
+    let extra =
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]);
     assert_eq!(extra.integer, Some(43));
 }
 
@@ -197,7 +198,7 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
 fn coercion_errors_include_the_component_field_path() {
     let input = indoc! {r"
         sources:
-          mock:
+          test_source:
             type: test_basic
             extra:
               integer: ${VECTOR_TEST_PARSE_FIRST_BAD_COUNT:-invalid}
@@ -209,7 +210,7 @@ fn coercion_errors_include_the_component_field_path() {
     assert!(
         errors
             .iter()
-            .any(|error| error.contains("sources.mock.extra.integer")),
+            .any(|error| error.contains("sources.test_source.extra.integer")),
         "{errors:?}"
     );
 }
@@ -217,13 +218,12 @@ fn coercion_errors_include_the_component_field_path() {
 #[test]
 fn invalid_unquoted_placeholders_include_migration_guidance() {
     const TOML: &str = indoc! {r"
-        [sources.mock]
+        [sources.test_source]
         type = 'test_basic'
-        [sources.mock.extra]
+        [sources.test_source.extra]
         integer = ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
     "};
-    const JSON: &str =
-        r#"{"sources":{"mock":{"type":"test_basic","extra":{"integer":SECRET[backend.count]}}}}"#;
+    const JSON: &str = r#"{"sources":{"test_source":{"type":"test_basic","extra":{"integer":SECRET[backend.count]}}}}"#;
     const YAML_ENV_LIST: &str = "proxy: {no_proxy: [${VECTOR_TEST_COMPAT_UNSET:-localhost}]}";
     const YAML_SECRET_LIST: &str = "proxy: {no_proxy: [SECRET[backend.host]]}";
     const YAML_ENV_MAP: &str = "proxy: {enabled: ${VECTOR_TEST_COMPAT_UNSET:-false}}";
@@ -300,7 +300,7 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
     std::fs::write(&path, r#"{"type":"test_basic","count":"42"}"#).unwrap();
     let input = serde_yaml::to_string(&json!({
         "secret": {"local": {"type": "file", "path": path}},
-        "sources": {"mock": {"type": "SECRET[local.type]", "extra": {"integer": "SECRET[local.count]"}}},
+        "sources": {"test_source": {"type": "SECRET[local.type]", "extra": {"integer": "SECRET[local.count]"}}},
         "SECRET[missing.key]": "not a secret reference"
     }))
     .unwrap();
@@ -320,7 +320,7 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
 
     let input = indoc! {r"
         sources:
-          mock:
+          test_source:
             type: SECRET[local.type]
             extra:
               integer: SECRET[local.count]
@@ -329,6 +329,7 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
         .secrets(secrets)
         .load_from_input(input.as_bytes(), Format::Yaml)
         .unwrap();
-    let extra = MockConfigData::from_config(&builder.sources[&ComponentKey::from("mock")]);
+    let extra =
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]);
     assert_eq!(extra.integer, Some(42));
 }

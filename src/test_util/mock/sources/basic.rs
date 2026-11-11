@@ -22,7 +22,7 @@ use vector_lib::{
 
 use crate::{
     config::{SourceConfig, SourceContext},
-    test_util::mock::MockConfigData,
+    test_util::mock::TestComponentData,
 };
 
 /// Configuration for the `test_basic` source.
@@ -47,7 +47,7 @@ pub struct BasicSourceConfig {
 
     /// Extra data retained for configuration-loading assertions.
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
-    pub extra: MockConfigData,
+    pub extra: TestComponentData,
 }
 
 impl Default for BasicSourceConfig {
@@ -60,7 +60,7 @@ impl Default for BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
-            extra: MockConfigData::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 }
@@ -76,7 +76,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
-            extra: MockConfigData::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 
@@ -88,7 +88,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: Some(data.into()),
-            extra: MockConfigData::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 
@@ -102,7 +102,7 @@ impl BasicSourceConfig {
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
-            extra: MockConfigData::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 

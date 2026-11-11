@@ -227,7 +227,7 @@ mod parse_first_tests {
     use super::{Format, IndexMap, ProxyConfig, Url, http_request_to_config_builder};
     use crate::{
         config::ComponentKey,
-        test_util::{http::spawn_blackhole_http_server, mock::MockConfigData},
+        test_util::{http::spawn_blackhole_http_server, mock::TestComponentData},
     };
 
     #[tokio::test]
@@ -235,7 +235,7 @@ mod parse_first_tests {
         let input = indoc::indoc! {"
             # ${VECTOR_TEST_HTTP_UNSET:?comments are not interpolated}
             sources:
-              mock:
+              test_source:
                 type: test_basic
                 extra:
                   strings: ['${VECTOR_TEST_HTTP_LINE:-a: b}']
@@ -257,7 +257,8 @@ mod parse_first_tests {
             )
             .await
             .unwrap();
-            let extra = MockConfigData::from_config(&config.sources[&ComponentKey::from("mock")]);
+            let extra =
+                TestComponentData::from_config(&config.sources[&ComponentKey::from("test_source")]);
             assert_eq!(extra.strings, [expected]);
             assert_eq!(extra.integer, Some(42));
         }
