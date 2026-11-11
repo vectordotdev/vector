@@ -816,7 +816,17 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         && let Some(el) = els.as_object()
     {
         for (key, value) in el {
-            tags.insert(key.to_string(), bytes_to_str(value));
+            match value {
+                Value::Array(arr) => {
+                    tags.set_multi_value(
+                        key.to_string(),
+                        arr.iter().map(|v| TagValue::from(bytes_to_str(v))),
+                    );
+                }
+                _ => {
+                    tags.insert(key.to_string(), bytes_to_str(value));
+                }
+            }
         }
     }
     let tags_result = Some(tags);
@@ -2366,5 +2376,46 @@ mod tests {
             )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn transform_all_metrics_multi_value_tags() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "counter": {
+            "value": 10.0
+          },
+          "kind": "incremental",
+          "name": "test.multi_value_tags",
+          "tags": {
+            "key": ["value1", "value2"],
+            "host": "localhost",
+            "env": []
+          }
+        }"#;
+
+        let event = create_log_event(json_str);
+        let metric = Box::pin(do_transform(config, event))
+            .await
+            .unwrap()
+            .into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        let mut expected_tags = MetricTags::default();
+        expected_tags.set_multi_value(
+            "key".to_string(),
+            vec![
+                TagValue::Value("value1".to_string()),
+                TagValue::Value("value2".to_string()),
+            ],
+        );
+        expected_tags.set_multi_value("env".to_string(), vec![]);
+        expected_tags.insert("host".to_string(), "localhost".to_string());
+
+        assert_eq!(tags.to_owned(), expected_tags);
     }
 }
