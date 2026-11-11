@@ -240,17 +240,19 @@ impl Config {
             .and_then(|component| component.inputs())
     }
 
-    /// Enables sink acknowledgements on every source upstream of a sink that has
-    /// acknowledgements enabled, following inputs through transforms.
+    /// Enables sink acknowledgements on every source upstream of an enrichment table or a sink
+    /// that has acknowledgements enabled, following inputs through transforms.
     ///
     /// # Errors
     ///
     /// Currently never returns an error. Sources that cannot acknowledge are logged as a
     /// warning instead.
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        let table_sinks = enrichment_table_sinks(&self.enrichment_tables).collect::<Vec<_>>();
         let inputs: Vec<_> = self
             .sinks
             .iter()
+            .chain(table_sinks.iter().map(|(key, sink)| (key, sink)))
             .filter(|(_, sink)| {
                 sink.inner
                     .acknowledgements()
@@ -1470,5 +1472,92 @@ mod resource_config_tests {
             }
             Err(e) => eprintln!("error while generating schema: {e:?}"),
         }
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-http_server",
+    feature = "enrichment-tables-memory",
+    feature = "sinks-file"
+))]
+mod config_tests {
+    use crate::config::{ConfigBuilder, Format, format};
+    use indoc::indoc;
+    use vector_common::config::ComponentKey;
+
+    #[test]
+    fn propagate_acknowledgements() {
+        let config_builder: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                acknowledgements:
+                  enabled: true
+                sources:
+                  incoming_0:
+                    type: http_server
+                    address: 127.0.0.1:8080
+                    decoding:
+                      codec: json
+                  incoming_1:
+                    type: http_server
+                    address: 127.0.0.1:8081
+                    decoding:
+                      codec: json
+                  incoming_2:
+                    type: http_server
+                    address: 127.0.0.1:8082
+                    decoding:
+                      codec: json
+                enrichment_tables:
+                  cache:
+                    type: memory
+                    inputs: [incoming_0]
+                sinks:
+                  outgoing_0:
+                    type: file
+                    inputs: [incoming_1]
+                    encoding:
+                      codec: text
+                    path: /path/to/out1
+                    acknowledgements: true
+                  outgoing_1:
+                    type: file
+                    inputs: [incoming_2]
+                    encoding:
+                      codec: text
+                    path: /path/to/out2
+                    acknowledgements: false
+            "#},
+            Format::Yaml,
+        )
+        .unwrap();
+        let mut config = config_builder.build().unwrap();
+        config
+            .sources
+            .iter()
+            .all(|(_, source)| !source.sink_acknowledgements);
+
+        config.propagate_acknowledgements().unwrap();
+        assert!(
+            config
+                .sources
+                .get(&ComponentKey::from("incoming_0"))
+                .unwrap()
+                .sink_acknowledgements
+        );
+        assert!(
+            config
+                .sources
+                .get(&ComponentKey::from("incoming_1"))
+                .unwrap()
+                .sink_acknowledgements
+        );
+        assert!(
+            !config
+                .sources
+                .get(&ComponentKey::from("incoming_2"))
+                .unwrap()
+                .sink_acknowledgements
+        );
     }
 }
