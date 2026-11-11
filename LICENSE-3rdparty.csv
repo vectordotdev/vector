@@ -233,6 +233,7 @@ data-encoding,https://github.com/ia0/data-encoding,MIT,The data-encoding Authors
 data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
 databend-client,https://github.com/databendlabs/bendsql,Apache-2.0,Databend Authors <opensource@databend.com>
 databricks-zerobus-ingest-sdk,https://github.com/databricks/zerobus-sdk,Apache-2.0,Databricks
+datadog-agent-metrics-v3,https://github.com/DataDog/saluki,Apache-2.0,"Datadog, Inc."
 dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 deadpool,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
 deadpool-runtime,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
