@@ -48,6 +48,9 @@ _schemaDefinitions: "codecs::decoding::DeserializerConfig": object: options: {
 			message_pack: """
 				Decodes the raw bytes as an [MessagePack][messagepack] message.
 
+				Stream-based `socket` sources (`tcp` and `unix_stream` modes) require an explicit
+				`framing` method, such as `length_delimited`.
+
 				[messagepack]: https://msgpack.org/
 				"""
 			native: """
