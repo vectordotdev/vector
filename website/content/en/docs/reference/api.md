@@ -34,7 +34,7 @@ vector tap --outputs-of my_transform
 replace `my_transform` with a source or transform ID. Both commands connect to an already running Vector process.
 If the connection fails, check `api.enabled`, `api.address`, and the client's `--url`.
 
-[Debug a pipeline with `vector top` and `vector tap`](/guides/developer/debugging/#vector-tools).
+For a walkthrough, see [Debug a pipeline with `vector top` and `vector tap`](/guides/developer/debugging/#vector-tools).
 
 ## Configuration
 

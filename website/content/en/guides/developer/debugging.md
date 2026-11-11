@@ -87,7 +87,7 @@ api:
 ```
 
 `vector top` and `vector tap` require the [API](/docs/reference/api/#enable-local-inspection).
-It is disabled by default and has no authentication. Keep it inaccessible to untrusted clients.
+The API is disabled by default and has no authentication. Restrict access to trusted clients.
 
 #### Sources
 

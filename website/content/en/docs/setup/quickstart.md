@@ -210,7 +210,7 @@ We can see that Vector has parsed the Syslog message and created a structured ev
 
 ## Validate and test your changes
 
-With the Docker alias, replace `./vector.yaml` with `/etc/vector/vector.yaml` in all commands below.
+If you use the Docker alias, replace `./vector.yaml` with `/etc/vector/vector.yaml` in the following commands.
 
 [Validate the configuration](/docs/administration/validating/) without environment or connectivity checks:
 
@@ -221,7 +221,7 @@ vector validate --no-environment ./vector.yaml
 Run `vector validate ./vector.yaml` in the deployment environment to check component requirements and available sink health checks.
 
 Use [unit tests](/docs/reference/configuration/unit-tests/) to check transform output.
-Test source ingestion and sink delivery separately. Add a `tests` section to the Syslog configuration:
+Unit tests don't cover source ingestion or sink delivery, so test those separately. Add a `tests` section to the Syslog configuration:
 
 ```yaml
 tests:
@@ -241,7 +241,7 @@ tests:
               assert_eq!(.message, "hello")
 ```
 
-Run the test after editing the transform, or in CI:
+Run the tests after you edit the transform or as part of CI:
 
 ```shell
 vector test ./vector.yaml
@@ -254,7 +254,7 @@ We're just scratching the surface in this post. To get your hands dirty with Vec
 * All of Vector's [sources][sources], [transforms][transforms], and [sinks][sinks].
 * The [Vector Remap Language][vrl], the heart of data processing in Vector.
 * More details on [component configuration][config] in Vector.
-* [Inspect a running pipeline](/guides/developer/debugging/#vector-tools) with `vector top` and `vector tap`.
+* The [debugging guide](/guides/developer/debugging/#vector-tools) to inspect a running pipeline with `vector top` and `vector tap`.
 * Finally, [deploying Vector][deployment] to launch Vector in your production environment.
 
 [components]: /components

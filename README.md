@@ -26,7 +26,7 @@ pipeline that puts you in control of your observability data.
 all your logs and metrics to any vendors you want today and any other
 vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
 data enrichment, and data security where you need it, not where it is most
-convenient for your vendors. Vector is 100% open source, the complete source code
+convenient for your vendors. Vector is 100% open source. The complete source code
 and all features are publicly available.
 
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
@@ -41,7 +41,7 @@ Vector is maintained by Datadog's [Community Open Source Engineering team](https
 * **Unified** - Stable support for [logs][docs.data-model.log] and
   [metrics][docs.data-model.metric] in one pipeline. Trace support is available
   in selected components, including the [OpenTelemetry source][docs.sources.opentelemetry].
-  Check each component's supported event types and limitations when building a trace pipeline.
+  When building a trace pipeline, check each component's supported event types and limitations.
 
 ### Use cases
 
@@ -65,6 +65,8 @@ Vector is maintained by Datadog's [Community Open Source Engineering team](https
 
 All user documentation is available at **[vector.dev/docs](https://vector.dev/docs)**.
 
+To build and verify a pipeline:
+
 1. [Develop a configuration][docs.quickstart] and transform events with [VRL][docs.reference.vrl].
 2. [Validate the configuration][docs.administration.validating] with `vector validate`.
 3. [Test transform behavior][docs.configuration.tests] with `vector test`.
@@ -85,8 +87,8 @@ Other Resources:
 
 ### Performance
 
-Historical [Vector test harness][urls.vector_test_harness] throughput benchmarks,
-in MiB/s (higher is better).
+The following table shows historical throughput benchmarks from the
+[Vector test harness][urls.vector_test_harness], in MiB/s. Higher values are better.
 
 Performance varies with workload, configuration, hardware, and software versions.
 Benchmark your own pipeline with current software.
