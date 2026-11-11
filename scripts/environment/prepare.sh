@@ -395,14 +395,9 @@ install_system_packages() {
         run_privileged_with_timeout sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' "$mirrors"
       fi
 
-      local apt_options=(
-        -o Acquire::Retries=3
-        -o Acquire::http::Timeout=15
-        -o Acquire::https::Timeout=15
-      )
       # Do not silently reuse stale indexes when any repository failed to update.
-      run_privileged_with_timeout apt-get "${apt_options[@]}" update --error-on=any
-      run_privileged_with_timeout apt-get "${apt_options[@]}" install -y --no-install-recommends "${packages[@]}"
+      run_privileged_with_timeout apt-get update --error-on=any
+      run_privileged_with_timeout apt-get install -y --no-install-recommends "${packages[@]}"
       ;;
     Darwin)
       local packages=()
