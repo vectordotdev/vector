@@ -138,6 +138,9 @@ impl Fixture {
     }
 
     pub(super) fn start(&self, pattern: &str, options: Value) -> vector::Result<Running> {
+        let Value::Object(options) = options else {
+            panic!("source options must be an object");
+        };
         let mut source = json!({
             "type": "file_v2",
             "include": [self.input.join(pattern)],
@@ -145,10 +148,7 @@ impl Fixture {
             "internal_metrics": {"include_file_tag": false},
             "acknowledgements": {"enabled": true}
         });
-        source
-            .as_object_mut()
-            .unwrap()
-            .extend(options.as_object().unwrap().clone());
+        source.as_object_mut().unwrap().extend(options);
         let acknowledgements = source["acknowledgements"]["enabled"]
             .as_bool()
             .unwrap_or(true);
@@ -251,6 +251,10 @@ impl Running {
         })
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Fixture counts are small integers exactly representable as f64."
+    )]
     pub(super) async fn wait_count(&mut self, count: usize) -> vector::Result<()> {
         self.wait_for(&format!("{count} records and source counter"), |seen| {
             seen.messages.len() >= count && seen.received_events >= count as f64
@@ -258,6 +262,10 @@ impl Running {
         .await
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Fixture counts are small integers exactly representable as f64."
+    )]
     pub(super) async fn wait_open_files(&mut self, count: usize) -> vector::Result<()> {
         self.wait_for(&format!("{count} open files"), |seen| {
             seen.open_files == Some(count as f64)
@@ -280,7 +288,12 @@ impl Running {
     }
 
     pub(super) fn pause(&self) -> vector::Result<()> {
-        let pid = Pid::from_raw(self.child.id().ok_or("Vector exited before pause")? as i32);
+        let pid = Pid::from_raw(
+            self.child
+                .id()
+                .ok_or("Vector exited before pause")?
+                .try_into()?,
+        );
         kill(pid, Signal::SIGSTOP)?;
         assert!(matches!(
             waitpid(pid, Some(WaitPidFlag::WUNTRACED))?,
@@ -290,14 +303,19 @@ impl Running {
     }
 
     pub(super) fn resume(&self) -> vector::Result<()> {
-        let pid = Pid::from_raw(self.child.id().ok_or("Vector exited before resume")? as i32);
+        let pid = Pid::from_raw(
+            self.child
+                .id()
+                .ok_or("Vector exited before resume")?
+                .try_into()?,
+        );
         kill(pid, Signal::SIGCONT)?;
         Ok(())
     }
 
     pub(super) async fn stop(mut self, signal: Signal) -> vector::Result<Observed> {
         let pid = self.child.id().ok_or("Vector exited before shutdown")?;
-        kill(Pid::from_raw(pid as i32), signal)?;
+        kill(Pid::from_raw(pid.try_into()?), signal)?;
         let status = timeout(DEADLINE, self.child.wait())
             .await
             .map_err(|_| "Vector did not exit within the deadline")??;

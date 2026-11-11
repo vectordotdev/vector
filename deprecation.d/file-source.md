@@ -1,6 +1,6 @@
 ---
 what: "`file` source"
-deprecated_since: "0.59.0"
+deprecated_since: "0.62.0"
 ---
 
 The `file` source is deprecated in favor of [`file_v2`](https://vector.dev/docs/reference/configuration/sources/file_v2/),

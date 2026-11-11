@@ -4,6 +4,10 @@ use serde_json::json;
 use std::{fs::OpenOptions, io::Write};
 
 #[tokio::test]
+#[allow(
+    clippy::float_cmp,
+    reason = "These counters count at most two records exactly; equality detects duplicate reports."
+)]
 async fn oversized_records_emit_one_error_and_drop_even_before_the_delimiter() -> vector::Result<()>
 {
     let fixture = Fixture::new()?;
@@ -38,6 +42,10 @@ async fn oversized_records_emit_one_error_and_drop_even_before_the_delimiter() -
 }
 
 #[tokio::test]
+#[allow(
+    clippy::float_cmp,
+    reason = "These counters count one discarded record exactly; equality detects duplicate reports."
+)]
 async fn retiring_partial_delimiter_reports_an_oversized_tail() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let path = fixture.input.join("partial.log");

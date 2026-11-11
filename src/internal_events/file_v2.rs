@@ -1,7 +1,7 @@
 use vector_lib::{configurable::configurable_component, internal_event::InternalEvent};
 
-pub use self::source::*;
-pub use super::file::{
+pub(crate) use self::source::*;
+pub(crate) use super::file::{
     FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileReadError,
     FileResumed, FileUnwatched,
 };
@@ -25,14 +25,13 @@ mod source {
     use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
     use vector_lib::{counter, internal_event::CounterName};
 
-    use crate::internal_events::FileLineTooBigError;
+    use crate::internal_events::file::FileLineTooBigError;
 
     use super::{
         FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileReadError,
         FileResumed, FileUnwatched, InternalEvent,
     };
-    use vector_lib::emit;
-    use vector_lib::internal_event::{error_stage, error_type};
+    use vector_lib::internal_event::{emit, error_stage, error_type};
 
     use metrics::Counter;
     use vector_lib::internal_event::{ByteSize, CountByteSize};
@@ -41,9 +40,10 @@ mod source {
         FileBytesReceived {
             file: Option<String>,
         } => {
-            bytes: Counter = match self.file {
-                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2", "file" => file),
-                None => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2"),
+            bytes: Counter = if let Some(file) = self.file {
+                counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2", "file" => file)
+            } else {
+                counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2")
             },
         }
 
@@ -56,13 +56,15 @@ mod source {
         FileEventsReceived {
             file: Option<String>,
         } => {
-            events: Counter = match self.file.as_ref() {
-                Some(file) => counter!(CounterName::ComponentReceivedEventsTotal, "file" => file.clone()),
-                None => counter!(CounterName::ComponentReceivedEventsTotal),
+            events: Counter = if let Some(file) = self.file.as_ref() {
+                counter!(CounterName::ComponentReceivedEventsTotal, "file" => file.clone())
+            } else {
+                counter!(CounterName::ComponentReceivedEventsTotal)
             },
-            event_bytes: Counter = match self.file {
-                Some(file) => counter!(CounterName::ComponentReceivedEventBytesTotal, "file" => file),
-                None => counter!(CounterName::ComponentReceivedEventBytesTotal),
+            event_bytes: Counter = if let Some(file) = self.file {
+                counter!(CounterName::ComponentReceivedEventBytesTotal, "file" => file)
+            } else {
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
             },
         }
 
@@ -73,7 +75,7 @@ mod source {
     );
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileFingerprintReadError<'a> {
+    pub(crate) struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
         pub error: Error,
         pub include_file_metric_tag: bool,
@@ -113,7 +115,7 @@ mod source {
     const DELETION_FAILED: &str = "deletion_failed";
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileDeleteError<'a> {
+    pub(crate) struct FileDeleteError<'a> {
         pub file: &'a Path,
         pub error: Error,
         pub include_file_metric_tag: bool,
@@ -189,7 +191,7 @@ mod source {
     }
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileCheckpointWriteError {
+    pub(crate) struct FileCheckpointWriteError {
         pub error: Error,
     }
 
@@ -214,7 +216,7 @@ mod source {
     }
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct PathGlobbingError<'a> {
+    pub(crate) struct PathGlobbingError<'a> {
         pub path: &'a Path,
         pub error: &'a Error,
     }
@@ -241,36 +243,36 @@ mod source {
     }
 
     #[derive(Clone)]
-    pub struct FileSourceInternalEventsEmitter {
+    pub(crate) struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
     }
 
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_added(&self, file: &Path) {
-            emit!(FileAdded {
+            emit(FileAdded {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_resumed(&self, file: &Path, file_position: u64) {
-            emit!(FileResumed {
+            emit(FileResumed {
                 file,
                 file_position,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_watch_error(&self, file: &Path, error: Error) {
-            emit!(FileWatchError {
+            emit(FileWatchError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_read_error(&self, file: &Path, error: Error) {
-            emit!(FileReadError {
+            emit(FileReadError {
                 file,
                 error,
                 include_file_metric_tag: self.include_file_metric_tag,
@@ -278,7 +280,7 @@ mod source {
         }
 
         fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: Option<u64>) {
-            emit!(FileUnwatched {
+            emit(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
                 reached_eof,
@@ -287,49 +289,49 @@ mod source {
         }
 
         fn emit_file_deleted(&self, file: &Path) {
-            emit!(FileDeleted {
+            emit(FileDeleted {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_delete_error(&self, file: &Path, error: Error) {
-            emit!(FileDeleteError {
+            emit(FileDeleteError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_fingerprint_read_error(&self, file: &Path, error: Error) {
-            emit!(FileFingerprintReadError {
+            emit(FileFingerprintReadError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_checksum_failed(&self, file: &Path) {
-            emit!(FileChecksumFailed {
+            emit(FileChecksumFailed {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
-            emit!(FileCheckpointed { count, duration });
+            emit(FileCheckpointed { count, duration });
         }
 
         fn emit_file_checkpoint_write_error(&self, error: Error) {
-            emit!(FileCheckpointWriteError { error });
+            emit(FileCheckpointWriteError { error });
         }
 
         fn emit_files_open(&self, count: usize) {
-            emit!(FileOpen { count });
+            emit(FileOpen { count });
         }
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
-            emit!(PathGlobbingError { path, error });
+            emit(PathGlobbingError { path, error });
         }
 
         fn emit_file_line_too_long(
@@ -338,10 +340,10 @@ mod source {
             configured_limit: usize,
             encountered_size_so_far: usize,
         ) {
-            emit!(FileLineTooBigError {
+            emit(FileLineTooBigError {
                 truncated_bytes,
                 configured_limit,
-                encountered_size_so_far
+                encountered_size_so_far,
             });
         }
     }

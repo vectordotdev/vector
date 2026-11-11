@@ -1,4 +1,9 @@
-use std::{convert::TryInto, num::NonZeroUsize, path::PathBuf, time::Duration};
+use std::{
+    convert::TryInto,
+    num::NonZeroUsize,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -20,7 +25,7 @@ use vector_lib::file_v2_source::{
 };
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::internal_event::{
-    ByteSize, CountByteSize, InternalEventHandle, RegisterInternalEvent,
+    ByteSize, CountByteSize, InternalEventHandle, RegisterInternalEvent, emit, register,
 };
 use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
@@ -225,8 +230,8 @@ pub struct FileConfig {
     pub reader_idle_timeout: Duration,
 }
 
-fn default_max_line_bytes() -> usize {
-    bytesize::kib(100u64) as usize
+const fn default_max_line_bytes() -> usize {
+    100 * 1024
 }
 
 fn default_file_key() -> OptionalValuePath {
@@ -352,9 +357,9 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
             encoding: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
             reader_idle_timeout: default_reader_idle_timeout(),
         }
     }
@@ -392,7 +397,7 @@ impl SourceConfig for FileConfig {
 
         file_v2_source(
             self,
-            data_dir,
+            &data_dir,
             cx.shutdown,
             Senders {
                 source_sender: cx.out,
@@ -461,9 +466,22 @@ pub struct Senders {
     pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
 }
 
+/// Constructs the file source and its checkpoint finalizer.
+///
+/// # Errors
+///
+/// Returns an error for empty includes, invalid glob patterns, or an unsupported `ignore_older_secs`.
+///
+/// # Panics
+///
+/// Panics if multiline settings have not been validated, or acknowledgements are enabled outside a Tokio runtime.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn file_v2_source(
     config: &FileConfig,
-    data_dir: PathBuf,
+    data_dir: &Path,
     shutdown: ShutdownSignal,
     out: Senders,
     acknowledgements: bool,
@@ -484,8 +502,7 @@ pub fn file_v2_source(
 
         if components
             .first()
-            .map(|first| first.to_string_lossy().contains("*"))
-            .unwrap_or(false)
+            .is_some_and(|first| first.to_string_lossy().contains('*'))
         {
             warn!(
                 "{} contains a * in its first path component. If a match resolves to a symlink it will not be watched.",
@@ -574,7 +591,7 @@ pub fn file_v2_source(
         None => Bytes::from(config.line_delimiter.clone()),
     };
 
-    let checkpointer = Checkpointer::new(&data_dir);
+    let checkpointer = Checkpointer::new(data_dir);
 
     let file_server = FileServer {
         paths_provider,
@@ -649,7 +666,7 @@ pub fn file_v2_source(
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
     let track_handoff = config.remove_after_secs.is_some() && !acknowledgements;
-    Ok(Box::pin(async move {
+    Ok(crate::sources::opaque_source(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
@@ -669,7 +686,7 @@ pub fn file_v2_source(
                     .emit(ByteSize(line.text.len()));
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
+                    Some(d) => d.decode_to_utf8(&line.text),
                     None => line.text,
                 };
                 line
@@ -756,8 +773,8 @@ pub fn file_v2_source(
             };
             match result {
                 Ok(()) => debug!("Finished sending."),
-                Err(_) => emit!(StreamClosedError {
-                    count: failed_count
+                Err(_) => emit(StreamClosedError {
+                    count: failed_count,
                 }),
             }
             if let Some(shutdown_output) = shutdown_output {
@@ -771,7 +788,7 @@ pub fn file_v2_source(
                 let result = file_server
                     .run(tx, shutdown, shutdown_checkpointer, checkpointer)
                     .await;
-                emit!(FileOpen { count: 0 });
+                emit(FileOpen { count: 0 });
                 result.unwrap();
             }
             .instrument(span),
@@ -807,26 +824,23 @@ fn wrap_with_line_agg(
             }),
             logic,
         )
-        .map(
-            |(
-                _,
-                text,
-                (filename, file_id, start_offset, initial_end, progress),
-                lastline_context,
-            )| {
-                let (end_offset, delivery_progress) = lastline_context
-                    .map(|(_, _, _, end, progress)| (end, progress))
-                    .unwrap_or((initial_end, progress));
-                Line {
-                    text,
-                    filename,
-                    file_id,
-                    start_offset,
-                    end_offset,
-                    delivery_progress,
-                }
-            },
-        ),
+        .map(|aggregated| {
+            let (filename, file_id, start_offset, initial_end, progress) =
+                aggregated.initial_context;
+            let (end_offset, delivery_progress) = aggregated
+                .last_context
+                .map_or((initial_end, progress), |(_, _, _, end, progress)| {
+                    (end, progress)
+                });
+            Line {
+                text: aggregated.line,
+                filename,
+                file_id,
+                start_offset,
+                end_offset,
+                delivery_progress,
+            }
+        }),
     )
 }
 
@@ -851,7 +865,7 @@ impl<E: RegisterInternalEvent> FileMetricCache<E> {
     fn get(&mut self, file: &str, event: impl FnOnce(Option<String>) -> E) -> &E::Handle {
         if self.handle.is_none() || (self.include_file_tag && self.file.as_deref() != Some(file)) {
             self.file = self.include_file_tag.then(|| file.to_owned());
-            self.handle = Some(register!(event(self.file.clone())));
+            self.handle = Some(register(event(self.file.clone())));
         }
         self.handle.as_ref().expect("metric handle was registered")
     }
@@ -1139,8 +1153,8 @@ mod tests {
                 fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 4096, false),
                 remove_after: None,
                 emitter,
-                reader_idle_timeout: Duration::from_secs(60),
-                checkpoint_interval: Duration::from_secs(60),
+                reader_idle_timeout: Duration::from_mins(1),
+                checkpoint_interval: Duration::from_mins(1),
                 test_sender: None,
             };
             let (tx, mut rx) = futures::channel::mpsc::channel(1);
@@ -1221,13 +1235,13 @@ mod tests {
         assert_eq!(
             provider.paths(false).await,
             PathUpdates::Changed {
-                updated: Default::default(),
-                removed: Default::default()
+                updated: HashSet::default(),
+                removed: HashSet::default()
             }
         );
         assert_eq!(
             provider.paths(true).await,
-            PathUpdates::Snapshot(Default::default())
+            PathUpdates::Snapshot(HashSet::default())
         );
     }
 
@@ -1238,11 +1252,10 @@ mod tests {
         timeout_ms: u64,
     ) {
         let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-        let mut files: HashSet<PathBuf> = HashSet::from_iter(
-            original_files
-                .into_iter()
-                .map(|path| path.canonicalize().unwrap()),
-        );
+        let mut files: HashSet<PathBuf> = original_files
+            .into_iter()
+            .map(|path| path.canonicalize().unwrap())
+            .collect();
         let original_files = files.clone();
 
         let mut counter = 0;
@@ -1578,7 +1591,7 @@ mod tests {
                         None
                     )
             )
-        )
+        );
     }
 
     #[test]
@@ -1610,7 +1623,7 @@ mod tests {
                 .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -2142,12 +2155,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_key_acknowledged() {
-        file_key(Acks).await
+        file_key(Acks).await;
     }
 
     #[tokio::test]
     async fn file_key_no_acknowledge() {
-        file_key(NoAcks).await
+        file_key(NoAcks).await;
     }
 
     async fn file_key(acks: AckingMode) {
@@ -2248,12 +2261,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
-        file_start_position_server_restart(Acks).await
+        file_start_position_server_restart(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_no_acknowledge() {
-        file_start_position_server_restart(NoAcks).await
+        file_start_position_server_restart(NoAcks).await;
     }
 
     // FIXME: sleeps should not be needed in here
@@ -2367,7 +2380,7 @@ mod tests {
                 tokio::spawn(
                     file_v2_source(
                         &first_config,
-                        first_config.data_dir.clone().unwrap(),
+                        first_config.data_dir.as_deref().unwrap(),
                         shutdown,
                         Senders {
                             source_sender: tx,
@@ -2472,12 +2485,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
-        file_start_position_server_restart_with_file_rotation(Acks).await
+        file_start_position_server_restart_with_file_rotation(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
-        file_start_position_server_restart_with_file_rotation(NoAcks).await
+        file_start_position_server_restart_with_file_rotation(NoAcks).await;
     }
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
@@ -2563,7 +2576,9 @@ mod tests {
                 tv_sec: older
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
-                    .as_secs() as _,
+                    .as_secs()
+                    .try_into()
+                    .unwrap(),
                 tv_usec: 0,
             };
 
@@ -2754,7 +2769,7 @@ mod tests {
             start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
             condition_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
             mode: line_agg::Mode::HaltBefore,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_mins(1),
         };
         let mut output = wrap_with_line_agg(input, config);
         // Require read order before the old-path timeout or stream shutdown can
@@ -2801,7 +2816,7 @@ mod tests {
             start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
             condition_pattern: regex::bytes::Regex::new("^ ").unwrap(),
             mode: line_agg::Mode::ContinueThrough,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_mins(1),
         };
         let output = wrap_with_line_agg(futures::stream::iter(lines), config)
             .collect::<Vec<_>>()
@@ -2842,7 +2857,7 @@ mod tests {
             start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
             condition_pattern: regex::bytes::Regex::new("^ ").unwrap(),
             mode: line_agg::Mode::ContinueThrough,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_mins(1),
         };
         let output = wrap_with_line_agg(input, config).collect::<Vec<_>>().await;
         assert_eq!(output.len(), 2);
@@ -3162,6 +3177,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this restart scenario is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn failed_delivery_without_deletion_replays_after_restart() {
         use vector_lib::event::Finalizable;
 
@@ -3171,7 +3190,7 @@ mod tests {
         let config = FileConfig {
             include: vec![path.clone(), healthy_path.clone()],
             remove_after_secs: None,
-            checkpoint_interval: Duration::from_secs(3600),
+            checkpoint_interval: Duration::from_hours(1),
             ..test_default_file_config(&dir)
         };
         fs::write(&path, "P\nA\nB\n").await.unwrap();
@@ -3180,7 +3199,7 @@ mod tests {
         let task = tokio::spawn(
             file_v2_source(
                 &config,
-                dir.path().to_path_buf(),
+                dir.path(),
                 shutdown,
                 Senders {
                     source_sender: tx,
@@ -3252,7 +3271,7 @@ mod tests {
         let task = tokio::spawn(
             file_v2_source(
                 &config,
-                dir.path().to_path_buf(),
+                dir.path(),
                 shutdown,
                 Senders {
                     source_sender: tx,
@@ -3328,7 +3347,7 @@ mod tests {
             let task = tokio::spawn(
                 file_v2::file_v2_source(
                     &config,
-                    config.data_dir.clone().unwrap(),
+                    config.data_dir.as_deref().unwrap(),
                     shutdown,
                     Senders {
                         source_sender: tx,
@@ -3416,7 +3435,7 @@ mod tests {
         let task = tokio::spawn(
             file_v2::file_v2_source(
                 &config,
-                config.data_dir.clone().unwrap(),
+                config.data_dir.as_deref().unwrap(),
                 shutdown,
                 Senders {
                     source_sender: tx,
@@ -3460,7 +3479,7 @@ mod tests {
         let config = file_v2::FileConfig {
             include: vec![path.clone()],
             remove_after_secs: Some(3600),
-            checkpoint_interval: Duration::from_secs(3600),
+            checkpoint_interval: Duration::from_hours(1),
             ..test_default_file_config(&dir)
         };
         let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
@@ -3472,7 +3491,7 @@ mod tests {
         let mut task = tokio::spawn(
             file_v2::file_v2_source(
                 &config,
-                config.data_dir.clone().unwrap(),
+                config.data_dir.as_deref().unwrap(),
                 shutdown,
                 Senders {
                     source_sender: tx,
@@ -3545,7 +3564,7 @@ mod tests {
             tokio::spawn(
                 file_v2::file_v2_source(
                     config,
-                    data_dir,
+                    &data_dir,
                     shutdown,
                     Senders {
                         source_sender: tx,

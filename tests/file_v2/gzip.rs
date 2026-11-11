@@ -8,6 +8,10 @@ use super::{
 };
 
 #[tokio::test]
+#[allow(
+    clippy::float_cmp,
+    reason = "The received-event counter is an exact small integer; equality detects duplicate events."
+)]
 async fn gzip_exact_output_across_read_batches() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let expected = records("gzip", 30);

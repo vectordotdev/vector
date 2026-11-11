@@ -52,6 +52,10 @@ async fn configured_fingerprint_waits_for_the_full_prefix() -> vector::Result<()
 }
 
 #[tokio::test]
+#[allow(
+    clippy::float_cmp,
+    reason = "The received-event counter is an exact small integer; equality detects duplicate events."
+)]
 async fn discovers_files_before_and_after_startup() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     std::fs::create_dir(fixture.input.join("existing"))?;
