@@ -387,6 +387,15 @@ install_system_packages() {
         return 1
       fi
 
+      # Keep CI's download policy global without changing developer machines.
+      if [[ "${CI:-}" == "true" ]]; then
+        run_privileged_with_timeout tee /etc/apt/apt.conf.d/99-vector-ci > /dev/null <<'EOF'
+Acquire::Retries "5";
+Acquire::http::Timeout "30";
+Acquire::https::Timeout "30";
+EOF
+      fi
+
       # GitHub's Azure mirror intermittently fails DNS resolution even while the
       # public Ubuntu archives are available. Keep the existing public fallbacks.
       local mirrors=/etc/apt/apt-mirrors.txt

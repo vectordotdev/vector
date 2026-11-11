@@ -118,17 +118,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure APT retries
-      if: ${{ runner.os == 'Linux' }}
-      shell: bash
-      run: |
-        # Apply to all later APT commands in this job, including package downloads.
-        sudo tee /etc/apt/apt.conf.d/99-vector-ci > /dev/null <<'EOF'
-        Acquire::Retries "5";
-        Acquire::http::Timeout "30";
-        Acquire::https::Timeout "30";
-        EOF
-
     - id: needs
       name: Compute if rust is needed
       shell: bash
