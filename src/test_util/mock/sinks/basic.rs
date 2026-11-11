@@ -35,6 +35,14 @@ pub struct BasicSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
 
+    /// Acknowledgements configuration retained by the test sink.
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+
     /// Extra data retained for configuration-loading assertions.
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub extra: TestComponentData,
@@ -58,6 +66,7 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: None,
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
             extra: TestComponentData::DEFAULT,
         }
     }
@@ -69,6 +78,7 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: Some(data.into()),
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
             extra: TestComponentData::DEFAULT,
         }
     }
@@ -104,7 +114,7 @@ impl SinkConfig for BasicSinkConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
+        &self.acknowledgements
     }
 }
 

@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use vector_config::schema::generate_root_schema;
 
-use crate::config::{ConfigBuilder, loading::schema_coercion::ValueCoercer};
+use crate::config::{ComponentKey, ConfigBuilder, loading::schema_coercion::ValueCoercer};
 
 #[test]
 fn existing_boolean_shorthands_match_generated_schema() {
@@ -103,6 +103,18 @@ fn assert_shorthand_matches_schema(
             serde_json::from_value(input.clone()).unwrap_or_else(|error| panic!("{name}: {error}"));
         let object: ConfigBuilder =
             serde_json::from_value(object_input).unwrap_or_else(|error| panic!("{name}: {error}"));
+        if pointer == "/sinks/out/acknowledgements" {
+            for config in [&shorthand, &object] {
+                assert_eq!(
+                    config.sinks[&ComponentKey::from("out")]
+                        .inner
+                        .acknowledgements()
+                        .enabled(),
+                    enabled,
+                    "{name}"
+                );
+            }
+        }
         assert_eq!(
             serde_json::to_value(shorthand).unwrap(),
             serde_json::to_value(object).unwrap(),
