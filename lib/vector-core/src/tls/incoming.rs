@@ -29,6 +29,8 @@ use super::{
 };
 use crate::tcp::{self, TcpKeepaliveConfig};
 
+const SESSION_ID_CONTEXT: &[u8] = b"vector";
+
 impl TlsSettings {
     pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         if self.identity.is_none() {
@@ -43,7 +45,7 @@ impl TlsSettings {
             // reconnect once. A fixed value suffices because each acceptor has its own session
             // cache and ticket keys, so sessions cannot be resumed across acceptors.
             acceptor
-                .set_session_id_context(b"vector")
+                .set_session_id_context(SESSION_ID_CONTEXT)
                 .context(CreateAcceptorSnafu)?;
             Ok(acceptor.build())
         }
@@ -502,11 +504,10 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 mod test {
     use std::{
         net::{TcpListener as StdTcpListener, TcpStream as StdTcpStream},
-        sync::Mutex,
         thread,
     };
 
-    use openssl::ssl::{SslConnector, SslFiletype, SslSession, SslSessionCacheMode};
+    use openssl::ssl::{SslConnector, SslFiletype, SslSession};
 
     use super::*;
     use crate::tls::{
@@ -549,9 +550,8 @@ mod test {
         (port, server)
     }
 
-    /// A client which presents a certificate and caches sessions like Vector's HTTP client.
-    fn mtls_connector() -> (SslConnector, Arc<Mutex<Option<SslSession>>>) {
-        let session = Arc::new(Mutex::new(None));
+    /// A client which presents a certificate.
+    fn mtls_connector() -> SslConnector {
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
         builder.set_ca_file(TEST_PEM_CA_PATH).unwrap();
         builder
@@ -560,19 +560,21 @@ mod test {
         builder
             .set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
             .unwrap();
-        builder.set_session_cache_mode(SslSessionCacheMode::CLIENT);
-        builder.set_new_session_callback({
-            let session = Arc::clone(&session);
-            move |_, new_session| *session.lock().unwrap() = Some(new_session)
-        });
-        (builder.build(), session)
+        builder.build()
     }
 
+    /// What the client observed on one connection.
+    struct Connected {
+        session_reused: bool,
+        session: SslSession,
+    }
+
+    /// Connects, offering `session` for resumption if given.
     fn connect(
         connector: &SslConnector,
         port: u16,
         session: Option<&SslSession>,
-    ) -> Result<bool, String> {
+    ) -> Result<Connected, String> {
         let mut config = connector.configure().unwrap();
         if let Some(session) = session {
             // SAFETY: the session was created by a connection with the same `SslContext`.
@@ -582,27 +584,28 @@ mod test {
         let mut stream = config
             .connect("localhost", tcp)
             .map_err(|error| error.to_string())?;
-        let session_reused = stream.ssl().session_reused();
         // Close cleanly: OpenSSL marks the session of an unclean close as not resumable.
         _ = stream.shutdown();
-        Ok(session_reused)
+        Ok(Connected {
+            session_reused: stream.ssl().session_reused(),
+            session: stream
+                .ssl()
+                .session()
+                .expect("handshake established no session")
+                .to_owned(),
+        })
     }
 
     #[test]
     fn mtls_session_resumes() {
         let (port, server) = serve_mtls(2);
-        let (connector, cached_session) = mtls_connector();
-        connect(&connector, port, None).unwrap();
-        let session = cached_session
-            .lock()
-            .unwrap()
-            .clone()
-            .expect("server issued no session");
+        let connector = mtls_connector();
+        let first = connect(&connector, port, None).unwrap();
 
-        let client_reused = connect(&connector, port, Some(&session));
+        let second = connect(&connector, port, Some(&first.session));
 
         let accepted = server.join().unwrap();
-        assert_eq!(client_reused, Ok(true));
+        assert_eq!(second.map(|connected| connected.session_reused), Ok(true));
         assert_eq!(
             accepted[1],
             Ok(Accepted {
