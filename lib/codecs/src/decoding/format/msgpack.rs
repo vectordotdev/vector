@@ -22,6 +22,9 @@ use vrl::{
 /// The extension type reserved by the `MessagePack` spec for timestamps.
 const TIMESTAMP_EXT_TYPE: i8 = -1;
 
+/// Nesting limit passed to `rmp_serde`.
+const MAX_DEPTH: usize = 128;
+
 /// Deserializer that builds `Event`s from a byte frame containing `MessagePack`.
 ///
 /// A frame may contain several concatenated `MessagePack` values (for example when the whole
@@ -93,6 +96,7 @@ impl Deserializer for MsgPackDeserializer {
         // Read through `rmp_serde` rather than `rmpv::decode::read_value`, which silently maps
         // the reserved `0xC1` marker to nil.
         let mut deserializer = rmp_serde::Deserializer::new(Cursor::new(&bytes[..]));
+        deserializer.set_max_depth(MAX_DEPTH);
         let mut events: SmallVec<[Event; 1]> = SmallVec::new();
 
         // Keep decoding until every byte of the frame has been consumed. A truncated or
