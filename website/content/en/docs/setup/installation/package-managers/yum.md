@@ -9,6 +9,11 @@ The [Yellowdog Updater, Modified][yum] (YUM) is a free and open-source command-l
 Our Yum repositories are provided by [Datadog]. This page covers installing and managing Vector
 through the YUM package repository.
 
+**Signing key change notice:** On November 30, 2026, Vector's package repositories
+will switch to a new signing key. Existing installations must [add the new
+key](/deprecations/#package-repository-signing-key) before this date to continue
+receiving package updates.
+
 ## Installation
 
 Add the repo:

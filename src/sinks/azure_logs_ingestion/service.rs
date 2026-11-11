@@ -4,17 +4,18 @@ use std::task::{Context, Poll};
 use azure_core::credentials::{AccessToken, TokenCredential};
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     HeaderValue, Request, StatusCode, Uri,
     header::{self, HeaderMap},
 };
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tracing::Instrument;
+use vector_http::full_body;
 
 use crate::{
-    http::client_v1::{HttpClient, full_body},
-    sinks::{HTTPV1RequestBuilderSnafu, prelude::*},
+    http::HttpClient,
+    sinks::{HTTPRequestBuilderSnafu, prelude::*},
 };
 
 /// Log Ingestion API version
@@ -24,7 +25,7 @@ const API_VERSION: &str = "2023-01-01";
 const CONTENT_TYPE: &str = "application/json";
 
 #[derive(Debug, Clone)]
-pub struct AzureLogsIngestionRequest {
+pub(super) struct AzureLogsIngestionRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -46,7 +47,7 @@ impl Finalizable for AzureLogsIngestionRequest {
     }
 }
 
-pub struct AzureLogsIngestionResponse {
+pub(super) struct AzureLogsIngestionResponse {
     pub http_status: StatusCode,
     pub events_byte_size: GroupedCountByteSize,
     pub raw_byte_size: usize,
@@ -72,7 +73,7 @@ impl DriverResponse for AzureLogsIngestionResponse {
 
 /// `AzureLogsIngestionService` is a `Tower` service used to send logs to Azure.
 #[derive(Debug, Clone)]
-pub struct AzureLogsIngestionService {
+pub(super) struct AzureLogsIngestionService {
     client: HttpClient,
     endpoint: Uri,
     credential: Arc<dyn TokenCredential>,
@@ -85,7 +86,7 @@ pub struct AzureLogsIngestionService {
 pub(super) fn request_path(
     dcr_immutable_id: &str,
     stream_name: &str,
-) -> crate::Result<http_1::uri::PathAndQuery> {
+) -> crate::Result<http::uri::PathAndQuery> {
     format!(
         "/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}"
     )
@@ -95,10 +96,10 @@ pub(super) fn request_path(
 
 impl AzureLogsIngestionService {
     /// Creates a new `AzureLogsIngestionService`.
-    pub fn new(
+    pub(super) fn new(
         client: HttpClient,
         endpoint: Uri,
-        path_and_query: http_1::uri::PathAndQuery,
+        path_and_query: http::uri::PathAndQuery,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
     ) -> crate::Result<Self> {
@@ -125,7 +126,7 @@ impl AzureLogsIngestionService {
     async fn build_request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
         let mut request = Request::post(&self.endpoint)
             .body(body)
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
         // TODO: make this an option, for sovereign clouds
         let access_token: AccessToken = self
@@ -144,7 +145,7 @@ impl AzureLogsIngestionService {
         Ok(request)
     }
 
-    pub fn healthcheck(&self) -> Healthcheck {
+    pub(super) fn healthcheck(&self) -> Healthcheck {
         let service = self.clone();
         Box::pin(async move {
             let request = service.build_request(Bytes::from("[]")).await?;

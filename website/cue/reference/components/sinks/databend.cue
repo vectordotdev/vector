@@ -5,7 +5,7 @@ components: sinks: databend: {
 
 	classes: {
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Databend"]
 		stateful: false

@@ -1,9 +1,10 @@
 //! Shared configuration, native HTTP healthchecks, and API errors for Datadog sinks.
 
 use futures_util::FutureExt;
-use http_1::{Request, Response, StatusCode, Uri};
-use hyper_1::body::Incoming;
+use http::{Request, Response, StatusCode, Uri};
+use hyper::body::Incoming;
 use snafu::Snafu;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
     sensitive_string::SensitiveString, tls::TlsEnableableConfig,
@@ -12,7 +13,7 @@ use vector_lib::{
 use super::Healthcheck;
 use crate::{
     common::datadog,
-    http::client_v1::{HttpClient, HttpError, empty_body},
+    http::HttpClient,
     sinks::{HealthcheckError, util::HttpEndpoint},
 };
 
@@ -162,7 +163,7 @@ impl DatadogCommonConfig {
     fn get_api_endpoint(&self, path: &str) -> crate::Result<Uri> {
         let base = datadog::get_api_base_endpoint(self.endpoint.as_deref(), self.site.as_str());
         let endpoint = HttpEndpoint::parse(&base)?.append_path(path)?;
-        Ok(endpoint.into_v1())
+        Ok(endpoint.into_uri())
     }
 }
 

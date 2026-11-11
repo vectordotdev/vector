@@ -99,11 +99,12 @@ impl CefSerializerConfig {
     }
 
     /// Build the `CefSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `device_vendor`, `device_product`, `device_version`, or
+    /// `device_event_class_id` exceeds its maximum length after escaping, or if an extension key
+    /// contains characters other than ASCII letters.
     pub fn build(&self) -> Result<CefSerializer, BuildError> {
         let device_vendor = validate_length(
             &self.cef.device_vendor,

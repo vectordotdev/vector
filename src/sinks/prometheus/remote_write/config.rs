@@ -1,11 +1,12 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use http::{HeaderValue, Uri, header::AUTHORIZATION};
+use http::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
+use vector_http::full_body;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
 use super::{
-    service::{RemoteWriteService, build_request},
+    service::{CustomHeaders, RemoteWriteService, build_request},
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
         util::{
             HttpEndpoint,
             auth::Auth,
-            http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
+            http::{RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },
@@ -28,7 +29,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
-pub struct RemoteWriteBatchConfig {
+pub(crate) struct RemoteWriteBatchConfig {
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
@@ -46,7 +47,7 @@ pub struct RemoteWriteBatchConfig {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct RemoteWriteConfig {
+pub(crate) struct RemoteWriteConfig {
     /// The endpoint to send data to.
     ///
     /// The endpoint should include the scheme and the path to write to.
@@ -104,7 +105,7 @@ pub struct RemoteWriteConfig {
 
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
-    #[cfg(feature = "aws-config")]
+    #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[serde(
@@ -139,7 +140,7 @@ impl_generate_config_from_default!(RemoteWriteConfig);
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
-pub struct RemoteWriteRequestConfig {
+pub(crate) struct RemoteWriteRequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
 
@@ -161,19 +162,25 @@ fn remote_write_headers_examples() -> BTreeMap<String, String> {
     ])
 }
 
+/// Validates the custom headers, keeping the sorted order of the shared `validate_headers`.
 fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
-    let headers = crate::sinks::util::http::validate_headers(headers)?;
-
-    for name in headers.keys() {
-        if configures_auth && name.inner() == AUTHORIZATION {
-            return Err("Authorization header can not be used with defined auth options".into());
-        }
-    }
-
-    Ok(headers)
+) -> crate::Result<CustomHeaders> {
+    crate::sinks::util::http::validate_headers(headers)?
+        .into_iter()
+        .map(
+            |(name, value)| -> crate::Result<(HeaderName, HeaderValue)> {
+                let name = name.inner().clone();
+                if configures_auth && name == AUTHORIZATION {
+                    return Err(
+                        "Authorization header can not be used with defined auth options".into(),
+                    );
+                }
+                Ok((name, value))
+            },
+        )
+        .collect()
 }
 
 /// Validates that `aws.region` is set when AWS authentication is selected.
@@ -211,9 +218,9 @@ impl SinkConfig for RemoteWriteConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedRemoteWrite {
+pub(crate) struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
-    validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    validated_headers: CustomHeaders,
     batch_settings: BatcherSettings,
 }
 
@@ -230,10 +237,7 @@ impl ValidatedSink for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let validated_headers = Arc::new(validate_headers(
-            &self.request.headers,
-            self.auth.is_some(),
-        )?);
+        let validated_headers = validate_headers(&self.request.headers, self.auth.is_some())?;
         let batch_settings = self
             .batch
             .batch_settings
@@ -267,7 +271,7 @@ impl ValidatedSink for RemoteWriteConfig {
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
 
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let auth = match &self.auth {
             Some(PrometheusRemoteWriteAuth::Basic { user, password }) => {
@@ -300,9 +304,10 @@ impl ValidatedSink for RemoteWriteConfig {
             None => None,
         };
 
+        let endpoint = self.endpoint.as_uri().clone();
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => self.endpoint.as_uri().clone(),
+            None => endpoint.clone(),
         };
 
         let healthcheck = healthcheck(
@@ -315,7 +320,7 @@ impl ValidatedSink for RemoteWriteConfig {
         .boxed();
 
         let service = RemoteWriteService {
-            endpoint: self.endpoint.clone(),
+            endpoint,
             client,
             auth,
             compression: self.compression,
@@ -348,24 +353,23 @@ async fn healthcheck(
     endpoint: Uri,
     compression: Compression,
     auth: Option<Auth>,
-    headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    headers: CustomHeaders,
 ) -> crate::Result<()> {
-    let body = bytes::Bytes::new();
     let request = build_request(
-        http::Method::GET,
+        Method::GET,
         &endpoint,
         compression,
-        body,
+        bytes::Bytes::new(),
         None,
-        auth,
-        headers,
+        auth.as_ref(),
+        &headers,
     )
     .await?;
-    let response = client.send(request).await?;
+    let response = client.send(request.map(full_body)).await?;
 
     match response.status() {
-        http::StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+        StatusCode::OK => Ok(()),
+        other => Err(HealthcheckError::unexpected_status(other).into()),
     }
 }
 

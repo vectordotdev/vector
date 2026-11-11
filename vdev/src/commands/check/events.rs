@@ -375,10 +375,10 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
+/// `emit(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
 /// block (which preserves comments and original formatting that `to_token_stream` strips).
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
+    Regex::new(r"(?:emit|register)\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
 });
 
 fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
@@ -391,14 +391,12 @@ fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
             if event.path.segments.last().is_some_and(|segment| segment.ident == "ComponentEventsDropped"))
 }
 
-/// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
+/// `emit(EventName)` / `register(Path::EventName)` use-counting regex,
 /// applied to the raw file text so it sees calls nested inside other macros
 /// (e.g. `tokio::select!`) that `syn` does not descend into.
 static RE_USES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?:^|[^A-Za-z0-9_])(?:emit!?|register!?)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)",
-    )
-    .unwrap()
+    Regex::new(r"(?:^|[^A-Za-z0-9_])(?:emit|register)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)")
+        .unwrap()
 });
 
 /// Locator for `tracing` log-macro calls (`trace!(`, `debug!(`, `info!(`,
@@ -777,7 +775,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        // Use-counting, emit!/register! ComponentEventsDropped detection, and
+        // Use-counting, emit/register ComponentEventsDropped detection, and
         // the log-message format check run via a separate raw-source pass
         // because `syn` does not descend into the bodies of arbitrary
         // `tokio::select!` / `cfg_if!` / etc. macro invocations.
@@ -1279,7 +1277,7 @@ mod tests {
     fn split_comma_args_respects_angle_brackets() {
         // A `registered_event!` handle field with a generic type containing a
         // comma must not be split at the comma inside `<...>`.
-        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
+        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register(X)";
         assert_eq!(split_comma_args(input), vec![input.to_string()]);
     }
 
@@ -1427,10 +1425,12 @@ mod tests {
 
     #[test]
     fn format_check_skips_non_literal_messages() {
-        // `error!(?err, "Plain text.")` — literal is fine, no report.
-        let src = r#"fn _f() { error!(?err, "Plain text."); }"#;
-        let reports = format_check_log_messages(src, "fixture.rs");
-        assert!(reports.is_empty(), "expected no reports, got: {reports:?}");
+        let source = r#"fn example() {
+            error!(message = reason, error_type = err);
+            warn!(reason);
+            info!(?err, "Plain text.");
+        }"#;
+        assert!(format_check_log_messages(source, "fixture.rs").is_empty());
     }
 
     #[test]
@@ -1454,49 +1454,29 @@ mod tests {
         assert!(p.parameters.contains(&"protocol".to_string()));
     }
 
-    fn check(message: &str) -> (bool, bool) {
-        // Replicates the gating in `format_check_log_messages` for a literal message.
-        let is_capitalized = message.starts_with('{')
-            || !message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_alphabetic())
-            || message
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_uppercase());
-        let has_trailing_period = message.ends_with('}') || message.ends_with('.');
-        (is_capitalized, has_trailing_period)
-    }
-
     #[test]
-    fn message_format_capital_period_pass() {
-        assert_eq!(check("Hello there."), (true, true));
-    }
-
-    #[test]
-    fn message_format_lowercase_first_fails() {
-        let (cap, _) = check("hello there.");
-        assert!(!cap);
-    }
-
-    #[test]
-    fn message_format_no_period_fails() {
-        let (_, period) = check("Hello there");
-        assert!(!period);
-    }
-
-    #[test]
-    fn message_format_interpolation_passes() {
-        // `{...}` at start or end is fine — we can't see what it expands to.
-        assert_eq!(check("{count} dropped."), (true, true));
-        assert_eq!(check("Dropped {count}"), (true, true));
-    }
-
-    #[test]
-    fn message_format_non_alpha_first_passes() {
-        // E.g. starts with a number — no capitalisation requirement.
-        assert_eq!(check("42 things happened."), (true, true));
+    fn checks_literal_message_format() {
+        for (message, capital, period) in [
+            ("Hello there.", true, true),
+            ("hello there.", false, true),
+            ("Hello there", true, false),
+            ("hello there", false, false),
+            ("{count} dropped.", true, true),
+            ("Dropped {count}", true, true),
+            ("42 things happened.", true, true),
+        ] {
+            let source = format!("fn example() {{ info!({message:?}); }}");
+            let reports = format_check_log_messages(&source, "fixture.rs");
+            let mut expected = Vec::new();
+            if !capital {
+                expected
+                    .push("    Message must start with a capital. (`info` call on fixture.rs:1)");
+            }
+            if !period {
+                expected.push("    Message must end with a period. (`info` call on fixture.rs:1)");
+            }
+            assert_eq!(reports, expected, "{message}");
+        }
     }
 
     // ---- validate_event branch coverage --------------------------------

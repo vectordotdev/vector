@@ -246,9 +246,10 @@ The mapping to wire-level structures differs by format:
   `TraceEvent` per distinct ID with that ID stored in `TraceEvent.trace_id`. The
   enclosing `ResourceSpans` provides `Resource`. See the OTLP mapping sub-RFC for the
   grouping algorithm and per-field mapping.
-- **Datadog**: each `TraceChunk` is partitioned by the full trace ID reconstructed from
-  the wire `Span.traceID` and `_dd.p.tid`, and by wire `Span.service`. The Datadog
-  mapping sub-RFC specifies the grouping and re-coalescence rules.
+- **Datadog**: each `TraceChunk` is partitioned by its full trace ID and by wire
+  `Span.service`. Standard payloads reconstruct the ID from the wire `Span.traceID` and
+  `_dd.p.tid`; indexed (`idx`) payloads carry it on the chunk. The Datadog mapping
+  sub-RFC specifies the grouping and re-coalescence rules for both forms.
 
 #### `Span`
 
@@ -321,6 +322,8 @@ pub struct DatadogChunkContext {
     pub priority: Option<SamplingPriority>,
     pub origin: Option<String>,
     pub dropped: bool,
+    /// Sampler that made the chunk's decision (Datadog `_dd.p.dm`).
+    pub sampling_mechanism: Option<u32>,
     pub tags: Attributes,
 }
 
@@ -394,8 +397,8 @@ smallest-item disposition above.
 A `TraceEvent` whose `spans` vector becomes empty retains its top-level `trace_id` and
 passes through unchanged. Sinks emit the corresponding empty wire shape, fire
 finalizers on successful delivery, and report the condition. OTLP and Datadog ingress
-produce no event from an empty wire grouping because neither format supplies an ID for
-it. The internal proto and typed JSON retain the ID on empty events.
+produce no event from an empty wire grouping: OTLP and standard Datadog payloads supply
+no ID for it, and an empty indexed Datadog chunk has no span or service to partition. The internal proto and typed JSON retain the ID on empty events.
 
 #### Status, kind, and sampling priority
 
@@ -531,6 +534,9 @@ Several common typed slots correspond to attribute-map keys that wire formats al
 - `Resource.environment` versus `Resource.attributes."deployment.environment.name"`.
 - `Resource.host` versus `Resource.attributes."host.name"`.
 - `Span.status` (`Error` / `Other` message) versus `Span.attributes."error.message"`.
+- `Span.kind` versus `Span.attributes."span.kind"`.
+- `DatadogChunkContext.sampling_mechanism` versus `_dd.p.dm` in chunk tags or span
+  attributes.
 
 The in-memory model permits both forms to coexist. The typed slot is the canonical
 field; the matching attribute-map key exists only as a wire-shape
@@ -641,7 +647,8 @@ for the renamed `LegacyTrace` / `LegacyTraceArray` variants and add sibling
 and shapes remain unchanged.
 
 The typed payload encodes the `TraceEvent` defined above.
-Proto presence preserves every `Option<String>` distinction and
+Proto presence preserves every `Option<String>` distinction, the
+`DatadogChunkContext.sampling_mechanism` `None` versus `Some(0)` distinction, and
 `datadog.chunk = None` versus `Some(DatadogChunkContext::default())`; an unset
 `AttrValue` oneof represents
 `AttrValue::Null`. Identifiers use their non-zero unsigned wire domains, trace IDs are

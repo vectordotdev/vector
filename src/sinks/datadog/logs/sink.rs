@@ -1,12 +1,11 @@
 use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
-use bytes::Bytes;
 use itertools::Itertools;
 use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     lookup::event_path,
 };
 use vrl::{
@@ -219,7 +218,7 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            emit!(DatadogLogsReservedAttributeConflict {
+            emit(DatadogLogsReservedAttributeConflict {
                 meaning,
                 source_path: current_path,
                 destination_path: expected_field_name,
@@ -280,7 +279,7 @@ impl LogRequestBuilder {
         clippy::needless_pass_by_value,
         reason = "Retain ownership of the API key while building and returning its requests."
     )]
-    pub fn build_request(
+    fn build_request(
         &self,
         events: Vec<Event>,
         api_key: Arc<str>,
@@ -306,9 +305,9 @@ impl LogRequestBuilder {
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
                 if events_with_estimated_size.pop_front().is_some() {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
-                        reason: "Event too large to encode."
+                        reason: "Event too large to encode.",
                     });
                 }
                 continue;
@@ -458,7 +457,7 @@ fn encode_log(
     // mismatch here indicates that the size calculation has diverged. Request serialization
     // separately enforces `max_payload_bytes` in release builds.
     debug_assert!(encoded_size <= truncation.max_log_bytes);
-    emit!(DatadogLogsEventTruncated {
+    emit(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
     });
@@ -509,12 +508,18 @@ fn set_truncated_message(
     body_len: usize,
     conforms_as_agent: bool,
 ) {
-    let marker = TRUNCATION_MARKER.as_bytes();
-    let mut truncated = Vec::with_capacity(body_len + marker.len());
-    truncated.extend_from_slice(&message.as_bytes()[..body_len]);
-    truncated.extend_from_slice(marker);
+    // The current caller supplies a character boundary because `select_message_body_len`
+    // advances via `char_indices`; keep the clamp as a defensive guard for future callers.
+    let body_len = message.floor_char_boundary(body_len);
+    let mut truncated = String::with_capacity(body_len + TRUNCATION_MARKER.len());
+    #[expect(
+        clippy::string_slice,
+        reason = "floor_char_boundary guarantees a valid char boundary"
+    )]
+    truncated.push_str(&message[..body_len]);
+    truncated.push_str(TRUNCATION_MARKER);
     *message_value_mut(log, conforms_as_agent).expect("the message was previously found") =
-        Value::Bytes(Bytes::from(truncated));
+        Value::from(truncated);
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
@@ -624,7 +629,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(reqs) => Some(futures::stream::iter(reqs)),

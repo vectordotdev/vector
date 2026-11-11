@@ -10,16 +10,15 @@ use std::{
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio::sync::Semaphore;
 use tonic::Code::{
     AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
     Unauthenticated, Unimplemented,
 };
-use tonic::body::BoxBody;
+use tonic::body::Body as TonicBody;
 use tower::{Service, ServiceBuilder};
+use vector_http::Http2Client;
 use vector_lib::configurable::configurable_component;
 use vector_lib::stream::BatcherSettings;
 
@@ -34,7 +33,6 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions, ValidatedSink,
     },
-    http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -125,7 +123,7 @@ pub struct VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct VectorKeepaliveConfig {
+pub(super) struct VectorKeepaliveConfig {
     /// How often, in seconds, to send a keepalive PING on idle connections.
     ///
     /// Shorter intervals detect dead connections faster at the cost of additional traffic.
@@ -246,7 +244,7 @@ impl ValidatedSink for VectorConfig {
     fn validate(&self) -> crate::Result<ValidatedVector> {
         // Endpoint options and endpoint syntax are validated here, and the
         // parsed endpoints are retained so `build` does not re-parse the
-        // original strings. Re-parsing is unsafe: `http::Uri` reads the host
+        // original strings. Re-parsing is unsafe: `Uri` reads the host
         // of a scheme-less `host:port[/path]` endpoint as a scheme, producing
         // a URI that validation accepted but the sink cannot use.
         let endpoints = self.validate_endpoint_options()?;
@@ -288,10 +286,10 @@ impl ValidatedSink for VectorConfig {
             .into_iter()
             .map(|uri| {
                 let endpoint = uri.to_string();
-                let service = VectorService::new(client.clone(), uri, self.compression);
-                (endpoint, service)
+                VectorService::new(client.clone(), uri, self.compression)
+                    .map(|service| (endpoint, service))
             })
-            .collect::<Vec<_>>();
+            .collect::<crate::Result<Vec<_>>>()?;
 
         let sink = match endpoint_strategy {
             _ if services.len() == 1 => {
@@ -363,7 +361,7 @@ impl ValidatedSink for VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum EndpointStrategy {
+pub(super) enum EndpointStrategy {
     /// Distribute requests across healthy endpoints using Vector's existing
     /// Tower distributed service. Endpoint health is tracked using
     /// `routing.health`, and unhealthy endpoints are backed off and probed
@@ -757,7 +755,7 @@ async fn healthcheck(
 }
 
 fn healthchecks(
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    client: Http2Client<TonicBody>,
     uris: &[Uri],
     options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
@@ -770,15 +768,19 @@ fn healthchecks(
 
     let timeout = options.timeout;
     let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
-        let service = VectorService::new(client.clone(), uri, VectorCompression::None);
-        healthcheck(
-            service,
-            SinkHealthcheckOptions {
-                enabled: true,
-                uri: None,
-                timeout,
-            },
-        )
+        let client = client.clone();
+        async move {
+            let service = VectorService::new(client, uri, VectorCompression::None)?;
+            healthcheck(
+                service,
+                SinkHealthcheckOptions {
+                    enabled: true,
+                    uri: None,
+                    timeout,
+                },
+            )
+            .await
+        }
         .boxed()
     });
 
@@ -824,11 +826,9 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
-
-    let mut builder = hyper::Client::builder();
-    builder.http2_only(true);
+) -> crate::Result<Http2Client<TonicBody>> {
+    let mut builder = Builder::new(TokioExecutor::new());
+    builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.
@@ -841,7 +841,7 @@ fn new_client(
             .http2_keep_alive_while_idle(true);
     }
 
-    Ok(builder.build(proxy))
+    Http2Client::new(tls_settings.clone(), proxy_config, builder)
 }
 
 #[derive(Debug, Clone)]

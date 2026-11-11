@@ -4,16 +4,14 @@ use std::str::FromStr;
 
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{
-    Auth,
-    client_v1::{HttpClient, empty_body},
-};
+use crate::http::{Auth, HttpClient};
 
 use super::parser::ClickHouseType;
 
@@ -44,7 +42,7 @@ impl TryFrom<ColumnInfo> for Field {
 }
 
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
-pub async fn fetch_table_schema(
+pub(crate) async fn fetch_table_schema(
     client: &HttpClient,
     endpoint: &str,
     database: &str,
@@ -72,7 +70,7 @@ pub async fn fetch_table_schema(
         .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;
@@ -107,7 +105,7 @@ fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
 
 /// Schema provider implementation for ClickHouse tables.
 #[derive(Clone, Debug)]
-pub struct ClickHouseSchemaProvider {
+pub(crate) struct ClickHouseSchemaProvider {
     client: HttpClient,
     endpoint: String,
     database: String,
@@ -117,7 +115,7 @@ pub struct ClickHouseSchemaProvider {
 
 impl ClickHouseSchemaProvider {
     /// Create a new ClickHouse schema provider.
-    pub const fn new(
+    pub(crate) const fn new(
         client: HttpClient,
         endpoint: String,
         database: String,

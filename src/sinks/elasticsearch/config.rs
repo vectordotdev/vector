@@ -6,6 +6,7 @@ use std::{
 use futures::{FutureExt, TryFutureExt};
 use vector_lib::{
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{event_path, lookup_v2::ConfigValuePath},
     schema::Requirement,
     stream::BatcherSettings,
@@ -16,7 +17,7 @@ use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
-    http::{HttpClient, QueryParameters},
+    http::QueryParameters,
     internal_events::TemplateRenderingError,
     sinks::{
         Healthcheck, VectorSink,
@@ -485,7 +486,7 @@ impl DataStreamMode {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -498,7 +499,7 @@ impl DataStreamMode {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -511,7 +512,7 @@ impl DataStreamMode {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -633,7 +634,7 @@ where
             template
                 .check_confinement(&s)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some(field),
                         drop_event: true,
@@ -641,7 +642,7 @@ where
                 })
                 .ok()?;
             if !is_valid_data_stream_component(&s, field) {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: crate::template::TemplateRenderingError::Confined {
                         rendered_preview: crate::template::confined_preview(&s),
                         rendered_len: s.len(),
@@ -860,10 +861,11 @@ impl ElasticsearchConfig {
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
         // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
         // The pure request/health settings were resolved during `validate`.
-        let commons = ElasticsearchCommon::parse_many(self, distribution, cx.proxy()).await?;
+        // One client serves the API-version probe, the healthchecks and the bulk requests.
+        let client = ElasticsearchCommon::build_client(self, cx.proxy())?;
+        let commons =
+            ElasticsearchCommon::parse_many(self, distribution, cx.proxy(), &client).await?;
         let common = commons[0].clone();
-
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let health_config = validated.health_config.clone();
 
