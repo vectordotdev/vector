@@ -250,42 +250,54 @@ impl OctetCountingDecoder {
     /// newline (as `LinesCodec` did), so a never-terminating sender cannot
     /// grow the buffer unbounded.
     fn newline_decode(&mut self, src: &mut BytesMut) -> Result<Option<Bytes>, BoxedFramingError> {
-        if self.newline_discarding {
-            // Discard the remainder of the oversized frame up to its newline.
-            match memchr(b'\n', src) {
-                Some(pos) => {
-                    src.advance(pos + 1);
-                    self.newline_discarding = false;
+        loop {
+            if self.newline_discarding {
+                // Discard the remainder of the oversized frame up to its newline.
+                match memchr(b'\n', src) {
+                    Some(pos) => {
+                        src.advance(pos + 1);
+                        self.newline_discarding = false;
+                    }
+                    None => src.advance(src.len()),
                 }
-                None => src.advance(src.len()),
-            }
-            self.newline_scan_pos = 0;
-        } else {
-            // The buffer may have shrunk (e.g. via `decode_eof`); clamp the cursor.
-            self.newline_scan_pos = self.newline_scan_pos.min(src.len());
-            if memchr(b'\n', &src[self.newline_scan_pos..]).is_some() {
+                self.newline_scan_pos = 0;
+            } else {
+                // The buffer may have shrunk (e.g. via `decode_eof`); clamp the cursor.
+                self.newline_scan_pos = self.newline_scan_pos.min(src.len());
+                if memchr(b'\n', &src[self.newline_scan_pos..]).is_none() {
+                    // Partial line: only scan newly arrived bytes next call
+                    // (the old `LinesCodec` `next_index` cursor).
+                    self.newline_scan_pos = src.len();
+                    if src.len() > self.other.max_length() {
+                        // Over the limit with no delimiter: drop the buffer and
+                        // discard the rest of this frame as it arrives.
+                        emit(DecoderFrameTooLongError {
+                            length: src.len(),
+                            max_length: self.other.max_length(),
+                        });
+                        src.advance(src.len());
+                        self.newline_discarding = true;
+                        self.newline_scan_pos = 0;
+                    }
+                    return Ok(None);
+                }
                 // Complete line available; the underlying decoder rescans
                 // for the delimiter once (linear, same as framing itself).
                 self.newline_scan_pos = 0;
-            } else {
-                // Partial line: only scan newly arrived bytes next call
-                // (the old `LinesCodec` `next_index` cursor).
-                self.newline_scan_pos = src.len();
-                if src.len() > self.other.max_length() {
-                    // Over the limit with no delimiter: drop the buffer and
-                    // discard the rest of this frame as it arrives.
-                    emit(DecoderFrameTooLongError {
-                        length: src.len(),
-                        max_length: self.other.max_length(),
-                    });
-                    src.advance(src.len());
-                    self.newline_discarding = true;
-                    self.newline_scan_pos = 0;
-                }
+            }
+            let before = src.len();
+            let frame = self.other.decode(src)?;
+            if frame.is_some() {
+                return Ok(frame);
+            }
+            if src.len() == before {
+                // No progress without more input.
                 return Ok(None);
             }
+            // The decoder skipped an oversized line and left a remainder:
+            // re-check it now so an oversized partial tail enters discard
+            // mode instead of waiting for (and buffering) more reads.
         }
-        self.other.decode(src)
     }
 }
 
@@ -509,6 +521,93 @@ mod tests {
             decoder.decode(&mut buffer).map_err(|_| false)
         );
         assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+    }
+
+    #[test]
+    fn non_octet_decode_discards_oversized_partial_after_skipped_line() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+        let mut buffer = BytesMut::with_capacity(4200);
+
+        // An oversized terminated line followed by an oversized partial tail:
+        // skipping the line must not leave the tail buffered while waiting
+        // for more reads — it enters discard mode in the same call.
+        buffer.put(&vec![b'x'; 65][..]);
+        buffer.put(&b"\n"[..]);
+        buffer.put(&vec![b'y'; 4096][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(buffer.is_empty(), "oversized partial tail must be consumed");
+        assert!(decoder.newline_discarding);
+
+        // The rest of the discarded frame is dropped up to its newline...
+        buffer.put(&b"tail\n"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+
+        // ...and framing resumes.
+        buffer.put(&b"<57>ok\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>ok".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+    }
+
+    #[test]
+    fn non_octet_decode_discards_oversized_tail_after_returned_frame() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
+        let mut buffer = BytesMut::with_capacity(128);
+
+        // An oversized line, a valid line, and an oversized partial tail in
+        // one buffer: the first call returns the valid frame; the very next
+        // call (no new data) must put the tail into discard mode.
+        buffer.put(&b"012345678901234567890\n"[..]);
+        buffer.put(&b"ok\n"[..]);
+        buffer.put(&vec![b'y'; 64][..]);
+        assert_eq!(
+            Ok(Some("ok".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(buffer.is_empty());
+        assert!(decoder.newline_discarding);
+    }
+
+    #[test]
+    fn non_octet_decode_survives_run_of_oversized_lines() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(8);
+        let mut buffer = BytesMut::with_capacity(256);
+
+        // Many oversized terminated lines followed by an oversized partial
+        // tail: the loop must consume them all in one call and terminate.
+        for _ in 0..20 {
+            buffer.put(&vec![b'x'; 9][..]);
+            buffer.put(&b"\n"[..]);
+        }
+        buffer.put(&vec![b'y'; 100][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(buffer.is_empty());
+        assert!(decoder.newline_discarding);
+    }
+
+    #[test]
+    fn non_octet_decode_accepts_exactly_max_length_line() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
+
+        // A line of exactly `max_length` bytes is a valid frame.
+        let mut buffer = BytesMut::from(&b"0123456789abcdef\n"[..]);
+        assert_eq!(
+            Ok(Some("0123456789abcdef".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+    }
+
+    #[test]
+    fn non_octet_decode_eof_while_discarding() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(8);
+
+        // EOF while in discard mode must not emit a frame nor panic.
+        let mut buffer = BytesMut::from(&vec![b'x'; 100][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(decoder.newline_discarding);
+        assert_eq!(Ok(None), decoder.decode_eof(&mut buffer).map_err(|_| false));
     }
 
     #[test]
