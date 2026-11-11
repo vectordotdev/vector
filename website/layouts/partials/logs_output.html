@@ -110,7 +110,7 @@
 
                               <div class="mt-1.5 flex flex-col space-y-1 text-sm">
                                 {{ range . }}
-                                  <span class="font-mono text-sm text-secondary dark:text-primary">{{ . }}</span>
+                                  {{ template "code" . }}
                                 {{ end }}
                               </div>
                             </div>
