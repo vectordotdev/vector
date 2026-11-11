@@ -52,6 +52,8 @@ on:
         value: ${{ jobs.source.outputs.website_tests }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      package_repositories:
+        value: ${{ jobs.source.outputs.package_repositories }}
       actionlint:
         value: ${{ jobs.source.outputs.actionlint }}
       prettier:
@@ -151,6 +153,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
+      e2e-datadog-traces:
+        value: ${{ jobs.e2e_tests.outputs.datadog-traces }}
       e2e-opentelemetry-logs:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
       e2e-opentelemetry-metrics:
@@ -187,6 +191,7 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
+      package_repositories: ${{ steps.filter.outputs.package_repositories }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       website_tests: ${{ steps.website_filter.outputs.website_tests }}
@@ -238,7 +243,7 @@ jobs:
               - ".github/workflows/deny.yml"
             deprecations:
               - 'deprecation.d/**'
-              - 'website/data/deprecations.json'
+              - 'website/content/en/deprecations/enacted/**'
               - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
@@ -283,6 +288,16 @@ jobs:
             install:
               - ".github/workflows/install-sh.yml"
               - "distribution/install.sh"
+              - ".github/workflows/changes.yml"
+            package_repositories:
+              - "distribution/repositories/**"
+              - "vdev/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - "scripts/environment/prepare.sh"
+              - ".github/workflows/package-repositories*.yml"
+              - ".github/workflows/vdev_publish.yml"
               - ".github/workflows/changes.yml"
             k8s:
               - "src/sources/kubernetes_logs/**"
@@ -358,6 +373,8 @@ jobs:
             website_tests:
               - "website/**"
               - "!website/cue/**"
+              # Mounted into the website as content; see website/config.toml.
+              - "deprecation.d/**"
               - ".github/workflows/website-tests.yml"
               - ".github/actions/install-vrl-doc-builder/**"
               - ".github/workflows/changes.yml"
@@ -499,6 +516,7 @@ jobs:
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
+      datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
       opentelemetry-traces: ${{ steps.filter.outputs.opentelemetry-traces }}
@@ -534,6 +552,7 @@ jobs:
           {
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
+            "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
             "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
             "opentelemetry-traces": ${{ steps.filter.outputs.opentelemetry-traces }},

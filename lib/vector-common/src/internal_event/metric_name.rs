@@ -82,6 +82,7 @@ pub enum CounterName {
     StoppedTotal,
     TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
+    TopologyDiskBufferLifecycleEventsTotal,
     ValueLimitReachedTotal,
     WebsocketBytesSentTotal,
     WebsocketMessagesSentTotal,
@@ -130,7 +131,6 @@ pub enum CounterName {
     NetworkTransmitPacketsDropTotal,
     NetworkTransmitPacketsTotal,
     NetworkTransmitErrsTotal,
-    ProcessRuntime,
     ProcessRuntimeTotal,
 }
 
@@ -209,20 +209,14 @@ pub enum GaugeName {
     ComponentRequestConcurrencyLimit,
     SourceBufferMaxSizeEvents,
     SourceBufferMaxSizeBytes,
-    SourceBufferMaxEventSize,
-    SourceBufferMaxByteSize,
     SourceBufferUtilizationLevel,
     SourceBufferUtilizationMean,
     TransformBufferMaxSizeEvents,
     TransformBufferMaxSizeBytes,
-    TransformBufferMaxEventSize,
-    TransformBufferMaxByteSize,
     TransformBufferUtilizationLevel,
     TransformBufferUtilizationMean,
     BufferMaxSizeEvents,
-    BufferMaxEventSize,
     BufferMaxSizeBytes,
-    BufferMaxByteSize,
     BufferSizeEvents,
     BufferSizeBytes,
     Utilization,
@@ -298,20 +292,14 @@ impl GaugeName {
             Self::ComponentRequestConcurrencyLimit => "component_request_concurrency_limit",
             Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
             Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
-            Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
-            Self::SourceBufferMaxByteSize => "source_buffer_max_byte_size",
             Self::SourceBufferUtilizationLevel => "source_buffer_utilization_level",
             Self::SourceBufferUtilizationMean => "source_buffer_utilization_mean",
             Self::TransformBufferMaxSizeEvents => "transform_buffer_max_size_events",
             Self::TransformBufferMaxSizeBytes => "transform_buffer_max_size_bytes",
-            Self::TransformBufferMaxEventSize => "transform_buffer_max_event_size",
-            Self::TransformBufferMaxByteSize => "transform_buffer_max_byte_size",
             Self::TransformBufferUtilizationLevel => "transform_buffer_utilization_level",
             Self::TransformBufferUtilizationMean => "transform_buffer_utilization_mean",
             Self::BufferMaxSizeEvents => "buffer_max_size_events",
-            Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
-            Self::BufferMaxByteSize => "buffer_max_byte_size",
             Self::BufferSizeEvents => "buffer_size_events",
             Self::BufferSizeBytes => "buffer_size_bytes",
             Self::Utilization => "utilization",
@@ -465,6 +453,9 @@ impl CounterName {
             Self::StoppedTotal => "stopped_total",
             Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
+            Self::TopologyDiskBufferLifecycleEventsTotal => {
+                "topology_disk_buffer_lifecycle_events_total"
+            }
             Self::ValueLimitReachedTotal => "value_limit_reached_total",
             Self::WebsocketBytesSentTotal => "websocket_bytes_sent_total",
             Self::WebsocketMessagesSentTotal => "websocket_messages_sent_total",
@@ -526,7 +517,6 @@ impl CounterName {
             Self::NetworkTransmitPacketsDropTotal => "network_transmit_packets_drop_total",
             Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
             Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
-            Self::ProcessRuntime => "process_runtime",
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
@@ -548,7 +538,6 @@ mod tests {
             "memory_enrichment_table_failed_insertions",
             "memory_enrichment_table_failed_reads",
             "memory_enrichment_table_ttl_expirations",
-            "process_runtime",
             "aggregate_failed_updates",
         ]);
 

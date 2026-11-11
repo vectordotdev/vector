@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http_1::{Request, header::CONTENT_TYPE};
+use http::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use super::{
@@ -10,21 +10,23 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
-        HTTPV1RequestBuilderSnafu, gcp,
+        HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             HttpEndpoint,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             service::TowerRequestConfigDefaults,
         },
     },
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct StackdriverMetricsTowerRequestConfigDefaults;
+pub(super) struct StackdriverMetricsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
@@ -37,7 +39,7 @@ impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-pub struct StackdriverConfig {
+pub(super) struct StackdriverConfig {
     #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
     pub(super) endpoint: HttpEndpoint,
@@ -171,7 +173,7 @@ impl ValidatedSink for StackdriverConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedStackdriverMetrics {
+pub(super) struct ValidatedStackdriverMetrics {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
 }
@@ -197,7 +199,7 @@ mod tests {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct StackdriverMetricsDefaultBatchSettings;
+pub(super) struct StackdriverMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
@@ -214,14 +216,14 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder =
-            Request::post(self.endpoint.clone().into_v1()).header(CONTENT_TYPE, "application/json");
+            Request::post(self.endpoint.as_uri().clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
 
-        self.auth.apply_v1(&mut request);
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
