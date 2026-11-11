@@ -210,6 +210,8 @@ We can see that Vector has parsed the Syslog message and created a structured ev
 
 ## Validate and test your changes
 
+With the Docker alias, replace `./vector.yaml` with `/etc/vector/vector.yaml` in all commands below.
+
 [Validate the configuration](/docs/administration/validating/) without environment or connectivity checks:
 
 ```shell
