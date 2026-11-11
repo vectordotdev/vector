@@ -856,13 +856,21 @@ where
         Ok(ledger)
     }
 
+    /// Spawns the task that applies reader acknowledgements to the ledger.
+    ///
+    /// The task holds only a weak reference so that dropping the last buffer handle releases the
+    /// ledger, and its lock file, immediately instead of whenever the task next gets polled.
     #[must_use]
-    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+    pub(super) fn spawn_finalizer(self: &Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
+        let ledger = Arc::downgrade(self);
         vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
-                self.increment_pending_acks(amount);
-                self.notify_writer_waiters();
+                let Some(ledger) = ledger.upgrade() else {
+                    break;
+                };
+                ledger.increment_pending_acks(amount);
+                ledger.notify_writer_waiters();
             }
         });
         finalizer
