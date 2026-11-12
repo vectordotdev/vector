@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
-    hash::{BuildHasher, RandomState},
+    hash::{BuildHasher, Hash, Hasher, RandomState},
     num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
@@ -466,15 +466,18 @@ async fn route(
         let mut per_shard: Vec<Vec<Event>> = vec![Vec::new(); shard_senders.len()];
 
         for event in events {
-            // TODO: we this, we compute the Discriminant two times: one here, and the second in the
-            // recursively called `Reduce::transform_one()`
-            let discriminant = Discriminant::from_log_event(event.as_log(), &group_by);
+            let log = event.as_log();
+            let mut state = hasher.build_hasher();
+            group_by
+                .iter()
+                .map(|field| log.parse_path_and_get_value(field).ok().flatten())
+                .for_each(|value| value.hash(&mut state));
 
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "deterministic: the same hash always maps to the same shard, and the low bits stay uniform"
             )]
-            let shard_number = (hasher.hash_one(&discriminant) as usize) % shard_senders.len();
+            let shard_number = (state.finish() as usize) % shard_senders.len();
             per_shard[shard_number].push(event);
         }
 
