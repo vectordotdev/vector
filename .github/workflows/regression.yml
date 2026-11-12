@@ -6,13 +6,15 @@
 #   - On demand, via the `/ci-run-regression` (or `/ci-run-all`) PR review comment,
 #     which invokes this workflow via `workflow_call` from `ci-review-trigger.yml`.
 #
-# The workflow accepts two optional inputs:
+# The workflow accepts three optional inputs:
 #   - The baseline ref:
 #     - If not specified, the SHA from 7 days ago on origin/master is used.
 #   - The comparison ref:
 #     - If not specified, the current HEAD of origin/master is used.
+#   - The experiment suite:
+#     - If not specified, all experiments run.
 #
-# Both inputs accept any git ref that `git rev-parse` can resolve: a full commit
+# Both ref inputs accept any git ref that `git rev-parse` can resolve: a full commit
 # SHA, a short SHA, a branch name (e.g. `origin/master`), or a tag.
 #
 # This workflow runs regression detection experiments, performing relative
@@ -36,6 +38,15 @@ on:
       comparison-sha:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
+      suite:
+        description: "Experiments to run."
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - logs
+          - metrics
   workflow_call:
     inputs:
       baseline-sha:
@@ -45,6 +56,11 @@ on:
       comparison-sha:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
+        type: string
+      suite:
+        description: "Experiments to run."
+        required: false
+        default: all
         type: string
   schedule:
     - cron: "0 7 * * 1" # Runs at 7 AM UTC on Mondays
@@ -67,6 +83,7 @@ jobs:
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
       baseline-tag: ${{ steps.set_and_validate_shas.outputs.BASELINE_TAG }}
       comparison-tag: ${{ steps.set_and_validate_shas.outputs.COMPARISON_TAG }}
+      suite: ${{ steps.set_and_validate_shas.outputs.SUITE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
       - name: Checkout repository
@@ -79,6 +96,7 @@ jobs:
         env:
           BASELINE_INPUT: ${{ inputs.baseline-sha }}
           COMPARISON_INPUT: ${{ inputs.comparison-sha }}
+          SUITE_INPUT: ${{ inputs.suite || 'all' }}
         run: |
           # Resolve baseline ref to a full commit SHA
           if [ -z "${BASELINE_INPUT}" ]; then
@@ -108,12 +126,21 @@ jobs:
           BASELINE_TAG="workflow_dispatch-${COMPARISON_SHA}-${BASELINE_SHA}"
           COMPARISON_TAG="workflow_dispatch-${COMPARISON_SHA}-${COMPARISON_SHA}"
 
+          case "${SUITE_INPUT}" in
+            all|logs|metrics) ;;
+            *)
+              echo "Invalid experiment suite: '${SUITE_INPUT}'. Expected all, logs, or metrics."
+              exit 1
+              ;;
+          esac
+
           {
             echo "BASELINE_SHA=${BASELINE_SHA}"
             echo "COMPARISON_SHA=${COMPARISON_SHA}"
 
             echo "BASELINE_TAG=${BASELINE_TAG}"
             echo "COMPARISON_TAG=${COMPARISON_TAG}"
+            echo "SUITE=${SUITE_INPUT}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set SMP version
@@ -429,6 +456,8 @@ jobs:
             --baseline-sha ${{ needs.resolve-inputs.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.resolve-inputs.outputs.comparison-sha }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
+            --manifest ${{ github.workspace }}/regression/selection.yaml \
+            --label ${{ needs.resolve-inputs.outputs.suite }} \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}
