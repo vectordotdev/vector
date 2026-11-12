@@ -1703,6 +1703,15 @@
         <tr>
           <td class="align-top">
             <code>{{ $k }}</code>
+            {{ if reflect.IsMap $v }}
+              {{ with $v.output_types }}
+                <div class="mt-2 flex flex-wrap gap-y-1 not-prose">
+                  {{ range . }}
+                    {{ partial "badge.html" (dict "prefix" "output" "word" . "color" "yellow" "inline" true) }}
+                  {{ end }}
+                </div>
+              {{ end }}
+            {{ end }}
           </td>
           <td class="align-top [&>p:first-child]:mt-0">
             {{ if and (reflect.IsMap $v) $v.deprecated }}
