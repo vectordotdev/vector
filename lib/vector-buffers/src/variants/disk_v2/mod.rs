@@ -278,7 +278,7 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let finalizer = Arc::clone(&ledger).spawn_finalizer();
+        let finalizer = ledger.spawn_finalizer();
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
         let mut unread_buffer_size = reader

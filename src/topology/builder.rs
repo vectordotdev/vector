@@ -34,7 +34,9 @@ use vector_lib::{
     cpu_time::{self, CpuTimedExt, spawn_timed},
     enrichment::Table,
     extra_context::ExtraContext,
-    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, register,
+    },
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
@@ -744,7 +746,7 @@ impl<'a> Builder<'a> {
 
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
-            let events_received = register!(EventsReceived);
+            let events_received = register(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
@@ -928,7 +930,7 @@ impl<'a> Builder<'a> {
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let filtered = input_rx
             .filter(move |events| ready(filter_events_type(events, input_type)))
             .inspect(move |events| {
@@ -937,7 +939,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+        let events_sent = register(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
             component: key.clone(),
             port: None,
@@ -1308,7 +1310,7 @@ impl Runner {
             outputs,
             timer_tx,
             latency_recorder,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             cpu_ns,
         }
     }

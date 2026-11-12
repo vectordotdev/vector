@@ -168,11 +168,13 @@ pub struct NatsSourceConfig {
     pub jetstream: Option<JetStreamConfig>,
 }
 
-pub fn default_subject_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("subject"))
+pub(super) const SUBJECT_KEY: &str = "subject";
+
+pub(super) fn default_subject_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(SUBJECT_KEY))
 }
 
-pub const fn default_subscription_capacity() -> usize {
+const fn default_subscription_capacity() -> usize {
     65536
 }
 
@@ -242,7 +244,7 @@ impl SourceConfig for NatsSourceConfig {
             .with_source_metadata(
                 NatsSourceConfig::NAME,
                 legacy_subject_key_field,
-                &owned_value_path!("subject"),
+                &owned_value_path!(SUBJECT_KEY),
                 Kind::bytes(),
                 None,
             );

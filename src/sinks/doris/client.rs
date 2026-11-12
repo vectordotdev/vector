@@ -4,6 +4,7 @@ use crate::{
     sinks::util::Compression,
 };
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+use vector_lib::internal_event::emit;
 
 /// Percent-encoding set for URL path segments (RFC 3986 unreserved chars are left unencoded).
 const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
@@ -49,12 +50,12 @@ const GROUP_COMMIT_SYNC_MODE: &str = "sync_mode";
 const GROUP_COMMIT_ASYNC_MODE: &str = "async_mode";
 
 /// Thread-safe version of the `DorisSinkClient`, wrapped in an Arc
-pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
+pub(super) type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 
 /// `DorisSinkClient` handles the HTTP communication with Doris server
 /// This client is thread-safe by design
 #[derive(Clone, Debug)]
-pub struct DorisSinkClient {
+pub(super) struct DorisSinkClient {
     http_client: HttpClient,
     base_url: Uri,
     auth: Option<Auth>,
@@ -64,7 +65,7 @@ pub struct DorisSinkClient {
 }
 
 impl DorisSinkClient {
-    pub fn new(
+    pub(super) fn new(
         http_client: HttpClient,
         base_url: Uri,
         auth: Option<Auth>,
@@ -87,7 +88,7 @@ impl DorisSinkClient {
     }
 
     /// Converts a `DorisSinkClient` into a thread-safe version
-    pub fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
+    pub(super) fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
         Arc::new(self)
     }
 
@@ -216,7 +217,7 @@ impl DorisSinkClient {
 
     /// Handle redirects and send the HTTP request to Doris
     /// Returns the HTTP response and event status
-    pub async fn send_stream_load(
+    pub(super) async fn send_stream_load(
         &self,
         database: String,
         table: String,
@@ -297,7 +298,7 @@ impl DorisSinkClient {
         }
 
         // Log endpoint bytes sent metric
-        emit!(EndpointBytesSent {
+        emit(EndpointBytesSent {
             byte_size,
             protocol,
             endpoint: endpoint.as_str(),
@@ -335,7 +336,7 @@ impl DorisSinkClient {
         })
     }
 
-    pub async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
+    pub(super) async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
         // Use Doris bootstrap API endpoint for health check, GET method
         let scheme = endpoint.scheme_str().unwrap_or("http");
         let authority = endpoint
@@ -422,7 +423,7 @@ impl DorisSinkClient {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct DorisStreamLoadResponse {
+pub(super) struct DorisStreamLoadResponse {
     pub http_status_code: StatusCode,
     pub stream_load_status: StreamLoadStatus,
     pub response: Response<Bytes>,
@@ -475,7 +476,7 @@ impl From<StreamLoadStatus> for vector_common::finalization::EventStatus {
 
 /// Errors that can occur during Doris Stream Load operations.
 #[derive(Debug, Snafu)]
-pub enum StreamLoadError {
+pub(super) enum StreamLoadError {
     #[snafu(display("Invalid redirect URI: {}", source))]
     InvalidRedirectUri { source: http::uri::InvalidUri },
 
@@ -506,7 +507,7 @@ pub enum StreamLoadError {
 
 /// Errors that can occur during Doris health check operations.
 #[derive(Debug, Snafu)]
-pub enum HealthCheckError {
+pub(super) enum HealthCheckError {
     #[snafu(display("Invalid health check URI: {}", source))]
     InvalidUri { source: http::uri::InvalidUri },
 
@@ -527,7 +528,7 @@ pub enum HealthCheckError {
 mod tests {
     use std::sync::Mutex;
 
-    use http_body_util::{BodyExt as _, Full};
+    use http_body_util::Full;
     use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},

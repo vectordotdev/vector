@@ -59,19 +59,20 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }
 vector-vrl-functions.workspace = true
-toml = { version = "0.9.8", optional = true }
+toml = { version = "1.1.8", optional = true }
 
 [dev-dependencies]
 criterion.workspace = true
-futures.workspace = true
+futures = { workspace = true, features = ["async-await"] }
 indoc.workspace = true
+opentelemetry-proto = { path = "../opentelemetry-proto", features = ["typed-trace"] }
 proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
 similar-asserts.workspace = true
 tempfile.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
-rstest = "0.26.1"
+rstest = "0.28.0"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
@@ -82,6 +83,8 @@ zstd = { workspace = true, features = ["zdict_builder"] }
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
+# Encode OTLP traces through the typed trace model (RFC 25329).
+typed-trace = ["opentelemetry-proto?/typed-trace"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []
 

@@ -56,7 +56,7 @@ pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
 
 /// Contains the information extracted from the pod log file path.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LogFileInfo<'a> {
+pub(super) struct LogFileInfo<'a> {
     pub pod_namespace: &'a str,
     pub pod_name: &'a str,
     pub pod_uid: &'a str,

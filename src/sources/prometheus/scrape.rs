@@ -4,7 +4,9 @@ use bytes::Bytes;
 use http::{StatusCode, Uri, response::Parts, uri::Scheme};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
+};
 
 use super::parser;
 use crate::{
@@ -309,7 +311,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                         endpoint = %url,
                     );
                 }
-                emit!(PrometheusParseError {
+                emit(PrometheusParseError {
                     error,
                     url: url.clone(),
                     body,
@@ -401,7 +403,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -436,7 +438,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -486,7 +488,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -550,7 +552,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<Metric> = events.into_iter().map(Event::into_metric).collect();
         let metric = &metrics[0];
@@ -617,7 +619,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -808,7 +810,7 @@ mod integration_tests {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 

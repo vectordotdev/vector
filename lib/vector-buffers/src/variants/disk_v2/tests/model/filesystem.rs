@@ -214,6 +214,10 @@ impl AsyncWrite for TestFile {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "Test files implement the async production interface"
+)]
 impl AsyncFile for TestFile {
     #[instrument(skip(self), level = "debug")]
     async fn metadata(&self) -> io::Result<Metadata> {
@@ -348,6 +352,10 @@ impl Default for TestFilesystem {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "The test filesystem implements the async production interface"
+)]
 impl Filesystem for TestFilesystem {
     type File = TestFile;
     type MemoryMap = TestMmap;

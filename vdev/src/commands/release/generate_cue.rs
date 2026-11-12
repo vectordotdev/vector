@@ -1299,7 +1299,7 @@ mod tests {
             assert_eq!(authors, ["alice", "bob"]);
             let (actual, authors) = split_authors(&body);
             assert_eq!(actual, body);
-            assert!(authors.is_empty());
+            assert_eq!(authors, Vec::<String>::new());
         }
     }
 

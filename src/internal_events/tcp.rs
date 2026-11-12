@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    internal_event::{CounterName, InternalEvent, emit, error_stage, error_type},
 };
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
@@ -32,7 +32,7 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketOutgoingConnectionError { error: self.error });
+        emit(SocketOutgoingConnectionError { error: self.error });
     }
 }
 

@@ -8,6 +8,7 @@ use vector_lib::{
         DatadogMetricOriginMetadata, LogEvent,
         metric::{Bucket, Quantile, Sample},
     },
+    internal_event::emit,
 };
 use vrl::{
     event_path, path,
@@ -333,7 +334,7 @@ fn render_tag_into(
     let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
-            emit!(crate::internal_events::TemplateRenderingError {
+            emit(crate::internal_events::TemplateRenderingError {
                 error: err,
                 drop_event: false,
                 field: Some(key_template.get_ref()),
@@ -353,7 +354,7 @@ fn render_tag_into(
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error: value_error,
                     drop_event: false,
                     field: Some(template.get_ref()),
@@ -815,7 +816,17 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         && let Some(el) = els.as_object()
     {
         for (key, value) in el {
-            tags.insert(key.to_string(), bytes_to_str(value));
+            match value {
+                Value::Array(arr) => {
+                    tags.set_multi_value(
+                        key.to_string(),
+                        arr.iter().map(|v| TagValue::from(bytes_to_str(v))),
+                    );
+                }
+                _ => {
+                    tags.insert(key.to_string(), bytes_to_str(value));
+                }
+            }
         }
     }
     let tags_result = Some(tags);
@@ -878,31 +889,31 @@ impl FunctionTransform for LogToMetric {
                 }
                 Err(err) => match err {
                     TransformError::MetricValueError { path, path_value } => {
-                        emit!(MetricMetadataInvalidFieldValueError {
+                        emit(MetricMetadataInvalidFieldValueError {
                             field: path.as_ref(),
-                            field_value: path_value.as_ref()
+                            field_value: path_value.as_ref(),
                         });
                     }
                     TransformError::PathNotFound { path } => {
-                        emit!(ParserMissingFieldError::<DROP_EVENT> {
-                            field: path.as_ref()
+                        emit(ParserMissingFieldError::<DROP_EVENT> {
+                            field: path.as_ref(),
                         });
                     }
                     TransformError::ParseError { path, kind } => {
-                        emit!(MetricMetadataParseError {
+                        emit(MetricMetadataParseError {
                             field: path.as_ref(),
                             kind: &kind.to_string(),
                         });
                     }
                     TransformError::MetricDetailsNotFound => {
-                        emit!(MetricMetadataMetricDetailsNotFoundError {});
+                        emit(MetricMetadataMetricDetailsNotFoundError {});
                     }
                     TransformError::PairExpansionError { key, value, error } => {
-                        emit!(PairExpansionError {
+                        emit(PairExpansionError {
                             key: &key,
                             value: &value,
                             drop_event: true,
-                            error
+                            error,
                         });
                     }
                     _ => {}
@@ -917,34 +928,34 @@ impl FunctionTransform for LogToMetric {
                     Err(err) => {
                         match err {
                             TransformError::PathNull { path } => {
-                                emit!(LogToMetricFieldNullError {
-                                    field: path.as_ref()
+                                emit(LogToMetricFieldNullError {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::PathNotFound { path } => {
-                                emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                    field: path.as_ref()
+                                emit(ParserMissingFieldError::<DROP_EVENT> {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::ParseFloatError { path, error } => {
-                                emit!(LogToMetricParseFloatError {
+                                emit(LogToMetricParseFloatError {
                                     field: path.as_ref(),
-                                    error
+                                    error,
                                 });
                             }
                             TransformError::TemplateRenderingError(error) => {
-                                emit!(crate::internal_events::TemplateRenderingError {
+                                emit(crate::internal_events::TemplateRenderingError {
                                     error,
                                     drop_event: true,
                                     field: None,
                                 });
                             }
                             TransformError::PairExpansionError { key, value, error } => {
-                                emit!(PairExpansionError {
+                                emit(PairExpansionError {
                                     key: &key,
                                     value: &value,
                                     drop_event: true,
-                                    error
+                                    error,
                                 });
                             }
                             _ => {}
@@ -2365,5 +2376,46 @@ mod tests {
             )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn transform_all_metrics_multi_value_tags() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "counter": {
+            "value": 10.0
+          },
+          "kind": "incremental",
+          "name": "test.multi_value_tags",
+          "tags": {
+            "key": ["value1", "value2"],
+            "host": "localhost",
+            "env": []
+          }
+        }"#;
+
+        let event = create_log_event(json_str);
+        let metric = Box::pin(do_transform(config, event))
+            .await
+            .unwrap()
+            .into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        let mut expected_tags = MetricTags::default();
+        expected_tags.set_multi_value(
+            "key".to_string(),
+            vec![
+                TagValue::Value("value1".to_string()),
+                TagValue::Value("value2".to_string()),
+            ],
+        );
+        expected_tags.set_multi_value("env".to_string(), vec![]);
+        expected_tags.insert("host".to_string(), "localhost".to_string());
+
+        assert_eq!(tags.to_owned(), expected_tags);
     }
 }

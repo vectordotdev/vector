@@ -42,7 +42,7 @@ pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
 });
 
 #[derive(Debug, Snafu)]
-pub enum EncoderError {
+pub(super) enum EncoderError {
     #[snafu(display(
         "Invalid metric value '{}' was given; '{}' expected",
         metric_value,
@@ -65,7 +65,7 @@ impl EncoderError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::InvalidMetric { .. } => "invalid_metric",
             Self::ProtoEncodingFailed => "failed_to_encode_sketch",
@@ -74,7 +74,7 @@ impl EncoderError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum FinishError {
+pub(super) enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
@@ -95,7 +95,7 @@ impl FinishError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
@@ -149,7 +149,7 @@ impl Default for EncoderState {
     }
 }
 
-pub struct DatadogMetricsEncoder {
+pub(super) struct DatadogMetricsEncoder {
     endpoint: DatadogMetricsEndpoint,
     default_namespace: Option<Arc<str>>,
     uncompressed_limit: usize,
@@ -163,7 +163,7 @@ pub struct DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint.
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let payload_limits = endpoint.payload_limits();
 
         Self {
@@ -183,7 +183,7 @@ impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint, with specific payload limits.
     ///
     /// Only available in tests; production code always uses the API-defined limits via `new`.
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
         uncompressed_limit: usize,
@@ -379,11 +379,11 @@ impl DatadogMetricsEncoder {
     /// # Errors
     ///
     /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    pub(super) fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
         self.encode_single_metric(metric)
     }
 
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let raw_bytes_written = self.state.written;
         let byte_size = self.state.byte_size.clone();
 
@@ -1235,7 +1235,7 @@ mod tests {
         assert!(series_proto.resources.iter().any(|resource| {
             resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
         }));
-        assert!(series_proto.tags.is_empty());
+        assert_eq!(series_proto.tags, [] as [std::string::String; 0]);
     }
 
     #[test]
@@ -1259,10 +1259,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this deterministic rate value exactly."
-    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1293,10 +1289,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this gauge value exactly."
-    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This

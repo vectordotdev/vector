@@ -53,9 +53,9 @@ pub struct HttpError {
 
 impl HttpError {
     /// Wraps a retriable transport error.
-    pub fn new(source: impl Error + Send + Sync + 'static) -> Self {
+    pub fn new(source: impl Into<BoxError>) -> Self {
         Self {
-            source: Box::new(source),
+            source: source.into(),
             retriable: true,
         }
     }

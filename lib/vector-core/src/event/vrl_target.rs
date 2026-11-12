@@ -15,7 +15,7 @@ use vrl::{
 };
 
 use super::{
-    Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent,
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, TraceEvent,
     metric::{MetricTags, TagValue, TagValueSet},
 };
 use crate::{
@@ -23,9 +23,9 @@ use crate::{
     schema::Definition,
 };
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
+const VALID_METRIC_PATHS_SET: &str =
+    ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
-/// We can get the `type` of the metric in Remap, but can't set it.
 const VALID_METRIC_PATHS_GET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
@@ -319,6 +319,34 @@ fn set_metric_tag_values(
     }
 }
 
+/// Converts a counter to a gauge or a gauge to a counter, keeping its value and kind.
+///
+/// Other metric types carry values that have no meaningful scalar equivalent, so they are
+/// rejected both as the current type and as the target type.
+fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
+    let target_type = value.clone().try_bytes().map_err(|e| e.to_string())?;
+    let current = match metric.value() {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => *value,
+        other => {
+            return Err(format!(
+                "cannot change the type of a {} metric, only `counter` and `gauge` metrics can be converted",
+                other.as_name()
+            ));
+        }
+    };
+    *metric.value_mut() = match target_type.as_ref() {
+        b"counter" => MetricValue::Counter { value: current },
+        b"gauge" => MetricValue::Gauge { value: current },
+        other => {
+            return Err(format!(
+                "invalid metric type {}, metric type must be `counter` or `gauge`",
+                String::from_utf8_lossy(other)
+            ));
+        }
+    };
+    Ok(())
+}
+
 impl Target for VrlTarget {
     fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         let path = &target_path.path;
@@ -388,6 +416,7 @@ impl Target for VrlTarget {
                             ["kind"] => {
                                 metric.data.kind = MetricKind::try_from(value.clone())?;
                             }
+                            ["type"] => set_metric_type(metric, &value)?,
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &path.to_string(),
@@ -486,6 +515,7 @@ impl Target for VrlTarget {
                             ["tags", field] => metric
                                 .remove_tag_set(field)
                                 .map(|tag_set| tag_value_set_to_vrl_value(&tag_set, *tag_mode)),
+                            ["type"] => return Err(MetricPathError::RemoveTypeError.to_string()),
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &target_path.path.to_string(),
@@ -745,6 +775,9 @@ enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
     SetPathError,
 
+    #[snafu(display("cannot delete metric type"))]
+    RemoveTypeError,
+
     #[snafu(display("invalid path {}: expected one of {}", path, expected))]
     InvalidPath { path: &'a str, expected: &'a str },
 }
@@ -756,8 +789,12 @@ mod test {
     use similar_asserts::assert_eq;
     use vrl::{btreemap, event_path, value::kind::Index};
 
-    use super::{super::MetricValue, *};
-    use crate::metric_tags;
+    use super::*;
+    use crate::{
+        event::metric::{MetricSketch, StatisticKind},
+        metric_tags,
+        metrics::AgentDDSketch,
+    };
 
     #[test]
     fn test_field_definitions_in_message() {
@@ -1432,6 +1469,7 @@ mod test {
             ".timestamp",
             ".kind",
             ".tags",
+            ".type",
         ];
 
         let info = ProgramInfo {
@@ -1477,6 +1515,183 @@ mod test {
             target.target_get(&OwnedTargetPath::event(owned_value_path!(
                 "tags", "foo", "flork"
             )))
+        );
+    }
+
+    fn type_program_info() -> ProgramInfo {
+        ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!("type"))],
+            target_assignments: vec![],
+        }
+    }
+
+    fn set_type(metric: Metric, new_type: Value) -> (VrlTarget, Result<(), String>) {
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+        let result =
+            target.target_insert(&OwnedTargetPath::event(owned_value_path!("type")), new_type);
+        (target, result)
+    }
+
+    fn into_metric(target: VrlTarget) -> Metric {
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Metric(metric)) => metric,
+            _ => panic!("must be a metric"),
+        }
+    }
+
+    #[test]
+    fn metric_set_type_converts_between_counter_and_gauge() {
+        let cases = [
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+        ];
+
+        for kind in [MetricKind::Absolute, MetricKind::Incremental] {
+            for (value, new_type, expected) in cases.clone() {
+                let metric =
+                    Metric::new("name", kind, value).with_tags(Some(metric_tags!("host" => "a")));
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(result, Ok(()));
+
+                // Later reads in the same program see the new type.
+                assert_eq!(
+                    target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                    Ok(Some(&Value::from(new_type)))
+                );
+
+                let metric = into_metric(target);
+                assert_eq!(metric.value(), &expected);
+                assert_eq!(metric.kind(), kind);
+                assert_eq!(metric.name(), "name");
+                assert_eq!(metric.tag_value("host"), Some("a".into()));
+            }
+        }
+    }
+
+    #[test]
+    fn metric_set_type_rejects_invalid_values() {
+        for new_type in [
+            Value::from("distribution"),
+            Value::from("Counter"),
+            Value::from(""),
+            Value::from(1),
+            Value::Null,
+        ] {
+            let metric = Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            );
+            let (target, result) = set_type(metric, new_type.clone());
+            assert!(result.is_err(), "{new_type:?} should be rejected");
+            assert_eq!(
+                target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                Ok(Some(&Value::from("gauge"))),
+                "{new_type:?} should leave `.type` reading the original type"
+            );
+            assert_eq!(
+                into_metric(target).value(),
+                &MetricValue::Gauge { value: 1.0 },
+                "{new_type:?} should leave the metric unchanged"
+            );
+        }
+
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        assert_eq!(
+            set_type(metric, "set".into()).1,
+            Err("invalid metric type set, metric type must be `counter` or `gauge`".to_owned())
+        );
+    }
+
+    #[test]
+    fn metric_set_type_rejects_non_scalar_metrics() {
+        let values = [
+            MetricValue::Set {
+                values: ["a".to_owned()].into(),
+            },
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 1],
+                count: 1,
+                sum: Some(1.0),
+            },
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![0.5 => 1.0],
+                count: 1,
+                sum: 1.0,
+            },
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+            },
+        ];
+
+        for value in values {
+            let name = value.as_name();
+            for new_type in ["counter", "gauge", name] {
+                let metric = Metric::new("name", MetricKind::Absolute, value.clone());
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(
+                    result,
+                    Err(format!(
+                        "cannot change the type of a {name} metric, only `counter` and `gauge` metrics can be converted"
+                    ))
+                );
+                assert_eq!(into_metric(target).value(), &value);
+            }
+        }
+    }
+
+    #[test]
+    fn metric_remove_type_is_an_error() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+
+        assert_eq!(
+            target.target_remove(&OwnedTargetPath::event(owned_value_path!("type")), true),
+            Err("cannot delete metric type".to_owned())
+        );
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 1.0 }
         );
     }
 

@@ -2,20 +2,21 @@
 //! small markdown files together into a bigger markdown file; whatever renders safely in
 //! a fragment renders identically in the guide. PR review handles content quality.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use semver::Version;
 
 use crate::commands::changelog::{
     FRAGMENT_TYPES, FragmentType, is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections,
     slugify,
 };
-use crate::utils::{git, paths};
+use crate::utils::{cargo::CargoToml, deprecation, git, paths};
 
 const CHANGELOG_DIR: &str = "changelog.d";
 const DEFAULT_MAX_FRAGMENTS: usize = 1000;
 
-/// Validate changelog fragments added on this branch/PR.
+/// Validate changelog fragments or a new deprecation announcement on this branch/PR.
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -44,15 +45,18 @@ impl Cli {
         // Schema validation, on the other hand, must see M (modified) fragments too.
         let is_real_fragment =
             |p: &PathBuf| p.file_name().and_then(|s| s.to_str()) != Some("README.md");
-        let added_real: Vec<PathBuf> = diff_fragments(&self.merge_base, "A")?
+        let added_real: Vec<PathBuf> = diff_fragments(&self.merge_base, "A", CHANGELOG_DIR)?
             .into_iter()
             .filter(is_real_fragment)
             .collect();
-        if added_real.is_empty() {
+        if added_real.is_empty()
+            && !has_added_deprecation_announcement(&repo_root, &self.merge_base)?
+        {
             bail!(
                 "No changelog fragments detected. \
-                 If no changes necessitate user-facing explanations, add the 'no-changelog' label. \
-                 Otherwise, add fragments to {CHANGELOG_DIR}/ (see {CHANGELOG_DIR}/README.md)."
+                 Add a fragment to {CHANGELOG_DIR}/ (see {CHANGELOG_DIR}/README.md). \
+                 For a deprecation announcement, add a valid new notice to deprecation.d/ instead \
+                 (see docs/DEPRECATION_POLICY.md)."
             );
         }
         if added_real.len() > self.max_fragments {
@@ -64,7 +68,7 @@ impl Cli {
         }
 
         // Every touched fragment (added or modified) must pass the schema check.
-        let modified: Vec<PathBuf> = diff_fragments(&self.merge_base, "M")?
+        let modified: Vec<PathBuf> = diff_fragments(&self.merge_base, "M", CHANGELOG_DIR)?
             .into_iter()
             .filter(is_real_fragment)
             .collect();
@@ -89,9 +93,53 @@ impl Cli {
         // time rather than at release time (when a partial CUE may already exist).
         validate_breaking_anchor_set(&changelog_dir)?;
 
-        info!("changelog additions are valid.");
+        info!("Release announcement requirement is satisfied.");
         Ok(())
     }
+}
+
+/// A new active notice is the announcement required by the deprecation policy.
+/// Validate it before accepting it, and do not waive the changelog for removals.
+fn has_added_deprecation_announcement(repo_root: &Path, merge_base: &str) -> Result<bool> {
+    let added = diff_fragments(merge_base, "A", deprecation::DEPRECATION_DIR)?;
+    if !added
+        .iter()
+        .any(|path| is_deprecation_notice(path, deprecation::DEPRECATION_DIR))
+    {
+        return Ok(false);
+    }
+
+    let notices = deprecation::read_all(repo_root)?;
+    let current = CargoToml::load_from(&repo_root.join("Cargo.toml"))?;
+    let current = Version::parse(&current.package.version)?;
+    // Release pages match the full version, with development suffixes removed.
+    let release = Version::new(current.major, current.minor, current.patch);
+    let has_announcement = notices.active.iter().any(|notice| {
+        notice.deprecated_since.0 == release
+            && added.contains(&Path::new(deprecation::DEPRECATION_DIR).join(&notice.filename))
+    });
+    if !has_announcement {
+        return Ok(false);
+    }
+
+    // Diff the directories separately so an enactment is seen as a deletion and
+    // addition even when Git detects it as a rename across the two directories.
+    let removed = diff_fragments(merge_base, "D", deprecation::DEPRECATION_DIR)?;
+    let enacted = diff_fragments(merge_base, "A", deprecation::ENACTED_DIR)?;
+    Ok(!removed
+        .iter()
+        .any(|path| is_deprecation_notice(path, deprecation::DEPRECATION_DIR))
+        && !enacted
+            .iter()
+            .any(|path| is_deprecation_notice(path, deprecation::ENACTED_DIR)))
+}
+
+fn is_deprecation_notice(path: &Path, directory: &str) -> bool {
+    path.parent() == Some(Path::new(directory))
+        && path.file_name().is_some_and(|name| name != "README.md")
+        && path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
 /// Load every fragment in `changelog.d/` whose type is flagged `breaking`, compute its anchor
@@ -142,11 +190,11 @@ fn validate_breaking_anchor_set(changelog_dir: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-/// `git diff --name-only --diff-filter=<filter> --merge-base <merge_base> changelog.d`
+/// `git diff --name-only --diff-filter=<filter> --merge-base <merge_base> -- <directory>`
 ///
 /// `filter` is a `git diff` `--diff-filter` value: `A` for added-only, `M` for
 /// modified-only, `AM` for both, etc.
-fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
+fn diff_fragments(merge_base: &str, filter: &str, directory: &str) -> Result<Vec<PathBuf>> {
     let filter_arg = format!("--diff-filter={filter}");
     let out = git::run_and_check_output(&[
         "diff",
@@ -154,7 +202,8 @@ fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
         &filter_arg,
         "--merge-base",
         merge_base,
-        CHANGELOG_DIR,
+        "--",
+        directory,
     ])?;
     Ok(out
         .lines()

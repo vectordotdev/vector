@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use vector_lib::internal_event::{emit, register};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
@@ -69,7 +70,7 @@ pub(super) async fn firehose(
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let log_namespace = context.log_namespace;
-    let events_received = register!(EventsReceived);
+    let events_received = register(EventsReceived);
     let common_attributes_map =
         build_common_attributes_map(&context.common_attributes, &common_attributes);
 
@@ -170,7 +171,7 @@ pub(super) async fn firehose(
                     match context.out.send_batch(events).await {
                         Ok(()) => (),
                         Err(SendError::Closed) => {
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             let error = RequestError::ShuttingDown {
                                 request_id: request_id.clone(),
                             };
@@ -255,9 +256,9 @@ fn decode_record(
                             compression: Compression::Gzip,
                         });
                     }
-                    emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                    emit(AwsKinesisFirehoseAutomaticRecordDecodeError {
                         compression: Compression::Gzip,
-                        error
+                        error,
                     });
                     Ok(Bytes::from(buf))
                 })

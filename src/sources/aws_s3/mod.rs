@@ -521,7 +521,7 @@ mod test {
         .await
         .unwrap();
 
-        assert!(data.is_empty());
+        assert_eq!(data, [] as [u8; 0]);
     }
 }
 
