@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
-use vector_lib::internal_event::GaugeName;
+use vector_lib::internal_event::{GaugeName, LossyF64};
 #[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
@@ -104,7 +104,7 @@ impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
             count = self.count,
         );
         vector_lib::gauge!(GaugeName::PrometheusKubernetesSdTargetsDiscovered)
-            .set(self.count as f64);
+            .set(LossyF64(self.count));
     }
 }
 

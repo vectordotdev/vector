@@ -42,7 +42,7 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of targets to discover."))]
-pub enum TargetConfig {
+pub(crate) enum TargetConfig {
     /// A static list of scrape URLs.
     Static {
         /// URLs to scrape.
@@ -210,82 +210,13 @@ impl SourceConfig for PrometheusScrapeConfig {
         let headers = build_headers(&self.headers)?;
 
         #[cfg(feature = "kubernetes")]
-        {
-            let kubernetes_cfgs: Vec<&KubernetesScrapeConfig> = self
-                .targets
-                .iter()
-                .filter_map(|t| {
-                    if let TargetConfig::Kubernetes(k) = t {
-                        Some(k)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            if let Some(k8s_cfg) = kubernetes_cfgs.first() {
-                let client =
-                    kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
-
-                let self_node_name = if k8s_cfg.use_self_node_only {
-                    let resolved = match k8s_cfg.self_node_name.clone() {
-                        Some(n) => n,
-                        None => std::env::var(kubernetes_sd::SELF_NODE_NAME_ENV_KEY).map_err(
-                            |_| {
-                                let msg = format!(
-                                    "self_node_name config value or {} env var must be set when use_self_node_only is true",
-                                    kubernetes_sd::SELF_NODE_NAME_ENV_KEY
-                                );
-                                msg
-                            },
-                        )?,
-                    };
-                    Some(resolved)
-                } else {
-                    None
-                };
-
-                let field_selector = kubernetes_sd::build_field_selector(
-                    self_node_name.as_deref(),
-                    &k8s_cfg.extra_field_selector,
-                );
-                let label_selector = kubernetes_sd::build_label_selector(&k8s_cfg.label_selector);
-
-                let parser_cfg = kubernetes_sd::AnnotationParserConfig {
-                    prefix: k8s_cfg.annotation_prefix.clone(),
-                    default_scheme: k8s_cfg.default_scheme,
-                    default_path: k8s_cfg.default_path.clone(),
-                    pod_label_tags: k8s_cfg.pod_label_tags.clone(),
-                    pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
-                };
-
-                let scrape_cfg = kubernetes_sd::ScrapeConfig {
-                    interval: self.interval,
-                    timeout: self.timeout,
-                    instance_tag: self.instance_tag.clone(),
-                    endpoint_tag: self.endpoint_tag.clone(),
-                    honor_labels: self.honor_labels,
-                    auth: self.auth.clone(),
-                    query: self.query.clone(),
-                };
-
-                // Convert static URLs to Target structs.
-                let static_targets = static_urls.into_iter().map(static_target).collect();
-
-                return Ok(Box::pin(kubernetes_sd::run(
-                    client,
-                    tls,
-                    cx.proxy.clone(),
-                    k8s_cfg.namespaces.clone(),
-                    field_selector,
-                    label_selector,
-                    parser_cfg,
-                    scrape_cfg,
-                    static_targets,
-                    cx.out,
-                    cx.shutdown,
-                )));
-            }
+        if let Some(k8s_cfg) = self.targets.iter().find_map(|target| match target {
+            TargetConfig::Kubernetes(k8s_cfg) => Some(k8s_cfg),
+            TargetConfig::Static { .. } => None,
+        }) {
+            return self
+                .build_kubernetes_source(k8s_cfg, static_urls, tls, cx)
+                .await;
         }
 
         // Pure static path: use existing `call()`.
@@ -378,16 +309,80 @@ fn static_target(uri: Uri) -> kubernetes_sd::Target {
 
 impl PrometheusScrapeConfig {
     fn has_any_targets(&self) -> bool {
-        for target in &self.targets {
-            match target {
-                TargetConfig::Static { urls } if !urls.is_empty() => return true,
-                #[cfg(feature = "kubernetes")]
-                TargetConfig::Kubernetes(_) => return true,
-                #[allow(unreachable_patterns)]
-                TargetConfig::Static { .. } => {}
-            }
-        }
-        false
+        self.targets.iter().any(|target| match target {
+            TargetConfig::Static { urls } => !urls.is_empty(),
+            #[cfg(feature = "kubernetes")]
+            TargetConfig::Kubernetes(_) => true,
+        })
+    }
+
+    /// Builds the source when `targets` contains a Kubernetes group. Static URLs are scraped
+    /// alongside the discovered targets.
+    #[cfg(feature = "kubernetes")]
+    async fn build_kubernetes_source(
+        &self,
+        k8s_cfg: &KubernetesScrapeConfig,
+        static_urls: Vec<Uri>,
+        tls: TlsSettings,
+        cx: SourceContext,
+    ) -> Result<sources::Source> {
+        let client = kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
+
+        let self_node_name = if k8s_cfg.use_self_node_only {
+            let resolved = match k8s_cfg.self_node_name.clone() {
+                Some(n) => n,
+                None => std::env::var(kubernetes_sd::SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+                    format!(
+                        "self_node_name config value or {} env var must be set when use_self_node_only is true",
+                        kubernetes_sd::SELF_NODE_NAME_ENV_KEY
+                    )
+                })?,
+            };
+            Some(resolved)
+        } else {
+            None
+        };
+
+        let field_selector = kubernetes_sd::build_field_selector(
+            self_node_name.as_deref(),
+            &k8s_cfg.extra_field_selector,
+        );
+        let label_selector = kubernetes_sd::build_label_selector(&k8s_cfg.label_selector);
+
+        let parser_cfg = kubernetes_sd::AnnotationParserConfig {
+            prefix: k8s_cfg.annotation_prefix.clone(),
+            default_scheme: k8s_cfg.default_scheme,
+            default_path: k8s_cfg.default_path.clone(),
+            pod_label_tags: k8s_cfg.pod_label_tags.clone(),
+            pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
+        };
+
+        let scrape_cfg = kubernetes_sd::ScrapeConfig {
+            interval: self.interval,
+            timeout: self.timeout,
+            instance_tag: self.instance_tag.clone(),
+            endpoint_tag: self.endpoint_tag.clone(),
+            honor_labels: self.honor_labels,
+            auth: self.auth.clone(),
+            query: self.query.clone(),
+        };
+
+        // Convert static URLs to Target structs.
+        let static_targets = static_urls.into_iter().map(static_target).collect();
+
+        Ok(sources::opaque_source(kubernetes_sd::run(
+            client,
+            tls,
+            cx.proxy.clone(),
+            k8s_cfg.namespaces.clone(),
+            field_selector,
+            label_selector,
+            parser_cfg,
+            scrape_cfg,
+            static_targets,
+            cx.out,
+            cx.shutdown,
+        )))
     }
 }
 
@@ -531,6 +526,7 @@ mod validation_tests {
             endpoint_tag: None,
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             tls: None,
             auth: None,
         }

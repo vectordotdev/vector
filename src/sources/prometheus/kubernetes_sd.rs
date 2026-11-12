@@ -8,9 +8,8 @@ use std::{collections::BTreeMap, net::IpAddr, path::PathBuf, sync::Arc, time::Du
 
 use bytes::Bytes;
 use futures::{StreamExt, stream};
-use http::{Uri, response::Parts};
-use http_1::{HeaderName, HeaderValue};
-use hyper::{Body, Request};
+use http::{HeaderName, HeaderValue, Request, StatusCode, Uri, response::Parts};
+use http_body_util::BodyExt as _;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Client, Config as ClientConfig,
@@ -21,10 +20,12 @@ use kube::{
 use serde_with::serde_as;
 use snafu::Snafu;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::empty_body;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::{Event, Metric},
+    internal_event::emit,
     json_size::JsonSize,
     shutdown::ShutdownSignal,
 };
@@ -64,7 +65,7 @@ fn default_annotation_prefix() -> String {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum Role {
+pub(crate) enum Role {
     /// Discover targets from Pods.
     #[default]
     Pod,
@@ -74,7 +75,7 @@ pub enum Role {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum Scheme {
+pub(crate) enum Scheme {
     /// Plain HTTP.
     #[default]
     Http,
@@ -107,7 +108,7 @@ impl Scheme {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct KubernetesScrapeConfig {
+pub(crate) struct KubernetesScrapeConfig {
     /// Discovery role. Only `pod` is supported in this release.
     role: Role,
 
@@ -124,7 +125,7 @@ pub struct KubernetesScrapeConfig {
     /// When enabled, the source filters Pods by `spec.nodeName=<node>` where
     /// `<node>` is read from the `VECTOR_SELF_NODE_NAME` environment variable
     /// (or the `self_node_name` option). Use this when deploying Vector as a
-    /// DaemonSet.
+    /// `DaemonSet`.
     pub(crate) use_self_node_only: bool,
 
     /// Override for the node name used by `use_self_node_only`.
@@ -323,7 +324,7 @@ pub(crate) async fn run(
         }));
     }
 
-    let http_client = match HttpClient::new(tls, &proxy) {
+    let http_client = match HttpClient::new(tls.into(), &proxy) {
         Ok(c) => c,
         Err(error) => {
             error!(message = "Failed to build HTTP client.", %error);
@@ -345,8 +346,8 @@ pub(crate) async fn run(
                 .flat_map(|store| collect_targets(store, &parser_cfg))
                 .collect();
             targets.splice(..0, static_targets.clone());
-            emit!(PrometheusKubernetesSdTargetsDiscovered {
-                count: targets.len()
+            emit(PrometheusKubernetesSdTargetsDiscovered {
+                count: targets.len(),
             });
 
             let scrape_cfg = Arc::clone(&scrape_cfg);
@@ -368,7 +369,7 @@ pub(crate) async fn run(
         .flat_map(stream::iter);
 
     let result = if out.send_event_stream(&mut events_stream).await.is_err() {
-        emit!(StreamClosedError { count: 0 });
+        emit(StreamClosedError { count: 0 });
         Err(())
     } else {
         Ok(())
@@ -389,7 +390,7 @@ fn collect_targets(
         match extract_targets(&pod, parser_cfg) {
             Ok(mut targets) => out.append(&mut targets),
             Err(error) => {
-                emit!(PrometheusKubernetesSdAnnotationParseError {
+                emit(PrometheusKubernetesSdAnnotationParseError {
                     pod: pod.metadata.name.as_deref().unwrap_or("<unknown>"),
                     namespace: pod.metadata.namespace.as_deref().unwrap_or(""),
                     error: &error.to_string(),
@@ -454,10 +455,7 @@ fn extract_targets(
         .unwrap_or_default();
 
     let scrape_key = format!("{}/scrape", cfg.prefix);
-    let scrape = annotations
-        .get(&scrape_key)
-        .map(|v| v.as_str())
-        .unwrap_or("false");
+    let scrape = annotations.get(&scrape_key).map_or("false", |v| v.as_str());
     if !is_truthy(scrape) {
         return Ok(Vec::new());
     }
@@ -465,21 +463,20 @@ fn extract_targets(
     let path_key = format!("{}/path", cfg.prefix);
     let path = annotations
         .get(&path_key)
-        .map(|s| s.as_str())
-        .unwrap_or(cfg.default_path.as_str())
-        .to_string();
+        .map_or(cfg.default_path.as_str(), |s| s.as_str())
+        .to_owned();
 
     let scheme_key = format!("{}/scheme", cfg.prefix);
     let scheme = match annotations.get(&scheme_key) {
         Some(v) => Scheme::parse(v.as_str()).ok_or_else(|| AnnotationError::InvalidValue {
             key: scheme_key.clone(),
-            value: v.to_string(),
+            value: (*v).clone(),
         })?,
         None => cfg.default_scheme,
     };
 
     let port_key = format!("{}/port", cfg.prefix);
-    let port_annotation = annotations.get(&port_key).map(|s| s.to_string());
+    let port_annotation = annotations.get(&port_key).map(|s| (*s).clone());
 
     // Build query string from `<prefix>/param_*` annotations.
     let param_prefix = format!("{}/param_", cfg.prefix);
@@ -487,7 +484,7 @@ fn extract_targets(
         .iter()
         .filter_map(|(k, v)| {
             k.strip_prefix(param_prefix.as_str())
-                .map(|name| (name.to_string(), v.to_string()))
+                .map(|name| (name.to_owned(), (*v).clone()))
         })
         .collect();
     query_pairs.sort();
@@ -547,9 +544,8 @@ struct ResolvedPort {
 /// Resolve scrape ports from a Pod and an optional `prometheus.io/port`
 /// annotation value (which may be a numeric port or a container port name).
 fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<ResolvedPort>, String> {
-    let spec = match pod.spec.as_ref() {
-        Some(s) => s,
-        None => return Ok(Vec::new()),
+    let Some(spec) = pod.spec.as_ref() else {
+        return Ok(Vec::new());
     };
 
     // Pre-compute all ports with their container names for lookup.
@@ -573,7 +569,7 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
             // Optionally find owning container by matching containerPort.
             let container = all_ports
                 .iter()
-                .find(|(_, p)| p.container_port == port as i32)
+                .find(|(_, p)| p.container_port == i32::from(port))
                 .and_then(|(name, _)| name.clone());
             return Ok(vec![ResolvedPort { port, container }]);
         }
@@ -695,10 +691,10 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     // `build_url` preserves them and appends the source-level parameters.
     let url = build_url(&target.uri, &cfg.query);
     let endpoint = url.to_string();
-    let mut request = match Request::get(&url).body(Body::empty()) {
+    let mut request = match Request::get(&url).body(empty_body()) {
         Ok(r) => r,
         Err(error) => {
-            emit!(HttpClientHttpError {
+            emit(HttpClientHttpError {
                 error: error.to_string().into(),
                 url: endpoint,
             });
@@ -716,14 +712,14 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     let response = match tokio::time::timeout(cfg.timeout, client.send(request)).await {
         Ok(Ok(r)) => r,
         Ok(Err(error)) => {
-            emit!(HttpClientHttpError {
+            emit(HttpClientHttpError {
                 error: error.into(),
                 url: endpoint,
             });
             return Vec::new();
         }
         Err(_) => {
-            emit!(HttpClientHttpError {
+            emit(HttpClientHttpError {
                 error: format!(
                     "Timeout error: request exceeded {}s",
                     cfg.timeout.as_secs_f64()
@@ -736,25 +732,25 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     };
 
     let (parts, body) = response.into_parts();
-    let body: Bytes = match http_body::Body::collect(body).await {
+    let body: Bytes = match body.collect().await {
         Ok(b) => b.to_bytes(),
         Err(error) => {
-            emit!(HttpClientHttpError {
+            emit(HttpClientHttpError {
                 error: error.into(),
                 url: endpoint,
             });
             return Vec::new();
         }
     };
-    emit!(EndpointBytesReceived {
+    emit(EndpointBytesReceived {
         byte_size: body.len(),
         protocol: "http",
         endpoint: endpoint.as_str(),
     });
 
-    if parts.status != hyper::StatusCode::OK {
+    if parts.status != StatusCode::OK {
         on_http_response_error(&url, &parts);
-        emit!(HttpClientHttpResponseError {
+        emit(HttpClientHttpResponseError {
             code: parts.status,
             url: endpoint,
         });
@@ -765,7 +761,7 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     let mut events = match parser::parse_text(&body_str) {
         Ok(events) => events,
         Err(error) => {
-            emit!(PrometheusParseError {
+            emit(PrometheusParseError {
                 error,
                 url: url.clone(),
                 body: body_str,
@@ -779,7 +775,7 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     } else {
         events.estimated_json_encoded_size_of()
     };
-    emit!(HttpClientEventsReceived {
+    emit(HttpClientEventsReceived {
         byte_size,
         count: events.len(),
         url: endpoint,
@@ -792,7 +788,7 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
 }
 
 fn on_http_response_error(url: &Uri, header: &Parts) {
-    if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+    if header.status == StatusCode::NOT_FOUND && url.path() == "/" {
         warn!(
             message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics?",
             endpoint = %url,
