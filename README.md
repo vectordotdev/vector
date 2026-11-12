@@ -85,18 +85,10 @@ Other Resources:
 
 ## Testing and benchmarks
 
-The [Vector test harness][urls.vector_test_harness]
-contains functional checks and performance workloads, with documented
-configurations, environments, and results.
-
-Historical cross-product performance and correctness tables have been
-withdrawn following a
-[comparability audit](https://github.com/vectordotdev/vector-test-harness/blob/master/docs/comparisons.md).
-The underlying cases did not consistently establish equivalent processing,
-delivery guarantees, and verified output.
-
-When evaluating Vector, benchmark a representative pipeline and verify the
-records delivered to its destination. Performance depends on the workload,
+The [Vector test harness][urls.vector_test_harness] contains functional checks
+and performance workloads, with documented configurations, environments, and
+results. When evaluating Vector, benchmark a representative pipeline and verify
+the records delivered to its destination. Performance depends on the workload,
 configuration, hardware, and software versions.
 
 ---
