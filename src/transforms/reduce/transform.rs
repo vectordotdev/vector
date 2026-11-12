@@ -407,7 +407,7 @@ impl TaskTransform<Event> for ShardedReduce {
         drop(output_tx);
 
         tasks.spawn_timed(
-            route(self.reduce.group_by, shards_senders, input_rx).in_current_span(),
+            route(self.reduce.group_by, shards_senders, input_rx),
             self.cpu_ns.clone(),
         );
 
