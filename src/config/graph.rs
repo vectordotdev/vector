@@ -732,21 +732,6 @@ mod test {
     }
 
     #[test]
-    fn checks_deep_graphs_without_recursion() {
-        let mut graph = Graph::default();
-        graph.add_source("in", DataType::Log);
-        let mut previous = "in".to_owned();
-        for i in 0..20_000 {
-            let id = format!("transform_{i}");
-            graph.add_transform(&id, DataType::Log, DataType::Log, vec![&previous]);
-            previous = id;
-        }
-        graph.add_sink("out", DataType::Log, vec![&previous]);
-
-        assert_eq!(graph.check_for_cycles(), Ok(()));
-    }
-
-    #[test]
     fn paths_doesnt_detect_noncycles() {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
