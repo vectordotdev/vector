@@ -1,9 +1,10 @@
 //! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use http_1::{HeaderValue, header::AUTHORIZATION};
+use http::{HeaderValue, header::AUTHORIZATION};
 use tonic::{
     Request, Response, Status,
     service::{RoutesBuilder, interceptor::InterceptedService},
@@ -66,7 +67,7 @@ impl proto::Service for Service {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
                 Err(error) => {
-                    emit!(GrpcEventDecodeError { error: &error });
+                    emit(GrpcEventDecodeError { error: &error });
                     return Err(Status::invalid_argument(error.to_string()));
                 }
             }
@@ -88,7 +89,7 @@ impl proto::Service for Service {
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
@@ -98,7 +99,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|()| handle_batch_status(receiver))
@@ -278,7 +279,7 @@ impl SourceConfig for VectorConfig {
         );
 
         // Create the standard gRPC health service
-        let (mut health_reporter, health_service) = health_reporter();
+        let (health_reporter, health_service) = health_reporter();
 
         // Register the Vector service as serving in the health reporter
         health_reporter
@@ -531,6 +532,62 @@ mod tests {
     #[tokio::test]
     async fn receive_zstd_compressed_message() {
         run_test(Some("zstd")).await;
+    }
+
+    #[tokio::test]
+    async fn rejects_deeply_nested_protobuf() {
+        use vector_lib::event::proto::{
+            EventWrapper, Log, Value, ValueArray, ValueMap, event_wrapper, value,
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source: VectorConfig = serde_yaml::from_str(&format!("address: \"{addr}\"\n")).unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let server = tokio::spawn(
+            source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap(),
+        );
+        test_util::wait_for_tcp(addr).await;
+        let mut client = proto::Client::connect(format!("http://{addr}"))
+            .await
+            .unwrap();
+
+        let request = |depth| {
+            let mut nested = Value {
+                kind: Some(value::Kind::Integer(1)),
+            };
+            for _ in 0..depth {
+                nested = Value {
+                    kind: Some(value::Kind::Array(ValueArray {
+                        items: vec![nested],
+                    })),
+                };
+            }
+            proto::PushEventsRequest {
+                events: vec![EventWrapper {
+                    event: Some(event_wrapper::Event::Log(Log {
+                        value: Some(Value {
+                            kind: Some(value::Kind::Map(ValueMap {
+                                fields: [("nested".to_owned(), nested)].into(),
+                            })),
+                        }),
+                        ..Default::default()
+                    })),
+                }],
+            }
+        };
+
+        // Each array adds two Protobuf message levels. This exceeds Prost's depth
+        // budget while remaining well below the request-size limit.
+        let error = client.push_events(request(64)).await.unwrap_err();
+        assert_eq!(error.code(), tonic::Code::Internal);
+        assert!(error.message().contains("recursion limit reached"));
+
+        client.push_events(request(1)).await.unwrap();
+        assert_eq!(test_util::collect_ready(rx).len(), 1);
+        server.abort();
     }
 
     #[tokio::test]

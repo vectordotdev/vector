@@ -35,7 +35,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-pub struct KinesisClientBuilder;
+pub(super) struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
     type Client = KinesisClient;
@@ -45,8 +45,8 @@ impl ClientBuilder for KinesisClientBuilder {
     }
 }
 
-pub const MAX_PAYLOAD_SIZE: usize = 5_000_000;
-pub const MAX_PAYLOAD_EVENTS: usize = 500;
+pub(super) const MAX_PAYLOAD_SIZE: usize = 5_000_000;
+pub(super) const MAX_PAYLOAD_EVENTS: usize = 500;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KinesisDefaultBatchSettings;

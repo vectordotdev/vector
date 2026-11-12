@@ -18,6 +18,7 @@ pub enum ApiStatus {
     BadRequestv2,
 }
 
+/// Starts an HTTP test server that captures http 1 request parts and body bytes.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::needless_pass_by_value,

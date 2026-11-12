@@ -1,5 +1,4 @@
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_body_util::{BodyExt, Collected};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -9,7 +8,8 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_lib::{configurable::configurable_component, event::EventStatus};
+use vector_http::full_body;
+use vector_lib::{configurable::configurable_component, event::EventStatus, internal_event::emit};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -109,7 +109,7 @@ impl HecAckClient {
     fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
-        emit!(SplunkIndexerAcknowledgementAckAdded);
+        emit(SplunkIndexerAcknowledgementAckAdded);
     }
 
     /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
@@ -138,7 +138,7 @@ impl HecAckClient {
                             // request/response format changes in future
                             // versions), log an error and fall back to default
                             // behavior.
-                            emit!(SplunkIndexerAcknowledgementAPIError {
+                            emit(SplunkIndexerAcknowledgementAPIError {
                                 message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
                                 error,
                             });
@@ -147,7 +147,7 @@ impl HecAckClient {
                             );
                         }
                         _ => {
-                            emit!(SplunkIndexerAcknowledgementAPIError {
+                            emit(SplunkIndexerAcknowledgementAPIError {
                                 message: "Unable to send acknowledgement query request. Will retry.",
                                 error,
                             });
@@ -169,8 +169,8 @@ impl HecAckClient {
                 debug!(message = "Finalized ack id.", ?ack_id);
             }
         }
-        emit!(SplunkIndexerAcknowledgementAcksRemoved {
-            count: removed_count
+        emit(SplunkIndexerAcknowledgementAcksRemoved {
+            count: removed_count,
         });
     }
 
@@ -203,8 +203,8 @@ impl HecAckClient {
                 removed_count += 1.0;
             }
         }
-        emit!(SplunkIndexerAcknowledgementAcksRemoved {
-            count: removed_count
+        emit(SplunkIndexerAcknowledgementAcksRemoved {
+            count: removed_count,
         });
     }
 
@@ -230,15 +230,14 @@ impl HecAckClient {
             .build_request(
                 payload,
                 "/services/collector/ack",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
             .client
-            .send(request.map(Body::from))
+            .send(request.map(full_body))
             .await
             .map_err(|_| HecAckApiError::ServerSendQuery)?;
 
@@ -303,14 +302,12 @@ mod tests {
 
     use super::{HecAckClient, HecClientAcknowledgementsConfig};
 
-    use crate::{
-        http::HttpClient,
-        sinks::{
-            splunk_hec::common::{
-                EndpointTarget, acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
-            },
-            util::Compression,
+    use crate::sinks::{
+        splunk_hec::common::{
+            EndpointTarget, acknowledgements::HecAckStatusRequest, create_client,
+            service::HttpRequestBuilder,
         },
+        util::Compression,
     };
 
     #[test]
@@ -339,7 +336,7 @@ mod tests {
     }
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = HttpRequestBuilder::new(
             String::new(),
             EndpointTarget::default(),

@@ -1146,7 +1146,7 @@ pub fn build_client(
     }
 
     // Use reqwest v0.13 since Azure SDK only implements HttpClient for reqwest::Client v0.13
-    let mut reqwest_builder = reqwest_13::ClientBuilder::new();
+    let mut reqwest_builder = reqwest::ClientBuilder::new();
     let bypass_proxy = {
         let host = url.host_str().unwrap_or("");
         let port = url.port();
@@ -1158,13 +1158,13 @@ pub fn build_client(
         reqwest_builder = reqwest_builder.no_proxy();
     } else {
         if let Some(http) = &proxy.http {
-            let p = reqwest_13::Proxy::http(http)
-                .map_err(|e| format!("Invalid HTTP proxy URL: {e}"))?;
+            let p =
+                reqwest::Proxy::http(http).map_err(|e| format!("Invalid HTTP proxy URL: {e}"))?;
             // If credentials are embedded in the proxy URL, reqwest will handle them.
             reqwest_builder = reqwest_builder.proxy(p);
         }
         if let Some(https) = &proxy.https {
-            let p = reqwest_13::Proxy::https(https)
+            let p = reqwest::Proxy::https(https)
                 .map_err(|e| format!("Invalid HTTPS proxy URL: {e}"))?;
             // If credentials are embedded in the proxy URL, reqwest will handle them.
             reqwest_builder = reqwest_builder.proxy(p);
@@ -1176,7 +1176,7 @@ pub fn build_client(
     {
         let mut buf = Vec::new();
         File::open(ca_file)?.read_to_end(&mut buf)?;
-        let cert = reqwest_13::Certificate::from_pem(&buf)?;
+        let cert = reqwest::Certificate::from_pem(&buf)?;
 
         warn!("Adding TLS root certificate from {}", ca_file.display());
         reqwest_builder = reqwest_builder.add_root_certificate(cert);

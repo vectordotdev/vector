@@ -47,7 +47,7 @@ impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
 }
 
 #[derive(Clone, Debug)]
-pub struct StackdriverMetricsEncoder {
+pub(super) struct StackdriverMetricsEncoder {
     pub(super) default_namespace: String,
     pub(super) started: chrono::DateTime<Utc>,
     pub(super) resource: gcp::GcpTypedResource,

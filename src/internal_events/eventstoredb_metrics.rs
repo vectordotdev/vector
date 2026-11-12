@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct EventStoreDbMetricsHttpError {
+pub(crate) struct EventStoreDbMetricsHttpError {
     pub error: crate::Error,
 }
 
@@ -26,7 +26,7 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct EventStoreDbStatsParsingError {
+pub(crate) struct EventStoreDbStatsParsingError {
     pub error: serde_json::Error,
 }
 

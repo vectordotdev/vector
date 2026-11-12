@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
 use aws_sdk_sqs::{
@@ -314,6 +315,7 @@ pub struct State {
 
     deferred: Option<DeferredConfig>,
     notification_parser: Option<Arc<dyn NotificationParser>>,
+    source_type: &'static str,
 }
 
 pub(super) struct Ingestor {
@@ -353,7 +355,7 @@ impl Ingestor {
             max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
-                .map_or_else(crate::num_threads, NonZeroUsize::get),
+                .map_or_else(vector_lib::num_threads, NonZeroUsize::get),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
@@ -361,13 +363,19 @@ impl Ingestor {
 
             deferred: config.deferred,
             notification_parser: None,
+            source_type: AwsS3Config::NAME,
         };
 
         Ok(Ingestor { state })
     }
 
-    pub(super) fn with_notification_parser(mut self, parser: Arc<dyn NotificationParser>) -> Self {
+    pub(super) fn with_notification_parser(
+        mut self,
+        parser: Arc<dyn NotificationParser>,
+        source_type: &'static str,
+    ) -> Self {
         self.state.notification_parser = Some(parser);
+        self.state.source_type = source_type;
         self
     }
 
@@ -432,8 +440,8 @@ impl IngestorProcess {
             shutdown,
             acknowledgements,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(Protocol::HTTP)),
+            events_received: register(EventsReceived),
             backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
@@ -469,13 +477,13 @@ impl IngestorProcess {
     async fn run_once(&mut self) -> Result<(), ()> {
         let messages = match self.receive_messages().await {
             Ok(messages) => {
-                emit!(SqsMessageReceiveSucceeded {
+                emit(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             }
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                emit(SqsMessageReceiveError { error: &err });
                 return Err(());
             }
         };
@@ -500,8 +508,8 @@ impl IngestorProcess {
                 .unwrap_or_else(|| "<unknown>".to_owned());
             match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
-                    emit!(SqsMessageProcessingSucceeded {
-                        message_id: &message_id
+                    emit(SqsMessageProcessingSucceeded {
+                        message_id: &message_id,
                     });
                     if self.state.delete_message {
                         trace!(
@@ -521,8 +529,8 @@ impl IngestorProcess {
                 Err(err) => {
                     match err {
                         ProcessingError::FileTooOld { .. } => {
-                            emit!(SqsMessageProcessingSucceeded {
-                                message_id: &message_id
+                            emit(SqsMessageProcessingSucceeded {
+                                message_id: &message_id,
                             });
                             if let Some(deferred) = &self.state.deferred {
                                 trace!(
@@ -557,7 +565,7 @@ impl IngestorProcess {
                             }
                         }
                         _ => {
-                            emit!(SqsMessageProcessingError {
+                            emit(SqsMessageProcessingError {
                                 message_id: &message_id,
                                 error: &err,
                             });
@@ -580,19 +588,19 @@ impl IngestorProcess {
             {
                 Ok(result) => {
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageSentSucceeded {
+                        emit(SqsMessageSentSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageSentPartialError {
-                            entries: result.failed
+                        emit(SqsMessageSentPartialError {
+                            entries: result.failed,
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageSendBatchError {
+                    emit(SqsMessageSendBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -607,19 +615,19 @@ impl IngestorProcess {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageDeleteSucceeded {
+                        emit(SqsMessageDeleteSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageDeletePartialError {
-                            entries: result.failed
+                        emit(SqsMessageDeletePartialError {
+                            entries: result.failed,
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageDeleteBatchError {
+                    emit(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -690,6 +698,7 @@ impl IngestorProcess {
         log_namespace: LogNamespace,
     ) -> Result<(), ProcessingError> {
         let download_start = Instant::now();
+        let source_type = self.state.source_type;
 
         let object_result = self
             .state
@@ -767,7 +776,7 @@ impl IngestorProcess {
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context, _lastline_context)| line),
+                .map(|aggregated| aggregated.line),
             ),
             None => lines,
         };
@@ -790,6 +799,7 @@ impl IngestorProcess {
                         handle_single_log(
                             log_event,
                             log_namespace,
+                            source_type,
                             &reference,
                             metadata.as_ref(),
                             timestamp,
@@ -806,7 +816,7 @@ impl IngestorProcess {
             Ok(()) => None,
             Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Some(SendError::Closed)
             }
             Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
@@ -820,9 +830,9 @@ impl IngestorProcess {
         let duration = download_start.elapsed();
 
         if read_error.is_some() {
-            emit!(S3ObjectProcessingFailed { bucket, duration });
+            emit(S3ObjectProcessingFailed { bucket, duration });
         } else {
-            emit!(S3ObjectProcessingSucceeded { bucket, duration });
+            emit(S3ObjectProcessingSucceeded { bucket, duration });
         }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
@@ -983,7 +993,7 @@ fn s3_record_batch(
         })));
     }
     if record.event_name.kind != "ObjectCreated" {
-        emit!(SqsS3EventRecordInvalidEventIgnored {
+        emit(SqsS3EventRecordInvalidEventIgnored {
             bucket: &record.s3.bucket.name,
             key: &record.s3.object.key,
             kind: &record.event_name.kind,
@@ -1004,6 +1014,7 @@ fn s3_record_batch(
 fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
+    source_type: &'static str,
     reference: &S3ObjectReference,
     metadata: Option<&HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
@@ -1047,7 +1058,7 @@ fn handle_single_log(
         log,
         log_schema().source_type_key(),
         path!(SOURCE_TYPE),
-        Value::from_static_str(AwsS3Config::NAME),
+        Value::from_static_str(source_type),
     );
 
     // This handles the transition from the original timestamp logic. Originally the
@@ -1236,7 +1247,7 @@ pub struct S3Object {
 mod urlencoded_string {
     use percent_encoding::{percent_decode, utf8_percent_encode};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -1259,7 +1270,7 @@ mod urlencoded_string {
         })
     }
 
-    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

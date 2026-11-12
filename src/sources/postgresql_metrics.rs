@@ -5,6 +5,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::{DateTime, Utc};
 use futures::{
@@ -237,16 +238,16 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(PostgresqlMetrics::collect)).await;
-                emit!(CollectionCompleted {
+                emit(CollectionCompleted {
                     start,
-                    end: Instant::now()
+                    end: Instant::now(),
                 });
 
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
                 let count = metrics.len();
 
                 if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     return Err(error);
                 }
             }
@@ -547,7 +548,7 @@ impl PostgresqlMetrics {
             namespace,
             tags,
             datname_filter,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
         })
     }
 
@@ -557,7 +558,7 @@ impl PostgresqlMetrics {
                 iter::once(self.create_metric("up", gauge!(1.0), tags!(self.tags))).chain(metrics),
             ),
             Err(error) => {
-                emit!(PostgresqlMetricsCollectError {
+                emit(PostgresqlMetricsCollectError {
                     error,
                     endpoint: &self.endpoint,
                 });
@@ -596,7 +597,7 @@ impl PostgresqlMetrics {
                                 res.2 + size,
                             )
                         });
-                emit!(EndpointBytesReceived {
+                emit(EndpointBytesReceived {
                     byte_size: received_byte_size,
                     protocol: "tcp",
                     endpoint: &self.endpoint,
@@ -889,7 +890,7 @@ impl PostgresqlMetrics {
 struct RowReader(usize);
 
 impl RowReader {
-    pub fn read<'a, T: FromSql<'a> + ByteSizeOf>(
+    fn read<'a, T: FromSql<'a> + ByteSizeOf>(
         &mut self,
         row: &'a Row,
         key: &'static str,
@@ -899,7 +900,7 @@ impl RowReader {
         Ok(value)
     }
 
-    pub const fn into_inner(self) -> usize {
+    const fn into_inner(self) -> usize {
         self.0
     }
 }
