@@ -20,9 +20,9 @@ impl<T> Emitter<T> {
 
 /// Similar to `stream.filter_map(..).flatten(..)` but also allows checking for expired events
 /// and flushing when the input stream ends.
-pub fn map_with_expiration<S, T, M, E, F>(
+pub fn map_with_expiration<S, I, O, M, E, F>(
     initial_state: S,
-    input: impl Stream<Item = T> + 'static,
+    input: impl Stream<Item = I> + 'static,
     expiration_interval: Duration,
     // called for each event
     mut map_fn: M,
@@ -30,11 +30,11 @@ pub fn map_with_expiration<S, T, M, E, F>(
     mut expiration_fn: E,
     // called once at the end of the input stream
     mut flush_fn: F,
-) -> impl Stream<Item = T>
+) -> impl Stream<Item = O>
 where
-    M: FnMut(&mut S, T, &mut Emitter<T>),
-    E: FnMut(&mut S, &mut Emitter<T>),
-    F: FnMut(&mut S, &mut Emitter<T>),
+    M: FnMut(&mut S, I, &mut Emitter<O>),
+    E: FnMut(&mut S, &mut Emitter<O>),
+    F: FnMut(&mut S, &mut Emitter<O>),
 {
     let mut state = initial_state;
     let mut flush_stream = tokio::time::interval(expiration_interval);
@@ -42,7 +42,7 @@ where
     Box::pin(stream! {
         futures_util::pin_mut!(input);
               loop {
-                let mut emitter = Emitter::<T>::new();
+                let mut emitter = Emitter::<O>::new();
                 let done = tokio::select! {
                     _ = flush_stream.tick() => {
                         expiration_fn(&mut state, &mut emitter);

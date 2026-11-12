@@ -16,6 +16,7 @@ use crate::{
     schema::Definition,
     transforms::{
         Transform,
+        partitioned::Partitioned,
         reduce::{merge_strategy::MergeStrategy, transform::Reduce},
     },
 };
@@ -54,6 +55,20 @@ pub struct ReduceConfig {
 
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
+
+    // TODO: change the default value
+    /// The number of parallel tasks used to reduce events.
+    ///
+    /// Groups are distributed across tasks by hashing their `group_by` values, so all events of a
+    /// group are always reduced by the same task, in arrival order. Only the order of output events
+    /// across different groups may change.
+    ///
+    /// Has no effect when `group_by` is empty: all events then belong to a single group, which is
+    /// reduced by a single task. Set to `1` to always reduce in a single task.
+    #[serde(default = "default_concurrency")]
+    #[derivative(Default(value = "default_concurrency()"))]
+    #[configurable(metadata(docs::human_name = "Concurrency"))]
+    pub concurrency: NonZeroUsize,
 
     /// An ordered list of fields by which to group events.
     ///
@@ -112,12 +127,32 @@ const fn default_flush_period_ms() -> Duration {
 
 impl_generate_config_from_default!(ReduceConfig);
 
+const fn default_concurrency() -> NonZeroUsize {
+    NonZeroUsize::new(8).expect("the default concurrency is non-zero")
+}
+
+impl ReduceConfig {
+    /// The number of shards to reduce in, or `None` to reduce in a single task: without
+    /// `group_by`, all events belong to one group, which only one task can reduce.
+    fn shards(&self) -> Option<NonZeroUsize> {
+        Some(self.concurrency).filter(|n| n.get() > 1 && !self.group_by.is_empty())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
-            .map(Transform::event_task)
+        let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
+        let Some(shards) = self.shards() else {
+            return Ok(Transform::event_task(reduce));
+        };
+
+        Ok(Transform::event_task(Partitioned::new(
+            move || reduce.clone(),
+            shards,
+            context.cpu_ns.clone(),
+        )))
     }
 
     fn input(&self) -> Input {

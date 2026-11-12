@@ -51,6 +51,8 @@ fn reduce(c: &mut Criterion) {
                 ends_when: None,
                 starts_when: None,
                 max_events: None,
+                // This benchmark builds a single-task `Reduce` directly.
+                concurrency: NonZeroUsize::MIN,
             },
         };
         group.throughput(Throughput::Elements(param.input.len() as u64));
