@@ -111,6 +111,21 @@ pub struct VectorConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
 
+    /// How long, in seconds, a connection that carries no request is kept open for reuse.
+    ///
+    /// Once a connection has been idle for longer, the sink closes it, and the next request opens
+    /// a new connection, with a new TLS handshake if TLS is enabled. To keep one connection
+    /// across requests that are spaced further apart than the default, set this longer than the
+    /// interval between requests, such as `batch.timeout_secs`.
+    ///
+    /// A longer timeout can leave a connection open that a firewall, NAT gateway, or load balancer
+    /// between the sink and the downstream Vector instance has already dropped. Configure
+    /// `keepalive` to detect such a connection before it is reused, and set this timeout shorter
+    /// than the idle timeout of any such device.
+    #[serde(default = "default_idle_connection_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Idle Connection Timeout"))]
+    idle_connection_timeout_secs: NonZeroU64,
+
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -138,6 +153,11 @@ pub(super) struct VectorKeepaliveConfig {
     #[serde(default = "default_keepalive_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
     pub timeout_secs: NonZeroU64,
+}
+
+const fn default_idle_connection_timeout_secs() -> NonZeroU64 {
+    // Matches the default idle timeout of the connection pool of Hyper.
+    NonZeroU64::new(90).expect("idle connection timeout default must be nonzero")
 }
 
 const fn default_keepalive_interval_secs() -> NonZeroU64 {
@@ -214,6 +234,7 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
+        idle_connection_timeout_secs: default_idle_connection_timeout_secs(),
         acknowledgements: AcknowledgementsConfig::default(),
     }
 }
@@ -278,7 +299,12 @@ impl ValidatedSink for VectorConfig {
             .as_ref()
             .map_or_else(EndpointStrategy::default, |routing| routing.strategy);
 
-        let client = new_client(&tls, cx.proxy(), self.keepalive)?;
+        let client = new_client(
+            &tls,
+            cx.proxy(),
+            self.keepalive,
+            self.idle_connection_timeout_secs,
+        )?;
 
         let healthcheck = healthchecks(client.clone(), &uris, &cx.healthcheck, endpoint_strategy);
 
@@ -826,9 +852,12 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
+    idle_connection_timeout_secs: NonZeroU64,
 ) -> crate::Result<Http2Client<TonicBody>> {
     let mut builder = Builder::new(CpuTimedExecutor);
-    builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
+    builder
+        .http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE)
+        .pool_idle_timeout(Duration::from_secs(idle_connection_timeout_secs.get()));
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.
@@ -891,6 +920,16 @@ impl HealthLogic for VectorGrpcHealthLogic {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::Infallible;
+
+    use bytes::Bytes;
+    use http::{Request, Response};
+    use http_body_util::{BodyExt as _, Full};
+    use hyper::service::service_fn;
+    use hyper_util::{rt::TokioExecutor, server::conn::auto};
+    use rstest::rstest;
+    use tokio::net::TcpListener;
+
     use super::*;
     use crate::sinks::util::UriSerde;
 
@@ -1504,5 +1543,98 @@ mod tests {
                 "https://127.0.0.1:6002/",
             ]
         );
+    }
+
+    #[test]
+    fn idle_connection_timeout_defaults_to_the_pool_default() {
+        let config: VectorConfig = toml::from_str("address = \"http://127.0.0.1:6000\"").unwrap();
+
+        assert_eq!(config.idle_connection_timeout_secs.get(), 90);
+    }
+
+    #[test]
+    fn idle_connection_timeout_is_read_from_the_config() {
+        let config: VectorConfig = toml::from_str(
+            "address = \"http://127.0.0.1:6000\"\nidle_connection_timeout_secs = 350",
+        )
+        .unwrap();
+
+        assert_eq!(config.idle_connection_timeout_secs.get(), 350);
+    }
+
+    /// Sends two requests, with `gap` between them, to a server that counts the connections it
+    /// accepts, and returns that count.
+    async fn connections_for_requests_spaced_by(idle_timeout_secs: u64, gap: Duration) -> usize {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        tokio::spawn({
+            let accepted = Arc::clone(&accepted);
+            async move {
+                loop {
+                    let (stream, _) = listener.accept().await.unwrap();
+                    accepted.fetch_add(1, Ordering::SeqCst);
+                    tokio::spawn(async move {
+                        let service = service_fn(|_| async {
+                            Ok::<_, Infallible>(Response::new(Full::new(Bytes::new())))
+                        });
+                        auto::Builder::new(TokioExecutor::new())
+                            .serve_connection(hyper_util::rt::TokioIo::new(stream), service)
+                            .await
+                            .ok();
+                    });
+                }
+            }
+        });
+        let client = new_client(
+            &MaybeTlsSettings::Raw(()),
+            &ProxyConfig::default(),
+            None,
+            NonZeroU64::new(idle_timeout_secs).unwrap(),
+        )
+        .unwrap();
+        let request = || {
+            client.request(
+                Request::post(format!("http://127.0.0.1:{port}/"))
+                    .body(TonicBody::empty())
+                    .unwrap(),
+            )
+        };
+
+        request()
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap();
+        // Let the connection return to the pool before the clock is paused.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        tokio::time::pause();
+        tokio::time::advance(gap).await;
+        tokio::time::resume();
+        request()
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap();
+
+        accepted.load(Ordering::SeqCst)
+    }
+
+    #[rstest]
+    #[case::reused_within_the_timeout(300, 1)]
+    #[case::reopened_after_the_timeout(60, 2)]
+    #[tokio::test]
+    async fn idle_connection_timeout_decides_whether_a_connection_is_reused(
+        #[case] idle_timeout_secs: u64,
+        #[case] expected_connections: usize,
+    ) {
+        let connections =
+            connections_for_requests_spaced_by(idle_timeout_secs, Duration::from_secs(100)).await;
+
+        assert_eq!(connections, expected_connections);
     }
 }

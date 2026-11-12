@@ -93,6 +93,23 @@ generated: components: sinks: vector: configuration: {
 			}
 		}
 	}
+	idle_connection_timeout_secs: {
+		description: """
+			How long, in seconds, a connection that carries no request is kept open for reuse.
+
+			Once a connection has been idle for longer, the sink closes it, and the next request opens
+			a new connection, with a new TLS handshake if TLS is enabled. To keep one connection
+			across requests that are spaced further apart than the default, set this longer than the
+			interval between requests, such as `batch.timeout_secs`.
+
+			A longer timeout can leave a connection open that a firewall, NAT gateway, or load balancer
+			between the sink and the downstream Vector instance has already dropped. Configure
+			`keepalive` to detect such a connection before it is reused, and set this timeout shorter
+			than the idle timeout of any such device.
+			"""
+		required: false
+		type: uint: default: 90
+	}
 	keepalive: {
 		description: """
 			HTTP/2 keepalive settings for the sink's gRPC connections.
