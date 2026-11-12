@@ -1,7 +1,10 @@
 use bytes::BytesMut;
-use http::{HeaderValue, header::CONTENT_TYPE};
 use prost::Message;
-use warp::{Reply, reply::Response};
+use warp::{
+    Reply,
+    http::{HeaderValue, header::CONTENT_TYPE},
+    reply::Response,
+};
 
 use super::status::Status;
 
@@ -12,7 +15,7 @@ use super::status::Status;
 /// If a type fails to be encoded as Protobuf, the error is logged at the
 /// `error` level, and the returned `impl Reply` will be an empty
 /// `500 Internal Server Error` response.
-pub fn protobuf<T>(val: T) -> Protobuf
+pub(super) fn protobuf<T>(val: T) -> Protobuf
 where
     T: Message,
 {
@@ -26,7 +29,7 @@ where
 
 /// A Protobuf formatted reply.
 #[allow(missing_debug_implementations)]
-pub struct Protobuf {
+pub(super) struct Protobuf {
     inner: Result<Vec<u8>, ()>,
 }
 

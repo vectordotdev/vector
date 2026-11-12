@@ -6,14 +6,14 @@
 
 use bytes::{Buf, Bytes};
 use databricks_zerobus_ingest_sdk::schema::arrow_schema_from_uc_schema;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body_util::{BodyExt, Collected};
 use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
 use serde::Deserialize;
 use vector_http::{empty_body, full_body};
 
 use super::error::ZerobusSinkError;
-use crate::http::client_v1::HttpClient;
+use crate::http::HttpClient;
 
 /// Whether a Unity Catalog HTTP response status should be retried.
 ///
@@ -33,7 +33,7 @@ fn status_is_retryable(status: StatusCode) -> bool {
 // Alias the SDK types under the names the rest of the sink already uses.
 #[cfg(test)]
 use databricks_zerobus_ingest_sdk::schema::UcColumn as UnityCatalogColumn;
-pub use databricks_zerobus_ingest_sdk::schema::UcTableSchema as UnityCatalogTableSchema;
+pub(super) use databricks_zerobus_ingest_sdk::schema::UcTableSchema as UnityCatalogTableSchema;
 
 /// OAuth token response from Databricks
 #[derive(Debug, Deserialize)]
@@ -42,7 +42,7 @@ struct OAuthTokenResponse {
 }
 
 /// Fetch table schema from Unity Catalog API
-pub async fn fetch_table_schema(
+pub(super) async fn fetch_table_schema(
     unity_catalog_endpoint: &str,
     table_name: &str,
     client_id: &str,
@@ -212,7 +212,7 @@ async fn get_oauth_token(
 /// The returned schema is used both to declare the Zerobus Arrow stream and to
 /// drive the Arrow batch encoder, so a single source of truth keeps the encoded
 /// `RecordBatch` schema in lock-step with the stream's declared schema.
-pub fn generate_arrow_schema_from_schema(
+pub(super) fn generate_arrow_schema_from_schema(
     schema: &UnityCatalogTableSchema,
 ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
     let arrow_schema =
@@ -275,7 +275,7 @@ mod tests {
             };
             http::Response::builder()
                 .status(status)
-                .body(hyper::Body::from(body))
+                .body(http_body_util::Full::new(Bytes::from(body)))
                 .expect("valid mock response")
         });
         tokio::spawn(server);
@@ -435,29 +435,23 @@ mod tests {
     fn test_generate_arrow_schema_simple_schema() {
         use arrow::datatypes::DataType;
 
-        let schema = UnityCatalogTableSchema {
-            name: "test_table".to_string(),
-            catalog_name: "test_catalog".to_string(),
-            schema_name: "test_schema".to_string(),
-            columns: vec![
-                UnityCatalogColumn {
-                    name: "id".to_string(),
-                    type_text: "bigint".to_string(),
-                    type_name: "BIGINT".to_string(),
-                    position: 1,
-                    nullable: false,
-                    type_json: "{}".to_string(),
-                },
-                UnityCatalogColumn {
-                    name: "body".to_string(),
-                    type_text: "string".to_string(),
-                    type_name: "STRING".to_string(),
-                    position: 2,
-                    nullable: true,
-                    type_json: "{}".to_string(),
-                },
+        let schema = UnityCatalogTableSchema::new(
+            "test_catalog",
+            "test_schema",
+            "test_table",
+            vec![
+                UnityCatalogColumn::new("id", "BIGINT")
+                    .with_type_text("bigint")
+                    .with_type_json("{}")
+                    .with_nullable(false)
+                    .with_position(1),
+                UnityCatalogColumn::new("body", "STRING")
+                    .with_type_text("string")
+                    .with_type_json("{}")
+                    .with_nullable(true)
+                    .with_position(2),
             ],
-        };
+        );
 
         let arrow_schema =
             generate_arrow_schema_from_schema(&schema).expect("arrow schema should be generated");

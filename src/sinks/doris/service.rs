@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use http_1::Response;
+use http::Response;
 use serde_json;
 use snafu::Snafu;
 use std::task::{Context, Poll};
@@ -19,15 +19,16 @@ use vector_common::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
+use vector_lib::internal_event::emit;
 
 #[derive(Clone)]
-pub struct DorisService {
+pub(super) struct DorisService {
     client: ThreadSafeDorisSinkClient,
     log_request: bool,
 }
 
 impl DorisService {
-    pub const fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
+    pub(super) const fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
         DorisService {
             client,
             log_request,
@@ -66,7 +67,7 @@ impl DorisService {
             if let Some(loaded_rows) = loaded_rows
                 && let Some(load_bytes) = load_bytes
             {
-                emit!(DorisRowsLoaded {
+                emit(DorisRowsLoaded {
                     loaded_rows,
                     load_bytes,
                 });
@@ -78,13 +79,13 @@ impl DorisService {
                 .and_then(serde_json::Value::as_i64)
                 && filtered_rows > 0
             {
-                emit!(DorisRowsFiltered { filtered_rows });
+                emit(DorisRowsFiltered { filtered_rows });
             }
         }
     }
 }
 #[derive(Debug, Snafu)]
-pub struct DorisResponse {
+pub(super) struct DorisResponse {
     pub metadata: RequestMetadata,
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,

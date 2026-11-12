@@ -2,15 +2,14 @@ use std::{collections::HashMap, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
-use http::StatusCode;
-use http_1::{Request, Uri};
+use http::{Request, StatusCode, Uri};
 use indoc::indoc;
 use snafu::ResultExt;
 use tower::Service;
 use vector_http::{HttpError, empty_body};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    internal_event::CountByteSize, request_metadata::RequestMetadata,
+    internal_event::CountByteSize, internal_event::emit, request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
 };
 
@@ -24,18 +23,18 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue},
     },
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
-        HTTPV1RequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,
+        HTTPRequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
             BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
             TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{
-                HttpResponse, HttpService, HttpServiceRequestBuilder, http_response_retry_logic,
+            http::{
+                HttpRequest, HttpResponse, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
             },
         },
     },
@@ -111,7 +110,7 @@ impl GenerateConfig for SematextMetricsConfig {
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = HttpEndpoint::parse(&endpoint)?
         .append_path("health")?
-        .into_v1();
+        .into_uri();
 
     let request = Request::get(uri)
         .body(empty_body())
@@ -119,9 +118,7 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    match status {
+    match response.status() {
         StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
@@ -208,8 +205,7 @@ impl SematextMetricsService {
         let ValidatedSematextMetrics { uri, batch, .. } = validated;
         let request = config.request.into_settings();
         let http_service =
-            HttpService::new(client, SematextMetricsRequestBuilder { uri: uri.clone() })
-                .with_response_decompression();
+            HttpService::new(client, SematextMetricsRequestBuilder { uri: uri.clone() });
         let sematext_service = SematextMetricsService {
             config,
             inner: http_service,
@@ -280,7 +276,7 @@ impl MetricNormalize for SematextMetricNormalize {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(SematextMetricsInvalidMetricError { metric: &metric });
+                emit(SematextMetricsInvalidMetricError { metric: &metric });
                 None
             }
         }
@@ -297,7 +293,7 @@ impl HttpServiceRequestBuilder<()> for SematextMetricsRequestBuilder {
         Request::post(self.uri.clone())
             .header("Content-Type", "text/plain")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
 }
@@ -338,7 +334,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(SematextMetricsEncodeEventError { error });
+            emit(SematextMetricsEncodeEventError { error });
         }
     }
 

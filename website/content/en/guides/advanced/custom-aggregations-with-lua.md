@@ -102,7 +102,7 @@ transforms:
               kind = "incremental",
               timestamp = os.date("!*t"),
               counter = {
-                value = counter
+                value = count
               }
             }
           }
@@ -118,11 +118,11 @@ transforms:
                 kind = "incremental",
                 timestamp = os.date("!*t"),
                 counter = {
-                  value = counter
+                  value = count
                 }
               }
             }
-            counter = 0
+            count = 0
           end
 ```
 
@@ -140,12 +140,14 @@ section of the config:
 ```yaml
 source: |
   function make_counter(value)
-    return metric = {
-      name = "event_counter",
-      kind = "incremental",
-      timestamp = os.date("!*t"),
-      counter = {
-        value = value
+    return {
+      metric = {
+        name = "event_counter",
+        kind = "incremental",
+        timestamp = os.date("!*t"),
+        counter = {
+          value = value
+        }
       }
     }
   end
@@ -158,8 +160,8 @@ timers:
   - interval_seconds: 5
     handler: |
       function (emit)
-        emit(make_counter(counter))
-        counter = 0
+        emit(make_counter(count))
+        count = 0
       end
 ```
 
@@ -169,7 +171,7 @@ and the `shutdown` hook:
 hooks:
   shutdown: |
     function (emit)
-      emit(make_counter(counter))
+      emit(make_counter(count))
     end
 ```
 
@@ -202,21 +204,23 @@ transforms:
       end
 
       function timer_handler(emit)
-        emit(make_counter(counter))
-        counter = 0
+        emit(make_counter(count))
+        count = 0
       end
 
       function shutdown(emit)
-        emit(make_counter(counter))
+        emit(make_counter(count))
       end
 
       function make_counter(value)
-        return metric = {
-          name = "event_counter",
-          kind = "incremental",
-          timestamp = os.date("!*t"),
-          counter = {
-            value = value
+        return {
+          metric = {
+            name = "event_counter",
+            kind = "incremental",
+            timestamp = os.date("!*t"),
+            counter = {
+              value = value
+            }
           }
         }
       end
@@ -238,26 +242,28 @@ function init()
   count = 0
 end
 
-function aggregator.process()
+function process()
   count = count + 1
 end
 
-function aggregator.timer_handler(emit)
-  emit(make_counter(counter))
-  counter = 0
+function timer_handler(emit)
+  emit(make_counter(count))
+  count = 0
 end
 
-function aggregator.shutdown(emit)
-  emit(make_counter(counter))
+function shutdown(emit)
+  emit(make_counter(count))
 end
 
-function aggregator.make_counter(value)
-  return metric = {
-    name = "event_counter",
-    kind = "incremental",
-    timestamp = os.date("!*t"),
-    counter = {
-      value = value
+function make_counter(value)
+  return {
+    metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = value
+      }
     }
   }
 end

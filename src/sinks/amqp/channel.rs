@@ -4,7 +4,7 @@ use lapin::options::ConfirmSelectOptions;
 use super::{config::AmqpSinkConfig, service::AmqpError};
 use crate::amqp::AmqpConfig;
 
-pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
+pub(super) type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 
 pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSinkChannels> {
     let max_channels = config.max_channels.try_into().map_err(|_| {
@@ -46,6 +46,10 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         Ok(channel)
     }
 
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn recycle(
         &self,
         channel: &mut Self::Type,
@@ -65,7 +69,7 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
 
 impl AmqpSinkChannelManager {
     /// Creates a new channel pool manager for the AMQP sink.
-    pub fn new(config: &AmqpConfig) -> Self {
+    pub(super) fn new(config: &AmqpConfig) -> Self {
         Self {
             config: config.clone(),
         }

@@ -6,24 +6,28 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
-use http_1::Request;
+use http::Request;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::{event::EventStatus, request_metadata::RequestMetadata};
+use vector_lib::{event::EventStatus, internal_event::emit, request_metadata::RequestMetadata};
 
 use super::{
     EndpointTarget,
     acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{Compression, http::HttpRequest, http_v1::HttpResponse, sink::Response},
+        util::{
+            Compression,
+            http::{HttpRequest, HttpResponse},
+            sink::Response,
+        },
     },
 };
 
@@ -154,8 +158,8 @@ where
                                     Ok(()) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
-                                        emit!(SplunkIndexerAcknowledgementUnavailableError {
-                                            error
+                                        emit(SplunkIndexerAcknowledgementUnavailableError {
+                                            error,
                                         });
                                         EventStatus::Delivered
                                     }
@@ -167,7 +171,7 @@ where
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            emit!(SplunkResponseParseError { error });
+                            emit(SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }
@@ -328,7 +332,7 @@ mod tests {
             request::HecRequest,
             service::{HecAckResponseBody, HecService, HttpRequestBuilder, MetadataFields},
         },
-        util::{Compression, http_v1::HttpService, metadata::RequestMetadataBuilder},
+        util::{Compression, http::HttpService, metadata::RequestMetadataBuilder},
     };
 
     const TOKEN: &str = "token";

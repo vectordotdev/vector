@@ -18,6 +18,7 @@ use tokio::{
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, codecs::encoding, config::LogNamespace, event::Event,
+    extra_context::ExtraContext,
 };
 
 pub use self::config::TopologyBuilder;
@@ -30,7 +31,6 @@ use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
     config::ConfigBuilder,
-    extra_context::ExtraContext,
     topology::RunningTopology,
 };
 
@@ -161,6 +161,7 @@ impl RunnerResults {
         &self.outputs
     }
 
+    #[must_use]
     pub fn validator_results(&self) -> &[Result<Vec<String>, Vec<String>>] {
         &self.validator_results
     }

@@ -1,4 +1,5 @@
 use std::task::Poll;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use fakedata::logs::{
@@ -146,7 +147,7 @@ const fn lines_example() -> [&'static str; 2] {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(DemoLogsEventProcessed);
+        emit(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
@@ -219,8 +220,8 @@ async fn demo_logs_source(
     let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
     let mut interval = interval.map(time::interval);
 
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
+    let events_received = register(EventsReceived);
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -268,7 +269,7 @@ async fn demo_logs_source(
                         event
                     });
                     out.send_batch(events).await.inspect_err(|_| {
-                        emit!(StreamClosedError { count });
+                        emit(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {

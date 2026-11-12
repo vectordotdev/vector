@@ -3,8 +3,6 @@ what: "Ignored configuration fields"
 deprecated_since: "0.61.0"
 ---
 
-<a id="ignored-configuration-fields"></a>
-
 Configuration fields that Vector accepts but discards during deserialization are deprecated.
 Vector now warns about these fields when loading configuration, including during `vector validate`.
 Existing configurations continue to work.

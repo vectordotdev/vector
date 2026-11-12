@@ -15,11 +15,15 @@ use tokio::{
 use tracing::Instrument;
 use vector_lib::{
     buffers::{BufferConfig, topology::channel::BufferSender},
+    extra_context::ExtraContext,
     gauge,
     internal_event::GaugeName,
+    internal_event::emit,
     shutdown::ShutdownSignal,
+    spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
+    utilization::UtilizationRegistry,
 };
 
 use super::{
@@ -37,12 +41,9 @@ use crate::{
         enrichment_table_sinks,
     },
     event::EventArray,
-    extra_context::ExtraContext,
     internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
-    spawn_named,
-    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -142,7 +143,6 @@ impl RunningTopology {
     /// detect that the sources in the topology are no longer
     /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
-    #[must_use]
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
@@ -672,7 +672,7 @@ impl RunningTopology {
                 let drain_in_background = !wait_for_sinks.contains(*key);
                 match usage {
                     Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
-                        emit!(TopologyDiskBufferRemoved {
+                        emit(TopologyDiskBufferRemoved {
                             component_id: key,
                             buffer_dirs: &buffer_dirs,
                             usage: Some(usage),
@@ -680,7 +680,7 @@ impl RunningTopology {
                         });
                     }
                     None => {
-                        emit!(TopologyDiskBufferRemoved {
+                        emit(TopologyDiskBufferRemoved {
                             component_id: key,
                             buffer_dirs: &buffer_dirs,
                             usage: None,
@@ -729,7 +729,7 @@ impl RunningTopology {
                         .iter()
                         .any(|path| new_buffer_dirs.contains(path))
                 {
-                    emit!(TopologyDiskBufferReplacementUnreferenced {
+                    emit(TopologyDiskBufferReplacementUnreferenced {
                         component_id: key,
                         buffer_dirs: &buffer_dirs,
                         new_buffer_dirs: &new_buffer_dirs,
@@ -1598,11 +1598,10 @@ fn enrichment_table_sink_buffer(
 mod tests {
     use std::collections::HashSet;
 
-    use vector_lib::config::ComponentKey;
+    use vector_lib::{config::ComponentKey, extra_context::ExtraContext};
 
     use crate::{
         config::Config,
-        extra_context::ExtraContext,
         test_util::{
             mock::{basic_sink, basic_source, basic_transform},
             start_topology, trace_init,

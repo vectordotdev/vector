@@ -4,6 +4,7 @@ use lru::LruCache;
 use vector_lib::{
     ByteSizeOf,
     config::LegacyKey,
+    internal_event::emit,
     lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
     sampling::RatioSampler,
 };
@@ -397,7 +398,7 @@ impl Sample {
             Event::Metric(_) => panic!("component can never receive metric events"),
         }
         .map_err(|error| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some("group_by"),
                 drop_event: false,
@@ -475,7 +476,7 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded {
+            emit(SampleEventDiscarded {
                 group: discarded_group,
                 include_group_tag: self.include_group_tag,
             });

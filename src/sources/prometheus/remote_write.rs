@@ -3,7 +3,8 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use prost::Message;
 use vector_lib::{
-    config::LogNamespace, configurable::configurable_component, prometheus::parser::proto,
+    config::LogNamespace, configurable::configurable_component, internal_event::emit,
+    prometheus::parser::proto,
 };
 use warp::http::{HeaderMap, StatusCode};
 
@@ -156,8 +157,8 @@ struct RemoteWriteSource {
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(PrometheusRemoteWriteParseError {
-                error: error.clone()
+            emit(PrometheusRemoteWriteParseError {
+                error: error.clone(),
             });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
@@ -898,7 +899,7 @@ mod test {
         let response = send_request(address.port(), request_body).await;
 
         // Should be rejected
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     }
 }
 
@@ -949,6 +950,6 @@ mod integration_tests {
             &HTTP_PUSH_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }
