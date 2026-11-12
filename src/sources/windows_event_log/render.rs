@@ -102,9 +102,7 @@ pub(super) fn render_event_xml(
 /// `rate(events_read_total)` to detect ingestion lag.
 /// Best-effort: if any API call fails, the gauge is left unchanged.
 #[allow(
-    clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
-    clippy::cast_ptr_alignment,
     reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
 )]
 pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
@@ -114,6 +112,11 @@ pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
 }
 
 /// Number of records currently in a channel, or `None` if it cannot be read.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_ptr_alignment,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn channel_record_count(channel: &str) -> Option<u64> {
     let channel_hstring = HSTRING::from(channel);
     let log_handle = unsafe {
