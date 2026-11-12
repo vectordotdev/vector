@@ -43,6 +43,10 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
 };
 
+const PUBLISH_TIME_KEY: &str = "publish_time";
+const TOPIC_KEY: &str = "topic";
+const PRODUCER_NAME_KEY: &str = "producer_name";
+
 /// Configuration for the `pulsar` source.
 #[configurable_component(source("pulsar", "Collect logs from Apache Pulsar."))]
 #[derive(Clone, Debug, Derivative)]
@@ -225,24 +229,28 @@ impl SourceConfig for PulsarSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("publish_time"))),
-                &owned_value_path!("publish_time"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    PUBLISH_TIME_KEY
+                ))),
+                &owned_value_path!(PUBLISH_TIME_KEY),
                 Kind::timestamp(),
-                Some("publish_time"),
+                Some(PUBLISH_TIME_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("topic"))),
-                &owned_value_path!("topic"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(TOPIC_KEY))),
+                &owned_value_path!(TOPIC_KEY),
                 Kind::bytes(),
-                Some("topic"),
+                Some(TOPIC_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("producer_name"))),
-                &owned_value_path!("producer_name"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    PRODUCER_NAME_KEY
+                ))),
+                &owned_value_path!(PRODUCER_NAME_KEY),
                 Kind::bytes(),
-                Some("producer_name"),
+                Some(PRODUCER_NAME_KEY),
             );
         vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
@@ -407,24 +415,24 @@ async fn parse_message(
                             log_namespace.insert_source_metadata(
                                 PulsarSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("publish_time"))),
-                                path!("publish_time"),
+                                Some(LegacyKey::InsertIfEmpty(path!(PUBLISH_TIME_KEY))),
+                                path!(PUBLISH_TIME_KEY),
                                 publish_time,
                             );
 
                             log_namespace.insert_source_metadata(
                                 PulsarSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("topic"))),
-                                path!("topic"),
+                                Some(LegacyKey::InsertIfEmpty(path!(TOPIC_KEY))),
+                                path!(TOPIC_KEY),
                                 topic.clone(),
                             );
 
                             log_namespace.insert_source_metadata(
                                 PulsarSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("producer_name"))),
-                                path!("producer_name"),
+                                Some(LegacyKey::InsertIfEmpty(path!(PRODUCER_NAME_KEY))),
+                                path!(PRODUCER_NAME_KEY),
                                 producer_name.clone(),
                             );
                         }

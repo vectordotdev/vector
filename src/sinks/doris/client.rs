@@ -528,7 +528,7 @@ pub(super) enum HealthCheckError {
 mod tests {
     use std::sync::Mutex;
 
-    use http_body_util::{BodyExt as _, Full};
+    use http_body_util::Full;
     use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},

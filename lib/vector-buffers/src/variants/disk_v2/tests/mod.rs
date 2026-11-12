@@ -32,6 +32,10 @@ mod model;
 mod record;
 mod size_limits;
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "Test files implement the async production interface"
+)]
 impl AsyncFile for DuplexStream {
     async fn metadata(&self) -> io::Result<Metadata> {
         Ok(Metadata { len: 0 })
@@ -53,6 +57,10 @@ impl AsyncFile for DuplexStream {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "Test files implement the async production interface"
+)]
 impl AsyncFile for Cursor<Vec<u8>> {
     async fn metadata(&self) -> io::Result<Metadata> {
         Ok(Metadata {

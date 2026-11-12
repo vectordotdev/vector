@@ -75,7 +75,7 @@ mod tests {
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(HostMetricsConfig::default()).process_metrics(&mut buffer);
         let metrics = buffer.into_metrics();
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
 
         // All metrics are named process_*
         assert!(

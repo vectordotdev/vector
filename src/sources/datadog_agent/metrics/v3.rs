@@ -620,12 +620,12 @@ pub(crate) fn decode_v3_metric_data(
             })
             .collect();
         if let Some(payload_metadata) = metadata {
-            decoded_resources.extend(payload_metadata.resources.chunks_exact(2).map(|pair| {
-                Resource {
+            decoded_resources.extend(payload_metadata.resources.as_chunks::<2>().0.iter().map(
+                |pair| Resource {
                     r#type: pair[0].clone(),
                     name: pair[1].clone(),
-                }
-            }));
+                },
+            ));
         }
         let interval =
             u32::try_from(data.intervals[index]).map_err(|_| "invalid Datadog v3 interval")?;

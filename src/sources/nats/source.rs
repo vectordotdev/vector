@@ -22,8 +22,8 @@ use crate::{
     internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
     sources::nats::config::{
-        BuildError, ConsumerSnafu, JetStreamConfig, MessagesSnafu, NatsSourceConfig, StreamSnafu,
-        SubscribeSnafu,
+        BuildError, ConsumerSnafu, JetStreamConfig, MessagesSnafu, NatsSourceConfig, SUBJECT_KEY,
+        StreamSnafu, SubscribeSnafu,
     },
 };
 
@@ -78,7 +78,7 @@ pub(super) async fn process_message(
                             NatsSourceConfig::NAME,
                             log,
                             legacy_subject_key_field,
-                            &owned_value_path!("subject"),
+                            &owned_value_path!(SUBJECT_KEY),
                             msg.subject.as_str(),
                         );
                     }

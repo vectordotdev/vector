@@ -296,7 +296,7 @@ fn benchmark_configs(
                     config.push_str(&sink_config);
 
                     let config = config::load_from_str(&config, config::Format::Toml)
-                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {}", &config));
+                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {config}"));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
