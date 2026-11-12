@@ -1,6 +1,6 @@
 //! Service implementation for the `Clickhouse` sink.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write as _};
 
 use bytes::Bytes;
 use http::{

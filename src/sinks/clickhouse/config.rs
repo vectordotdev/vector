@@ -169,7 +169,6 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub extra_query_params: HashMap<String, String>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
