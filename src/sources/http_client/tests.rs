@@ -47,7 +47,7 @@ pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
         run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
     events
 }
@@ -829,7 +829,7 @@ async fn requests_through_authenticated_proxy() {
     )
     .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     for event in events {
         assert_eq!(
             event

@@ -99,7 +99,7 @@ mod tests {
             .await;
         let metrics = buffer.into_metrics();
 
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
 
         let mut n_physical_cpus = 0;
         let mut n_logical_cpus = 0;

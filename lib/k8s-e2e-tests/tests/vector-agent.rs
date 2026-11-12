@@ -703,28 +703,19 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             assert!(val["kubernetes"]["pod_ip"].is_string());
         } else {
             assert!(val["kubernetes"]["pod_ip"].is_string());
-            assert!(
-                !val["kubernetes"]["pod_ips"]
+            assert_ne!(
+                val["kubernetes"]["pod_ips"]
                     .as_array()
                     .expect("Couldn't take array from expected vec")
-                    .is_empty()
+                    .as_slice(),
+                &[] as &[serde_json::Value]
             );
         }
         // We don't have the node name to compare this to, so just assert it's
         // a non-empty string.
-        assert!(
-            !val["kubernetes"]["pod_node_name"]
-                .as_str()
-                .unwrap()
-                .is_empty()
-        );
+        assert_ne!(val["kubernetes"]["pod_node_name"].as_str().unwrap(), "");
         assert_eq!(val["kubernetes"]["container_name"], "test-pod");
-        assert!(
-            !val["kubernetes"]["container_id"]
-                .as_str()
-                .unwrap()
-                .is_empty()
-        );
+        assert_ne!(val["kubernetes"]["container_id"].as_str().unwrap(), "");
         assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
 
         // Request to stop the flow.
