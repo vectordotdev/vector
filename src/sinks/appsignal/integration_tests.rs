@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http::header::AUTHORIZATION;
-use hyper::StatusCode;
+use http::{StatusCode, header::AUTHORIZATION};
 use indoc::indoc;
 use vector_lib::event::{
     BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue,
@@ -232,7 +231,7 @@ async fn logs_shape() {
             .unwrap()
             .as_object()
             .unwrap();
-        assert!(!event.get("timestamp").unwrap().as_str().unwrap().is_empty());
+        assert_ne!(event.get("timestamp").unwrap().as_str().unwrap(), "");
     }
 }
 

@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use vector_lib::config::LogNamespace;
+#[cfg(windows)]
+use vector_lib::internal_event::{emit, register};
 use vrl::value::{Kind, kind::Collection};
 
 use vector_config::component::SourceDescription;
@@ -209,7 +211,7 @@ async fn process_event_batch(
                 log_events.push(log_event);
             }
             Err(e) => {
-                emit!(WindowsEventLogParseError {
+                emit(WindowsEventLogParseError {
                     error: e.to_string(),
                     channel,
                     event_id: Some(event_id),
@@ -226,7 +228,7 @@ async fn process_event_batch(
         // BACK PRESSURE: block until the pipeline accepts the batch.
         // We don't call EvtNext again until this completes.
         if let Err(_error) = out.send_batch(log_events).await {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
             return true; // signal: break the main loop
         }
 
@@ -332,8 +334,8 @@ impl WindowsEventLogSource {
         .await?;
         let parser = EventLogParser::new(&self.config, self.log_namespace);
 
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::from("windows_event_log")));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::from("windows_event_log")));
 
         let timeout_ms = self.config.event_timeout_ms as u32;
         let batch_size = self.config.batch_size as usize;
@@ -457,7 +459,7 @@ impl WindowsEventLogSource {
                             }
                         }
                         Err(e) => {
-                            emit!(WindowsEventLogQueryError {
+                            emit(WindowsEventLogQueryError {
                                 channel: "all".to_string(),
                                 query: None,
                                 error: e.to_string(),
@@ -557,7 +559,7 @@ impl WindowsEventLogSource {
                             }
                         }
                         Err(e) => {
-                            emit!(WindowsEventLogQueryError {
+                            emit(WindowsEventLogQueryError {
                                 channel: "all".to_string(),
                                 query: None,
                                 error: e.to_string(),

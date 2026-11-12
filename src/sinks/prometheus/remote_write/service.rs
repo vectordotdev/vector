@@ -2,21 +2,22 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
-use http_1::{HeaderName, HeaderValue, Method, Request, Response, Uri};
+use http::{HeaderName, HeaderValue, Method, Request, Response, Uri};
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use vector_http::full_body;
 
 use super::request_builder::RemoteWriteRequest;
 use crate::{
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::EndpointBytesSent,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         prelude::*,
-        util::{auth::Auth, http_v1::HttpResponse},
+        util::{auth::Auth, http::HttpResponse},
     },
 };
 
@@ -86,7 +87,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
 
             if response.status().is_success() {
                 // We can't rely on the framework to emit this because we need to specify the additional `endpoint` tag.
-                emit!(EndpointBytesSent {
+                emit(EndpointBytesSent {
                     byte_size: raw_byte_size,
                     protocol: "http",
                     endpoint: &endpoint.to_string(),
@@ -133,16 +134,16 @@ pub(super) async fn build_request(
         builder = builder.header(name, value);
     }
 
-    let mut request = builder.body(body).context(HTTPV1RequestBuilderSnafu)?;
+    let mut request = builder.body(body).context(HTTPRequestBuilderSnafu)?;
 
     match auth {
-        Some(Auth::Basic(http_auth)) => http_auth.apply_v1(&mut request),
+        Some(Auth::Basic(http_auth)) => http_auth.apply(&mut request),
         #[cfg(feature = "aws-core")]
         Some(Auth::Aws {
             credentials_provider,
             region,
         }) => {
-            crate::aws::sign_request_v1(
+            crate::aws::sign_request(
                 "aps",
                 &mut request,
                 credentials_provider,

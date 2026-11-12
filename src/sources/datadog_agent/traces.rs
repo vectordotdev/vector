@@ -9,7 +9,7 @@ use prost::Message;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::TraceLayout,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
 };
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
@@ -25,11 +25,14 @@ use crate::{
 pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
+    discard_apm_stats: bool,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(handler, source)
-        .or(build_stats_filter())
-        .unify()
-        .boxed()
+    let trace_filter = build_trace_filter(handler, source);
+    if discard_apm_stats {
+        trace_filter.or(build_stats_filter()).unify().boxed()
+    } else {
+        trace_filter
+    }
 }
 
 fn build_trace_filter(
@@ -93,13 +96,13 @@ fn handle_dd_trace_payload(
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = ddtrace_proto::AgentPayload::decode(frame)?;
     if !decoded_payload.idx_tracer_payloads.is_empty() {
-        emit!(DatadogAgentUnsupportedTracePayloadError {
+        emit(DatadogAgentUnsupportedTracePayloadError {
             error_code: "idx_tracer_payloads",
         });
     }
     if decoded_payload.tracer_payloads.is_empty() {
         if decoded_payload.idx_tracer_payloads.is_empty() {
-            emit!(DatadogAgentUnsupportedTracePayloadError {
+            emit(DatadogAgentUnsupportedTracePayloadError {
                 error_code: "empty_tracer_payloads",
             });
         }

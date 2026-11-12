@@ -87,29 +87,29 @@ const fn default_max_events() -> NonZeroUsize {
 
 const LAST_RECEIVED_QUERY_PARAM_NAME: &str = "last_received";
 
-pub struct BufferReplayRequest {
+pub(super) struct BufferReplayRequest {
     should_replay: bool,
     replay_from: Option<Uuid>,
 }
 
 impl BufferReplayRequest {
-    pub const NO_REPLAY: Self = Self {
+    pub(super) const NO_REPLAY: Self = Self {
         should_replay: false,
         replay_from: None,
     };
-    pub const REPLAY_ALL: Self = Self {
+    pub(super) const REPLAY_ALL: Self = Self {
         should_replay: true,
         replay_from: None,
     };
 
-    pub const fn with_replay_from(replay_from: Uuid) -> Self {
+    const fn with_replay_from(replay_from: Uuid) -> Self {
         Self {
             should_replay: true,
             replay_from: Some(replay_from),
         }
     }
 
-    pub fn replay_messages(
+    pub(super) fn replay_messages(
         &self,
         buffer: &VecDeque<(Uuid, Message)>,
         replay: impl FnMut(&(Uuid, Message)),
@@ -123,7 +123,7 @@ impl BufferReplayRequest {
     }
 }
 
-pub trait WsMessageBufferConfig {
+pub(super) trait WsMessageBufferConfig {
     /// Returns true if this configuration enables buffering.
     fn should_buffer(&self) -> bool;
     /// Generates key for a client based on connection request and address.
@@ -251,7 +251,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             .ack_decoding
             .build()
             .expect("Invalid `ack_decoding` config.")
-            .parse(request.into_data().into(), LogNamespace::default())
+            .parse(request.into_data(), LogNamespace::default())
             .inspect_err(|err| {
                 debug!(message = "Parsing ACK request failed.", %err);
             })

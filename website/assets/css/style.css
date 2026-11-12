@@ -266,7 +266,7 @@
 
 .dark .release-page .prose pre,
 .dark .release-page .prose .chroma,
-.dark .release-page .has-copy-button {
+.dark .release-page .has-code-controls {
   background-color: var(--color-neutral-900);
 }
 
@@ -627,4 +627,39 @@ a[type="button"] {
   margin-right: 0.4em;
   padding-bottom: 1px;
   width: 20px;
+}
+
+@media (min-width: 64rem) {
+  .deprecations-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(16rem, 24vw, 18rem);
+    gap: 2.5rem;
+  }
+}
+
+.deprecations-toc #toc {
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.deprecations-toc .toc-list .toc-list > li + li {
+  margin-top: 0.5rem;
+}
+
+.deprecations-toc .toc-list.is-collapsed {
+  display: none;
+}
+
+.deprecations-toc #toc > .toc-list > li > a {
+  font-weight: 600;
+}
+
+.deprecations-toc .toc-list .toc-list a {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }

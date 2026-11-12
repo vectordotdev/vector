@@ -5,19 +5,22 @@ use futures::{StreamExt, stream};
 use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use vector_lib::config::{ComponentKey, LogNamespace};
+use vector_lib::{
+    config::{ComponentKey, LogNamespace},
+    metrics::AgentDDSketch,
+};
 use vrl::value::Kind;
 
 use super::{
-    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, MissingTimestamp,
-    config::default_max_future_ms,
+    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, LateEvents, LateEventsStrategy,
+    MetricType, MissingTimestamp, config::default_max_future_ms,
 };
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
     event::{
         BatchNotifier, BatchStatus, BatchStatusReceiver, DatadogMetricOriginMetadata, Event,
         EventMetadata, EventStatus, Metric,
-        metric::{MetricKind, MetricValue},
+        metric::{MetricKind, MetricSketch, MetricValue, StatisticKind},
     },
     schema::Definition,
     test_util::components::assert_transform_compliance,
@@ -120,7 +123,6 @@ fn flush_final(agg: &mut Aggregate) -> Vec<Event> {
     out
 }
 
-#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_counter(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Counter { value } => assert_eq!(*value, expected),
@@ -128,7 +130,6 @@ fn assert_counter(event: &Event, expected: f64) {
     }
 }
 
-#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_gauge(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Gauge { value } => assert_eq!(*value, expected),
@@ -1179,6 +1180,172 @@ fn event_time_late_events_are_rejected_by_cutoff_and_watermark() {
     assert_gauge(&out[0], 7.0);
 }
 
+/// With `late_events.strategy = forward` and no `metric_types`, events rejected by the wall-clock cutoff or the
+/// watermark are forwarded unchanged instead of being dropped, and never touch
+/// bucket state.
+#[test]
+fn event_time_late_events_forward_passes_through_unchanged() {
+    let interval_ms = 10_000_u64;
+    let interval_i64 = interval_ms.cast_signed();
+
+    // Wall-clock cutoff: ended window, no flush yet.
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Auto,
+        |et| {
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
+                metric_types: None,
+            };
+        },
+    ))
+    .unwrap();
+    let now_ms = Utc::now().timestamp_millis();
+    let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
+    let ts = Utc
+        .timestamp_millis_opt(ended_bucket_key + interval_i64 / 2)
+        .latest()
+        .unwrap();
+    let late = make_metric_with_timestamp(
+        "late_before_flush",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+        ts,
+    );
+    let out = agg
+        .record(late.clone())
+        .expect("late event must pass through");
+    assert_eq!(late, out);
+    assert!(agg.event_time_buckets.is_empty());
+    assert_eq!(agg.watermark, None);
+
+    // Watermark: bucket already flushed.
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Auto,
+        |et| {
+            et.allowed_lateness_ms = 10_000;
+            et.max_future_ms = 600_000;
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
+                metric_types: None,
+            };
+        },
+    ))
+    .unwrap();
+    let bucket0 = open_bucket_timestamp(interval_ms);
+    agg.record(make_metric_with_timestamp(
+        "gauge_closed_bucket_forward",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+        bucket0,
+    ));
+    assert_eq!(1, flush_final(&mut agg).len());
+    let watermark = agg.watermark;
+
+    let late = make_metric_with_timestamp(
+        "gauge_closed_bucket_forward",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 99.0 },
+        bucket0 + chrono::Duration::milliseconds(500),
+    );
+    let out = agg
+        .record(late.clone())
+        .expect("late event must pass through");
+    assert_eq!(late, out);
+    assert!(agg.event_time_buckets.is_empty());
+    assert_eq!(agg.watermark, watermark);
+    assert_eq!(flush_final(&mut agg), [] as [vector_lib::event::Event; 0]);
+}
+
+/// With `late_events.metric_types` set, a late event is forwarded only if its
+/// type is listed and it is incremental; absolute events of a listed type
+/// (including gauges) and events of unlisted types are dropped. Neither touches
+/// bucket state.
+#[test]
+fn event_time_late_events_forward_metric_types() {
+    let interval_ms = 10_000_u64;
+    let interval_i64 = interval_ms.cast_signed();
+
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Auto,
+        |et| {
+            et.late_events = LateEvents {
+                strategy: LateEventsStrategy::Forward,
+                metric_types: Some(vec![
+                    MetricType::Gauge,
+                    MetricType::Distribution,
+                    MetricType::AggregatedHistogram,
+                    MetricType::Sketch,
+                ]),
+            };
+        },
+    ))
+    .unwrap();
+    let now_ms = Utc::now().timestamp_millis();
+    let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
+    let ts = Utc
+        .timestamp_millis_opt(ended_bucket_key + interval_i64 / 2)
+        .latest()
+        .unwrap();
+
+    let distribution = || MetricValue::Distribution {
+        samples: vector_lib::samples![1.0 => 1],
+        statistic: StatisticKind::Histogram,
+    };
+    let histogram = || MetricValue::AggregatedHistogram {
+        buckets: vector_lib::buckets![1.0 => 1],
+        count: 1,
+        sum: Some(1.0),
+    };
+    let sketch = || MetricValue::Sketch {
+        sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+    };
+
+    let kept = [
+        (MetricKind::Incremental, MetricValue::Gauge { value: 1.0 }),
+        (MetricKind::Incremental, distribution()),
+        (MetricKind::Incremental, histogram()),
+        (MetricKind::Incremental, sketch()),
+    ];
+    for (kind, value) in kept {
+        let late = make_metric_with_timestamp("late_kept", kind, value, ts);
+        let out = agg
+            .record(late.clone())
+            .expect("late incremental event of a listed type must pass through");
+        assert_eq!(late, out);
+    }
+
+    // Absolute events of listed types are dropped: delta-converting sinks would
+    // treat an older sample as a reset and inflate the next delta.
+    let dropped = [
+        (MetricKind::Absolute, MetricValue::Gauge { value: 1.0 }),
+        (MetricKind::Absolute, distribution()),
+        (MetricKind::Absolute, histogram()),
+        (MetricKind::Absolute, sketch()),
+        (MetricKind::Incremental, MetricValue::Counter { value: 1.0 }),
+        (
+            MetricKind::Incremental,
+            MetricValue::AggregatedSummary {
+                quantiles: vector_lib::quantiles![0.5 => 1.0],
+                count: 1,
+                sum: 1.0,
+            },
+        ),
+    ];
+    for (kind, value) in dropped {
+        assert!(
+            agg.record(make_metric_with_timestamp("late_dropped", kind, value, ts))
+                .is_none(),
+            "late absolute or unlisted event must be dropped"
+        );
+    }
+
+    assert!(agg.event_time_buckets.is_empty());
+    assert_eq!(agg.watermark, None);
+}
+
 /// Diff keeps a bounded previous-bucket map for deltas; Auto must not retain any.
 #[test]
 fn event_time_previous_bucket_retention_is_mode_specific_and_bounded() {
@@ -1253,18 +1420,74 @@ fn event_time_block_parses_documented_literals() {
     );
     assert_eq!(event_time.allowed_lateness_ms, 5000);
     assert_eq!(event_time.max_future_ms, 60000);
+    assert_eq!(event_time.late_events, LateEvents::default());
 
     let cfg: AggregateConfig = toml::from_str(
         r#"
         [event_time]
         missing_timestamp = "drop"
+        late_events.strategy = "forward"
+    "#,
+    )
+    .unwrap();
+    let event_time = cfg.event_time.unwrap();
+    assert_eq!(event_time.missing_timestamp, MissingTimestamp::Drop);
+    assert_eq!(
+        event_time.late_events,
+        LateEvents {
+            strategy: LateEventsStrategy::Forward,
+            metric_types: None,
+        }
+    );
+
+    let cfg: AggregateConfig = toml::from_str(
+        r#"
+        [event_time.late_events]
+        strategy = "forward"
+        metric_types = ["distribution", "aggregated_histogram", "sketch"]
     "#,
     )
     .unwrap();
     assert_eq!(
-        cfg.event_time.unwrap().missing_timestamp,
-        MissingTimestamp::Drop
+        cfg.event_time.unwrap().late_events,
+        LateEvents {
+            strategy: LateEventsStrategy::Forward,
+            metric_types: Some(vec![
+                MetricType::Distribution,
+                MetricType::AggregatedHistogram,
+                MetricType::Sketch,
+            ]),
+        }
     );
+
+    let cfg: AggregateConfig = toml::from_str(
+        r#"
+        [event_time.late_events]
+        strategy = "drop"
+    "#,
+    )
+    .unwrap();
+    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::default());
+
+    // An empty block falls back to the default `drop` strategy.
+    let cfg: AggregateConfig = toml::from_str(
+        r"
+        [event_time.late_events]
+    ",
+    )
+    .unwrap();
+    assert_eq!(cfg.event_time.unwrap().late_events, LateEvents::default());
+
+    // `metric_types` only applies to `forward`; pairing it with `drop` is a build error.
+    let cfg: AggregateConfig = toml::from_str(
+        r#"
+        [event_time.late_events]
+        metric_types = ["distribution"]
+    "#,
+    )
+    .unwrap();
+    let err = Aggregate::new(&cfg).expect_err("`metric_types` requires the `forward` strategy");
+    assert!(err.to_string().contains("metric_types"), "{err}");
 }
 
 #[tokio::test]
@@ -1303,6 +1526,89 @@ allowed_lateness_ms = 600000
         assert_counter(&ev, 41.0);
     }
     assert_eq!(count, 1, "open event-time bucket must drain on input close");
+}
+
+#[tokio::test]
+async fn transform_late_events_forward() {
+    // Generous lateness keeps the on-time samples recordable even if the test
+    // runs across a bucket boundary; the 2020 samples are still far too late.
+    let agg = serde_yaml::from_str::<AggregateConfig>(indoc! {"
+        interval_ms: 10000
+        event_time:
+          allowed_lateness_ms: 60000
+          late_events:
+            strategy: forward
+            metric_types:
+              - distribution
+    "})
+    .unwrap()
+    .build(&TransformContext::default())
+    .await
+    .unwrap()
+    .into_task();
+
+    // One shared timestamp so both on-time samples land in the same bucket.
+    let on_time_ts = Utc::now();
+    // Far in the past, so these are always past their bucket's cutoff.
+    let late_ts = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
+    let late_distribution = make_metric_with_timestamp(
+        "late_distribution",
+        MetricKind::Incremental,
+        MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 1],
+            statistic: StatisticKind::Histogram,
+        },
+        late_ts,
+    );
+    let inputs = vec![
+        late_distribution.clone(),
+        // Listed type but absolute: dropped.
+        make_metric_with_timestamp(
+            "late_absolute_distribution",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            late_ts,
+        ),
+        // Unlisted type: dropped.
+        make_metric_with_timestamp(
+            "late_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            late_ts,
+        ),
+        // On time: aggregated and emitted by the final flush.
+        make_metric_with_timestamp(
+            "on_time_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+            on_time_ts,
+        ),
+        make_metric_with_timestamp(
+            "on_time_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 3.0 },
+            on_time_ts,
+        ),
+    ];
+
+    let out: Vec<Event> = agg
+        .transform_events(Box::pin(stream::iter(inputs)))
+        .collect()
+        .await;
+
+    assert_eq!(2, out.len(), "unexpected output: {out:?}");
+    assert_eq!(
+        late_distribution, out[0],
+        "late distribution must be forwarded unchanged"
+    );
+    assert_eq!(
+        out[1].as_metric().series().name.name.as_str(),
+        "on_time_counter"
+    );
+    assert_counter(&out[1], 5.0);
 }
 
 /// Future skew uses saturating millis math: events beyond `max_future_ms` drop,
@@ -1453,7 +1759,7 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
 
     let mut out = vec![];
     agg.flush_into(&mut out);
-    assert!(out.is_empty());
+    assert_eq!(out, [] as [vector_lib::event::Event; 0]);
     assert!(agg.watermark.is_none());
 
     agg.record(make_metric_with_timestamp(

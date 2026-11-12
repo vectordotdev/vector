@@ -544,33 +544,6 @@ framework are at `lib/k8s-e2e-tests`.
 The Kubernetes-related distribution bit that are at `distribution/docker`,
 `distribution/kubernetes` and our Helm chart can be found at [`vectordotdev/helm-charts`](https://github.com/vectordotdev/helm-charts/).
 
-The development assistance resources are located at `Tiltfile`
-and in the `tilt` dir.
-
-#### Development
-
-There is a special flow for when you develop portions of Vector that are
-designed to work with Kubernetes, like `kubernetes_logs` source or the
-`deployment/kubernetes/*.yaml` configs.
-
-This flow facilitates building Vector and deploying it into a cluster.
-
-##### Requirements
-
-There are some extra requirements besides what you'd normally need to work on
-Vector:
-
-- [`tilt`](https://tilt.dev/)
-- [`docker`](https://www.docker.com/)
-- [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
-
-##### Automatic
-
-You can use `tilt` to detect changes, rebuild your image, and update your
-Kubernetes resource. Simply start your local Kubernetes cluster and run
-`tilt up` from Vector's root dir.
-
 #### Testing
 
 ##### Integration tests
@@ -621,11 +594,9 @@ after the `:`. Replace `<your name>` with your Docker Hub username.
 
 You can also pass additional parameters to adjust the behavior of the test:
 
-- `QUICK_BUILD=true` - use development build and an image from the dev
-  flow instead of a production docker image. Significantly speeds up the
-  preparation process, but doesn't guarantee the correctness in the release
-  build. Useful for development of the tests or Vector code to speed up the
-  iteration cycles.
+- `SKIP_PACKAGE_DEB=true` - skip building the `.deb` package and reuse the one
+  already in `target/artifacts`. Useful when you already built the package and
+  only want to rebuild the docker image.
 
 - `USE_MINIKUBE_CACHE=true` - instead of pushing the built docker image to the
   registry under the specified name, directly load the image into
@@ -654,11 +625,11 @@ You can also pass additional parameters to adjust the behavior of the test:
 Passing additional commands is done like so:
 
 ```shell
-QUICK_BUILD=true USE_MINIKUBE_CACHE=true make test-e2e-kubernetes
+USE_MINIKUBE_CACHE=true make test-e2e-kubernetes
 ```
 
 or
 
 ```shell
-QUICK_BUILD=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
+SKIP_PACKAGE_DEB=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 ```

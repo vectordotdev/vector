@@ -23,14 +23,14 @@ const CHECKPOINT_FILENAME: &str = "windows_event_log_checkpoints.json";
 /// Uses Windows Event Log bookmarks for robust position tracking that survives
 /// channel clears, log rotations, and provides O(1) seeking.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ChannelCheckpoint {
+pub(super) struct ChannelCheckpoint {
     /// The channel name (e.g., "System", "Application", "Security")
-    pub channel: String,
+    pub(super) channel: String,
     /// Windows Event Log bookmark XML for position tracking
-    pub bookmark_xml: String,
+    pub(super) bookmark_xml: String,
     /// Timestamp when this checkpoint was last updated (for debugging)
     #[serde(default)]
-    pub updated_at: String,
+    pub(super) updated_at: String,
 }
 
 /// Container for all channel checkpoints
@@ -56,14 +56,14 @@ impl Default for CheckpointState {
 /// Uses Windows Event Log bookmarks (opaque XML handles) to track position in
 /// each channel. Bookmarks are more robust than record IDs as they survive
 /// channel clears, log rotations, and provide O(1) seeking on restart.
-pub struct Checkpointer {
+pub(super) struct Checkpointer {
     checkpoint_path: PathBuf,
     state: Mutex<CheckpointState>,
 }
 
 impl Checkpointer {
     /// Create a new checkpointer for the given data directory
-    pub async fn new(data_dir: &Path) -> Result<Self, WindowsEventLogError> {
+    pub(super) async fn new(data_dir: &Path) -> Result<Self, WindowsEventLogError> {
         let checkpoint_path = data_dir.join(CHECKPOINT_FILENAME);
 
         // Ensure the data directory exists
@@ -89,7 +89,7 @@ impl Checkpointer {
     }
 
     /// Get the last checkpoint for a specific channel
-    pub async fn get(&self, channel: &str) -> Option<ChannelCheckpoint> {
+    pub(super) async fn get(&self, channel: &str) -> Option<ChannelCheckpoint> {
         let state = self.state.lock().await;
         state.channels.get(channel).cloned()
     }
@@ -102,7 +102,7 @@ impl Checkpointer {
     /// Note: For better performance with multiple channels, prefer `set_batch()`
     /// which writes all checkpoints in a single disk operation.
     #[cfg(test)]
-    pub async fn set(
+    pub(super) async fn set(
         &self,
         channel: String,
         bookmark_xml: String,
@@ -137,7 +137,7 @@ impl Checkpointer {
     ///
     /// Batching checkpoint updates is standard practice for event log collectors
     /// and avoids per-event disk I/O overhead.
-    pub async fn set_batch(
+    pub(super) async fn set_batch(
         &self,
         updates: Vec<(String, String)>,
     ) -> Result<(), WindowsEventLogError> {
@@ -280,7 +280,7 @@ impl Checkpointer {
 
     /// Remove checkpoint for a channel (useful for testing or reset)
     #[cfg(test)]
-    pub async fn remove(&self, channel: &str) -> Result<(), WindowsEventLogError> {
+    pub(super) async fn remove(&self, channel: &str) -> Result<(), WindowsEventLogError> {
         let mut state = self.state.lock().await;
         state.channels.remove(channel);
         self.save_to_disk(&state).await?;
@@ -295,7 +295,7 @@ impl Checkpointer {
 
     /// Get all channel checkpoints (useful for debugging)
     #[cfg(test)]
-    pub async fn list(&self) -> Vec<ChannelCheckpoint> {
+    pub(super) async fn list(&self) -> Vec<ChannelCheckpoint> {
         let state = self.state.lock().await;
         state.channels.values().cloned().collect()
     }

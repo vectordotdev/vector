@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use vector_lib::{
     config::{LogNamespace, log_schema},
+    internal_event::emit,
     lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
     schema::meaning,
 };
@@ -26,7 +27,7 @@ use crate::{
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
 //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
 //       empty string to a `None` path internally.
-pub struct HecLogsSink<S> {
+pub(super) struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
@@ -41,7 +42,7 @@ pub struct HecLogsSink<S> {
     pub auto_extract_timestamp: bool,
 }
 
-pub struct HecLogData<'a> {
+pub(super) struct HecLogData<'a> {
     pub sourcetype: Option<&'a ConfinedTemplate>,
     pub source: Option<&'a ConfinedTemplate>,
     pub index: Option<&'a ConfinedTemplate>,
@@ -181,7 +182,7 @@ fn has_confined_partition_error(
             .and_then(|t| t.render_string(event).err())
             .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
         {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field),
                 // Count the drop once — subsequent violations on the same event
@@ -233,7 +234,7 @@ impl Partitioner for EventPartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let emit_err = |error, field| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field),
                 drop_event: false,
@@ -301,7 +302,7 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 // determine the path for a field from one of the following use cases:
 // 1. user provided a path in the config settings
@@ -324,7 +325,7 @@ fn user_or_namespaced_path(
     }
 }
 
-pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
+pub(super) fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let mut log = event.into_log();
 
     let sourcetype = data
@@ -374,13 +375,13 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
                     Some(time)
                 }
                 Some(value) => {
-                    emit!(SplunkEventTimestampInvalidType {
-                        r#type: value.kind_str()
+                    emit(SplunkEventTimestampInvalidType {
+                        r#type: value.kind_str(),
                     });
                     None
                 }
                 None => {
-                    emit!(SplunkEventTimestampMissing {});
+                    emit(SplunkEventTimestampMissing {});
                     None
                 }
             }

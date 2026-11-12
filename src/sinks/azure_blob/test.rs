@@ -381,10 +381,12 @@ async fn azure_blob_build_config_with_account_name() {
         .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
-    let _ = config
-        .build(cx)
-        .await
-        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+    drop(
+        config
+            .build(cx)
+            .await
+            .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}")),
+    );
 }
 
 #[tokio::test]
@@ -429,10 +431,12 @@ async fn azure_blob_build_config_with_blob_endpoint() {
         .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
-    let _ = config
-        .build(cx)
-        .await
-        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+    drop(
+        config
+            .build(cx)
+            .await
+            .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}")),
+    );
 }
 
 #[tokio::test]
@@ -542,10 +546,12 @@ async fn azure_blob_build_config_with_custom_ca_certificate() {
         .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
-    let _ = config
-        .build(cx)
-        .await
-        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+    drop(
+        config
+            .build(cx)
+            .await
+            .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}")),
+    );
 }
 
 #[test]
@@ -992,7 +998,7 @@ fn azure_blob_append_blob_accepts_explicit_newline_framing() {
     let encoder = config
         .build_encoder()
         .expect("explicit newline framing must be accepted in append mode");
-    assert!(encoder.batch_prefix().is_empty());
+    assert_eq!(encoder.batch_prefix(), b"");
 }
 
 #[test]
@@ -1463,10 +1469,9 @@ async fn azure_blob_append_blob_default_max_bytes_succeeds() {
     .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"));
 
     let cx = SinkContext::default();
-    let _ = config
-        .build(cx)
-        .await
-        .unwrap_or_else(|e| panic!("build should succeed without explicit batch.max_bytes: {e:?}"));
+    drop(config.build(cx).await.unwrap_or_else(|e| {
+        panic!("build should succeed without explicit batch.max_bytes: {e:?}")
+    }));
 }
 
 #[tokio::test]
@@ -1519,9 +1524,9 @@ async fn azure_blob_append_blob_partial_batch_without_max_bytes_succeeds() {
     .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"));
 
     let cx = SinkContext::default();
-    let _ = config.build(cx).await.unwrap_or_else(|e| {
+    drop(config.build(cx).await.unwrap_or_else(|e| {
         panic!("build should succeed when [batch] omits max_bytes (only timeout_secs set): {e:?}")
-    });
+    }));
 }
 
 fn append_blob_config_with_compression(compression: &str) -> AzureBlobSinkConfig {
@@ -1560,12 +1565,14 @@ async fn azure_blob_append_blob_rejects_unappendable_compression() {
 async fn azure_blob_append_blob_accepts_concatenable_compression() {
     for compression in ["gzip", "zstd", "none"] {
         let config = append_blob_config_with_compression(compression);
-        let _ = config
-            .build(SinkContext::default())
-            .await
-            .unwrap_or_else(|e| {
-                panic!("build should succeed for `compression` = `{compression}`: {e:?}")
-            });
+        drop(
+            config
+                .build(SinkContext::default())
+                .await
+                .unwrap_or_else(|e| {
+                    panic!("build should succeed for `compression` = `{compression}`: {e:?}")
+                }),
+        );
     }
 }
 
@@ -1586,12 +1593,14 @@ async fn azure_blob_block_blob_accepts_any_compression() {
         ))
         .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"));
 
-        let _ = config
-            .build(SinkContext::default())
-            .await
-            .unwrap_or_else(|e| {
-                panic!("block blob build should succeed for `{compression}`: {e:?}")
-            });
+        drop(
+            config
+                .build(SinkContext::default())
+                .await
+                .unwrap_or_else(|e| {
+                    panic!("block blob build should succeed for `{compression}`: {e:?}")
+                }),
+        );
     }
 }
 

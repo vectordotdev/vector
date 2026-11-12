@@ -15,6 +15,10 @@ pub struct TestBackend {
 impl_generate_config_from_default!(TestBackend);
 
 impl SecretBackend for TestBackend {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
