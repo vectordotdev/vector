@@ -99,8 +99,7 @@ impl AppsignalConfig {
             compression: self.compression,
         };
 
-        let service =
-            HttpService::new(http_client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(http_client, service_request_builder);
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
