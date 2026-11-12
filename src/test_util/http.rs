@@ -85,16 +85,12 @@ pub fn always_200_response(
 pub enum SlowBody {
     /// Send the response headers and the first byte of the body, then nothing more.
     Stall,
-    /// Send the body one byte at a time with the given delay between bytes. Each read is quick,
-    /// but the full body takes far longer than any timeout used in tests.
+    /// Send the body one byte at a time with the given delay between bytes.
     Trickle(Duration),
 }
 
-/// Spawns an HTTP server whose responses send headers right away but never finish the body in
-/// time.
-///
-/// Every response is a `200 OK` that announces a 1 MiB body. Use it to check that a client's
-/// timeout also covers reading the response body.
+/// Spawns an HTTP server whose responses send the headers right away but never finish the body
+/// in time. Every response is a `200 OK` that announces a 1 MiB body.
 ///
 /// # Panics
 ///
@@ -103,7 +99,7 @@ pub async fn spawn_slow_body_http_server(body: SlowBody) -> Uri {
     const HEAD: &[u8] =
         b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 1048576\r\n\r\n";
 
-    let (_guard, address) = next_addr();
+    let (guard, address) = next_addr();
 
     let uri = Uri::builder()
         .scheme(Scheme::HTTP)
@@ -115,9 +111,11 @@ pub async fn spawn_slow_body_http_server(body: SlowBody) -> Uri {
     let listener = TcpListener::bind(address).await.unwrap();
 
     tokio::spawn(async move {
+        // Keep the port reserved for as long as the server runs.
+        let _guard = guard;
         while let Ok((mut stream, _)) = listener.accept().await {
             tokio::spawn(async move {
-                // Read the request head. Test clients send small requests without a body.
+                // Read the request head; test requests have no body.
                 let mut buf = [0u8; 1024];
                 let mut request = Vec::new();
                 while !request.windows(4).any(|window| window == b"\r\n\r\n") {

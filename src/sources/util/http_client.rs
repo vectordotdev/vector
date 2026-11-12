@@ -257,9 +257,7 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            // The timeout covers both sending the request and reading the full response body, so
-            // an endpoint that sends headers and then stalls the body can't hold a request open
-            // forever.
+            // The timeout covers reading the body too, so a stalled body can't hang the request.
             let fetch = async move {
                 let response = client.send(request).await?;
                 let (header, body) = response.into_parts();

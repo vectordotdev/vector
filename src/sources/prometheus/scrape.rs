@@ -409,8 +409,6 @@ mod test {
         assert!(!events.is_empty());
     }
 
-    /// An endpoint whose response body stalls must time out with an error, and must not hold back
-    /// the metrics scraped from the other endpoints.
     #[tokio::test]
     async fn test_prometheus_stalled_body_times_out_without_blocking_other_endpoints() {
         let stalled = spawn_slow_body_http_server(SlowBody::Stall).await;

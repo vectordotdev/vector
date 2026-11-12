@@ -90,8 +90,7 @@ impl ValidatableComponent for HttpClientConfig {
 
 register_validatable_component!(HttpClientConfig);
 
-/// Runs the source against an endpoint whose response body doesn't finish within the timeout, and
-/// asserts that the request fails with an error instead of staying open.
+/// Asserts that a request whose body doesn't finish in time fails with an error.
 async fn run_slow_body_error(body: SlowBody) {
     let uri = spawn_slow_body_http_server(body).await;
 
@@ -118,15 +117,13 @@ async fn run_slow_body_error(body: SlowBody) {
     assert!(events.is_empty());
 }
 
-/// The timeout must also cover reading the response body: an endpoint that sends the response
-/// headers and then stalls the body must not hold the request open.
+/// The headers arrive in time, so only a timeout that also covers the body read can end this.
 #[tokio::test]
 async fn timeout_covers_stalled_response_body() {
     run_slow_body_error(SlowBody::Stall).await;
 }
 
-/// The timeout applies to the whole request, not to each read: a body that arrives in quick
-/// pieces but takes longer than the timeout overall must still time out.
+/// A body that keeps arriving in small chunks must not extend the deadline.
 #[tokio::test]
 async fn timeout_covers_slow_response_body() {
     run_slow_body_error(SlowBody::Trickle(Duration::from_millis(100))).await;
