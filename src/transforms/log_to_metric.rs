@@ -2281,168 +2281,101 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn transform_counter_integer_value() {
-        let config = LogToMetricConfig {
-            metrics: None,
-            all_metrics: Some(true),
-        };
+    async fn transform_integer_values() {
+        let cases = [
+            (
+                "counter",
+                r#"{
+                  "counter": {"value": 42},
+                  "kind": "incremental",
+                  "name": "test.transform.counter", "tags": {}
+                }"#,
+                MetricValue::Counter { value: 42.0 },
+            ),
+            (
+                "gauge",
+                r#"{
+                  "gauge": {"value": 990},
+                  "kind": "absolute",
+                  "name": "test.transform.gauge", "tags": {}
+                }"#,
+                MetricValue::Gauge { value: 990.0 },
+            ),
+            (
+                "distribution",
+                r#"{
+                  "distribution": {
+                    "samples": [{"value": 2, "rate": 3}],
+                    "statistic": "histogram"
+                  },
+                  "kind": "incremental",
+                  "name": "test.transform.distribution", "tags": {}
+                }"#,
+                MetricValue::Distribution {
+                    samples: vec![Sample {
+                        value: 2.0,
+                        rate: 3,
+                    }],
+                    statistic: StatisticKind::Histogram,
+                },
+            ),
+            (
+                "histogram",
+                r#"{
+                  "aggregated_histogram": {
+                    "sum": 18,
+                    "count": 3,
+                    "buckets": [{"upper_limit": 1, "count": 1}, {"upper_limit": 10, "count": 2}]
+                  },
+                  "kind": "absolute",
+                  "name": "test.transform.histogram", "tags": {}
+                }"#,
+                MetricValue::AggregatedHistogram {
+                    count: 3,
+                    sum: Some(18.0),
+                    buckets: vec![
+                        Bucket {
+                            upper_limit: 1.0,
+                            count: 1,
+                        },
+                        Bucket {
+                            upper_limit: 10.0,
+                            count: 2,
+                        },
+                    ],
+                },
+            ),
+            (
+                "summary",
+                r#"{
+                  "aggregated_summary": {
+                    "sum": 100,
+                    "count": 7,
+                    "quantiles": [{"quantile": 1, "value": 25}]
+                  },
+                  "kind": "absolute",
+                  "name": "test.transform.summary", "tags": {}
+                }"#,
+                MetricValue::AggregatedSummary {
+                    quantiles: vec![Quantile {
+                        quantile: 1.0,
+                        value: 25.0,
+                    }],
+                    count: 7,
+                    sum: 100.0,
+                },
+            ),
+        ];
 
-        let json_str = r#"{
-          "counter": {
-            "value": 42
-          },
-          "kind": "incremental",
-          "name": "test.transform.counter",
-          "tags": {}
-        }"#;
-        let log = create_log_event(json_str);
-        let metric = Box::pin(do_transform(config, log.clone())).await.unwrap();
-        assert_eq!(
-            metric.as_metric().value(),
-            &MetricValue::Counter { value: 42.0 }
-        );
-    }
-
-    #[tokio::test]
-    async fn transform_gauge_integer_value() {
-        let config = LogToMetricConfig {
-            metrics: None,
-            all_metrics: Some(true),
-        };
-
-        let json_str = r#"{
-          "gauge": {
-            "value": 990
-          },
-          "kind": "absolute",
-          "name": "test.transform.gauge",
-          "tags": {}
-        }"#;
-        let log = create_log_event(json_str);
-        let metric = Box::pin(do_transform(config, log.clone())).await.unwrap();
-        assert_eq!(
-            metric.as_metric().value(),
-            &MetricValue::Gauge { value: 990.0 }
-        );
-    }
-
-    #[tokio::test]
-    async fn transform_distribution_integer_values() {
-        let config = LogToMetricConfig {
-            metrics: None,
-            all_metrics: Some(true),
-        };
-
-        let json_str = r#"{
-          "distribution": {
-            "samples": [
-              {
-                "value": 2,
-                "rate": 3
-              }
-            ],
-            "statistic": "histogram"
-          },
-          "kind": "incremental",
-          "name": "test.transform.distribution",
-          "tags": {}
-        }"#;
-        let log = create_log_event(json_str);
-        let metric = Box::pin(do_transform(config, log.clone())).await.unwrap();
-        assert_eq!(
-            metric.as_metric().value(),
-            &MetricValue::Distribution {
-                samples: vec![Sample {
-                    value: 2.0,
-                    rate: 3
-                }],
-                statistic: StatisticKind::Histogram,
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn transform_histogram_integer_values() {
-        let config = LogToMetricConfig {
-            metrics: None,
-            all_metrics: Some(true),
-        };
-
-        let json_str = r#"{
-          "aggregated_histogram": {
-            "sum": 18,
-            "count": 3,
-            "buckets": [
-              {
-                "upper_limit": 1,
-                "count": 1
-              },
-              {
-                "upper_limit": 10,
-                "count": 2
-              }
-            ]
-          },
-          "kind": "absolute",
-          "name": "test.transform.histogram",
-          "tags": {}
-        }"#;
-        let log = create_log_event(json_str);
-        let metric = Box::pin(do_transform(config, log.clone())).await.unwrap();
-        assert_eq!(
-            metric.as_metric().value(),
-            &MetricValue::AggregatedHistogram {
-                count: 3,
-                sum: Some(18.0),
-                buckets: vec![
-                    Bucket {
-                        upper_limit: 1.0,
-                        count: 1,
-                    },
-                    Bucket {
-                        upper_limit: 10.0,
-                        count: 2,
-                    },
-                ],
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn transform_summary_integer_values() {
-        let config = LogToMetricConfig {
-            metrics: None,
-            all_metrics: Some(true),
-        };
-
-        let json_str = r#"{
-          "aggregated_summary": {
-            "sum": 100,
-            "count": 7,
-            "quantiles": [
-              {
-                "quantile": 1,
-                "value": 25
-              }
-            ]
-          },
-          "kind": "absolute",
-          "name": "test.transform.summary",
-          "tags": {}
-        }"#;
-        let log = create_log_event(json_str);
-        let metric = Box::pin(do_transform(config, log.clone())).await.unwrap();
-        assert_eq!(
-            metric.as_metric().value(),
-            &MetricValue::AggregatedSummary {
-                quantiles: vec![Quantile {
-                    quantile: 1.0,
-                    value: 25.0,
-                }],
-                count: 7,
-                sum: 100.0,
-            }
-        );
+        for (name, json_str, expected) in cases {
+            let config = LogToMetricConfig {
+                metrics: None,
+                all_metrics: Some(true),
+            };
+            let log = create_log_event(json_str);
+            let metric = do_transform(config, log).await.expect(name);
+            assert_eq!(metric.as_metric().value(), &expected, "{name}");
+        }
     }
 
     #[tokio::test]
