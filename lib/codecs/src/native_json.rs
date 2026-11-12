@@ -6,8 +6,8 @@ use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, ReflectMe
 use vector_core::event::{Event, proto};
 
 const SOURCE_EVENT_ID_BYTES: usize = 16;
-// Match the maximum container nesting accepted by serde_json's default decoder.
-const MAX_JSON_EVENT_DEPTH: usize = 127;
+// Reserve one container below serde_json's default limit for an outer batch array.
+const MAX_JSON_EVENT_DEPTH: usize = 126;
 
 static DESCRIPTOR_POOL: LazyLock<DescriptorPool> =
     LazyLock::new(
