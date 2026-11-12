@@ -7,14 +7,13 @@ use std::{
 };
 
 use async_stream::stream;
-use futures::{Stream, StreamExt, stream};
+use futures::{Stream, StreamExt, future, stream};
 use indexmap::IndexMap;
 use metrics::Counter;
 use tokio::{sync::mpsc, task::JoinSet};
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::{
     cpu_time::SpawnTimedExt,
-    source_sender::chunk_size_events,
     stream::expiration_map::{Emitter, map_with_expiration},
 };
 use vector_vrl_metrics::MetricsStorage;
@@ -353,9 +352,12 @@ where
     ))
 }
 
-// How many batches can wait in one shard's queue before the router has to wait
-// TODO: there might be a variable somewhere in vector to handle this kind of stuff
+// How many batches can wait in one shard's queue before the router has to wait.
 const SHARD_QUEUE_BATCHES: usize = 4;
+
+/// Maximum number of events in a batch sent from the router to a shard, or from a shard to the
+/// output. It bounds each shard queue to `SHARD_QUEUE_BATCHES * BATCH_EVENTS` events.
+pub const BATCH_EVENTS: usize = 100;
 
 // All shards send into one shared output channel, which holds
 // `shards * OUTPUT_QUEUE_BATCHES_PER_SHARD` batches. Only there to absorb bursts.
@@ -438,11 +440,8 @@ async fn run_shard(
 ) {
     let events = ReceiverStream::new(rx).flat_map(stream::iter).boxed();
 
-    // TODO: don't know/not sure about
-    // 1. if chunk_size_events() is really the function we should use for max ready_events at the
-    //    same time
-    // 2. code very similar to Output in vector-core; maybe we should rewrite this another way.
-    let mut reduced = reduce.transform(events).ready_chunks(chunk_size_events());
+    // TODO: code very similar to Output in vector-core; maybe we should rewrite this another way.
+    let mut reduced = reduce.transform(events).ready_chunks(BATCH_EVENTS);
 
     while let Some(batch) = reduced.next().await {
         // Fails only if the topology dropped the output stream. A normal shutdown ends the input instead.
@@ -459,8 +458,7 @@ async fn route(
 ) {
     let hasher = RandomState::new();
 
-    // TODO: same question as for `reduced` var in `run_shard()`
-    let mut input = input_rx.ready_chunks(chunk_size_events());
+    let mut input = input_rx.ready_chunks(BATCH_EVENTS);
 
     while let Some(events) = input.next().await {
         let mut per_shard: Vec<Vec<Event>> = vec![Vec::new(); shard_senders.len()];
@@ -481,11 +479,15 @@ async fn route(
             per_shard[shard_number].push(event);
         }
 
-        for (shard_tx, shard_batch) in shard_senders.iter().zip(per_shard) {
-            // Fails only if the shard stopped after the output stream was dropped.
-            if !shard_batch.is_empty() && shard_tx.send(shard_batch).await.is_err() {
-                return;
-            }
+        let sends = shard_senders
+            .iter()
+            .zip(per_shard)
+            .filter(|(_, shard_batch)| !shard_batch.is_empty())
+            .map(|(shard_tx, shard_batch)| shard_tx.send(shard_batch));
+
+        // Fails only if a shard stopped after the output stream was dropped.
+        if future::try_join_all(sends).await.is_err() {
+            return;
         }
     }
 }
