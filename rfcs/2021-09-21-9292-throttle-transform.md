@@ -143,7 +143,7 @@ form of the event, which will differ from what downstream sinks will actually re
 
 * [Governor](https://docs.rs/governor/0.3.2/governor/index.html)
 * [Throttle - FluentBit](https://docs.fluentbit.io/manual/pipeline/filters/throttle)
-* [grouper::bucker - Tremor](https://github.com/tremor-rs/tremor-runtime/blob/main/tremor-pipeline/src/op/grouper/bucket.rs)
+* [grouper::bucket - Tremor](https://github.com/tremor-rs/tremor-runtime/blob/main/tremor-pipeline/src/op/grouper/bucket.rs)
 
 ## Alternatives
 

@@ -1,0 +1,16 @@
+sinks:
+  my_sink_id:
+    type: gcp_chronicle_unstructured
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    customer_id: c8c65bfa-5f2c-42d4-9189-64bb7b939f2c
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.1:8080
+    fallback_log_type: VECTOR_DEV
+    labels:
+      source: vector
+      tenant: marketing
+    log_type: WINDOWS_DNS
+    namespace: production

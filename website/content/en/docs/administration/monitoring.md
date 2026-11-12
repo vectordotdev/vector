@@ -77,14 +77,14 @@ sinks:
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
 command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
-Method | Description
-:------|:-----------
-`-v` flag | Drops the log level to `debug`
-`-vv` flag | Drops the log level to `trace`
-`-q` flag | Raises the log level to `warn`
-`-qq` flag | Raises the log level to `error`
-`-qqq` flag | Disables logging
-`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+| Method | Description |
+| :------- | :----------- |
+| `-v` flag | Drops the log level to `debug` |
+| `-vv` flag | Drops the log level to `trace` |
+| `-q` flag | Raises the log level to `warn` |
+| `-qq` flag | Raises the log level to `error` |
+| `-qqq` flag | Disables logging |
+| `VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`. |
 
 #### Stack traces
 
@@ -114,6 +114,12 @@ sinks:
 
 The table below provides a list of internal metrics provided by Vector. See the docs for the [`internal_metrics`
 source][output] for more detailed information about the available metrics and the [debugging guide][debugging_guide] on how to use them.
+
+## Inspect a running Vector instance
+
+Use [`vector top`](/guides/developer/debugging/#vector-top) to compare component activity and
+[`vector tap`](/guides/developer/debugging/#vector-tap) to sample events at component boundaries.
+Both commands require the [Observability API](/docs/reference/api/#enable-local-inspection), which is disabled by default.
 
 ## Troubleshooting
 

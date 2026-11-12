@@ -1,5 +1,5 @@
 api_key: DEADBEEF
-log_level: 'debug'
+log_level: "debug"
 
 # disable bunch of stuff we don't need
 inventories_configuration_enabled: false
@@ -29,4 +29,4 @@ logs_config:
   batch_wait: 1
 
 # Required per https://github.com/DataDog/datadog-agent/tree/main/test/fakeintake#docker
-dd_url: 'http://fakeintake-agent:80'
+dd_url: "http://fakeintake-agent:80"

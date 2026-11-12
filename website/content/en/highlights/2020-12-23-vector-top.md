@@ -12,6 +12,8 @@ badges:
   domains: ["cli", "observability"]
 ---
 
+{{< grpc-migration-warning >}}
+
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well
 as information about your Vector [topology] through a beautiful dashboard-style interface reminiscent of tools like
 [htop]. To use it, run `vector top` and specify the URL of the running Vector instance you want to monitor:

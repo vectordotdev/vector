@@ -1,12 +1,17 @@
 #![allow(missing_docs)]
 
-pub mod ewma_gauge;
+mod ewma_gauge;
+mod time_ewma;
 
-pub use ewma_gauge::{DEFAULT_EWMA_ALPHA, EwmaGauge};
+pub use ewma_gauge::{EwmaGauge, TimeEwmaGauge};
+pub use time_ewma::TimeEwma;
 
 use std::sync::atomic::Ordering;
 
 use crate::atomic::AtomicF64;
+
+/// The default alpha parameter used when constructing EWMA-backed gauges.
+pub const DEFAULT_EWMA_ALPHA: f64 = 0.9;
 
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]

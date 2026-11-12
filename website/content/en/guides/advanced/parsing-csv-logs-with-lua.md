@@ -36,36 +36,40 @@ log file:
 
 Let us draft an initial version of the Vector's configuration file:
 
-```toml title="vector.toml"
-data_dir = "."
+```yaml title="vector.yaml"
+data_dir: "."
 
-[sources.file]
-  type = "file"
-  include = ["*.csv"]
-  ignore_checkpoints = true
+sources:
+  file:
+    type: "file"
+    include: ["*.csv"]
+    ignore_checkpoints: true
 
-[transforms.lua]
-  inputs = ["file"]
-  type = "lua"
-  version = "2"
-  hooks.process = """
-    function (event, emit)
-      -- to be expanded
-      emit(event)
-    end
-  """
+transforms:
+  lua:
+    inputs: ["file"]
+    type: "lua"
+    version: "2"
+    hooks:
+      process: |
+        function (event, emit)
+          -- to be expanded
+          emit(event)
+        end
 
-[sinks.console]
-  inputs = ["lua"]
-  type = "console"
-  encoding.codec = "json"
+sinks:
+  console:
+    inputs: ["lua"]
+    type: "console"
+    encoding:
+      codec: "json"
 ```
 
 This config sets up a [pipeline][docs.meta.glossary#pipeline] that reads log files, pipes them through the parsing
 transform (which currently is configured to just pass the events through), and displays the produced log events using
 [`console`][docs.sinks.console] sink.
 
-At this point, running `vector --config vector.toml` results in the following output:
+At this point, running `vector --config vector.yaml` results in the following output:
 
 ```json
 {"file":"log.csv","host":"localhost","message":"2020-04-09 12:48:49.661 UTC,,,1,,localhost.1,1,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"ending log output to stderr\",,\"Future log output will go to log destination \"\"csvlog\"\".\",,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
@@ -77,7 +81,7 @@ At this point, running `vector --config vector.toml` results in the following ou
 
 In order to perform actual parsing, it is possible to leverage [`lua-csv`][urls.lua_csv_repo].
 Because it consists of a [single file][urls.lua_csv_view], it is possible to just download it to the same
-directory where `vector.toml` is stored:
+directory where `vector.yaml` is stored:
 
 ```bash
 curl -o csv.lua https://raw.githubusercontent.com/geoffleyland/lua-csv/d20cd42d61dc52e7f6bcb13b596ac7a7d4282fbf/lua/csv.lua
@@ -86,10 +90,9 @@ curl -o csv.lua https://raw.githubusercontent.com/geoffleyland/lua-csv/d20cd42d6
 Then it would be possible to load it by calling [`require`][urls.lua_require] Lua function in the
 [`source`][docs.transforms.lua#source] configuration section:
 
-```toml
-source = """
+```yaml
+source: |
   csv = require("csv")
-"""
 ```
 
 With this `source` the `csv` module is loaded when Vector is started up (or if the `lua` transform is added later and the
@@ -99,85 +102,85 @@ config is automatically reloaded) and can be used through the global variable `c
 
 With the `csv` module, the [`hooks.process`][docs.transforms.lua#process] can be changed to the following:
 
-```toml
-hooks.process = """
-  function (event, emit)
-    fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
-    event.log.message = nil -- drop the `message` field
+```yaml
+hooks:
+  process: |
+    function (event, emit)
+      fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
+      event.log.message = nil -- drop the `message` field
 
-    column_names = {  -- a sequence containing CSV column names
-      -- ...
-    }
+      column_names = {  -- a sequence containing CSV column names
+        -- ...
+      }
 
-    for column, value in ipairs(fields) do -- iterate over CSV columns
-      column_name = column_names[column] -- get column name
-      event.log[column_name] = value -- set the corresponding field in the event
+      for column, value in ipairs(fields) do -- iterate over CSV columns
+        column_name = column_names[column] -- get column name
+        event.log[column_name] = value -- set the corresponding field in the event
+      end
+
+      emit(event) -- emit the transformed event
     end
-
-    emit(event) -- emit the transformed event
-  end
-"""
 ```
 
 Note that the `column_names` can be created just once, in the `source` section instead to speed up processing.
 Putting it there and using the column names from the PostgreSQL documentation results in the following definition of
 the whole transform:
 
-```toml title="vector.toml"
+```yaml title="vector.yaml"
 # ...
-[transforms.lua]
-  inputs = ["file"]
-  type = "lua"
-  version = "2"
-  source = """
-    csv = require("csv") -- load external module for parsing CSV
-    column_names = {  -- a sequence containing CSV column names
-      "log_time",
-      "user_name",
-      "database_name",
-      "process_id",
-      "connection_from",
-      "session_id",
-      "session_line_num",
-      "command_tag",
-      "session_start_time",
-      "virtual_transaction_id",
-      "transaction_id",
-      "error_severity",
-      "sql_state_code",
-      "message",
-      "detail",
-      "hint",
-      "internal_query",
-      "internal_query_pos",
-      "context",
-      "query",
-      "query_pos",
-      "location",
-      "application_name",
-      -- available only in postgres > 13, to remove for postgres <= 13
-      "backend_type",
-      "leader_pid",
-      "query_id"
-    }
-  """
-  hooks.process = """
-    function (event, emit)
-      fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
-      event.log.message = nil -- drop the `message` field
+transforms:
+  lua:
+    inputs: ["file"]
+    type: "lua"
+    version: "2"
+    source: |
+      csv = require("csv") -- load external module for parsing CSV
+      column_names = {  -- a sequence containing CSV column names
+        "log_time",
+        "user_name",
+        "database_name",
+        "process_id",
+        "connection_from",
+        "session_id",
+        "session_line_num",
+        "command_tag",
+        "session_start_time",
+        "virtual_transaction_id",
+        "transaction_id",
+        "error_severity",
+        "sql_state_code",
+        "message",
+        "detail",
+        "hint",
+        "internal_query",
+        "internal_query_pos",
+        "context",
+        "query",
+        "query_pos",
+        "location",
+        "application_name",
+        -- available only in postgres > 13, to remove for postgres <= 13
+        "backend_type",
+        "leader_pid",
+        "query_id"
+      }
+    hooks:
+      process: |
+        function (event, emit)
+          fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
+          event.log.message = nil -- drop the `message` field
 
-      for column, column_name in ipairs(column_names) do -- iterate over column names
-        value = fields[column] -- get field value
-        event.log[column_name] = value -- set the corresponding field in the event
-      end
+          for column, column_name in ipairs(column_names) do -- iterate over column names
+            value = fields[column] -- get field value
+            event.log[column_name] = value -- set the corresponding field in the event
+          end
 
-      emit(event) -- emit the transformed event
-    end
-    """
-#...
+          emit(event) -- emit the transformed event
+        end
+# ...
 ```
 
-Trying to run `vector --config vector.toml` with the same input file results in structured events being output:
+Trying to run `vector --config vector.yaml` with the same input file results in structured events being output:
 
 ```json
 {"application_name":"","backend_type":"not initialized","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"Future log output will go to log destination \"csvlog\".","host":"localhost","internal_query":"","internal_query_pos":"","leader_pid":"","location":"","log_time":"2020-04-09 12:48:49.661 UTC","message":"ending log output to stderr","process_id":"1","query":"","query_id":"0","query_pos":"","session_id":"localhost.1","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}

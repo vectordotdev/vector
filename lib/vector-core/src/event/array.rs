@@ -2,7 +2,7 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, slice, sync::Arc, vec};
+use std::{iter, slice, vec};
 
 use futures::{Stream, stream};
 #[cfg(test)]
@@ -10,14 +10,16 @@ use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    config::ComponentKey,
-    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizerGroups, EventFinalizers, Finalizable,
+        GroupedFinalizable, MergeFinalizable,
+    },
     json_size::JsonSize,
 };
 
 use super::{
-    EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
-    LogEvent, Metric, TraceEvent,
+    EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMetadata, EventMutRef,
+    EventRef, LogEvent, Metric, TraceEvent,
 };
 
 /// The type alias for an array of `LogEvent` elements.
@@ -142,36 +144,6 @@ pub enum EventArray {
 }
 
 impl EventArray {
-    /// Sets the `OutputId` in the metadata for all the events in this array.
-    pub fn set_output_id(&mut self, output_id: &Arc<ComponentKey>) {
-        match self {
-            EventArray::Logs(logs) => {
-                for log in logs {
-                    log.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-            EventArray::Metrics(metrics) => {
-                for metric in metrics {
-                    metric.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-            EventArray::Traces(traces) => {
-                for trace in traces {
-                    trace.metadata_mut().set_source_id(Arc::clone(output_id));
-                }
-            }
-        }
-    }
-
-    /// Sets the `source_type` in the metadata for all metric events in this array.
-    pub fn set_source_type(&mut self, source_type: &'static str) {
-        if let EventArray::Metrics(metrics) = self {
-            for metric in metrics {
-                metric.metadata_mut().set_source_type(source_type);
-            }
-        }
-    }
-
     /// Iterate over references to this array's events.
     pub fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
         match self {
@@ -195,6 +167,27 @@ impl EventArray {
         match self {
             Self::Logs(array) => TypedArrayIterMut(Some(array.iter_mut())),
             _ => TypedArrayIterMut(None),
+        }
+    }
+
+    /// Applies a closure to each event's metadata in this array.
+    pub fn for_each_metadata_mut(&mut self, mut f: impl FnMut(&mut EventMetadata)) {
+        match self {
+            Self::Logs(logs) => {
+                for log in logs {
+                    f(log.metadata_mut());
+                }
+            }
+            Self::Metrics(metrics) => {
+                for metric in metrics {
+                    f(metric.metadata_mut());
+                }
+            }
+            Self::Traces(traces) => {
+                for trace in traces {
+                    f(trace.metadata_mut());
+                }
+            }
         }
     }
 }
@@ -323,6 +316,88 @@ impl Finalizable for EventArray {
             Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
             Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
         }
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        match self {
+            Self::Logs(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+        }
+    }
+}
+
+impl GroupedFinalizable for EventArray {
+    fn merge_finalizer_groups(&mut self, finalizers: EventFinalizerGroups) {
+        fn merge_into<T: MergeFinalizable>(items: &mut [T], finalizers: EventFinalizerGroups) {
+            assert_eq!(
+                items.len(),
+                finalizers.len(),
+                "finalizer group count must match EventArray length"
+            );
+
+            for (item, finalizers) in items.iter_mut().zip(finalizers.into_groups()) {
+                item.merge_finalizers(finalizers);
+            }
+        }
+
+        match self {
+            Self::Logs(a) => merge_into(a, finalizers),
+            Self::Metrics(a) => merge_into(a, finalizers),
+            Self::Traces(a) => merge_into(a, finalizers),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::oneshot::error::TryRecvError;
+    use vector_common::finalization::{BatchStatus, EventStatus};
+
+    use super::*;
+
+    #[test]
+    fn grouped_finalizer_round_trip_preserves_event_ownership() {
+        let (first_batch, mut first_rx) = BatchNotifier::new_with_receiver();
+        let (second_batch, mut second_rx) = BatchNotifier::new_with_receiver();
+
+        let mut first = LogEvent::default();
+        first.add_finalizer(EventFinalizer::new(first_batch));
+
+        let mut second = LogEvent::default();
+        second.add_finalizer(EventFinalizer::new(second_batch));
+
+        let mut array = EventArray::Logs(vec![first, second]);
+        let finalizers = array.take_finalizer_groups();
+        array.merge_finalizer_groups(finalizers);
+
+        let mut events = array.into_events();
+        let mut first = events.next().expect("first event must exist");
+        let mut second = events.next().expect("second event must exist");
+        assert!(events.next().is_none());
+
+        let first_finalizers = first.take_finalizers();
+        first_finalizers.update_status(EventStatus::Delivered);
+        drop(first_finalizers);
+
+        assert_eq!(first_rx.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(matches!(second_rx.try_recv(), Err(TryRecvError::Empty)));
+
+        let second_finalizers = second.take_finalizers();
+        second_finalizers.update_status(EventStatus::Errored);
+        drop(second_finalizers);
+
+        assert_eq!(second_rx.try_recv(), Ok(BatchStatus::Errored));
+    }
+
+    #[test]
+    fn empty_event_array_grouped_round_trip() {
+        let mut array = EventArray::Logs(Vec::new());
+        let finalizers = array.take_finalizer_groups();
+
+        assert!(finalizers.is_empty());
+        array.merge_finalizer_groups(finalizers);
+        assert!(array.is_empty());
     }
 }
 

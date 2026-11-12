@@ -1,1 +1,0 @@
-{"metric":{"name":"h","timestamp":"1970-01-01T01:26:55.000010802Z","kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":554496.0,"count":1987673368243139464}],"count":5439450519154848621,"sum":6016.0}}}

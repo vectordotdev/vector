@@ -2,6 +2,10 @@ name: "Pull Request Labeler"
 on:
   pull_request_target:
 
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -13,7 +17,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-    - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
-        sync-labels: true
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: true

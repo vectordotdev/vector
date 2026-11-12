@@ -1,9 +1,12 @@
 //! Internal events for codecs.
 
-use metrics::counter;
 use tracing::error;
-use vector_common::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, emit, error_stage, error_type,
+use vector_common::{
+    counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
+    },
 };
 use vector_common_macros::NamedInternalEvent;
 
@@ -24,8 +27,37 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "decoder_frame",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when a decoder discards a frame that exceeds the configured maximum length.
+pub struct DecoderFrameTooLongError {
+    /// The length of the discarded frame in bytes, not including the delimiter.
+    pub length: usize,
+    /// The configured maximum frame length in bytes.
+    pub max_length: usize,
+}
+
+impl InternalEvent for DecoderFrameTooLongError {
+    fn emit(self) {
+        error!(
+            message = "Discarding frame larger than max_length.",
+            length = self.length,
+            max_length = self.max_length,
+            error_code = "decoder_frame_too_long",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "decoder_frame_too_long",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
@@ -50,7 +82,7 @@ impl InternalEvent for DecoderDeserializeError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "decoder_deserialize",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -77,7 +109,7 @@ impl InternalEvent for EncoderFramingError<'_> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "encoder_frame",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
@@ -105,7 +137,7 @@ impl InternalEvent for EncoderSerializeError<'_> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "encoder_serialize",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
@@ -137,7 +169,7 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         )
@@ -162,24 +194,129 @@ pub struct EncoderNullConstraintError<'a> {
 #[cfg(feature = "arrow")]
 impl InternalEvent for EncoderNullConstraintError<'_> {
     fn emit(self) {
-        const CONSTRAINT_REASON: &str = "Schema constraint violation.";
         error!(
-            message = CONSTRAINT_REASON,
+            message = "Schema constraint violation.",
             error = %self.error,
             error_code = "encoding_null_constraint",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "encoding_null_constraint",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: CONSTRAINT_REASON,
-        });
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when Arrow record batch construction fails (e.g. schema decoder build,
+/// JSON-to-Arrow decoding such as type mismatches).
+pub struct EncoderRecordBatchError<'a, E> {
+    /// The encoding error that occurred.
+    pub error: &'a E,
+    /// Stable error code identifying the failure mode.
+    pub error_code: &'static str,
+}
+
+#[cfg(feature = "arrow")]
+impl<E: std::fmt::Display> InternalEvent for EncoderRecordBatchError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "Failed to build Arrow record batch.",
+            error = %self.error,
+            error_code = self.error_code,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => self.error_code,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct SchemaGenerationError<'a> {
+    pub error: &'a arrow::error::ArrowError,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for SchemaGenerationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not generate schema for batched events",
+            error = %self.error,
+            error_code = "parquet_schema_generation_failed",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "parquet_schema_generation_failed",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct ArrowWriterError<'a> {
+    pub error: &'a parquet::errors::ParquetError,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for ArrowWriterError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to write record batch with ArrowWriter.",
+            error = %self.error,
+            error_code = "parquet_arrow_writer_failed",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "parquet_arrow_writer_failed",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(feature = "parquet")]
+#[derive(NamedInternalEvent)]
+pub(crate) struct JsonSerializationError<'a> {
+    pub error: &'a serde_json::Error,
+}
+
+#[cfg(feature = "parquet")]
+impl InternalEvent for JsonSerializationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Could not serialize event to JSON.",
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
     }
 }

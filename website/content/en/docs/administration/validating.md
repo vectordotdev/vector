@@ -31,15 +31,22 @@ files, including:
 1. That all of the [sources], [transforms], and [sinks] include all required fields.
 2. All fields are of the proper type.
 
+### Ignored fields
+
+Vector warns about fields discarded during deserialization, including misspelled settings
+and fields belonging to a different enum variant. These warnings include field paths without
+printing their values. Correct the settings before a future release rejects them; see the
+[migration notice](/deprecations/#ignored-configuration-fields).
+
 ### Topology checks
 
 These checks verify that the configuration file contains a valid topology:
 
 1. At least one [source][sources] is defined
-1. At least one [sink][sinks] is defined
-1. All inputs for each topology component (specified using the `inputs` parameter) contain at least
+2. At least one [sink][sinks] is defined
+3. All inputs for each topology component (specified using the `inputs` parameter) contain at least
   one value.
-1. All inputs refer to valid and upstream [sources] or [transforms].
+4. All inputs refer to valid and upstream [sources] or [transforms].
 
 ### Environment checks
 
@@ -47,7 +54,7 @@ Finally, these checks ensure that Vector is running in an environment that can s
 configured topology:
 
 1. All components have the pre-requisites to run, e.g. data directories exist and are writable.
-1. All sinks can connect to their specified targets.
+2. All sinks can connect to their specified targets.
 
 These environment checks can be disabled using the [`--no-environment`][no_environment] flag:
 
@@ -65,7 +72,7 @@ the [`--skip-healthchecks`][skip_healthchecks] flag:
 vector validate --skip-healthchecks /etc/vector/vector.yaml
 ```
 
-**Note:** The configured `data_dir` must still be writeable.
+**Note:** The configured `data_dir` must still be writable.
 
 [components]: /components
 [no_environment]: /docs/reference/cli/#validate-no-environment

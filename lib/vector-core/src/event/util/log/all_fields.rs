@@ -259,7 +259,11 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
         // Compare without the leading `"` char so that the order is the same as the collected fields.
-        expected.sort_by(|(a, _), (b, _)| a[1..].cmp(&b[1..]));
+        expected.sort_by(|(a, _), (b, _)| {
+            a.strip_prefix('"')
+                .unwrap_or(a)
+                .cmp(b.strip_prefix('"').unwrap_or(b))
+        });
 
         assert_eq!(collected, expected);
     }

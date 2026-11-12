@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures_util::{FutureExt, future::err};
+use futures_util::future::err;
 use vector_lib::{
     config::{DataType, LogNamespace, SourceOutput},
     configurable::configurable_component,
@@ -23,7 +23,7 @@ impl_generate_config_from_default!(ErrorSourceConfig);
 #[typetag::serde(name = "test_error")]
 impl SourceConfig for ErrorSourceConfig {
     async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
-        Ok(err(()).boxed())
+        Ok(vector_lib::source::opaque_source(err(())))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

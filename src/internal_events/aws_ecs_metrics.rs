@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 
-use metrics::counter;
 use vector_lib::{
-    NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEcsMetricsEventsReceived<'a> {
+pub(crate) struct AwsEcsMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
@@ -24,12 +23,12 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
             endpoint = %self.endpoint,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_string(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_string(),
         )
         .increment(self.byte_size.get() as u64);
@@ -37,7 +36,7 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AwsEcsMetricsParseError<'a> {
+pub(crate) struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,
     pub endpoint: &'a str,
     pub body: Cow<'a, str>,
@@ -57,9 +56,9 @@ impl InternalEvent for AwsEcsMetricsParseError<'_> {
             endpoint = %self.endpoint,
             "Failed to parse response.",
         );
-        counter!("parse_errors_total").increment(1);
+        counter!(CounterName::ParseErrorsTotal).increment(1);
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_string(),

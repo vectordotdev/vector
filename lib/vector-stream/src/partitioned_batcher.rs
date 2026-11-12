@@ -35,6 +35,7 @@ impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
     /// `timeout` is used for all insertions and resets.
+    #[must_use]
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -47,11 +48,13 @@ impl<K> ExpirationQueue<K> {
     ///
     /// Includes subtimers which have expired but have not yet been removed via
     /// calls to `poll_expired`.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.expirations.len()
     }
 
     /// Returns `true` if the queue has a length of 0.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -118,6 +121,7 @@ pub struct BatcherSettings {
 }
 
 impl BatcherSettings {
+    #[must_use]
     pub const fn new(
         timeout: Duration,
         size_limit: NonZeroUsize,
@@ -132,6 +136,7 @@ impl BatcherSettings {
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
     /// The output is a  `Vec<T>`.
+    #[must_use]
     pub fn as_byte_size_config<T: ByteSizeOf>(
         &self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
@@ -211,10 +216,9 @@ where
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
-    F: Fn() -> C + Send,
+    F: Fn(&Prt::Key) -> C + Send,
 {
-    pub fn new(stream: St, partitioner: Prt, settings: F) -> Self {
-        let timeout = settings().timeout();
+    pub fn new(stream: St, partitioner: Prt, timeout: Duration, settings: F) -> Self {
         Self {
             state: settings,
             batches: HashMap::default(),
@@ -233,8 +237,8 @@ where
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
-    C: BatchConfig<Prt::Item>,
-    F: Fn() -> C + Send,
+    C: BatchConfig<Prt::Item, Batch = B>,
+    F: Fn(&Prt::Key) -> C + Send,
 {
     pub fn with_timer(stream: St, partitioner: Prt, timer: KT, settings: F) -> Self {
         Self {
@@ -256,7 +260,7 @@ where
     Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = B>,
-    F: Fn() -> C + Send,
+    F: Fn(&Prt::Key) -> C + Send,
 {
     type Item = (Prt::Key, B);
 
@@ -307,7 +311,7 @@ where
                     let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
                         batch
                     } else {
-                        let batch = (this.state)();
+                        let batch = (this.state)(&item_key);
                         this.batches.insert(item_key.clone(), batch);
                         this.timer.insert(item_key.clone());
                         this.batches
@@ -479,7 +483,7 @@ mod test {
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
 
             let batcher = PartitionedBatcher::with_timer(&mut stream, partitioner, timer,
-                                              Box::new(move || batch_settings.as_byte_size_config()));
+                                              move |_: &u8| batch_settings.as_byte_size_config::<u64>());
             let batcher_size_hint = batcher.size_hint();
 
             assert_eq!(stream_size_hint, batcher_size_hint);
@@ -503,7 +507,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -574,7 +578,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -618,7 +622,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
             let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;
@@ -641,7 +645,6 @@ mod test {
     }
 
     #[tokio::test(start_paused = true)]
-    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.

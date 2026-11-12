@@ -1,17 +1,46 @@
-use std::{io::Cursor, time::Duration};
+use std::{io::Cursor, sync::Arc, time::Duration};
 
+use fslock::LockFile;
 use futures::{StreamExt, stream};
 use tokio::{select, time::sleep};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 use vector_common::finalization::Finalizable;
 
-use super::{create_default_buffer_v2, read_next, read_next_some};
+use super::{
+    create_default_buffer_v2, create_default_buffer_v2_with_usage, read_next, read_next_some,
+};
 use crate::{
     EventCount, assert_buffer_is_empty, assert_buffer_records,
+    buffer_usage_data::BufferUsageHandle,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
+    variants::disk_v2::{BufferWriter, DiskBufferConfigBuilder, Ledger, writer::RecordWriter},
 };
+
+#[tokio::test]
+async fn dropping_buffer_releases_lock_without_yielding() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (writer, reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            drop(writer);
+            drop(reader);
+            drop(ledger);
+
+            // No await point since the drops: background tasks have not run, so the lock must
+            // already be free for the buffer to be reopened in the same process.
+            let mut lock =
+                LockFile::open(&data_dir.join("buffer.lock")).expect("open should not fail");
+            assert!(
+                lock.try_lock().expect("try_lock should not fail"),
+                "buffer lock should be released once all buffer handles are dropped"
+            );
+        }
+    })
+    .await;
+}
 
 #[tokio::test]
 async fn basic_read_write_loop() {
@@ -155,8 +184,25 @@ async fn initial_size_correct_with_multievents() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create a regular buffer, no customizations required.
-            let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await;
+            // Build a write-only buffer without background tasks. The regular helper spawns
+            // cleanup, which can hold an Arc<Ledger> across asynchronous I/O and keep the lock
+            // held when we reopen the buffer below.
+            let config = DiskBufferConfigBuilder::from_path(&data_dir)
+                .build()
+                .expect("creating buffer config should not fail");
+            let usage_handle = BufferUsageHandle::noop();
+            let ledger = Ledger::load_or_create(config, usage_handle)
+                .await
+                .expect("ledger should not fail to load/create");
+            let ledger = Arc::new(ledger);
+
+            let mut writer = BufferWriter::new(Arc::clone(&ledger));
+            writer
+                .validate_last_write()
+                .await
+                .expect("validate_last_write should not fail");
+
+            ledger.synchronize_buffer_usage();
 
             let input_items = (512..768)
                 .cycle()
@@ -209,11 +255,15 @@ async fn initial_size_correct_with_multievents() {
             writer.flush().await.expect("writer flush should not fail");
             writer.close();
 
-            // Now drop our buffer and reopen it.
+            // No background tasks hold the ledger, so dropping these handles releases the lock.
             drop(writer);
-            let (writer, mut reader, ledger, usage) =
-                create_default_buffer_v2_with_usage::<_, MultiEventRecord>(data_dir).await;
-            drop(writer);
+            drop(ledger);
+
+            // Reopen the buffer with a full reader to verify the persisted data.
+            let (mut writer, mut reader, ledger, usage) =
+                create_default_buffer_v2_with_usage::<_, MultiEventRecord>(&data_dir).await;
+            let disk_usage = writer.usage_snapshot();
+            writer.close();
 
             // Make sure our usage data agrees with our expected event count and byte size:
             let snapshot = usage.snapshot();
@@ -221,6 +271,8 @@ async fn initial_size_correct_with_multievents() {
             assert_eq!(expected_bytes as u64, snapshot.received_byte_size);
             assert_eq!(expected_events as u64, ledger.get_total_records());
             assert_eq!(expected_bytes, total_bytes_written);
+            assert_eq!(expected_events as u64, disk_usage.event_count);
+            assert_eq!(expected_bytes as u64, disk_usage.byte_size);
 
             // Make sure we can read all of the records we wrote, and recalculate some of these
             // values from the source:
@@ -235,6 +287,9 @@ async fn initial_size_correct_with_multievents() {
 
             assert_eq!(expected_events, total_record_events);
             assert_eq!(expected_records, total_records_read);
+            let disk_usage = writer.usage_snapshot();
+            assert_eq!(0, disk_usage.event_count);
+            assert_eq!(0, disk_usage.byte_size);
         }
     })
     .await;

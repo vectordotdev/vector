@@ -85,7 +85,7 @@ To do so, we can make use of the [`get_enrichment_table_record`][get_enrichment_
 type = "remap"
 inputs = ["datadog_agents"]
 source = '''
-. = parse_json!(.status_message)
+. = parse_json!(.message)
 
 status_code = del(.status_code)
 
@@ -149,10 +149,10 @@ that case, you can set your `csv` file, let's call it  similarly to below:
 
 ``` csv
 ip,alert_type,severity
-"192.0.2.0", "alert", "high"
-"198.51.100.0", "alert", "medium"
+"192.0.2.0","alert","high"
+"198.51.100.0","alert","medium"
 ...
-"203.0.113.0", "warn", "medium"
+"203.0.113.0","warn","medium"
 ```
 
 Assuming you set the `enrichment_tables` similarly to the configuration in Use
@@ -183,7 +183,7 @@ Your observability data, assuming it was in JSON, now has been transformed from:
   "host":"my.host.com",
   "timestamp":"2019-11-01T21:15:47+00:00",
   ...
-  "ip":"192.0.2.0",
+  "ip":"192.0.2.0"
 }
 ```
 
@@ -196,7 +196,7 @@ To:
   ...
   "alert": {
     "type":"alert",
-    "severity":"medium"
+    "severity":"high"
   }
 }
 ```

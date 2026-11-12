@@ -1,6 +1,7 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DecoderBomRemoval {
@@ -13,7 +14,7 @@ impl InternalEvent for DecoderBomRemoval {
             message = "Removing initial BOM bytes from the final output while decoding to utf8.",
             from_encoding = %self.from_encoding
         );
-        counter!("decoder_bom_removals_total").increment(1);
+        counter!(CounterName::DecoderBomRemovalsTotal).increment(1);
     }
 }
 
@@ -30,7 +31,7 @@ impl InternalEvent for DecoderMalformedReplacement {
         );
         // NOT the actual number of replacements in the output: there's no easy
         // way to get that from the lib we use here (encoding_rs)
-        counter!("decoder_malformed_replacement_warnings_total").increment(1);
+        counter!(CounterName::DecoderMalformedReplacementWarningsTotal).increment(1);
     }
 }
 
@@ -47,6 +48,6 @@ impl InternalEvent for EncoderUnmappableReplacement {
         );
         // NOT the actual number of replacements in the output: there's no easy
         // way to get that from the lib we use here (encoding_rs)
-        counter!("encoder_unmappable_replacement_warnings_total").increment(1);
+        counter!(CounterName::EncoderUnmappableReplacementWarningsTotal).increment(1);
     }
 }

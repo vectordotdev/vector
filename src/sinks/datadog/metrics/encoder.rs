@@ -7,7 +7,11 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
+use datadog_agent_metrics_v3::V3EncodeError;
+use datadog_proto::agentpayload as ddmetric_proto;
+use prost_reflect::DescriptorPool;
 use snafu::{ResultExt, Snafu};
+use vector_common::constants::ZSTD_SMALL_INPUT_THRESHOLD;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
@@ -18,16 +22,11 @@ use vector_lib::{
 
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
-    common::datadog::{
-        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+    common::datadog::DATADOG_METRIC_RESOURCE_TAG_PREFIX,
+    sinks::util::{
+        Compression, Compressor, encode_metric_tag, encode_namespace, request_builder::EncodeResult,
     },
-    proto::fds::protobuf_descriptors,
-    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
 };
-
-const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
-const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
-const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
@@ -42,30 +41,8 @@ pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
         .unwrap_or(DEFAULT_DD_ORIGIN_PRODUCT_VALUE)
 });
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
 #[derive(Debug, Snafu)]
-pub enum CreateError {
-    #[snafu(display("Invalid compressed/uncompressed payload size limits were given"))]
-    InvalidLimits,
-}
-
-impl CreateError {
-    /// Gets the telemetry-friendly string version of this error.
-    ///
-    /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
-        match self {
-            Self::InvalidLimits => "invalid_payload_limits",
-        }
-    }
-}
-
-#[derive(Debug, Snafu)]
-pub enum EncoderError {
+pub(super) enum EncoderError {
     #[snafu(display(
         "Invalid metric value '{}' was given; '{}' expected",
         metric_value,
@@ -75,12 +52,6 @@ pub enum EncoderError {
         expected: &'static str,
         metric_value: &'static str,
     },
-
-    #[snafu(
-        context(false),
-        display("Failed to encode series metric to JSON: {source}")
-    )]
-    JsonEncodingFailed { source: serde_json::Error },
 
     // Currently, the only time `prost` ever emits `EncodeError` is when there is insufficient
     // buffer capacity, so we don't need to hold on to the error, and we can just hardcode this.
@@ -94,17 +65,16 @@ impl EncoderError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::InvalidMetric { .. } => "invalid_metric",
-            Self::JsonEncodingFailed { .. } => "failed_to_encode_series",
             Self::ProtoEncodingFailed => "failed_to_encode_sketch",
         }
     }
 }
 
 #[derive(Debug, Snafu)]
-pub enum FinishError {
+pub(super) enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
@@ -116,23 +86,51 @@ pub enum FinishError {
         metrics: Vec<Metric>,
         recommended_splits: usize,
     },
+
+    #[snafu(display("Failed to encode V3 payload to Protocol Buffers: {}", source))]
+    V3EncodingFailed { source: protobuf::Error },
 }
 
 impl FinishError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
+            Self::V3EncodingFailed { .. } => "v3_encoding_failed",
         }
+    }
+}
+
+impl From<V3EncodeError> for FinishError {
+    fn from(err: V3EncodeError) -> Self {
+        FinishError::V3EncodingFailed {
+            source: err.into_inner(),
+        }
+    }
+}
+
+impl From<protobuf::Error> for FinishError {
+    fn from(source: protobuf::Error) -> Self {
+        FinishError::V3EncodingFailed { source }
     }
 }
 
 struct EncoderState {
     writer: Compressor,
     written: usize,
+    /// Upper bound on uncompressed bytes sitting in the compressor's internal buffer (written but
+    /// not yet flushed to `writer.get_ref()`). Zstd buffers up to 128 KB per block.
+    /// Since `get_ref().len()` only
+    /// reflects bytes that have been flushed through all layers, we track this bound to avoid
+    /// underestimating the compressed payload size.
+    ///
+    /// Increases by `n` on each write. Resets to `n` when a new compressed block is detected in
+    /// `writer.get_ref()` (the triggering write may straddle the block boundary, so `n` is a safe
+    /// upper bound on what remains buffered after the flush).
+    buffered_bound: usize,
     buf: Vec<u8>,
     processed: Vec<Metric>,
     byte_size: GroupedCountByteSize,
@@ -141,8 +139,9 @@ struct EncoderState {
 impl Default for EncoderState {
     fn default() -> Self {
         Self {
-            writer: get_compressor(),
+            writer: Compression::zstd_default().into(),
             written: 0,
+            buffered_bound: 0,
             buf: Vec::with_capacity(1024),
             processed: Vec::new(),
             byte_size: telemetry().create_request_count_byte_size(),
@@ -150,7 +149,7 @@ impl Default for EncoderState {
     }
 }
 
-pub struct DatadogMetricsEncoder {
+pub(super) struct DatadogMetricsEncoder {
     endpoint: DatadogMetricsEndpoint,
     default_namespace: Option<Arc<str>>,
     uncompressed_limit: usize,
@@ -164,31 +163,33 @@ pub struct DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint.
-    pub fn new(
-        endpoint: DatadogMetricsEndpoint,
-        default_namespace: Option<String>,
-    ) -> Result<Self, CreateError> {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let payload_limits = endpoint.payload_limits();
-        Self::with_payload_limits(
-            endpoint,
-            default_namespace,
-            payload_limits.uncompressed,
-            payload_limits.compressed,
-        )
-    }
 
+        Self {
+            endpoint,
+            default_namespace: default_namespace.map(Arc::from),
+            uncompressed_limit: payload_limits.uncompressed,
+            compressed_limit: payload_limits.compressed,
+            state: EncoderState::default(),
+            log_schema: log_schema(),
+            origin_product_value: *ORIGIN_PRODUCT_VALUE,
+        }
+    }
+}
+
+#[cfg(test)]
+impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint, with specific payload limits.
-    pub fn with_payload_limits(
+    ///
+    /// Only available in tests; production code always uses the API-defined limits via `new`.
+    pub(super) fn with_payload_limits(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
         uncompressed_limit: usize,
         compressed_limit: usize,
-    ) -> Result<Self, CreateError> {
-        let (uncompressed_limit, compressed_limit) =
-            validate_payload_size_limits(endpoint, uncompressed_limit, compressed_limit)
-                .ok_or(CreateError::InvalidLimits)?;
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             endpoint,
             default_namespace: default_namespace.map(Arc::from),
             uncompressed_limit,
@@ -196,7 +197,12 @@ impl DatadogMetricsEncoder {
             state: EncoderState::default(),
             log_schema: log_schema(),
             origin_product_value: *ORIGIN_PRODUCT_VALUE,
-        })
+        }
+    }
+
+    /// Returns the current `buffered_bound` value for white-box testing of zstd block-flush reset.
+    fn buffered_bound(&self) -> usize {
+        self.state.buffered_bound
     }
 }
 
@@ -239,29 +245,6 @@ impl DatadogMetricsEncoder {
         // Similarly, `MetricPayload` has a single repeated `series` field.
 
         match self.endpoint {
-            // V1 Series metrics are encoded via JSON, in an incremental fashion.
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => {
-                // A single `Metric` might generate multiple Datadog series metrics.
-                let all_series = generate_series_metrics(
-                    &metric,
-                    &self.default_namespace,
-                    self.log_schema,
-                    self.origin_product_value,
-                )?;
-
-                // We handle adding the JSON array separator (comma) manually since the encoding is
-                // happening incrementally.
-                let has_processed = !self.state.processed.is_empty();
-                for (i, series) in all_series.iter().enumerate() {
-                    // Add a array delimiter if we already have other metrics encoded.
-                    if (has_processed || i > 0)
-                        && write_payload_delimiter(self.endpoint, &mut self.state.buf).is_err()
-                    {
-                        return Ok(Some(metric));
-                    }
-                    serde_json::to_writer(&mut self.state.buf, series)?;
-                }
-            }
             // V2 Series metrics are encoded via ProtoBuf, in an incremental fashion.
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => match metric.value() {
                 MetricValue::Counter { .. }
@@ -288,6 +271,13 @@ impl DatadogMetricsEncoder {
                     });
                 }
             },
+            // V3 metrics must be routed to DatadogMetricsV3Encoder.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3) => {
+                return Err(EncoderError::InvalidMetric {
+                    expected: "v2 series",
+                    metric_value: "v3",
+                });
+            }
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
@@ -342,24 +332,34 @@ impl DatadogMetricsEncoder {
         // compressor might have internal state around checksums, etc, that can't be similarly
         // rolled back.
         //
-        // Our strategy is thus: simply take the encoded-but-decompressed size and see if it would
-        // fit within the compressed limit.  In `get_endpoint_payload_size_limits`, we calculate the
-        // expected maximum overhead of zlib based on all input data being incompressible, which
-        // zlib ensures will be the worst case as it can figure out whether a compressed or
-        // uncompressed block would take up more space _before_ choosing which strategy to go with.
+        // Strategy: split the estimate into two parts:
+        //   1. Bytes already flushed to the output buffer (`get_ref().len()`) — exact compressed size.
+        //   2. Bytes still in the compressor's internal buffer plus this new metric — estimated via
+        //      max_compressed_size(buffered_bound + n) (worst-case upper bound).
         //
-        // Thus, simply put, we've already accounted for the uncertainty by making our check here
-        // assume the worst case while our limits assume the worst case _overhead_.  Maybe our
-        // numbers are technically off in the end, but `finish` catches that for us, too.
-        let compressed_len = self.state.writer.get_ref().len();
-        let max_compressed_metric_len = n + max_compressed_overhead_len(n);
-        if compressed_len + max_compressed_metric_len > self.compressed_limit {
+        // Zstd buffers up to 128 KB per block before flushing to the output.
+        // `get_ref().len()` only reflects bytes that have been flushed through all layers.
+        // We track `buffered_bound` — an upper bound on uncompressed bytes written but not yet
+        // visible in `get_ref()` — and include it in the estimate.
+        let flushed_compressed = self.state.writer.get_ref().len();
+        if flushed_compressed + max_compressed_size(self.state.buffered_bound + n)
+            > self.compressed_limit
+        {
             return Ok(false);
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
+        //
+        // Update buffered_bound: if a new block appeared in the output (flushed_compressed grew),
+        // reset to n — the triggering write may straddle the block boundary, so n is a safe upper
+        // bound on what remains buffered.  Otherwise accumulate.
         self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
+        if self.state.writer.get_ref().len() > flushed_compressed {
+            self.state.buffered_bound = n;
+        } else {
+            self.state.buffered_bound += n;
+        }
         Ok(true)
     }
 
@@ -379,24 +379,11 @@ impl DatadogMetricsEncoder {
     /// # Errors
     ///
     /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
-        // Make sure we've written our header already.
-        if self.state.written == 0 {
-            match write_payload_header(self.endpoint, &mut self.state.writer) {
-                Ok(n) => self.state.written += n,
-                Err(_) => return Ok(Some(metric)),
-            }
-        }
-
+    pub(super) fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
         self.encode_single_metric(metric)
     }
 
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
-        // Write any payload footer necessary for the configured endpoint.
-        let n = write_payload_footer(self.endpoint, &mut self.state.writer)
-            .context(CompressionFailedSnafu)?;
-        self.state.written += n;
-
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let raw_bytes_written = self.state.written;
         let byte_size = self.state.byte_size.clone();
 
@@ -410,8 +397,8 @@ impl DatadogMetricsEncoder {
         let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
-        // succeeded up until this point, then our payload should be within the limits after writing
-        // the footer and finishing the compressor.
+        // succeeded up until this point, then our payload should be within the limits after
+        // finishing the compressor.
         //
         // We're not only double checking that here, but we're figuring out how much bigger than the
         // limit the payload is, if it is indeed bigger, so that we can recommend how many splits
@@ -456,6 +443,7 @@ fn generate_proto_metadata(
             }
             ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: origin.metric_type().unwrap_or_default(),
                     origin_product: origin.product().unwrap_or_default(),
                     origin_category: origin.category().unwrap_or_default(),
                     origin_service: origin.service().unwrap_or_default(),
@@ -463,6 +451,15 @@ fn generate_proto_metadata(
             }
         },
     )
+}
+
+fn protobuf_descriptors() -> &'static DescriptorPool {
+    static PROTOBUF_FDS: OnceLock<DescriptorPool> = OnceLock::new();
+    PROTOBUF_FDS.get_or_init(|| {
+        DescriptorPool::decode(datadog_proto::DESCRIPTOR_BYTES).expect(
+            "should not fail to decode protobuf file descriptor set generated from datadog-proto",
+        )
+    })
 }
 
 fn get_sketch_payload_sketches_field_number() -> u32 {
@@ -495,6 +492,11 @@ fn get_series_payload_series_field_number() -> u32 {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn sketch_to_proto_message(
     metric: &Metric,
     ddsketch: &AgentDDSketch,
@@ -508,14 +510,21 @@ fn sketch_to_proto_message(
 
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-        .unwrap_or_default();
-    let tags = encode_tags(&tags);
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
+    let host = host_key
+        .as_deref()
+        .and_then(|key| metric_tags.and_then(|tags| tags.get(key)))
+        .unwrap_or_default()
+        .to_owned();
+    let tags = encode_tag_pairs(
+        metric_tags
+            .into_iter()
+            .flat_map(MetricTags::iter_all)
+            .filter(|(name, _)| host_key.as_deref() != Some(*name)),
+    );
 
-    let cnt = ddsketch.count() as i64;
+    let cnt = i64::from(ddsketch.count());
     let min = ddsketch
         .min()
         .expect("min should be present for non-empty sketch");
@@ -561,6 +570,82 @@ fn sketch_to_proto_message(
     })
 }
 
+/// A metric's tags, split into the three pieces the series wire formats send separately.
+pub(super) struct SeriesTags {
+    /// Remaining tags, encoded as sorted `key:value` (or bare `key`) strings.
+    pub(super) tags: Vec<String>,
+    /// Structured `(type, name)` resources, in wire order.
+    pub(super) resources: Vec<(String, String)>,
+    /// The `source_type_name` tag's value, or empty when absent.
+    pub(super) source_type_name: String,
+}
+
+/// Splits a metric's tags into resources, `source_type_name`, and the remaining tags
+pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> SeriesTags {
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
+    let mut resources = vec![];
+
+    if let Some(host_key) = host_key.as_deref() {
+        resources.push((
+            "host".to_owned(),
+            metric_tags
+                .and_then(|tags| tags.get(host_key))
+                .unwrap_or_default()
+                .to_owned(),
+        ));
+    }
+
+    // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
+    if host_key.as_deref() != Some("device")
+        && let Some(device) = metric_tags.and_then(|tags| tags.get("device"))
+    {
+        resources.push(("device".to_owned(), device.to_owned()));
+    }
+
+    let source_type_name = if host_key.as_deref() == Some("source_type_name") {
+        String::new()
+    } else {
+        metric_tags
+            .and_then(|tags| tags.get("source_type_name"))
+            .unwrap_or_default()
+            .to_owned()
+    };
+
+    let mut tags = vec![];
+    for (tag, value) in metric_tags.into_iter().flat_map(MetricTags::iter_all) {
+        if host_key.as_deref() == Some(tag) || matches!(tag, "device" | "source_type_name") {
+            continue;
+        }
+
+        if let Some(resource_type) = tag
+            .strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
+            .filter(|resource_type| !resource_type.is_empty())
+            && let Some(name) = value.filter(|name| !name.is_empty())
+        {
+            resources.push((resource_type.to_owned(), name.to_owned()));
+        } else {
+            tags.push(encode_tag(tag, value));
+        }
+    }
+    tags.sort_unstable();
+
+    SeriesTags {
+        tags,
+        resources,
+        source_type_name,
+    }
+}
+
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn series_to_proto_message(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
@@ -568,32 +653,17 @@ fn series_to_proto_message(
     origin_product_value: u32,
 ) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
     let metric_name = get_namespaced_name(metric, default_namespace);
-    let mut tags = metric.tags().cloned().unwrap_or_default();
 
-    let mut resources = vec![];
+    let SeriesTags {
+        tags,
+        resources,
+        source_type_name,
+    } = split_series_tags(metric, log_schema);
 
-    if let Some(host) = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-    {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "host".to_string(),
-            name: host,
-        });
-    }
-
-    // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
-    // and `resource.device` for the V2 endpoint.
-    if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "device".to_string(),
-            name: device,
-        });
-    }
-
-    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
-
-    let tags = encode_tags(&tags);
+    let resources = resources
+        .into_iter()
+        .map(|(r#type, name)| ddmetric_proto::metric_payload::Resource { r#type, name })
+        .collect();
 
     let event_metadata = metric.metadata();
     let metadata = generate_proto_metadata(
@@ -614,7 +684,7 @@ fn series_to_proto_message(
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                let value = *value / (interval as f64);
+                let value = *value / f64::from(interval);
                 (
                     vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
                     ddmetric_proto::metric_payload::MetricType::Rate,
@@ -659,15 +729,22 @@ fn series_to_proto_message(
         tags,
         points,
         r#type: metric_type.into(),
-        // unit is omitted
-        unit: "".to_string(),
+        unit: event_metadata
+            .datadog_metric_unit()
+            .unwrap_or_default()
+            .to_string(),
         source_type_name,
-        interval: maybe_interval.unwrap_or(0) as i64,
+        interval: i64::from(maybe_interval.unwrap_or(0)),
         metadata,
     })
 }
 
 // Manually write the field tag and then encode the Message payload directly as a length-delimited message.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
 where
     T: prost::Message,
@@ -679,26 +756,31 @@ where
         .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
     encode_namespace(
         metric
             .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(std::convert::AsRef::as_ref)),
         '.',
         metric.name(),
     )
 }
 
-fn encode_tags(tags: &MetricTags) -> Vec<String> {
-    let mut pairs: Vec<_> = tags
-        .iter_all()
-        .map(|(name, value)| match value {
-            Some(value) => format!("{name}:{value}"),
-            None => name.into(),
-        })
-        .collect();
-    pairs.sort();
+fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
+    let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
+    pairs.sort_unstable();
     pairs
+}
+
+fn encode_tag(name: &str, value: Option<&str>) -> String {
+    let mut encoded = String::new();
+    encode_metric_tag(&mut encoded, name, value);
+    encoded
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -754,7 +836,7 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
 /// set already upstream or not. The generalized struct `DatadogMetricOriginMetadata` is
 /// utilized in this function, which allows the series and sketch encoding to call and map
 /// the result appropriately for the given protocol they operate on.
-fn generate_origin_metadata(
+pub(super) fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
     maybe_source_type: Option<&str>,
     origin_product_value: u32,
@@ -770,11 +852,14 @@ fn generate_origin_metadata(
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
-        Some(DatadogMetricOriginMetadata::new(
-            pass_through.product().or(Some(origin_product_value)),
-            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
-            pass_through.service().or(Some(no_value)),
-        ))
+        Some(
+            DatadogMetricOriginMetadata::new(
+                pass_through.product().or(Some(origin_product_value)),
+                pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+                pass_through.service().or(Some(no_value)),
+            )
+            .with_metric_type(pass_through.metric_type()),
+        )
 
     // No metadata has been set upstream
     } else {
@@ -793,210 +878,33 @@ fn generate_origin_metadata(
     }
 }
 
-fn generate_series_metadata(
-    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&str>,
-    origin_product_value: u32,
-) -> Option<DatadogSeriesMetricMetadata> {
-    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
-        |origin| DatadogSeriesMetricMetadata {
-            origin: Some(origin),
-        },
-    )
-}
-
-fn generate_series_metrics(
-    metric: &Metric,
-    default_namespace: &Option<Arc<str>>,
-    log_schema: &'static LogSchema,
-    origin_product_value: u32,
-) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
-    let name = get_namespaced_name(metric, default_namespace);
-
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default());
-
-    let source_type_name = tags.remove("source_type_name");
-    let device = tags.remove("device");
-    let ts = encode_timestamp(metric.timestamp());
-    let tags = Some(encode_tags(&tags));
-
-    // our internal representation is in milliseconds but the expected output is in seconds
-    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
-
-    let event_metadata = metric.metadata();
-    let metadata = generate_series_metadata(
-        event_metadata.datadog_origin_metadata(),
-        event_metadata.source_type(),
-        origin_product_value,
-    );
-
-    trace!(?metadata, "Generated series metadata.");
-
-    let (points, metric_type) = match metric.value() {
-        MetricValue::Counter { value } => {
-            if let Some(interval) = maybe_interval {
-                // When an interval is defined, it implies the value should be in a per-second form,
-                // so we need to get back to seconds from our milliseconds-based interval, and then
-                // divide our value by that amount as well.
-                let value = *value / (interval as f64);
-                (vec![DatadogPoint(ts, value)], DatadogMetricType::Rate)
-            } else {
-                (vec![DatadogPoint(ts, *value)], DatadogMetricType::Count)
-            }
+/// Returns the worst-case zstd compressed size of `n` uncompressed bytes.
+///
+/// This uses the same formula as `ZSTD_compressBound` from the zstd C library.
+const fn max_compressed_size(n: usize) -> usize {
+    // zstd_safe::compress_bound is not const, so we use the same formula it uses
+    // internally: srcSize + (srcSize >> 8) + small correction for inputs < 128 KB.
+    n + (n >> 8)
+        + if n < ZSTD_SMALL_INPUT_THRESHOLD {
+            (ZSTD_SMALL_INPUT_THRESHOLD - n) >> 11
+        } else {
+            0
         }
-        MetricValue::Set { values } => (
-            vec![DatadogPoint(ts, values.len() as f64)],
-            DatadogMetricType::Gauge,
-        ),
-        MetricValue::Gauge { value } => (vec![DatadogPoint(ts, *value)], DatadogMetricType::Gauge),
-        // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
-        value => {
-            return Err(EncoderError::InvalidMetric {
-                expected: "series",
-                metric_value: value.as_name(),
-            });
-        }
-    };
-
-    Ok(vec![DatadogSeriesMetric {
-        metric: name,
-        r#type: metric_type,
-        interval: maybe_interval,
-        points,
-        tags,
-        host,
-        source_type_name,
-        device,
-        metadata,
-    }])
-}
-
-fn get_compressor() -> Compressor {
-    // We use the "zlib default" compressor because it's all Datadog supports, and adding it
-    // generically to `Compression` would make things a little weird because of the conversion trait
-    // implementations that are also only none vs gzip.
-    Compression::zlib_default().into()
-}
-
-const fn max_uncompressed_header_len() -> usize {
-    SERIES_PAYLOAD_HEADER.len() + SERIES_PAYLOAD_FOOTER.len()
-}
-
-// Datadog ingest APIs accept zlib, which is what we're accounting for here. By default, zlib
-// has a 2 byte header and 4 byte CRC trailer. [1]
-//
-// [1] https://www.zlib.net/zlib_tech.html
-const ZLIB_HEADER_TRAILER: usize = 6;
-
-const fn max_compression_overhead_len(compressed_limit: usize) -> usize {
-    // We calculate the overhead as the zlib header/trailer plus the worst case overhead of
-    // compressing `compressed_limit` bytes, such that we assume all of the data we write may not be
-    // compressed at all.
-    ZLIB_HEADER_TRAILER + max_compressed_overhead_len(compressed_limit)
-}
-
-const fn max_compressed_overhead_len(len: usize) -> usize {
-    // Datadog ingest APIs accept zlib, which is what we're accounting for here.
-    //
-    // Deflate, the underlying compression algorithm, has a technique to ensure that input data
-    // can't be encoded in such a way where it's expanded by a meaningful amount. This technique
-    // allows storing blocks of uncompressed data with only 5 bytes of overhead per block.
-    // Technically, the blocks can be up to 65KB in Deflate, but modern zlib implementations use
-    // block sizes of 16KB. [1][2]
-    //
-    // We calculate the overhead of compressing a given `len` bytes as the worst case of that many
-    // bytes being written to the compressor and being unable to be compressed at all
-    //
-    // [1] https://www.zlib.net/zlib_tech.html
-    // [2] https://www.bolet.org/~pornin/deflate-flush-fr.html
-    const STORED_BLOCK_SIZE: usize = 16384;
-    (1 + len.saturating_sub(ZLIB_HEADER_TRAILER) / STORED_BLOCK_SIZE) * 5
-}
-
-const fn validate_payload_size_limits(
-    endpoint: DatadogMetricsEndpoint,
-    uncompressed_limit: usize,
-    compressed_limit: usize,
-) -> Option<(usize, usize)> {
-    if endpoint.is_series() {
-        // For series, we need to make sure the uncompressed limit can account for the header/footer
-        // we would add that wraps the encoded metrics up in the expected JSON object. This does
-        // imply that adding 1 to this limit would be allowed, and obviously we can't encode a
-        // series metric in a single byte, but this is just a simple sanity check, not an exhaustive
-        // search of the absolute bare minimum size.
-        let header_len = max_uncompressed_header_len();
-        if uncompressed_limit <= header_len {
-            return None;
-        }
-    }
-
-    // Get the maximum possible overhead of the compression container, based on the incoming
-    // _uncompressed_ limit. We use the uncompressed limit because we're calculating the maximum
-    // overhead in the case that, theoretically, none of the input data was compressible.  This
-    // possibility is essentially impossible, but serves as a proper worst-case-scenario check.
-    let max_compression_overhead = max_compression_overhead_len(uncompressed_limit);
-    if compressed_limit <= max_compression_overhead {
-        return None;
-    }
-
-    Some((uncompressed_limit, compressed_limit))
-}
-
-fn write_payload_header(
-    endpoint: DatadogMetricsEndpoint,
-    writer: &mut dyn io::Write,
-) -> io::Result<usize> {
-    match endpoint {
-        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
-            .write_all(SERIES_PAYLOAD_HEADER)
-            .map(|_| SERIES_PAYLOAD_HEADER.len()),
-        _ => Ok(0),
-    }
-}
-
-fn write_payload_delimiter(
-    endpoint: DatadogMetricsEndpoint,
-    writer: &mut dyn io::Write,
-) -> io::Result<usize> {
-    match endpoint {
-        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
-            .write_all(SERIES_PAYLOAD_DELIMITER)
-            .map(|_| SERIES_PAYLOAD_DELIMITER.len()),
-        _ => Ok(0),
-    }
-}
-
-fn write_payload_footer(
-    endpoint: DatadogMetricsEndpoint,
-    writer: &mut dyn io::Write,
-) -> io::Result<usize> {
-    match endpoint {
-        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
-            .write_all(SERIES_PAYLOAD_FOOTER)
-            .map(|_| SERIES_PAYLOAD_FOOTER.len()),
-        _ => Ok(0),
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        io::{self, copy},
-        num::NonZeroU32,
-        sync::Arc,
-    };
+    use std::io::Write as _;
+    use std::{num::NonZeroU32, sync::Arc};
 
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{BufMut, Bytes};
     use chrono::{DateTime, TimeZone, Timelike, Utc};
-    use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
+    use vector_common::decompression::CappedDecoder;
     use vector_lib::{
         config::{LogSchema, log_schema},
         event::{
@@ -1010,17 +918,15 @@ mod tests {
 
     use super::{
         DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
-        encode_tags, encode_timestamp, generate_series_metrics, get_compressor,
-        get_sketch_payload_sketches_field_number, max_compression_overhead_len,
-        max_uncompressed_header_len, series_to_proto_message, sketch_to_proto_message,
-        validate_payload_size_limits, write_payload_footer, write_payload_header,
+        encode_tag_pairs, encode_timestamp, get_sketch_payload_sketches_field_number,
+        max_compressed_size, series_to_proto_message, sketch_to_proto_message,
     };
-    use crate::{
-        common::datadog::DatadogMetricType,
-        sinks::datadog::metrics::{
+    use crate::sinks::{
+        datadog::metrics::{
             config::{DatadogMetricsEndpoint, SeriesApiVersion},
             encoder::{DEFAULT_DD_ORIGIN_PRODUCT_VALUE, ORIGIN_PRODUCT_VALUE},
         },
+        util::{Compression, Compressor},
     };
 
     fn get_simple_counter() -> Metric {
@@ -1048,32 +954,78 @@ mod tests {
             .with_timestamp(Some(ts()))
     }
 
-    fn get_compressed_empty_series_payload() -> Bytes {
-        let mut compressor = get_compressor();
-
-        _ = write_payload_header(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
-            &mut compressor,
-        )
-        .expect("should not fail");
-        _ = write_payload_footer(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
-            &mut compressor,
-        )
-        .expect("should not fail");
-
-        compressor.finish().expect("should not fail").freeze()
-    }
-
     fn get_compressed_empty_sketches_payload() -> Bytes {
-        get_compressor().finish().expect("should not fail").freeze()
+        Compressor::from(Compression::zstd_default())
+            .finish()
+            .expect("should not fail")
+            .freeze()
     }
 
-    fn decompress_payload(payload: Bytes) -> io::Result<Bytes> {
-        let mut decompressor = ZlibDecoder::new(&payload[..]);
-        let mut decompressed = BytesMut::new().writer();
-        let result = copy(&mut decompressor, &mut decompressed);
-        result.map(|_| decompressed.into_inner().freeze())
+    fn get_compressed_empty_series_v2_payload() -> Bytes {
+        Compressor::from(Compression::zstd_default())
+            .finish()
+            .expect("should not fail")
+            .freeze()
+    }
+
+    /// Compresses `n` bytes of high-entropy (worst-case for compression) data and returns the
+    /// total output size after `finish()`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    fn total_compressed_len(n: usize) -> usize {
+        // Xorshift64 — period 2^64-1, passes BigCrush, produces statistically random bytes
+        // that zstd cannot compress significantly.
+        let mut state = 0xdead_beef_cafe_babe_u64;
+        let data: Vec<u8> = (0..n)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state as u8
+            })
+            .collect();
+        let mut compressor = Compressor::from(Compression::zstd_default());
+        compressor.write_all(&data).expect("write should succeed");
+        compressor.finish().expect("finish should succeed").len()
+    }
+
+    /// Validates that `max_compressed_size(n)` is a true upper bound on the compressed bytes
+    /// attributable to `n` uncompressed bytes.
+    ///
+    /// We measure `total_compressed_len(n) - total_compressed_len(0)` to strip the fixed frame
+    /// overhead (header + trailer) written regardless of input size, isolating the bytes
+    /// contributed by the data itself.
+    #[test]
+    fn max_compressed_size_is_upper_bound() {
+        // Include sizes around the zstd block boundary: 131 072 bytes.
+        let test_sizes = [
+            0, 1, 100, 1_000, 16_383, 16_384, 16_385, 32_767, 32_768, 131_071, 131_072, 131_073,
+            500_000,
+        ];
+
+        let zstd_frame = total_compressed_len(0);
+
+        // The formula must not overestimate by more than 1% of input + 64 bytes (a small
+        // constant that covers the zstd correction term for very small inputs).
+        let max_slack = |n: usize| n / 100 + 64;
+
+        for &n in &test_sizes {
+            let actual_zstd = total_compressed_len(n) - zstd_frame;
+            let max_zstd = max_compressed_size(n);
+            assert!(
+                actual_zstd <= max_zstd,
+                "zstd n={n}: formula underestimates: actual={actual_zstd} > max={max_zstd}"
+            );
+            assert!(
+                max_zstd - actual_zstd <= max_slack(n),
+                "zstd n={n}: formula overestimates: slack={} > {}",
+                max_zstd - actual_zstd,
+                max_slack(n)
+            );
+        }
     }
 
     fn ts() -> DateTime<Utc> {
@@ -1093,6 +1045,11 @@ mod tests {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     fn encode_sketches_normal<B>(
         metrics: &[Metric],
         default_namespace: &Option<Arc<str>>,
@@ -1123,13 +1080,14 @@ mod tests {
         };
 
         // Now try encoding this sketch payload, and then try to compress it.
-        sketch_payload.encode(buf).unwrap()
+        sketch_payload.encode(buf).unwrap();
     }
 
     #[test]
-    fn test_encode_tags() {
+    fn test_encode_tag_pairs() {
+        let tags = tags();
         assert_eq!(
-            encode_tags(&tags()),
+            encode_tag_pairs(tags.iter_all()),
             vec![
                 "empty_tag",
                 "multi_value:one",
@@ -1141,16 +1099,149 @@ mod tests {
     }
 
     #[test]
+    fn sketch_tags_exclude_host_and_preserve_all_other_values() {
+        let metric = get_simple_sketch().with_tags(Some(metric_tags! {
+            "host" => "example.com",
+            "bare" => TagValue::Bare,
+            "multi" => "one",
+            "multi" => "two",
+            "normal" => "value",
+        }));
+        let MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(ddsketch),
+        } = metric.value()
+        else {
+            panic!("must be an AgentDDSketch")
+        };
+
+        let sketch = sketch_to_proto_message(&metric, ddsketch, &None, log_schema(), 14).unwrap();
+
+        assert_eq!(sketch.host, "example.com");
+        assert_eq!(
+            sketch.tags,
+            vec!["bare", "multi:one", "multi:two", "normal:value"]
+        );
+    }
+
+    #[test]
     fn test_encode_timestamp() {
         assert_eq!(encode_timestamp(None), Utc::now().timestamp());
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950);
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950);
+    }
+
+    #[test]
+    fn encode_resource_tags_as_v2_resources() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+            "resource.database_instance" => "custom",
+            "resource.aws_docdb_cluster" => "docdb-cluster",
+            "resource.owner" => "payments",
+            "abc.def.ghi" => "database_name:mongo_potatoes",
+        }));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "aws_docdb_cluster" && resource.name == "docdb-cluster"
+        }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "custom"
+        }));
+        assert!(
+            series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "owner" && resource.name == "payments")
+        );
+        assert_eq!(
+            series_proto.tags,
+            vec!["abc.def.ghi:database_name:mongo_potatoes"]
+        );
+    }
+
+    #[test]
+    fn encode_multi_value_resource_tags_and_preserve_bare_tags() {
+        let mut tags = MetricTags::default();
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-01".into()),
+        );
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-02".into()),
+        );
+        tags.insert("resource.database_instance".into(), TagValue::Bare);
+        tags.insert("resource.bare_only".into(), TagValue::Bare);
+        tags.insert("resource.".into(), "missing-type");
+        tags.insert("resource.empty".into(), "");
+
+        let metric = get_simple_counter().with_tags(Some(tags));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        let database_instances: Vec<_> = series_proto
+            .resources
+            .iter()
+            .filter(|resource| resource.r#type == "database_instance")
+            .map(|resource| resource.name.as_str())
+            .collect();
+        assert_eq!(database_instances, vec!["mongo-repro-01", "mongo-repro-02"]);
+        assert!(
+            !series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "bare_only")
+        );
+        assert_eq!(
+            series_proto.tags,
+            vec![
+                "resource.:missing-type",
+                "resource.bare_only",
+                "resource.database_instance",
+                "resource.empty:",
+            ]
+        );
+    }
+
+    #[test]
+    fn encode_resource_tag_from_any_source_as_v2_resource() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+        }));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert!(series_proto.tags.is_empty());
     }
 
     #[test]
     fn incorrect_metric_for_endpoint_causes_error() {
         // Series metrics can't go to the sketches endpoint.
-        let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
-            .expect("default payload size limits should be valid");
+        let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None);
         let series_result = sketch_encoder.try_encode(get_simple_counter());
         assert!(matches!(
             series_result.err(),
@@ -1158,18 +1249,8 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        let mut series_v1_encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
-                .expect("default payload size limits should be valid");
-        let sketch_result = series_v1_encoder.try_encode(get_simple_sketch());
-        assert!(matches!(
-            sketch_result.err(),
-            Some(EncoderError::InvalidMetric { .. })
-        ));
-
         let mut series_v2_encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
-                .expect("default payload size limits should be valid");
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None);
         let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
@@ -1177,6 +1258,11 @@ mod tests {
         ));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this deterministic rate value exactly."
+    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1187,29 +1273,8 @@ mod tests {
         let value = 423.1331;
         let interval_ms = 10000;
         let rate_counter = get_simple_rate_counter(value, interval_ms);
-        let expected_value = value / (interval_ms / 1000) as f64;
+        let expected_value = value / f64::from(interval_ms / 1000);
         let expected_interval = interval_ms / 1000;
-
-        // series v1
-        {
-            // Encode the metric and make sure we did the rate conversion correctly.
-            let result = generate_series_metrics(
-                &rate_counter,
-                &None,
-                log_schema(),
-                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
-            );
-            assert!(result.is_ok());
-
-            let metrics = result.unwrap();
-            assert_eq!(metrics.len(), 1);
-
-            let actual = &metrics[0];
-            assert_eq!(actual.r#type, DatadogMetricType::Rate);
-            assert_eq!(actual.interval, Some(expected_interval));
-            assert_eq!(actual.points.len(), 1);
-            assert_eq!(actual.points[0].1, expected_value);
-        }
 
         // series v2
         {
@@ -1221,12 +1286,17 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 2);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this gauge value exactly."
+    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This
@@ -1247,27 +1317,6 @@ mod tests {
         let expected_value = value; // For gauge, the value should not be modified by interval
         let expected_interval = interval_ms / 1000;
 
-        // series v1
-        {
-            // Encode the metric and make sure we did the rate conversion correctly.
-            let result = generate_series_metrics(
-                &gauge,
-                &None,
-                log_schema(),
-                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
-            );
-            assert!(result.is_ok());
-
-            let metrics = result.unwrap();
-            assert_eq!(metrics.len(), 1);
-
-            let actual = &metrics[0];
-            assert_eq!(actual.r#type, DatadogMetricType::Gauge);
-            assert_eq!(actual.interval, Some(expected_interval));
-            assert_eq!(actual.points.len(), 1);
-            assert_eq!(actual.points[0].1, expected_value);
-        }
-
         // series v2
         {
             let series_proto = series_to_proto_message(
@@ -1278,7 +1327,7 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 3);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
@@ -1290,31 +1339,14 @@ mod tests {
         let category = 11;
         let service = 9;
 
-        let event_metadata = EventMetadata::default().with_origin_metadata(
-            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
-        );
+        let event_metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service))
+                    .with_metric_type(Some(9)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
         let counter = get_simple_counter_with_metadata(event_metadata);
 
-        // series v1
-        {
-            let result = generate_series_metrics(
-                &counter,
-                &None,
-                log_schema(),
-                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
-            );
-            assert!(result.is_ok());
-
-            let metrics = result.unwrap();
-            assert_eq!(metrics.len(), 1);
-
-            let actual = &metrics[0];
-            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
-
-            assert_eq!(generated_origin.product().unwrap(), product);
-            assert_eq!(generated_origin.category().unwrap(), category);
-            assert_eq!(generated_origin.service().unwrap(), service);
-        }
         // series v2
         {
             let series_proto = series_to_proto_message(
@@ -1326,9 +1358,11 @@ mod tests {
             .unwrap();
 
             let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.metric_type, 9);
             assert_eq!(generated_origin.origin_product, product);
             assert_eq!(generated_origin.origin_category, category);
             assert_eq!(generated_origin.origin_service, service);
+            assert_eq!(series_proto.unit, "byte");
         }
     }
 
@@ -1343,21 +1377,6 @@ mod tests {
 
         counter.metadata_mut().set_source_type("statsd");
 
-        // series v1
-        {
-            let result = generate_series_metrics(&counter, &None, log_schema(), product);
-            assert!(result.is_ok());
-
-            let metrics = result.unwrap();
-            assert_eq!(metrics.len(), 1);
-
-            let actual = &metrics[0];
-            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
-
-            assert_eq!(generated_origin.product().unwrap(), product);
-            assert_eq!(generated_origin.category().unwrap(), category);
-            assert_eq!(generated_origin.service().unwrap(), service);
-        }
         // series v2
         {
             let series_proto = series_to_proto_message(
@@ -1376,36 +1395,11 @@ mod tests {
     }
 
     #[test]
-    fn encode_single_series_v1_metric_with_default_limits() {
-        // This is a simple test where we ensure that a single metric, with the default limits, can
-        // be encoded without hitting any errors.
-        let mut encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
-                .expect("default payload size limits should be valid");
-        let counter = get_simple_counter();
-        let expected = counter.clone();
-
-        // Encode the counter.
-        let result = encoder.try_encode(counter);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
-
-        // Finish the payload, make sure we got what we came for.
-        let result = encoder.finish();
-        assert!(result.is_ok());
-
-        let (_payload, mut processed) = result.unwrap();
-        assert_eq!(processed.len(), 1);
-        assert_eq!(expected, processed.pop().unwrap());
-    }
-
-    #[test]
     fn encode_single_series_v2_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
         let mut encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
-                .expect("default payload size limits should be valid");
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None);
         let counter = get_simple_counter();
         let expected = counter.clone();
 
@@ -1427,8 +1421,7 @@ mod tests {
     fn encode_single_sketch_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
-            .expect("default payload size limits should be valid");
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None);
         let sketch = get_simple_sketch();
         let expected = sketch.clone();
 
@@ -1450,8 +1443,7 @@ mod tests {
     fn encode_empty_sketch() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
-            .expect("default payload size limits should be valid");
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None);
         let sketch = Metric::new(
             "empty",
             MetricKind::Incremental,
@@ -1512,89 +1504,82 @@ mod tests {
     }
 
     #[test]
-    fn payload_size_limits_series() {
-        // Get the maximum length of the header/trailer data.
-        let header_len = max_uncompressed_header_len();
+    fn default_payload_limits_are_endpoint_aware() {
+        let v2 = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2).payload_limits();
+        assert_eq!(v2.uncompressed, 5_242_880);
+        assert_eq!(v2.compressed, 512_000);
 
-        // This is too small.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
-            header_len,
-            usize::MAX,
-        );
-        assert_eq!(result, None);
-
-        // This is just right.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
-            header_len + 1,
-            usize::MAX,
-        );
-        assert_eq!(result, Some((header_len + 1, usize::MAX)));
-
-        // Get the maximum compressed overhead length, based on our input uncompressed size.  This
-        // represents the worst case overhead based on the input data (of length usize::MAX, in this
-        // case) being entirely incompressible.
-        let compression_overhead_len = max_compression_overhead_len(usize::MAX);
-
-        // This is too small.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
-            usize::MAX,
-            compression_overhead_len,
-        );
-        assert_eq!(result, None);
-
-        // This is just right.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
-            usize::MAX,
-            compression_overhead_len + 1,
-        );
-        assert_eq!(result, Some((usize::MAX, compression_overhead_len + 1)));
+        let sketches = DatadogMetricsEndpoint::Sketches.payload_limits();
+        assert_eq!(sketches.uncompressed, 62_914_560);
+        assert_eq!(sketches.compressed, 3_200_000);
     }
 
     #[test]
-    fn payload_size_limits_sketches() {
-        // There's no lower bound on uncompressed size for the sketches payload.
-        let result = validate_payload_size_limits(DatadogMetricsEndpoint::Sketches, 0, usize::MAX);
-        assert_eq!(result, Some((0, usize::MAX)));
+    fn v2_series_default_limits_split_large_batches() {
+        // Simulate a large send and validate that default V2 limits split payloads into multiple
+        // requests, while still making forward progress each pass.
+        let mut pending = vec![get_simple_counter(); 120_000];
+        let mut encoded_batches = 0;
+        let mut encoded_metrics = 0;
 
-        // Get the maximum compressed overhead length, based on our input uncompressed size.  This
-        // represents the worst case overhead based on the input data (of length usize::MAX, in this
-        // case) being entirely incompressible.
-        let compression_overhead_len = max_compression_overhead_len(usize::MAX);
+        while !pending.is_empty() {
+            let mut encoder = DatadogMetricsEncoder::new(
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+                None,
+            );
 
-        // This is too small.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Sketches,
-            usize::MAX,
-            compression_overhead_len,
+            let mut next_pending = Vec::new();
+            let mut hit_limit = false;
+            for metric in pending.drain(..) {
+                match encoder.try_encode(metric.clone()) {
+                    Ok(None) => {}
+                    Ok(Some(returned_metric)) => {
+                        hit_limit = true;
+                        next_pending.push(returned_metric);
+                    }
+                    Err(error) => panic!("unexpected encoding error: {error}"),
+                }
+            }
+
+            let finish_result = encoder.finish();
+            assert!(finish_result.is_ok());
+            let (_payload, processed) = finish_result.unwrap();
+            assert!(
+                !processed.is_empty(),
+                "encoder should always make progress for a non-empty batch"
+            );
+
+            encoded_metrics += processed.len();
+            encoded_batches += 1;
+
+            if hit_limit {
+                assert!(
+                    !next_pending.is_empty(),
+                    "hitting limits should leave metrics to process in the next batch"
+                );
+            }
+
+            pending = next_pending;
+        }
+
+        assert_eq!(encoded_metrics, 120_000);
+        assert!(
+            encoded_batches > 1,
+            "expected multiple batches for V2 default limits"
         );
-        assert_eq!(result, None);
-
-        // This is just right.
-        let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Sketches,
-            usize::MAX,
-            compression_overhead_len + 1,
-        );
-        assert_eq!(result, Some((usize::MAX, compression_overhead_len + 1)));
     }
 
     #[test]
-    fn encode_series_breaks_out_when_limit_reached_uncompressed() {
+    fn encode_series_v2_breaks_out_when_limit_reached_uncompressed() {
         // We manually create the encoder with an arbitrarily low "uncompressed" limit but high
         // "compressed" limit to exercise the codepath that should avoid encoding a metric when the
         // uncompressed payload would exceed the limit.
-        let header_len = max_uncompressed_header_len();
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             None,
-            header_len + 1,
+            1,
             usize::MAX,
-        )
-        .expect("payload size limits should be valid");
+        );
 
         // Trying to encode a metric that would cause us to exceed our uncompressed limits will
         // _not_ return an error from `try_encode`, but instead will simply return back the metric
@@ -1605,19 +1590,15 @@ mod tests {
         assert_eq!(result.unwrap(), Some(counter));
 
         // And similarly, since we didn't actually encode a metric, we _should_ be able to finish
-        // this payload, but it will be empty (effectively, the header/footer will exist) and no
-        // processed metrics should be returned.
+        // this payload, but it will be empty and no processed metrics should be returned.
         let result = encoder.finish();
         assert!(result.is_ok());
 
         let (payload, processed) = result.unwrap();
-        assert_eq!(
-            payload.uncompressed_byte_size,
-            max_uncompressed_header_len()
-        );
+        assert_eq!(payload.uncompressed_byte_size, 0);
         assert_eq!(
             payload.into_payload(),
-            get_compressed_empty_series_payload()
+            get_compressed_empty_series_v2_payload()
         );
         assert_eq!(processed.len(), 0);
     }
@@ -1632,8 +1613,7 @@ mod tests {
             None,
             1,
             usize::MAX,
-        )
-        .expect("payload size limits should be valid");
+        );
 
         // Trying to encode a metric that would cause us to exceed our uncompressed limits will
         // _not_ return an error from `try_encode`, but instead will simply return back the metric
@@ -1658,60 +1638,18 @@ mod tests {
     }
 
     #[test]
-    fn encode_series_breaks_out_when_limit_reached_compressed() {
+    fn encode_sketches_breaks_out_when_limit_reached_compressed() {
         // We manually create the encoder with an arbitrarily low "compressed" limit but high
         // "uncompressed" limit to exercise the codepath that should avoid encoding a metric when the
         // compressed payload would exceed the limit.
         let uncompressed_limit = 128;
         let compressed_limit = 32;
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
-            None,
-            uncompressed_limit,
-            compressed_limit,
-        )
-        .expect("payload size limits should be valid");
-
-        // Trying to encode a metric that would cause us to exceed our compressed limits will
-        // _not_ return an error from `try_encode`, but instead will simply return back the metric
-        // as it could not be added.
-        let counter = get_simple_counter();
-        let result = encoder.try_encode(counter.clone());
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some(counter));
-
-        // And similarly, since we didn't actually encode a metric, we _should_ be able to finish
-        // this payload, but it will be empty (effectively, the header/footer will exist) and no
-        // processed metrics should be returned.
-        let result = encoder.finish();
-        assert!(result.is_ok());
-
-        let (payload, processed) = result.unwrap();
-        assert_eq!(
-            payload.uncompressed_byte_size,
-            max_uncompressed_header_len()
-        );
-        assert_eq!(
-            payload.into_payload(),
-            get_compressed_empty_series_payload()
-        );
-        assert_eq!(processed.len(), 0);
-    }
-
-    #[test]
-    fn encode_sketches_breaks_out_when_limit_reached_compressed() {
-        // We manually create the encoder with an arbitrarily low "compressed" limit but high
-        // "uncompressed" limit to exercise the codepath that should avoid encoding a metric when the
-        // compressed payload would exceed the limit.
-        let uncompressed_limit = 128;
-        let compressed_limit = 16;
-        let mut encoder = DatadogMetricsEncoder::with_payload_limits(
             DatadogMetricsEndpoint::Sketches,
             None,
             uncompressed_limit,
             compressed_limit,
-        )
-        .expect("payload size limits should be valid");
+        );
 
         // Trying to encode a metric that would cause us to exceed our compressed limits will
         // _not_ return an error from `try_encode`, but instead will simply return back the metric
@@ -1722,8 +1660,7 @@ mod tests {
         assert_eq!(result.unwrap(), Some(sketch));
 
         // And similarly, since we didn't actually encode a metric, we _should_ be able to finish
-        // this payload, but it will be empty (effectively, the header/footer will exist) and no
-        // processed metrics should be returned.
+        // this payload, but it will be empty and no processed metrics should be returned.
         let result = encoder.finish();
         assert!(result.is_ok());
 
@@ -1734,6 +1671,293 @@ mod tests {
             get_compressed_empty_sketches_payload()
         );
         assert_eq!(processed.len(), 0);
+    }
+
+    #[test]
+    fn encode_series_v2_breaks_out_when_limit_reached_compressed() {
+        // We manually create the encoder with an arbitrarily low "compressed" limit but high
+        // "uncompressed" limit to exercise the codepath that should avoid encoding a metric when the
+        // compressed payload would exceed the limit.
+        let uncompressed_limit = 128;
+        let compressed_limit = 32;
+        let mut encoder = DatadogMetricsEncoder::with_payload_limits(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            None,
+            uncompressed_limit,
+            compressed_limit,
+        );
+
+        // Trying to encode a metric that would cause us to exceed our compressed limits will
+        // _not_ return an error from `try_encode`, but instead will simply return back the metric
+        // as it could not be added.
+        let counter = get_simple_counter();
+        let result = encoder.try_encode(counter.clone());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(counter));
+
+        // And similarly, since we didn't actually encode a metric, we _should_ be able to finish
+        // this payload, but it will be empty and no processed metrics should be returned.
+        let result = encoder.finish();
+        assert!(result.is_ok());
+
+        let (payload, processed) = result.unwrap();
+        assert_eq!(payload.uncompressed_byte_size, 0);
+        assert_eq!(
+            payload.into_payload(),
+            get_compressed_empty_series_v2_payload()
+        );
+        assert_eq!(processed.len(), 0);
+    }
+
+    #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    fn zstd_v2_payload_never_exceeds_512kb_with_incompressible_data() {
+        // End-to-end regression test using the real 512 KB compressed limit.
+        //
+        // Metric names are generated with a xorshift64 PRNG producing random printable ASCII
+        // (6.5 bits of entropy per byte), making them effectively incompressible for zstd.
+        // This makes the capacity estimate tight, so the test validates both directions:
+        //
+        //   Safety   (upper bound): payload ≤ 512 KB.
+        //     Without the fix, the encoder ignores zstd's internal 128 KB buffer.  When the
+        //     encoder finally stops, finish() flushes that hidden buffer on top of the already
+        //     ~511 KB payload → ~639 KB → TooLarge.
+        //
+        //   Utilization (lower bound): payload > 95% of 512 KB.
+        //     With incompressible data, actual_compressed ≈ max_cs(uncompressed), so the
+        //     estimate is tight.  The ~2.5% gap comes from: (1) compressible proto framing
+        //     (field tags, timestamps, metadata) that zstd compresses better than max_cs
+        //     predicts, (2) the max_cs overhead term (~0.4%), and (3) one-metric stopping
+        //     granularity (~1%).
+
+        // xorshift64 PRNG: 5000 random printable ASCII chars per metric name (0x21..0x7E,
+        // 93 values ≈ 6.5 bits/byte).  Long names ensure the random portion dominates the
+        // compressible proto framing, maximizing utilization.
+        const PRINTABLE_START: u8 = 0x21;
+        const PRINTABLE_END: u8 = 0x7E;
+        const PRINTABLE_LEN: u64 = (PRINTABLE_END - PRINTABLE_START + 1) as u64; // 93
+        let mut xor_state = 0xdead_beef_cafe_babe_u64;
+        let mut next_name = || -> String {
+            std::iter::once('m')
+                .chain((0..4999).map(|_| {
+                    xor_state ^= xor_state << 13;
+                    xor_state ^= xor_state >> 7;
+                    xor_state ^= xor_state << 17;
+                    (PRINTABLE_START + (xor_state % PRINTABLE_LEN) as u8) as char
+                }))
+                .collect()
+        };
+
+        let mut encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None);
+
+        let mut accepted = 0usize;
+        loop {
+            let metric = Metric::new(
+                next_name(),
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: (accepted + 1) as f64,
+                },
+            )
+            .with_timestamp(Some(ts()));
+
+            match encoder.try_encode(metric) {
+                Ok(None) => accepted += 1,
+                Ok(Some(_)) => break,
+                Err(e) => panic!("unexpected encoding error: {e}"),
+            }
+        }
+
+        assert!(accepted > 0, "at least one metric must be accepted");
+
+        let compressed_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
+            .payload_limits()
+            .compressed;
+
+        let (payload, _) = encoder.finish().unwrap_or_else(|e| {
+            panic!(
+                "finish() returned an error after {accepted} metrics — \
+                 the capacity estimate failed to prevent overflow: {e:?}"
+            )
+        });
+        let payload_len = payload.into_payload().len();
+
+        // Safety: the hard limit must never be exceeded.
+        assert!(
+            payload_len <= compressed_limit,
+            "payload ({payload_len} bytes) exceeded the {compressed_limit}-byte compressed limit"
+        );
+
+        // Utilization: the encoder should use at least 95% of the available capacity.
+        let min_utilization = compressed_limit * 95 / 100;
+        assert!(
+            payload_len > min_utilization,
+            "payload ({payload_len} bytes) is below 95% of the {compressed_limit}-byte limit \
+             ({min_utilization} bytes) — estimate may be over-conservative"
+        );
+    }
+
+    #[test]
+    fn compressed_limit_is_respected_regardless_of_compressor_internal_buffering() {
+        // Regression test for zstd's internal buffering hiding the compressed-size check.
+        //
+        // zstd buffers up to 128 KB internally before flushing a block to the output Vec.
+        // The old capacity check used `get_ref().len()` alone as "compressed bytes so far", which
+        // returns 0 until zstd's first 128 KB block completes. This caused the encoder to accept
+        // metrics indefinitely — finish() would then return TooLarge, triggering expensive
+        // re-encoding.
+        //
+        // The fix splits the estimate: exact compressed size for flushed blocks, plus
+        // max_compressed_size for the unflushed portion (bytes still in zstd's internal buffer).
+        // This is accurate for flushed data and bounded for unflushed data.
+        //
+        // At compressed_limit=512, no zstd block will flush (needs 128 KB of input), so
+        // get_ref().len() stays 0 throughout. The old code would accept all 100 metrics;
+        // the new code stops after a handful.
+        let compressed_limit = 512;
+        let mut encoder = DatadogMetricsEncoder::with_payload_limits(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            None,
+            1_000_000,
+            compressed_limit,
+        );
+
+        let mut accepted = 0;
+        for i in 0..100 {
+            let metric = Metric::new(
+                format!("counter_{i:0>20}"),
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: f64::from(i + 1),
+                },
+            )
+            .with_timestamp(Some(ts()));
+            match encoder.try_encode(metric) {
+                Ok(None) => accepted += 1,
+                Ok(Some(_)) => break,
+                Err(e) => panic!("unexpected encoding error: {e}"),
+            }
+        }
+
+        assert!(accepted > 0, "encoder should accept at least one metric");
+        assert!(
+            accepted < 10,
+            "encoder accepted too many metrics — compressed limit was likely not enforced (accepted={accepted})"
+        );
+
+        let result = encoder.finish();
+        assert!(
+            result.is_ok(),
+            "finish() must not return TooLarge: {:?}",
+            result.err()
+        );
+        let (payload, _) = result.unwrap();
+        assert!(
+            payload.into_payload().len() <= compressed_limit,
+            "payload exceeded compressed_limit"
+        );
+    }
+
+    #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    fn zstd_buffered_bound_resets_to_last_metric_size_after_block_flush() {
+        // White-box test: directly verifies that buffered_bound resets to exactly n (the last
+        // metric's encoded size) when a zstd block flush occurs, not to 0 or some other value.
+        //
+        // buffered_bound is an upper bound on bytes in zstd's internal buffer.  On each write it
+        // accumulates (+= n).  When a flush is detected (get_ref().len() grows), it resets to n —
+        // meaning only the triggering write could straddle the block boundary.
+        //
+        // If it reset to 0 instead, subsequent capacity checks would degenerate to
+        //   flushed_compressed + max_cs(n)
+        // which vastly underestimates for any data written after the flush, re-introducing the
+        // original blind spot.  If it failed to reset at all, the encoder would become
+        // over-conservative and reject valid metrics after the first flush.
+        //
+        // Strategy:
+        //   1. Measure a single metric's encoded size by inspecting buffered_bound after one write.
+        //   2. Feed metrics into a second encoder (with unlimited limits) until buffered_bound
+        //      *decreases*, which signals a block flush.  Assert the post-flush value equals
+        //      exactly one metric's encoded size.
+
+        let make_metric = |i: usize| {
+            // Fixed-width name (600-char zero-padded) gives a constant per-metric encoded size.
+            // Value is (i + 1) to ensure it is never 0.0: proto3 omits default (zero) values,
+            // which would make the first metric smaller than the rest.
+            Metric::new(
+                format!("counter_{i:0>600}"),
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: (i + 1) as f64,
+                },
+            )
+            .with_timestamp(Some(ts()))
+        };
+
+        // Step 1: measure a single metric's encoded size.
+        let metric_size = {
+            let mut probe = DatadogMetricsEncoder::with_payload_limits(
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+                None,
+                usize::MAX,
+                usize::MAX,
+            );
+            assert!(
+                probe.try_encode(make_metric(0)).unwrap().is_none(),
+                "first metric must be accepted"
+            );
+            probe.buffered_bound()
+        };
+        assert!(metric_size > 0, "encoded metric must be non-empty");
+
+        // Step 2: encode metrics until buffered_bound decreases (= flush detected).
+        let mut encoder = DatadogMetricsEncoder::with_payload_limits(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            None,
+            usize::MAX,
+            usize::MAX,
+        );
+
+        let mut prev_buffered = 0usize;
+        let mut flush_seen = false;
+
+        for i in 0..1000 {
+            let metric = make_metric(i);
+            match encoder.try_encode(metric) {
+                Ok(None) => {}
+                Ok(Some(_)) => panic!("unexpected rejection at i={i} with unlimited limits"),
+                Err(e) => panic!("unexpected error at i={i}: {e}"),
+            }
+
+            let curr = encoder.buffered_bound();
+
+            if curr < prev_buffered {
+                // A block flush just occurred: buffered_bound must reset to exactly n.
+                assert_eq!(
+                    curr, metric_size,
+                    "after block flush, buffered_bound should reset to one metric's encoded size \
+                     ({metric_size} bytes) but got {curr}"
+                );
+                flush_seen = true;
+                break;
+            }
+
+            prev_buffered = curr;
+        }
+
+        assert!(
+            flush_seen,
+            "no zstd block flush detected after 1000 metrics — increase loop bound or metric size"
+        );
     }
 
     fn arb_counter_metric() -> impl Strategy<Value = Metric> {
@@ -1756,36 +1980,31 @@ mod tests {
 
     proptest! {
         #[test]
-        fn encoding_check_for_payload_limit_edge_cases(
-            uncompressed_limit in 0..64_000_000usize,
-            compressed_limit in 0..10_000_000usize,
+        fn encoding_check_for_payload_limit_edge_cases_v2(
+            uncompressed_limit in 1..10_000_000usize,
+            compressed_limit in 1..1_000_000usize,
             metric in arb_counter_metric(),
         ) {
-            // We simply try to encode a single metric into an encoder, and make sure that when we
-            // finish the payload, if it didn't result in an error, that the payload was under the
-            // configured limits.
-            //
-            // We check this with targeted unit tests as well but this is some cheap insurance to
-            // show that we're hopefully not missing any particular corner cases.
-            let result = DatadogMetricsEncoder::with_payload_limits(
+            let mut encoder = DatadogMetricsEncoder::with_payload_limits(
                 DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
                 None,
                 uncompressed_limit,
                 compressed_limit,
             );
-            if let Ok(mut encoder) = result {
-                _ = encoder.try_encode(metric);
+            _ = encoder.try_encode(metric);
 
-                if let Ok((payload, _processed)) = encoder.finish() {
-                    let payload = payload.into_payload();
-                    prop_assert!(payload.len() <= compressed_limit);
+            if let Ok((payload, _processed)) = encoder.finish() {
+                let payload = payload.into_payload();
+                prop_assert!(payload.len() <= compressed_limit);
 
-                    let result = decompress_payload(payload);
-                    prop_assert!(result.is_ok());
+                // V2 uses zstd.
+                let result = CappedDecoder::zstd(&payload[..])
+                    .and_then(vector_common::decompression::CappedDecoder::decompress)
+                    .map(Bytes::from);
+                prop_assert!(result.is_ok());
 
-                    let decompressed = result.unwrap();
-                    prop_assert!(decompressed.len() <= uncompressed_limit);
-                }
+                let decompressed = result.unwrap();
+                prop_assert!(decompressed.len() <= uncompressed_limit);
             }
         }
     }

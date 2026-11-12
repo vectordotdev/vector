@@ -12,8 +12,7 @@ components: sinks: datadog_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
-				max_bytes:    4_250_000
+				max_bytes:    4_250_000 // default: max_payload_bytes (5 MB) - 750 KB headroom
 				max_events:   1000
 				timeout_secs: 5.0
 			}
@@ -73,6 +72,23 @@ components: sinks: datadog_logs: {
 			body: """
 				Datadog's logs API has special handling for the following fields: `ddsource`, `ddtags`, `hostname`, `message`, and `service`.
 				If your event contains any of these fields they will be used as described by the [API reference](https://docs.datadoghq.com/api/latest/logs/#send-logs).
+				"""
+		}
+		payload_size: {
+			title: "Payload size limit"
+			body: """
+				The `max_payload_bytes` option controls the maximum uncompressed payload size sent to the
+				endpoint. It defaults to `5,000,000` bytes (5 MB), which matches the standard Datadog API
+				limit. Increase it when targeting a compatible endpoint that accepts larger payloads.
+
+				A batch that exceeds `max_payload_bytes` is split across multiple requests. A single event
+				that still exceeds `max_payload_bytes` after optional truncation is dropped.
+
+				Set `truncate_oversized_logs` to opt in to reducing individual logs whose encoded JSON
+				exceeds `truncate_oversized_logs.max_log_bytes` (default 1,000,000). The message is
+				shortened to the largest size that fits and `...TRUNCATED...` is appended. Every reduced
+				log is tagged `truncated:single_line`. Logs whose non-message fields leave no room for
+				a truncated message, or have no string message to truncate, are dropped.
 				"""
 		}
 	}

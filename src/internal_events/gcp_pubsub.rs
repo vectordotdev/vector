@@ -1,10 +1,11 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubConnectError {
-    pub error: tonic::transport::Error,
+pub(crate) struct GcpPubsubConnectError {
+    pub error: tonic::Status,
 }
 
 impl InternalEvent for GcpPubsubConnectError {
@@ -18,7 +19,7 @@ impl InternalEvent for GcpPubsubConnectError {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_connecting",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -28,7 +29,7 @@ impl InternalEvent for GcpPubsubConnectError {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubStreamingPullError {
+pub(crate) struct GcpPubsubStreamingPullError {
     pub error: tonic::Status,
 }
 
@@ -43,7 +44,7 @@ impl InternalEvent for GcpPubsubStreamingPullError {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_streaming_pull",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -53,7 +54,7 @@ impl InternalEvent for GcpPubsubStreamingPullError {
 }
 
 #[derive(NamedInternalEvent)]
-pub struct GcpPubsubReceiveError {
+pub(crate) struct GcpPubsubReceiveError {
     pub error: tonic::Status,
 }
 
@@ -68,7 +69,7 @@ impl InternalEvent for GcpPubsubReceiveError {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_fetching_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,

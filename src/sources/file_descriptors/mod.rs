@@ -1,14 +1,15 @@
 use std::io;
+use vector_lib::internal_event::{emit, register};
 
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt, channel::mpsc, executor};
-use tokio_util::{codec::FramedRead, io::StreamReader};
+use tokio_util::io::StreamReader;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -38,6 +39,10 @@ pub trait FileDescriptorConfig: NamedComponent {
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured decoder cannot be built.
     fn source<R>(
         &self,
         reader: R,
@@ -70,11 +75,11 @@ pub trait FileDescriptorConfig: NamedComponent {
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
         std::thread::spawn(move || {
-            info!("Capturing {}.", description);
+            info!("Capturing {description}.");
             read_from_fd(reader, sender);
         });
 
-        Ok(Box::pin(process_stream(
+        Ok(crate::sources::source_with_error(process_stream(
             receiver,
             decoder,
             out,
@@ -122,16 +127,16 @@ async fn process_stream(
     source_type: &'static str,
     hostname: Option<String>,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let events_received = register!(EventsReceived);
+) -> vector_lib::source_sender::SendResult {
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
+    let events_received = register(EventsReceived);
     let stream = receiver.inspect(|result| {
         if let Err(error) = result {
-            emit!(FileDescriptorReadError { error: &error });
+            emit(FileDescriptorReadError { error: &error });
         }
     });
     let stream = StreamReader::new(stream);
-    let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+    let mut stream = DecoderFramedRead::new(stream, decoder).take_until(shutdown);
     let mut stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
@@ -152,7 +157,7 @@ async fn process_stream(
                                 log_namespace.insert_standard_vector_source_metadata(
                                     log,
                                     source_type,
-                                    now,
+                                    now
                                 );
 
                                 if let Some(hostname) = &hostname {
@@ -190,19 +195,19 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(_) => {
+        Err(error) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
+            emit(StreamClosedError { count });
+            Err(error)
         }
     }
 }
 
 /// Builds the `vector_lib::config::Outputs` for stdin and
-/// file_descriptor sources.
+/// `file_descriptor` sources.
 fn outputs(
     log_namespace: LogNamespace,
-    host_key: &Option<OptionalValuePath>,
+    host_key: Option<&OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<SourceOutput> {
@@ -211,7 +216,7 @@ fn outputs(
         .with_source_metadata(
             source_name,
             host_key
-                .clone()
+                .cloned()
                 .map_or(log_schema().host_key().cloned(), |key| key.path)
                 .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),

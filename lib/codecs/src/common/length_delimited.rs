@@ -60,7 +60,7 @@ impl LengthDelimitedCoderOptions {
             builder.big_endian();
         } else {
             builder.little_endian();
-        };
+        }
         builder.new_codec()
     }
 }

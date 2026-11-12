@@ -17,7 +17,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 # Local vars
 #
 
-PACKAGE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$(${VDEV:-cargo vdev} version)"}"
 ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 
@@ -36,10 +36,9 @@ echo "TARGET: $TARGET"
 # release is 1.
 export RELEASE=1
 
-# The RPM spec does not like a leading `v` or `-` in the version name.
-# Therefore we clean the version so that the `rpmbuild` command does
-# not fail.
-export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
+# RPM uses `~` to order prereleases before the corresponding stable version.
+CLEANED_VERSION="${PACKAGE_VERSION/-/\~}"
+export CLEANED_VERSION="${CLEANED_VERSION//-/.}"
 
 # The arch is the first part of the target
 # For some architectures, like armv7hl it doesn't match the arch
@@ -63,11 +62,22 @@ cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 # Copy the archive into the sources dir
 cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
+# Determine the correct strip tool for cross-compilation.
+case "$TARGET" in
+  aarch64-*) STRIP_TOOL="aarch64-linux-gnu-strip" ;;
+  armv7-*-gnueabihf) STRIP_TOOL="arm-linux-gnueabihf-strip" ;;
+  *) STRIP_TOOL="strip" ;;
+esac
+# Fall back to the host's strip when building natively on the target arch
+# (e.g., aarch64 native build doesn't have aarch64-linux-gnu-strip).
+command -v "$STRIP_TOOL" >/dev/null 2>&1 || STRIP_TOOL="strip"
+
 # Perform the build.
 rpmbuild \
   --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
+  --define "__strip $STRIP_TOOL" \
   --nodebuginfo \
   -ba distribution/rpm/vector.spec
 

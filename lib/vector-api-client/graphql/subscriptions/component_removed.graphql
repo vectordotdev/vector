@@ -1,6 +1,0 @@
-subscription ComponentRemovedSubscription {
-    componentRemoved {
-        __typename
-        componentId
-    }
-}

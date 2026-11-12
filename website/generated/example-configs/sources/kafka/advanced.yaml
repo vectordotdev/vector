@@ -1,0 +1,22 @@
+sources:
+  my_source_id:
+    type: kafka
+    auto_offset_reset: largest
+    bootstrap_servers: 10.14.22.123:9092,10.14.23.332:9092
+    commit_interval_ms: 5000
+    drain_timeout_ms: 2500
+    fetch_wait_max_ms: 100
+    group_id: consumer-group-name
+    headers_key: headers
+    key_field: message_key
+    librdkafka_options:
+      client.id: ${ENV_VAR}
+      fetch.error.backoff.ms: "1000"
+      socket.send.buffer.bytes: "100"
+    offset_key: offset
+    partition_key: partition
+    session_timeout_ms: 10000
+    socket_timeout_ms: 60000
+    topic_key: topic
+    topics:
+      - ^(prefix1|prefix2)-.+

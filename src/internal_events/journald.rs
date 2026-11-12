@@ -1,12 +1,12 @@
-use metrics::counter;
 use vector_lib::{
     NamedInternalEvent,
     codecs::decoding::BoxedFramingError,
-    internal_event::{InternalEvent, error_stage, error_type},
+    counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldInvalidRecordError {
+pub(crate) struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
 }
@@ -21,7 +21,7 @@ impl InternalEvent for JournaldInvalidRecordError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         )
@@ -30,7 +30,7 @@ impl InternalEvent for JournaldInvalidRecordError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldStartJournalctlError {
+pub(crate) struct JournaldStartJournalctlError {
     pub error: crate::Error,
 }
 
@@ -43,7 +43,7 @@ impl InternalEvent for JournaldStartJournalctlError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::COMMAND_FAILED,
         )
@@ -52,7 +52,7 @@ impl InternalEvent for JournaldStartJournalctlError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldReadError {
+pub(crate) struct JournaldReadError {
     pub error: BoxedFramingError,
 }
 
@@ -65,7 +65,7 @@ impl InternalEvent for JournaldReadError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::READER_FAILED,
         )
@@ -74,7 +74,7 @@ impl InternalEvent for JournaldReadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldCheckpointSetError {
+pub(crate) struct JournaldCheckpointSetError {
     pub error: std::io::Error,
     pub filename: String,
 }
@@ -89,7 +89,7 @@ impl InternalEvent for JournaldCheckpointSetError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::IO_FAILED,
         )
@@ -98,12 +98,12 @@ impl InternalEvent for JournaldCheckpointSetError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldCheckpointFileOpenError {
-    pub error: std::io::Error,
+pub(crate) struct JournaldCheckpointFileOpenError<'a> {
+    pub error: &'a std::io::Error,
     pub path: String,
 }
 
-impl InternalEvent for JournaldCheckpointFileOpenError {
+impl InternalEvent for JournaldCheckpointFileOpenError<'_> {
     fn emit(self) {
         error!(
             message = "Unable to open checkpoint file.",
@@ -113,7 +113,7 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::IO_FAILED,
         )

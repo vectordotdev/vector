@@ -37,7 +37,7 @@ installing a HAProxy Deployment for load balancing across multiple aggregators.
 
 ## Setup and installation
 
-Instructions on how setup and install the `vector-aggregator` chart can be found [here][setup].
+Instructions on how setup and install the `vector-aggregator` chart can be found in the [Helm installation guide][setup].
 
 ## Looking forward
 

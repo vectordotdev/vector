@@ -1,7 +1,17 @@
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let value = match ctx.target().get_secret(key_str.as_ref()) {
         Some(secret) => secret.into(),
         None => Value::Null,
@@ -21,20 +31,36 @@ impl Function for GetSecret {
         "Returns the value of the given secret from an event."
     }
 
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::BYTES | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-        }]
+        const PARAMETERS: &[Parameter] = &[Parameter::required(
+            "key",
+            kind::BYTES,
+            "The name of the secret.",
+        )];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[example!(
-            title: "Get the datadog api key",
-            source: r#"get_secret("datadog_api_key")"#,
-            result: Ok("secret value"),
-        )]
+        &[
+            example! {
+                title: "Get the Datadog API key from the event metadata",
+                source: r#"get_secret("datadog_api_key")"#,
+                result: Ok("secret value"),
+            },
+            example! {
+                title: "Get a non existent secret",
+                source: r#"get_secret("i_dont_exist")"#,
+                result: Ok("null"),
+            },
+        ]
     }
 
     fn compile(

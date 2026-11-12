@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: pulsar
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: pulsar://127.0.0.1:6650
+    topic: topic-1234

@@ -1,0 +1,18 @@
+{{ $currentGroup := .Get "group" -}}
+
+{{- /* Define all configuration pages in one place */ -}}
+{{ $configPages := slice
+  (dict "group" "global_options" "url" "/docs/reference/configuration/global-options/" "title" "Global Options" "desc" "Global settings like data directories and timezone")
+  (dict "group" "pipeline_components" "url" "/docs/reference/configuration/pipeline-components/" "title" "Pipeline Components" "desc" "Configure sources, transforms, sinks, and enrichment tables")
+  (dict "group" "api" "url" "/docs/reference/configuration/api/" "title" "API" "desc" "Configure Vector's observability API")
+  (dict "group" "schema" "url" "/docs/reference/configuration/schema/" "title" "Schema" "desc" "Configure Vector's internal schema system")
+  (dict "group" "secrets" "url" "/docs/reference/configuration/secrets/" "title" "Secrets" "desc" "Configure secrets management")
+-}}
+<p>For other top-level configuration options, see:</p>
+<ul>
+{{ range $configPages -}}
+{{ if ne .group $currentGroup -}}
+<li><a href="{{ .url }}">{{ .title }}</a> - {{ .desc }}</li>
+{{ end -}}
+{{ end -}}
+</ul>

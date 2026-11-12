@@ -128,6 +128,6 @@ transforms like `filter`. In the meantime, if you any feedback for us, let us
 know on our [Discord chat] or on [Twitter]!
 
 [remap docs page]: /docs/reference/configuration/transforms/remap/
-[log_schema.metadata_key]: /docs/reference/configuration/global-options/#log_schema.metadata_key
+[log_schema.metadata_key]: /docs/reference/configuration/schema/#log_schema.metadata_key
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev

@@ -1,9 +1,18 @@
-use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write as _,
+    path::PathBuf,
+};
 
 use clap::Parser;
 use itertools::Itertools;
+use vector_lib::{config::OutputId, id::ComponentKey};
 
-use crate::config;
+use crate::config::{
+    self,
+    dot_graph::{EdgeAttributes, GraphConfig},
+    enrichment_table_sinks, enrichment_table_sources,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -48,18 +57,19 @@ pub struct Opts {
 
     /// Set the output format
     ///
-    /// See https://mermaid.js.org/syntax/flowchart.html#styling-and-classes for
+    /// See <https://mermaid.js.org/syntax/flowchart.html#styling-and-classes> for
     /// information on the `mermaid` format.
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,7 +90,7 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -94,14 +104,23 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
+fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<&str>) -> String {
+    let mut attrs = attributes.0.clone();
+    if let Some(default_label) = default_label
+        && !attrs.contains_key("label")
+    {
+        attrs.insert("label".to_string(), default_label.to_string());
+    }
+    attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
+}
+
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
-    let paths = match config::process_paths(&paths) {
-        Some(paths) => paths,
-        None => return exitcode::CONFIG,
+    let Some(paths) = config::process_paths(&paths) else {
+        return exitcode::CONFIG;
     };
 
-    let config = match config::load_from_paths(&paths, !opts.disable_env_var_interpolation) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]
@@ -114,19 +133,45 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let format = opts.format;
     match format {
-        OutputFormat::Dot => render_dot(config),
-        OutputFormat::Mermaid => render_mermaid(config),
+        OutputFormat::Dot => render_dot(&config),
+        OutputFormat::Mermaid => render_mermaid(&config),
     }
 }
 
-fn render_dot(config: config::Config) -> exitcode::ExitCode {
+fn render_dot(config: &config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
+
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, table) in enrichment_table_sources(&config.enrichment_tables) {
+        writeln!(
+            dot,
+            "  \"{id}\" [{}]",
+            node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+        )
+        .expect("write to String never fails");
+        written_tables.insert(id);
+    }
+
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
+        if !written_tables.contains(&id) {
+            writeln!(
+                dot,
+                "  \"{id}\" [{}]",
+                node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+            )
+            .expect("write to String never fails");
+        }
+
+        for input in &table.inputs {
+            render_dot_edge(&mut dot, &id, input, &table.graph);
+        }
+    }
 
     for (id, source) in config.sources() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&source.graph.node_attributes, "trapezium")
         )
         .expect("write to String never fails");
@@ -135,46 +180,26 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     for (id, transform) in config.transforms() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&transform.graph.node_attributes, "diamond")
         )
         .expect("write to String never fails");
 
-        for input in transform.inputs.iter() {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+        for input in &transform.inputs {
+            render_dot_edge(&mut dot, id, input, &transform.graph);
         }
     }
 
     for (id, sink) in config.sinks() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&sink.graph.node_attributes, "invtrapezium")
         )
         .expect("write to String never fails");
 
         for input in &sink.inputs {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+            render_dot_edge(&mut dot, id, input, &sink.graph);
         }
     }
 
@@ -188,8 +213,58 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     exitcode::OK
 }
 
-fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
+fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph: &GraphConfig) {
+    let edge_attributes = graph
+        .edge_attributes
+        .get(&input.to_string())
+        .or_else(|| graph.edge_attributes.get(&input.component.to_string()));
+    if let Some(port) = &input.port {
+        writeln!(
+            into,
+            "  \"{}\" -> \"{id}\" [{}]",
+            input.component,
+            edge_attributes_to_string(
+                edge_attributes.unwrap_or(&EdgeAttributes::default()),
+                Some(port)
+            )
+        )
+        .expect("write to String never fails");
+    } else if let Some(edge_attributes) = edge_attributes {
+        writeln!(
+            into,
+            "  \"{input}\" -> \"{id}\" [{}]",
+            edge_attributes_to_string(edge_attributes, None)
+        )
+        .expect("write to String never fails");
+    } else {
+        writeln!(into, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
+    }
+}
+
+fn render_mermaid(config: &config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
+
+    writeln!(mermaid, "\n  %% Enrichment tables").unwrap();
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, _) in enrichment_table_sources(&config.enrichment_tables) {
+        writeln!(mermaid, "  {id}[({id})]").unwrap();
+        written_tables.insert(id);
+    }
+
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
+        if !written_tables.contains(&id) {
+            writeln!(mermaid, "  {id}[({id})]").unwrap();
+        }
+
+        for input in &table.inputs {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
+            } else {
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
+            }
+        }
+    }
 
     writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
@@ -200,11 +275,11 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     for (id, transform) in config.transforms() {
         writeln!(mermaid, "  {id}{{{id}}}").unwrap();
 
-        for input in transform.inputs.iter() {
+        for input in &transform.inputs {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
             }
         }
     }
@@ -215,9 +290,9 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
             }
         }
     }

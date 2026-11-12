@@ -13,31 +13,36 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
   schedule:
-    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
+    - cron: "0 10 * * 1" # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   contents: read
 
 jobs:
   check-component-features:
+    if: github.repository == 'vectordotdev/vector'
     # use free tier on schedule and 8 core to expedite results on demand invocation
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
     timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time
     steps:
       - name: Checkout branch
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
 
       - uses: ./.github/actions/setup
         with:
@@ -45,5 +50,7 @@ jobs:
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          cargo-hack: true
+          cargo-cache: true
 
       - run: make check-component-features

@@ -5,7 +5,8 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
+use vector_lib::codecs::DecoderFramedRead;
 
 use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -84,7 +85,7 @@ impl<T: AsyncWrite, F> AsyncWrite for AfterRead<T, F> {
     }
 }
 
-pub enum DecoderError<E> {
+pub(super) enum DecoderError<E> {
     IO(io::Error),
     Other(E),
 }
@@ -107,7 +108,7 @@ impl<E> From<io::Error> for DecoderError<E> {
     }
 }
 
-pub struct LenientFramedReadDecoder<D> {
+pub(super) struct LenientFramedReadDecoder<D> {
     inner: D,
 }
 
@@ -115,7 +116,7 @@ impl<D> LenientFramedReadDecoder<D>
 where
     D: Decoder,
 {
-    pub const fn new(inner: D) -> Self {
+    pub(super) const fn new(inner: D) -> Self {
         Self { inner }
     }
 }
@@ -142,7 +143,7 @@ where
 #[pin_project]
 pub struct LenientFramedRead<T, D> {
     #[pin]
-    inner: FramedRead<T, LenientFramedReadDecoder<D>>,
+    inner: DecoderFramedRead<T, LenientFramedReadDecoder<D>>,
 }
 
 impl<T, D> LenientFramedRead<T, D>
@@ -153,7 +154,7 @@ where
     /// Creates a new `LenientFramedRead` with the given `decoder`.
     pub fn new(inner: T, decoder: D) -> Self {
         Self {
-            inner: FramedRead::new(inner, LenientFramedReadDecoder::new(decoder)),
+            inner: DecoderFramedRead::new(inner, LenientFramedReadDecoder::new(decoder)),
         }
     }
 
@@ -201,7 +202,7 @@ where
                     Poll::Ready(Some(Err(D::Error::from(e))))
                 }
             }
-            other => other.map_err(|e| e.into_inner()),
+            other => other.map_err(DecoderError::into_inner),
         }
     }
 }

@@ -10,17 +10,18 @@ use vector_lib::{
 
 use self::{
     sinks::{
-        BackpressureSinkConfig, BasicSinkConfig, CompletionSinkConfig, ErrorSinkConfig,
-        OneshotSinkConfig, PanicSinkConfig,
+        BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, OneshotSinkConfig,
+        PanicSinkConfig,
     },
     sources::{
         BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
         TripwireSourceConfig,
     },
-    transforms::{
-        BasicTransformConfig, ErrorDefinitionTransformConfig, NoopTransformConfig, TransformType,
-    },
+    transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
+
+mod config;
+pub use self::config::TestComponentData;
 
 pub mod sinks;
 pub mod sources;
@@ -32,16 +33,19 @@ pub fn backpressure_source(counter: &Arc<AtomicUsize>) -> BackpressureSourceConf
     }
 }
 
+#[must_use]
 pub fn basic_source() -> (SourceSender, BasicSourceConfig) {
     let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
     (tx, BasicSourceConfig::new(rx))
 }
 
+#[must_use]
 pub fn basic_source_with_data(data: &str) -> (SourceSender, BasicSourceConfig) {
     let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
     (tx, BasicSourceConfig::new_with_data(rx, data))
 }
 
+#[must_use]
 pub fn basic_source_with_event_counter(
     force_shutdown: bool,
 ) -> (SourceSender, BasicSourceConfig, Arc<AtomicUsize>) {
@@ -53,26 +57,32 @@ pub fn basic_source_with_event_counter(
     (tx, source, event_counter)
 }
 
+#[must_use]
 pub fn error_source() -> ErrorSourceConfig {
     ErrorSourceConfig::default()
 }
 
+#[must_use]
 pub fn panic_source() -> PanicSourceConfig {
     PanicSourceConfig::default()
 }
 
+#[must_use]
 pub fn tripwire_source() -> (Trigger, TripwireSourceConfig) {
     TripwireSourceConfig::new()
 }
 
+#[must_use]
 pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
     BasicTransformConfig::new(suffix.to_owned(), increase)
 }
 
+#[must_use]
 pub const fn error_definition_transform() -> ErrorDefinitionTransformConfig {
     ErrorDefinitionTransformConfig {}
 }
 
+#[must_use]
 pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig {
     BackpressureSinkConfig { num_to_consume }
 }
@@ -103,22 +113,17 @@ pub fn basic_sink_failing_healthcheck(
     (rx.into_stream(), sink)
 }
 
+#[must_use]
 pub fn error_sink() -> ErrorSinkConfig {
     ErrorSinkConfig::default()
 }
 
+#[must_use]
 pub fn oneshot_sink(tx: Sender<EventArray>) -> OneshotSinkConfig {
     OneshotSinkConfig::new(tx)
 }
 
+#[must_use]
 pub fn panic_sink() -> PanicSinkConfig {
     PanicSinkConfig::default()
-}
-
-pub fn completion_sink(expected: usize, tx: Sender<bool>) -> CompletionSinkConfig {
-    CompletionSinkConfig::new(expected, tx)
-}
-
-pub fn noop_transform() -> NoopTransformConfig {
-    NoopTransformConfig::from(TransformType::Function)
 }

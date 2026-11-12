@@ -5,16 +5,17 @@ use crate::sinks::{
     prelude::*,
     util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
-pub struct LogsSinkSetting {
-    pub dbname: Template,
-    pub table: Template,
-    pub pipeline_name: Template,
-    pub pipeline_version: Option<Template>,
+pub(super) struct LogsSinkSetting {
+    pub dbname: ConfinedTemplate,
+    pub table: ConfinedTemplate,
+    pub pipeline_name: ConfinedTemplate,
+    pub pipeline_version: Option<ConfinedTemplate>,
 }
 
 /// A sink that ingests logs into GreptimeDB.
-pub struct GreptimeDBLogsHttpSink<S> {
+pub(super) struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
@@ -28,7 +29,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         batcher_settings: BatcherSettings,
         service: S,
         request_builder: GreptimeDBLogsHttpRequestBuilder,
@@ -52,7 +53,8 @@ where
                     self.logs_sink_setting.pipeline_name,
                     self.logs_sink_setting.pipeline_version,
                 ),
-                || batcher_settings.as_byte_size_config(),
+                batcher_settings.timeout,
+                |_| batcher_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
@@ -62,7 +64,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

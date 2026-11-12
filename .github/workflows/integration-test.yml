@@ -2,7 +2,6 @@
 #
 # This workflow is used to run an integration test on demand.
 # An input for the test name needs to be provided.
-# TODO: check if the input is "all" , and run all, without a timeout?
 
 name: Integration Test
 
@@ -14,12 +13,15 @@ on:
         required: true
         type: string
 
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read # Required to checkout code
+
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -30,7 +32,10 @@ jobs:
   test-integration:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    if: inputs.if || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      id-token: write
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
@@ -39,25 +44,20 @@ jobs:
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/dd-token
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
-      - run: make test-integration-${{ inputs.test_name }}
+      # Preserve the retry policy used by integration test.
+      - run: cargo vdev --verbose integration run "$TEST_NAME" --retries 0
         env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-
-      - run: make test-integration-${{ inputs.test_name }}-cleanup
-        if: ${{ always() }}
-        env:
+          TEST_NAME: ${{ inputs.test_name }}
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}

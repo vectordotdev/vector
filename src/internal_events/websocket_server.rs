@@ -1,11 +1,12 @@
 use std::{error::Error, fmt::Debug};
 
-use metrics::{counter, gauge};
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter, gauge,
+    internal_event::{CounterName, GaugeName, InternalEvent, LossyF64, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionEstablished {
+pub(crate) struct WebSocketListenerConnectionEstablished {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -18,13 +19,13 @@ impl InternalEvent for WebSocketListenerConnectionEstablished {
                 self.client_count
             )
         );
-        counter!("connection_established_total", &self.extra_tags).increment(1);
-        gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
+        counter!(CounterName::ConnectionEstablishedTotal, &self.extra_tags).increment(1);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(LossyF64(self.client_count));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionFailedError {
+pub(crate) struct WebSocketListenerConnectionFailedError {
     pub error: Box<dyn Error>,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -38,7 +39,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
         );
-        let mut all_tags = self.extra_tags.clone();
+        let mut all_tags = self.extra_tags;
         all_tags.extend([
             ("error_code".to_string(), "ws_connection_failed".to_string()),
             (
@@ -49,12 +50,12 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
         ]);
         // Tags required by `component_errors_total` are dynamically added above.
         // ## skip check-validity-events ##
-        counter!("component_errors_total", &all_tags).increment(1);
+        counter!(CounterName::ComponentErrorsTotal, &all_tags).increment(1);
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerConnectionShutdown {
+pub(crate) struct WebSocketListenerConnectionShutdown {
     pub client_count: usize,
     pub extra_tags: Vec<(String, String)>,
 }
@@ -67,13 +68,13 @@ impl InternalEvent for WebSocketListenerConnectionShutdown {
                 self.client_count
             )
         );
-        counter!("connection_shutdown_total", &self.extra_tags).increment(1);
-        gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
+        counter!(CounterName::ConnectionShutdownTotal, &self.extra_tags).increment(1);
+        gauge!(GaugeName::ActiveClients, &self.extra_tags).set(LossyF64(self.client_count));
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerSendError {
+pub(crate) struct WebSocketListenerSendError {
     pub error: Box<dyn Error>,
 }
 
@@ -87,7 +88,7 @@ impl InternalEvent for WebSocketListenerSendError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "ws_server_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
@@ -97,15 +98,15 @@ impl InternalEvent for WebSocketListenerSendError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WebSocketListenerMessageSent {
+pub(crate) struct WebSocketListenerMessageSent {
     pub message_size: usize,
     pub extra_tags: Vec<(String, String)>,
 }
 
 impl InternalEvent for WebSocketListenerMessageSent {
     fn emit(self) {
-        counter!("websocket_messages_sent_total", &self.extra_tags).increment(1);
-        counter!("websocket_bytes_sent_total", &self.extra_tags)
+        counter!(CounterName::WebsocketMessagesSentTotal, &self.extra_tags).increment(1);
+        counter!(CounterName::WebsocketBytesSentTotal, &self.extra_tags)
             .increment(self.message_size as u64);
     }
 }

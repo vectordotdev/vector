@@ -1,4 +1,5 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
+use vector_lib::internal_event::emit;
 
 use rand::random;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
@@ -58,7 +59,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -92,11 +93,11 @@ where
 }
 
 /// Returns a `KinesisProcessedEvent` containing the unmodified log event + metadata consisting of
-/// the partition key. The partition key is either generated from the provided partition_key_field
+/// the partition key. The partition key is either generated from the provided `partition_key_field`
 /// or is generated randomly.
 ///
-/// If the provided partition_key_field was not found in the log, `Error` `EventsDropped` internal
-/// events are emitted and None is returned.
+/// If the provided `partition_key_field` was not found in the log, `Error` `EventsDropped` internal
+/// events are emitted and `None` is returned.
 pub(crate) fn process_log(
     log: LogEvent,
     partition_key_field: Option<&ConfigValuePath>,
@@ -105,8 +106,8 @@ pub(crate) fn process_log(
         if let Some(v) = log.get((PathPrefix::Event, partition_key_field)) {
             v.to_string_lossy()
         } else {
-            emit!(AwsKinesisStreamNoPartitionKeyError {
-                partition_key_field: partition_key_field.0.to_string().as_str()
+            emit(AwsKinesisStreamNoPartitionKeyError {
+                partition_key_field: partition_key_field.0.to_string().as_str(),
             });
             return None;
         }
@@ -114,7 +115,12 @@ pub(crate) fn process_log(
         Cow::Owned(gen_partition_key())
     };
     let partition_key = if partition_key.len() >= 256 {
-        partition_key[..256].to_string()
+        #[expect(
+            clippy::string_slice,
+            reason = "floor_char_boundary guarantees a valid char boundary"
+        )]
+        let s = &partition_key[..partition_key.floor_char_boundary(256)];
+        s.to_string()
     } else {
         partition_key.into_owned()
     };
@@ -148,7 +154,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            events: self.events.to_vec(),
+            events: self.events.clone(),
             metadata: self.metadata.clone(),
         }
     }

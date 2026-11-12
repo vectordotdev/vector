@@ -1,5 +1,5 @@
 features:
-- fluent-integration-tests
+  - fluent-integration-tests
 
 test_filter: "::fluent::"
 
@@ -14,7 +14,7 @@ matrix:
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/fluent.rs"
-- "src/sources/fluent/**"
-- "src/sources/util/**"
-- "tests/integration/fluent/**"
+  - "src/internal_events/fluent.rs"
+  - "src/sources/fluent/**"
+  - "src/sources/util/**"
+  - "tests/integration/fluent/**"
