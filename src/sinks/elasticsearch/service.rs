@@ -12,6 +12,7 @@ use tower_http::decompression::Decompression;
 use vector_http::full_body;
 use vector_lib::{
     ByteSizeOf,
+    internal_event::emit,
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
@@ -218,7 +219,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
                 .build_request(req)
                 .await
                 .inspect_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })?;
             let byte_size = request.body().len();
 
@@ -228,7 +229,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
             let response = service.call(request.map(full_body)).await?;
 
             if response.status().is_success() {
-                emit!(EndpointBytesSent {
+                emit(EndpointBytesSent {
                     byte_size,
                     protocol: &protocol,
                     endpoint: &endpoint,

@@ -2,6 +2,7 @@ use async_nats::jetstream::consumer::PullConsumer;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::ResultExt;
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
@@ -85,7 +86,7 @@ pub(super) async fn process_message(
                 });
 
                 if let Err(error) = out.send_batch(events).await {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     return ProcessingStatus::ChannelClosed(error);
                 }
             }
@@ -138,8 +139,8 @@ pub(super) async fn run_nats_jetstream(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> vector_lib::source_sender::SendResult {
-    let events_received = register!(EventsReceived);
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::TCP));
     let mut backoff = ExponentialBackoff::default().max_delay(std::time::Duration::from_secs(30));
 
     let js_config = config
@@ -233,8 +234,8 @@ pub(super) async fn run_nats_core(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> vector_lib::source_sender::SendResult {
-    let events_received = register!(EventsReceived);
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::TCP));
 
     loop {
         tokio::select! {

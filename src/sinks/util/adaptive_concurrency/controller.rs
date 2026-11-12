@@ -6,7 +6,7 @@ use std::{
 
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
-use vector_lib::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{InternalEventHandle as _, Registered, register};
 use vector_lib::stats::{EwmaVar, Mean, MeanVariance};
 
 use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
@@ -102,10 +102,10 @@ impl<L> Controller<L> {
             })),
             #[cfg(test)]
             stats: Arc::new(Mutex::new(ControllerStatistics::default())),
-            limit: register!(AdaptiveConcurrencyLimit),
-            in_flight: register!(AdaptiveConcurrencyInFlight),
-            observed_rtt: register!(AdaptiveConcurrencyObservedRtt),
-            averaged_rtt: register!(AdaptiveConcurrencyAveragedRtt),
+            limit: register(AdaptiveConcurrencyLimit),
+            in_flight: register(AdaptiveConcurrencyInFlight),
+            observed_rtt: register(AdaptiveConcurrencyObservedRtt),
+            averaged_rtt: register(AdaptiveConcurrencyAveragedRtt),
         }
     }
 

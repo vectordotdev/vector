@@ -6,7 +6,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::BytesDeserializer,
     config::LegacyKey,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
     lookup::path,
 };
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
@@ -60,7 +60,7 @@ pub(crate) fn build_apm_stats_event(
     http_path: &str,
     source: &DatadogAgentSource,
 ) -> Vec<Event> {
-    emit!(HttpBytesReceived {
+    emit(HttpBytesReceived {
         byte_size: body.len(),
         http_path,
         protocol: source.protocol,

@@ -15,6 +15,7 @@ use vector_lib::{
     configurable::configurable_component,
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     partition::Partitioner,
     request_metadata::{GroupedCountByteSize, RequestMetadata},
@@ -203,8 +204,7 @@ impl ValidatedSink for MezmoConfig {
                 password: SensitiveString::default(),
             },
         };
-        let service =
-            HttpService::new(client.clone(), service_request_builder).with_response_decompression();
+        let service = HttpService::new(client.clone(), service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings.clone(),
@@ -301,7 +301,7 @@ impl MezmoEventEncoder {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,
@@ -363,7 +363,7 @@ impl MezmoEventEncoder {
         // batch is dropped, but its finalizers and sizes stay in a batch.
         let length = line.get().len();
         let line = if length + 1 >= self.max_bytes {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length,
                 max_length: self.max_bytes,
             });
@@ -614,7 +614,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),

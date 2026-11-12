@@ -15,6 +15,7 @@ use vector_lib::{
     configurable::configurable_component,
     finalization::{EventFinalizers, EventStatus},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
     request_metadata::{GroupedCountByteSize, RequestMetadata},
@@ -266,8 +267,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
             source_type_key,
         };
 
-        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token))
-            .with_response_decompression();
+        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token));
         let service = ServiceBuilder::new()
             .settings(request, http_response_retry_logic(RetryStrategy::Default))
             .service(service);
@@ -349,9 +349,9 @@ impl InfluxDbLogsEncoder {
             timestamp,
             &mut output,
         ) {
-            emit!(InfluxdbEncodingError {
+            emit(InfluxdbEncodingError {
                 error_message,
-                count: 1
+                count: 1,
             });
             return None;
         }
@@ -438,7 +438,7 @@ impl StreamBatchConfig<EncodedLine> for LogBatchConfig {
 
         let max_bytes = self.settings.size_limit;
         if self.batch.lines.is_empty() && line.len() > max_bytes {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: line.len(),
                 max_length: max_bytes,
             });
@@ -580,7 +580,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),

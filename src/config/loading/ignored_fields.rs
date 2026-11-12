@@ -24,7 +24,7 @@ const CLOSED_OBJECT: &str = "x-vector-closed-object";
 const OPEN_OBJECT: &str = "x-vector-open-object";
 const IGNORED_FIELD: &str = "x-vector-ignored-field";
 const SERDE_IGNORED: &str = "serde::ignored";
-const SERDE_OPTIONAL_TAG: &str = "serde::optional_tag";
+pub(super) const SERDE_OPTIONAL_TAG: &str = "serde::optional_tag";
 
 static VALIDATOR: LazyLock<Option<Validator>> = LazyLock::new(|| {
     let result = generate_root_schema::<ConfigBuilder>()
@@ -210,7 +210,7 @@ fn prepare_schema(schema: &mut Value) {
     prepare_subschemas(object);
 }
 
-fn make_tag_optional(schema: &mut Map<String, Value>, tag: &str) {
+pub(super) fn make_tag_optional(schema: &mut Map<String, Value>, tag: &str) {
     if let Some(required) = schema.get_mut("required").and_then(Value::as_array_mut) {
         required.retain(|name| name.as_str() != Some(tag));
     }

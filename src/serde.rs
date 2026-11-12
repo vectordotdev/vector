@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Number;
 pub use vector_lib::serde::{bool_or_struct, is_default};
 use vector_lib::{
     codecs::{
@@ -9,6 +10,56 @@ use vector_lib::{
     },
     configurable::configurable_component,
 };
+
+pub(crate) fn remove_digit_separators(input: &str, radix: u32) -> Option<String> {
+    // TOML permits underscores only between digits, including exponent digits.
+    let is_digit = |byte: u8| char::from(byte).is_digit(radix);
+    if input.starts_with('_')
+        || input.ends_with('_')
+        || input
+            .as_bytes()
+            .windows(3)
+            .any(|bytes| bytes[1] == b'_' && (!is_digit(bytes[0]) || !is_digit(bytes[2])))
+    {
+        return None;
+    }
+    Some(input.replace('_', ""))
+}
+
+pub(crate) fn parse_integer(input: &str) -> Option<Number> {
+    let input = input.trim();
+    let (sign, digits) = if let Some(digits) = input.strip_prefix('-') {
+        ("-", digits)
+    } else {
+        ("", input.strip_prefix('+').unwrap_or(input))
+    };
+    let (digits, radix) = [("0x", 16), ("0o", 8), ("0b", 2)]
+        .into_iter()
+        .find_map(|(prefix, radix)| digits.strip_prefix(prefix).map(|digits| (digits, radix)))
+        .unwrap_or((digits, 10));
+    if digits.starts_with(['+', '-']) {
+        return None;
+    }
+    // Keep the sign for checked parsing, including i64::MIN, without accepting
+    // arrays, maps, tags, or other configuration syntax from substituted values.
+    let digits = remove_digit_separators(digits, radix)?;
+    let number = format!("{sign}{digits}");
+    i64::from_str_radix(&number, radix)
+        .map(Number::from)
+        .or_else(|_| u64::from_str_radix(&number, radix).map(Number::from))
+        .ok()
+}
+
+pub(crate) fn parse_unsigned_integer_literal(input: &str) -> Option<u64> {
+    let input = input.trim();
+
+    // Preserve rejection of negative spellings, including "-0".
+    if input.starts_with('-') {
+        return None;
+    }
+
+    parse_integer(input)?.as_u64()
+}
 
 #[must_use]
 pub const fn default_true() -> bool {
