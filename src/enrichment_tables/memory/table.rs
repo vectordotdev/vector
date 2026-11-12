@@ -896,10 +896,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "These assertions check exact counter and gauge values."
-    )]
     async fn flush_metrics_without_interval() {
         let event = Event::Log(LogEvent::from(ObjectMap::from([(
             "test_key".into(),
@@ -969,10 +965,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "These assertions check exact counter and gauge values."
-    )]
     async fn flush_metrics_with_interval() {
         let event = Event::Log(LogEvent::from(ObjectMap::from([(
             "test_key".into(),
@@ -1130,7 +1122,7 @@ mod tests {
         )
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         let log = event.as_log();
 

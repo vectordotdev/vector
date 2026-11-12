@@ -309,7 +309,6 @@ impl NetworkConnector {
     }
 
     /// Gets a `Healthcheck` based on the configured destination of this connector.
-    #[must_use]
     pub fn healthcheck(&self) -> Healthcheck {
         let connector = self.clone();
         Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })

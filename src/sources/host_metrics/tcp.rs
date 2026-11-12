@@ -158,10 +158,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "Empty input leaves the counters at exactly zero."
-    )]
     fn parse_tcp_entries_handles_empty_list() {
         use super::{TcpStats, parse_tcp_entries};
 
@@ -182,7 +178,7 @@ mod tests {
             .await;
         let metrics = buffer.into_metrics();
 
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
 
         let mut transmit_queue_metric_count = 0;
         let mut received_bytes_metric_count = 0;

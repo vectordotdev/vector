@@ -30,10 +30,6 @@ fn confinement_gauge<'a>(metrics: &'a [Metric], component_id: &str) -> Option<&'
 }
 
 #[track_caller]
-#[expect(
-    clippy::float_cmp,
-    reason = "The confinement gauge must equal its exact fixture value."
-)]
 fn assert_gauge(metrics: &[Metric], component_id: &str, expected: f64) {
     let metric = confinement_gauge(metrics, component_id).unwrap_or_else(|| {
         panic!(

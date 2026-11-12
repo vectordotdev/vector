@@ -344,7 +344,7 @@ mod tests {
 
         receiver.connected().await;
         time::sleep(Duration::from_millis(500)).await;
-        assert!(!receiver.await.is_empty());
+        assert_ne!(receiver.await, [] as [std::string::String; 0]);
 
         let mut receiver = create_count_receiver(addr, tls, false, None);
         assert!(

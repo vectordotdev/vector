@@ -47,7 +47,7 @@ pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
         run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
     events
 }
@@ -178,6 +178,35 @@ async fn json_decoding_newline_delimited() {
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::default()),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        body: None,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+}
+
+/// JSON with the default framing should be decoded and HTTP header set to application/json.
+#[tokio::test]
+async fn json_decoding_default_framing() {
+    let (_guard, in_addr) = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
+        framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
         body: None,
@@ -868,7 +897,7 @@ async fn requests_through_authenticated_proxy() {
     )
     .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     for event in events {
         assert_eq!(
             event

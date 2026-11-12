@@ -98,6 +98,10 @@ impl GenerateConfig for GeoipConfig {
 }
 
 impl EnrichmentTableConfig for GeoipConfig {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
