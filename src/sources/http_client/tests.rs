@@ -114,7 +114,7 @@ async fn run_slow_body_error(body: SlowBody) {
     )
     .await;
 
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 /// The headers arrive in time, so only a timeout that also covers the body read can end this.

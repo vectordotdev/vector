@@ -438,7 +438,7 @@ mod test {
         let events =
             run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS)
                 .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
