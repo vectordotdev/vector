@@ -149,6 +149,35 @@ async fn json_decoding_newline_delimited() {
     .await;
 }
 
+/// JSON with the default framing should be decoded and HTTP header set to application/json.
+#[tokio::test]
+async fn json_decoding_default_framing() {
+    let (_guard, in_addr) = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        body: None,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+}
+
 /// JSON with character delimiter should be decoded and HTTP header set to application/json.
 #[tokio::test]
 async fn json_decoding_character_delimited() {
