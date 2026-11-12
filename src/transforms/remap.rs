@@ -645,7 +645,7 @@ where
                         if !self.reroute_dropped {
                             emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
-                                error: error.to_string(),
+                                error: &error,
                             });
                         }
                         ("abort", error, self.drop_on_abort)
