@@ -3,6 +3,7 @@ transforms:
     type: reduce
     inputs:
       - my-source-or-transform-id
+    concurrency: 1
     expire_after_ms: 30000
     flush_period_ms: 1000
     group_by:

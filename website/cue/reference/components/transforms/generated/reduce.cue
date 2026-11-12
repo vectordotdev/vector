@@ -1,6 +1,20 @@
 package metadata
 
 generated: components: transforms: reduce: configuration: {
+	concurrency: {
+		description: """
+			The number of parallel tasks used to reduce events.
+
+			Groups are distributed across tasks by hashing their `group_by` values, so all events of a
+			group are always reduced by the same task, in arrival order. Only the order of output events
+			across different groups may change.
+
+			Has no effect when `group_by` is empty: all events then belong to a single group, which is
+			reduced by a single task.
+			"""
+		required: false
+		type: uint: default: 1
+	}
 	end_every_period_ms: {
 		description: """
 			If supplied, every time this interval elapses for a given grouping, the reduced value

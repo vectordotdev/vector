@@ -175,6 +175,10 @@ impl Reduce {
     /// # Errors
     ///
     /// Returns an error for incompatible conditions, invalid merge paths, or a condition that cannot be built.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "merge strategy paths are validated by validate_merge_strategies"
+    )]
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -207,18 +211,12 @@ impl Reduce {
             merge_strategies: config
                 .merge_strategies
                 .iter()
-                .filter_map(|(path, strategy)| {
-                    // TODO: dont think the below todo is relevant, as an hard error is sent via
-                    // validate_merge_strategies just above.
-
-                    // TODO Invalid paths are ignored to preserve backwards compatibility.
-                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
-                    //      which means an invalid path would result in an configuration error.
-                    let parsed_path = parse_target_path(path).ok();
-                    if parsed_path.is_none() {
-                        warn!(message = "Ignoring strategy with invalid path.", %path);
-                    }
-                    parsed_path.map(|path| (path, strategy.clone()))
+                .map(|(path, strategy)| {
+                    // There are no invalid paths here: `validate_merge_strategies` above already
+                    // returns a configuration error for any path that fails to parse.
+                    let path =
+                        parse_target_path(path).expect("validated by validate_merge_strategies");
+                    (path, strategy.clone())
                 })
                 .collect(),
             merge_states: HashMap::new(),
@@ -360,8 +358,8 @@ where
 // TODO: there might be a variable somewhere in vector to handle this kind of stuff
 const SHARD_QUEUE_BATCHES: usize = 4;
 
-// Batches the shared output queue can hold per shard. It only absorbs bursts.
-// TODO: It's an arbitraty value. Find what we use in vector in similar cases
+// All shards send into one shared output channel, which holds
+// `shards * OUTPUT_QUEUE_BATCHES_PER_SHARD` batches. Only there to absorb bursts.
 const OUTPUT_QUEUE_BATCHES_PER_SHARD: usize = 1;
 
 #[derive(Debug)]
@@ -448,9 +446,7 @@ async fn run_shard(
     let mut reduced = reduce.transform(events).ready_chunks(chunk_size_events());
 
     while let Some(batch) = reduced.next().await {
-        // TODO: This happens if the receiver is gone: so if the topology dropped this transform's
-        // output stream. In that case, we lose in-flight events. I don't know how we should handle
-        // this case/how is it handled everywhere else in Vector?
+        // Fails only if the topology dropped the output stream. A normal shutdown ends the input instead.
         if sender.send(batch).await.is_err() {
             return;
         }
@@ -484,7 +480,7 @@ async fn route(
         }
 
         for (shard_tx, shard_batch) in shard_senders.iter().zip(per_shard) {
-            // TODO: same problem as in `run_shard()`
+            // Fails only if the shard stopped after the output stream was dropped.
             if !shard_batch.is_empty() && shard_tx.send(shard_batch).await.is_err() {
                 return;
             }
@@ -975,6 +971,60 @@ mod test {
             assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
             assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
             assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sharded_keeps_arrival_order_within_group() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            concurrency: 4
+            merge_strategies:
+              foo: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            for (foo, request_id, end) in [
+                (1, "1", false),
+                (2, "2", false),
+                (3, "1", false),
+                (4, "2", false),
+                (5, "1", true),
+                (6, "2", true),
+            ] {
+                let mut event = LogEvent::from(format!("test message {foo}"));
+                event.insert(event_path!("foo"), foo);
+                event.insert(event_path!("request_id"), request_id);
+                if end {
+                    event.insert(event_path!("test_end"), "yep");
+                }
+                tx.send(event.into()).await.unwrap();
+            }
+
+            // Groups may reach different shards, so either group can come out first.
+            let mut outputs = [
+                out.recv().await.unwrap().into_log(),
+                out.recv().await.unwrap().into_log(),
+            ];
+            outputs.sort_by_key(|output| output["request_id"].to_string());
+
+            assert_eq!(outputs[0]["message"], "test message 1".into());
+            assert_eq!(outputs[0]["foo"], json!([1, 3, 5]).into());
+            assert_eq!(outputs[1]["message"], "test message 2".into());
+            assert_eq!(outputs[1]["foo"], json!([2, 4, 6]).into());
 
             drop(tx);
             topology.stop().await;
