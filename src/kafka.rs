@@ -1,16 +1,12 @@
 #![allow(missing_docs)]
-use std::path::{Path, PathBuf};
-
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
 use rdkafka::{ClientConfig, ClientContext, Statistics, consumer::ConsumerContext};
 use snafu::Snafu;
+use std::path::{Path, PathBuf};
 use tracing::Span;
+use vector_lib::tls::TlsSettings;
 use vector_lib::{
     configurable::configurable_component, internal_event::emit, sensitive_string::SensitiveString,
-};
-
-use crate::{
-    internal_events::KafkaStatisticsReceived,
-    tls::{PEM_START_MARKER, TlsEnableableConfig},
 };
 
 #[derive(Debug, Snafu)]
@@ -124,35 +120,48 @@ impl KafkaAuthConfig {
                 );
             }
 
-            if let Some(path) = &tls.options.ca_file {
-                let text = pathbuf_to_string(path)?;
-                if text.contains(PEM_START_MARKER) {
-                    client.set("ssl.ca.pem", text);
-                } else {
-                    client.set("ssl.ca.location", text);
-                }
+            let mut tls_options = tls.options.clone();
+            if let Some(path) = &tls.options.ca_file
+                && path.is_dir()
+            {
+                warn!(
+                    "DEPRECATED: Passing a directory to `tls.ca_file` for a Kafka connection is deprecated, combine the CA certificates into a single PEM/DER file or inline value and pass it to `tls.ca_file` instead."
+                );
+                client.set("ssl.ca.location", pathbuf_to_string(path)?);
+
+                // Admittedly, cloning `tls.options` to clear `ca_file` isn't pretty, but it preserves
+                // backward compatibility for directory paths in `ca_file` (which `librdkafka` supports
+                // via `ssl.ca.location`) while letting us reuse `TlsSettings::from_options` out of the box
+                // instead of custom certificate-loading logic.
+                // Remove this cloning once the deprecated directory fallback above is removed.
+                tls_options.ca_file = None;
             }
 
-            if let Some(path) = &tls.options.crt_file {
-                let text = pathbuf_to_string(path)?;
-                if text.contains(PEM_START_MARKER) {
-                    client.set("ssl.certificate.pem", text);
-                } else {
-                    client.set("ssl.certificate.location", text);
-                }
+            let tls_settings = TlsSettings::from_options(Some(&tls_options))?;
+
+            let ca_pem: String = tls_settings
+                .authorities_pem()
+                .map(|pem| {
+                    String::from_utf8(pem)
+                        .expect("Failed to parse CA certificate for a Kafka connection")
+                })
+                .collect();
+
+            if !ca_pem.is_empty() {
+                client.set("ssl.ca.pem", ca_pem);
             }
 
-            if let Some(path) = &tls.options.key_file {
-                let text = pathbuf_to_string(path)?;
-                if text.contains(PEM_START_MARKER) {
-                    client.set("ssl.key.pem", text);
-                } else {
-                    client.set("ssl.key.location", text);
-                }
-            }
-
-            if let Some(pass) = &tls.options.key_pass {
-                client.set("ssl.key.password", pass);
+            if let Some((cert_pem, key_pem)) = tls_settings.identity_pem() {
+                client.set(
+                    "ssl.certificate.pem",
+                    String::from_utf8(cert_pem)
+                        .expect("Failed to parse client certificate for a Kafka connection"),
+                );
+                client.set(
+                    "ssl.key.pem",
+                    String::from_utf8(key_pem)
+                        .expect("Failed to parse private key for a Kafka connection"),
+                );
             }
         }
 
@@ -183,3 +192,77 @@ impl ClientContext for KafkaStatisticsContext {
 }
 
 impl ConsumerContext for KafkaStatisticsContext {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tls::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
+    use vector_lib::tls::TlsConfig;
+
+    #[test]
+    fn tls_pem_config() {
+        let auth = build_kafka_auth_config(TlsConfig {
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
+            crt_file: Some(TEST_PEM_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_KEY_PATH.into()),
+            key_pass: Some("test_password".into()),
+            ..Default::default()
+        });
+
+        let mut client_config = ClientConfig::new();
+        auth.apply(&mut client_config).unwrap();
+
+        assert!(
+            client_config
+                .get("ssl.ca.pem")
+                .unwrap()
+                .contains("-----BEGIN CERTIFICATE-----")
+        );
+        assert!(
+            client_config
+                .get("ssl.certificate.pem")
+                .unwrap()
+                .contains("-----BEGIN CERTIFICATE-----")
+        );
+        assert!(
+            client_config
+                .get("ssl.key.pem")
+                .unwrap()
+                .contains("PRIVATE KEY-----")
+        );
+
+        assert_eq!(client_config.get("ssl.ca.location"), None);
+        assert_eq!(client_config.get("ssl.certificate.location"), None);
+        assert_eq!(client_config.get("ssl.key.location"), None);
+        assert_eq!(client_config.get("ssl.key.password"), None);
+    }
+
+    #[test]
+    fn tls_ca_directory_fallback() {
+        let ca_dir = tempfile::tempdir().unwrap();
+
+        let auth = build_kafka_auth_config(TlsConfig {
+            ca_file: Some(ca_dir.path().to_path_buf()),
+            ..Default::default()
+        });
+
+        let mut client_config = ClientConfig::new();
+        auth.apply(&mut client_config).unwrap();
+
+        assert_eq!(
+            client_config.get("ssl.ca.location"),
+            Some(ca_dir.path().to_str().unwrap())
+        );
+        assert_eq!(client_config.get("ssl.ca.pem"), None);
+    }
+
+    fn build_kafka_auth_config(options: TlsConfig) -> KafkaAuthConfig {
+        KafkaAuthConfig {
+            sasl: None,
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options,
+            }),
+        }
+    }
+}
