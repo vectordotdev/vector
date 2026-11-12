@@ -2,7 +2,8 @@ use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+    EstimatedJsonEncodedSizeOf, config::telemetry, internal_event::emit,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::sink::HecProcessedEvent;
@@ -92,8 +93,8 @@ impl HecMetricsEncoder {
         match serde_json::to_vec(&hec_data) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(SplunkEventEncodeError {
-                    error: error.into()
+                emit(SplunkEventEncodeError {
+                    error: error.into(),
                 });
                 None
             }

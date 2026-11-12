@@ -6,7 +6,7 @@ use std::{
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
-use vector_lib::{event::Event, transform::TaskTransform};
+use vector_lib::{event::Event, internal_event::emit, transform::TaskTransform};
 
 use crate::internal_events::{
     TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -106,7 +106,7 @@ impl TagCardinalityLimit {
     /// successful new-key allocation in `accepted_tags`.
     fn record_new_key_allocation(&mut self) {
         self.tracked_keys_count += 1;
-        emit!(TagCardinalityTrackedKeys {
+        emit(TagCardinalityTrackedKeys {
             count: self.tracked_keys_count,
         });
     }
@@ -353,7 +353,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value.clone());
 
             if tag_value_set.len() == config.value_limit {
-                emit!(TagCardinalityValueLimitReached { key });
+                emit(TagCardinalityValueLimitReached { key });
             }
 
             AcceptResult::Tracked
@@ -493,7 +493,7 @@ impl TagCardinalityLimit {
                         if self.tag_limit_exceeded(metric_key.as_ref(), key, value) {
                             let include_extended_tags =
                                 resolved.internal_metrics.include_extended_tags;
-                            emit!(TagCardinalityLimitRejectingEvent {
+                            emit(TagCardinalityLimitRejectingEvent {
                                 metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
@@ -521,7 +521,7 @@ impl TagCardinalityLimit {
                                     }
                                     TagSettings::Excluded => false, // unreachable: excluded tags return Tracked
                                 };
-                                emit!(TagCardinalityLimitRejectingTag {
+                                emit(TagCardinalityLimitRejectingTag {
                                     metric_name: &metric_name,
                                     tag_key: key,
                                     tag_value: &value.to_string(),
@@ -539,7 +539,7 @@ impl TagCardinalityLimit {
             }
 
             if any_untracked {
-                emit!(TagCardinalityLimitUntracked);
+                emit(TagCardinalityLimitUntracked);
             }
         }
         Some(event)

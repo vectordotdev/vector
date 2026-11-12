@@ -7,7 +7,7 @@ use std::{
 
 use futures::executor;
 use tokio::sync::watch;
-use vector_lib::{buffers::BufferConfig, config::ComponentKey};
+use vector_lib::{buffers::BufferConfig, config::ComponentKey, internal_event::emit};
 
 use crate::{config::Config, internal_events::TopologyDiskBufferUnreferenced};
 
@@ -115,7 +115,7 @@ fn report_orphaned_disk_buffers(
             );
             continue;
         };
-        emit!(TopologyDiskBufferUnreferenced {
+        emit(TopologyDiskBufferUnreferenced {
             buffer_id: orphaned_buffer_id,
             buffer_dir: &orphaned_buffer,
         });

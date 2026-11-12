@@ -4,7 +4,10 @@ use heim::units::information::byte;
 use heim::units::ratio::ratio;
 #[cfg(unix)]
 use nix::sys::statvfs::statvfs;
-use vector_lib::{configurable::configurable_component, internal_event::GaugeName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::GaugeName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
@@ -96,7 +99,7 @@ impl HostMetrics {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                emit!(HostMetricsScrapeFilesystemError {
+                                emit(HostMetricsScrapeFilesystemError {
                                     message: "Failed to load partitions info.",
                                     mount_point: partition
                                         .mount_point()
@@ -172,7 +175,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load partitions info.",
                     error,
                 });

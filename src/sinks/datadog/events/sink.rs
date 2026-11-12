@@ -1,4 +1,5 @@
 use std::{fmt, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use vector_lib::lookup::event_path;
 
@@ -31,7 +32,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -47,7 +48,7 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
     let mut log = event.into_log();
 
     if !log.contains(event_path!("title")) {
-        emit!(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
+        emit(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
         return None;
     }
 

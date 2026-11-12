@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use futures_util::StreamExt;
 use snafu::Snafu;
@@ -157,7 +158,7 @@ impl InputHandler {
                         }
                         Err(error) => {
                             // Bad payload. We just log and keep going.
-                            emit!(RedisReceiveEventError::from(error));
+                            emit(RedisReceiveEventError::from(error));
                         }
                     },
 
@@ -172,7 +173,7 @@ impl InputHandler {
                         // Redis closed an established connection (e.g. server restart). Record
                         // it as a component error — so alerts fire even if the reconnect
                         // succeeds immediately — and reconnect in the outer loop.
-                        emit!(RedisConnectionDroppedError);
+                        emit(RedisConnectionDroppedError);
                         return SessionEnd::Disconnected;
                     }
 
@@ -214,7 +215,7 @@ impl InputHandler {
                 // Obtain a live connection: reuse the pending one, or reconnect with backoff.
                 let mut pubsub_conn = match next_conn.take() {
                     Some(conn) => {
-                        emit!(RedisConnectionEstablished { reconnect: false });
+                        emit(RedisConnectionEstablished { reconnect: false });
                         conn
                     }
                     None => 'reconnect: loop {
@@ -236,7 +237,7 @@ impl InputHandler {
 
                         match res {
                             Ok(conn) => {
-                                emit!(RedisConnectionEstablished { reconnect: true });
+                                emit(RedisConnectionEstablished { reconnect: true });
                                 break 'reconnect conn;
                             }
                             Err(err) => {
@@ -245,7 +246,7 @@ impl InputHandler {
                                 // already ruled out by the successful build-time connect, and
                                 // stopping here would drop the resilience this adds. The error
                                 // is recorded so metric-based alerts still fire.
-                                emit!(RedisConnectionError::from(err.into_source()));
+                                emit(RedisConnectionError::from(err.into_source()));
                                 // keep retrying; backoff advances on the next iteration.
                             }
                         }

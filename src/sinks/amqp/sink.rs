@@ -2,6 +2,7 @@
 //! event and sends it to `AMQP`.
 use lapin::BasicProperties;
 use serde::Serialize;
+use vector_lib::internal_event::emit;
 
 use super::{
     BuildError,
@@ -65,7 +66,7 @@ impl AmqpSink {
             .exchange
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("exchange"),
                     drop_event: true,
@@ -78,7 +79,7 @@ impl AmqpSink {
             Some(key) => key
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error: missing_keys,
                         field: Some("routing_key"),
                         drop_event: true,

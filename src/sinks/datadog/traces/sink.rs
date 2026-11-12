@@ -10,6 +10,7 @@ use tower::Service;
 use vector_lib::{
     config::log_schema,
     event::{Event, Value},
+    internal_event::emit,
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -113,7 +114,7 @@ where
                 match request {
                     Err(e) => {
                         let (error_message, error_reason, dropped_events) = e.into_parts();
-                        emit!(DatadogTracesEncodingError {
+                        emit(DatadogTracesEncodingError {
                             error_message,
                             error_reason,
                             dropped_events,
