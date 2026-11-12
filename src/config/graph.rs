@@ -3,7 +3,7 @@ use std::{
     fmt,
 };
 
-use indexmap::set::IndexSet;
+use petgraph::{algo::kosaraju_scc, graphmap::DiGraphMap};
 
 use super::{
     ComponentKey, ComponentKind, DataType, OutputId, SourceOutput, TransformOutput,
@@ -61,7 +61,7 @@ pub(super) struct InputSpec {
 pub(super) struct NodeSpec {
     pub runtime_id: ComponentKey,
     pub component_id: ComponentKey,
-    // Preserve the existing diagnostic labels and sink-rooted traversals.
+    // Preserve the existing diagnostic labels.
     pub kind: ComponentKind,
     pub input: Option<InputSpec>,
     pub outputs: Vec<OutputSpec>,
@@ -249,66 +249,41 @@ impl Graph {
         }
     }
 
-    pub(super) fn check_for_cycles(&self) -> Result<(), String> {
-        // Start from the sinks, then from every other node: a cycle that no sink consumes would
-        // otherwise go unnoticed and overflow the stack later during topology building.
-        let (mut sinks, mut others): (Vec<_>, Vec<_>) = self
-            .nodes
-            .keys()
-            .partition(|name| self.nodes[*name].kind == ComponentKind::Sink);
-        // `nodes` is a `HashMap`; sort so the reported cycle does not change between runs.
-        sinks.sort();
-        others.sort();
+    pub(super) fn check_for_cycles(&self) -> Result<(), Vec<String>> {
+        let mut graph = DiGraphMap::<_, ()>::new();
+        for node in self.nodes.keys() {
+            graph.add_node(node);
+        }
+        for edge in &self.edges {
+            graph.add_edge(&edge.from.component, &edge.to, ());
+        }
 
-        // A node fully explored from an earlier start cannot lead to an undetected cycle, so
-        // `visited` is shared across starts.
-        let mut visited: HashSet<ComponentKey> = HashSet::new();
-
-        // run DFS from each start while keep tracking the current stack to detect cycles
-        for s in sinks.into_iter().chain(others) {
-            if visited.contains(s) {
+        // Each nontrivial strongly connected component is a cyclic group. Report all groups,
+        // including those disconnected from sinks, without enumerating overlapping cycles.
+        // Kosaraju's implementation is iterative, so deep pipelines cannot overflow the stack.
+        let mut errors = Vec::new();
+        for mut group in kosaraju_scc(&graph) {
+            if group.len() == 1 && !graph.contains_edge(group[0], group[0]) {
                 continue;
             }
-            let mut traversal: VecDeque<ComponentKey> = VecDeque::new();
-            let mut stack: IndexSet<ComponentKey> = IndexSet::new();
 
-            traversal.push_back(s.to_owned());
-            while !traversal.is_empty() {
-                let n = traversal.back().expect("can't be empty").clone();
-                if visited.contains(&n) {
-                    // we came back to the node after exploring all its children - remove it from the stack and traversal
-                    stack.shift_remove(&n);
-                    traversal.pop_back();
-                } else {
-                    visited.insert(n.clone());
-                    stack.insert(n.clone());
-                }
-                let inputs = self
-                    .edges
-                    .iter()
-                    .filter(|e| e.to == n)
-                    .map(|e| e.from.clone());
-                for input in inputs {
-                    if !visited.contains(&input.component) {
-                        traversal.push_back(input.component);
-                    } else if let Some(cycle_start) = stack.get_index_of(&input.component) {
-                        // we reached the node while it is on the current stack - it's a cycle
-                        let path = stack
-                            .iter()
-                            .skip(cycle_start)
-                            .rev()
-                            .map(std::string::ToString::to_string)
-                            .collect::<Vec<_>>();
-                        return Err(format!(
-                            "Cyclic dependency detected in the chain [ {} -> {} ]",
-                            input.component.id(),
-                            path.join(" -> ")
-                        ));
-                    }
-                }
-            }
+            group.sort_unstable();
+            let components = group
+                .into_iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            errors.push(format!(
+                "Cyclic dependency detected among components [ {components} ]"
+            ));
         }
-        Ok(())
+
+        errors.sort_unstable();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 
     /// Maps output names used in `inputs` to output IDs, rejecting ambiguous names.
@@ -622,7 +597,9 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ one, three, two ]".into()
+            ]),
             graph.check_for_cycles()
         );
 
@@ -634,11 +611,15 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["two"]);
 
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ one, three, two ]".into()
+            ]),
             graph.check_for_cycles()
         );
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ one, three, two ]".into()
+            ]),
             graph.check_for_cycles()
         );
 
@@ -649,7 +630,9 @@ mod test {
 
         // This isn't really a cyclic dependency but let me have this one.
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ in -> in ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ in ]".into()
+            ]),
             graph.check_for_cycles()
         );
     }
@@ -662,7 +645,9 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["in"]);
 
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ loop -> loop ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ loop ]".into()
+            ]),
             graph.check_for_cycles()
         );
 
@@ -673,7 +658,9 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["in"]);
 
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ a -> b -> a ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ a, b ]".into()
+            ]),
             graph.check_for_cycles()
         );
     }
@@ -689,9 +676,74 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["after"]);
 
         assert_eq!(
-            Err("Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()),
+            Err(vec![
+                "Cyclic dependency detected among components [ one, three, two ]".into()
+            ]),
             graph.check_for_cycles()
         );
+    }
+
+    #[test]
+    fn reports_all_cyclic_groups() {
+        // The groups remain separate even when one feeds another. "loop" is disconnected
+        // from every sink, while the acyclic "after" component must not be reported.
+        for reverse in [false, true] {
+            let mut graph = Graph::default();
+            let mut transforms = vec![
+                ("a", vec!["b"]),
+                ("b", vec!["a"]),
+                ("c", vec!["b", "d"]),
+                ("d", vec!["c"]),
+                ("loop", vec!["loop"]),
+                ("after", vec!["d"]),
+            ];
+            if reverse {
+                transforms.reverse();
+            }
+            for (id, inputs) in transforms {
+                graph.add_transform(id, DataType::Log, DataType::Log, inputs);
+            }
+            graph.add_sink("out", DataType::Log, vec!["after"]);
+
+            assert_eq!(
+                graph.check_for_cycles(),
+                Err(vec![
+                    "Cyclic dependency detected among components [ a, b ]".into(),
+                    "Cyclic dependency detected among components [ c, d ]".into(),
+                    "Cyclic dependency detected among components [ loop ]".into(),
+                ])
+            );
+        }
+    }
+
+    #[test]
+    fn reports_overlapping_cycles_as_one_group() {
+        let mut graph = Graph::default();
+        graph.add_transform("a", DataType::Log, DataType::Log, vec!["b"]);
+        graph.add_transform("b", DataType::Log, DataType::Log, vec!["a", "c"]);
+        graph.add_transform("c", DataType::Log, DataType::Log, vec!["b"]);
+
+        assert_eq!(
+            graph.check_for_cycles(),
+            Err(vec![
+                "Cyclic dependency detected among components [ a, b, c ]".into()
+            ])
+        );
+    }
+
+    #[test]
+    fn checks_deep_graphs_without_recursion() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        let mut previous = "in".to_owned();
+        for i in 0..20_000 {
+            let id = format!("transform_{i}");
+            graph.add_transform(&id, DataType::Log, DataType::Log, vec![&previous]);
+            previous = id;
+        }
+        graph.add_sink("out", DataType::Log, vec![&previous]);
+
+        assert_eq!(graph.check_for_cycles(), Ok(()));
     }
 
     #[test]

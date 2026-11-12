@@ -13410,6 +13410,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "parquet",
  "percent-encoding",
+ "petgraph 0.8.3",
  "pin-project",
  "postgres-openssl",
  "procfs",
