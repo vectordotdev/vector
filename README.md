@@ -83,63 +83,21 @@ Other Resources:
   * [**Versioning**][urls.vector_versioning_policy]
   * [**Security**][urls.vector_security_policy]
 
-## Comparisons
+## Testing and benchmarks
 
-### Performance
+The [Vector test harness][urls.vector_test_harness]
+contains functional checks and performance workloads, with documented
+configurations, environments, and results.
 
-The following table shows historical throughput benchmarks from the
-[Vector test harness][urls.vector_test_harness], in MiB/s. Higher values are better.
+Historical cross-product performance and correctness tables have been
+withdrawn following a
+[comparability audit](https://github.com/vectordotdev/vector-test-harness/blob/master/docs/comparisons.md).
+The underlying cases did not consistently establish equivalent processing,
+delivery guarantees, and verified output.
 
-Performance varies with workload, configuration, hardware, and software versions.
-Benchmark your own pipeline with current software.
-
-| Test                                                                                                                   | Vector   | Filebeat | Fluent Bit | Fluentd | Logstash | Splunk UF | Splunk HF | Highest throughput |
-| ---------------------------------------------------------------------------------------------------------------------- | -------- | -------- | ---------- | ------- | -------- | --------- | --------- | ------------------ |
-| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | **86**   | n/a      | 64.4       | 27.7    | 40.6     | n/a       | n/a       | **Vector**         |
-| [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance)           | **76.7** | 7.8      | 35         | 26.1    | 3.1      | 40.1      | 39        | **Vector**         |
-| [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance)       | 13.2     | n/a      | **20.5**   | 2.6     | 4.6      | n/a       | 7.8       | **Fluent Bit**     |
-| [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance)           | **26.7** | n/a      | 19.6       | <1      | 2.7      | n/a       | n/a       | **Vector**         |
-| [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance)             | 69.9     | 5        | 67.1       | 3.9     | 10       | **70.4**  | 7.6       | **Splunk UF**      |
-
-### Correctness
-
-The following correctness tests are not exhaustive, but they demonstrate
-fundamental differences in quality and attention to detail:
-
-| Test                                                                                                                                 | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
-| ------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------- | --------- | ------- | -------- | --------- | --------- |
-| [Disk Buffer Persistence](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  | ✓        |           |         | ⚠        | ✓         | ✓         |
-| [File Rotate (create)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_create_correctness)         | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
-| [File Rotate (copytruncate)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          | ✓         | ✓         |
-| [File Truncation](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_truncate_correctness)                   | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
-| [Process (SIGHUP)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/sighup_correctness)                         | **✓**  |          |           |         | ⚠        | ✓         | ✓         |
-| [JSON (wrapped)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/wrapped_json_correctness)                     | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
-
-To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
-
-### Features
-
-Vector is an end-to-end, unified, open data platform.
-
-|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF | Telegraf |
-| ------------------- | ---------- | ----- | --------- | ------- | -------- | --------- | --------- | -------- |
-| **End-to-end**      | **✓**      |       |           |         |          |           |           | ✓        |
-| Agent               | **✓**      | ✓     | ✓         |         |          | ✓         |           | ✓        |
-| Aggregator          | **✓**      |       |           | ✓       | ✓        |           | ✓         | ✓        |
-| **Unified**         | **✓**      |       |           |         |          |           |           | ✓        |
-| Logs                | **✓**      | ✓     | ✓         | ✓       | ✓        | ✓         | ✓         | ✓        |
-| Metrics             | **✓**      | ⚠     | ⚠         | ⚠       | ⚠        | ⚠         | ⚠         | ✓        |
-| Traces              | Partial    |       |           |         |          |           |           |          |
-| **Open**            | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
-| Open-source         | **✓**      | ✓     | ✓         | ✓       | ✓        |           |           | ✓        |
-| Vendor-neutral      | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
-| **Reliability**     | **✓**      |       |           |         |          |           |           |          |
-| Memory-safe         | **✓**      |       |           |         |          |           |           | ✓        |
-| Delivery guarantees | **✓**      |       |           |         |          | ✓         | ✓         |          |
-| Multi-core          | **✓**      | ✓     | ✓         | ✓       | ✓        | ✓         | ✓         | ✓        |
-
-
-⚠ = Not interoperable, metrics are represented as structured logs
+When evaluating Vector, benchmark a representative pipeline and verify the
+records delivered to its destination. Performance depends on the workload,
+configuration, hardware, and software versions.
 
 ---
 
