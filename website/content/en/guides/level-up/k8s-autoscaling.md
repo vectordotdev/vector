@@ -61,7 +61,7 @@ avoids event loss only as long as those stalled connections stay open. If the
 NGINX Ingress Controller or the load generator times out and closes a connection
 first, the in-flight request's events are lost along with it.
 
-## Test setup
+## Architecture
 
 The experiments compare one, three, and eight fixed Vector replicas with an
 HPA-managed deployment. All runs use a [K3s](https://k3s.io/) single-node
@@ -128,14 +128,22 @@ without traffic.
 For this reason, the experiments place the NGINX Ingress Controller in front
 of Vector instead of exposing Vector directly through a ClusterIP Service.
 
-## Manual scaling
+## Setup & manual scaling
+
+TODO:
+1. Describe at the top; move files to the bottom.
+2. Organize like the Architecture section: producer -> vector -> consumer
+3. Make the code blocks hidden and at the end and all in one
+4. Subheadings to differentiate between setup and measurements
+4.1. Do the same in Automatic scaling with HPA
 
 Deploy the shared test components before starting the measurements. The
 consumer drains all data forwarded by Vector, and the NGINX Ingress Controller
 distributes requests across the Vector replicas:
 
-{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir=true >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir=true collapsed=true >}}
 
+{{< collapsible title="Setup commands" open="false" >}}
 ```bash
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add vectordotdev https://helm.vector.dev
@@ -151,12 +159,14 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.replicaCount=1 \
   --wait --timeout=3m
 ```
+{{< /collapsible >}}
 
 The following Helm values configure Vector with an
 `http_server` source, the `parse_regex!` transform, and the `socket` sink that forwards data to
 the consumer:
 
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true >}}
+
 
 ```bash
 helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
@@ -171,7 +181,7 @@ helm upgrade --install producer manifests/producer-chart \
 The following Ingress routes HTTP POST requests to the Vector Service at the request level (L7),
 so every pod receives a share of traffic as soon as it's Ready, independent of how or why the replica count changes:
 
-{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir=true >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir=true collapsed=true >}}
 
 Note that `proxy-read-timeout` and `proxy-send-timeout` are left at their
 60-second defaults. Under overload, a stalled connection that exceeds those
@@ -406,6 +416,10 @@ and keeping CPU at its 70% target instead of
 leaving each pod with roughly 53% of unused CPU capacity.
 
 ## Handling sudden bursts
+
+TODO:
+1. Make 1st paragraph more clear, describe the problem and don't mention numbers.
+2. Move numbers to a later paragraph. Make data loss explanation better/more concise.
 
 The HPA is a reactive controller. It can adjust capacity for sustained changes,
 but it cannot make new pods Ready immediately when a burst begins. It only
