@@ -71,7 +71,11 @@ mod tests {
     use vrl::btreemap;
 
     use super::*;
-    use crate::{NativeJsonDeserializerConfig, decoding::format::Deserializer};
+    use crate::{
+        NativeJsonDeserializerConfig,
+        decoding::format::Deserializer,
+        encoding::{CharacterDelimitedEncoder, Encoder as EventEncoder, Framer},
+    };
 
     fn with_fixed_source_event_id(mut event: Event) -> Event {
         let metadata = std::mem::take(event.metadata_mut());
@@ -115,12 +119,8 @@ mod tests {
         for metadata in [false, true] {
             for arrays in [false, true] {
                 // Objects reach the Protobuf limit first; arrays reach the JSON
-                // limit first. Metadata adds one container to the JSON depth.
-                let depth = match (arrays, metadata) {
-                    (false, _) => 32,
-                    (true, false) => 41,
-                    (true, true) => 40,
-                };
+                // limit first, including room for an outer batch array.
+                let depth = if arrays { 40 } else { 32 };
                 let event = nested_event(depth, arrays, metadata);
                 let mut serializer = NativeJsonSerializer;
                 let mut bytes = BytesMut::new();
@@ -136,14 +136,35 @@ mod tests {
     }
 
     #[test]
+    fn serialize_deep_values_in_array_batches_roundtrips() {
+        for metadata in [false, true] {
+            for arrays in [false, true] {
+                let depth = if arrays { 40 } else { 32 };
+                let event = nested_event(depth, arrays, metadata);
+                let tail = Event::Log(LogEvent::from("tail"));
+                let mut encoder = EventEncoder::<Framer>::new(
+                    CharacterDelimitedEncoder::new(b',').into(),
+                    NativeJsonSerializer.into(),
+                );
+                let mut bytes = BytesMut::from(encoder.batch_prefix());
+                encoder.encode(event.clone(), &mut bytes).unwrap();
+                encoder.serialize(tail.clone(), &mut bytes).unwrap();
+                bytes.extend_from_slice(encoder.batch_suffix(false));
+
+                let decoded = NativeJsonDeserializerConfig::default()
+                    .build()
+                    .parse(bytes.freeze(), LogNamespace::Legacy)
+                    .unwrap();
+                assert_eq!(decoded.as_slice(), &[event, tail]);
+            }
+        }
+    }
+
+    #[test]
     fn serialize_rejects_values_exceeding_decoding_nesting_limits() {
         for metadata in [false, true] {
             for arrays in [false, true] {
-                let depth = match (arrays, metadata) {
-                    (false, _) => 33,
-                    (true, false) => 42,
-                    (true, true) => 41,
-                };
+                let depth = if arrays { 41 } else { 33 };
                 let expected_error = if arrays {
                     "JSON nesting limit exceeded"
                 } else {

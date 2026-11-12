@@ -48,9 +48,9 @@ impl NativeJsonDeserializerConfig {
     /// The schema produced by the deserializer.
     #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
-        // Native JSON preserves arbitrary event values, including scalar roots and timestamps,
-        // regardless of the configured namespace.
-        schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+        // Native JSON preserves arbitrary event and metadata values, including scalar roots and
+        // timestamps, regardless of the configured namespace.
+        schema::Definition::new(Kind::any(), Kind::any(), [log_namespace])
     }
 }
 
@@ -148,15 +148,20 @@ mod test {
     use serde_json::json;
     use uuid::Uuid;
     use vector_core::event::{MetricValue, metric::MetricSketch};
+    use vrl::compiler::{
+        CompileConfig, TypeState,
+        state::{ExternalEnv, LocalEnv},
+    };
 
     use super::*;
 
     #[test]
-    fn schema_includes_decoded_native_values() {
+    fn schema_includes_decoded_native_and_metadata_values() {
         let config = NativeJsonDeserializerConfig::default();
         let deserializer = config.build();
         let values = [
             json!({"rawBytes": "c2NhbGFy"}),
+            json!({"integer": "1"}),
             json!({"timestamp": "2026-09-25T12:00:00Z"}),
             json!({"array": {"items": [{"timestamp": "2026-09-25T12:00:00Z"}]}}),
             json!({"map": {"fields": {"nested": {"timestamp": "2026-09-25T12:00:00Z"}}}}),
@@ -166,7 +171,11 @@ mod test {
             let schema = config.schema_definition(log_namespace);
             for value in &values {
                 let input = Bytes::from(
-                    serde_json::to_vec(&json!({"event": {"log": {"value": value}}})).unwrap(),
+                    serde_json::to_vec(&json!({"event": {"log": {
+                        "value": value,
+                        "metadataFull": {"value": value}
+                    }}}))
+                    .unwrap(),
                 );
                 let events = deserializer.parse(input, log_namespace).unwrap();
 
@@ -178,7 +187,50 @@ mod test {
                         .is_ok(),
                     "decoded value does not fit {log_namespace:?} schema: {value}"
                 );
+                assert!(
+                    schema
+                        .metadata_kind()
+                        .is_superset(&Kind::from(events[0].metadata().value()))
+                        .is_ok(),
+                    "decoded metadata does not fit {log_namespace:?} schema: {value}"
+                );
             }
+        }
+    }
+
+    #[test]
+    fn schema_requires_handling_fallible_metadata_functions() {
+        let config = NativeJsonDeserializerConfig::default();
+        let functions = vector_vrl_functions::all();
+
+        for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let schema = config.schema_definition(log_namespace);
+            let state = TypeState {
+                local: LocalEnv::default(),
+                external: ExternalEnv::new_with_kind(
+                    schema.event_kind().clone(),
+                    schema.metadata_kind().clone(),
+                ),
+            };
+
+            assert!(
+                vector_core::compile_vrl(
+                    ".n = length(%)",
+                    &functions,
+                    &state,
+                    CompileConfig::default(),
+                )
+                .is_err()
+            );
+            assert!(
+                vector_core::compile_vrl(
+                    ".n = length(%) ?? 0",
+                    &functions,
+                    &state,
+                    CompileConfig::default(),
+                )
+                .is_ok()
+            );
         }
     }
 
