@@ -19,7 +19,7 @@ matrix:
 # tracer flushes on stop, then the Agent flushes to both endpoints, then Vector drains its sink.
 lifecycle:
   before_validation:
-    - wait_for_success: {service: client, timeout_secs: 120}
+    - wait_for_success: { service: client, timeout_secs: 120 }
     - stop:
         labels: [vector.datadog-traces.producer=true]
         timeout_secs: 30
