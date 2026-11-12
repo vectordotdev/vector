@@ -440,7 +440,6 @@ async fn run_shard(
 ) {
     let events = ReceiverStream::new(rx).flat_map(stream::iter).boxed();
 
-    // TODO: code very similar to Output in vector-core; maybe we should rewrite this another way.
     let mut reduced = reduce.transform(events).ready_chunks(BATCH_EVENTS);
 
     while let Some(batch) = reduced.next().await {
