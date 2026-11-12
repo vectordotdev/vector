@@ -268,6 +268,21 @@ impl Service<OpenDalRequest> for OpenDalService {
     }
 }
 
+/// Retries the OpenDAL errors that OpenDAL itself marks as temporary, such as
+/// failed HTTP sends and `5xx` responses.
+#[derive(Debug, Clone)]
+pub struct OpenDalRetryLogic;
+
+impl RetryLogic for OpenDalRetryLogic {
+    type Error = opendal::Error;
+    type Request = OpenDalRequest;
+    type Response = OpenDalResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_temporary()
+    }
+}
+
 /// `OpenDalError` is the error returned by opendal services.
 ///
 /// # TODO
