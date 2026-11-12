@@ -3,6 +3,7 @@
 use crate::tls::TlsConfig;
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use std::error::Error;
+use tracing::warn;
 use vector_lib::configurable::configurable_component;
 
 /// AMQP connection options.
@@ -109,6 +110,17 @@ impl AmqpConfig {
     fn build_identity(
         tls: &TlsConfig,
     ) -> Result<Option<OwnedIdentity>, Box<dyn Error + Send + Sync>> {
+        // legacy fallback: for details see https://github.com/vectordotdev/vector/pull/27130#discussion_r4540620744
+        if let (None, Some(path)) = (&tls.crt_file, &tls.key_file) {
+            warn!(
+                "DEPRECATED: Specifying a PKCS#12 archive in `tls.key_file` for an AMQP connection is deprecated, pass the archive via `tls.crt_file` instead."
+            );
+            return Ok(Some(OwnedIdentity::PKCS12 {
+                der: std::fs::read(path)?,
+                password: tls.key_pass.clone().unwrap_or_default(),
+            }));
+        }
+
         match tls.load_identity()? {
             Some(identity_store) => {
                 let password = tls.key_pass.clone().unwrap_or_default();
@@ -211,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn build_identity_store() {
+    fn build_identity() {
         let tls = TlsConfig {
             ca_file: Some(TEST_PEM_INTERMEDIATE_CA_PATH.into()),
             crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
@@ -271,6 +283,30 @@ mod tests {
             pkcs_12.parse2("definitely-wrong-password").is_err(),
             "PKCS#12 archive must fail decryption with an incorrect password"
         );
+    }
+
+    #[test]
+    fn build_identity_via_key_file_as_deprecated_fallback() {
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let expected_der = b"dummy-pkcs12-der-bytes";
+        std::io::Write::write_all(&mut temp_file, expected_der).unwrap();
+
+        let expected_password = "some-password";
+        let tls = TlsConfig {
+            ca_file: None,
+            key_file: Some(temp_file.path().to_path_buf()),
+            key_pass: Some(expected_password.into()),
+            ..Default::default()
+        };
+
+        let identity = AmqpConfig::build_identity(&tls).expect("failed to build OwnerIdentity");
+
+        let Some(OwnedIdentity::PKCS12 { der, password }) = identity else {
+            panic!("expected OwnedIdentity::PKCS12")
+        };
+
+        assert_eq!(der, expected_der);
+        assert_eq!(password, expected_password);
     }
 
     #[test]
