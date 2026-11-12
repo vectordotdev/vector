@@ -137,7 +137,8 @@ const fn default_concurrency() -> NonZeroUsize {
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
-        let shards = (self.concurrency.get() > 1 && !self.group_by.is_empty()).then_some(self.concurrency);
+        let shards =
+            (self.concurrency.get() > 1 && !self.group_by.is_empty()).then_some(self.concurrency);
 
         Ok(match shards {
             None => Transform::event_task(reduce),

@@ -12,7 +12,6 @@ use indexmap::IndexMap;
 use metrics::Counter;
 use tokio::{sync::mpsc, task::JoinSet};
 use tokio_stream::wrappers::ReceiverStream;
-use tracing::Instrument;
 use vector_lib::{
     cpu_time::SpawnTimedExt,
     source_sender::chunk_size_events,
