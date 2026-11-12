@@ -36,7 +36,7 @@ pub mod net;
     any(feature = "sources-socket", feature = "sources-utils-net-unix",)
 ))]
 pub mod unix;
-#[cfg(all(unix, feature = "sources-socket"))]
+#[cfg(all(unix, any(feature = "sources-socket", feature = "sources-syslog")))]
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-net-unix"))]
 mod unix_stream;
@@ -51,8 +51,10 @@ pub use multiline_config::MultilineConfig;
     any(feature = "sources-socket", feature = "sources-utils-net-unix",)
 ))]
 pub use unix::change_socket_permissions;
-#[cfg(all(unix, feature = "sources-socket",))]
-pub use unix_datagram::build_unix_datagram_source;
+#[cfg(all(unix, any(feature = "sources-socket", feature = "sources-syslog")))]
+pub use unix_datagram::{
+    build_unix_datagram_source, build_unix_datagram_source_with_message_decoder,
+};
 #[cfg(all(unix, feature = "sources-utils-net-unix",))]
 pub use unix_stream::build_unix_stream_source;
 pub use wrappers::{AfterRead, AfterReadExt, LenientFramedRead};

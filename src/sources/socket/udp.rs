@@ -1,7 +1,10 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    io,
+    net::{Ipv4Addr, SocketAddr},
+    pin::Pin,
+};
 use vector_lib::internal_event::{emit, register};
 
-use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -15,6 +18,7 @@ use vector_lib::{
     configurable::configurable_component,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+    source_sender::chunk_size_events,
 };
 
 use super::default_host_key;
@@ -24,7 +28,7 @@ use crate::{
     event::Event,
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
-        SocketReceiveError, StreamClosedError,
+        SocketOversizedDatagram, SocketReceiveError, StreamClosedError,
     },
     net,
     serde::default_decoding,
@@ -33,7 +37,7 @@ use crate::{
     sources::{
         Source,
         socket::SocketConfig,
-        util::net::{SocketListenAddr, try_bind_udp_socket},
+        util::net::{SocketListenAddr, UdpBatchReceiver, try_bind_udp_socket},
     },
 };
 
@@ -235,126 +239,248 @@ pub(super) fn udp(
             max_length = std::cmp::min(max_length, receive_buffer_bytes);
         }
 
+        // The receiver handles platform-specific over-length detection internally. Pass the
+        // configured limit unchanged so a datagram of `max_length + 1` is rejected.
+        let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
+            emit(SocketReceiveError {
+                mode: SocketMode::Udp,
+                error: &error,
+            });
+            SourceError::from(error)
+        })?;
+        #[cfg(target_os = "linux")]
+        if matches!(config.address, SocketListenAddr::SocketAddr(_)) {
+            receiver.enable_gro();
+        }
+
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let send_batch_size = chunk_size_events().max(1);
+        let legacy_host_key = config.host_key.clone().unwrap_or(default_host_key()).path;
+        let legacy_port_key = config.port_key.clone().path;
 
         info!(message = "Listening.", address = %config.address);
-        // We add 1 to the max_length in order to determine if the received data has been truncated.
-        let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
-            buf.resize(max_length + 1, 0);
-            tokio::select! {
-                recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = match recv {
-                        Ok(res) => res,
-                        Err(error) => {
-                            #[cfg(windows)]
-                            if let Some(err) = error.raw_os_error() {
-                                if err == 10040 {
-                                    // 10040 is the Windows error that the Udp message has exceeded max_length
-                                    warn!(
-                                        message = "Discarding frame larger than max_length.",
-                                        max_length = max_length
-                                    );
-                                    continue;
-                                }
-                            }
-
-                            emit(SocketReceiveError {
+            let batch = tokio::select! {
+                batch_result = receiver.recv_batch() => match batch_result {
+                    Ok(batch) => batch,
+                    Err(error) => {
+                        #[cfg(windows)]
+                        if error.raw_os_error() == Some(10040) {
+                            emit(SocketOversizedDatagram {
                                 mode: SocketMode::Udp,
-                                error: &error
                             });
-                            return Err(SourceError::from(error));
-                       }
-                    };
+                            warn!(
+                                message = "Discarding frame larger than max_length.",
+                                max_length
+                            );
+                            continue;
+                        }
 
-                    bytes_received.emit(ByteSize(byte_size));
-                    let payload = buf.split_to(byte_size);
-                    let truncated = byte_size == max_length + 1;
-                    let mut stream =
-                        DecoderFramedRead::new(payload.as_ref(), decoder.clone()).peekable();
+                        emit(SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error,
+                        });
+                        return Err(SourceError::from(error));
+                    }
+                },
+                _ = &mut shutdown => return Ok(()),
+            };
 
-                    while let Some(result) = stream.next().await {
-                        let last = Pin::new(&mut stream).peek().await.is_none();
-                        match result {
-                            Ok((mut events, _byte_size)) => {
-                                if last && truncated {
-                                    // The last event in this payload was truncated, so we want to drop it.
-                                    _ = events.pop();
-                                    warn!(
-                                        message = "Discarding frame larger than max_length.",
-                                        max_length = max_length
+            bytes_received.emit(ByteSize(batch.received_bytes()));
+            let mut output = Vec::with_capacity(batch.len().min(send_batch_size));
+            for datagram in batch.iter() {
+                if datagram.ancillary_truncated {
+                    let error = io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "UDP ancillary data was truncated",
+                    );
+                    emit(SocketReceiveError {
+                        mode: SocketMode::Udp,
+                        error: &error,
+                    });
+                    continue;
+                }
+                if datagram.truncated {
+                    emit(SocketOversizedDatagram {
+                        mode: SocketMode::Udp,
+                    });
+                }
+                let address = datagram.address;
+                let source_host = address.ip().to_string();
+                let now = Utc::now();
+                let mut stream =
+                    DecoderFramedRead::new(datagram.payload, decoder.clone()).peekable();
+
+                while let Some(result) = stream.next().await {
+                    let last = Pin::new(&mut stream).peek().await.is_none();
+                    match result {
+                        Ok((mut events, _byte_size)) => {
+                            if last && datagram.truncated {
+                                // Keep complete frames at the start of the datagram, but discard
+                                // the final frame because it may have been cut at max_length.
+                                _ = events.pop();
+                                warn!(
+                                    message = "Discarding frame larger than max_length.",
+                                    max_length
+                                );
+                            }
+
+                            if events.is_empty() {
+                                continue;
+                            }
+
+                            let count = events.len();
+                            emit(SocketEventsReceived {
+                                mode: SocketMode::Udp,
+                                byte_size: events.estimated_json_encoded_size_of(),
+                                count,
+                            });
+
+                            for event in &mut events {
+                                if let Event::Log(log) = event {
+                                    log_namespace.insert_standard_vector_source_metadata(
+                                        log,
+                                        SocketConfig::NAME,
+                                        now,
+                                    );
+                                    log_namespace.insert_source_metadata(
+                                        SocketConfig::NAME,
+                                        log,
+                                        legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                        path!("host"),
+                                        source_host.clone(),
+                                    );
+                                    log_namespace.insert_source_metadata(
+                                        SocketConfig::NAME,
+                                        log,
+                                        legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                        path!("port"),
+                                        address.port(),
                                     );
                                 }
-
-                                if events.is_empty() {
-                                    continue;
-                                }
-
-                                let count = events.len();
-                                emit(SocketEventsReceived {
-                                    mode: SocketMode::Udp,
-                                    byte_size: events.estimated_json_encoded_size_of(),
-                                    count,
-                                });
-
-                                let now = Utc::now();
-
-                                for event in &mut events {
-                                    if let Event::Log(log) = event {
-                                        log_namespace.insert_standard_vector_source_metadata(
-                                            log,
-                                            SocketConfig::NAME,
-                                            now,
-                                        );
-
-                                        let legacy_host_key = config
-                                            .host_key
-                                            .clone()
-                                            .unwrap_or(default_host_key())
-                                            .path;
-
-                                        log_namespace.insert_source_metadata(
-                                            SocketConfig::NAME,
-                                            log,
-                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("host"),
-                                            address.ip().to_string()
-                                        );
-
-                                        let legacy_port_key = config.port_key.clone().path;
-
-                                        log_namespace.insert_source_metadata(
-                                            SocketConfig::NAME,
-                                            log,
-                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("port"),
-                                            address.port()
-                                        );
-                                    }
-                                }
-
-                                tokio::select!{
-                                    result = out.send_batch(events) => {
-                                        if result.is_err() {
-                                            emit(StreamClosedError { count });
-                                            return Ok(())
-                                        }
-                                    }
-                                    _ = &mut shutdown => return Ok(()),
+                            }
+                            for event in events {
+                                output.push(event);
+                                if output.len() >= send_batch_size
+                                    && !send_buffered_events(&mut out, &mut output).await
+                                {
+                                    return Ok(());
                                 }
                             }
-                            Err(error) => {
-                                // Error is logged by `vector_lib::codecs::Decoder`, no
-                                // further handling is needed here.
-                                if !error.can_continue() {
-                                    break;
-                                }
+                        }
+                        Err(error) => {
+                            // Error is logged by `vector_lib::codecs::Decoder`, no further
+                            // handling is needed here.
+                            if !error.can_continue() {
+                                break;
                             }
                         }
                     }
                 }
-                _ = &mut shutdown => return Ok(()),
+            }
+
+            drop(batch);
+            if output.is_empty() {
+                continue;
+            }
+
+            if !send_buffered_events(&mut out, &mut output).await {
+                return Ok(());
             }
         }
     })
+}
+
+async fn send_buffered_events(out: &mut SourceSender, output: &mut Vec<Event>) -> bool {
+    let events = std::mem::take(output);
+    let count = events.len();
+    debug_assert!(count > 0);
+
+    // Drain decoded events during graceful shutdown. The topology enforces the deadline.
+    if out.send_batch(events).await.is_err() {
+        emit(StreamClosedError { count });
+        false
+    } else {
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use futures::StreamExt;
+    use tokio::{
+        net::UdpSocket,
+        sync::Notify,
+        time::{Duration, timeout},
+    };
+    use vector_lib::{
+        event::{EventContainer, LogEvent},
+        source_sender::PostProcessor,
+    };
+
+    use super::*;
+    use crate::config::{SourceConfig, SourceContext};
+
+    struct NotifyOnSend(Notify);
+
+    impl PostProcessor for NotifyOnSend {
+        fn process_log(&self, _: &mut LogEvent) {
+            self.0.notify_one();
+        }
+    }
+
+    #[tokio::test]
+    async fn shutdown_drains_backpressured_batch() {
+        let (mut out, mut output) = SourceSender::new_test_sender_with_options(1, None);
+        out.send_event(crate::event::LogEvent::from("buffered"))
+            .await
+            .unwrap();
+        let sending = Arc::new(NotifyOnSend(Notify::new()));
+        out.set_post_processor(&(Arc::clone(&sending) as Arc<dyn PostProcessor>));
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let (_guard, address) = crate::test_util::addr::next_addr();
+        let config = SocketConfig::from(UdpConfig::from_address(address.into()));
+        let mut context = SourceContext::new_test(out, None);
+        context.shutdown = shutdown;
+        let mut source = config.build(context).await.unwrap();
+        // Poll once to bind the socket before sending.
+        assert!(futures::poll!(&mut source).is_pending());
+        let sender = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sender.send_to(b"pending", address).await.unwrap();
+        timeout(Duration::from_secs(5), async {
+            tokio::select! {
+                result = &mut source => panic!("source exited before sending: {result:?}"),
+                () = sending.0.notified() => {},
+            }
+        })
+        .await
+        .unwrap();
+
+        stop.cancel();
+        assert!(futures::poll!(&mut source).is_pending());
+        // Free the occupied output slot only after shutdown has been observed.
+        output.next().await.unwrap();
+        let (result, events) = timeout(Duration::from_secs(5), async {
+            tokio::join!(source, async {
+                output
+                    .into_stream()
+                    .flat_map(|item| futures::stream::iter(item.events.into_events()))
+                    .collect::<Vec<_>>()
+                    .await
+            })
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[crate::config::log_schema()
+                .message_key()
+                .unwrap()
+                .to_string()],
+            "pending".into()
+        );
+    }
 }

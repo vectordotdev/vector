@@ -27,6 +27,23 @@ impl SocketMode {
     }
 }
 
+/// Counts datagrams that exceed the configured receive limit, independently of
+/// rate-limited logs and the generic discarded-event counter.
+#[derive(Debug, NamedInternalEvent)]
+pub struct SocketOversizedDatagram {
+    pub mode: SocketMode,
+}
+
+impl InternalEvent for SocketOversizedDatagram {
+    fn emit(self) {
+        counter!(
+            CounterName::ComponentOversizedDatagramsTotal,
+            "mode" => self.mode.as_str(),
+        )
+        .increment(1);
+    }
+}
+
 #[derive(Debug, NamedInternalEvent)]
 pub struct SocketBytesReceived {
     pub mode: SocketMode,

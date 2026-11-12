@@ -1,27 +1,31 @@
-use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
+use std::{io, net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 use vector_lib::internal_event::{emit, register};
 
+use bytes::Bytes;
 use chrono::Utc;
-use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
-use tokio_util::udp::UdpFramed;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
-        decoding::{Deserializer, Framer},
+        OctetCountingDecoder, SyslogDeserializerConfig,
+        decoding::{Deserializer, Framer, format::Deserializer as FormatDeserializer},
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    internal_event::{
+        ByteSize, BytesReceived, ComponentEventsDropped, InternalEventHandle as _, Protocol,
+        UNINTENTIONAL,
+    },
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
 use vrl::{event_path, value::Value};
 
 #[cfg(unix)]
-use crate::sources::util::build_unix_stream_source;
+use crate::sources::util::{
+    build_unix_datagram_source_with_message_decoder, build_unix_stream_source,
+};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -31,11 +35,14 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketOversizedDatagram,
+        SocketReceiveError, StreamClosedError,
     },
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
+    sources::util::net::{
+        SocketListenAddr, TcpNullAcker, TcpSource, UdpBatchReceiver, try_bind_udp_socket,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -120,6 +127,10 @@ pub enum Mode {
     ///
     /// For Unix datagram sockets, use the `socket` source instead.
     Unix(UnixOnly<UnixConfig>),
+
+    /// Listen on a Unix domain datagram socket.
+    #[serde(alias = "unix_dgram")]
+    UnixDatagram(UnixOnly<UnixDatagramConfig>),
 }
 
 /// Unix domain socket configuration for the `syslog` source.
@@ -137,6 +148,31 @@ pub struct UnixConfig {
     /// The file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
     socket_file_mode: Option<u32>,
+}
+
+/// Unix domain datagram socket configuration for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixDatagramConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// Unix file mode bits to be applied to the socket file.
+    socket_file_mode: Option<u32>,
+
+    /// The size of the receive buffer used for the listening socket.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    receive_buffer_bytes: Option<usize>,
+
+    /// Maximum memory used for payload buffers in one `recvmmsg` batch.
+    ///
+    /// The event count remains capped at 256. If omitted, payload buffers
+    /// are capped at 16 MiB per source.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    max_batch_bytes: Option<usize>,
 }
 
 impl SyslogConfig {
@@ -180,6 +216,7 @@ impl GenerateConfig for SyslogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
+    #[allow(clippy::too_many_lines)]
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let host_key = self
@@ -252,19 +289,50 @@ impl SourceConfig for SyslogConfig {
                     (max_length, host_key, log_namespace, shutdown, out),
                     #[cfg(unix)]
                     |config, (max_length, host_key, log_namespace, shutdown, out)| {
-                        let decoder = Decoder::new(
-                            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
-                                max_length,
-                            )),
-                            Deserializer::Syslog(
-                                SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                            ),
-                        );
+                        let decoder = syslog_stream_decoder(max_length, log_namespace);
 
                         build_unix_stream_source(
                             config.path,
                             config.socket_file_mode,
                             decoder,
+                            move |events, host| {
+                                handle_events(
+                                    events,
+                                    &host_key,
+                                    host.map(Value::from),
+                                    log_namespace,
+                                );
+                            },
+                            shutdown,
+                            out,
+                        )
+                    },
+                )
+            }
+            Mode::UnixDatagram(config) => {
+                let (max_length, host_key, log_namespace, shutdown, out) = (
+                    self.max_length,
+                    host_key,
+                    log_namespace,
+                    cx.shutdown,
+                    cx.out,
+                );
+                config.on_unix(
+                    (max_length, host_key, log_namespace, shutdown, out),
+                    #[cfg(unix)]
+                    |config, (max_length, host_key, log_namespace, shutdown, out)| {
+                        let decoder =
+                            SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
+
+                        build_unix_datagram_source_with_message_decoder(
+                            config.path,
+                            config.socket_file_mode,
+                            max_length,
+                            config.receive_buffer_bytes,
+                            config.max_batch_bytes,
+                            decoder,
+                            log_namespace,
+                            true,
                             move |events, host| {
                                 handle_events(
                                     events,
@@ -298,7 +366,7 @@ impl SourceConfig for SyslogConfig {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
             Mode::Udp { address, .. } => vec![address.as_udp_resource()],
-            Mode::Unix(_) => vec![],
+            Mode::Unix(_) | Mode::UnixDatagram(_) => vec![],
         }
     }
 
@@ -314,6 +382,14 @@ struct SyslogTcpSource {
     log_namespace: LogNamespace,
 }
 
+fn syslog_stream_decoder(max_length: usize, log_namespace: LogNamespace) -> Decoder {
+    Decoder::new(
+        Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(max_length)),
+        Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
+    )
+    .with_log_namespace(log_namespace)
+}
+
 impl TcpSource for SyslogTcpSource {
     type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
@@ -321,10 +397,7 @@ impl TcpSource for SyslogTcpSource {
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        Decoder::new(
-            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
-        )
+        syslog_stream_decoder(self.max_length, self.log_namespace)
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
@@ -342,12 +415,13 @@ impl TcpSource for SyslogTcpSource {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn udp(
     addr: SocketListenAddr,
-    _max_length: usize,
+    max_length: usize,
     host_key: Option<OwnedValuePath>,
     receive_buffer_bytes: Option<usize>,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
     mut out: SourceSender,
 ) -> super::Source {
@@ -367,6 +441,19 @@ pub fn udp(
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
+        // One extra byte makes an over-length datagram distinguishable from an exactly-sized one.
+        let mut receiver = UdpBatchReceiver::from_socket(socket, max_length).map_err(|error| {
+            emit(SocketReceiveError {
+                mode: SocketMode::Udp,
+                error: &error,
+            });
+            super::SourceError::from(error)
+        })?;
+        #[cfg(target_os = "linux")]
+        if matches!(addr, SocketListenAddr::SocketAddr(_)) {
+            receiver.enable_gro();
+        }
+
         info!(
             message = "Listening.",
             addr = %addr,
@@ -374,55 +461,93 @@ pub fn udp(
         );
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
 
-        let mut stream = UdpFramed::new(
-            socket,
-            Decoder::new(
-                Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(
-                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                ),
-            ),
-        )
-        .take_until(shutdown)
-        .filter_map(|frame| {
-            let host_key = host_key.clone();
-            let bytes_received = bytes_received.clone();
-            async move {
-                match frame {
-                    Ok(((mut events, byte_size), received_from)) => {
+        loop {
+            let batch = tokio::select! {
+                batch_result = receiver.recv_batch() => match batch_result {
+                    Ok(batch) => batch,
+                    Err(error) => {
+                        #[cfg(windows)]
+                        if error.raw_os_error() == Some(10040) {
+                            emit(SocketOversizedDatagram {
+                                mode: SocketMode::Udp,
+                            });
+                        }
+                        emit(SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error,
+                        });
+                        continue;
+                    }
+                },
+                _ = &mut shutdown => return Ok(()),
+            };
+
+            if batch.is_empty() {
+                continue;
+            }
+
+            bytes_received.emit(ByteSize(batch.received_bytes()));
+            let mut output = Vec::with_capacity(batch.len());
+            for datagram in batch.iter() {
+                if datagram.ancillary_truncated {
+                    let error = io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "UDP ancillary data was truncated",
+                    );
+                    emit(SocketReceiveError {
+                        mode: SocketMode::Udp,
+                        error: &error,
+                    });
+                    continue;
+                }
+                if datagram.truncated {
+                    emit(SocketOversizedDatagram {
+                        mode: SocketMode::Udp,
+                    });
+                    warn!(
+                        message = "Discarding frame larger than max_length.",
+                        max_length
+                    );
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: 1,
+                        reason: "UDP datagram exceeded max_length.",
+                    });
+                    continue;
+                }
+
+                match parser.parse(Bytes::copy_from_slice(datagram.payload), log_namespace) {
+                    Ok(mut events) => {
                         let count = events.len();
-                        bytes_received.emit(ByteSize(byte_size));
                         emit(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
-                        let received_from = Value::from(received_from.ip().to_string());
+                        let received_from = Value::from(datagram.address.ip().to_string());
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
-                        Some(events.remove(0))
+                        output.extend(events);
                     }
                     Err(error) => {
                         emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
                         });
-                        None
                     }
                 }
             }
-        })
-        .boxed();
 
-        match out.send_event_stream(&mut stream).await {
-            Ok(()) => {
-                debug!("Finished sending.");
-                Ok(())
+            drop(batch);
+            if output.is_empty() {
+                continue;
             }
-            Err(error) => {
-                let (count, _) = stream.size_hint();
+
+            let count = output.len();
+            // Drain decoded events during graceful shutdown. The topology enforces the deadline.
+            if let Err(error) = out.send_batch(output).await {
                 emit(StreamClosedError { count });
-                Err(error.into())
+                return Err(error.into());
             }
         }
     })
@@ -469,8 +594,13 @@ fn enrich_syslog_event(
         );
     }
 
-    let parsed_hostname = log
-        .get(event_path!("hostname"))
+    let parsed_hostname = log_namespace
+        .get_source_metadata(
+            SyslogConfig::NAME,
+            log,
+            path!("hostname"),
+            path!("hostname"),
+        )
         .map(|hostname| Value::from(hostname.coerce_to_bytes()));
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
@@ -507,6 +637,7 @@ mod test {
 
     use bytes::Bytes;
     use chrono::prelude::*;
+    use futures::StreamExt;
     use indoc::indoc;
     use rand::{RngExt, rng};
     use serde::Deserialize;
@@ -540,7 +671,7 @@ mod test {
         log_namespace: LogNamespace,
     ) -> Option<Event> {
         let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
-        let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
+        let mut events = parser.parse(bytes, log_namespace).ok()?;
         handle_events(
             &mut events,
             &Some(owned_value_path!(host_key)),
@@ -861,6 +992,28 @@ mod test {
         assert_eq!(socket_file_mode, Some(0o777));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn config_unix_datagram_and_alias() {
+        for mode in ["unix_datagram", "unix_dgram"] {
+            let config: SyslogConfig = serde_yaml::from_str(&format!(
+                "mode: {mode}\npath: /tmp/vector-syslog.sock\nsocket_file_mode: 432\nreceive_buffer_bytes: 8388608\nmax_batch_bytes: 4194304\n"
+            ))
+            .unwrap();
+
+            match config.mode {
+                Mode::UnixDatagram(config) => {
+                    let config = config.platform_independent();
+                    assert_eq!(config.path, PathBuf::from("/tmp/vector-syslog.sock"));
+                    assert_eq!(config.socket_file_mode, Some(0o660));
+                    assert_eq!(config.receive_buffer_bytes, Some(8 * 1024 * 1024));
+                    assert_eq!(config.max_batch_bytes, Some(4 * 1024 * 1024));
+                }
+                _ => panic!("expected Mode::UnixDatagram"),
+            }
+        }
+    }
+
     #[test]
     fn syslog_ng_network_syslog_protocol() {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
@@ -911,6 +1064,62 @@ mod test {
             )
             .unwrap(),
             expected
+        );
+    }
+
+    #[test]
+    fn vector_namespace_prefers_parsed_hostname_over_sender_ip() {
+        let event = event_from_bytes(
+            "host",
+            Some(Value::from("192.0.2.1")),
+            Bytes::from_static(b"<13>1 2026-11-10T00:00:00Z parsed-host app - - - message"),
+            LogNamespace::Vector,
+        )
+        .unwrap();
+        let metadata = event.as_log().metadata().value();
+
+        assert_eq!(
+            metadata.get(path!("syslog", "hostname")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "host")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "source_ip")),
+            Some(&Value::from("192.0.2.1"))
+        );
+    }
+
+    #[test]
+    fn namespaced_stream_decoder_preserves_parsed_hostname() {
+        let source = SyslogTcpSource {
+            max_length: 1024,
+            host_key: Some(owned_value_path!("host")),
+            log_namespace: LogNamespace::Vector,
+        };
+        let (mut events, _) = source
+            .decoder()
+            .deserializer_parse(Bytes::from_static(
+                b"<13>1 2026-11-10T00:00:00Z parsed-host app - - - message",
+            ))
+            .unwrap();
+
+        source.handle_events(&mut events, "192.0.2.1:514".parse().unwrap());
+        let metadata = events[0].as_log().metadata().value();
+
+        assert_eq!(
+            metadata.get(path!("syslog", "hostname")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "host")),
+            Some(&Value::from("parsed-host"))
+        );
+        assert_eq!(
+            metadata.get(path!("syslog", "source_ip")),
+            Some(&Value::from("192.0.2.1"))
         );
     }
 
@@ -1252,6 +1461,76 @@ mod test {
     }
 
     #[tokio::test]
+    async fn shutdown_drains_backpressured_batch() {
+        use std::sync::Arc;
+
+        use tokio::sync::Notify;
+        use vector_lib::{event::EventContainer, source_sender::PostProcessor};
+
+        struct NotifyOnSend(Notify);
+
+        impl PostProcessor for NotifyOnSend {
+            fn process_log(&self, _: &mut LogEvent) {
+                self.0.notify_one();
+            }
+        }
+
+        let (mut out, mut output) = SourceSender::new_test_sender_with_options(1, None);
+        out.send_event(crate::event::LogEvent::from("buffered"))
+            .await
+            .unwrap();
+        let sending = Arc::new(NotifyOnSend(Notify::new()));
+        out.set_post_processor(&(Arc::clone(&sending) as Arc<dyn PostProcessor>));
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let (_guard, address) = next_addr();
+        let config = SyslogConfig::from_mode(Mode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        });
+        let mut context = SourceContext::new_test(out, None);
+        context.shutdown = shutdown;
+        let mut source = config.build(context).await.unwrap();
+        assert!(futures::poll!(&mut source).is_pending());
+        let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sender
+            .send_to(
+                b"<13>1 2026-11-10T03:00:00Z host app - - - pending",
+                address,
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::select! {
+                result = &mut source => panic!("source exited before sending: {result:?}"),
+                () = sending.0.notified() => {},
+            }
+        })
+        .await
+        .unwrap();
+
+        stop.cancel();
+        assert!(futures::poll!(&mut source).is_pending());
+        output.next().await.unwrap();
+        let (result, events) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(source, async {
+                output
+                    .into_stream()
+                    .flat_map(|item| futures::stream::iter(item.events.into_events()))
+                    .collect::<Vec<_>>()
+                    .await
+            })
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "pending".into()
+        );
+    }
+
+    #[tokio::test]
     async fn test_udp_syslog_send_error_retains_cause() {
         let (_guard, in_addr) = next_addr();
         let config = SyslogConfig::from_mode(Mode::Udp {
@@ -1344,6 +1623,148 @@ mod test {
         .await;
     }
 
+    fn assert_oversized_datagram_count(mode: &str, expected: f64) {
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        let metric = metrics
+            .iter()
+            .find(|metric| {
+                metric.name() == "component_oversized_datagrams_total"
+                    && metric.tag_value("mode").as_deref() == Some(mode)
+            })
+            .expect("oversized datagram counter must be emitted");
+        assert_eq!(
+            metric.value(),
+            &crate::event::MetricValue::Counter { value: expected }
+        );
+    }
+
+    #[tokio::test]
+    async fn udp_rejects_datagram_one_byte_over_max_length() {
+        crate::test_util::trace_init();
+        let (_guard, in_addr) = next_addr();
+        let exact = b"<13>1 2026-10-12T13:00:00Z host app - - - exact";
+        let mut oversized = exact.to_vec();
+        oversized.push(b'x');
+
+        let mut config = SyslogConfig::from_mode(Mode::Udp {
+            address: in_addr.into(),
+            receive_buffer_bytes: None,
+        });
+        config.max_length = exact.len();
+
+        let key = ComponentKey::from("in");
+        let (tx, rx) = SourceSender::new_test();
+        let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+        let shutdown_complete = shutdown.shutdown_tripwire();
+        let source = config.build(context).await.unwrap();
+        tokio::spawn(source);
+        sleep(Duration::from_millis(150)).await;
+
+        let output_events = CountReceiver::receive_events(rx);
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        socket.send_to(exact, in_addr).await.unwrap();
+        for _ in 0..3 {
+            socket.send_to(&oversized, in_addr).await.unwrap();
+        }
+        socket.send_to(exact, in_addr).await.unwrap();
+        sleep(Duration::from_millis(150)).await;
+
+        shutdown
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+            .await;
+        shutdown_complete.await;
+
+        let events = output_events.await;
+        assert_eq!(events.len(), 2);
+        assert_oversized_datagram_count("udp", 3.0);
+        assert_eq!(
+            events[0]
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap()),
+            Some(&Value::Bytes(Bytes::from_static(b"exact")))
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_counts_oversized_datagrams() {
+        use tokio::net::UnixDatagram;
+
+        crate::test_util::trace_init();
+        let directory = tempfile::tempdir().unwrap();
+        let in_path = directory.path().join("oversized.sock");
+        let mut config = SyslogConfig::from_mode(Mode::UnixDatagram(
+            UnixDatagramConfig {
+                path: in_path.clone(),
+                socket_file_mode: None,
+                receive_buffer_bytes: None,
+                max_batch_bytes: None,
+            }
+            .into(),
+        ));
+        let exact = b"<184>Oct 29 18:45:35 access_log: exact";
+        config.max_length = exact.len();
+
+        let key = ComponentKey::from("in");
+        let (tx, mut output) = SourceSender::new_test();
+        let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+        let source = tokio::spawn(config.build(context).await.unwrap());
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !in_path.exists() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        let socket = UnixDatagram::unbound().unwrap();
+        socket.connect(&in_path).unwrap();
+        let mut oversized = exact.to_vec();
+        oversized.push(b'x');
+        socket.send(exact).await.unwrap();
+        for _ in 0..3 {
+            socket.send(&oversized).await.unwrap();
+        }
+        // A much larger packet also counts once, regardless of truncation size.
+        socket.send(&exact.repeat(4)).await.unwrap();
+        socket.send(exact).await.unwrap();
+
+        for _ in 0..2 {
+            let event = tokio::time::timeout(Duration::from_secs(5), output.next())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                event
+                    .as_log()
+                    .get(log_schema().message_key_target_path().unwrap()),
+                Some(&Value::Bytes(Bytes::from_static(b"exact")))
+            );
+        }
+        // Receiving the final good packet synchronizes processing of the
+        // earlier oversize packets without sleeping or depending on batching.
+        assert_oversized_datagram_count("unix", 4.0);
+        let discarded = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .into_iter()
+            .find(|metric| metric.name() == "component_discarded_events_total")
+            .unwrap();
+        assert_eq!(discarded.tag_value("intentional").as_deref(), Some("false"));
+        assert_eq!(
+            discarded.value(),
+            &crate::event::MetricValue::Counter { value: 4.0 }
+        );
+
+        shutdown
+            .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
+            .await;
+        source.await.unwrap().unwrap();
+        assert!(output.next().await.is_none());
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
@@ -1421,6 +1842,74 @@ mod test {
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_unix_datagram_syslog() {
+        use tokio::net::UnixDatagram;
+
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let num_messages: usize = 1000;
+            let directory = tempfile::tempdir().unwrap();
+            let in_path = directory.path().join("syslog.sock");
+
+            let config = SyslogConfig::from_mode(Mode::UnixDatagram(
+                UnixDatagramConfig {
+                    path: in_path.clone(),
+                    socket_file_mode: Some(0o660),
+                    receive_buffer_bytes: None,
+                    max_batch_bytes: None,
+                }
+                .into(),
+            ));
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            while !in_path.exists() {
+                tokio::task::yield_now().await;
+            }
+
+            let output_events = CountReceiver::receive_events(rx);
+            let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
+                .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
+                .collect();
+            let socket = UnixDatagram::unbound().unwrap();
+            socket.connect(&in_path).unwrap();
+            for message in &input_messages {
+                socket.send(message.to_string().as_bytes()).await.unwrap();
+            }
+
+            sleep(Duration::from_secs(1)).await;
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .await
+                .into_iter()
+                .map(|mut event| {
+                    event.as_mut_log().remove(event_path!("hostname"));
+                    event.as_mut_log().remove(event_path!("source_ip"));
+                    event.into()
+                })
+                .collect();
+            assert_eq!(output_messages, input_messages);
+            assert!(
+                !in_path.exists(),
+                "socket path should be removed on shutdown"
+            );
         })
         .await;
     }
