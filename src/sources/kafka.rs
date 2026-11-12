@@ -80,7 +80,7 @@ enum BuildError {
     SubscribeError { source: rdkafka::error::KafkaError },
 }
 
-/// Metrics (beta) configuration.
+/// Metrics configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 struct Metrics {

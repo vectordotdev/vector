@@ -27,13 +27,14 @@ up your troubleshooting experience.
 
 ## Getting Started
 
-To start, we'll reference the following base configuration, but feel free to
-substitute your own. Just note that the [Vector API] must be enabled for `vector
-tap` to work. See [under the hood](#under-the-hood) for more details.
+`vector tap` requires the [Vector API], which is disabled by default and has no authentication.
+[Enable the API](/docs/reference/api/#enable-local-inspection) and restrict access to trusted clients.
+Use a loopback address for local debugging:
 
 ```yaml
 api:
   enabled: true
+  address: "127.0.0.1:8686"
 
 sources:
   in:

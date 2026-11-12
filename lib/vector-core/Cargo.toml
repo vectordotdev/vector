@@ -79,6 +79,7 @@ strum.workspace = true
 chrono-tz.workspace = true
 criterion = { workspace = true, features = ["html_reports"] }
 env-test-util = "1.0.1"
+futures = { workspace = true, features = ["async-await"] }
 jsonschema.workspace = true
 quickcheck.workspace = true
 quickcheck_macros = "1"
