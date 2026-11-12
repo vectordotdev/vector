@@ -341,7 +341,6 @@ impl TcpSource for SyslogTcpSource {
     }
 }
 
-#[must_use]
 pub fn udp(
     addr: SocketListenAddr,
     _max_length: usize,

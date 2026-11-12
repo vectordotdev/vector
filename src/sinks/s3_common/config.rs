@@ -397,7 +397,6 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-#[must_use]
 pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     let healthcheck = async move {
         let req = client

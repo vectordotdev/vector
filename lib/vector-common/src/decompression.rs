@@ -129,7 +129,7 @@ pub const fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
         // leaving the allocation guard unset.
         None => Some(MIN_ZSTD_WINDOW_LOG),
         Some(max_index) => {
-            let window_log = usize::BITS - max_index.leading_zeros();
+            let window_log = max_index.bit_width();
             let clamped = if window_log < MIN_ZSTD_WINDOW_LOG {
                 MIN_ZSTD_WINDOW_LOG
             } else if window_log > MAX_ZSTD_WINDOW_LOG {

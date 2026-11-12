@@ -709,7 +709,7 @@ mod tests {
 
         let batches = batch(vec![message], size, 1000).await;
         assert_eq!(batches.len(), 1);
-        assert!(batches[0].messages.is_empty());
+        assert_eq!(batches[0].messages, [] as [std::string::String; 0]);
         assert_eq!(batches[0].event_count, 1);
 
         let message = encode(&mut encoder, log_event("message", None));

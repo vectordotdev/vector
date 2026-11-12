@@ -230,7 +230,7 @@ impl CuckooMemoryTable {
                     Err(err) => match err.kind() {
                         std::io::ErrorKind::NotFound => {
                             if let Some(parent) = path.parent()
-                                && parent != ""
+                                && !parent.is_empty()
                                 && !fs::metadata(parent).is_ok_and(|m| m.is_dir())
                             {
                                 return Err(format!(
@@ -311,7 +311,7 @@ impl CuckooMemoryTable {
                 && let Err(err) = File::open(path)
                 && err.kind() == std::io::ErrorKind::NotFound
                 && let Some(parent) = path.parent()
-                && parent != ""
+                && !parent.is_empty()
                 && !fs::metadata(parent).is_ok_and(|m| m.is_dir())
             {
                 return Err(format!(

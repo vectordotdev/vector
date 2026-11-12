@@ -25,13 +25,13 @@ fn empty_event_retains_trace_id() {
     let id = trace_id(0xDEAD_BEEF);
     let mut event = TraceEvent::new(id);
     assert_eq!(event.trace_id(), id);
-    assert!(event.spans().is_empty());
+    assert_eq!(event.spans(), &[] as &[Span]);
     assert_eq!(event.event_count(), 1);
 
     event.spans_mut().push(Span::new(span_id(1), "root"));
     event.spans_mut().clear();
     assert_eq!(event.trace_id(), id);
-    assert!(event.spans().is_empty());
+    assert_eq!(event.spans(), &[] as &[Span]);
 }
 
 #[test]

@@ -2199,8 +2199,8 @@ mod integration_test {
 
         sleep(Duration::from_secs(1)).await;
 
-        assert!(!events1.is_empty());
-        assert!(!events2.is_empty());
+        assert_ne!(events1, [] as [vector_lib::event::EventArray; 0]);
+        assert_ne!(events2, [] as [vector_lib::event::EventArray; 0]);
 
         match fetch_tpl_offset(&group_id, &topic, 0) {
             Offset::Offset(offset) => {

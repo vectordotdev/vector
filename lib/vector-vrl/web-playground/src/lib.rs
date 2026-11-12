@@ -252,7 +252,7 @@ mod tests {
         let parse_json = docs.iter().find(|doc| doc.name == "parse_json").unwrap();
         assert_eq!(parse_json.arguments[0].name, "value");
         assert!(parse_json.arguments[0].required);
-        assert!(!parse_json.internal_failure_reasons.is_empty());
+        assert_ne!(parse_json.internal_failure_reasons, Vec::<String>::new());
         // Vector's own functions are documented too, not only the stdlib's.
         assert!(
             docs.iter()

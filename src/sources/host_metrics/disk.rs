@@ -98,7 +98,7 @@ mod tests {
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
         #[cfg(not(windows))]
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
         assert!(metrics.len().is_multiple_of(4));
         assert!(all_counters(&metrics));
 

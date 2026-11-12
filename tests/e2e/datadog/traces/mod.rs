@@ -444,12 +444,12 @@ mod tests {
                 });
             }
         }
-        assert!(compare(&input, &[regrouped]).is_empty());
+        assert_eq!(compare(&input, &[regrouped]), Vec::<String>::new());
 
         let mut duplicated = input.clone();
         duplicated.push(input[0].clone());
-        assert!(!compare(&input, &duplicated).is_empty());
-        assert!(!compare(&input, &[]).is_empty());
+        assert_ne!(compare(&input, &duplicated), Vec::<String>::new());
+        assert_ne!(compare(&input, &[]), Vec::<String>::new());
 
         let mut changed = input.clone();
         changed[0].tracer_payloads[0].chunks[0].spans[0]

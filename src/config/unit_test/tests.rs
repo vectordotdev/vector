@@ -405,7 +405,10 @@ async fn test_success_multi_inputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -463,7 +466,10 @@ async fn test_success() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -516,7 +522,10 @@ async fn test_route() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -549,7 +558,10 @@ async fn test_fail_no_outputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -614,8 +626,14 @@ async fn test_fail_two_output_events() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -651,8 +669,14 @@ async fn test_no_outputs_from() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -694,8 +718,14 @@ async fn test_no_outputs_from_chained() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -746,7 +776,10 @@ async fn test_log_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -784,7 +817,10 @@ async fn test_metric_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -829,7 +865,10 @@ async fn test_success_over_gap() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -886,7 +925,10 @@ async fn test_success_tree() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -953,8 +995,14 @@ async fn test_fails() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(!tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -1022,9 +1070,18 @@ async fn test_dropped_branch() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -1091,8 +1148,14 @@ async fn test_task_transform() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
+    assert_ne!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -1130,7 +1193,10 @@ async fn test_glob_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -1164,7 +1230,10 @@ async fn expected_event_count_correct() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]
@@ -1199,7 +1268,7 @@ async fn expected_event_count_wrong() {
 
     let mut tests = build_unit_tests(config).await.unwrap();
     let errors = tests.remove(0).run().await.errors;
-    assert!(!errors.is_empty());
+    assert_ne!(errors, [] as [std::string::String; 0]);
     assert!(
         errors
             .iter()
@@ -1237,7 +1306,10 @@ async fn expected_event_count_zero_no_conditions() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
 }
 
 #[tokio::test]

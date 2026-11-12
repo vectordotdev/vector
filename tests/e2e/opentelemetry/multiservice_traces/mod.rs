@@ -408,9 +408,12 @@ mod tests {
         rebatched.resource_spans[0].scope_spans[0]
             .spans
             .push(source.resource_spans[0].scope_spans[0].spans[0].clone());
-        assert!(compare(&repeated, &rebatched).is_empty());
-        assert!(!compare(&source, &rebatched).is_empty());
-        assert!(!compare(&source, &ExportTraceServiceRequest::default()).is_empty());
+        assert_eq!(compare(&repeated, &rebatched), Vec::<String>::new());
+        assert_ne!(compare(&source, &rebatched), Vec::<String>::new());
+        assert_ne!(
+            compare(&source, &ExportTraceServiceRequest::default()),
+            Vec::<String>::new()
+        );
         for field in ["parent", "span", "resource", "scope", "schema"] {
             let mut changed = source.clone();
             let rs = &mut changed.resource_spans[0];
@@ -467,7 +470,7 @@ mod tests {
         {
             list.values.reverse();
         }
-        assert!(compare(&source, &reordered).is_empty());
+        assert_eq!(compare(&source, &reordered), Vec::<String>::new());
         for field in ["attribute", "event", "link", "flags", "dropped"] {
             let mut changed = source.clone();
             let span = &mut changed.resource_spans[0].scope_spans[0].spans[0];

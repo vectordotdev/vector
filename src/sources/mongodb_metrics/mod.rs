@@ -1062,7 +1062,7 @@ fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
 
                             // Update options in endpoint
                             endpoint =
-                                format!("{}{}", &endpoint[..=lstart + segments.0.len()], &options);
+                                format!("{}{}", &endpoint[..=lstart + segments.0.len()], options);
                         }
                     }
                     segments = endpoint[start..].split_at(index);
@@ -1171,7 +1171,7 @@ mod integration_tests {
             for event in events {
                 let metric = event.into_metric();
                 // validate namespace
-                assert!(metric.namespace() == Some(namespace));
+                assert_eq!(metric.namespace(), Some(namespace));
                 // validate timestamp
                 let timestamp = metric.timestamp().expect("existed timestamp");
                 assert!((timestamp - Utc::now()).num_seconds() < 1);

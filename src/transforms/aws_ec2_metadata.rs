@@ -582,7 +582,7 @@ impl MetadataClient {
                     new_state.push((
                         MetadataKey {
                             log_path: self.keys.tags.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, tag),
                         },
                         tag_content,
                     ));
