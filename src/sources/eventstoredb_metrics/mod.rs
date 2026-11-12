@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, StreamExt};
 use http::{Request, Uri};
@@ -95,8 +96,8 @@ fn eventstoredb(
     let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
     let url: Uri = endpoint.parse()?;
 
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let events_received = register(EventsReceived);
 
     Ok(Box::pin(
         async move {
@@ -108,7 +109,7 @@ fn eventstoredb(
 
                 match client.send(req).await {
                     Err(error) => {
-                        emit!(EventStoreDbMetricsHttpError {
+                        emit(EventStoreDbMetricsHttpError {
                             error: error.into(),
                         });
                     }
@@ -118,7 +119,7 @@ fn eventstoredb(
                         {
                             Ok(b) => b,
                             Err(error) => {
-                                emit!(EventStoreDbMetricsHttpError {
+                                emit(EventStoreDbMetricsHttpError {
                                     error: error.into(),
                                 });
                                 continue;
@@ -128,7 +129,7 @@ fn eventstoredb(
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
-                                emit!(EventStoreDbStatsParsingError { error });
+                                emit(EventStoreDbStatsParsingError { error });
                             }
 
                             Ok(stats) => {
@@ -139,7 +140,7 @@ fn eventstoredb(
                                 events_received.emit(CountByteSize(count, byte_size));
 
                                 if (cx.out.send_batch(metrics).await).is_err() {
-                                    emit!(StreamClosedError { count });
+                                    emit(StreamClosedError { count });
                                     break;
                                 }
                             }

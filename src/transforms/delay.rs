@@ -7,7 +7,9 @@ use snafu::Snafu;
 use tokio_util::time::DelayQueue;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::INTENTIONAL;
-use vector_lib::{config::clone_input_definitions, internal_event::ComponentEventsDropped};
+use vector_lib::{
+    config::clone_input_definitions, internal_event::ComponentEventsDropped, internal_event::emit,
+};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -215,7 +217,7 @@ impl TaskTransform<Event> for Delay {
                                                 }
                                             },
                                             OverflowStrategy::DropNewest => {
-                                                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                                                emit(ComponentEventsDropped::<INTENTIONAL> {
                                                     count: 1,
                                                     reason: "Queue is full and overflow strategy is drop_newest",
                                                 });

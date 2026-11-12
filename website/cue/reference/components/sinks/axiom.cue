@@ -5,7 +5,7 @@ components: sinks: axiom: {
 
 	classes: {
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Axiom"]
 		stateful: false

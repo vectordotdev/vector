@@ -11,6 +11,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::JsonSerializerConfig,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -163,7 +164,7 @@ impl Service<PostgresRequest> for PostgresService {
             .await
             .context(PostgresSnafu)?;
 
-            emit!(EndpointBytesSent {
+            emit(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
                 protocol: POSTGRES_PROTOCOL,
                 endpoint: &service.endpoint,
