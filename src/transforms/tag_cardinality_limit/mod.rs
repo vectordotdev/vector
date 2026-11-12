@@ -168,7 +168,7 @@ impl TagCardinalityLimit {
         self.accepted_tags.retain(|_, inner| !inner.is_empty());
         if reclaimed > 0 {
             self.tracked_keys_count = self.tracked_keys_count.saturating_sub(reclaimed);
-            emit!(TagCardinalityTrackedKeys {
+            emit(TagCardinalityTrackedKeys {
                 count: self.tracked_keys_count,
             });
         }
@@ -334,14 +334,15 @@ impl TagCardinalityLimit {
             tag_value_set.contains_with_limit_transition(value, config.value_limit);
         if already_tracked {
             if reached_limit {
-                emit!(TagCardinalityValueLimitReached { key });
+                emit(TagCardinalityValueLimitReached { key });
             }
             return AcceptResult::Tracked;
         }
 
         // Ordinary `len` stays O(1) between exact-TTL sweeps. Only when the
         // approximate count says we are full do we purge lapsed entries and
-        // re-check, so filling `value_limit` is O(N) rather than O(N²).
+        // re-check, so filling `value_limit` is O(N) rather than O(N²). The
+        // purge itself runs at most once per second.
         let mut live = tag_value_set.len();
         if live >= config.value_limit {
             live = tag_value_set.len_reclaiming();

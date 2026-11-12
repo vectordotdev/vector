@@ -23,6 +23,7 @@ use std::{
 
 use bloomy::BloomFilter;
 use hash_hasher::HashedSet;
+use vector_lib::internal_event::emit;
 
 use crate::{
     event::metric::TagValueSet,
@@ -130,6 +131,11 @@ impl FingerprintStorage {
     }
 }
 
+/// Minimum gap between exact-TTL capacity purges. A full bucket of live values
+/// would otherwise be retained on every rejected value. One second matches the
+/// empty-bucket reclaim gap and the minimum TTL slice.
+const CAPACITY_PURGE_INTERVAL: Duration = Duration::from_secs(1);
+
 /// `HashMap`-backed exact cache with per-value last-seen timestamps.
 ///
 /// At most once per `sweep_interval` (= `ttl / generations`, after capping),
@@ -140,12 +146,16 @@ impl FingerprintStorage {
 /// the value it was asked about and drops that single entry when its lease has
 /// lapsed. Ordinary `len` checks also stay O(1) between sweeps (`maybe_sweep`);
 /// a full purge is reserved for capacity-recovery paths via
-/// [`Self::purge_expired`].
+/// [`Self::purge_expired`], and that purge itself runs at most once per second.
 struct TtlExactStorage {
     map: HashMap<TagValueSet, Instant>,
     ttl: Duration,
     sweep_interval: Duration,
     last_sweep: Instant,
+    /// Start of the last capacity purge. Independent of `last_sweep`: during
+    /// overflow the periodic sweep is not due, so `last_sweep` is minutes old
+    /// and cannot bound a per-rejection scan.
+    last_capacity_purge: Option<Instant>,
 }
 
 impl TtlExactStorage {
@@ -159,6 +169,7 @@ impl TtlExactStorage {
             ttl,
             sweep_interval,
             last_sweep: Instant::now(),
+            last_capacity_purge: None,
         }
     }
 
@@ -177,7 +188,7 @@ impl TtlExactStorage {
             .retain(|_, last_seen| now.duration_since(*last_seen) <= ttl);
         let expired = before.saturating_sub(self.map.len()) as u64;
         self.last_sweep = now;
-        emit!(TagCardinalityTtlExpired { count: expired });
+        emit(TagCardinalityTtlExpired { count: expired });
     }
 
     /// Drop a single lapsed entry found on a read path.
@@ -187,7 +198,7 @@ impl TtlExactStorage {
     /// accept path `O(cached values)` per tag.
     fn expire_one(&mut self, value: &TagValueSet) {
         self.map.remove(value);
-        emit!(TagCardinalityTtlExpired { count: 1 });
+        emit(TagCardinalityTtlExpired { count: 1 });
     }
 
     fn contains(&mut self, value: &TagValueSet) -> bool {
@@ -249,11 +260,24 @@ impl TtlExactStorage {
         self.map.len()
     }
 
-    /// Drop every lapsed entry now. Used when a capacity check has already
-    /// hit `value_limit` (or when reclaiming empty buckets) so expired slots
-    /// can be reused without scanning on every event.
+    /// Drop every lapsed entry, at most once per [`CAPACITY_PURGE_INTERVAL`].
+    ///
+    /// Both rejection paths (`try_accept_tag` and the `DropEvent` pre-check)
+    /// call this once `len` says the bucket is full. Without the gap, a bucket
+    /// full of still-valid values is retained on every rejected value. A value
+    /// that lapses just after a purge keeps its slot until the next one, at
+    /// most one second later. The first purge after a quiet second still runs
+    /// immediately.
     fn purge_expired(&mut self) {
-        self.sweep(Instant::now());
+        let now = Instant::now();
+        if self
+            .last_capacity_purge
+            .is_some_and(|last| now.duration_since(last) < CAPACITY_PURGE_INTERVAL)
+        {
+            return;
+        }
+        self.last_capacity_purge = Some(now);
+        self.sweep(now);
     }
 }
 
@@ -329,7 +353,7 @@ impl RollingBloomStorage {
                 // refreshed into a newer shard is counted here even though it is
                 // still retained. This matches `len`, which sums the same
                 // per-shard counts to enforce `value_limit`.
-                emit!(TagCardinalityTtlExpired {
+                emit(TagCardinalityTtlExpired {
                     count: dropped.count() as u64,
                 });
             }
@@ -636,6 +660,41 @@ mod tests {
     // The storage types are exercised directly so we can drive
     // `Instant`-typed parameters on private helpers; `AcceptedTagValueSet`
     // itself calls `Instant::now()`, which can't be mocked cheaply.
+
+    #[test]
+    fn exact_ttl_capacity_purge_runs_at_most_once_per_second() {
+        let ttl = Duration::from_mins(1);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let now = Instant::now();
+        s.map.insert(v("live"), now);
+        s.last_sweep = now;
+
+        // First purge after a quiet period still scans immediately.
+        s.purge_expired();
+        assert!(s.map.contains_key(&v("live")));
+        assert!(s.last_capacity_purge.is_some());
+
+        // A lease that lapses after that purge must survive a second call in
+        // the same second. Both rejection paths come through this function.
+        let expired_at = now
+            .checked_sub(ttl + Duration::from_secs(1))
+            .expect("test instant fits");
+        s.map.insert(v("stale"), expired_at);
+        s.purge_expired();
+        assert!(
+            s.map.contains_key(&v("stale")),
+            "a second purge inside the interval must not scan again"
+        );
+
+        // Clearing the timestamp stands in for the interval elapsing.
+        s.last_capacity_purge = None;
+        s.purge_expired();
+        assert!(
+            !s.map.contains_key(&v("stale")),
+            "the next purge must drop the lapsed value"
+        );
+        assert!(s.map.contains_key(&v("live")));
+    }
 
     #[test]
     fn ttl_exact_expires_values_past_ttl() {
