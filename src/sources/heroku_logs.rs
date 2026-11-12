@@ -16,6 +16,7 @@ use vector_lib::{
     },
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{lookup_v2::parse_value_path, owned_value_path, path},
     schema::Definition,
 };
@@ -246,10 +247,10 @@ impl LogplexSource {
         let frame_id = get_header(header_map, "Logplex-Frame-Id")?;
         let drain_token = get_header(header_map, "Logplex-Drain-Token")?;
 
-        emit!(HerokuLogplexRequestReceived {
+        emit(HerokuLogplexRequestReceived {
             msg_count,
             frame_id,
-            drain_token
+            drain_token,
         });
 
         // Deal with body
@@ -274,7 +275,7 @@ impl LogplexSource {
         let rdr = BufReader::new(body.reader());
         rdr.lines()
             .filter_map(|res| {
-                res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
+                res.map_err(|error| emit(HerokuLogplexRequestReadError { error }))
                     .ok()
             })
             .filter(|s| !s.is_empty())

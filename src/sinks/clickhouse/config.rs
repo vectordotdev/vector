@@ -2,8 +2,8 @@
 
 use std::{collections::HashMap, fmt};
 
-use http::Uri;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode, Uri};
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -20,13 +20,10 @@ use super::{
 };
 use crate::{
     config::{SinkContext, ValidatedSink},
-    http::{
-        Auth, MaybeAuth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -531,7 +528,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

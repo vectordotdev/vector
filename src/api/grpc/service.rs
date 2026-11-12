@@ -17,6 +17,7 @@ use tokio_stream::{
     wrappers::{IntervalStream, ReceiverStream},
 };
 use tonic::{Request, Response, Status};
+use vector_common::internal_event::{InternalMetricKind, all_metrics};
 use vector_lib::tap::{
     controller::{TapController, TapPatterns, TapPayload},
     topology::WatchRx,
@@ -25,10 +26,11 @@ use vector_lib::tap::{
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
-    self, Component as ProtoComponent, ComponentMetrics, ComponentType, EventNotification,
-    GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse, GetComponentsRequest,
-    GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName, Output,
-    StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
+    self, AvailableMetric, Component as ProtoComponent, ComponentMetrics, ComponentType,
+    EventNotification, GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
+    GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest, GetComponentsResponse,
+    GetMetaRequest, GetMetaResponse, InternalMetricKind as ProtoInternalMetricKind, MetricName,
+    Output, StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
     StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
     StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
     StreamUptimeRequest, StreamUptimeResponse, TappedEvent, ThroughputMetric, TotalMetric,
@@ -440,12 +442,12 @@ fn ports_to_proto_outputs(
 }
 
 /// gRPC observability service implementation.
-pub struct ObservabilityService {
+pub(crate) struct ObservabilityService {
     watch_rx: WatchRx,
 }
 
 impl ObservabilityService {
-    pub const fn new(watch_rx: WatchRx) -> Self {
+    pub(crate) const fn new(watch_rx: WatchRx) -> Self {
         Self { watch_rx }
     }
 }
@@ -477,6 +479,33 @@ impl observability::Service for ObservabilityService {
         let enabled = false;
         Ok(Response::new(GetAllocationTracingStatusResponse {
             enabled,
+        }))
+    }
+
+    async fn get_capabilities(
+        &self,
+        _request: Request<GetCapabilitiesRequest>,
+    ) -> Result<Response<GetCapabilitiesResponse>, Status> {
+        #[cfg(unix)]
+        let allocation_tracing_enabled =
+            crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(unix))]
+        let allocation_tracing_enabled = false;
+
+        let available_metrics = all_metrics()
+            .map(|(name, kind)| AvailableMetric {
+                name: name.to_string(),
+                kind: match kind {
+                    InternalMetricKind::Counter => ProtoInternalMetricKind::Counter as i32,
+                    InternalMetricKind::Gauge => ProtoInternalMetricKind::Gauge as i32,
+                    InternalMetricKind::Histogram => ProtoInternalMetricKind::Histogram as i32,
+                },
+            })
+            .collect();
+
+        Ok(Response::new(GetCapabilitiesResponse {
+            allocation_tracing_enabled,
+            available_metrics,
         }))
     }
 
@@ -532,7 +561,7 @@ impl observability::Service for ObservabilityService {
                 component_type: ComponentType::Source as i32,
                 on_type,
                 outputs: ports_to_proto_outputs(ports, &key_str, &sent_events_by_output),
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 
@@ -556,7 +585,7 @@ impl observability::Service for ObservabilityService {
                 component_type: component_type as i32,
                 on_type,
                 outputs,
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 
@@ -927,5 +956,65 @@ fn create_notification_event(message: &str) -> StreamOutputEventsResponse {
                 message: message.to_string(),
             },
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::watch;
+    use tonic::Request;
+    use vector_lib::tap::topology::TapResource;
+
+    use super::{
+        GetAllocationTracingStatusRequest, GetCapabilitiesRequest, ObservabilityService,
+        ProtoInternalMetricKind, observability::Service as _,
+    };
+
+    #[tokio::test]
+    async fn capabilities_include_current_metrics_and_legacy_allocation_status() {
+        let (_tx, rx) = watch::channel(TapResource::default());
+        let service = ObservabilityService::new(rx);
+        let capabilities = service
+            .get_capabilities(Request::new(GetCapabilitiesRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        let legacy_status = service
+            .get_allocation_tracing_status(Request::new(GetAllocationTracingStatusRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        assert_eq!(
+            capabilities.allocation_tracing_enabled,
+            legacy_status.enabled
+        );
+
+        // Include metrics added since the capabilities RPC was first proposed,
+        // and verify that all three metric kinds cross the proto boundary.
+        for (name, kind) in [
+            (
+                "component_cpu_usage_ns_total",
+                ProtoInternalMetricKind::Counter,
+            ),
+            ("buffer_size_events", ProtoInternalMetricKind::Gauge),
+            (
+                "component_latency_seconds",
+                ProtoInternalMetricKind::Histogram,
+            ),
+        ] {
+            assert!(
+                capabilities
+                    .available_metrics
+                    .iter()
+                    .any(|metric| { metric.name == name && metric.kind == kind as i32 }),
+                "missing {name} with kind {kind:?}"
+            );
+        }
+        assert!(
+            capabilities
+                .available_metrics
+                .iter()
+                .all(|metric| { metric.kind != ProtoInternalMetricKind::Unspecified as i32 })
+        );
     }
 }

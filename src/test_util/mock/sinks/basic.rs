@@ -14,6 +14,7 @@ use crate::{
     SourceSender,
     config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
+    test_util::mock::TestComponentData,
 };
 
 /// Configuration for the `test_basic` sink.
@@ -33,6 +34,18 @@ pub struct BasicSinkConfig {
 
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
+
+    /// Acknowledgements configuration retained by the test sink.
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+
+    /// Extra data retained for configuration-loading assertions.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub extra: TestComponentData,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
@@ -53,6 +66,8 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: None,
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 
@@ -63,6 +78,8 @@ impl BasicSinkConfig {
             healthy,
             confinement: None,
             data: Some(data.into()),
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 
@@ -97,7 +114,7 @@ impl SinkConfig for BasicSinkConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
+        &self.acknowledgements
     }
 }
 
@@ -126,7 +143,7 @@ impl ValidatedSink for BasicSinkConfig {
             None
         };
 
-        let sink = MockSink {
+        let sink = BasicSink {
             sink: self.sink.clone(),
             health_tx,
         };
@@ -137,13 +154,13 @@ impl ValidatedSink for BasicSinkConfig {
     }
 }
 
-struct MockSink {
+struct BasicSink {
     sink: Mode,
     health_tx: Option<oneshot::Sender<crate::Result<()>>>,
 }
 
 #[async_trait]
-impl StreamSink<Event> for MockSink {
+impl StreamSink<Event> for BasicSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         match self.sink {
             Mode::Normal(mut sink) => {
@@ -155,7 +172,7 @@ impl StreamSink<Event> for MockSink {
                 while let Some(mut event) = input.next().await {
                     let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
-                        error!(message = "Ingesting an event failed at mock sink.", %error);
+                        error!(message = "Ingesting an event failed at test sink.", %error);
                     }
                     drop(finalizers);
                 }

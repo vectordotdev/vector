@@ -6,7 +6,7 @@ components: sources: pulsar: {
 	classes: {
 		delivery: "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

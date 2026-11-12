@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(crate) enum RequestBuilderError {
     #[snafu(display(
         "Building an APM stats request payload failed ({}, {})",
         message,
@@ -51,7 +51,7 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    pub fn into_parts(self) -> (&'static str, String, usize) {
+    pub(crate) fn into_parts(self) -> (&'static str, String, usize) {
         match self {
             Self::FailedToBuild {
                 message,
@@ -66,22 +66,24 @@ impl RequestBuilderError {
     }
 }
 
-pub struct DatadogTracesRequestBuilder {
+pub(super) struct DatadogTracesRequestBuilder {
     api_key: Arc<str>,
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
     max_size: usize,
     /// Contains the Aggregated stats across a time window.
     stats_aggregator: Arc<Mutex<Aggregator>>,
+    disable_apm_stats: bool,
 }
 
 impl DatadogTracesRequestBuilder {
-    pub const fn new(
+    pub(super) const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
         max_size: usize,
         stats_aggregator: Arc<Mutex<Aggregator>>,
+        disable_apm_stats: bool,
     ) -> Self {
         Self {
             api_key,
@@ -89,11 +91,12 @@ impl DatadogTracesRequestBuilder {
             compression,
             max_size,
             stats_aggregator,
+            disable_apm_stats,
         }
     }
 }
 
-pub struct DDTracesMetadata {
+pub(crate) struct DDTracesMetadata {
     pub api_key: Arc<str>,
     pub endpoint: DatadogTracesEndpoint,
     pub finalizers: EventFinalizers,
@@ -119,7 +122,9 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
         // separately from the sink framework, by the thread `flush_apm_stats_thread()`
-        compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
+        if !self.disable_apm_stats {
+            compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
+        }
 
         encode_traces(&key, trace_events, self.max_size)
             .into_iter()
@@ -180,7 +185,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 /// * `payload`                  - Compressed and encoded bytes to send.
 /// * `compression`              - `Compression` used to reference the Content-Encoding header.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
-pub fn build_request(
+pub(crate) fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
     payload: Bytes,
     compression: Compression,
@@ -200,19 +205,20 @@ pub fn build_request(
         body: payload,
         headers,
         finalizers: ddtraces_metadata.finalizers,
-        uri: endpoint_configuration
-            .get_uri_for_endpoint(ddtraces_metadata.endpoint)
-            .into_uri(),
+        uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
         uncompressed_size: ddtraces_metadata.uncompressed_size,
         metadata: request_metadata,
     }
 }
 
+/// An encoded payload and the trace events it contains.
+type EncodeResult = Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>;
+
 fn encode_traces(
     key: &PartitionKey,
     trace_events: Vec<TraceEvent>,
     max_size: usize,
-) -> Vec<Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>> {
+) -> Vec<EncodeResult> {
     let mut results = Vec::new();
     let mut processed = Vec::new();
     let mut payload = build_empty_payload(key);

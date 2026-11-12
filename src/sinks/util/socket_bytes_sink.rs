@@ -12,6 +12,7 @@ use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector_lib::{
     finalization::{EventFinalizers, EventStatus},
+    internal_event::emit,
     json_size::JsonSize,
 };
 
@@ -83,12 +84,12 @@ impl State {
             }
 
             if status == EventStatus::Delivered {
-                emit!(SocketEventsSent {
+                emit(SocketEventsSent {
                     mode: self.socket_mode,
                     count: self.events_total as u64,
                     byte_size: self.event_bytes,
                 });
-                emit!(SocketBytesSent {
+                emit(SocketBytesSent {
                     mode: self.socket_mode,
                     byte_size: self.bytes_total,
                 });

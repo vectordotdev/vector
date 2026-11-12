@@ -20,7 +20,7 @@ use crate::sinks::util::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(super) enum RequestBuilderError {
     #[snafu(context(false), display("Failed to encode metric: {source}"))]
     FailedToEncode { source: EncoderError },
 
@@ -37,7 +37,7 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     /// Converts this error into its constituent parts: the error reason, the error type, and how
     /// many events were dropped as a result.
-    pub fn into_parts(self) -> (String, &'static str, u64) {
+    pub(super) fn into_parts(self) -> (String, &'static str, u64) {
         match self {
             // Encoding errors always happen at the per-metric level, so we could only ever drop a
             // single metric/event at a time.
@@ -61,7 +61,7 @@ impl RequestBuilderError {
 }
 
 /// Metadata that the `DatadogMetricsRequestBuilder` sends with each request.
-pub struct DDMetricsMetadata {
+pub(super) struct DDMetricsMetadata {
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     finalizers: EventFinalizers,
@@ -118,14 +118,14 @@ impl MetricsEncoder for EncoderKind {
 }
 
 /// Incremental request builder specific to Datadog metrics.
-pub struct DatadogMetricsRequestBuilder {
+pub(super) struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: EncoderKind,
     sketches_encoder: DatadogMetricsEncoder,
 }
 
 impl DatadogMetricsRequestBuilder {
-    pub fn new(
+    pub(super) fn new(
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
         series_api_version: SeriesApiVersion,
@@ -187,8 +187,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
 
         let uri = self
             .endpoint_configuration
-            .get_uri_for_endpoint(ddmetrics_metadata.endpoint)
-            .into_uri();
+            .get_uri_for_endpoint(ddmetrics_metadata.endpoint);
 
         DatadogMetricsRequest {
             api_key: ddmetrics_metadata.api_key,

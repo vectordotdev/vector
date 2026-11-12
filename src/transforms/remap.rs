@@ -14,6 +14,7 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     enrichment::TableRegistry,
+    internal_event::emit,
     lookup::{PathPrefix, metadata_path, owned_value_path},
     schema::Definition,
 };
@@ -633,7 +634,7 @@ where
                 }
             },
             Err(Terminate::Interrupted) => {
-                emit!(RemapMappingError {
+                emit(RemapMappingError {
                     error: ExpressionError::Interrupted.to_string(),
                     event_dropped: true,
                 });
@@ -642,15 +643,16 @@ where
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingAbort {
+                            emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
+                                error: &error,
                             });
                         }
                         ("abort", error, self.drop_on_abort)
                     }
                     Terminate::Error(error) => {
                         if !self.reroute_dropped {
-                            emit!(RemapMappingError {
+                            emit(RemapMappingError {
                                 error: error.to_string(),
                                 event_dropped: self.drop_on_error,
                             });
@@ -715,7 +717,7 @@ mod tests {
         config::{ConfigBuilder, build_unit_tests},
         event::{
             LogEvent, Metric, TraceEvent, TraceLayout, Value,
-            metric::{MetricKind, MetricValue},
+            metric::{MetricKind, MetricValue, StatisticKind},
         },
         metrics::Controller,
         schema,
@@ -1159,6 +1161,41 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_abort_logs_message() {
+        use std::io::{Read as _, Seek as _, SeekFrom};
+
+        let conf = RemapConfig {
+            source: Some(r#"abort "col_ip invalid:\n" + "garbage""#.to_string()),
+            drop_on_abort: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let mut buffer = tempfile::tempfile().unwrap();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(buffer.try_clone().unwrap())
+            .finish();
+        let output = tracing::subscriber::with_default(subscriber, || {
+            // Another test thread may have cached the callsite as disabled before this
+            // subscriber existed.
+            tracing::callsite::rebuild_interest_cache();
+            transform_one(&mut tform, Event::Log(LogEvent::from("message")))
+        });
+
+        assert!(output.is_none());
+        let mut logs = String::new();
+        buffer.seek(SeekFrom::Start(0)).unwrap();
+        buffer.read_to_string(&mut logs).unwrap();
+        // The message is escaped, so event data cannot break the log line.
+        assert!(
+            logs.contains(r#"Event mapping aborted. error="col_ip invalid:\ngarbage""#),
+            "{logs}"
+        );
+    }
+
+    #[test]
     fn check_remap_metric() {
         let metric = Event::Metric(Metric::new(
             "counter",
@@ -1200,6 +1237,46 @@ mod tests {
                 }))
             )
         );
+    }
+
+    #[test]
+    fn check_remap_metric_type() {
+        let conf = RemapConfig {
+            source: Some(
+                r#"if ends_with(string!(.name), "_count") { .type = "counter" }"#.to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let distribution = MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 1],
+            statistic: StatisticKind::Histogram,
+        };
+        let cases = [
+            (
+                "requests_count",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                "queue_depth",
+                MetricValue::Gauge { value: 4.5 },
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            // Unsupported conversions are ignored rather than failing the program, so the metric
+            // passes through unchanged instead of being dropped.
+            ("latency_count", distribution.clone(), distribution),
+        ];
+
+        for (name, value, expected) in cases {
+            let metric = Event::Metric(Metric::new(name, MetricKind::Absolute, value));
+            let result = transform_one(&mut tform, metric).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.value(), &expected, "{name}");
+            assert_eq!(metric.kind(), MetricKind::Absolute, "{name}");
+        }
     }
 
     #[test]

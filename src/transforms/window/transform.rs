@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered, register};
 
 use crate::{
     conditions::Condition,
@@ -42,7 +42,7 @@ impl Window {
             flush_when,
             num_events_before,
             num_events_after,
-            events_dropped: register!(WindowEventsDropped),
+            events_dropped: register(WindowEventsDropped),
             buffer,
             events_counter: 0,
             is_flushing: false,

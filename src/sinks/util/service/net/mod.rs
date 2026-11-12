@@ -24,6 +24,7 @@ use tokio::{
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
+    internal_event::emit,
     tls::{MaybeTlsStream, TlsError},
 };
 
@@ -195,11 +196,11 @@ impl NetworkConnection {
             // socket has an I/O error that kills the connection entirely.
             Self::Tcp(_) => {}
             Self::Udp(_) => {
-                emit!(UdpSendIncompleteError { data_size, sent });
+                emit(UdpSendIncompleteError { data_size, sent });
             }
             #[cfg(unix)]
             Self::Unix(_) => {
-                emit!(UnixSendIncompleteError { data_size, sent });
+                emit(UnixSendIncompleteError { data_size, sent });
             }
         }
     }
@@ -244,19 +245,19 @@ impl NetworkConnector {
     fn on_connected(metadata: ConnectionMetadata) {
         match metadata {
             ConnectionMetadata::Tcp { peer_addr } => {
-                emit!(TcpSocketConnectionEstablished {
-                    peer_addr: Some(peer_addr)
+                emit(TcpSocketConnectionEstablished {
+                    peer_addr: Some(peer_addr),
                 });
             }
             #[cfg(unix)]
             ConnectionMetadata::Unix { path } => {
-                emit!(UnixSocketConnectionEstablished { path: &path });
+                emit(UnixSocketConnectionEstablished { path: &path });
             }
         }
     }
 
     fn on_connection_error<E: std::error::Error>(error: E) {
-        emit!(SocketOutgoingConnectionError { error });
+        emit(SocketOutgoingConnectionError { error });
     }
 
     async fn connect(&self) -> Result<(NetworkConnection, Option<ConnectionMetadata>), NetError> {

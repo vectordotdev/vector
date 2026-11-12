@@ -15,7 +15,7 @@ use crate::sinks::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct GreptimeDBMetricNormalize;
+pub(super) struct GreptimeDBMetricNormalize;
 
 impl MetricNormalize for GreptimeDBMetricNormalize {
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
@@ -31,7 +31,7 @@ impl MetricNormalize for GreptimeDBMetricNormalize {
 
 /// `GreptimeDBGrpcSink` is a sink that sends metrics to GreptimeDB via gRPC.
 /// It uses the `GreptimeDBGrpcService` to send the metrics.
-pub struct GreptimeDBGrpcSink {
+pub(super) struct GreptimeDBGrpcSink {
     pub(super) service: Svc<GreptimeDBGrpcService, GreptimeDBGrpcRetryLogic>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) request_builder_options: RequestBuilderOptions,

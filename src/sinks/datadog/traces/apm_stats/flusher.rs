@@ -6,7 +6,10 @@ use std::{
 use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
-use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
+use vector_http::full_body;
+use vector_lib::{
+    finalization::EventFinalizers, internal_event::emit, request_metadata::RequestMetadata,
+};
 
 use super::{
     BUCKET_DURATION_NANOSECONDS, DDTracesMetadata, DatadogTracesEndpoint,
@@ -14,9 +17,12 @@ use super::{
     build_request,
 };
 use crate::{
-    http::{BuildRequestSnafu, HttpClient},
+    http::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
-    sinks::util::{Compression, Compressor},
+    sinks::{
+        HTTPRequestBuilderSnafu,
+        util::{Compression, Compressor},
+    },
 };
 
 /// Flushes cached APM stats buckets to Datadog on a 10 second interval.
@@ -30,7 +36,7 @@ use crate::{
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
-pub async fn flush_apm_stats_thread(
+pub(crate) async fn flush_apm_stats_thread(
     mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
     compression: Compression,
@@ -104,7 +110,7 @@ impl ApmStatsSender {
             }
         } && let Err(error) = self.compress_and_send(payload, api_key).await
         {
-            emit!(DatadogTracesAPMStatsError { error });
+            emit(DatadogTracesAPMStatsError { error });
         }
     }
 
@@ -127,9 +133,9 @@ impl ApmStatsSender {
 
         let http_request = trace_api_request
             .into_http_request()
-            .context(BuildRequestSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
-        self.client.send(http_request).await?;
+        self.client.send(http_request.map(full_body)).await?;
 
         Ok(())
     }

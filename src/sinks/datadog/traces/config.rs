@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use http::Uri;
 use indoc::indoc;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
@@ -37,11 +38,11 @@ use crate::{
 // The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
 // Beyond this limit the payload will be ignored, enforcing a slight lower
 // limit as a safety margin.
-pub const BATCH_GOAL_BYTES: usize = 3_000_000;
-pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
+pub(super) const BATCH_GOAL_BYTES: usize = 3_000_000;
+pub(super) const BATCH_MAX_EVENTS: usize = 1_000;
+pub(super) const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
-pub const PAYLOAD_LIMIT: usize = 3_200_000;
+pub(super) const PAYLOAD_LIMIT: usize = 3_200_000;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
@@ -68,6 +69,14 @@ pub struct DatadogTracesConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// Do not compute APM stats from the received traces.
+    ///
+    /// Enable this when APM stats are forwarded separately, for example stats computed by the
+    /// Datadog Agent, to avoid counting them twice.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub disable_apm_stats: bool,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -81,21 +90,23 @@ impl GenerateConfig for DatadogTracesConfig {
 
 /// Datadog traces API has two routes: one for traces and another one for stats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DatadogTracesEndpoint {
+pub(crate) enum DatadogTracesEndpoint {
     Traces,
     #[allow(dead_code)] // This will be used when APM stats will be generated
     APMStats,
 }
 
-/// Store traces & APM stats endpoints actual URIs.
+/// Stores the native HTTP URIs for traces and APM stats.
 #[derive(Clone)]
-pub struct DatadogTracesEndpointConfiguration {
-    traces_endpoint: HttpEndpoint,
-    stats_endpoint: HttpEndpoint,
+pub(crate) struct DatadogTracesEndpointConfiguration {
+    traces_endpoint: Uri,
+    stats_endpoint: Uri,
 }
 
 impl DatadogTracesEndpointConfiguration {
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> HttpEndpoint {
+    /// Returns the cached native HTTP URI for the specified intake endpoint.
+    #[must_use]
+    pub(crate) fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> Uri {
         match endpoint {
             DatadogTracesEndpoint::Traces => self.traces_endpoint.clone(),
             DatadogTracesEndpoint::APMStats => self.stats_endpoint.clone(),
@@ -119,8 +130,8 @@ impl DatadogTracesConfig {
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
         Ok(DatadogTracesEndpointConfiguration {
-            traces_endpoint,
-            stats_endpoint,
+            traces_endpoint: traces_endpoint.into_uri(),
+            stats_endpoint: stats_endpoint.into_uri(),
         })
     }
 
@@ -155,6 +166,7 @@ impl DatadogTracesConfig {
             compression,
             PAYLOAD_LIMIT,
             Arc::clone(&apm_stats_aggregator),
+            self.disable_apm_stats,
         );
 
         // shutdown= Sender that the sink signals when input stream is exhausted.
@@ -166,7 +178,11 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            endpoints.traces_endpoint.protocol().to_string(),
+            endpoints
+                .traces_endpoint
+                .scheme_str()
+                .unwrap_or("https")
+                .to_string(),
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -200,7 +216,7 @@ impl DatadogTracesConfig {
             }),
             false,
         )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
+        HttpClient::new(tls_settings, proxy)
     }
 }
 

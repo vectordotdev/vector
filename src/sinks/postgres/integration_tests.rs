@@ -97,7 +97,7 @@ fn create_span(resource: &str) -> ObjectMap {
     ])
 }
 
-pub fn create_trace(resource: &str) -> TraceEvent {
+fn create_trace(resource: &str) -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert(event_path!("trace_id"), Value::Integer(123));
     t.insert(
