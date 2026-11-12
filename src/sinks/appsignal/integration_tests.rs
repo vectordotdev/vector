@@ -231,7 +231,7 @@ async fn logs_shape() {
             .unwrap()
             .as_object()
             .unwrap();
-        assert!(!event.get("timestamp").unwrap().as_str().unwrap().is_empty());
+        assert_ne!(event.get("timestamp").unwrap().as_str().unwrap(), "");
     }
 }
 

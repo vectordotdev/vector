@@ -51,8 +51,8 @@ async fn malformed_later_record_prevents_all_downloads() {
     let events = fixture
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(
         fixture
             .calls("AmazonSQS.DeleteMessageBatch")
@@ -106,8 +106,8 @@ async fn ignored_event_still_requires_supported_version() {
     let events = fixture
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(
         fixture
             .calls("AmazonSQS.DeleteMessageBatch")
@@ -124,8 +124,8 @@ async fn region_validation_precedes_age_deferral() {
     let events = fixture
         .process(&fixture.config(true), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(fixture.calls("AmazonSQS.SendMessageBatch").await.is_empty());
     assert!(
         fixture
@@ -170,8 +170,8 @@ async fn legacy_forward_failure_still_queues_deletion() {
     let events = fixture
         .process(&fixture.config(true), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert_eq!(fixture.calls("AmazonSQS.SendMessageBatch").await.len(), 1);
     assert_eq!(fixture.calls("AmazonSQS.DeleteMessageBatch").await.len(), 1);
 }

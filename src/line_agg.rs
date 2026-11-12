@@ -180,7 +180,7 @@ where
             }
 
             // If we're in draining mode, short circuit here.
-            if let Some(to_drain) = &mut this.draining {
+            if let Some(to_drain) = this.draining {
                 match to_drain.pop() {
                     Some(val) => {
                         return Poll::Ready(Some(val));

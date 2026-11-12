@@ -202,7 +202,7 @@ mod tests {
             .filesystem_metrics(&mut buffer)
             .await;
         let metrics = buffer.into_metrics();
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
         assert!(all_gauges(&metrics));
 
         // Base metrics (these are always present)

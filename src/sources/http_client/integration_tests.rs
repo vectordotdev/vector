@@ -42,7 +42,7 @@ pub(crate) async fn run_error(config: HttpClientConfig) {
     let events =
         run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS).await;
 
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 /// An endpoint in the config that is not reachable should generate errors.

@@ -598,7 +598,7 @@ mod tests {
             proto::ServingStatus::Serving as i32
         );
         let observations_before_expiry = max_connection_age_connection_observations();
-        assert!(!observations_before_expiry.is_empty());
+        assert_ne!(observations_before_expiry, [] as [std::net::SocketAddr; 0]);
 
         sleep(Duration::from_millis(1500)).await;
 

@@ -474,6 +474,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_counter_minimal() {
         let metric = Metric::new(
             "example counter",
@@ -498,6 +499,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_gauge() {
         let metric = Metric::new(
             "example gauge",
@@ -665,6 +667,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_counter_minimal() {
         let value = r#"{
             name = "example counter",
@@ -761,6 +764,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_gauge() {
         let value = r#"{
             name = "example gauge",

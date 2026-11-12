@@ -1132,7 +1132,7 @@ mod housekeeping {
         write(repo, "docs/generated/vrl.json", "{}\n");
         commit(repo);
         fixture.validate(true);
-        assert!(git(repo, &["status", "--porcelain"]).is_empty());
+        assert_eq!(git(repo, &["status", "--porcelain"]), "");
     }
 
     #[test]
@@ -1244,7 +1244,7 @@ mod housekeeping {
         version(fixture.repo.path(), "0.58.0");
         commit(fixture.repo.path());
         fixture.run(&["housekeeping-prepare", "--version", "0.59.0"], false);
-        assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
+        assert_eq!(git(fixture.repo.path(), &["status", "--porcelain"]), "");
     }
 }
 
