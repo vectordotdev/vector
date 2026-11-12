@@ -250,16 +250,26 @@ impl Graph {
     }
 
     pub(super) fn check_for_cycles(&self) -> Result<(), String> {
-        // find all sinks
-        let sinks = self
+        // Start from the sinks, then from every other node: a cycle that no sink consumes would
+        // otherwise go unnoticed and overflow the stack later during topology building.
+        let (mut sinks, mut others): (Vec<_>, Vec<_>) = self
             .nodes
-            .iter()
-            .filter_map(|(name, node)| (node.kind == ComponentKind::Sink).then_some(name));
+            .keys()
+            .partition(|name| self.nodes[*name].kind == ComponentKind::Sink);
+        // `nodes` is a `HashMap`; sort so the reported cycle does not change between runs.
+        sinks.sort();
+        others.sort();
 
-        // run DFS from each sink while keep tracking the current stack to detect cycles
-        for s in sinks {
+        // A node fully explored from an earlier start cannot lead to an undetected cycle, so
+        // `visited` is shared across starts.
+        let mut visited: HashSet<ComponentKey> = HashSet::new();
+
+        // run DFS from each start while keep tracking the current stack to detect cycles
+        for s in sinks.into_iter().chain(others) {
+            if visited.contains(s) {
+                continue;
+            }
             let mut traversal: VecDeque<ComponentKey> = VecDeque::new();
-            let mut visited: HashSet<ComponentKey> = HashSet::new();
             let mut stack: IndexSet<ComponentKey> = IndexSet::new();
 
             traversal.push_back(s.to_owned());
@@ -281,11 +291,11 @@ impl Graph {
                 for input in inputs {
                     if !visited.contains(&input.component) {
                         traversal.push_back(input.component);
-                    } else if stack.contains(&input.component) {
+                    } else if let Some(cycle_start) = stack.get_index_of(&input.component) {
                         // we reached the node while it is on the current stack - it's a cycle
                         let path = stack
                             .iter()
-                            .skip(1) // skip the sink
+                            .skip(cycle_start)
                             .rev()
                             .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>();
@@ -640,6 +650,46 @@ mod test {
         // This isn't really a cyclic dependency but let me have this one.
         assert_eq!(
             Err("Cyclic dependency detected in the chain [ in -> in ]".into()),
+            graph.check_for_cycles()
+        );
+    }
+
+    #[test]
+    fn paths_detects_cycles_not_feeding_a_sink() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("loop", DataType::Log, DataType::Log, vec!["loop"]);
+        graph.add_sink("out", DataType::Log, vec!["in"]);
+
+        assert_eq!(
+            Err("Cyclic dependency detected in the chain [ loop -> loop ]".into()),
+            graph.check_for_cycles()
+        );
+
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("b", DataType::Log, DataType::Log, vec!["a"]);
+        graph.add_transform("a", DataType::Log, DataType::Log, vec!["b"]);
+        graph.add_sink("out", DataType::Log, vec!["in"]);
+
+        assert_eq!(
+            Err("Cyclic dependency detected in the chain [ a -> b -> a ]".into()),
+            graph.check_for_cycles()
+        );
+    }
+
+    #[test]
+    fn paths_reports_only_the_cycle() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
+        graph.add_transform("after", DataType::Log, DataType::Log, vec!["three"]);
+        graph.add_sink("out", DataType::Log, vec!["after"]);
+
+        assert_eq!(
+            Err("Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()),
             graph.check_for_cycles()
         );
     }
