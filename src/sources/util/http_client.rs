@@ -41,8 +41,8 @@ use crate::{
 
 /// A target that [`call`] sends requests to.
 ///
-/// A source can attach its own per-target data by implementing this trait on its own type. The
-/// [`HttpClientBuilder`] receives the whole target, so that data can reach the context.
+/// Implement it on a source's own type to attach per-target data; [`HttpClientBuilder::build`]
+/// receives the whole target.
 pub(crate) trait HttpClientTarget: Clone + Send + 'static {
     /// The base URL of the request.
     fn url(&self) -> &Uri;
@@ -57,7 +57,7 @@ impl HttpClientTarget for Uri {
 /// Returns the targets to call. [`call`] invokes it once per interval tick.
 pub(crate) type Targets<T> = Box<dyn FnMut() -> Vec<T> + Send>;
 
-/// Calls the same targets on every interval tick.
+/// Returns the same targets on every interval tick.
 pub(crate) fn fixed_targets<T: HttpClientTarget>(targets: Vec<T>) -> Targets<T> {
     Box::new(move || targets.clone())
 }
@@ -214,7 +214,6 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
 )]
 /// Calls one or more targets at an interval.
-///   - The targets are read again on every interval tick.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
@@ -388,7 +387,6 @@ mod tests {
         tls::MaybeTlsSettings,
     };
 
-    /// A target with a label, standing in for the per-target data a source attaches.
     #[derive(Clone)]
     struct LabeledTarget {
         url: Uri,
@@ -435,14 +433,14 @@ mod tests {
             label,
         };
 
-        // The first tick calls `/a`, and every later tick calls `/b`.
+        // Start empty, like Kubernetes discovery before any Pod appears.
         let mut ticks = 0;
         let targets: Targets<LabeledTarget> = Box::new(move || {
             ticks += 1;
-            if ticks == 1 {
-                vec![target("a", "first")]
-            } else {
-                vec![target("b", "later")]
+            match ticks {
+                1 => Vec::new(),
+                2 => vec![target("a", "first")],
+                _ => vec![target("b", "later")],
             }
         });
 
