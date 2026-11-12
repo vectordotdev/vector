@@ -118,6 +118,11 @@ fn git_path(path: &str) -> std::io::Result<String> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
@@ -133,21 +138,12 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/agent_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/tracer_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/span.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/tracer_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/span.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
         println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
-        //
-        // This allows us to use runtime reflection to manually build Protocol Buffers payloads
-        // in a type-safe way, which is necessary for incrementally building certain payloads, like
-        // the ones generated in the `datadog_metrics` sink.
+        // Used for gRPC reflection of Vector's own observability/API protos.
         let protobuf_fds_path =
             Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
                 .join("protobuf-fds.bin");
@@ -158,16 +154,13 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_with_config(
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
-                    "proto/vector/dd_metric.proto",
-                    "proto/datadog/trace/agent_payload.proto",
-                    "proto/datadog/trace/idx/tracer_payload.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",

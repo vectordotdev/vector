@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
 
-#[allow(warnings, clippy::all, clippy::pedantic)]
+#[allow(warnings, clippy::all)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
@@ -17,7 +17,7 @@ pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
-use super::metadata::{Inner, default_schema_definition};
+use super::metadata::Inner;
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
@@ -173,23 +173,25 @@ impl TryFrom<MetricValue> for super::MetricValue {
                 statistic: dist.statistic().into(),
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
+            // Versions 1 and 2 have no way to encode an absent sum, so whatever they carry was
+            // reported by the source.
             MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
                 buckets: super::metric::zip_buckets(
                     hist.buckets,
                     hist.counts.iter().map(|h| u64::from(*h)),
                 ),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram2(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
-                sum: hist.sum,
+                sum: (!hist.sum_missing).then_some(hist.sum),
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
                 quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
@@ -388,7 +390,9 @@ impl From<super::MetricValue> for MetricValue {
             } => Self::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
-                sum,
+                // Readers that predate `sum_missing` ignore it and see zero.
+                sum: sum.unwrap_or(0.0),
+                sum_missing: sum.is_none(),
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
@@ -429,12 +433,10 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-        // (as per chrono leap-second specs), which is below i32::MAX
-        #[allow(clippy::cast_possible_wrap)]
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
-            nanos: ts.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                .expect("chrono subsecond nanoseconds fit in i32"),
         });
 
         let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
@@ -597,6 +599,7 @@ impl From<Secrets> for super::metadata::Secrets {
 impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
+            metric_type: value.metric_type(),
             origin_product: value.product(),
             origin_category: value.category(),
             origin_service: value.service(),
@@ -611,6 +614,7 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
             value.origin_category,
             value.origin_service,
         )
+        .with_metric_type(value.metric_type)
     }
 }
 
@@ -638,7 +642,9 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
+            trace_layout,
             ..
         } = value.into_owned();
 
@@ -652,6 +658,8 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
+            trace_layout: encode_trace_layout(trace_layout),
         }
     }
 }
@@ -667,7 +675,9 @@ impl TryFrom<Metadata> for EventMetadata {
             upstream_id,
             secrets,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
+            trace_layout,
         } = value;
 
         let metadata_value = match metadata_value {
@@ -703,14 +713,35 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: default_schema_definition(),
+                schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                datadog_metric_unit: datadog_metric_unit.map(Arc::from),
+                trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
             last_transform_timestamp: None,
         })
     }
+}
+
+fn encode_trace_layout(layout: Option<super::TraceLayout>) -> Option<i32> {
+    Some(match layout? {
+        super::TraceLayout::Datadog => TraceLayout::Datadog as i32,
+        super::TraceLayout::OtelFlattened => TraceLayout::OtelFlattened as i32,
+        super::TraceLayout::OtlpResourceSpans => TraceLayout::OtlpResourceSpans as i32,
+        super::TraceLayout::Unrecognized(value) => value,
+    })
+}
+
+fn decode_trace_layout(value: Option<i32>) -> Option<super::TraceLayout> {
+    let value = value?;
+    Some(match TraceLayout::try_from(value) {
+        Ok(TraceLayout::Datadog) => super::TraceLayout::Datadog,
+        Ok(TraceLayout::OtelFlattened) => super::TraceLayout::OtelFlattened,
+        Ok(TraceLayout::OtlpResourceSpans) => super::TraceLayout::OtlpResourceSpans,
+        Ok(TraceLayout::Unspecified) | Err(_) => super::TraceLayout::Unrecognized(value),
+    })
 }
 
 fn decode_event_metadata(
@@ -731,10 +762,9 @@ fn decode_event_metadata(
 fn decode_timestamp(
     ts: &prost_types::Timestamp,
 ) -> Result<chrono::DateTime<chrono::Utc>, DecodeError> {
-    // Sign is never lost as ts.nanos is always non negative (per proto spec)
-    #[allow(clippy::cast_sign_loss)]
+    let nanos = u32::try_from(ts.nanos).map_err(|_| DecodeError::InvalidTimestamp)?;
     chrono::Utc
-        .timestamp_opt(ts.seconds, ts.nanos as u32)
+        .timestamp_opt(ts.seconds, nanos)
         .single()
         .ok_or(DecodeError::InvalidTimestamp)
 }
@@ -787,13 +817,12 @@ fn encode_value(value: super::Value) -> Value {
     Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            super::Value::String(s) => Some(value::Kind::RawBytes(s.into_bytes())),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
-            // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-            // (as per chrono leap-second specs), which is below i32::MAX
-            #[allow(clippy::cast_possible_wrap)]
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
-                nanos: ts.timestamp_subsec_nanos() as i32,
+                nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                    .expect("chrono subsecond nanoseconds fit in i32"),
             })),
             super::Value::Integer(value) => Some(value::Kind::Integer(value)),
             super::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
@@ -885,7 +914,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedHistogram {
                 buckets: vec![metric::Bucket {
@@ -893,7 +922,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedSummary {
                 quantiles: vec![metric::Quantile {
@@ -927,6 +956,64 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(decoded, expected);
+    }
+
+    /// A histogram marked `sum_missing` reported no sum, whatever `sum` carries.
+    #[test]
+    fn decodes_histogram_marked_sum_missing_as_absent() {
+        let value = MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
+            buckets: vec![HistogramBucket3 {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 7.0,
+            sum_missing: true,
+        });
+
+        assert_eq!(
+            EventMetricValue::try_from(value).expect("marked histogram should decode"),
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: None,
+            }
+        );
+    }
+
+    fn encode_histogram(sum: Option<f64>) -> AggregatedHistogram3 {
+        let value = MetricValue::from(EventMetricValue::AggregatedHistogram {
+            buckets: vec![metric::Bucket {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum,
+        });
+
+        let MetricValue::AggregatedHistogram3(hist) = value else {
+            panic!("expected AggregatedHistogram3, got {value:?}");
+        };
+        hist
+    }
+
+    /// A reported sum of zero must not be mistaken for a missing one.
+    #[test]
+    fn encodes_reported_zero_sum_without_marker() {
+        let hist = encode_histogram(Some(0.0));
+        assert!(!hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
+    }
+
+    /// Readers that predate `sum_missing` skip it, so the zero in `sum` is what they see.
+    #[test]
+    fn encodes_unreported_sum_as_marked_zero() {
+        let hist = encode_histogram(None);
+        assert!(hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
     }
 
     #[test]
@@ -994,6 +1081,7 @@ mod tests {
 
         assert_eq!(decoded.source_event_id(), None);
         assert_eq!(decoded.source_type(), Some("legacy"));
+        assert_eq!(decoded.trace_layout(), None);
     }
 
     #[test]
@@ -1061,6 +1149,17 @@ mod tests {
             crate::event::Metric::try_from(proto),
             Err(DecodeError::MismatchedSketchBins)
         );
+    }
+
+    #[test]
+    fn strings_preserve_bytes_wire_encoding() {
+        let string = VrlValue::from("café\n");
+        let bytes = VrlValue::Bytes("café\n".into());
+        let encoded = encode_value(string.clone());
+        assert_eq!(encoded.encode_to_vec(), encode_value(bytes).encode_to_vec());
+        let decoded = decode_value(encoded).unwrap().unwrap();
+        assert!(matches!(decoded, VrlValue::Bytes(_)));
+        assert_eq!(decoded, string);
     }
 
     #[test]

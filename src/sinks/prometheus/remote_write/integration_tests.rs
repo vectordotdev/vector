@@ -67,7 +67,10 @@ async fn insert_metrics(url: &str) {
 
             match metric.value() {
                 MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
+                    #[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
+                    {
+                        assert_eq!(output["value"].as_f64().unwrap(), *value);
+                    }
                 }
                 _ => panic!("Unhandled metric value, fix the test"),
             }
@@ -81,7 +84,7 @@ async fn insert_metrics(url: &str) {
 
         cleanup_v1(url, &database).await;
     })
-    .await
+    .await;
 }
 
 async fn query(url: &str, query: &str) -> Value {
@@ -109,6 +112,6 @@ fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
 
 fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
     name_range
-        .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
+        .map(move |num| create_event(format!("metric_{num}"), value(f64::from(num))))
         .collect()
 }

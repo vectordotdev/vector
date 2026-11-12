@@ -9,16 +9,19 @@ pub struct NativeJsonSerializerConfig;
 
 impl NativeJsonSerializerConfig {
     /// Build the `NativeJsonSerializer` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> NativeJsonSerializer {
         NativeJsonSerializer
     }
 
     /// The data type of events that are accepted by `NativeJsonSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::all_bits()
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
@@ -30,6 +33,15 @@ pub struct NativeJsonSerializer;
 
 impl NativeJsonSerializer {
     /// Encode event and represent it as native JSON value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         serde_json::to_value(&event).map_err(|e| e.to_string().into())
     }
@@ -90,7 +102,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
             },
         ));

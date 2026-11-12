@@ -214,6 +214,26 @@ components: transforms: aggregate: {
 						`allowed_lateness_ms = 0` enforces strict lateness even if the flush interval is
 						long or misaligned.
 
+						Set `event_time.late_events.strategy` to `forward` to send late events downstream
+						unchanged instead of dropping them. Forwarded events skip aggregation and do not
+						create buckets or affect the watermark. Because they keep their original
+						timestamp, they can share a timestamp with the aggregate emitted for their bucket;
+						sinks that overwrite values for an identical timestamp, such as the Datadog Metrics
+						sink, may then replace the aggregate with the late value. Sinks that convert
+						absolute metrics to deltas, such as the Datadog Metrics sink, treat a late
+						absolute counter or histogram as a reset and reset their baseline, inflating the
+						next delta. In `count` and `diff` modes, forwarded events carry their raw value
+						rather than a count or delta.
+
+						Set `event_time.late_events.metric_types` to forward only late events of the
+						listed types, for example `["distribution", "aggregated_histogram", "sketch"]`.
+						With a list, only incremental events are forwarded, which keeps late absolute
+						counters and histograms from resetting a sink's delta baseline. The rule applies
+						to every type, so absolute gauges are dropped too; gauges are usually absolute,
+						so listing `gauge` rarely forwards anything. Forwarding only the types the
+						Datadog Metrics sink sends as distributions also avoids overwriting the bucket's
+						aggregate, because distributions are merged rather than overwritten.
+
 						Metrics the configured `mode` does not aggregate (for example an `incremental`
 						event in `mean` mode, or an `absolute` event in `sum` mode) pass through
 						unchanged, matching system-time behavior, without creating buckets or affecting
@@ -251,7 +271,7 @@ components: transforms: aggregate: {
 
 	telemetry: metrics: {
 		aggregate_events_recorded_total: components.sources.internal_metrics.output.metrics.aggregate_events_recorded_total
-		aggregate_failed_updates:        components.sources.internal_metrics.output.metrics.aggregate_failed_updates
+		aggregate_failed_updates_total:  components.sources.internal_metrics.output.metrics.aggregate_failed_updates_total
 		aggregate_flushes_total:         components.sources.internal_metrics.output.metrics.aggregate_flushes_total
 	}
 }

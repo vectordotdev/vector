@@ -1,9 +1,8 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-use hyper::{
-    Body, Request, Response, Server, StatusCode,
-    service::{make_service_fn, service_fn},
-};
+use bytes::Bytes;
+use http::{Response, StatusCode, Uri};
+use http_body_util::Full;
 use tokio::{
     sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
@@ -12,54 +11,38 @@ use tokio::{
 
 use super::RunningTopology;
 use crate::{
-    Error,
     config::{self, ConfigDiff, Format},
-    test_util,
+    test_util::{self, http::spawn_blackhole_http_server},
     topology::builder::TopologyPiecesBuilder,
 };
 
 type Lock = Arc<Mutex<()>>;
 
-pub async fn respond(
+async fn respond(
     waiter: Lock,
     tx: mpsc::Sender<()>,
     status: StatusCode,
-) -> Result<Response<Body>, Error> {
+) -> Result<Response<Full<Bytes>>, Infallible> {
     tx.send(())
         .await
         .expect("Error sending 'before' status from test server");
     _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
-        .body(Body::empty())
+        .body(Full::default())
         .unwrap())
 }
 
-pub async fn http_server(
-    address: SocketAddr,
-    waiter: Lock,
-    status: StatusCode,
-) -> mpsc::Receiver<()> {
+async fn http_server(waiter: Lock, status: StatusCode) -> (Uri, mpsc::Receiver<()>) {
     let (tx, rx) = mpsc::channel(1);
-    let service = make_service_fn(move |_| {
-        let waiter = Arc::clone(&waiter);
-        let tx = tx.clone();
-        async move {
-            Ok::<_, Error>(service_fn(move |_req: Request<Body>| {
-                respond(Arc::clone(&waiter), tx.clone(), status)
-            }))
-        }
-    });
+    let uri =
+        spawn_blackhole_http_server(move |_| respond(Arc::clone(&waiter), tx.clone(), status))
+            .await;
 
-    let server = Server::bind(&address).serve(service);
-    tokio::spawn(server);
-
-    test_util::wait_for_tcp(address).await;
-
-    rx
+    (uri, rx)
 }
 
-pub fn http_client(
+fn http_client(
     address: SocketAddr,
     body: impl Into<String>,
 ) -> (oneshot::Receiver<()>, JoinHandle<reqwest::Response>) {
@@ -82,8 +65,11 @@ pub fn http_client(
 async fn http_to_http(status: StatusCode, response: StatusCode) {
     test_util::trace_init();
 
+    let mutex = Arc::new(Mutex::new(()));
+    let pause = mutex.lock().await;
+    let (sink_uri, mut rx_server) = http_server(Arc::clone(&mutex), status).await;
+
     let (_guard_1, address1) = test_util::addr::next_addr();
-    let (_guard_2, address2) = test_util::addr::next_addr();
     let config = config::load_from_str(
         &format!(
             r#"
@@ -96,7 +82,7 @@ acknowledgements.enabled = true
 type = "http"
 inputs = ["in"]
 encoding.codec = "json"
-uri = "http://{address2}/"
+uri = "{sink_uri}"
 "#,
         ),
         Format::Toml,
@@ -112,10 +98,6 @@ uri = "http://{address2}/"
         .unwrap();
 
     test_util::wait_for_tcp(address1).await;
-
-    let mutex = Arc::new(Mutex::new(()));
-    let pause = mutex.lock().await;
-    let mut rx_server = http_server(address2, Arc::clone(&mutex), status).await;
 
     // The expected flow is this:
     // 0. Nothing is ready to continue.

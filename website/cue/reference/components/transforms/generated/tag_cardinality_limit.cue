@@ -13,7 +13,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		type: uint: default: 5120
 	}
 	internal_metrics: {
-		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+		description: "Configuration of internal metrics for the `TagCardinalityLimit` transform."
 		required:    false
 		type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 	}
@@ -78,7 +78,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		description: "Tag cardinality limits configuration per metric name."
 		required:    false
 		type: object: options: "*": {
-			description: "An individual metric configuration."
+			description: "Per-metric name tag cardinality limit configuration."
 			required:    true
 			type: object: options: {
 				cache_size_per_key: {
@@ -93,7 +93,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					type: uint: default: 5120
 				}
 				internal_metrics: {
-					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+					description: "Configuration of internal metrics for the `TagCardinalityLimit` transform."
 					required:    false
 					type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 				}

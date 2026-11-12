@@ -4,7 +4,10 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::CounterName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -21,6 +24,10 @@ pub struct NetworkConfig {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn network_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "network";
         match heim::net::io_counters().await {
@@ -46,46 +53,46 @@ impl HostMetrics {
                     let interface = counter.interface();
                     let tags = metric_tags!("device" => interface);
                     output.counter(
-                        "network_receive_bytes_total",
+                        CounterName::NetworkReceiveBytesTotal,
                         counter.bytes_recv().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "network_receive_errs_total",
+                        CounterName::NetworkReceiveErrsTotal,
                         counter.errors_recv() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "network_receive_packets_total",
+                        CounterName::NetworkReceivePacketsTotal,
                         counter.packets_recv() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "network_transmit_bytes_total",
+                        CounterName::NetworkTransmitBytesTotal,
                         counter.bytes_sent().get::<byte>() as f64,
                         tags.clone(),
                     );
                     #[cfg(any(target_os = "linux", windows))]
                     output.counter(
-                        "network_transmit_packets_drop_total",
+                        CounterName::NetworkTransmitPacketsDropTotal,
                         counter.drop_sent() as f64,
                         tags.clone(),
                     );
                     #[cfg(any(target_os = "linux", windows))]
                     output.counter(
-                        "network_transmit_packets_total",
+                        CounterName::NetworkTransmitPacketsTotal,
                         counter.packets_sent() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "network_transmit_errs_total",
+                        CounterName::NetworkTransmitErrsTotal,
                         counter.errors_sent() as f64,
                         tags,
                     );
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load network I/O counters.",
                     error,
                 });
@@ -112,7 +119,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .network_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 
@@ -137,7 +144,7 @@ mod tests {
             })
             .network_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }

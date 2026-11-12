@@ -3,10 +3,24 @@ import tocbot from "tocbot";
 // Table of contents for documentation pages
 const tableOfContents = () => {
   if (document.getElementById("toc")) {
+    const content = document.getElementById("page-content");
     tocbot.init({
       tocSelector: "#toc",
       contentSelector: "#page-content",
-      headingSelector: "h2,h3,h4,h5",
+      headingSelector: content?.dataset.tocHeadings || "h2,h3,h4,h5",
+      includeTitleTags: Boolean(content?.dataset.tocHeadings),
+      headingObjectCallback: (heading, element) => {
+        // Notice cards sit below their section; headings inside their bodies are excluded.
+        if (element.matches(".changelog-card")) {
+          return {
+            ...heading,
+            nodeName: "H3",
+            headingLevel: 3,
+            textContent: element.querySelector("[data-toc-title]").textContent.trim()
+          };
+        }
+        return heading;
+      },
       scrollSmoothDuration: 400,
       headingsOffset: 80,
       scrollSmoothOffset: -80,
@@ -14,6 +28,8 @@ const tableOfContents = () => {
     });
   }
 };
+
+document.addEventListener("deprecations-sorted", tableOfContents);
 
 const showCodeFilename = () => {
   var els = document.getElementsByClassName("highlight");
@@ -26,9 +42,136 @@ const showCodeFilename = () => {
   }
 };
 
+// Text of a code block, without line numbers. Returns null if the code can't be identified.
+const codeBlockText = (block) => {
+  // Table-style line numbers render two <pre> elements; the code is in the last cell.
+  const pre = block.querySelector(".lntd:last-child pre") || block.querySelector("pre");
+  if (!pre) return null;
+
+  const clone = pre.cloneNode(true);
+  clone.querySelectorAll(".ln, .lnt").forEach((el) => el.remove());
+  const text = clone.textContent.replace(/\n$/, "");
+  return text.length ? text : null;
+};
+
+const svgIcon = (body) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const copyIcon = svgIcon(
+  '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
+);
+const copiedIcon = svgIcon('<polyline points="20 6 9 17 4 12"/>');
+const failedIcon = svgIcon(
+  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+);
+
+// Copy the full snippet even when its content is collapsed.
+const addCopyButton = (block, controls) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "code-copy-button";
+  button.setAttribute("aria-label", "Copy code to clipboard");
+  button.title = "Copy";
+  button.innerHTML = copyIcon;
+
+  const status = document.createElement("span");
+  status.className = "sr-only";
+  status.setAttribute("aria-live", "polite");
+
+  let resetTimer;
+  let copying = false;
+  button.addEventListener("click", async () => {
+    // Guard with a flag rather than `disabled`, which can drop keyboard focus
+    if (copying) return;
+    copying = true;
+    clearTimeout(resetTimer);
+    try {
+      await navigator.clipboard.writeText(codeBlockText(block));
+      button.innerHTML = copiedIcon;
+      button.title = status.textContent = "Copied!";
+    } catch {
+      button.innerHTML = failedIcon;
+      button.title = status.textContent = "Copy failed. Select the code to copy it manually.";
+    } finally {
+      copying = false;
+    }
+    resetTimer = setTimeout(() => {
+      button.innerHTML = copyIcon;
+      button.title = "Copy";
+      status.textContent = "";
+    }, 2000);
+  });
+
+  controls.append(button, status);
+};
+
+const collapsibleCodeLineCount = 20;
+
+const addCodeControls = () => {
+  // Plain-text and raw HTML code blocks lack Hugo's .highlight wrapper.
+  document.querySelectorAll("#page-content pre").forEach((pre) => {
+    if (pre.closest(".highlight")) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "highlight";
+    pre.replaceWith(wrapper);
+    wrapper.append(pre);
+  });
+
+  document.querySelectorAll("#page-content .highlight").forEach((block, index) => {
+    const text = codeBlockText(block);
+    if (text === null) return;
+
+    const lineCount = text.split("\n").length;
+    const collapsedByDefault = block.parentElement.dataset.codeCollapsed === "true";
+    const collapsible = collapsedByDefault || lineCount > collapsibleCodeLineCount;
+    const canCopy = Boolean(navigator.clipboard?.writeText);
+    if (!collapsible && !canCopy) return;
+
+    const content = block.firstElementChild;
+    content.classList.add("code-block-content");
+    block.classList.add("has-code-controls");
+
+    const controls = document.createElement("div");
+    controls.className = "code-block-controls";
+
+    if (collapsible) {
+      block.classList.add("is-collapsible");
+      content.id ||= `code-block-content-${index}`;
+
+      const lineCountLabel = document.createElement("span");
+      lineCountLabel.className = "code-line-count";
+      const filename = block.parentElement.dataset.codeFilename;
+      lineCountLabel.textContent = filename ? `${filename} · ${lineCount} lines` : `${lineCount} lines`;
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "code-toggle-button";
+      content.hidden = collapsedByDefault;
+      toggle.textContent = content.hidden ? "Expand" : "Collapse";
+      toggle.setAttribute("aria-expanded", String(!content.hidden));
+      toggle.setAttribute("aria-controls", content.id);
+      toggle.addEventListener("click", () => {
+        content.hidden = !content.hidden;
+        toggle.setAttribute("aria-expanded", String(!content.hidden));
+        toggle.textContent = content.hidden ? "Expand" : "Collapse";
+      });
+
+      controls.append(lineCountLabel, toggle);
+      block.prepend(controls);
+    } else {
+      block.append(controls);
+    }
+
+    if (canCopy) addCopyButton(block, controls);
+  });
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   // search.start();
 
   tableOfContents();
   showCodeFilename();
+  addCodeControls();
+
+  // Code controls change the layout after Firefox may have followed the URL fragment.
+  document.querySelector(":target")?.scrollIntoView();
 });

@@ -95,6 +95,7 @@ pub enum ConnectionStatus {
 }
 
 impl ConnectionStatus {
+    #[must_use]
     pub fn as_ui_spans(&self) -> Vec<Span<'_>> {
         match self {
             Self::Pending => vec![Span::styled(
@@ -154,6 +155,7 @@ pub enum FilterColumn {
 }
 
 impl SortColumn {
+    #[must_use]
     pub fn matches_header(&self, header: &str) -> bool {
         match self {
             SortColumn::Id => header == columns::ID,
@@ -169,6 +171,7 @@ impl SortColumn {
         }
     }
 
+    #[must_use]
     pub fn items() -> Vec<&'static str> {
         vec![
             columns::ID,
@@ -190,6 +193,7 @@ impl SortColumn {
 }
 
 impl FilterColumn {
+    #[must_use]
     pub fn matches_header(&self, header: &str) -> bool {
         match self {
             FilterColumn::Id => header == columns::ID,
@@ -198,6 +202,7 @@ impl FilterColumn {
         }
     }
 
+    #[must_use]
     pub fn items() -> Vec<&'static str> {
         vec![columns::ID, columns::KIND, columns::TYPE]
     }
@@ -297,7 +302,7 @@ pub struct FilterMenuState {
 impl Default for FilterMenuState {
     fn default() -> Self {
         Self {
-            input: Default::default(),
+            input: String::new(),
             column_selection: ListState::default().with_selected(Some(0)),
         }
     }
@@ -306,12 +311,14 @@ impl Default for FilterMenuState {
 impl UiState {
     /// Returns the height of components display box in rows, based on provided [`Size`].
     /// Calculates by deducting rows used for header and footer.
+    #[must_use]
     pub fn components_box_height(area: Size) -> u16 {
         // Currently hardcoded (10 is the number of rows the header and footer take up)
         area.height.saturating_sub(10)
     }
 
     /// Returns the maximum scroll value
+    #[must_use]
     pub fn max_scroll(area: Size, components_count: usize) -> usize {
         components_count.saturating_sub(Self::components_box_height(area).into())
     }
@@ -328,6 +335,11 @@ impl UiState {
 
     /// Changes current scroll by provided diff in pages. Uses [`Size`] to limit scroll,
     /// and to calculate number of rows a page contains.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Vector targets have pointers wide enough to represent terminal dimensions."
+    )]
     pub fn scroll_page(&mut self, diff: isize, area: Size, components_count: usize) {
         self.scroll(
             diff * (Self::components_box_height(area) as isize),
@@ -338,6 +350,7 @@ impl UiState {
 }
 
 impl State {
+    #[must_use]
     pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
@@ -367,7 +380,7 @@ impl State {
             .pattern
             .as_ref()
             .map(|r| r.as_str().to_string())
-            .unwrap_or("".to_string());
+            .unwrap_or_default();
     }
 }
 
@@ -414,6 +427,7 @@ pub struct ComponentRow {
 impl ComponentRow {
     /// Note, we ignore `outputs` if it only contains [`DEFAULT_OUTPUT`] to avoid
     /// redundancy with information shown in the overall component row
+    #[must_use]
     pub fn has_displayable_outputs(&self) -> bool {
         self.outputs.len() > 1
             || (self.outputs.len() == 1 && !self.outputs.contains_key(DEFAULT_OUTPUT))
@@ -424,6 +438,12 @@ impl ComponentRow {
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
 /// UI and other events are handled separately, to ensure one doesn't block the other.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing dashboard layout and event handling together during the lint rollout."
+)]
 pub fn updater(mut event_rx: EventRx, mut ui_event_rx: UiEventRx, mut state: State) -> StateRx {
     let (tx, rx) = watch::channel(state.clone());
 
@@ -559,6 +579,11 @@ pub fn updater(mut event_rx: EventRx, mut ui_event_rx: UiEventRx, mut state: Sta
     rx
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "UI events are consumed once by the state updater."
+)]
 fn handle_ui_event(event: UiEventType, state: &mut State) {
     match event {
         UiEventType::Scroll(diff, area) => {
@@ -593,7 +618,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
         UiEventType::SortByColumn(col) => state.sort_state.column = Some(col),
         UiEventType::SortConfirmation => {
             if let Some(selected) = state.ui.sort_menu_state.selected() {
-                state.sort_state.column = Some(selected.into())
+                state.sort_state.column = Some(selected.into());
             }
             state.ui.sort_visible = false;
         }
@@ -635,7 +660,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
                 state.filter_state.pattern = Regex::new(&state.ui.filter_menu_state.input).ok();
             }
             if let Some(selected) = state.ui.filter_menu_state.column_selection.selected() {
-                state.filter_state.column = selected.into()
+                state.filter_state.column = selected.into();
             }
             state.ui.filter_visible = false;
         }

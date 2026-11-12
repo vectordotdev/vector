@@ -2,7 +2,7 @@
 // the full `vector-buffers` crate into the Antithesis workload binaries.
 const DISK_V2_WRITE_BUFFER_SIZE: usize = 256 * 1024;
 
-/// Payload lengths in bytes, one per id class. Sized around the disk_v2 write
+/// Payload lengths in bytes, one per id class. Sized around the `disk_v2` write
 /// buffer so the produced records straddle the boundary at which the buffer is
 /// flushed to the data file: empty, a single byte, fractions of, just under, at,
 /// just over, and a record several times larger than the buffer.
@@ -32,8 +32,15 @@ fn splitmix64(state: &mut u64) -> u64 {
 /// producer regenerates the same record on every retry and the oracle regenerates
 /// the same expected bytes with no per-id state to carry. Length comes from the
 /// id's class; content is a splitmix64 stream seeded by id.
+#[must_use]
 pub fn payload_for(id: u64) -> Vec<u8> {
-    let len = PAYLOAD_LENGTHS[(id % PAYLOAD_LENGTHS.len() as u64) as usize];
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the remainder is below the eight payload classes on every target"
+    )]
+    let class = (id % PAYLOAD_LENGTHS.len() as u64) as usize;
+    let len = PAYLOAD_LENGTHS[class];
     let mut out = Vec::with_capacity(len);
     let mut state = id;
     while out.len() < len {
@@ -47,12 +54,14 @@ pub fn payload_for(id: u64) -> Vec<u8> {
 /// Hex-encoding of `payload_for(id)`. Hex survives JSON and Vector transport
 /// without escaping concerns, and a corruption of the bytes shows up as a hex
 /// mismatch.
+#[must_use]
 pub fn payload_field(id: u64) -> String {
+    const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
     let bytes = payload_for(id);
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        s.push(char::from_digit((b >> 4) as u32, 16).unwrap());
-        s.push(char::from_digit((b & 0x0f) as u32, 16).unwrap());
+        s.push(char::from(HEX_DIGITS[usize::from(b >> 4)]));
+        s.push(char::from(HEX_DIGITS[usize::from(b & 0x0f)]));
     }
     s
 }
@@ -60,6 +69,7 @@ pub fn payload_field(id: u64) -> String {
 /// Decode the hex produced by [`payload_field`] back to bytes. Returns `None` on
 /// any non-hex or odd-length input so the oracle can tell a mangled field from a
 /// content mismatch.
+#[must_use]
 pub fn decode_payload_field(field: &str) -> Option<Vec<u8>> {
     if !field.len().is_multiple_of(2) {
         return None;
@@ -69,7 +79,7 @@ pub fn decode_payload_field(field: &str) -> Option<Vec<u8>> {
     while let (Some(hi), Some(lo)) = (bytes.next(), bytes.next()) {
         let hi = (hi as char).to_digit(16)?;
         let lo = (lo as char).to_digit(16)?;
-        out.push(((hi << 4) | lo) as u8);
+        out.push(u8::try_from((hi << 4) | lo).ok()?);
     }
     Some(out)
 }
@@ -87,8 +97,8 @@ mod tests {
 
     #[test]
     fn payload_length_follows_class() {
-        for id in 0..PAYLOAD_LENGTHS.len() as u64 {
-            assert_eq!(payload_for(id).len(), PAYLOAD_LENGTHS[id as usize]);
+        for (id, &len) in PAYLOAD_LENGTHS.iter().enumerate() {
+            assert_eq!(payload_for(id as u64).len(), len);
         }
     }
 

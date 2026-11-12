@@ -64,16 +64,21 @@ pub struct KinesisSinkBaseConfig {
 }
 
 impl KinesisSinkBaseConfig {
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
+    #[must_use]
     pub const fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
 }
 
-/// Builds an aws_kinesis sink.
+/// Builds an AWS Kinesis sink.
+///
+/// # Errors
+/// Returns an error if the configured serializer cannot be built.
 pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
     partition_key_field: Option<ConfigValuePath>,

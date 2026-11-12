@@ -14,6 +14,12 @@ pub struct DnstapEventSchema;
 
 impl DnstapEventSchema {
     /// The message schema for the request and response message fields
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        clippy::unused_self,
+        reason = "keep the existing protocol field mapping together; splitting is deferred; retain the existing instance-based schema builder API"
+    )]
     pub(crate) fn request_message_schema_definition(&self) -> Collection<Field> {
         let mut result: BTreeMap<Field, Kind> = BTreeMap::new();
         result.insert(
@@ -133,6 +139,11 @@ impl DnstapEventSchema {
     }
 
     /// Schema definition for fields stored in the root.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "retain the existing instance-based schema builder API"
+    )]
     fn root_schema_definition(
         &self,
         schema: vector_core::schema::Definition,
@@ -150,6 +161,7 @@ impl DnstapEventSchema {
     }
 
     /// Schema definition from the message.
+    #[must_use]
     pub fn message_schema_definition(
         &self,
         schema: vector_core::schema::Definition,
@@ -188,6 +200,7 @@ impl DnstapEventSchema {
     }
 
     /// The schema definition for a dns tap message.
+    #[must_use]
     pub fn schema_definition(
         &self,
         schema: vector_core::schema::Definition,
@@ -388,6 +401,7 @@ pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPa
 pub struct DnsQueryHeaderSchema;
 
 impl DnsQueryHeaderSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.id.to_string() => Kind::integer(),
@@ -413,6 +427,7 @@ impl DnsQueryHeaderSchema {
 pub struct DnsUpdateHeaderSchema;
 
 impl DnsUpdateHeaderSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.id.to_string() => Kind::integer(),
@@ -432,6 +447,7 @@ impl DnsUpdateHeaderSchema {
 pub struct DnsMessageOptPseudoSectionSchema;
 
 impl DnsMessageOptPseudoSectionSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.extended_rcode.to_string() => Kind::integer(),
@@ -450,6 +466,7 @@ impl DnsMessageOptPseudoSectionSchema {
 pub struct DnsMessageEdeOptionSchema;
 
 impl DnsMessageEdeOptionSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.info_code.to_string() => Kind::integer(),
@@ -464,6 +481,7 @@ impl DnsMessageEdeOptionSchema {
 pub struct DnsMessageOptionSchema;
 
 impl DnsMessageOptionSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.opt_code.to_string() => Kind::integer(),
@@ -478,6 +496,7 @@ impl DnsMessageOptionSchema {
 pub struct DnsRecordSchema;
 
 impl DnsRecordSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.domain_name.to_string() => Kind::bytes(),
@@ -496,6 +515,7 @@ impl DnsRecordSchema {
 pub struct DnsQueryQuestionSchema;
 
 impl DnsQueryQuestionSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.class.to_string() => Kind::bytes(),
@@ -511,6 +531,7 @@ impl DnsQueryQuestionSchema {
 pub struct DnsUpdateZoneInfoSchema;
 
 impl DnsUpdateZoneInfoSchema {
+    #[must_use]
     pub fn schema_definition() -> Collection<Field> {
         btreemap! {
             DNSTAP_VALUE_PATHS.zone_name.to_string() => Kind::bytes(),

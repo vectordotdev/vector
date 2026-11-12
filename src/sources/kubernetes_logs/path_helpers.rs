@@ -56,7 +56,7 @@ pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
 
 /// Contains the information extracted from the pod log file path.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LogFileInfo<'a> {
+pub(super) struct LogFileInfo<'a> {
     pub pod_namespace: &'a str,
     pub pod_name: &'a str,
     pub pod_uid: &'a str,
@@ -92,7 +92,7 @@ mod tests {
             (("", "", ""), "/var/log/pods/__"),
         ];
 
-        for ((in_namespace, in_name, in_uid), expected) in cases.into_iter() {
+        for ((in_namespace, in_name, in_uid), expected) in cases {
             assert_eq!(
                 build_pod_logs_directory(in_namespace, in_name, in_uid),
                 PathBuf::from(expected)
@@ -137,7 +137,7 @@ mod tests {
             ("", None),
         ];
 
-        for (input, expected) in cases.into_iter() {
+        for (input, expected) in cases {
             assert_eq!(parse_log_file_path(input), expected);
         }
     }

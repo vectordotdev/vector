@@ -42,7 +42,7 @@ fn find_enrichment_table_records(
     enrichment_tables: &TableSearch,
     table: &str,
     case_sensitive: Case,
-    wildcard: Option<Value>,
+    wildcard: Option<&Value>,
     condition: &[Condition],
     index: Option<IndexHandle>,
 ) -> Resolved {
@@ -64,8 +64,8 @@ fn find_enrichment_table_records(
             table,
             case_sensitive,
             condition,
-            select.as_ref().map(|select| select.as_ref()),
-            wildcard.as_ref(),
+            select.as_deref(),
+            wildcard,
             index,
         )?
         .into_iter()
@@ -249,7 +249,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
             enrichment_tables,
             table,
             case_sensitive,
-            wildcard,
+            wildcard.as_ref(),
             &condition,
             index,
         )

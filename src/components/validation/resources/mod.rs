@@ -62,6 +62,7 @@ impl ResourceCodec {
     /// Not all codecs support all possible event types (i.e. a codec has no means to losslessly
     /// represent the data in a particular event type) so we must check at runtime to ensure that
     /// we're only generating event payloads that can be encoded/decoded for the given component.
+    #[must_use]
     pub fn allowed_event_data_types(self) -> DataType {
         match self {
             Self::Encoding(encoding) => encoding.config().input_type(),
@@ -74,6 +75,13 @@ impl ResourceCodec {
     ///
     /// The encoder is generated as an inverse to the input codec: if a decoding configuration was
     /// given, we generate an encoder that satisfies that decoding configuration, and vice versa.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the serializer fails to build, or if the decoding configuration uses a
+    /// deserializer (`influxdb`, `vrl`) or framing (`octet_counting`, `chunked_gelf`) that has no
+    /// encoding equivalent.
+    #[must_use]
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
@@ -105,6 +113,16 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the deserializer cannot be built, such as when a Protobuf descriptor
+    /// file cannot be loaded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the encoding configuration uses a serializer that has no decoding equivalent
+    /// (`avro`, `cef`, `csv`, `logfmt`, `otlp`, or `syslog`).
     pub fn into_decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
@@ -144,6 +162,11 @@ impl From<DecodingConfig> for ResourceCodec {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Preserve inferred default types"
+)]
 fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::Serializer {
     let serializer_config = match config {
         // TODO: This isn't necessarily a one-to-one conversion, at least not in the future when
@@ -214,6 +237,11 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
     framing_config.build()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Preserve inferred default types"
+)]
 fn serializer_config_to_deserializer(
     config: &SerializerConfig,
 ) -> vector_lib::Result<decoding::Deserializer> {
@@ -245,6 +273,11 @@ fn serializer_config_to_deserializer(
     deserializer_config.build()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Preserve inferred default types"
+)]
 fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decoding::Framer {
     let framing_config = match framing {
         encoding::FramingConfig::Bytes => decoding::FramingConfig::Bytes,
@@ -376,6 +409,16 @@ impl ExternalResource {
     }
 
     /// Spawns this resource for use as an output for a sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder for the resource codec cannot be built.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an HTTP resource uses the `Pull` direction, which is not implemented, or if its
+    /// URI host is missing or not an IP address. Panics if the codec uses a serializer that has no
+    /// matching deserializer for validation.
     pub fn spawn_as_output(
         self,
         output_tx: mpsc::Sender<Vec<Event>>,

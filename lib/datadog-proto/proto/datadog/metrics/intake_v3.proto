@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package datadoghq.api.metrics.v3;
+
+option go_package = "github.com/DataDog/agent-payload/v5/metrics/intake_v3";
+
+message Payload {
+  reserved 1; // for compatibility with agentpayload.MetricPayload.series
+  Metadata metadata = 2;
+  MetricData metricData = 3;
+}
+
+message Metadata {
+  repeated string tags = 1;
+  repeated string resources = 2; // even number of elements, [Type, Name] pairs
+}
+
+message MetricData {
+  // Dictionaries
+  // All dictionary indexes are base-1, zero implicitly represents an empty value.
+  bytes dictNameStr = 1;                // varint length + value
+  bytes dictTagStr = 2;                 // varint length + value
+  repeated sint64 dictTagsets = 3;      // length, delta encoded set of indexes into dictTagsStr
+
+  bytes dictResourceStr = 4;            // varint length + value
+  repeated int64 dictResourceLen = 5;   // number of elements in Type and Name arrays
+  repeated sint64 dictResourceType = 6; // delta encoded set of indexes into dictResourceStr
+  repeated sint64 dictResourceName = 7; // delta encoded set of indexes into dictResourceStr
+
+  bytes dictSourceTypeName = 8;         // varint length + value
+  repeated int32 dictOriginInfo = 9;    // (product, category, service) tuples
+  bytes dictUnitStr = 25;                // varint length + value
+
+  // One entry per time series
+  repeated uint64 types = 10;           // type = metricType | valueType | metricFlags
+  repeated sint64 nameRefs = 11;        // index into dictNameStr, entire array is delta encoded
+  repeated sint64 tagsetRefs = 12;      // index into dictTagsets, entire array is delta encoded
+  repeated sint64 resourcesRefs = 13;   // index into dictResourceLen, entire array is delta encoded
+  repeated uint64 intervals = 14;
+  repeated uint64 numPoints = 15;
+  repeated sint64 sourceTypeNameRefs = 23;  // index into dictSourceTypeName, entire array is delta encoded
+  repeated sint64 originInfoRefs = 24;      // index into dictOriginInfo, entire array is delta encoded
+  repeated sint64 unitRefs = 26;            // index into dictUnitStr, value present if flagHasUnit is set, entire array is delta encoded
+
+  // each metric has numPoints values in this section
+  repeated sint64 timestamps = 16;      // entire array delta encoded
+  repeated sint64 valsSint64 = 17;      // or
+  repeated float valsFloat32 = 18;      // or
+  repeated double valsFloat64 = 19;     // based on valueType
+  repeated uint64 sketchNumBins = 20;
+  repeated sint32 sketchBinKeys = 21;   // per-metric sequence is delta encoded
+  repeated uint32 sketchBinCnts = 22;
+  // sketch summary Sum, Min, Max are encoded as three consecutive elements in one of vals using valueType
+  // sketch summary Cnt is always encoded in valInt64
+  // sketch summary Avg is reconstructed as Sum/Cnt in the intake
+}
+
+enum metricType {
+  UNUSED = 0;
+  Count = 1;
+  Rate = 2;
+  Gauge = 3;
+  Sketch = 4;
+}
+
+enum valueType {
+  Zero    = 0x00;  // value is zero, not stored explicitly
+  Sint64  = 0x10;  // value is stored in valsSint64
+  Float32 = 0x20;  // value is stored in valsFloat32
+  Float64 = 0x30;  // value is stored in valsFloat64
+}
+
+enum metricFlags {
+  flagNone    = 0;
+  flagNoIndex = 0x100; // metric should not be indexed (equivalent to origin metric type == agent_hidden in v2)
+  flagHasUnit = 0x200; // timeseries has a unit in the unitRefs column
+}
+
+message Response {
+  string error = 1;
+}

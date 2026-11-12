@@ -312,7 +312,7 @@ transforms:
   remap_function_to_unix_timestamp:
     inputs: []
     type: remap
-    source: "     .secs = to_unix_timestamp(parse_timestamp!(.time, \"%+\"))\n     .millis = to_unix_timestamp(parse_timestamp!(.time, \"%+\"), unit: \"milliseconds\")\n     .nanos = to_unix_timestamp(parse_timestamp!(.time, \"%+\"), unit: \"nanoseconds\")\n   "
+    source: "     .secs = to_unix_timestamp(parse_timestamp!(.time, \"%+\"))\n     .millis = to_unix_timestamp(parse_timestamp!(.time, \"%+\"), unit: \"milliseconds\")\n     .nanos = to_unix_timestamp!(parse_timestamp!(.time, \"%+\"), unit: \"nanoseconds\")\n   "
   remap_function_push_to_array:
     inputs: []
     type: remap
