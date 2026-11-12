@@ -109,6 +109,10 @@ impl ContainerState {
     }
 }
 
+fn service_label(service: &str) -> String {
+    format!("com.docker.compose.service={service}")
+}
+
 struct Steps<'a> {
     compose: &'a Compose,
     environment: &'a Environment,
@@ -122,19 +126,14 @@ impl Steps<'_> {
         command
     }
 
-    fn service_containers(&self, services: &[String]) -> Result<Vec<String>> {
-        let output = self
-            .compose_command()
-            .args(["ps", "--all", "--quiet"])
-            .args(services)
-            .check_output()?;
-        Ok(output.split_whitespace().map(str::to_owned).collect())
-    }
-
-    fn labeled_containers(&self, label: &str) -> Result<Vec<String>> {
-        let project_label = format!("label=com.docker.compose.project={}", self.project_name);
-        let output = docker_command(["ps", "--all", "--quiet", "--filter"])
-            .arg(project_label)
+    /// This project's containers with `label`, excluding `compose run` one-offs.
+    fn containers(&self, label: &str) -> Result<Vec<String>> {
+        let output = docker_command(["ps", "--all", "--quiet"])
+            .args([
+                "--filter",
+                &format!("label=com.docker.compose.project={}", self.project_name),
+            ])
+            .args(["--filter", "label=com.docker.compose.oneoff=False"])
             .args(["--filter", &format!("label={label}")])
             .check_output()?;
         Ok(output.split_whitespace().map(str::to_owned).collect())
@@ -159,7 +158,7 @@ impl Steps<'_> {
     fn wait_for_success(&self, wait: &WaitForSuccess) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(wait.timeout_secs);
         loop {
-            let containers = self.service_containers(std::slice::from_ref(&wait.service))?;
+            let containers = self.containers(&service_label(&wait.service))?;
             let [container] = containers.as_slice() else {
                 bail!(
                     "expected one {} container, found {}",
@@ -183,11 +182,9 @@ impl Steps<'_> {
 
     fn stop(&self, group: &StopGroup) -> Result<()> {
         let mut containers = BTreeSet::new();
-        if !group.services.is_empty() {
-            containers.extend(self.service_containers(&group.services)?);
-        }
-        for label in &group.labels {
-            containers.extend(self.labeled_containers(label)?);
+        let services = group.services.iter().map(|service| service_label(service));
+        for label in services.chain(group.labels.iter().cloned()) {
+            containers.extend(self.containers(&label)?);
         }
         if containers.is_empty() {
             bail!("no containers matched");
@@ -209,6 +206,13 @@ impl Steps<'_> {
             }
             if !group.reject_log_messages.is_empty() {
                 let output = docker_command(["logs", container]).output()?;
+                // Otherwise the error text would be searched and the check silently skipped.
+                if !output.status.success() {
+                    bail!(
+                        "failed to read logs of {name}: {}",
+                        String::from_utf8_lossy(&output.stderr).trim()
+                    );
+                }
                 let logs = [output.stdout, output.stderr].concat();
                 let logs = String::from_utf8_lossy(&logs);
                 for message in &group.reject_log_messages {
