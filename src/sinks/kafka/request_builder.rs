@@ -67,11 +67,14 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: Option<&OwnedTargetPath>) -> Option<Bytes> {
     key_field.and_then(|key_field| match event {
+        // A null key is sent as no key, like a missing one, rather than the string `<null>`.
         Event::Log(log) => log
             .get(key_field)
+            .filter(|value| !value.is_null())
             .map(vector_lib::event::Value::coerce_to_bytes),
         Event::Trace(trace) => trace
             .get(key_field)
+            .filter(|value| !value.is_null())
             .map(vector_lib::event::Value::coerce_to_bytes),
         Event::Metric(metric) => metric
             .tags()
@@ -170,5 +173,25 @@ mod tests {
         assert_eq!(headers.get(0).value.unwrap(), "a-value".as_bytes());
         assert_eq!(headers.get(1).key, "b-key");
         assert_eq!(headers.get(1).value.unwrap(), "b-value".as_bytes());
+    }
+
+    #[test]
+    fn kafka_get_key_null_is_no_key() {
+        let key_field = OwnedTargetPath::try_from("key".to_string()).unwrap();
+
+        let mut event = Event::Log(LogEvent::from("hello"));
+        event.as_mut_log().insert(&key_field, Value::Null);
+        assert_eq!(get_key(&event, Some(&key_field)), None);
+
+        let mut event = Event::Trace(TraceEvent::from(LogEvent::from("hello")));
+        event.as_mut_trace().insert(&key_field, Value::Null);
+        assert_eq!(get_key(&event, Some(&key_field)), None);
+
+        let mut event = Event::Log(LogEvent::from("hello"));
+        event.as_mut_log().insert(&key_field, "a-key");
+        assert_eq!(
+            get_key(&event, Some(&key_field)),
+            Some(Bytes::from("a-key"))
+        );
     }
 }
