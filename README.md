@@ -26,8 +26,8 @@ pipeline that puts you in control of your observability data.
 all your logs and metrics to any vendors you want today and any other
 vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
 data enrichment, and data security where you need it, not where it is most
-convenient for your vendors. Additionally, it is open source and up to 10x
-faster than every alternative in the space.
+convenient for your vendors. Vector is 100% open source. The complete source code
+and all features are publicly available.
 
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
@@ -38,7 +38,10 @@ Vector is maintained by Datadog's [Community Open Source Engineering team](https
 
 * **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
 * **End-to-end** - Deploys as an [agent][docs.roles#agent] or [aggregator][docs.roles#aggregator]. Vector is a complete platform.
-* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric] (beta), and traces (coming soon). One tool for all of your data.
+* **Unified** - Stable support for [logs][docs.data-model.log] and
+  [metrics][docs.data-model.metric] in one pipeline. Trace support is available
+  in selected components, including the [OpenTelemetry source][docs.sources.opentelemetry].
+  When building a trace pipeline, check each component's supported event types and limitations.
 
 ### Use cases
 
@@ -50,17 +53,24 @@ Vector is maintained by Datadog's [Community Open Source Engineering team](https
 
 ### Community
 
-* Vector is relied on by startups and enterprises like **Atlassian**, **T-Mobile**,
-  **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
-  **Tuple**, **Douban**, **Visa**, **Mambu**, **Blockfi**, **Claranet**,
-  **Instacart**, **Forcepoint**, and [many more][urls.production_users].
-* Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 500TB daily**.
-* Vector has **over 500 contributors** and growing.
+* Vector powers observability pipelines at [Atlassian][users.atlassian],
+  [Riot Games][users.riot_games], [Comcast][users.comcast],
+  [FanDuel][users.fanduel], [Zerodha][users.zerodha],
+  [Timescale][users.timescale], [Quad9][users.quad9],
+  [OpenAI][users.openai], [Anthropic][users.anthropic],
+  and [many more][urls.production_users].
+* [Contributors][urls.contributors]
 
 ## Documentation
 
 All user documentation is available at **[vector.dev/docs](https://vector.dev/docs)**.
+
+To build and verify a pipeline:
+
+1. [Develop a configuration][docs.quickstart] and transform events with [VRL][docs.reference.vrl].
+2. [Validate the configuration][docs.administration.validating] with `vector validate`.
+3. [Test transform behavior][docs.configuration.tests] with `vector test`.
+4. [Inspect a running pipeline][docs.guides.debugging] with `vector top` and `vector tap`.
 
 Other Resources:
 
@@ -77,18 +87,19 @@ Other Resources:
 
 ### Performance
 
-The following performance tests demonstrate baseline performance between
-common protocols with the exception of the Regex Parsing test.
+The following table shows historical throughput benchmarks from the
+[Vector test harness][urls.vector_test_harness], in MiB/s. Higher values are better.
 
-| Test                                                                                                                   | Vector          | Filebeat | FluentBit       | FluentD   | Logstash  | SplunkUF        | SplunkHF |
-| ---------------------------------------------------------------------------------------------------------------------- | --------------- | -------- | --------------- | --------- | --------- | --------------- | -------- |
-| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**86mib/s**_   | n/a      | 64.4mib/s       | 27.7mib/s | 40.6mib/s | n/a             | n/a      |
-| [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance)           | _**76.7mib/s**_ | 7.8mib/s | 35mib/s         | 26.1mib/s | 3.1mib/s  | 40.1mib/s       | 39mib/s  |
-| [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance)       | 13.2mib/s       | n/a      | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  | n/a             | 7.8mib/s |
-| [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance)           | _**26.7mib/s**_ | n/a      | 19.6mib/s       | <1mib/s   | 2.7mib/s  | n/a             | n/a      |
-| [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance)             | 69.9mib/s       | 5mib/s   | 67.1mib/s       | 3.9mib/s  | 10mib/s   | _**70.4mib/s**_ | 7.6mib/s |
+Performance varies with workload, configuration, hardware, and software versions.
+Benchmark your own pipeline with current software.
 
-To learn more about our performance tests, please see the [Vector test harness][urls.vector_test_harness].
+| Test                                                                                                                   | Vector   | Filebeat | Fluent Bit | Fluentd | Logstash | Splunk UF | Splunk HF | Highest throughput |
+| ---------------------------------------------------------------------------------------------------------------------- | -------- | -------- | ---------- | ------- | -------- | --------- | --------- | ------------------ |
+| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | **86**   | n/a      | 64.4       | 27.7    | 40.6     | n/a       | n/a       | **Vector**         |
+| [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance)           | **76.7** | 7.8      | 35         | 26.1    | 3.1      | 40.1      | 39        | **Vector**         |
+| [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance)       | 13.2     | n/a      | **20.5**   | 2.6     | 4.6      | n/a       | 7.8       | **Fluent Bit**     |
+| [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance)           | **26.7** | n/a      | 19.6       | <1      | 2.7      | n/a       | n/a       | **Vector**         |
+| [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance)             | 69.9     | 5        | 67.1       | 3.9     | 10       | **70.4**  | 7.6       | **Splunk UF**      |
 
 ### Correctness
 
@@ -118,7 +129,7 @@ Vector is an end-to-end, unified, open data platform.
 | **Unified**         | **✓**      |       |           |         |          |           |           | ✓        |
 | Logs                | **✓**      | ✓     | ✓         | ✓       | ✓        | ✓         | ✓         | ✓        |
 | Metrics             | **✓**      | ⚠     | ⚠         | ⚠       | ⚠        | ⚠         | ⚠         | ✓        |
-| Traces              | 🚧         |       |           |         |          |           |           |          |
+| Traces              | Partial    |       |           |         |          |           |           |          |
 | **Open**            | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
 | Open-source         | **✓**      | ✓     | ✓         | ✓       | ✓        |           |           | ✓        |
 | Vendor-neutral      | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
@@ -148,7 +159,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.architecture.runtime-model]: https://vector.dev/docs/architecture/runtime-model/
 [docs.configuration.sinks]: https://vector.dev/docs/reference/configuration/sinks/
 [docs.configuration.sources]: https://vector.dev/docs/reference/configuration/sources/
-[docs.configuration.tests]: https://vector.dev/docs/reference/configuration/tests/
+[docs.configuration.tests]: https://vector.dev/docs/reference/configuration/unit-tests/
 [docs.configuration.transforms]: https://vector.dev/docs/reference/configuration/transforms/
 [docs.configuration.enrichment_tables]: https://vector.dev/docs/reference/configuration/global-options/#enrichment_tables
 [docs.data-model.log]: https://vector.dev/docs/architecture/data-model/log/
@@ -163,6 +174,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.installation]: https://vector.dev/docs/setup/installation/
 [docs.architecture.adaptive-request-concurrency]: https://vector.dev/docs/architecture/arc/
 [docs.platforms.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
+[docs.guides.debugging]: https://vector.dev/guides/developer/debugging/
 [docs.quickstart]: https://vector.dev/docs/setup/quickstart/
 [docs.reference.api]: https://vector.dev/docs/reference/api/
 [docs.reference.cli]: https://vector.dev/docs/reference/cli/
@@ -181,6 +193,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources.file]: https://vector.dev/docs/reference/configuration/sources/file/
 [docs.sources.http]: https://vector.dev/docs/reference/configuration/sources/http/
 [docs.sources.journald]: https://vector.dev/docs/reference/configuration/sources/journald/
+[docs.sources.opentelemetry]: https://vector.dev/docs/reference/configuration/sources/opentelemetry/
 [docs.sources.kafka]: https://vector.dev/docs/reference/configuration/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/configuration/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/configuration/sources/
@@ -193,6 +206,16 @@ Vector is an end-to-end, unified, open data platform.
 [docs.introduction.architecture]: https://vector.dev/docs/architecture/
 [docs.introduction.guarantees]: https://vector.dev/docs/introduction/guarantees/
 [docs.introduction.architecture]: https://vector.dev/docs/architecture/
+[urls.contributors]: https://github.com/vectordotdev/vector/graphs/contributors
+[users.atlassian]: https://github.com/vectordotdev/vector/issues/790#issuecomment-771352503
+[users.riot_games]: https://github.com/vectordotdev/vector/issues/790#issuecomment-2344338242
+[users.comcast]: https://github.com/vectordotdev/vector/issues/790#issuecomment-676373980
+[users.fanduel]: https://github.com/vectordotdev/vector/issues/790#issuecomment-2471802445
+[users.zerodha]: https://github.com/vectordotdev/vector/issues/790#issuecomment-1681726280
+[users.timescale]: https://github.com/vectordotdev/vector/issues/790#issuecomment-2304712820
+[users.quad9]: https://github.com/vectordotdev/vector/issues/790#issuecomment-2950776289
+[users.openai]: https://openai.com/index/harness-engineering/
+[users.anthropic]: https://clickhouse.com/blog/how-anthropic-is-using-clickhouse-to-scale-observability-for-ai-era
 [urls.production_users]: https://github.com/vectordotdev/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_calendar]: https://calendar.vector.dev
@@ -208,4 +231,4 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vector_versioning_policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md
-[urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22type%3A+feature%22
+[urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+type%3AFeature

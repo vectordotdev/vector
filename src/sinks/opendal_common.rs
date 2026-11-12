@@ -9,6 +9,7 @@
 //! - Limitation
 
 use std::{fmt, task::Poll};
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use opendal::Operator;
@@ -91,7 +92,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

@@ -13,12 +13,12 @@ const SID_CACHE_CAPACITY: usize = 4096;
 /// names (e.g. "NT AUTHORITY\SYSTEM") using the Windows `LookupAccountSidW` API.
 ///
 /// Results are cached in an LRU cache to avoid repeated lookups for the same SID.
-pub struct SidResolver {
+pub(super) struct SidResolver {
     cache: LruCache<String, Option<String>>,
 }
 
 impl SidResolver {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             cache: LruCache::new(NonZeroUsize::new(SID_CACHE_CAPACITY).unwrap()),
         }
@@ -27,7 +27,7 @@ impl SidResolver {
     /// Resolve a SID string to "DOMAIN\Username" format.
     /// Returns `None` if the SID cannot be resolved (unknown account, invalid SID, etc.).
     /// Caches both successful and failed lookups.
-    pub fn resolve(&mut self, sid_string: &str) -> Option<String> {
+    pub(super) fn resolve(&mut self, sid_string: &str) -> Option<String> {
         if let Some(cached) = self.cache.get(sid_string) {
             return cached.clone();
         }

@@ -1,25 +1,27 @@
 use std::collections::HashMap;
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::Framer;
 
 use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{
-        Auth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, HttpClient},
     sinks::{
-        HTTPV1RequestBuilderSnafu, HealthcheckError,
+        HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 
@@ -41,7 +43,7 @@ pub(super) struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
-    pub const fn new(
+    pub(super) const fn new(
         db: ConfinedTemplate,
         table: ConfinedTemplate,
         pipeline_name: ConfinedTemplate,
@@ -59,7 +61,7 @@ impl KeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -85,7 +87,7 @@ impl Partitioner for KeyPartitioner {
             Some(template) => match template.render_string(item) {
                 Ok(s) => Some(s),
                 Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: true,
@@ -93,7 +95,7 @@ impl Partitioner for KeyPartitioner {
                     return None;
                 }
                 Err(error) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: false,
@@ -188,10 +190,10 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 
         let mut request = builder
             .body(payload)
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)
@@ -258,7 +260,7 @@ pub(super) async fn http_healthcheck(
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;

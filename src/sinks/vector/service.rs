@@ -2,11 +2,12 @@ use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper_1::body::Incoming;
 use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
+use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
+use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -15,20 +16,19 @@ use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::{Http2Client, HttpError},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
 };
 
 #[derive(Clone, Debug)]
-pub struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport>,
+pub(super) struct VectorService {
+    pub client: proto_vector::Client<GrpcTransport<TonicBody>>,
     pub protocol: String,
     pub endpoint: String,
 }
 
-pub struct VectorResponse {
+pub(super) struct VectorResponse {
     events_byte_size: GroupedCountByteSize,
 }
 
@@ -43,7 +43,7 @@ impl DriverResponse for VectorResponse {
 }
 
 #[derive(Clone, Default)]
-pub struct VectorRequest {
+pub(super) struct VectorRequest {
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
     pub request: proto_vector::PushEventsRequest,
@@ -69,8 +69,8 @@ impl VectorService {
     /// Sends every request to the scheme and authority of `uri`; its path is ignored.
     ///
     /// Fails if `uri` has no scheme or authority.
-    pub fn new(
-        client: Http2Client<BoxBody>,
+    pub(super) fn new(
+        client: Http2Client<TonicBody>,
         uri: Uri,
         compression: VectorCompression,
     ) -> crate::Result<Self> {
@@ -91,17 +91,17 @@ impl VectorService {
 }
 
 /// Returns the `scheme://authority/` origin that tonic prefixes to each gRPC method path.
-fn grpc_origin(uri: &Uri) -> crate::Result<http_1::Uri> {
-    let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+fn grpc_origin(uri: &Uri) -> crate::Result<Uri> {
+    let (Some(scheme), Some(authority)) = (uri.scheme(), uri.authority()) else {
         return Err(VectorSinkError::NotAbsoluteUri {
             uri: uri.to_string(),
         }
         .into());
     };
 
-    Ok(http_1::Uri::builder()
-        .scheme(scheme)
-        .authority(authority.as_str())
+    Ok(Uri::builder()
+        .scheme(scheme.clone())
+        .authority(authority.clone())
         .path_and_query("/")
         .build()?)
 }
@@ -133,7 +133,7 @@ impl Service<VectorRequest> for VectorService {
                 .client
                 .push_events(list.request.into_request())
                 .map_ok(|_response| {
-                    emit!(EndpointBytesSent {
+                    emit(EndpointBytesSent {
                         byte_size,
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
@@ -146,25 +146,5 @@ impl Service<VectorRequest> for VectorService {
         };
 
         Box::pin(future)
-    }
-}
-
-/// Sends tonic's gRPC requests over the native HTTP/2 client.
-#[derive(Clone, Debug)]
-pub struct GrpcTransport(Http2Client<BoxBody>);
-
-impl Service<http_1::Request<BoxBody>> for GrpcTransport {
-    type Response = http_1::Response<Incoming>;
-    type Error = HttpError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: http_1::Request<BoxBody>) -> Self::Future {
-        Box::pin(self.0.request(request))
     }
 }

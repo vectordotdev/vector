@@ -8,7 +8,7 @@ components: transforms: delay: {
 		"""
 
 	classes: {
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
 	}

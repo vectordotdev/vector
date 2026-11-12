@@ -1,4 +1,5 @@
 use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
+use vector_lib::internal_event::emit;
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
@@ -82,7 +83,7 @@ where
     }
 
     pub fn emit_event_discarded(&self, key: String) {
-        emit!(ThrottleEventDiscarded {
+        emit(ThrottleEventDiscarded {
             key,
             emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
             include_group_tag: self.internal_metrics.include_group_tag,
@@ -117,7 +118,7 @@ where
                     let key = self.key_field.as_ref().and_then(|t| {
                         t.render_string(&event)
                             .map_err(|error| {
-                                emit!(TemplateRenderingError {
+                                emit(TemplateRenderingError {
                                     error,
                                     field: Some("key_field"),
                                     drop_event: false,

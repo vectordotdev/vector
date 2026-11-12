@@ -630,3 +630,14 @@ div#output-section {
   font-weight: normal;
   font-size: 12px;
 }
+
+/* Native disabled controls block input before initialization completes. */
+[data-startup-control]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#startup-status {
+  color: var(--datadog-gray);
+  font-size: 0.875rem;
+}

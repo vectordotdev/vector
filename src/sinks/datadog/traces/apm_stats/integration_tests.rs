@@ -200,7 +200,7 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
                 .await
                 .unwrap();
 
-            if res.status() != hyper::StatusCode::OK {
+            if res.status() != http::StatusCode::OK {
                 error!("Error sending traces to {url}, res: {res:?}.");
                 return false;
             }
