@@ -118,6 +118,10 @@ pub fn max_zlib_compressed_frame_size_bytes() -> usize {
 /// that on top.
 #[must_use]
 #[allow(clippy::manual_clamp)] // `usize::clamp` is not a const fn; the manual form keeps this const
+#[allow(
+    clippy::manual_bit_width,
+    reason = "usize::bit_width requires Rust 1.97; preserve the Rust 1.95 MSRV"
+)]
 pub const fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
     const MIN_ZSTD_WINDOW_LOG: u32 = 10;
     const MAX_ZSTD_WINDOW_LOG: u32 = 31;
@@ -129,7 +133,7 @@ pub const fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
         // leaving the allocation guard unset.
         None => Some(MIN_ZSTD_WINDOW_LOG),
         Some(max_index) => {
-            let window_log = max_index.bit_width();
+            let window_log = usize::BITS - max_index.leading_zeros();
             let clamped = if window_log < MIN_ZSTD_WINDOW_LOG {
                 MIN_ZSTD_WINDOW_LOG
             } else if window_log > MAX_ZSTD_WINDOW_LOG {

@@ -637,7 +637,7 @@ impl IngestorProcess {
         Ok(())
     }
 
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
@@ -669,7 +669,7 @@ impl IngestorProcess {
         Ok(())
     }
 
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
@@ -700,7 +700,7 @@ impl IngestorProcess {
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
@@ -905,7 +905,7 @@ impl IngestorProcess {
         }
     }
 
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
@@ -924,7 +924,7 @@ impl IngestorProcess {
             .await
     }
 
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
@@ -941,7 +941,7 @@ impl IngestorProcess {
             .await
     }
 
-    #[expect(
+    #[allow(
         clippy::result_large_err,
         reason = "Preserve the existing AWS SDK and processing error types"
     )]
