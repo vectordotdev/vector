@@ -40,11 +40,13 @@ pub(crate) struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
     /// during mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
+    /// The message given to `abort`, or `aborted` when there is none.
+    pub error: String,
 }
 
 impl InternalEvent for RemapMappingAbort {
     fn emit(self) {
-        debug!("Event mapping aborted.");
+        debug!(message = "Event mapping aborted.", error = ?self.error);
 
         if self.event_dropped {
             emit(ComponentEventsDropped::<INTENTIONAL> {
