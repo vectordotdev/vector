@@ -22,7 +22,11 @@ pub struct Cli {
     #[arg(long, value_name = "DIR")]
     base_dir: Option<PathBuf>,
 
-    /// Lints to allow. All other warnings are errors. Pass an empty value to allow none.
+    /// Treat warnings as errors. Set false and pass --allow '' to use configured lint levels.
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    deny_warnings: bool,
+
+    /// Lints to allow. Pass an empty value to allow none.
     #[arg(
         short = 'A',
         long,
@@ -88,9 +92,10 @@ impl Cli {
             "--all-features",
             "check",
             check,
-            "--deny",
-            "warnings",
         ];
+        if self.deny_warnings {
+            args.extend(["--deny", "warnings"]);
+        }
         for lint in self.allow.iter().filter(|lint| !lint.is_empty()) {
             args.extend(["--allow", lint]);
         }
@@ -203,5 +208,129 @@ impl From<Diagnostic> for DenyError {
 impl fmt::Display for DenyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\t{}", self.key, self.description)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser as _;
+
+    use super::Cli;
+
+    #[derive(clap::Parser)]
+    struct Args {
+        #[command(flatten)]
+        deny: Cli,
+    }
+
+    fn args(options: &[&str]) -> Cli {
+        Args::parse_from(std::iter::once("deny").chain(options.iter().copied())).deny
+    }
+
+    #[test]
+    fn defaults_preserve_vectors_warning_policy() {
+        assert_eq!(
+            args(&[]).args("human"),
+            [
+                "deny",
+                "--log-level",
+                "error",
+                "--format",
+                "human",
+                "--all-features",
+                "check",
+                "all",
+                "--deny",
+                "warnings",
+                "--allow",
+                "duplicate",
+                "--allow",
+                "source-not-allowed",
+            ]
+        );
+    }
+
+    #[test]
+    fn repository_policy_leaves_lint_levels_unchanged() {
+        let cli = args(&["--deny-warnings=false", "--allow", ""]);
+        for format in ["human", "json"] {
+            assert_eq!(
+                cli.args(format),
+                [
+                    "deny",
+                    "--log-level",
+                    "error",
+                    "--format",
+                    format,
+                    "--all-features",
+                    "check",
+                    "all"
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_allowlist_still_applies_without_warning_promotion() {
+        assert_eq!(
+            args(&["--deny-warnings=false", "--allow", "duplicate"]).args("json"),
+            [
+                "deny",
+                "--log-level",
+                "error",
+                "--format",
+                "json",
+                "--all-features",
+                "check",
+                "all",
+                "--allow",
+                "duplicate",
+            ]
+        );
+    }
+
+    #[test]
+    fn clearing_allowlist_keeps_warning_promotion() {
+        assert_eq!(
+            args(&["--allow", ""]).args("json"),
+            [
+                "deny",
+                "--log-level",
+                "error",
+                "--format",
+                "json",
+                "--all-features",
+                "check",
+                "all",
+                "--deny",
+                "warnings",
+            ]
+        );
+    }
+
+    #[test]
+    fn license_only_check_retains_repository_policy() {
+        let cli = args(&["--licenses-only", "--deny-warnings=false", "--allow", ""]);
+        assert_eq!(
+            cli.args("json"),
+            [
+                "deny",
+                "--log-level",
+                "error",
+                "--format",
+                "json",
+                "--all-features",
+                "check",
+                "licenses",
+            ]
+        );
+    }
+
+    #[test]
+    fn base_comparison_uses_the_same_policy() {
+        let cli = args(&["--base-dir", "base", "--deny-warnings=false", "--allow", ""]);
+        assert_eq!(cli.base_dir.as_deref(), Some(std::path::Path::new("base")));
+        assert!(!cli.args("json").contains(&"--deny"));
+        assert!(!cli.args("json").contains(&"--allow"));
     }
 }
