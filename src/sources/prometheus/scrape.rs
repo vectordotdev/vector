@@ -1,11 +1,12 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use http::{StatusCode, Uri, response::Parts, uri::Scheme};
+use http::{HeaderMap, HeaderValue, StatusCode, Uri, response::Parts, uri::Scheme};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
+    shutdown::ShutdownSignal,
 };
 
 #[cfg(feature = "kubernetes")]
@@ -21,8 +22,8 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
-                build_url, call, default_interval, default_timeout, fixed_targets,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, Targets,
+                build_headers, build_url, call, default_interval, default_timeout, fixed_targets,
                 warn_if_interval_too_low,
             },
         },
@@ -207,8 +208,18 @@ impl SourceConfig for PrometheusScrapeConfig {
             }
         }
 
+        let static_urls: Vec<Uri> = static_urls
+            .iter()
+            .map(|uri| build_url(uri, &self.query))
+            .collect();
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let headers = build_headers(&self.headers)?;
+        let client = HttpClient::new(tls.into(), &cx.proxy)?;
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: self.honor_labels,
+            instance_tag: self.instance_tag.clone(),
+            endpoint_tag: self.endpoint_tag.clone(),
+        };
 
         #[cfg(feature = "kubernetes")]
         if let Some(k8s_cfg) = self.targets.iter().find_map(|target| match target {
@@ -216,33 +227,12 @@ impl SourceConfig for PrometheusScrapeConfig {
             TargetConfig::Static { .. } => None,
         }) {
             return self
-                .build_kubernetes_source(k8s_cfg, static_urls, tls, cx)
+                .build_kubernetes_source(k8s_cfg, static_urls, headers, client, builder, cx)
                 .await;
         }
 
-        // Pure static path: use existing `call()`.
-        let builder = PrometheusScrapeBuilder {
-            honor_labels: self.honor_labels,
-            instance_tag: self.instance_tag.clone(),
-            endpoint_tag: self.endpoint_tag.clone(),
-        };
-
-        let inputs = GenericHttpClientInputs {
-            targets: fixed_targets(
-                static_urls
-                    .iter()
-                    .map(|uri| build_url(uri, &self.query))
-                    .collect(),
-            ),
-            interval: self.interval,
-            timeout: self.timeout,
-            headers,
-            content_type: "text/plain".to_string(),
-            auth: self.auth.clone(),
-            client: HttpClient::new(tls.into(), &cx.proxy)?,
-            shutdown: cx.shutdown,
-        };
-
+        let inputs =
+            self.http_client_inputs(fixed_targets(static_urls), headers, client, cx.shutdown);
         Ok(crate::sources::source_with_error(call(
             inputs,
             builder,
@@ -289,27 +279,6 @@ impl SourceConfig for PrometheusScrapeConfig {
     }
 }
 
-#[cfg(feature = "kubernetes")]
-fn static_target(uri: Uri) -> kubernetes_sd::Target {
-    let port = uri.port_u16().unwrap_or_else(|| match uri.scheme() {
-        Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-        Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
-        _ => 0,
-    });
-    let instance = kubernetes_sd::format_host_port(uri.host().unwrap_or_default(), port);
-    kubernetes_sd::Target {
-        uri,
-        instance,
-        is_static: true,
-        namespace: String::new(),
-        pod_name: String::new(),
-        pod_uid: String::new(),
-        node_name: None,
-        container_name: None,
-        extra_tags: std::collections::BTreeMap::new(),
-    }
-}
-
 impl PrometheusScrapeConfig {
     fn has_any_targets(&self) -> bool {
         self.targets.iter().any(|target| match target {
@@ -319,17 +288,41 @@ impl PrometheusScrapeConfig {
         })
     }
 
-    /// Builds the source when `targets` contains a Kubernetes group. Static URLs are scraped
-    /// alongside the discovered targets.
+    fn http_client_inputs<T>(
+        &self,
+        targets: Targets<T>,
+        headers: HeaderMap<HeaderValue>,
+        client: HttpClient,
+        shutdown: ShutdownSignal,
+    ) -> GenericHttpClientInputs<T> {
+        GenericHttpClientInputs {
+            targets,
+            interval: self.interval,
+            timeout: self.timeout,
+            headers,
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
+            client,
+            shutdown,
+        }
+    }
+
+    /// Builds the source when `targets` contains a Kubernetes group.
+    ///
+    /// Static URLs and discovered Pods are scraped by two loops that share the source's output.
+    /// The source ends when either loop ends, which also stops the Pod watchers.
     #[cfg(feature = "kubernetes")]
     async fn build_kubernetes_source(
         &self,
         k8s_cfg: &KubernetesScrapeConfig,
         static_urls: Vec<Uri>,
-        tls: TlsSettings,
+        headers: HeaderMap<HeaderValue>,
+        client: HttpClient,
+        builder: PrometheusScrapeBuilder,
         cx: SourceContext,
     ) -> Result<sources::Source> {
-        let client = kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
+        let kube_client =
+            kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
 
         let self_node_name = if k8s_cfg.use_self_node_only {
             let resolved = match k8s_cfg.self_node_name.clone() {
@@ -346,46 +339,65 @@ impl PrometheusScrapeConfig {
             None
         };
 
-        let field_selector = kubernetes_sd::build_field_selector(
-            self_node_name.as_deref(),
-            &k8s_cfg.extra_field_selector,
+        let discovery = kubernetes_sd::PodDiscovery::start(
+            &kube_client,
+            &k8s_cfg.namespaces,
+            kubernetes_sd::build_field_selector(
+                self_node_name.as_deref(),
+                &k8s_cfg.extra_field_selector,
+            ),
+            kubernetes_sd::build_label_selector(&k8s_cfg.label_selector),
+            kubernetes_sd::AnnotationParserConfig {
+                prefix: k8s_cfg.annotation_prefix.clone(),
+                default_scheme: k8s_cfg.default_scheme,
+                default_path: k8s_cfg.default_path.clone(),
+                pod_label_tags: k8s_cfg.pod_label_tags.clone(),
+                pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
+            },
         );
-        let label_selector = kubernetes_sd::build_label_selector(&k8s_cfg.label_selector);
 
-        let parser_cfg = kubernetes_sd::AnnotationParserConfig {
-            prefix: k8s_cfg.annotation_prefix.clone(),
-            default_scheme: k8s_cfg.default_scheme,
-            default_path: k8s_cfg.default_path.clone(),
-            pod_label_tags: k8s_cfg.pod_label_tags.clone(),
-            pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
-        };
+        let static_scrape = (!static_urls.is_empty()).then(|| {
+            call(
+                self.http_client_inputs(
+                    fixed_targets(static_urls),
+                    headers.clone(),
+                    client.clone(),
+                    cx.shutdown.clone(),
+                ),
+                builder.clone(),
+                cx.out.clone(),
+                HttpMethod::Get,
+            )
+        });
 
-        let scrape_cfg = kubernetes_sd::ScrapeConfig {
-            interval: self.interval,
-            timeout: self.timeout,
-            instance_tag: self.instance_tag.clone(),
-            endpoint_tag: self.endpoint_tag.clone(),
-            honor_labels: self.honor_labels,
-            auth: self.auth.clone(),
-            query: self.query.clone(),
-        };
-
-        // Convert static URLs to Target structs.
-        let static_targets = static_urls.into_iter().map(static_target).collect();
-
-        Ok(sources::opaque_source(kubernetes_sd::run(
+        let inputs = self.http_client_inputs(
+            discovery.targets(self.query.clone()),
+            headers,
             client,
-            tls,
-            cx.proxy.clone(),
-            k8s_cfg.namespaces.clone(),
-            field_selector,
-            label_selector,
-            parser_cfg,
-            scrape_cfg,
-            static_targets,
-            cx.out,
-            cx.shutdown,
-        )))
+            cx.shutdown.clone(),
+        );
+        let max_wait = self.interval;
+        let shutdown = cx.shutdown;
+        let out = cx.out;
+        let discovered_scrape = async move {
+            // Start once the initial Pod list is in, so the first scrape isn't empty.
+            if !discovery.wait_until_ready(max_wait, shutdown).await {
+                return Ok(());
+            }
+            let result = call(inputs, builder, out, HttpMethod::Get).await;
+            // The watchers keep the targets up to date, so they live as long as the loop.
+            drop(discovery);
+            result
+        };
+
+        Ok(sources::source_with_error(async move {
+            match static_scrape {
+                Some(static_scrape) => futures::future::try_join(static_scrape, discovered_scrape)
+                    .await
+                    .map(|((), ())| ()),
+                None => discovered_scrape.await,
+            }
+        }))
     }
 }
 
@@ -417,26 +429,13 @@ struct PrometheusScrapeBuilder {
     endpoint_tag: Option<String>,
 }
 
-impl HttpClientBuilder for PrometheusScrapeBuilder {
-    type Context = PrometheusScrapeContext;
-
-    /// Expands the context with the instance info and endpoint info for the current request.
-    fn build(&self, url: &Uri) -> Self::Context {
-        let instance_info = self.instance_tag.as_ref().map(|tag| {
-            let instance = format!(
-                "{}:{}",
-                url.host().unwrap_or_default(),
-                url.port_u16().unwrap_or_else(|| match url.scheme() {
-                    Some(scheme) if scheme == &Scheme::HTTP => 80,
-                    Some(scheme) if scheme == &Scheme::HTTPS => 443,
-                    _ => 0,
-                })
-            );
-            InstanceInfo {
-                tag: tag.clone(),
-                instance,
-                honor_label: self.honor_labels,
-            }
+impl PrometheusScrapeBuilder {
+    /// Builds the context with the instance info and endpoint info for the current request.
+    fn context(&self, url: &Uri, instance: String) -> PrometheusScrapeContext {
+        let instance_info = self.instance_tag.as_ref().map(|tag| InstanceInfo {
+            tag: tag.clone(),
+            instance,
+            honor_label: self.honor_labels,
         });
         let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
             tag: tag.clone(),
@@ -446,7 +445,37 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
         PrometheusScrapeContext {
             instance_info,
             endpoint_info,
+            honor_labels: self.honor_labels,
+            discovery_tags: Vec::new(),
         }
+    }
+}
+
+impl HttpClientBuilder for PrometheusScrapeBuilder {
+    type Context = PrometheusScrapeContext;
+
+    fn build(&self, url: &Uri) -> Self::Context {
+        let instance = format!(
+            "{}:{}",
+            url.host().unwrap_or_default(),
+            url.port_u16().unwrap_or_else(|| match url.scheme() {
+                Some(scheme) if scheme == &Scheme::HTTP => 80,
+                Some(scheme) if scheme == &Scheme::HTTPS => 443,
+                _ => 0,
+            })
+        );
+        self.context(url, instance)
+    }
+}
+
+#[cfg(feature = "kubernetes")]
+impl HttpClientBuilder<kubernetes_sd::Target> for PrometheusScrapeBuilder {
+    type Context = PrometheusScrapeContext;
+
+    fn build(&self, target: &kubernetes_sd::Target) -> Self::Context {
+        let mut context = self.context(&target.uri, target.instance.clone());
+        context.discovery_tags = target.discovery_tags();
+        context
     }
 }
 
@@ -454,6 +483,9 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
 struct PrometheusScrapeContext {
     instance_info: Option<InstanceInfo>,
     endpoint_info: Option<EndpointInfo>,
+    honor_labels: bool,
+    /// Tags from Kubernetes discovery, such as `namespace` and `pod`. Empty for static targets.
+    discovery_tags: Vec<(String, String)>,
 }
 
 impl HttpClientContext for PrometheusScrapeContext {
@@ -475,6 +507,9 @@ impl HttpClientContext for PrometheusScrapeContext {
             }) = &self.endpoint_info
             {
                 super::merge_honor_label_tag(metric, tag, endpoint, *honor_label);
+            }
+            for (tag, value) in &self.discovery_tags {
+                super::merge_honor_label_tag(metric, tag, value, self.honor_labels);
             }
         }
     }
@@ -606,19 +641,6 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
-    }
-
-    #[cfg(feature = "kubernetes")]
-    #[test]
-    fn mixed_static_target_applies_source_query_once() {
-        let target = static_target("http://localhost:9090/metrics".parse().unwrap());
-        let query = HashMap::from([(
-            "key".to_string(),
-            QueryParameterValue::MultiParams(vec![ParameterValue::String("value".to_string())]),
-        )]);
-
-        let url = build_url(&target.uri, &query);
-        assert_eq!(url.query(), Some("key=value"));
     }
 
     #[tokio::test]

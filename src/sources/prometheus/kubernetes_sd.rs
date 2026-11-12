@@ -6,10 +6,8 @@
 
 use std::{collections::BTreeMap, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
 
-use bytes::Bytes;
-use futures::{StreamExt, stream};
-use http::{HeaderName, HeaderValue, Request, StatusCode, Uri, response::Parts};
-use http_body_util::BodyExt as _;
+use futures::{StreamExt, future};
+use http::{HeaderName, HeaderValue, Uri};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Client, Config as ClientConfig,
@@ -19,29 +17,19 @@ use kube::{
 };
 use serde_with::serde_as;
 use snafu::Snafu;
-use tokio_stream::wrappers::IntervalStream;
-use vector_http::empty_body;
+use tokio::task::JoinSet;
+use tracing::Instrument as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    configurable::configurable_component,
-    event::{Event, Metric},
-    internal_event::emit,
-    json_size::JsonSize,
-    shutdown::ShutdownSignal,
+    configurable::configurable_component, internal_event::emit, shutdown::ShutdownSignal,
 };
 
-use super::parser;
 use crate::{
-    SourceSender,
     built_info::{PKG_NAME, PKG_VERSION},
-    http::{Auth, HttpClient},
+    http::QueryParameters,
     internal_events::{
-        EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
-        HttpClientHttpResponseError, PrometheusKubernetesSdAnnotationParseError,
-        PrometheusKubernetesSdTargetsDiscovered, PrometheusParseError, StreamClosedError,
+        PrometheusKubernetesSdAnnotationParseError, PrometheusKubernetesSdTargetsDiscovered,
     },
-    sources::util::http_client::build_url,
-    tls::TlsSettings,
+    sources::util::http_client::{HttpClientTarget, Targets, build_url},
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
@@ -263,122 +251,106 @@ pub(crate) fn build_label_selector(extra: &str) -> String {
     }
 }
 
-/// Per-target scrape parameters that don't depend on the discovered Pod.
-#[derive(Clone)]
-pub(crate) struct ScrapeConfig {
-    pub(crate) interval: Duration,
-    pub(crate) timeout: Duration,
-    pub(crate) instance_tag: Option<String>,
-    pub(crate) endpoint_tag: Option<String>,
-    pub(crate) honor_labels: bool,
-    pub(crate) auth: Option<Auth>,
-    pub(crate) query: crate::http::QueryParameters,
+/// Watches Pods and turns them into scrape targets.
+///
+/// The watcher tasks belong to this value. Dropping it, including when the source is cancelled,
+/// aborts them.
+pub(crate) struct PodDiscovery {
+    stores: Vec<reflector::Store<Pod>>,
+    parser_cfg: Arc<AnnotationParserConfig>,
+    _watchers: JoinSet<()>,
 }
 
-/// Top-level scrape loop. Owns the reflector spawn and the periodic scraper.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run(
-    client: Client,
-    tls: TlsSettings,
-    proxy: vector_lib::config::proxy::ProxyConfig,
-    namespaces: Vec<String>,
-    field_selector: Option<String>,
-    label_selector: String,
-    parser_cfg: AnnotationParserConfig,
-    scrape_cfg: ScrapeConfig,
-    static_targets: Vec<Target>,
-    mut out: SourceSender,
-    shutdown: ShutdownSignal,
-) -> Result<(), ()> {
-    let watcher_cfg = watcher::Config {
-        field_selector,
-        label_selector: Some(label_selector),
-        ..Default::default()
-    };
-    let apis = if namespaces.is_empty() {
-        vec![Api::<Pod>::all(client.clone())]
-    } else {
-        namespaces
-            .iter()
-            .map(|namespace| Api::<Pod>::namespaced(client.clone(), namespace))
-            .collect()
-    };
-    let mut stores = Vec::with_capacity(apis.len());
-    let mut reflector_handles = Vec::with_capacity(apis.len());
-    for api in apis {
-        let store_w = reflector::store::Writer::<Pod>::default();
-        stores.push(store_w.as_reader());
-        let stream = watcher(api, watcher_cfg.clone()).backoff(watcher::DefaultBackoff::default());
-        let reflected = reflector::reflector(store_w, stream);
-        reflector_handles.push(crate::spawn_in_current_span(async move {
-            reflected
-                .for_each(|result| async move {
-                    if let Err(error) = result {
-                        warn!(
-                            message = "Watcher stream received an error. Retrying.",
-                            ?error
-                        );
-                    }
-                })
-                .await;
-        }));
+impl PodDiscovery {
+    /// Starts one watcher per namespace, or a single cluster-wide watcher when `namespaces` is
+    /// empty.
+    pub(crate) fn start(
+        client: &Client,
+        namespaces: &[String],
+        field_selector: Option<String>,
+        label_selector: String,
+        parser_cfg: AnnotationParserConfig,
+    ) -> Self {
+        let watcher_cfg = watcher::Config {
+            field_selector,
+            label_selector: Some(label_selector),
+            ..Default::default()
+        };
+        let apis = if namespaces.is_empty() {
+            vec![Api::<Pod>::all(client.clone())]
+        } else {
+            namespaces
+                .iter()
+                .map(|namespace| Api::<Pod>::namespaced(client.clone(), namespace))
+                .collect()
+        };
+        let mut stores = Vec::with_capacity(apis.len());
+        let mut watchers = JoinSet::new();
+        for api in apis {
+            let writer = reflector::store::Writer::<Pod>::default();
+            stores.push(writer.as_reader());
+            let stream =
+                watcher(api, watcher_cfg.clone()).backoff(watcher::DefaultBackoff::default());
+            watchers.spawn(
+                reflector::reflector(writer, stream)
+                    .for_each(|result| async move {
+                        if let Err(error) = result {
+                            warn!(
+                                message = "Watcher stream received an error. Retrying.",
+                                ?error
+                            );
+                        }
+                    })
+                    .in_current_span(),
+            );
+        }
+        Self {
+            stores,
+            parser_cfg: Arc::new(parser_cfg),
+            _watchers: watchers,
+        }
     }
 
-    let http_client = match HttpClient::new(tls.into(), &proxy) {
-        Ok(c) => c,
-        Err(error) => {
-            error!(message = "Failed to build HTTP client.", %error);
-            for handle in reflector_handles {
-                handle.abort();
+    /// Waits until every watcher has finished its initial list, or until `max_wait` passes.
+    /// Returns `false` if `shutdown` resolves first.
+    pub(crate) async fn wait_until_ready(
+        &self,
+        max_wait: Duration,
+        shutdown: ShutdownSignal,
+    ) -> bool {
+        let ready = future::join_all(self.stores.iter().map(reflector::Store::wait_until_ready));
+        tokio::select! {
+            result = tokio::time::timeout(max_wait, ready) => {
+                if result.is_err() {
+                    warn!(
+                        message = "Kubernetes discovery has not finished its initial sync. Scraping the Pods found so far."
+                    );
+                }
+                true
             }
-            return Err(());
+            _ = shutdown => false,
         }
-    };
+    }
 
-    let parser_cfg = Arc::new(parser_cfg);
-    let scrape_cfg = Arc::new(scrape_cfg);
-    let interval_stream =
-        IntervalStream::new(tokio::time::interval(scrape_cfg.interval)).take_until(shutdown);
-    let mut events_stream = interval_stream
-        .map(move |_| {
-            let mut targets: Vec<_> = stores
+    /// Returns the function that the shared scrape loop calls on every interval tick to get the
+    /// current targets.
+    pub(crate) fn targets(&self, query: QueryParameters) -> Targets<Target> {
+        let stores = self.stores.clone();
+        let parser_cfg = Arc::clone(&self.parser_cfg);
+        Box::new(move || {
+            let mut targets: Vec<Target> = stores
                 .iter()
                 .flat_map(|store| collect_targets(store, &parser_cfg))
                 .collect();
-            targets.splice(..0, static_targets.clone());
+            for target in &mut targets {
+                target.uri = build_url(&target.uri, &query);
+            }
             emit(PrometheusKubernetesSdTargetsDiscovered {
                 count: targets.len(),
             });
-
-            let scrape_cfg = Arc::clone(&scrape_cfg);
-            let http_client = http_client.clone();
-            async move {
-                stream::iter(targets)
-                    .map(move |target| {
-                        let http_client = http_client.clone();
-                        let scrape_cfg = Arc::clone(&scrape_cfg);
-                        async move { scrape_target(&http_client, &scrape_cfg, target).await }
-                    })
-                    .buffer_unordered(usize::MAX)
-                    .flat_map(stream::iter)
-                    .collect::<Vec<_>>()
-                    .await
-            }
+            targets
         })
-        .buffer_unordered(usize::MAX)
-        .flat_map(stream::iter);
-
-    let result = if out.send_event_stream(&mut events_stream).await.is_err() {
-        emit(StreamClosedError { count: 0 });
-        Err(())
-    } else {
-        Ok(())
-    };
-
-    for handle in reflector_handles {
-        handle.abort();
     }
-    result
 }
 
 fn collect_targets(
@@ -406,8 +378,6 @@ fn collect_targets(
 pub(crate) struct Target {
     pub(crate) uri: Uri,
     pub(crate) instance: String,
-    /// When `true`, kubernetes-specific tags (namespace, pod, node, container) are not added.
-    pub(crate) is_static: bool,
     pub(crate) namespace: String,
     pub(crate) pod_name: String,
     pub(crate) pod_uid: String,
@@ -415,6 +385,30 @@ pub(crate) struct Target {
     pub(crate) container_name: Option<String>,
     /// Additional metric tags to apply (pod labels/annotations allowlist).
     pub(crate) extra_tags: BTreeMap<String, String>,
+}
+
+impl HttpClientTarget for Target {
+    fn url(&self) -> &Uri {
+        &self.uri
+    }
+}
+
+impl Target {
+    /// The tags added to every metric scraped from this target, in the order they are merged.
+    pub(crate) fn discovery_tags(&self) -> Vec<(String, String)> {
+        let mut tags = vec![
+            ("namespace".to_owned(), self.namespace.clone()),
+            ("pod".to_owned(), self.pod_name.clone()),
+        ];
+        if let Some(node) = &self.node_name {
+            tags.push(("node".to_owned(), node.clone()));
+        }
+        if let Some(container) = &self.container_name {
+            tags.push(("container".to_owned(), container.clone()));
+        }
+        tags.extend(self.extra_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
+        tags
+    }
 }
 
 /// Annotation-parser configuration shared across ticks.
@@ -518,7 +512,6 @@ fn extract_targets(
         targets.push(Target {
             uri,
             instance,
-            is_static: false,
             namespace: namespace.clone(),
             pod_name: pod_name.clone(),
             pod_uid: pod_uid.clone(),
@@ -680,145 +673,6 @@ pub(crate) fn format_host_port(host: &str, port: u16) -> String {
         format!("[{host}]:{port}")
     } else {
         format!("{host}:{port}")
-    }
-}
-
-/// Perform a single scrape and return the resulting events. Emits all the
-/// usual HTTP-client internal events on the way.
-async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) -> Vec<Event> {
-    // Keep `query` behavior consistent across static and discovered targets.
-    // The discovered URI can already contain annotation-derived parameters;
-    // `build_url` preserves them and appends the source-level parameters.
-    let url = build_url(&target.uri, &cfg.query);
-    let endpoint = url.to_string();
-    let mut request = match Request::get(&url).body(empty_body()) {
-        Ok(r) => r,
-        Err(error) => {
-            emit(HttpClientHttpError {
-                error: error.to_string().into(),
-                url: endpoint,
-            });
-            return Vec::new();
-        }
-    };
-    request.headers_mut().insert(
-        http::header::ACCEPT,
-        http::HeaderValue::from_static("text/plain"),
-    );
-    if let Some(auth) = &cfg.auth {
-        auth.apply(&mut request);
-    }
-
-    let response = match tokio::time::timeout(cfg.timeout, client.send(request)).await {
-        Ok(Ok(r)) => r,
-        Ok(Err(error)) => {
-            emit(HttpClientHttpError {
-                error: error.into(),
-                url: endpoint,
-            });
-            return Vec::new();
-        }
-        Err(_) => {
-            emit(HttpClientHttpError {
-                error: format!(
-                    "Timeout error: request exceeded {}s",
-                    cfg.timeout.as_secs_f64()
-                )
-                .into(),
-                url: endpoint,
-            });
-            return Vec::new();
-        }
-    };
-
-    let (parts, body) = response.into_parts();
-    let body: Bytes = match body.collect().await {
-        Ok(b) => b.to_bytes(),
-        Err(error) => {
-            emit(HttpClientHttpError {
-                error: error.into(),
-                url: endpoint,
-            });
-            return Vec::new();
-        }
-    };
-    emit(EndpointBytesReceived {
-        byte_size: body.len(),
-        protocol: "http",
-        endpoint: endpoint.as_str(),
-    });
-
-    if parts.status != StatusCode::OK {
-        on_http_response_error(&url, &parts);
-        emit(HttpClientHttpResponseError {
-            code: parts.status,
-            url: endpoint,
-        });
-        return Vec::new();
-    }
-
-    let body_str = String::from_utf8_lossy(&body);
-    let mut events = match parser::parse_text(&body_str) {
-        Ok(events) => events,
-        Err(error) => {
-            emit(PrometheusParseError {
-                error,
-                url: url.clone(),
-                body: body_str,
-            });
-            return Vec::new();
-        }
-    };
-
-    let byte_size = if events.is_empty() {
-        JsonSize::zero()
-    } else {
-        events.estimated_json_encoded_size_of()
-    };
-    emit(HttpClientEventsReceived {
-        byte_size,
-        count: events.len(),
-        url: endpoint,
-    });
-
-    let mut target = target;
-    target.uri = url;
-    enrich_events(&mut events, &target, cfg);
-    events
-}
-
-fn on_http_response_error(url: &Uri, header: &Parts) {
-    if header.status == StatusCode::NOT_FOUND && url.path() == "/" {
-        warn!(
-            message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics?",
-            endpoint = %url,
-        );
-    }
-}
-
-fn enrich_events(events: &mut [Event], target: &Target, cfg: &ScrapeConfig) {
-    for event in events.iter_mut() {
-        let metric: &mut Metric = event.as_mut_metric();
-        if let Some(tag) = &cfg.instance_tag {
-            super::merge_honor_label_tag(metric, tag, &target.instance, cfg.honor_labels);
-        }
-        if let Some(tag) = &cfg.endpoint_tag {
-            super::merge_honor_label_tag(metric, tag, &target.uri.to_string(), cfg.honor_labels);
-        }
-        if target.is_static {
-            continue;
-        }
-        super::merge_honor_label_tag(metric, "namespace", &target.namespace, cfg.honor_labels);
-        super::merge_honor_label_tag(metric, "pod", &target.pod_name, cfg.honor_labels);
-        if let Some(node) = &target.node_name {
-            super::merge_honor_label_tag(metric, "node", node, cfg.honor_labels);
-        }
-        if let Some(container) = &target.container_name {
-            super::merge_honor_label_tag(metric, "container", container, cfg.honor_labels);
-        }
-        for (k, v) in &target.extra_tags {
-            super::merge_honor_label_tag(metric, k, v, cfg.honor_labels);
-        }
     }
 }
 
