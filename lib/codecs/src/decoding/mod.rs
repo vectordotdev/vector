@@ -510,6 +510,12 @@ impl DeserializerConfig {
                 DeserializerConfig::Gelf(_)
                 | DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_),
+                FramingConfig::Bytes,
+            ) => "application/json",
+            (
+                DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Json(_)
+                | DeserializerConfig::NativeJson(_),
                 FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
                     character_delimited:
                         CharacterDelimitedDecoderOptions {
@@ -627,5 +633,19 @@ mod tests {
                 }
             }) if delimiter.as_byte() == 0
         ));
+    }
+
+    #[test]
+    fn json_content_type_with_bytes_framing() {
+        for deserializer_config in [
+            DeserializerConfig::from(GelfDeserializerConfig::default()),
+            DeserializerConfig::from(JsonDeserializerConfig::default()),
+            DeserializerConfig::from(NativeJsonDeserializerConfig::default()),
+        ] {
+            assert_eq!(
+                deserializer_config.content_type(&FramingConfig::Bytes),
+                "application/json"
+            );
+        }
     }
 }

@@ -198,7 +198,7 @@ impl Container {
             .build();
 
         let config = ContainerCreateBody {
-            image: Some(format!("{}:{}", &self.image, &self.tag)),
+            image: Some(format!("{}:{}", self.image, self.tag)),
             cmd: self.cmd,
             host_config: Some(HostConfig {
                 network_mode: Some(String::from("host")),

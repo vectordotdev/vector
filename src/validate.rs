@@ -226,7 +226,7 @@ pub async fn validate_config(
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
 
     let mut report_error = |errors| {
-        fmt.title(format!("Failed to load {:?}", &paths_list));
+        fmt.title(format!("Failed to load {paths_list:?}"));
         fmt.sub_error(errors);
     };
 
@@ -257,14 +257,14 @@ pub async fn validate_config(
 
     // Warnings
     if warnings.is_empty() {
-        fmt.success(format!("Loaded {:?}", &paths_list));
+        fmt.success(format!("Loaded {paths_list:?}"));
     } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
         }
 
-        fmt.title(format!("Loaded with warnings {:?}", &paths_list));
+        fmt.title(format!("Loaded with warnings {paths_list:?}"));
         fmt.sub_warning(warnings);
     }
 

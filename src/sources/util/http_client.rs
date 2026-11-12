@@ -14,7 +14,7 @@
 use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
-use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use futures_util::{FutureExt, StreamExt, stream};
 use http::{
     HeaderMap, Request, StatusCode, Uri,
     header::{ACCEPT, CONTENT_TYPE, HeaderName, HeaderValue},
@@ -39,10 +39,33 @@ use crate::{
     sources::util::http::HttpMethod,
 };
 
+/// A target that [`call`] sends requests to.
+///
+/// Implement it on a source's own type to attach per-target data; [`HttpClientBuilder::build`]
+/// receives the whole target.
+pub(crate) trait HttpClientTarget: Clone + Send + 'static {
+    /// The base URL of the request.
+    fn url(&self) -> &Uri;
+}
+
+impl HttpClientTarget for Uri {
+    fn url(&self) -> &Uri {
+        self
+    }
+}
+
+/// Returns the targets to call. [`call`] invokes it once per interval tick.
+pub(crate) type Targets<T> = Box<dyn FnMut() -> Vec<T> + Send>;
+
+/// Returns the same targets on every interval tick.
+pub(crate) fn fixed_targets<T: HttpClientTarget>(targets: Vec<T>) -> Targets<T> {
+    Box::new(move || targets.clone())
+}
+
 /// Contains the inputs generic to any http client.
-pub(crate) struct GenericHttpClientInputs {
-    /// Array of URLs to call.
-    pub urls: Vec<Uri>,
+pub(crate) struct GenericHttpClientInputs<T = Uri> {
+    /// Targets to call on each interval tick.
+    pub targets: Targets<T>,
     /// Interval between calls.
     pub interval: Duration,
     /// Timeout for the HTTP request.
@@ -107,11 +130,11 @@ pub(crate) const fn default_timeout() -> Duration {
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
-pub(crate) trait HttpClientBuilder {
+pub(crate) trait HttpClientBuilder<T = Uri> {
     type Context: HttpClientContext;
 
     /// Called before the HTTP request is made to build out the context.
-    fn build(&self, url: &Uri) -> Self::Context;
+    fn build(&self, target: &T) -> Self::Context;
 }
 
 /// Methods that allow context-specific behavior during the scraping procedure.
@@ -190,30 +213,33 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     clippy::too_many_lines,
     reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
 )]
-/// Calls one or more urls at an interval.
+/// Calls one or more targets at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
 pub(crate) async fn call<
-    B: HttpClientBuilder<Context = C> + Send + Clone,
+    T: HttpClientTarget,
+    B: HttpClientBuilder<T, Context = C> + Send + Clone,
     C: HttpClientContext + Send,
 >(
-    inputs: GenericHttpClientInputs,
+    inputs: GenericHttpClientInputs<T>,
     context_builder: B,
     mut out: SourceSender,
     http_method: HttpMethod,
 ) -> vector_lib::source_sender::SendResult {
     let client = inputs.client;
+    let mut targets = inputs.targets;
     let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
         .take_until(inputs.shutdown)
-        .map(move |_| stream::iter(inputs.urls.clone()))
+        .map(move |_| stream::iter(targets()))
         .flatten()
-        .map(move |base_url| {
+        .map(move |target| {
             let client = client.clone();
+            let base_url = target.url().clone();
             let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
-            let mut context = context_builder.build(&base_url);
+            let mut context = context_builder.build(&target);
 
             // Check if we need to process the URL dynamically (for updating VRL expressions)
             let url = context.process_url(&base_url).unwrap_or(base_url);
@@ -257,28 +283,29 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            let send = async move { client.send(request).await };
-            tokio::time::timeout(inputs.timeout, send)
-                .then(move |result| async move {
-                    match result {
-                        Ok(Ok(response)) => Ok(response),
-                        Ok(Err(error)) => Err(error.into()),
-                        Err(_) => Err(format!(
-                            "Timeout error: request exceeded {}s",
-                            inputs.timeout.as_secs_f64()
-                        )
-                        .into()),
+            // The timeout covers reading the body too, so a stalled body can't hang the request.
+            let fetch = async move {
+                let response = client.send(request).await?;
+                let (header, body) = response.into_parts();
+                let body = body.collect().await?.to_bytes();
+                Ok::<_, crate::Error>((header, body))
+            };
+            tokio::time::timeout(inputs.timeout, fetch)
+                .map(move |result| match result {
+                    Ok(Ok((header, body))) => {
+                        emit(EndpointBytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http",
+                            endpoint: endpoint.as_str(),
+                        });
+                        Ok((header, body))
                     }
-                })
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = body.collect().await?.to_bytes();
-                    emit(EndpointBytesReceived {
-                        byte_size: body.len(),
-                        protocol: "http",
-                        endpoint: endpoint.as_str(),
-                    });
-                    Ok((header, body))
+                    Ok(Err(error)) => Err(error),
+                    Err(_) => Err(format!(
+                        "Timeout error: request exceeded {}s",
+                        inputs.timeout.as_secs_f64()
+                    )
+                    .into()),
                 })
                 .into_stream()
                 .filter_map(move |response| {
@@ -350,7 +377,117 @@ pub(crate) async fn call<
 
 #[cfg(test)]
 mod tests {
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
     use super::*;
+    use crate::{
+        config::ProxyConfig,
+        test_util::http::{always_200_response, spawn_blackhole_http_server},
+        tls::MaybeTlsSettings,
+    };
+
+    #[derive(Clone)]
+    struct LabeledTarget {
+        url: Uri,
+        label: &'static str,
+    }
+
+    impl HttpClientTarget for LabeledTarget {
+        fn url(&self) -> &Uri {
+            &self.url
+        }
+    }
+
+    #[derive(Clone)]
+    struct LabelBuilder;
+
+    impl HttpClientBuilder<LabeledTarget> for LabelBuilder {
+        type Context = LabelContext;
+
+        fn build(&self, target: &LabeledTarget) -> Self::Context {
+            LabelContext {
+                label: target.label,
+            }
+        }
+    }
+
+    struct LabelContext {
+        label: &'static str,
+    }
+
+    impl HttpClientContext for LabelContext {
+        fn on_response(&mut self, url: &Uri, _: &Parts, _: &Bytes) -> Option<Vec<Event>> {
+            let mut log = LogEvent::default();
+            log.insert(event_path!("label"), self.label);
+            log.insert(event_path!("path"), url.path().to_owned());
+            Some(vec![log.into()])
+        }
+    }
+
+    #[tokio::test]
+    async fn targets_are_read_on_every_tick() {
+        let base = spawn_blackhole_http_server(always_200_response).await;
+        let target = move |path: &str, label| LabeledTarget {
+            url: format!("{base}{path}").parse().unwrap(),
+            label,
+        };
+
+        // Start empty, like Kubernetes discovery before any Pod appears.
+        let mut ticks = 0;
+        let targets: Targets<LabeledTarget> = Box::new(move || {
+            ticks += 1;
+            match ticks {
+                1 => Vec::new(),
+                2 => vec![target("a", "first")],
+                _ => vec![target("b", "later")],
+            }
+        });
+
+        let (out, rx) = SourceSender::new_test();
+        let inputs = GenericHttpClientInputs {
+            targets,
+            interval: Duration::from_millis(50),
+            timeout: Duration::from_secs(1),
+            headers: HeaderMap::new(),
+            content_type: "text/plain".to_owned(),
+            auth: None,
+            client: HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default()).unwrap(),
+            shutdown: ShutdownSignal::noop(),
+        };
+        let source = tokio::spawn(call(inputs, LabelBuilder, out, HttpMethod::Get));
+
+        let events: Vec<Event> = tokio::time::timeout(Duration::from_secs(5), rx.take(4).collect())
+            .await
+            .expect("source should emit events");
+        source.abort();
+
+        let seen: Vec<(String, String)> = events
+            .into_iter()
+            .map(|event| {
+                let log = event.into_log();
+                let label = log.get(event_path!("label")).unwrap();
+                let path = log.get(event_path!("path")).unwrap();
+                (
+                    label.to_string_lossy().into_owned(),
+                    path.to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+
+        // Each event's label must come from the same target as its URL.
+        let first = ("first".to_owned(), "/a".to_owned());
+        let later = ("later".to_owned(), "/b".to_owned());
+        assert_eq!(
+            seen.iter().filter(|pair| **pair == first).count(),
+            1,
+            "{seen:?}"
+        );
+        assert!(
+            seen.iter().all(|pair| *pair == first || *pair == later),
+            "{seen:?}"
+        );
+    }
 
     #[test]
     fn headers_are_normalized_and_sensitive() {

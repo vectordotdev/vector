@@ -307,8 +307,8 @@ async fn invalid_or_empty_custom_notifications_do_not_download() {
                 EventStatus::Delivered,
             )
             .await;
-        assert!(events.is_empty());
-        assert!(fixture.downloads().await.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+        assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
         assert!(fixture.calls("AmazonSQS.SendMessageBatch").await.is_empty());
         assert_eq!(
             fixture.calls("AmazonSQS.DeleteMessageBatch").await.len(),

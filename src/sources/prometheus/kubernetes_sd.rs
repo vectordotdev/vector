@@ -896,7 +896,7 @@ mod tests {
             None,
         );
         let cfg = default_cfg();
-        assert!(extract_targets(&pod, &cfg).unwrap().is_empty());
+        assert_eq!(extract_targets(&pod, &cfg).unwrap(), [] as [Target; 0]);
     }
 
     #[test]
@@ -914,7 +914,7 @@ mod tests {
             None,
         );
         let cfg = default_cfg();
-        assert!(extract_targets(&pod, &cfg).unwrap().is_empty());
+        assert_eq!(extract_targets(&pod, &cfg).unwrap(), [] as [Target; 0]);
     }
 
     #[test]

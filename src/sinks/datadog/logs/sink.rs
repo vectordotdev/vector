@@ -922,10 +922,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "A metric counter is integer-valued, so exact zero proves no events were dropped."
-    )]
     #[test]
     fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();
@@ -1221,7 +1217,7 @@ mod tests {
         log.insert(event_path!("source"), "the_source");
         log.insert(event_path!("severity"), "the_severity");
 
-        assert!(log.namespace() == LogNamespace::Legacy);
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
 
         let mut event = Event::Log(log);
         normalize_event(&mut event);
@@ -1269,7 +1265,7 @@ mod tests {
         log.insert(metadata_path!("datadog_agent", "source"), "the_source");
         log.insert(metadata_path!("datadog_agent", "severity"), "the_severity");
 
-        assert!(log.namespace() == LogNamespace::Vector);
+        assert_eq!(log.namespace(), LogNamespace::Vector);
         Event::Log(log)
     }
 

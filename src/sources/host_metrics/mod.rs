@@ -984,7 +984,7 @@ mod tests {
             let filtered_metrics_with = get_metrics(filter).await;
 
             assert!(filtered_metrics_with.len() <= all_metrics.len());
-            assert!(!filtered_metrics_with.is_empty());
+            assert_ne!(filtered_metrics_with, [] as [vector_lib::event::Metric; 0]);
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
             let filter = FilterList {
@@ -1034,6 +1034,6 @@ mod tests {
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

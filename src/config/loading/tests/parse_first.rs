@@ -4,7 +4,10 @@ use indoc::indoc;
 use serde_json::{Value, json};
 
 use super::super::{ConfigBuilderLoader, SecretBackendLoader, SourceLoader};
-use crate::config::{ConfigPath, Format};
+use crate::{
+    config::{ComponentKey, ConfigPath, Format},
+    test_util::mock::TestComponentData,
+};
 
 #[test]
 fn comments_are_not_interpolated() {
@@ -17,14 +20,21 @@ fn comments_are_not_interpolated() {
 
 #[test]
 fn secrets_cannot_inject_configuration_structure() {
-    let secret = "\"\ncount: 999\ninjected: [a, b]\n";
+    let secret = "\"\ninteger: 999\ninjected: [a, b]\n";
     let input = indoc! {r"
         sources:
-          demo:
-            type: demo_logs
-            format: shuffle
-            lines: ['SECRET[backend.line]']
-            count: 'SECRET[backend.count]'
+          test_source:
+            type: test_basic
+            extra:
+              strings: ['SECRET[backend.line]']
+              integer: 'SECRET[backend.count]'
+        sinks:
+          out:
+            type: test_basic
+            inputs: [test_source]
+            extra:
+              strings: ['SECRET[backend.line]']
+              integer: 'SECRET[backend.count]'
     "};
     let builder = ConfigBuilderLoader::default()
         .secrets(HashMap::from([
@@ -33,10 +43,15 @@ fn secrets_cannot_inject_configuration_structure() {
         ]))
         .load_from_input(input.as_bytes(), Format::Yaml)
         .unwrap();
-    let value = serde_json::to_value(builder).unwrap();
-    assert_eq!(value["sources"]["demo"]["lines"], json!([secret]));
-    assert_eq!(value["sources"]["demo"]["count"], 42);
-    assert_eq!(value["sources"].as_object().unwrap().len(), 1);
+    for extra in [
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]),
+        TestComponentData::from_config(&builder.sinks[&ComponentKey::from("out")]),
+    ] {
+        assert_eq!(extra.strings, [secret]);
+        assert_eq!(extra.integer, Some(42));
+    }
+    assert_eq!(builder.sources.len(), 1);
+    assert_eq!(builder.sinks.len(), 1);
 }
 
 #[test]
@@ -121,10 +136,10 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
           backend:
             type: file
         sources:
-          demo:
-            type: demo_logs
-            format: json
-            count: 43
+          test_source:
+            type: test_basic
+            extra:
+              integer: 43
         proxy:
           enabled: true
     "};
@@ -133,8 +148,9 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
           backend:
             path: ""
         sources:
-          demo:
-            count: SECRET[backend.count]
+          test_source:
+            extra:
+              integer: SECRET[backend.count]
         proxy:
           enabled: ${VECTOR_TEST_DIRECTORY_BOOL:-true}
     "#};
@@ -173,18 +189,19 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
         .load_from_paths(&paths)
         .unwrap();
     assert!(builder.global.proxy.enabled);
-    let value = serde_json::to_value(builder).unwrap();
-    assert_eq!(value["sources"]["demo"]["count"], 43);
+    let extra =
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]);
+    assert_eq!(extra.integer, Some(43));
 }
 
 #[test]
 fn coercion_errors_include_the_component_field_path() {
     let input = indoc! {r"
         sources:
-          demo:
-            type: demo_logs
-            format: json
-            count: ${VECTOR_TEST_PARSE_FIRST_BAD_COUNT:-invalid}
+          test_source:
+            type: test_basic
+            extra:
+              integer: ${VECTOR_TEST_PARSE_FIRST_BAD_COUNT:-invalid}
     "};
     let errors = ConfigBuilderLoader::default()
         .interpolate_env(true)
@@ -193,7 +210,7 @@ fn coercion_errors_include_the_component_field_path() {
     assert!(
         errors
             .iter()
-            .any(|error| error.contains("sources.demo.count")),
+            .any(|error| error.contains("sources.test_source.extra.integer")),
         "{errors:?}"
     );
 }
@@ -201,12 +218,12 @@ fn coercion_errors_include_the_component_field_path() {
 #[test]
 fn invalid_unquoted_placeholders_include_migration_guidance() {
     const TOML: &str = indoc! {r"
-        [sources.demo]
-        type = 'demo_logs'
-        format = 'json'
-        count = ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
+        [sources.test_source]
+        type = 'test_basic'
+        [sources.test_source.extra]
+        integer = ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
     "};
-    const JSON: &str = r#"{"sources":{"demo":{"type":"demo_logs","format":"json","count":SECRET[backend.count]}}}"#;
+    const JSON: &str = r#"{"sources":{"test_source":{"type":"test_basic","extra":{"integer":SECRET[backend.count]}}}}"#;
     const YAML_ENV_LIST: &str = "proxy: {no_proxy: [${VECTOR_TEST_COMPAT_UNSET:-localhost}]}";
     const YAML_SECRET_LIST: &str = "proxy: {no_proxy: [SECRET[backend.host]]}";
     const YAML_ENV_MAP: &str = "proxy: {enabled: ${VECTOR_TEST_COMPAT_UNSET:-false}}";
@@ -280,10 +297,10 @@ fn source_loader_preserves_placeholders_and_types() {
 async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("secrets.json");
-    std::fs::write(&path, r#"{"type":"demo_logs","count":"42"}"#).unwrap();
+    std::fs::write(&path, r#"{"type":"test_basic","count":"42"}"#).unwrap();
     let input = serde_yaml::to_string(&json!({
         "secret": {"local": {"type": "file", "path": path}},
-        "sources": {"demo": {"type": "SECRET[local.type]", "count": "SECRET[local.count]"}},
+        "sources": {"test_source": {"type": "SECRET[local.type]", "extra": {"integer": "SECRET[local.count]"}}},
         "SECRET[missing.key]": "not a secret reference"
     }))
     .unwrap();
@@ -296,24 +313,23 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
     assert_eq!(
         secrets,
         HashMap::from([
-            ("local.type".into(), "demo_logs".into()),
+            ("local.type".into(), "test_basic".into()),
             ("local.count".into(), "42".into())
         ])
     );
 
     let input = indoc! {r"
         sources:
-          demo:
+          test_source:
             type: SECRET[local.type]
-            format: json
-            count: SECRET[local.count]
+            extra:
+              integer: SECRET[local.count]
     "};
     let builder = ConfigBuilderLoader::default()
         .secrets(secrets)
         .load_from_input(input.as_bytes(), Format::Yaml)
         .unwrap();
-    assert_eq!(
-        serde_json::to_value(builder).unwrap()["sources"]["demo"]["count"],
-        42
-    );
+    let extra =
+        TestComponentData::from_config(&builder.sources[&ComponentKey::from("test_source")]);
+    assert_eq!(extra.integer, Some(42));
 }

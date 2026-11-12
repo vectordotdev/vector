@@ -110,7 +110,7 @@ mod tests {
         let a = payload_for(2);
         let b = payload_for(10);
         assert_eq!(a.len(), b.len());
-        assert!(!a.is_empty());
+        assert_ne!(a, Vec::<u8>::new());
         assert_ne!(a, b);
     }
 

@@ -452,8 +452,6 @@ mod tests {
     use tracing::info;
     use tracing_subscriber::layer::SubscriberExt;
 
-    use futures::StreamExt as _;
-
     use super::*;
 
     /// Verifies that `RateLimitedLayer<BroadcastLayer>` — the configuration produced by

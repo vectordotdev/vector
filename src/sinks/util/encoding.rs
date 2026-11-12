@@ -70,7 +70,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
         }
 
         let batch_suffix = encoder.batch_suffix(is_empty);
-        assert!(n_events_pending == 0);
+        assert_eq!(n_events_pending, 0);
         write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
 

@@ -10,7 +10,7 @@ workspace = true
 
 [dependencies]
 async-stream.workspace = true
-futures.workspace = true
+futures = { workspace = true, features = ["async-await"] }
 futures-util.workspace = true
 pin-project.workspace = true
 tokio = { workspace = true, features = ["full"] }
