@@ -14,7 +14,7 @@
 use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
-use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use futures_util::{FutureExt, StreamExt, stream};
 use http::{
     HeaderMap, Request, StatusCode, Uri,
     header::{ACCEPT, CONTENT_TYPE, HeaderName, HeaderValue},
@@ -257,28 +257,29 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            let send = async move { client.send(request).await };
-            tokio::time::timeout(inputs.timeout, send)
-                .then(move |result| async move {
-                    match result {
-                        Ok(Ok(response)) => Ok(response),
-                        Ok(Err(error)) => Err(error.into()),
-                        Err(_) => Err(format!(
-                            "Timeout error: request exceeded {}s",
-                            inputs.timeout.as_secs_f64()
-                        )
-                        .into()),
+            // The timeout covers reading the body too, so a stalled body can't hang the request.
+            let fetch = async move {
+                let response = client.send(request).await?;
+                let (header, body) = response.into_parts();
+                let body = body.collect().await?.to_bytes();
+                Ok::<_, crate::Error>((header, body))
+            };
+            tokio::time::timeout(inputs.timeout, fetch)
+                .map(move |result| match result {
+                    Ok(Ok((header, body))) => {
+                        emit(EndpointBytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http",
+                            endpoint: endpoint.as_str(),
+                        });
+                        Ok((header, body))
                     }
-                })
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = body.collect().await?.to_bytes();
-                    emit(EndpointBytesReceived {
-                        byte_size: body.len(),
-                        protocol: "http",
-                        endpoint: endpoint.as_str(),
-                    });
-                    Ok((header, body))
+                    Ok(Err(error)) => Err(error),
+                    Err(_) => Err(format!(
+                        "Timeout error: request exceeded {}s",
+                        inputs.timeout.as_secs_f64()
+                    )
+                    .into()),
                 })
                 .into_stream()
                 .filter_map(move |response| {

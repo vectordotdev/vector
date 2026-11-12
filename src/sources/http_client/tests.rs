@@ -29,10 +29,10 @@ use crate::{
     test_util::{
         addr::next_addr,
         components::{
-            HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
-            run_and_assert_source_compliance_advanced,
+            COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_compliance_advanced, run_and_assert_source_error,
         },
-        http::spawn_authenticated_http_proxy,
+        http::{SlowBody, spawn_authenticated_http_proxy, spawn_slow_body_http_server},
         test_generate_config, wait_for_tcp,
     },
 };
@@ -89,6 +89,45 @@ impl ValidatableComponent for HttpClientConfig {
 }
 
 register_validatable_component!(HttpClientConfig);
+
+/// Asserts that a request whose body doesn't finish in time fails with an error.
+async fn run_slow_body_error(body: SlowBody) {
+    let uri = spawn_slow_body_http_server(body).await;
+
+    let events = run_and_assert_source_error(
+        HttpClientConfig {
+            endpoint: uri.to_string(),
+            interval: INTERVAL,
+            timeout: TIMEOUT,
+            query: HashMap::new(),
+            decoding: default_decoding(),
+            framing: default_framing_message_based(),
+            headers: HashMap::new(),
+            method: HttpMethod::Get,
+            body: None,
+            tls: None,
+            auth: None,
+            log_namespace: None,
+        },
+        Duration::from_secs(3),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+}
+
+/// The headers arrive in time, so only a timeout that also covers the body read can end this.
+#[tokio::test]
+async fn timeout_covers_stalled_response_body() {
+    run_slow_body_error(SlowBody::Stall).await;
+}
+
+/// A body that keeps arriving in small chunks must not extend the deadline.
+#[tokio::test]
+async fn timeout_covers_slow_response_body() {
+    run_slow_body_error(SlowBody::Trickle(Duration::from_millis(100))).await;
+}
 
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
