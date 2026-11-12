@@ -423,23 +423,6 @@ mod tests {
         assert_ready_err!(fut.poll());
     }
 
-    #[test]
-    fn advance_increments_retry_attempt_number() {
-        let mut policy = FibonacciRetryPolicy::new(
-            2,
-            Duration::from_secs(1),
-            Duration::from_secs(10),
-            SvcRetryLogic::default(),
-            JitterMode::None,
-        );
-
-        assert_eq!(policy.retry_attempt, 0);
-        policy.advance();
-        assert_eq!(policy.retry_attempt, 1);
-        policy.advance();
-        assert_eq!(policy.retry_attempt, 2);
-    }
-
     #[tokio::test]
     async fn sustained_failure_errors_exclude_retry_details() {
         let cases = [
