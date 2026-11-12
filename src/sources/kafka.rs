@@ -411,7 +411,7 @@ impl SourceConfig for KafkaSourceConfig {
                 Self::NAME,
                 keys.key_field.map(LegacyKey::Overwrite),
                 &owned_value_path!("message_key"),
-                Kind::bytes(),
+                Kind::bytes().or_null(),
                 None,
             );
 
@@ -1544,7 +1544,7 @@ mod test {
                     )
                     .with_metadata_field(
                         &owned_value_path!("kafka", "message_key"),
-                        Kind::bytes(),
+                        Kind::bytes().or_null(),
                         None
                     )
                     .with_metadata_field(&owned_value_path!("kafka", "topic"), Kind::bytes(), None)
@@ -1595,7 +1595,11 @@ mod test {
                         Kind::timestamp(),
                         Some("timestamp")
                     )
-                    .with_event_field(&owned_value_path!("message_key"), Kind::bytes(), None)
+                    .with_event_field(
+                        &owned_value_path!("message_key"),
+                        Kind::bytes().or_null(),
+                        None
+                    )
                     .with_event_field(&owned_value_path!("topic"), Kind::bytes(), None)
                     .with_event_field(&owned_value_path!("partition"), Kind::bytes(), None)
                     .with_event_field(&owned_value_path!("offset"), Kind::bytes(), None)
