@@ -9,6 +9,13 @@ Compatibility between versions before and after this change:
 | Previous `native_json` → new decoder | Supported through the legacy reader. |
 | New `native_json` → previous decoder | Unsupported; previous versions cannot read the new `{"event": ...}` envelope. |
 
+For rolling upgrades of `native_json` pipelines, upgrade consumers before producers, starting at the
+downstream end. Intermediaries that encode with `native_json` emit the new format after upgrading, even
+when reading legacy input. For rollbacks, roll back producers first and drain queued data in the new
+format before rolling back consumers. Decoding legacy input cannot restore metadata omitted by older
+producers.
+
 Use binary `native` for mixed-version Vector pipelines that need compatibility in both directions.
+Configure both ends to use `native` with matching framing, such as `length_delimited` over TCP.
 
 authors: pront
