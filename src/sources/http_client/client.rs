@@ -42,7 +42,7 @@ use crate::{
         http_client,
         http_client::{
             GenericHttpClientInputs, HttpClientBuilder, build_headers, build_url, call,
-            default_interval, default_timeout, warn_if_interval_too_low,
+            default_interval, default_timeout, fixed_targets, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -374,7 +374,7 @@ impl SourceConfig for HttpClientConfig {
         warn_if_interval_too_low(self.timeout, self.interval);
 
         let inputs = GenericHttpClientInputs {
-            urls,
+            targets: fixed_targets(urls),
             interval: self.interval,
             timeout: self.timeout,
             headers,
