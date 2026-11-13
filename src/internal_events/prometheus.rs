@@ -119,7 +119,7 @@ pub(crate) struct PrometheusKubernetesSdAnnotationParseError<'a> {
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Failed to parse prometheus.io annotations on pod.",
             pod = %self.pod,
             namespace = %self.namespace,
