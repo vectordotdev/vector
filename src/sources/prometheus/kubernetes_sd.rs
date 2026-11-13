@@ -8,7 +8,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     net::IpAddr,
     path::PathBuf,
-    sync::Arc,
     time::Duration,
 };
 
@@ -35,7 +34,7 @@ use crate::{
     internal_events::{
         PrometheusKubernetesSdAnnotationParseError, PrometheusKubernetesSdTargetsDiscovered,
     },
-    sources::util::http_client::{HttpClientTarget, Targets, build_url},
+    sources::util::http_client::build_url,
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
@@ -258,7 +257,7 @@ pub(crate) fn build_label_selector(label_selector: &str) -> Option<String> {
 /// aborts them.
 pub(crate) struct PodDiscovery {
     stores: Vec<reflector::Store<Pod>>,
-    parser_cfg: Arc<AnnotationParserConfig>,
+    parser_cfg: AnnotationParserConfig,
     _watchers: JoinSet<()>,
 }
 
@@ -309,7 +308,7 @@ impl PodDiscovery {
         }
         Self {
             stores,
-            parser_cfg: Arc::new(parser_cfg),
+            parser_cfg,
             _watchers: watchers,
         }
     }
@@ -335,24 +334,21 @@ impl PodDiscovery {
         }
     }
 
-    /// Returns the function that the shared scrape loop calls on every interval tick to get the
-    /// current targets.
-    pub(crate) fn targets(&self, query: QueryParameters) -> Targets<Target> {
-        let stores = self.stores.clone();
-        let parser_cfg = Arc::clone(&self.parser_cfg);
-        Box::new(move || {
-            let mut targets: Vec<Target> = stores
-                .iter()
-                .flat_map(|store| collect_targets(store, &parser_cfg))
-                .collect();
-            for target in &mut targets {
-                target.uri = build_url(&target.uri, &query);
-            }
-            emit(PrometheusKubernetesSdTargetsDiscovered {
-                count: targets.len(),
-            });
-            targets
-        })
+    /// Lists the targets of the Pods the watchers currently know about, with the source's
+    /// `query` parameters added to each URL.
+    pub(crate) fn targets(&self, query: &QueryParameters) -> Vec<Target> {
+        let mut targets: Vec<Target> = self
+            .stores
+            .iter()
+            .flat_map(|store| collect_targets(store, &self.parser_cfg))
+            .collect();
+        for target in &mut targets {
+            target.uri = build_url(&target.uri, query);
+        }
+        emit(PrometheusKubernetesSdTargetsDiscovered {
+            count: targets.len(),
+        });
+        targets
     }
 }
 
@@ -388,12 +384,6 @@ pub(crate) struct Target {
     pub(crate) container_name: Option<String>,
     /// Additional metric tags to apply (pod labels/annotations allowlist).
     pub(crate) extra_tags: BTreeMap<String, String>,
-}
-
-impl HttpClientTarget for Target {
-    fn url(&self) -> &Uri {
-        &self.uri
-    }
 }
 
 impl Target {

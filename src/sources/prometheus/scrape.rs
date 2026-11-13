@@ -10,8 +10,15 @@ use vector_lib::{
 };
 
 #[cfg(feature = "kubernetes")]
+use futures::{StreamExt, stream};
+#[cfg(feature = "kubernetes")]
+use tokio_stream::wrappers::IntervalStream;
+
+#[cfg(feature = "kubernetes")]
 use super::kubernetes_sd::{self, KubernetesScrapeConfig};
 use super::parser;
+#[cfg(feature = "kubernetes")]
+use crate::sources::util::http_client::{RequestOptions, run};
 use crate::{
     Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
@@ -22,9 +29,8 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, Targets,
-                build_headers, build_url, call, default_interval, default_timeout, fixed_targets,
-                warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
+                build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
             },
         },
     },
@@ -231,8 +237,7 @@ impl SourceConfig for PrometheusScrapeConfig {
                 .await;
         }
 
-        let inputs =
-            self.http_client_inputs(fixed_targets(static_urls), headers, client, cx.shutdown);
+        let inputs = self.http_client_inputs(static_urls, headers, client, cx.shutdown);
         Ok(crate::sources::source_with_error(call(
             inputs,
             builder,
@@ -288,15 +293,15 @@ impl PrometheusScrapeConfig {
         })
     }
 
-    fn http_client_inputs<T>(
+    fn http_client_inputs(
         &self,
-        targets: Targets<T>,
+        urls: Vec<Uri>,
         headers: HeaderMap<HeaderValue>,
         client: HttpClient,
         shutdown: ShutdownSignal,
-    ) -> GenericHttpClientInputs<T> {
+    ) -> GenericHttpClientInputs {
         GenericHttpClientInputs {
-            targets,
+            urls,
             interval: self.interval,
             timeout: self.timeout,
             headers,
@@ -359,7 +364,7 @@ impl PrometheusScrapeConfig {
         let static_scrape = (!static_urls.is_empty()).then(|| {
             call(
                 self.http_client_inputs(
-                    fixed_targets(static_urls),
+                    static_urls,
                     headers.clone(),
                     client.clone(),
                     cx.shutdown.clone(),
@@ -370,24 +375,33 @@ impl PrometheusScrapeConfig {
             )
         });
 
-        let inputs = self.http_client_inputs(
-            discovery.targets(self.query.clone()),
-            headers,
+        let options = RequestOptions {
             client,
-            cx.shutdown.clone(),
-        );
-        let max_wait = self.interval;
+            method: HttpMethod::Get,
+            timeout: self.timeout,
+            headers,
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
+        };
+        let interval = self.interval;
+        let query = self.query.clone();
         let shutdown = cx.shutdown;
         let out = cx.out;
         let discovered_scrape = async move {
             // Start once the initial Pod list is in, so the first scrape isn't empty.
-            if !discovery.wait_until_ready(max_wait, shutdown).await {
+            if !discovery.wait_until_ready(interval, shutdown.clone()).await {
                 return Ok(());
             }
-            let result = call(inputs, builder, out, HttpMethod::Get).await;
-            // The watchers keep the targets up to date, so they live as long as the loop.
-            drop(discovery);
-            result
+            // Read the current Pods on every tick. `discovery` owns the watchers, so it lives
+            // as long as this loop.
+            let requests = IntervalStream::new(tokio::time::interval(interval))
+                .take_until(shutdown)
+                .flat_map(|_| stream::iter(discovery.targets(&query)))
+                .map(|target| {
+                    let context = builder.context_for(&target);
+                    (target.uri, context)
+                });
+            run(requests, options, out).await
         };
 
         Ok(sources::source_with_error(async move {
@@ -469,10 +483,9 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
 }
 
 #[cfg(feature = "kubernetes")]
-impl HttpClientBuilder<kubernetes_sd::Target> for PrometheusScrapeBuilder {
-    type Context = PrometheusScrapeContext;
-
-    fn build(&self, target: &kubernetes_sd::Target) -> Self::Context {
+impl PrometheusScrapeBuilder {
+    /// Builds the context for a discovered Pod target, which adds the Pod's tags.
+    fn context_for(&self, target: &kubernetes_sd::Target) -> PrometheusScrapeContext {
         let mut context = self.context(&target.uri, target.instance.clone());
         context.discovery_tags = target.discovery_tags();
         context
