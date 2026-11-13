@@ -44,6 +44,7 @@ rustls.workspace = true
 zmij = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
+simdutf8 = { workspace = true, optional = true }
 serde_with.workspace = true
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu.workspace = true
@@ -85,6 +86,7 @@ quickcheck.workspace = true
 quickcheck_macros = "1"
 proptest.workspace = true
 similar-asserts.workspace = true
+simdutf8.workspace = true
 tokio-test.workspace = true
 toml.workspace = true
 ndarray = "0.17.2"
@@ -102,7 +104,7 @@ default = []
 lua = ["dep:mlua", "vrl/lua"]
 test = ["vector-common/test", "proptest"]
 # Internal typed trace event (RFC 25329). Off by default until a source, transform, or sink consumes it.
-typed-trace = []
+typed-trace = ["dep:simdutf8"]
 
 [[bench]]
 name = "event"

@@ -12587,6 +12587,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "trace-conversion"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "chrono",
+ "indexmap 2.14.2",
+ "opentelemetry-proto",
+ "ordered-float 5.3.0",
+ "similar-asserts",
+ "tracing 0.1.44",
+ "vector-core",
+ "vrl",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13614,6 +13629,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "serial_test",
+ "simdutf8",
  "similar-asserts",
  "smallvec",
  "snafu 0.9.2",
@@ -13679,6 +13695,7 @@ dependencies = [
  "file-source-common",
  "opentelemetry-proto",
  "prometheus-parser",
+ "trace-conversion",
  "vector-api-client",
  "vector-buffers",
  "vector-common",

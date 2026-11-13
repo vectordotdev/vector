@@ -196,7 +196,14 @@ impl DatadogTracesConfig {
             Arc::clone(&apm_stats_aggregator),
         ));
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        #[cfg(not(feature = "typed-trace"))]
+        {
+            Ok(VectorSink::from_event_streamsink(sink))
+        }
+        #[cfg(feature = "typed-trace")]
+        {
+            Ok(VectorSink::from_streamsink(sink))
+        }
     }
 
     /// Creates an HTTP client using this sink's TLS settings and the supplied proxy.

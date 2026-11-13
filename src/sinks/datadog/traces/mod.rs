@@ -6,16 +6,24 @@
 //! This module use the same protocol as the official Datadog trace-agent to
 //! submit traces to the Datadog intake.
 
-#[cfg(all(test, feature = "datadog-traces-integration-tests"))]
+#[cfg(all(
+    test,
+    feature = "datadog-traces-integration-tests",
+    not(feature = "typed-trace")
+))]
 mod integration_tests;
-#[cfg(test)]
+#[cfg(all(test, not(feature = "typed-trace")))]
 mod tests;
+#[cfg(all(test, feature = "typed-trace"))]
+mod typed_tests;
 
 pub(crate) mod apm_stats;
 mod config;
 mod request_builder;
 mod service;
 mod sink;
+#[cfg(feature = "typed-trace")]
+mod typed;
 
 #[allow(
     warnings,

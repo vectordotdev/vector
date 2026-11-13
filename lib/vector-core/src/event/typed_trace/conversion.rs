@@ -13,6 +13,27 @@ pub enum IdField {
     ParentSpanId,
 }
 
+impl IdField {
+    /// Static name of this identifier field.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TraceId => "trace_id",
+            Self::SpanId => "span_id",
+            Self::ParentSpanId => "parent_span_id",
+        }
+    }
+
+    /// Bounded error code for an invalid value in this field.
+    #[must_use]
+    pub const fn error_code(self) -> &'static str {
+        match self {
+            Self::TraceId => "invalid_trace_id",
+            Self::SpanId | Self::ParentSpanId => "invalid_span_id",
+        }
+    }
+}
+
 /// A drop or normalization found while converting between a wire format and typed traces.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TraceConversionIssue<'a> {
@@ -175,5 +196,29 @@ impl TraceConversionReporter for TraceConversionCounts {
             TraceConversionIssue::ReversedSpanTimestamps => self.reversed_span_timestamps += 1,
             TraceConversionIssue::ClampedTimestamp => self.clamped_timestamps += 1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IdField;
+
+    #[test]
+    fn identifier_fields_name_themselves_and_their_error_codes() {
+        assert_eq!(
+            (IdField::TraceId.as_str(), IdField::TraceId.error_code()),
+            ("trace_id", "invalid_trace_id")
+        );
+        assert_eq!(
+            (IdField::SpanId.as_str(), IdField::SpanId.error_code()),
+            ("span_id", "invalid_span_id")
+        );
+        assert_eq!(
+            (
+                IdField::ParentSpanId.as_str(),
+                IdField::ParentSpanId.error_code()
+            ),
+            ("parent_span_id", "invalid_span_id")
+        );
     }
 }
