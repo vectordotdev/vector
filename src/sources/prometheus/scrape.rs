@@ -71,8 +71,7 @@ pub(crate) enum TargetConfig {
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
-    ///
-    /// Deprecated: use `targets` with a `static` block instead.
+    #[configurable(deprecated = "Use `targets` with a `static` block instead.")]
     #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
@@ -194,6 +193,11 @@ enum ConfigError {
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         warn_if_interval_too_low(self.timeout, self.interval);
+        if !self.endpoints.is_empty() {
+            warn!(
+                message = "DEPRECATED: The `endpoints` option of the `prometheus_scrape` source is deprecated. Use `targets` with a `static` block instead. See https://vector.dev/deprecations/ for migration instructions."
+            );
+        }
 
         // Collect static URLs
         let mut static_urls: Vec<Uri> = Vec::new();
