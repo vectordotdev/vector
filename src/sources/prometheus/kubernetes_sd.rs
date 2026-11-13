@@ -443,6 +443,22 @@ impl PodDiscovery {
     }
 }
 
+#[cfg(test)]
+impl PodDiscovery {
+    /// Builds discovery on existing stores without starting watchers, so tests can feed Pod
+    /// events through a `reflector::store::Writer`.
+    pub(crate) fn from_stores(
+        stores: Vec<reflector::Store<Pod>>,
+        parser_cfg: AnnotationParserConfig,
+    ) -> Self {
+        Self {
+            stores,
+            parser_cfg,
+            _watchers: JoinSet::new(),
+        }
+    }
+}
+
 fn collect_targets(
     store: &reflector::store::Store<Pod>,
     parser_cfg: &AnnotationParserConfig,
@@ -779,7 +795,140 @@ mod tests {
     use super::*;
     use k8s_openapi::api::core::v1::{Container, ContainerPort, PodSpec, PodStatus};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-    use std::collections::BTreeMap;
+    use std::{
+        collections::BTreeMap,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Instant,
+    };
+    use tokio::sync::mpsc;
+
+    /// Counts a request as open until its future is dropped.
+    struct OpenRequest(Arc<AtomicUsize>);
+
+    impl OpenRequest {
+        fn new(open: &Arc<AtomicUsize>) -> Self {
+            open.fetch_add(1, Ordering::SeqCst);
+            Self(Arc::clone(open))
+        }
+    }
+
+    impl Drop for OpenRequest {
+        fn drop(&mut self) {
+            self.0.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    /// A Kubernetes client that reports each request's URI and never answers.
+    fn unresponsive_client(uris: mpsc::UnboundedSender<String>, open: Arc<AtomicUsize>) -> Client {
+        let service = tower::service_fn(move |request: http::Request<kube::client::Body>| {
+            _ = uris.send(request.uri().to_string());
+            let open_request = OpenRequest::new(&open);
+            async move {
+                let _open_request = open_request;
+                std::future::pending::<
+                    Result<
+                        http::Response<http_body_util::Empty<bytes::Bytes>>,
+                        std::convert::Infallible,
+                    >,
+                >()
+                .await
+            }
+        });
+        Client::new(service, "default")
+    }
+
+    async fn wait_for(condition: impl Fn() -> bool) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !condition() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("condition should hold within 5s");
+    }
+
+    #[tokio::test]
+    async fn watchers_use_namespaced_apis_and_stop_when_dropped() {
+        let (uris_tx, mut uris) = mpsc::unbounded_channel();
+        let open = Arc::new(AtomicUsize::new(0));
+        let client = unresponsive_client(uris_tx, Arc::clone(&open));
+        let namespaces = ["b", "a", "a"].map(str::to_owned);
+
+        let discovery = PodDiscovery::start(
+            &client,
+            &namespaces,
+            None,
+            Some("app=web".to_owned()),
+            default_cfg(),
+        );
+
+        // One watcher per distinct namespace, each listing its own namespace with the selector.
+        let mut listed = Vec::new();
+        for _ in 0..2 {
+            let uri = tokio::time::timeout(Duration::from_secs(5), uris.recv())
+                .await
+                .expect("each watcher should send a request")
+                .unwrap();
+            listed.push(uri);
+        }
+        listed.sort();
+        assert!(
+            listed[0].contains("/api/v1/namespaces/a/pods?"),
+            "{listed:?}"
+        );
+        assert!(
+            listed[1].contains("/api/v1/namespaces/b/pods?"),
+            "{listed:?}"
+        );
+        assert!(
+            listed
+                .iter()
+                .all(|uri| uri.contains("labelSelector=app%3Dweb")),
+            "{listed:?}"
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(200), uris.recv())
+                .await
+                .is_err(),
+            "a repeated namespace must not start another watcher"
+        );
+        wait_for(|| open.load(Ordering::SeqCst) == 2).await;
+
+        // Dropping discovery, as happens when the source is cancelled, aborts the watchers and
+        // with them their in-flight requests.
+        drop(discovery);
+        wait_for(|| open.load(Ordering::SeqCst) == 0).await;
+    }
+
+    #[tokio::test]
+    async fn wait_until_ready_gives_up_after_max_wait_or_shutdown() {
+        let (uris_tx, _uris) = mpsc::unbounded_channel();
+        let client = unresponsive_client(uris_tx, Arc::new(AtomicUsize::new(0)));
+        let discovery = PodDiscovery::start(&client, &[], None, None, default_cfg());
+
+        // The initial list never completes, so the wait ends after `max_wait`.
+        let started = Instant::now();
+        assert!(
+            discovery
+                .wait_until_ready(Duration::from_millis(100), ShutdownSignal::noop())
+                .await
+        );
+        assert!(started.elapsed() >= Duration::from_millis(100));
+
+        // Shutdown ends the wait early.
+        let (trigger, shutdown, _done) = ShutdownSignal::new_wired();
+        drop(trigger);
+        let stopped = tokio::time::timeout(
+            Duration::from_secs(5),
+            discovery.wait_until_ready(Duration::from_secs(60), shutdown),
+        )
+        .await
+        .expect("shutdown should end the wait");
+        assert!(!stopped);
+    }
 
     fn make_pod(
         name: &str,

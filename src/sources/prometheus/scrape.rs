@@ -10,7 +10,7 @@ use vector_lib::{
 };
 
 #[cfg(feature = "kubernetes")]
-use futures::{StreamExt, stream};
+use futures::{Stream, StreamExt, stream};
 #[cfg(feature = "kubernetes")]
 use tokio_stream::wrappers::IntervalStream;
 
@@ -416,15 +416,8 @@ impl PrometheusScrapeConfig {
             if !discovery.wait_until_ready(interval, shutdown.clone()).await {
                 return Ok(());
             }
-            // Read the current Pods on every tick. `discovery` owns the watchers, so it lives
-            // as long as this loop.
-            let requests = IntervalStream::new(tokio::time::interval(interval))
-                .take_until(shutdown)
-                .flat_map(|_| stream::iter(discovery.targets(&query)))
-                .map(|target| {
-                    let context = builder.context_for(&target);
-                    (target.uri, context)
-                });
+            // `discovery` owns the watchers, so it lives as long as this loop.
+            let requests = discovered_requests(&discovery, &builder, &query, interval, shutdown);
             run(requests, options, out).await
         };
 
@@ -504,6 +497,24 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
         );
         self.context(url, instance)
     }
+}
+
+/// The requests for discovered Pods: on every tick, one request per current target.
+#[cfg(feature = "kubernetes")]
+fn discovered_requests<'a>(
+    discovery: &'a kubernetes_sd::PodDiscovery,
+    builder: &'a PrometheusScrapeBuilder,
+    query: &'a QueryParameters,
+    interval: Duration,
+    shutdown: ShutdownSignal,
+) -> impl Stream<Item = (Uri, PrometheusScrapeContext)> + Send + 'a {
+    IntervalStream::new(tokio::time::interval(interval))
+        .take_until(shutdown)
+        .flat_map(move |_| stream::iter(discovery.targets(query)))
+        .map(move |target| {
+            let context = builder.context_for(&target);
+            (target.uri, context)
+        })
 }
 
 #[cfg(feature = "kubernetes")]
@@ -1282,5 +1293,180 @@ mod integration_tests {
             go_info.tag_value("endpoint"),
             Some("http://prometheus:9090/metrics".to_string())
         );
+    }
+}
+
+#[cfg(all(test, feature = "kubernetes"))]
+mod kubernetes_tests {
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, Mutex},
+    };
+
+    use http::Response;
+    use http_body_util::Full;
+    use k8s_openapi::{
+        api::core::v1::{Pod, PodSpec, PodStatus},
+        apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    };
+    use kube::runtime::{reflector, watcher};
+    use tokio::time::sleep;
+
+    use super::*;
+    use crate::{
+        SourceSender,
+        config::ProxyConfig,
+        http::{ParameterValue, QueryParameterValue},
+        test_util::http::spawn_blackhole_http_server,
+        tls::MaybeTlsSettings,
+    };
+
+    const INTERVAL: Duration = Duration::from_millis(50);
+
+    fn pod(name: &str, path: &str, port: u16) -> Pod {
+        Pod {
+            metadata: ObjectMeta {
+                name: Some(name.to_owned()),
+                namespace: Some("ns".to_owned()),
+                annotations: Some(BTreeMap::from([
+                    ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+                    ("prometheus.io/port".to_owned(), port.to_string()),
+                    ("prometheus.io/path".to_owned(), path.to_owned()),
+                ])),
+                ..ObjectMeta::default()
+            },
+            spec: Some(PodSpec::default()),
+            status: Some(PodStatus {
+                pod_ip: Some("127.0.0.1".to_owned()),
+                ..PodStatus::default()
+            }),
+        }
+    }
+
+    /// Waits until the server has seen a request for every path in `expected`, then clears the
+    /// record and checks that the next few ticks only hit those paths.
+    async fn assert_scraped_paths(requests: &Mutex<Vec<String>>, expected: &[&str]) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let seen = requests.lock().unwrap().clone();
+                if expected
+                    .iter()
+                    .all(|path| seen.iter().any(|request| request.starts_with(path)))
+                {
+                    break;
+                }
+                sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("expected requests for {expected:?}"));
+
+        requests.lock().unwrap().clear();
+        sleep(INTERVAL * 4).await;
+        let seen = requests.lock().unwrap().clone();
+        assert!(
+            !seen.is_empty()
+                && seen
+                    .iter()
+                    .all(|request| expected.iter().any(|path| request.starts_with(path))),
+            "expected only {expected:?}, got {seen:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn discovered_pods_are_scraped_as_they_change() {
+        // The server records the path, query, and `x-test` header of every request.
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&requests);
+        let base = spawn_blackhole_http_server(move |request: http::Request<_>| {
+            let recorded = Arc::clone(&recorded);
+            async move {
+                let header = request
+                    .headers()
+                    .get("x-test")
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or_default()
+                    .to_owned();
+                recorded
+                    .lock()
+                    .unwrap()
+                    .push(format!("{} {header}", request.uri()));
+                Ok(Response::new(Full::from("up 1\n")))
+            }
+        })
+        .await;
+        let port = base.port_u16().unwrap();
+
+        let mut writer = reflector::store::Writer::<Pod>::default();
+        let discovery = kubernetes_sd::PodDiscovery::from_stores(
+            vec![writer.as_reader()],
+            kubernetes_sd::AnnotationParserConfig {
+                prefix: "prometheus.io".to_owned(),
+                default_scheme: kubernetes_sd::Scheme::Http,
+                default_path: "/metrics".to_owned(),
+                pod_label_tags: Vec::new(),
+                pod_annotation_tags: Vec::new(),
+            },
+        );
+        writer.apply_watcher_event(&watcher::Event::Init);
+        writer.apply_watcher_event(&watcher::Event::InitApply(pod("a", "/a", port)));
+        writer.apply_watcher_event(&watcher::Event::InitDone);
+
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: false,
+            instance_tag: None,
+            endpoint_tag: None,
+        };
+        let query = HashMap::from([(
+            "key".to_owned(),
+            QueryParameterValue::SingleParam(ParameterValue::String("value".to_owned())),
+        )]);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-test", HeaderValue::from_static("yes"));
+        let options = RequestOptions {
+            client: HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default()).unwrap(),
+            method: HttpMethod::Get,
+            timeout: Duration::from_secs(1),
+            headers,
+            content_type: "text/plain".to_owned(),
+            auth: None,
+        };
+        let (out, rx) = SourceSender::new_test();
+        let (trigger, shutdown, _done) = ShutdownSignal::new_wired();
+        let scrape = tokio::spawn(async move {
+            let requests = discovered_requests(&discovery, &builder, &query, INTERVAL, shutdown);
+            run(requests, options, out).await
+        });
+        // Keep reading events so the source never blocks on a full output.
+        let drain = tokio::spawn(rx.for_each(|_| async {}));
+
+        // The source query and headers apply to discovered targets too.
+        assert_scraped_paths(&requests, &["/a?key=value yes"]).await;
+
+        // An update changes the target.
+        writer.apply_watcher_event(&watcher::Event::Apply(pod("a", "/b", port)));
+        assert_scraped_paths(&requests, &["/b?"]).await;
+
+        // A new Pod is picked up on a later tick.
+        writer.apply_watcher_event(&watcher::Event::Apply(pod("c", "/c", port)));
+        assert_scraped_paths(&requests, &["/b?", "/c?"]).await;
+
+        // A deleted Pod gets no new requests.
+        writer.apply_watcher_event(&watcher::Event::Delete(pod("a", "/b", port)));
+        assert_scraped_paths(&requests, &["/c?"]).await;
+
+        // A re-list, as after a watcher reconnects, leaves no stale targets behind.
+        writer.apply_watcher_event(&watcher::Event::Init);
+        writer.apply_watcher_event(&watcher::Event::InitApply(pod("d", "/d", port)));
+        writer.apply_watcher_event(&watcher::Event::InitDone);
+        assert_scraped_paths(&requests, &["/d?"]).await;
+
+        drop(trigger);
+        tokio::time::timeout(Duration::from_secs(5), scrape)
+            .await
+            .expect("shutdown should stop the scrape loop")
+            .unwrap()
+            .unwrap();
+        drain.await.unwrap();
     }
 }
