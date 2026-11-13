@@ -167,6 +167,16 @@ impl TlsConfig {
             ..Self::default()
         }
     }
+
+    /// TLS file paths to watch for changes. Values provided inline as PEM
+    /// content are skipped, since they aren't files.
+    pub fn files_to_watch(&self) -> Vec<&PathBuf> {
+        [&self.ca_file, &self.crt_file, &self.key_file]
+            .into_iter()
+            .flatten()
+            .filter(|p| !p.to_str().is_some_and(|s| s.contains(PEM_START_MARKER)))
+            .collect()
+    }
 }
 
 /// Directly usable settings for TLS connectors, constructed with an explicit client or server role.
@@ -1092,6 +1102,38 @@ mod test {
     fn from_config_with_certificate() {
         let config = settings_from_config(Some(true), true, true, true);
         assert!(config.is_tls());
+    }
+
+    #[test]
+    fn files_to_watch() {
+        let options = TlsConfig {
+            ca_file: Some("/etc/tls/ca.crt".into()),
+            key_file: Some("/etc/tls/tls.key".into()),
+            crt_file: Some("/etc/tls/tls.crt".into()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            options.files_to_watch(),
+            [
+                Path::new("/etc/tls/ca.crt"),
+                Path::new("/etc/tls/tls.crt"),
+                Path::new("/etc/tls/tls.key"),
+            ]
+        );
+    }
+
+    #[test]
+    fn files_to_watch_skips_inline_pem_and_missing() {
+        let key = String::from_utf8(TEST_PEM_KEY_BYTES.to_vec()).unwrap();
+        let options = TlsConfig {
+            ca_file: Some("/etc/tls/ca.crt".into()), // path
+            key_file: Some(key.into()),              // inline PEM
+            // crt_file is unset
+            ..Default::default()
+        };
+
+        assert_eq!(options.files_to_watch(), [Path::new("/etc/tls/ca.crt")]);
     }
 
     fn settings_from_config(
