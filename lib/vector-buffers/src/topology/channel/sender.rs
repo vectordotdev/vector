@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Instant};
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{InternalEventHandle, Registered, register};
+use vector_common::{
+    finalization::EventStatus,
+    internal_event::{InternalEventHandle, Registered, register},
+};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -90,13 +93,15 @@ where
                 // if any part of it made it to disk. Pieces the writer drops are already accounted
                 // for in its ledger.
                 let mut outcome = TryWriteOutcome::Dropped;
-                for piece in split_to_fit(item, item_size, max_record_size) {
-                    if let TryWriteOutcome::Written = writer
-                        .write_record_outcome(piece)
-                        .await
-                        .map_err(unrecoverable_writer_error)?
-                    {
-                        outcome = TryWriteOutcome::Written;
+                let mut pieces = split_to_fit(item, item_size, max_record_size).into_iter();
+                while let Some(piece) = pieces.next() {
+                    match writer.write_record_outcome(piece).await {
+                        Ok(TryWriteOutcome::Written) => outcome = TryWriteOutcome::Written,
+                        Ok(_) => {}
+                        Err(error) => {
+                            error_unwritten_pieces(pieces);
+                            return Err(unrecoverable_writer_error(error));
+                        }
                     }
                 }
                 Ok(outcome)
@@ -143,15 +148,15 @@ where
                 let mut outcome = TryWriteOutcome::Dropped;
                 let mut pieces = split_to_fit(item, item_size, max_record_size).into_iter();
                 while let Some(piece) = pieces.next() {
-                    match writer
-                        .try_write_record(piece)
-                        .await
-                        .map_err(unrecoverable_writer_error)?
-                    {
-                        TryWriteOutcome::Written => outcome = TryWriteOutcome::Written,
-                        TryWriteOutcome::Dropped => {}
-                        TryWriteOutcome::Full(piece) => {
+                    match writer.try_write_record(piece).await {
+                        Ok(TryWriteOutcome::Written) => outcome = TryWriteOutcome::Written,
+                        Ok(TryWriteOutcome::Dropped) => {}
+                        Ok(TryWriteOutcome::Full(piece)) => {
                             return Ok(TryWriteOutcome::Full(pieces.fold(piece, T::rejoin)));
+                        }
+                        Err(error) => {
+                            error_unwritten_pieces(pieces);
+                            return Err(unrecoverable_writer_error(error));
                         }
                     }
                 }
@@ -258,6 +263,20 @@ where
         );
     }
     pieces
+}
+
+/// Resolves the finalizers of split pieces that will never be written as errored.
+///
+/// The writer errors the finalizers of the piece whose write failed, but pieces after it are never
+/// handed to the writer. Dropped as they are, their finalizers would keep their default
+/// `EventStatus::Dropped`, which acknowledging sources treat as delivered, and they would
+/// acknowledge or checkpoint events that never reached disk.
+fn error_unwritten_pieces<T: Bufferable>(pieces: impl IntoIterator<Item = T>) {
+    for mut piece in pieces {
+        piece
+            .take_finalizer_groups()
+            .update_status(EventStatus::Errored);
+    }
 }
 
 /// Record-level failures that can never succeed (a record too large to encode within the max
@@ -511,9 +530,30 @@ mod tests {
 
     use tempfile::tempdir;
     use tracing::Span;
+    use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
-    use super::SenderAdapter;
+    use super::{SenderAdapter, error_unwritten_pieces};
     use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn unwritten_pieces_resolve_as_errored() {
+        let mut receivers = Vec::new();
+        let pieces: Vec<_> = (0..2)
+            .map(|value| {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                let mut piece = SizedRecord::new(value);
+                piece.add_batch_notifier(batch);
+                receivers.push(receiver);
+                piece
+            })
+            .collect();
+
+        error_unwritten_pieces(pieces);
+
+        for receiver in receivers {
+            assert_eq!(receiver.await, BatchStatus::Errored);
+        }
+    }
 
     #[tokio::test]
     async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
