@@ -13,10 +13,10 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
-        opendal_common::{OpenDalRequestBuilder, OpenDalService, OpenDalSink},
+        opendal_common::{OpenDalRequestBuilder, OpenDalRetryLogic, OpenDalService, OpenDalSink},
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
-            partitioner::KeyPartitioner,
+            ServiceBuilderExt, TowerRequestConfig, partitioner::KeyPartitioner,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
@@ -71,6 +71,9 @@ pub struct WebHdfsConfig {
 
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+    /// Settings for outbound requests, including timeouts and retries.
+    #[serde(default)]
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
@@ -97,6 +100,7 @@ impl GenerateConfig for WebHdfsConfig {
                 .into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
 
             acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
@@ -197,8 +201,11 @@ impl WebHdfsConfig {
             compression: self.compression,
         };
 
-        // TODO: we can add tower middleware here.
-        let svc = ServiceBuilder::new().service(OpenDalService::new(op));
+        let request_settings = self.request.into_settings();
+
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, OpenDalRetryLogic)
+            .service(OpenDalService::new(op));
 
         let sink = OpenDalSink::new(
             svc,
@@ -257,6 +264,7 @@ mod tests {
                 .into(),
             compression: crate::sinks::util::Compression::None,
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
