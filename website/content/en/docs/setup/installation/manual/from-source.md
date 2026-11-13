@@ -237,11 +237,13 @@ Vector supports many feature flags to customize which features are included in a
 all sources, transforms, and sinks are enabled. To view a complete list of features, they are listed
 under "[features]" in [Cargo.toml](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
 
+Custom builds should include `tls-ring` so that Vector installs its default TLS crypto provider.
+
 Example of building with only specific components:
 
 ```shell
 # Build with only file source, remap transform, and console sink
-FEATURES="api,sources-file,transforms-remap,sinks-console" make build
+FEATURES="api,sources-file,transforms-remap,sinks-console,tls-ring" make build
 ```
 
 [buffer]: /docs/reference/glossary/#buffer
