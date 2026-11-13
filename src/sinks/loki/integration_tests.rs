@@ -164,6 +164,7 @@ async fn data_volume_tags() {
                 emit_service: true,
                 emit_source: true,
             },
+            ..Default::default()
         },
         true,
     );

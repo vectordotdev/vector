@@ -147,6 +147,7 @@ fn enable_telemetry() {
                 emit_service: true,
                 emit_source: true,
             },
+            ..Default::default()
         },
         true,
     );

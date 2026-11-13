@@ -8,7 +8,7 @@ use super::{
     LAG_TIME_NAME, Output, OutputMetrics, PostProcessor, SEND_BATCH_LATENCY_NAME,
     SEND_LATENCY_NAME, SourceSender, SourceSenderItem, chunk_size_events,
 };
-use crate::config::{ComponentKey, OutputId, SourceOutput};
+use crate::config::{ComponentKey, OutputId, SourceOutput, telemetry};
 
 pub struct Builder {
     buf_size: usize,
@@ -22,14 +22,15 @@ pub struct Builder {
 
 impl Default for Builder {
     fn default() -> Self {
+        let emit_detailed_metrics = telemetry().emit_detailed_metrics;
         Self {
             buf_size: chunk_size_events(),
             default_output: None,
             named_outputs: Default::default(),
             output_metrics: OutputMetrics::new(
-                Some(histogram!(LAG_TIME_NAME)),
-                Some(histogram!(SEND_LATENCY_NAME)),
-                Some(histogram!(SEND_BATCH_LATENCY_NAME)),
+                emit_detailed_metrics.then(|| histogram!(LAG_TIME_NAME)),
+                emit_detailed_metrics.then(|| histogram!(SEND_LATENCY_NAME)),
+                emit_detailed_metrics.then(|| histogram!(SEND_BATCH_LATENCY_NAME)),
             ),
             timeout: None,
             ewma_half_life_seconds: None,

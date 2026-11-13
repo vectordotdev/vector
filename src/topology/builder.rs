@@ -20,7 +20,6 @@ use tokio::{
 };
 use tracing::{Instrument, Span};
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
     buffers::{
         BufferType, WhenFull,
         topology::{
@@ -759,7 +758,7 @@ impl<'a> Builder<'a> {
                     .inspect(|events| {
                         events_received.emit(CountByteSize(
                             events.len(),
-                            events.estimated_json_encoded_size_of(),
+                            vector_lib::config::telemetry().event_size(events),
                         ))
                     })
                     .take_until_if(tripwire),
@@ -938,7 +937,7 @@ impl<'a> Builder<'a> {
             .inspect(move |events| {
                 events_received.emit(CountByteSize(
                     events.len(),
-                    events.estimated_json_encoded_size_of(),
+                    vector_lib::config::telemetry().event_size(events),
                 ))
             });
         let events_sent = register!(EventsSent::from(internal_event::Output(None)));
@@ -972,7 +971,7 @@ impl<'a> Builder<'a> {
             .inspect(move |(events, _): &(EventArray, Instant)| {
                 events_sent.emit(CountByteSize(
                     events.len(),
-                    events.estimated_json_encoded_size_of(),
+                    vector_lib::config::telemetry().event_size(events),
                 ));
             });
         let stream = OutputUtilization::new(output_sender, stream);
@@ -1034,11 +1033,15 @@ async fn run_source_output_pump(
                         // operation), we set the `last_transform_timestamp` to the current time
                         // instead to get an accurate reference for when the events started
                         // waiting for the first transform.
-                        let now = Instant::now();
+                        let now = vector_lib::config::telemetry()
+                            .emit_detailed_metrics
+                            .then(Instant::now);
                         array.for_each_metadata_mut(|metadata| {
                             metadata.set_source_id(Arc::clone(&source));
                             metadata.set_source_type(source_type);
-                            metadata.set_last_transform_timestamp(now);
+                            if let Some(now) = now {
+                                metadata.set_last_transform_timestamp(now);
+                            }
                         });
                         fanout
                             .send(array, Some(send_reference))
@@ -1311,7 +1314,7 @@ impl Runner {
 
         self.events_received.emit(CountByteSize(
             events.len(),
-            events.estimated_json_encoded_size_of(),
+            vector_lib::config::telemetry().event_size(events),
         ));
     }
 

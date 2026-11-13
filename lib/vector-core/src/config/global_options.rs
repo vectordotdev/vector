@@ -91,8 +91,8 @@ pub struct GlobalOptions {
 
     /// Telemetry options.
     ///
-    /// Determines whether `source` and `service` tags should be emitted with the
-    /// `component_sent_*` and `component_received_*` events.
+    /// Controls detailed topology metrics and whether `source` and `service`
+    /// tags are emitted with `component_sent_*` and `component_received_*` events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::required = false))]
     pub telemetry: Telemetry,

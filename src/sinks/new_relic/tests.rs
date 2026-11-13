@@ -56,6 +56,7 @@ async fn component_spec_compliance_data_volume() {
                 emit_service: true,
                 emit_source: true,
             },
+            ..Default::default()
         },
         true,
     );
