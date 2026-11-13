@@ -737,19 +737,9 @@ impl SinkConfig for ElasticsearchConfig {
     }
 
     fn files_to_watch(&self) -> Vec<&PathBuf> {
-        let mut files = Vec::new();
-        if let Some(tls) = &self.tls {
-            if let Some(ca_file) = &tls.ca_file {
-                files.push(ca_file);
-            }
-            if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file);
-            }
-            if let Some(key_file) = &tls.key_file {
-                files.push(key_file);
-            }
-        }
-        files
+        self.tls
+            .as_ref()
+            .map_or_else(Vec::new, TlsConfig::files_to_watch)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
