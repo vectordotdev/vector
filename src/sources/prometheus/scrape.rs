@@ -657,12 +657,22 @@ mod validation_tests {
         }));
     }
 
+    /// Loads through the normal config loader, which also checks the config against the schema.
     #[test]
-    fn hosts_alias_still_configures_endpoints() {
-        let config: PrometheusScrapeConfig =
-            toml::from_str(r#"hosts = ["http://localhost:9090/metrics"]"#).unwrap();
-        assert_eq!(config.endpoints, ["http://localhost:9090/metrics"]);
-        assert_eq!(SourceConfig::validate_structure(&config), Ok(()));
+    fn hosts_endpoints_and_targets_all_load() {
+        for targets in [
+            "hosts: [http://localhost:9090/metrics]",
+            "endpoints: [http://localhost:9090/metrics]",
+            "targets: [{static: {urls: [http://localhost:9090/metrics]}}]",
+        ] {
+            let yaml = format!(
+                "sources:\n  prom:\n    type: prometheus_scrape\n    {targets}\n\
+                 sinks:\n  out:\n    type: prometheus_exporter\n    inputs: [prom]\n"
+            );
+            if let Err(errors) = config::load_from_str(&yaml, config::Format::Yaml) {
+                panic!("`{targets}` should load: {errors:?}");
+            }
+        }
     }
 
     #[cfg(feature = "kubernetes")]
