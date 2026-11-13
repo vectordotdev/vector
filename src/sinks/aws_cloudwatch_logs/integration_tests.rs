@@ -403,6 +403,8 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 
     assert_eq!(output_lines.sort(), input_lines.sort());
 
+    // Search by prefix, not by pattern: with `logGroupNamePattern`, DescribeLogGroups returns only
+    // `arn`, `creationTime`, and `logGroupName`, so `kmsKeyId` would be missing.
     let log_group = create_client_test()
         .await
         .describe_log_groups()
