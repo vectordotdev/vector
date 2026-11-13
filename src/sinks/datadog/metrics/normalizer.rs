@@ -10,6 +10,16 @@ pub(crate) struct DatadogMetricsNormalizer;
 
 impl MetricNormalize for DatadogMetricsNormalizer {
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        // The periodic TTL sweep (for `expire_metrics_secs`) is normally driven by
+        // `MetricSet::make_absolute`/`make_incremental`, called below for every branch except
+        // `MetricValue::Sketch`, which is passed through without touching `state` at all. Without
+        // this, a sink that settles into sketch-only traffic would never sweep entries left behind
+        // by earlier non-sketch series, leaking them for as long as the process runs despite a
+        // configured TTL. Driving it unconditionally here covers that gap; it's cheap to call
+        // redundantly for the other branches since `maybe_cleanup` no-ops unless the cleanup
+        // interval has actually elapsed.
+        state.maybe_cleanup();
+
         // We primarily care about making sure that counters are incremental, and that gauges are
         // always absolute.  For other metric kinds, we want them to be incremental.
         match &metric.value() {
@@ -39,9 +49,66 @@ mod tests {
     };
 
     use super::DatadogMetricsNormalizer;
-    use crate::test_util::metrics::{
-        assert_normalize, generate_f64s, get_aggregated_histogram, get_distribution, tests,
+    use crate::{
+        sinks::util::buffer::metrics::{MetricNormalize, MetricSet, TtlPolicy},
+        test_util::metrics::{
+            assert_normalize, generate_f64s, get_aggregated_histogram, get_distribution, tests,
+        },
     };
+
+    // Regression test for a Codex-flagged gap: `MetricValue::Sketch` is passed through directly
+    // in `normalize` without ever touching `state` via `make_absolute`/`make_incremental`, which
+    // are the only places that used to drive `MetricSet`'s periodic TTL sweep. A sink that
+    // receives a non-sketch metric and then settles into sketch-only traffic would therefore
+    // never sweep the stale entry left behind, leaking it for as long as the process runs despite
+    // a configured `expire_metrics_secs`. `normalize` now calls `state.maybe_cleanup()`
+    // unconditionally to cover every branch, including this one.
+    #[test]
+    fn ttl_sweep_runs_during_sketch_only_traffic() {
+        use std::time::{Duration, Instant};
+
+        let ttl = Duration::from_millis(50);
+        // Construct the policy directly, rather than via `TtlPolicy::new`, so `cleanup_interval`
+        // isn't clamped to its usual 10-second floor: that floor exists to bound real-world sweep
+        // overhead, but would make this test wait 10+ seconds for no benefit.
+        let policy = TtlPolicy {
+            ttl,
+            cleanup_interval: Duration::from_millis(10),
+            last_cleanup: Instant::now(),
+        };
+        let mut state = MetricSet::with_policies(None, Some(policy));
+        let mut normalizer = DatadogMetricsNormalizer;
+
+        // Seed a stale-to-be gauge entry. `MetricValue::Gauge` goes through `make_absolute`,
+        // which only caches the entry for `MetricKind::Incremental` input (via
+        // `incremental_to_absolute`'s unconditional `insert`) — an already-`Absolute` gauge is
+        // passed straight through without being cached at all.
+        let gauge = get_gauge("stale_gauge", 1.0, MetricKind::Incremental);
+        assert_eq!(
+            normalizer.normalize(&mut state, gauge),
+            Some(get_gauge("stale_gauge", 1.0, MetricKind::Absolute))
+        );
+        assert_eq!(state.len(), 1);
+
+        // Let the gauge entry exceed its TTL, and the (artificially short) cleanup interval
+        // elapse.
+        std::thread::sleep(ttl + Duration::from_millis(50));
+
+        // Send only a sketch from here on. Sketches never touch `state` directly, so if cleanup
+        // weren't driven unconditionally, the stale gauge entry above would never be swept.
+        let sketch = get_sketch("some_sketch", [1.0, 2.0], MetricKind::Incremental);
+        let _ = normalizer.normalize(&mut state, sketch);
+
+        assert_eq!(
+            state.len(),
+            0,
+            "stale gauge entry should have been swept by the TTL cleanup driven for sketch-only traffic"
+        );
+    }
+
+    fn get_gauge<N: Into<String>>(name: N, value: f64, kind: MetricKind) -> Metric {
+        Metric::new(name, kind, MetricValue::Gauge { value })
+    }
 
     fn get_sketch<N, S, V>(name: N, samples: S, kind: MetricKind) -> Metric
     where
