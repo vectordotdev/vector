@@ -55,10 +55,10 @@ pub enum SampleError {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct SampleInternalMetricsConfig {
-    /// Whether or not to also count discarded events per group, in the
-    /// `component_discarded_events_by_group_total` internal metric.
+    /// Whether or not to include the `group` tag on the `component_discarded_events_total`
+    /// internal metric.
     ///
-    /// The metric's `group` tag contains the rendered `group_by` value.
+    /// When enabled, adds a `group` tag containing the rendered `group_by` value.
     /// Missing or unrenderable values use `None`.
     ///
     /// Note that this defaults to false because the `group` tag has potentially unbounded
