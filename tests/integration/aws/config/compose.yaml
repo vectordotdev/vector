@@ -7,6 +7,8 @@ services:
     build: ../data
     # vdev runs `up` without `--build`; rebuild so Dockerfile edits are not ignored.
     pull_policy: build
+    volumes:
+      - aws-emulator-credentials:/home/emulator/.aws/emulator
   mock-ecs:
     image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
     environment:
@@ -15,6 +17,12 @@ services:
     volumes:
       - $DOCKER_SOCKET:/var/run/docker.sock
       - $HOME/.aws/:/home/.aws/
+
+volumes:
+  # Also mounted in the test runner; see `runner.volumes` in test.yaml.
+  aws-emulator-credentials:
+    name: aws_aws-emulator-credentials
+    external: true
 
 networks:
   default:

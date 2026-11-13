@@ -10,8 +10,8 @@ RUN dnf install -y socat \
   && rpm -i /tmp/aws-emulator.rpm \
   && rm /tmp/aws-emulator.rpm \
   && dnf clean all \
-  && mkdir -p /home/emulator \
-  && chown 1000 /home/emulator
+  && mkdir -p /home/emulator/.aws/emulator \
+  && chown -R 1000 /home/emulator
 
 COPY entrypoint.sh /entrypoint.sh
 
