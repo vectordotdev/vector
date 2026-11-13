@@ -111,6 +111,8 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting the TLS session id context: {}", source))]
+    SetSessionIdContext { source: ErrorStack },
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]

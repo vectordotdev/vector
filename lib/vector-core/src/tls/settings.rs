@@ -11,7 +11,7 @@ use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
     FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
     ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    SetPrivateKeySnafu, SetSessionIdContextSnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
@@ -323,6 +323,14 @@ impl TlsSettings {
         } else {
             SslVerifyMode::NONE
         });
+        if for_server {
+            // When it requests client certificates, OpenSSL fails the handshake of any client
+            // resuming a session unless a session id context is set. Each context has its own
+            // session cache and ticket keys, so a constant is enough.
+            context
+                .set_session_id_context(b"vector")
+                .context(SetSessionIdContextSnafu)?;
+        }
         if let Some(identity) = &self.identity {
             context
                 .set_certificate(&identity.cert)
@@ -1103,6 +1111,81 @@ mod test {
         let config = make_config(enabled, set_crt, set_key);
         MaybeTlsSettings::from_config(Some(&config), for_server)
             .expect("Failed to generate settings from config")
+    }
+
+    #[tokio::test]
+    async fn verified_client_can_resume_its_session() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslSession, SslVersion};
+        use tokio::{io::AsyncWriteExt as _, net::TcpStream};
+        use tokio_openssl::SslStream;
+
+        async fn connect(
+            connector: &SslConnector,
+            addr: SocketAddr,
+            session: Option<&SslSession>,
+        ) -> SslStream<TcpStream> {
+            let mut ssl = connector
+                .configure()
+                .unwrap()
+                .into_ssl("localhost")
+                .unwrap();
+            if let Some(session) = session {
+                // SAFETY: the session was issued to a connection of the same connector.
+                unsafe { ssl.set_session(session).unwrap() };
+            }
+            let tcp = TcpStream::connect(addr).await.unwrap();
+            let mut stream = SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .expect("the server accepts the client");
+            // OpenSSL never resumes the session of a connection that was not shut down cleanly.
+            stream.shutdown().await.ok();
+            stream
+        }
+
+        let config = TlsEnableableConfig {
+            enabled: Some(true),
+            options: TlsConfig {
+                verify_certificate: Some(true),
+                ca_file: Some(TEST_PEM_CA_PATH.into()),
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                ..Default::default()
+            },
+        };
+        let mut listener = MaybeTlsSettings::from_config(Some(&config), true)
+            .unwrap()
+            .bind(&"127.0.0.1:0".parse().unwrap())
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+        builder
+            .set_certificate_chain_file(TEST_PEM_CLIENT_CRT_PATH)
+            .unwrap();
+        builder
+            .set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
+            .unwrap();
+        // Under TLS 1.2, the session is available as soon as the handshake completes.
+        builder
+            .set_max_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+        let connector = builder.build();
+
+        let first = connect(&connector, addr, None).await;
+        let session = first.ssl().session().unwrap().to_owned();
+        let second = connect(&connector, addr, Some(&session)).await;
+        assert!(second.ssl().session_reused());
     }
 
     fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsEnableableConfig {
