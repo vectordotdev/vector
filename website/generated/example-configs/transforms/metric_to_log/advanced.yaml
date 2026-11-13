@@ -4,6 +4,6 @@ transforms:
     inputs:
       - my-source-or-transform-id
     host_tag: host
+    measure_cpu_usage: false
     metric_tag_values: single
     timezone: local
-    measure_cpu_usage: false

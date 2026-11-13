@@ -6,6 +6,6 @@ sinks:
     log_id: my-log
     project_id: my-project
     resource:
-      type: gce_instance
       instanceId: Twilight
       zone: zone-{{ zone }}
+      type: gce_instance

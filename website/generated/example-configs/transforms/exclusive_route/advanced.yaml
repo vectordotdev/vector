@@ -3,9 +3,9 @@ transforms:
     type: exclusive_route
     inputs:
       - my-source-or-transform-id
+    measure_cpu_usage: false
     routes:
       - condition:
           source: exists(.foo) && exists(.bar)
           type: vrl
         name: foo-and-bar-exist
-    measure_cpu_usage: false

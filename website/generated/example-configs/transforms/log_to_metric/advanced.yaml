@@ -4,8 +4,8 @@ transforms:
     inputs:
       - my-source-or-transform-id
     all_metrics: false
+    measure_cpu_usage: false
     metrics:
       - field: .my_field
         kind: incremental
         type: counter
-    measure_cpu_usage: false

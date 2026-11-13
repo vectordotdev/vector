@@ -3,6 +3,7 @@ transforms:
     type: route
     inputs:
       - my-source-or-transform-id
+    measure_cpu_usage: false
     reroute_unmatched: true
     route:
       foo-does-not-exist:
@@ -11,4 +12,3 @@ transforms:
       foo-exists:
         source: exists(.foo)
         type: vrl
-    measure_cpu_usage: false

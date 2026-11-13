@@ -6,5 +6,5 @@ transforms:
     flush_when:
       type: vrl
       source: .status_code != 200 && !includes(["info", "debug"], .severity)
-    num_events_before: 100
     measure_cpu_usage: false
+    num_events_before: 100

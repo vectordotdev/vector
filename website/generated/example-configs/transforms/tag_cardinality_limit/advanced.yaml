@@ -4,7 +4,7 @@ transforms:
     inputs:
       - my-source-or-transform-id
     limit_exceeded_action: drop_tag
+    measure_cpu_usage: false
     mode: exact
     tracking_scope: global
     value_limit: 500
-    measure_cpu_usage: false

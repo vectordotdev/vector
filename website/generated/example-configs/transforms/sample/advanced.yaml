@@ -6,6 +6,6 @@ transforms:
     group_by: "{{ service }}"
     key_field: message
     max_state_bytes: 134217728
+    measure_cpu_usage: false
     ratio: 0.13
     sample_rate_key: sample_rate
-    measure_cpu_usage: false

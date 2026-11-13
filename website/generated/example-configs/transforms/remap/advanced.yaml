@@ -5,6 +5,7 @@ transforms:
       - my-source-or-transform-id
     drop_on_abort: true
     drop_on_error: false
+    measure_cpu_usage: false
     metric_tag_values: single
     reroute_dropped: false
     source: |-
@@ -14,4 +15,3 @@ transforms:
       .duration = parse_duration!(.duration, "s")
       .new_name = del(.old_name)
     timezone: local
-    measure_cpu_usage: false
