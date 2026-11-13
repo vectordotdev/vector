@@ -10,6 +10,7 @@ use vector_lib::{
     codecs::{
         OctetCountingDecoder, SyslogDeserializerConfig,
         decoding::{Deserializer, Framer, format::Deserializer as FormatDeserializer},
+        internal_events::DecoderDeserializeError,
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -530,6 +531,8 @@ pub fn udp(
                         output.extend(events);
                     }
                     Err(error) => {
+                        // Parsing datagrams directly bypasses the decoder's error instrumentation.
+                        emit(DecoderDeserializeError { error: &error });
                         emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
@@ -1621,6 +1624,74 @@ mod test {
             assert_eq!(output_messages, input_messages);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn udp_syslog_preserves_parser_error_metrics() {
+        crate::test_util::trace_init();
+        let (_guard, address) = next_addr();
+        let config = SyslogConfig::from_mode(Mode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        });
+        let (out, mut output) = SourceSender::new_test();
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let mut context = SourceContext::new_test(out, None);
+        context.shutdown = shutdown;
+        let mut source = config.build(context).await.unwrap();
+        assert!(futures::poll!(&mut source).is_pending());
+        let source = tokio::spawn(source);
+
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        socket.send_to(b"not syslog", address).await.unwrap();
+        socket
+            .send_to(
+                b"<13>1 2026-11-13T00:00:00Z host app - - - valid",
+                address,
+            )
+            .await
+            .unwrap();
+
+        // The following valid packet synchronizes processing of the malformed one.
+        let event = tokio::time::timeout(Duration::from_secs(5), output.next())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            event
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap()),
+            Some(&Value::Bytes(Bytes::from_static(b"valid")))
+        );
+        stop.cancel();
+        tokio::time::timeout(Duration::from_secs(5), source)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(output.next().await.is_none());
+
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        for (code, error_type, stage) in [
+            ("decoder_deserialize", "parser_failed", "processing"),
+            ("socket_receive", "reader_failed", "receiving"),
+        ] {
+            let metric = metrics
+                .iter()
+                .find(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_value("error_code").as_deref() == Some(code)
+                        && metric.tag_value("error_type").as_deref() == Some(error_type)
+                        && metric.tag_value("stage").as_deref() == Some(stage)
+                })
+                .unwrap_or_else(|| panic!("missing {code} error metric"));
+            assert_eq!(
+                metric.value(),
+                &crate::event::MetricValue::Counter { value: 1.0 }
+            );
+        }
     }
 
     fn assert_oversized_datagram_count(mode: &str, expected: f64) {
