@@ -426,9 +426,20 @@ components: sources: internal_metrics: {
 					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
 					required:    true
 				}
+			}
+		}
+		component_discarded_events_by_group_total: {
+			description:       "The number of events dropped by this component, per group. Emitted only when enabled in the component configuration, such as `internal_metrics.include_group_tag` on the `throttle` and `sample` transforms."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
 				group: {
-					description: "The group that the discarded event belonged to. This tag is included only when enabled in the component configuration, such as `internal_metrics.include_group_tag` on the `throttle` transform."
-					required:    false
+					description: "The group that the discarded event belonged to."
+					required:    true
 				}
 			}
 		}
