@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn files_to_watch_includes_tls_files() {
-        let config: BoxedSink = serde_yaml::from_str(&format!(
+        let config: BoxedSink = serde_yaml::from_str(
             r"
             type: opensearch
             endpoints: [https://localhost:9200]
@@ -235,8 +235,8 @@ mod tests {
                 ca_file: /etc/tls/ca.crt
                 crt_file: /etc/tls/tls.crt
                 key_file: /etc/tls/tls.key
-            "
-        ))
+            ",
+        )
         .unwrap();
 
         let files: Vec<PathBuf> = config.files_to_watch().into_iter().cloned().collect();
