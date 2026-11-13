@@ -142,9 +142,7 @@ impl TransformConfig for ReduceConfig {
 
         Ok(match shards {
             None => Transform::event_task(reduce),
-            Some(shards) => {
-                Transform::event_task(ShardedReduce::new(reduce, shards, context.cpu_ns.clone()))
-            }
+            Some(shards) => Transform::event_task(ShardedReduce::new(reduce, shards)),
         })
     }
 

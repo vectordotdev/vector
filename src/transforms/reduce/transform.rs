@@ -10,7 +10,6 @@ use vector_lib::internal_event::emit;
 use async_stream::stream;
 use futures::{Stream, StreamExt, future, stream};
 use indexmap::IndexMap;
-use metrics::Counter;
 use tokio::{sync::mpsc, task::JoinSet};
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::{
@@ -368,16 +367,11 @@ const OUTPUT_QUEUE_BATCHES_PER_SHARD: usize = 1;
 pub struct ShardedReduce {
     reduce: Reduce,
     shards: NonZeroUsize,
-    cpu_ns: Option<Counter>,
 }
 
 impl ShardedReduce {
-    pub const fn new(reduce: Reduce, shards: NonZeroUsize, cpu_ns: Option<Counter>) -> Self {
-        Self {
-            reduce,
-            shards,
-            cpu_ns,
-        }
+    pub const fn new(reduce: Reduce, shards: NonZeroUsize) -> Self {
+        Self { reduce, shards }
     }
 }
 
@@ -396,20 +390,18 @@ impl TaskTransform<Event> for ShardedReduce {
         let shards_senders = (0..self.shards.get())
             .map(|_| {
                 let (tx, rx) = mpsc::channel::<Vec<Event>>(SHARD_QUEUE_BATCHES);
-                tasks.spawn_timed(
-                    run_shard(Box::new(self.reduce.clone()), rx, output_tx.clone()),
-                    self.cpu_ns.clone(),
-                );
+                tasks.spawn_timed(run_shard(
+                    Box::new(self.reduce.clone()),
+                    rx,
+                    output_tx.clone(),
+                ));
                 tx
             })
             .collect();
 
         drop(output_tx);
 
-        tasks.spawn_timed(
-            route(self.reduce.group_by, shards_senders, input_rx),
-            self.cpu_ns.clone(),
-        );
+        tasks.spawn_timed(route(self.reduce.group_by, shards_senders, input_rx));
 
         stream! {
             let mut output = std::pin::pin!(ReceiverStream::new(output_rx));
