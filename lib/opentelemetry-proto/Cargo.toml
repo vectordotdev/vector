@@ -28,7 +28,7 @@ vector-core = { path = "../vector-core", default-features = false }
 
 [features]
 default = []
-# Internal typed trace event (RFC 25329). Off by default until a source, transform, or sink consumes it.
+# Internal typed trace event (RFC 25329). The `otlp` serializer consumes it.
 typed-trace = ["dep:indexmap", "vector-core/typed-trace"]
 
 [dev-dependencies]

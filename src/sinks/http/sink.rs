@@ -43,6 +43,12 @@ where
         let batch_sizer = HttpBatchSizer {
             encoder: self.request_builder.encoder.encoder.clone(),
         };
+        // An OTLP batch whose every span was rejected encodes to zero bytes. A collector
+        // answers that body with a 400, which rejects acknowledgements for spans the
+        // conversion already reported. Dropping the request leaves finalizers at
+        // `EventStatus::Dropped`, which does not change `BatchStatus` (it stays
+        // `Delivered`), so the batch is not retried.
+        let skip_empty_otlp_body = self.request_builder.encoder.is_otlp();
         input
             // Batch the input stream with size calculation based on the configured codec
             .batched_partitioned(
@@ -57,13 +63,17 @@ where
                 self.request_builder,
             )
             // Filter out any errors that occurred in the request building.
-            .filter_map(|request| async move {
+            .filter_map(move |request| async move {
                 match request {
                     Err(error) => {
                         emit(SinkRequestBuildError { error });
                         None
                     }
-                    Ok(req) => Some(req),
+                    Ok(request) if skip_empty_otlp_body && request.payload().is_empty() => {
+                        tracing::debug!("OTLP request body was empty, so it was not sent.");
+                        None
+                    }
+                    Ok(request) => Some(request),
                 }
             })
             // Generate the driver that will send requests and handle retries,

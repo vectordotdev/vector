@@ -84,23 +84,33 @@ impl GroupedCountByteSize {
     where
         E: GetEventCountTags,
     {
+        let tags = self.event_tags(event);
+        self.add_event_tags(tags, json_size);
+    }
+
+    /// Returns the tags that `add_event` records for the event, or `None` when not tracking
+    /// by tags. This lets a caller count an event after giving it away.
+    pub fn event_tags<E>(&self, event: &E) -> Option<TaggedEventsSent>
+    where
+        E: GetEventCountTags,
+    {
+        self.is_tagged().then(|| event.get_tags())
+    }
+
+    /// Adds one event with tags taken earlier by `event_tags`.
+    pub fn add_event_tags(&mut self, tags: Option<TaggedEventsSent>, json_size: JsonSize) {
+        let size = CountByteSize(1, json_size);
         match self {
             Self::Tagged { sizes } => {
-                let size = CountByteSize(1, json_size);
-                let tags = event.get_tags();
-
-                match sizes.get_mut(&tags) {
-                    Some(current) => {
-                        *current += size;
-                    }
-                    None => {
-                        sizes.insert(tags, size);
-                    }
-                }
+                debug_assert!(
+                    tags.is_some(),
+                    "a tagged count was given an event with no tags"
+                );
+                *sizes
+                    .entry(tags.unwrap_or_else(TaggedEventsSent::new_empty))
+                    .or_insert(CountByteSize(0, JsonSize::zero())) += size;
             }
-            Self::Untagged { size } => {
-                *size += CountByteSize(1, json_size);
-            }
+            Self::Untagged { size: total } => *total += size,
         }
     }
 
