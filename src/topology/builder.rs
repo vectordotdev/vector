@@ -342,6 +342,9 @@ impl<'a> Builder<'a> {
         let typetag = source.inner.get_component_name();
         let source_outputs = source.inner.outputs(self.config.schema.log_namespace());
 
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = source.measure_cpu_usage.then(cpu_time::register_counter);
+
         let task_name = format!(
             ">> {} ({}, pump) >>",
             source.inner.get_component_name(),
@@ -367,7 +370,7 @@ impl<'a> Builder<'a> {
 
             let pump = run_source_output_pump(rx, fanout, source, source_type);
 
-            pumps.push(pump.instrument(Span::current()));
+            pumps.push(cpu_timed_if(pump, cpu_ns.clone()).instrument(Span::current()));
             controls.insert(
                 OutputId {
                     component: key.clone(),
@@ -432,7 +435,7 @@ impl<'a> Builder<'a> {
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
         };
-        let server = match source.inner.build(context).await {
+        let server = match cpu_scoped_if(source.inner.build(context), cpu_ns.clone()).await {
             Err(error) => {
                 self.errors.push(format!("Source \"{key}\": {error}"));
                 return Err(());
@@ -485,7 +488,7 @@ impl<'a> Builder<'a> {
                 }
             }
         };
-        let server = Task::new(key.clone(), typetag, server);
+        let server = Task::new(key.clone(), typetag, cpu_timed_if(server, cpu_ns));
 
         self.outputs.extend(controls);
         self.tasks.insert(key.clone(), pump);

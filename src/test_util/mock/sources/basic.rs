@@ -4,6 +4,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -14,6 +15,7 @@ use vector_lib::{
     },
     config::{DataType, LogNamespace, SourceOutput},
     configurable::configurable_component,
+    cpu_time::spawn_timed,
     event::EventContainer,
     schema::Definition,
     source::Source,
@@ -22,7 +24,7 @@ use vector_lib::{
 
 use crate::{
     config::{SourceConfig, SourceContext},
-    test_util::mock::TestComponentData,
+    test_util::mock::{TestComponentData, transforms::busy_spin},
 };
 
 /// Configuration for the `test_basic` source.
@@ -42,6 +44,10 @@ pub struct BasicSourceConfig {
     #[serde(skip)]
     force_shutdown: bool,
 
+    /// CPU time burned per received batch, in a task spawned with `spawn_timed`.
+    #[serde(skip)]
+    cpu_burn_ms: Option<u64>,
+
     /// Meaningless field that only exists for triggering config diffs during topology reloading.
     data: Option<String>,
 
@@ -59,6 +65,7 @@ impl Default for BasicSourceConfig {
             event_counter: None,
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
+            cpu_burn_ms: None,
             data: None,
             extra: TestComponentData::DEFAULT,
         }
@@ -75,6 +82,7 @@ impl BasicSourceConfig {
             event_counter: None,
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
+            cpu_burn_ms: None,
             data: None,
             extra: TestComponentData::DEFAULT,
         }
@@ -87,6 +95,7 @@ impl BasicSourceConfig {
             event_counter: None,
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
+            cpu_burn_ms: None,
             data: Some(data.into()),
             extra: TestComponentData::DEFAULT,
         }
@@ -101,6 +110,7 @@ impl BasicSourceConfig {
             event_counter: Some(event_counter),
             data_type: Some(DataType::all_bits()),
             force_shutdown: false,
+            cpu_burn_ms: None,
             data: None,
             extra: TestComponentData::DEFAULT,
         }
@@ -108,6 +118,12 @@ impl BasicSourceConfig {
 
     pub fn set_force_shutdown(&mut self, force_shutdown: bool) {
         self.force_shutdown = force_shutdown;
+    }
+
+    #[must_use]
+    pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
+        self.cpu_burn_ms = Some(cpu_burn_ms);
+        self
     }
 }
 
@@ -122,6 +138,7 @@ impl SourceConfig for BasicSourceConfig {
         let shutdown2 = cx.shutdown;
         let mut out = cx.out;
         let force_shutdown = self.force_shutdown;
+        let cpu_burn = self.cpu_burn_ms.map(Duration::from_millis);
 
         Ok(Box::pin(async move {
             tokio::pin!(shutdown1);
@@ -136,6 +153,12 @@ impl SourceConfig for BasicSourceConfig {
                     Some(array) = recv.next() => {
                         if let Some(counter) = &event_counter {
                             counter.fetch_add(array.len(), Ordering::Relaxed);
+                        }
+
+                        if let Some(cpu_burn) = cpu_burn {
+                            spawn_timed(async move { busy_spin(cpu_burn) })
+                                .await
+                                .expect("CPU burn task panicked");
                         }
 
                         if let Err(e) = out.send_event(array).await {

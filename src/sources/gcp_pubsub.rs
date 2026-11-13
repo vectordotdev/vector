@@ -440,7 +440,7 @@ impl PubsubSource {
         // when it has an idle interval it will mark itself as not
         // busy.
         let busy_flag = Arc::new(AtomicBool::new(false));
-        let task = crate::spawn_in_current_span(self.clone().run(Arc::clone(&busy_flag)));
+        let task = vector_lib::cpu_time::spawn_timed(self.clone().run(Arc::clone(&busy_flag)));
         tasks.push(Task { task, busy_flag });
     }
 

@@ -116,7 +116,7 @@ where
 
             let connection_open = connection_open.clone();
             let mut out = out.clone();
-            tokio::spawn(
+            vector_lib::cpu_time::spawn_timed_without_span(
                 async move {
                     let _open_token = connection_open.open(|count| emit(ConnectionOpen { count }));
 

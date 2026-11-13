@@ -510,7 +510,7 @@ pub fn build_framestream_tcp_source(
                             request_limiter,
                         );
 
-                        tokio::spawn(
+                        vector_lib::cpu_time::spawn_timed_without_span(
                             fut.map(move |()| {
                                 drop(open_token);
                                 drop(tcp_connection_permit);
@@ -898,7 +898,7 @@ fn build_framestream_source<T: Send + 'static>(
                 .await;
             info!("Finished sending.");
         };
-        tokio::spawn(handler.instrument(span.or_current()));
+        vector_lib::cpu_time::spawn_timed_without_span(handler.instrument(span.or_current()));
     } else {
         let mut events = frames.filter_map(move |f| {
             future::ready(frame_handler_copy.handle_event(received_from.clone(), f))
@@ -911,7 +911,7 @@ fn build_framestream_source<T: Send + 'static>(
 
             info!("Finished sending.");
         };
-        tokio::spawn(handler.instrument(span.or_current()));
+        vector_lib::cpu_time::spawn_timed_without_span(handler.instrument(span.or_current()));
     }
 }
 
@@ -925,7 +925,7 @@ async fn spawn_event_handling_tasks(
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
-    crate::spawn_in_current_span(async move {
+    vector_lib::cpu_time::spawn_timed(async move {
         if let Some(evt) = event_handler.handle_event(received_from, event_data)
             && event_sink.send_event(evt).await.is_err()
         {

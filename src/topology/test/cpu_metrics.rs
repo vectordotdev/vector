@@ -11,6 +11,7 @@ use crate::{
         mock::{
             basic_source,
             sinks::CompletionSinkConfig,
+            sources::BasicSourceConfig,
             transforms::{NoopTransformConfig, TransformType},
         },
         start_topology, trace_init,
@@ -18,6 +19,8 @@ use crate::{
 };
 
 const EVENT_COUNT: usize = 100;
+const SOURCE_TYPE: &str = "test_basic";
+const SOURCE_KIND: &str = "source";
 const TRANSFORM_TYPE: &str = "test_noop";
 const TRANSFORM_KIND: &str = "transform";
 const SINK_TYPE: &str = "test_completion";
@@ -37,6 +40,32 @@ const CPU_BURN_MS: u64 = 1;
 /// itself spends on `EVENT_COUNT` events.
 const HEALTHCHECK_CPU_BURN_MS: u32 = 100;
 
+/// Which components of the test topology have `measure_cpu_usage` enabled.
+#[derive(Clone, Copy)]
+struct Measure {
+    source: bool,
+    transform: bool,
+    sink: bool,
+}
+
+const MEASURE_NONE: Measure = Measure {
+    source: false,
+    transform: false,
+    sink: false,
+};
+const MEASURE_SOURCE: Measure = Measure {
+    source: true,
+    ..MEASURE_NONE
+};
+const MEASURE_TRANSFORM: Measure = Measure {
+    transform: true,
+    ..MEASURE_NONE
+};
+const MEASURE_SINK: Measure = Measure {
+    sink: true,
+    ..MEASURE_NONE
+};
+
 fn has_component_tags(metric: &Metric, kind: &str, component_type: &str, id: &str) -> bool {
     metric.tags().is_some_and(|tags| {
         tags.get("component_id") == Some(id)
@@ -47,6 +76,10 @@ fn has_component_tags(metric: &Metric, kind: &str, component_type: &str, id: &st
 
 fn has_transform_tags(metric: &Metric, transform_id: &str) -> bool {
     has_component_tags(metric, TRANSFORM_KIND, TRANSFORM_TYPE, transform_id)
+}
+
+fn has_source_tags(metric: &Metric, source_id: &str) -> bool {
+    has_component_tags(metric, SOURCE_KIND, SOURCE_TYPE, source_id)
 }
 
 fn has_sink_tags(metric: &Metric, sink_id: &str) -> bool {
@@ -102,17 +135,16 @@ fn component_cpu_counter(
 /// discriminate this topology's metrics from those of concurrently-running
 /// tests that share the same process-wide registry.
 ///
-/// `measure_cpu_usage` controls the transform's `measure_cpu_usage` flag.
-/// `measure_sink_cpu_usage` controls the sink's.
+/// `measure` sets the `measure_cpu_usage` flag of each component.
 ///
-/// `make_config` and `make_sink` receive the base transform and sink configs and
-/// can apply extra options (e.g. `.with_concurrency()`) before the topology is
-/// assembled.
+/// `make_source`, `make_transform` and `make_sink` receive the base component
+/// configs and can apply extra options (e.g. `.with_concurrency()`) before the
+/// topology is assembled.
 async fn run_cpu_topology(
     transform_id: &str,
-    measure_cpu_usage: bool,
-    measure_sink_cpu_usage: bool,
-    make_config: impl FnOnce(NoopTransformConfig) -> NoopTransformConfig,
+    measure: Measure,
+    make_source: impl FnOnce(BasicSourceConfig) -> BasicSourceConfig,
+    make_transform: impl FnOnce(NoopTransformConfig) -> NoopTransformConfig,
     make_sink: impl FnOnce(CompletionSinkConfig) -> CompletionSinkConfig,
 ) -> Vec<Metric> {
     trace_init();
@@ -129,27 +161,32 @@ async fn run_cpu_topology(
     let sink_config = make_sink(CompletionSinkConfig::new(EVENT_COUNT, sink_done_tx));
 
     let mut config = Config::builder();
-    config.add_source(&source_id, source_config);
+    // Add each component first, then flip the measure_cpu_usage flag on the
+    // outer config that the builder just inserted.
+    config.add_source(&source_id, make_source(source_config));
+    config
+        .sources
+        .get_mut(&ComponentKey::from(source_id.as_str()))
+        .expect("source not found in builder")
+        .measure_cpu_usage = measure.source;
 
-    // Add a plain noop transform first, then flip the measure_cpu_usage flag on
-    // the TransformOuter that the builder just inserted.
     config.add_transform(
         transform_id,
         &[source_id.as_str()],
-        make_config(NoopTransformConfig::from(TransformType::Function)),
+        make_transform(NoopTransformConfig::from(TransformType::Function)),
     );
     config
         .transforms
         .get_mut(&ComponentKey::from(transform_id))
         .expect("transform not found in builder")
-        .measure_cpu_usage = measure_cpu_usage;
+        .measure_cpu_usage = measure.transform;
 
     config.add_sink(&sink_id, &[transform_id], sink_config);
     config
         .sinks
         .get_mut(&ComponentKey::from(sink_id.as_str()))
         .expect("sink not found in builder")
-        .measure_cpu_usage = measure_sink_cpu_usage;
+        .measure_cpu_usage = measure.sink;
 
     let (topology, _) = start_topology(config.build().unwrap(), true).await;
 
@@ -180,8 +217,14 @@ async fn run_cpu_topology(
 #[tokio::test]
 async fn component_cpu_usage_emitted_function_transform() {
     let id = "cpu_transform_fn";
-    let metrics =
-        run_cpu_topology(id, true, false, |c| c.with_cpu_burn_ms(CPU_BURN_MS), |s| s).await;
+    let metrics = run_cpu_topology(
+        id,
+        MEASURE_TRANSFORM,
+        |s| s,
+        |c| c.with_cpu_burn_ms(CPU_BURN_MS),
+        |s| s,
+    )
+    .await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -193,8 +236,8 @@ async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
     let metrics = run_cpu_topology(
         id,
-        true,
-        false,
+        MEASURE_TRANSFORM,
+        |s| s,
         |_| NoopTransformConfig::from(TransformType::Task).with_cpu_burn_ms(CPU_BURN_MS),
         |s| s,
     )
@@ -210,8 +253,8 @@ async fn component_cpu_usage_emitted_concurrent_transform() {
     let id = "cpu_transform_concurrent";
     let metrics = run_cpu_topology(
         id,
-        true,
-        false,
+        MEASURE_TRANSFORM,
+        |s| s,
         |c| c.with_concurrency().with_cpu_burn_ms(CPU_BURN_MS),
         |s| s,
     )
@@ -224,12 +267,15 @@ async fn component_cpu_usage_emitted_concurrent_transform() {
 #[tokio::test]
 async fn component_cpu_usage_not_emitted_without_measure_cpu_usage() {
     let id = "cpu_transform_no_measure";
-    let metrics = run_cpu_topology(id, false, false, |c| c, |s| s).await;
+    let metrics = run_cpu_topology(id, MEASURE_NONE, |s| s, |c| c, |s| s).await;
 
+    let source_id = format!("{id}_source");
     let sink_id = format!("{id}_sink");
     let found = metrics.iter().any(|m| {
         m.name() == "component_cpu_usage_ns_total"
-            && (has_transform_tags(m, id) || has_sink_tags(m, &sink_id))
+            && (has_source_tags(m, &source_id)
+                || has_transform_tags(m, id)
+                || has_sink_tags(m, &sink_id))
     });
 
     assert!(
@@ -243,8 +289,14 @@ async fn component_cpu_usage_not_emitted_without_measure_cpu_usage() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_sink() {
     let id = "cpu_sink";
-    let metrics =
-        run_cpu_topology(id, false, true, |c| c, |s| s.with_cpu_burn_ms(CPU_BURN_MS)).await;
+    let metrics = run_cpu_topology(
+        id,
+        MEASURE_SINK,
+        |s| s,
+        |c| c,
+        |s| s.with_cpu_burn_ms(CPU_BURN_MS),
+    )
+    .await;
     assert_component_cpu_counter_positive(&metrics, &format!("{id}_sink"), has_sink_tags);
 }
 
@@ -255,8 +307,8 @@ async fn component_cpu_usage_includes_sink_healthcheck_tasks() {
     let id = "cpu_sink_healthcheck";
     let metrics = run_cpu_topology(
         id,
-        false,
-        true,
+        MEASURE_SINK,
+        |s| s,
         |c| c,
         |s| s.with_healthcheck_cpu_burn_ms(u64::from(HEALTHCHECK_CPU_BURN_MS)),
     )
@@ -269,4 +321,20 @@ async fn component_cpu_usage_includes_sink_healthcheck_tasks() {
         value >= min_ns,
         "expected component_cpu_usage_ns_total >= {min_ns}, got {value}"
     );
+}
+
+/// Source: the source task is timed, and the CPU of the subtasks it spawns with
+/// `spawn_timed` is charged to the same counter.
+#[tokio::test]
+async fn component_cpu_usage_emitted_source() {
+    let id = "cpu_source";
+    let metrics = run_cpu_topology(
+        id,
+        MEASURE_SOURCE,
+        |s| s.with_cpu_burn_ms(CPU_BURN_MS),
+        |c| c,
+        |s| s,
+    )
+    .await;
+    assert_component_cpu_counter_positive(&metrics, &format!("{id}_source"), has_source_tags);
 }
