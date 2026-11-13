@@ -35,7 +35,8 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for HttpRequestBuilder {
     ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         // Same packing as `RequestBuilder::encode_events`. An empty OTLP body stays
         // empty: finishing a compressor with no input still emits a gzip or zstd
-        // frame, and a collector rejects that body with HTTP 400.
+        // frame, and a collector rejects that body, which rejects acknowledgements
+        // for spans the conversion already consumed.
         let mut compressor = crate::sinks::util::Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
         let (written, json_size) = self.encoder().encode_input(events, &mut compressor)?;

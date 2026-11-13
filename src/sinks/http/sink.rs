@@ -43,9 +43,11 @@ where
         let batch_sizer = HttpBatchSizer {
             encoder: self.request_builder.encoder.encoder.clone(),
         };
-        // An empty OTLP body gets a collector 400. Dropping the request leaves
-        // finalizers at `EventStatus::Dropped`, which does not change `BatchStatus`
-        // (it stays `Delivered`), so the batch is not retried.
+        // An OTLP batch whose every span was rejected encodes to zero bytes. A collector
+        // answers that body with a 400, which rejects acknowledgements for spans the
+        // conversion already reported. Dropping the request leaves finalizers at
+        // `EventStatus::Dropped`, which does not change `BatchStatus` (it stays
+        // `Delivered`), so the batch is not retried.
         let skip_empty_otlp_body = self.request_builder.encoder.is_otlp();
         input
             // Batch the input stream with size calculation based on the configured codec

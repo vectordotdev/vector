@@ -83,11 +83,24 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         for mut event in events {
             self.transformer.transform(&mut event);
 
-            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-
-            encoder
-                .encode(event, &mut body)
-                .map_err(|_| io::Error::other("unable to encode event"))?;
+            #[cfg(not(feature = "typed-trace"))]
+            {
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+                encoder.encode(event, &mut body).map_err(io::Error::other)?;
+            }
+            // An OTLP trace whose spans were all rejected encodes to nothing, and the
+            // codec already counted it as discarded. Other codecs can also write zero
+            // bytes without reporting a discard, so they stay in the sent count.
+            #[cfg(feature = "typed-trace")]
+            {
+                let json_size = event.estimated_json_encoded_size_of();
+                let tags = byte_size.event_tags(&event);
+                let body_len = body.len();
+                encoder.encode(event, &mut body).map_err(io::Error::other)?;
+                if !self.is_otlp() || body.len() > body_len {
+                    byte_size.add_event_tags(tags, json_size);
+                }
+            }
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {

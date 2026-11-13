@@ -8,8 +8,7 @@
 //! parses each layout back into protobuf `ResourceSpans` and runs them through the same
 //! decoding, so converting a legacy record and decoding wire input share one mapping.
 //!
-//! Gated behind the `typed-trace` cargo feature until a source, transform, or sink
-//! consumes it.
+//! Gated behind the `typed-trace` cargo feature. The `otlp` serializer consumes it.
 
 mod any_value;
 mod convert;

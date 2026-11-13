@@ -3,9 +3,9 @@
 //! This module is the internal typed model. It is not re-exported as
 //! `vector_core::event::TraceEvent`; that name remains the legacy `LogEvent` newtype.
 //!
-//! Gated behind the `typed-trace` cargo feature until a source, transform, or sink
-//! consumes it. The module also compiles under `cfg(test)` so this crate's unit tests
-//! run without enabling the feature for dependents.
+//! Gated behind the `typed-trace` cargo feature. The `otlp` serializer consumes it.
+//! The module also compiles under `cfg(test)` so this crate's unit tests run without
+//! enabling the feature for dependents.
 
 mod attributes;
 mod conversion;
