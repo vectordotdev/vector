@@ -72,7 +72,7 @@ pub(crate) enum TargetConfig {
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
     #[configurable(deprecated = "Use `targets` with a `static` block instead.")]
-    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
+    #[configurable(required_one_of = "targets")]
     #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
 
@@ -80,6 +80,8 @@ pub struct PrometheusScrapeConfig {
     ///
     /// Each entry in the list configures a target group. Supported types are
     /// `static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
+    #[configurable(metadata(docs::examples = "static_target_example()"))]
+    #[configurable(required_one_of = "targets")]
     #[serde(default)]
     targets: Vec<TargetConfig>,
 
@@ -151,6 +153,12 @@ fn query_example() -> serde_json::Value {
     })
 }
 
+fn static_target_example() -> serde_json::Value {
+    serde_json::json!({
+        "static": { "urls": ["http://localhost:9090/metrics"] }
+    })
+}
+
 fn headers_example() -> serde_json::Value {
     serde_json::json!({
         "X-My-Header": ["value1", "value2"]
@@ -160,6 +168,8 @@ fn headers_example() -> serde_json::Value {
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
+            // `test_generate_config` parses YAML with `serde_yaml` directly, which rejects the
+            // map form of `targets` entries that Vector's config loading accepts.
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             targets: vec![],
             interval: default_interval(),

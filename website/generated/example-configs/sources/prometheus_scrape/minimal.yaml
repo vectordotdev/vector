@@ -1,3 +1,7 @@
 sources:
   my_source_id:
     type: prometheus_scrape
+    targets:
+      - static:
+          urls:
+            - http://localhost:9090/metrics

@@ -1,8 +1,6 @@
 sources:
   my_source_id:
     type: prometheus_scrape
-    endpoints:
-      - http://localhost:9090/metrics
     headers:
       X-My-Header:
         - value1
@@ -14,3 +12,7 @@ sources:
         - '{__name__=~"job:.*"}'
     scrape_interval_secs: 15
     scrape_timeout_secs: 5.0
+    targets:
+      - static:
+          urls:
+            - http://localhost:9090/metrics
