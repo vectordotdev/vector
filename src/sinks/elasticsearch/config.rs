@@ -740,7 +740,7 @@ impl SinkConfig for ElasticsearchConfig {
         let mut files = Vec::new();
         if let Some(tls) = &self.tls {
             if let Some(ca_file) = &tls.ca_file {
-                files.push(ca_file)
+                files.push(ca_file);
             }
             if let Some(crt_file) = &tls.crt_file {
                 files.push(crt_file);
