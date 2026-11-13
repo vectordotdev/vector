@@ -38,7 +38,7 @@ async fn kinesis_put_records_with_partition_key() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: TowerRequestConfig::default(),
@@ -68,7 +68,7 @@ async fn kinesis_put_records_with_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -120,7 +120,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -202,11 +202,7 @@ async fn ensure_stream(stream_name: String) {
         Err(error) => panic!("Unable to check the stream {error:?}"),
     }
 
-    // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
-    // during PutRecords
-    //
-    // I initially tried using `wait_for` with `DescribeStream` but localstack would
-    // successfully return the stream before it was able to accept PutRecords requests
+    // Give the new stream time to accept PutRecords requests.
     sleep(Duration::from_secs(1)).await;
 }
 
@@ -261,7 +257,7 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
     // Send events through the sink
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Wait for localstack to process all records including retries
+    // Wait for the emulator to process all records including retries
     sleep(Duration::from_secs(3)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -323,7 +319,7 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
     // Send events through the sink
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Wait for localstack to process records
+    // Wait for the emulator to process records
     sleep(Duration::from_secs(2)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();

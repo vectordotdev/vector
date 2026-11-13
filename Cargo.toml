@@ -323,7 +323,6 @@ aws-config = { workspace = true, features = ["credentials-process", "sso"], opti
 aws-credential-types = { version = "1.3.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sdk-cloudwatch = { version = "1.140.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "1.162.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-elasticsearch = { version = "1.127.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-firehose = { version = "1.128.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kinesis = { version = "1.130.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kms = { version = "1.129.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -404,7 +403,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
+greptimedb-ingester = { version = "0.19.1", default-features = false, features = ["tls-ring"], optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false }
@@ -571,8 +570,6 @@ wiremock = "0.6.4"
 zstd = { workspace = true, features = ["zdict_builder"] }
 
 [patch.crates-io]
-# Preserve inbound Prost recursion limits until GreptimeTeam/greptimedb-ingester-rust#64 is released.
-greptimedb-ingester = { git = "https://github.com/vectordotdev/greptimedb-ingester-rust.git", rev = "173e32ae82fbaf83008716857a8584c94c198d70" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
@@ -1103,7 +1100,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws-sdk-elasticsearch", "sinks-elasticsearch"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws-sdk-s3"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs"]
