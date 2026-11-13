@@ -204,6 +204,40 @@ resource and span keys (see "Reserved OTLP bridge keys" below) for best-effort
 cross-format relay. Ordinary `_dd.*` keys have no special meaning and flow through the
 generic `AttrValue` -> `AnyValue` mapping.
 
+#### Malformed fields in legacy layouts
+
+The parent RFC's smallest-item drop rule governs malformed leaves on the wire. The OTLP
+legacy shim reads a different input: a `LogEvent` that an earlier component built. Vector's
+own source fills it from decoded protobuf, so its values have the right types, and only a
+transform, typically VRL, can retype one. This mapping therefore defines one normalization
+for a present field of the wrong type in either legacy layout. A field that is absent is not
+malformed and takes its protobuf default without a report. Apply the first case that fits:
+
+1. **Coerce a value that converts without loss**, as the existing legacy OTLP encoder does.
+   An integer, boolean, or float read as a string becomes its text. A decimal string read as
+   an integer becomes that integer. An integer read as an enum becomes that enum number,
+   and a number outside the known variants is carried by the parent RFC's escape-hatch
+   variants. Coercion does not apply to attribute keys or `AnyValue` members: the variant
+   of an `AnyValue` is preserved structurally, so a string in `int_value` is a malformed
+   attribute and follows the parent RFC's drop rule.
+2. **Default and report a field whose protobuf default means "unknown" or "unset".** These
+   are span `name` (OTLP defines an empty name as an unknown span name), `kind`, `status`
+   and its members, `trace_state` on spans and links, `flags`, scope `name` and `version`,
+   `schema_url`, and the dropped counts. The item continues with the default, and each
+   defaulted field is reported as malformed.
+3. **Drop the smallest item that holds any other field.** The default would otherwise
+   present invented data as real. A span with a malformed `start_time_unix_nano` or
+   `end_time_unix_nano` is dropped and reported as a rejected span, since a default would
+   place it at the Unix epoch. A span event with a malformed `name` or time is dropped, and
+   the span's `dropped_events_count` is saturating-incremented. A `resource` or `scope`
+   that is not an object drops its `ResourceSpans` or `ScopeSpans` grouping, with the spans
+   it holds, and reports a malformed grouping, since the spans would otherwise relay under
+   an empty resource or scope. Invalid IDs follow the zero-ID rule below. Siblings of a
+   dropped item continue.
+
+Each item dropped under case 3 is reported twice: as a malformed field naming the cause,
+and as the dropped item.
+
 #### Zero-ID detection
 
 OTLP wire IDs are raw byte arrays interpreted in big-endian order. Because they are

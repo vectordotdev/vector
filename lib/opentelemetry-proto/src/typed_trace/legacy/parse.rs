@@ -2,6 +2,18 @@
 //!
 //! These recover protobuf values only. Fields a layout does not carry take their protobuf
 //! defaults, and the shared decoding in `convert` applies the mapping rules.
+//!
+//! A present field of the wrong type follows the legacy-layout rule in the OTLP mapping RFC:
+//!
+//! 1. A value that converts without loss is coerced, as the legacy OTLP encoder does: a number
+//!    or boolean for a string, a decimal string for an integer, an integer for an enum.
+//! 2. Otherwise a field whose protobuf default means "unknown" takes that default and is
+//!    reported as [`TraceConversionIssue::MalformedField`]: span `name`, `kind`, `status`,
+//!    `trace_state`, `flags`, scope `name` and `version`, `schema_url`, and the dropped counts.
+//! 3. Otherwise the smallest item holding the field is dropped and counted: a span with a
+//!    malformed timestamp, a span event with a malformed name or time, and a resource or scope
+//!    grouping whose `resource` or `scope` is not an object. The cause is also reported as a
+//!    `MalformedField`.
 
 use vector_core::event::typed_trace::{TraceConversionIssue, TraceConversionReporter};
 use vrl::value::{ObjectMap, Value};
@@ -26,6 +38,11 @@ use crate::{
 
 /// A length no identifier has, so the shared span conversion rejects and counts it.
 const INVALID_ID: &[u8] = &[0];
+
+/// A field the item cannot do without was malformed. It has already been reported, and the
+/// caller drops the item.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Malformed;
 
 /// Flattened key the source writes on every event. It records when Vector received the span
 /// and has no OTLP field, so dropping it is expected and not reported.
@@ -64,12 +81,30 @@ impl<'r, R: TraceConversionReporter> ConsumeFields<'r, R> {
         T::default()
     }
 
+    /// Reports `field` as malformed, for a field with no default that is safe to use.
+    fn reject<T>(&mut self, field: &'static str) -> Result<T, Malformed> {
+        self.reporter
+            .report(TraceConversionIssue::MalformedField { field });
+        Err(Malformed)
+    }
+
+    /// Reads a string whose default means "unknown". Absent reads as empty.
     fn read_string(&mut self, key: &'static str) -> String {
         self.take(key).map_or_else(String::new, |value| {
-            into_utf8(value).unwrap_or_else(|| self.malformed(key))
+            into_string(value).unwrap_or_else(|| self.malformed(key))
         })
     }
 
+    /// Reads a string the item cannot do without. Absent reads as empty, but a present
+    /// value that is not a string rejects the item.
+    fn read_required_string(&mut self, key: &'static str) -> Result<String, Malformed> {
+        match self.take(key) {
+            None => Ok(String::new()),
+            Some(value) => into_string(value).map_or_else(|| self.reject(key), Ok),
+        }
+    }
+
+    /// Reads an object whose default means "absent".
     fn read_object(&mut self, key: &'static str) -> Option<ObjectMap> {
         match self.take(key) {
             None => None,
@@ -78,11 +113,22 @@ impl<'r, R: TraceConversionReporter> ConsumeFields<'r, R> {
         }
     }
 
+    /// Reads an object the item cannot do without. A present value that is not an object
+    /// rejects the item.
+    fn read_required_object(&mut self, key: &'static str) -> Result<Option<ObjectMap>, Malformed> {
+        match self.take(key) {
+            None => Ok(None),
+            Some(Value::Object(object)) => Ok(Some(object)),
+            Some(_) => self.reject(key),
+        }
+    }
+
     fn read_integer<T: TryFrom<i64> + Default>(&mut self, key: &'static str) -> T {
         match self.take(key) {
             None => T::default(),
-            Some(Value::Integer(n)) => T::try_from(n).unwrap_or_else(|_| self.malformed(key)),
-            Some(_) => self.malformed(key),
+            Some(value) => into_integer(value)
+                .and_then(|n| T::try_from(n).ok())
+                .unwrap_or_else(|| self.malformed(key)),
         }
     }
 
@@ -95,36 +141,38 @@ impl<'r, R: TraceConversionReporter> ConsumeFields<'r, R> {
     }
 
     /// Reads a `resourceSpans` `fixed64`, which the protobuf decoder stores as `u64 as i64`.
-    fn read_fixed64(&mut self, key: &'static str) -> u64 {
+    /// Absent reads as zero, but a present value that is not a number rejects the item.
+    fn read_fixed64(&mut self, key: &'static str) -> Result<u64, Malformed> {
         match self.take(key) {
-            None => 0,
-            Some(Value::Integer(n)) => i64::cast_unsigned(n),
-            Some(_) => self.malformed(key),
+            None => Ok(0),
+            Some(value) => into_fixed64(value).map_or_else(|| self.reject(key), Ok),
         }
     }
 
     /// Reads a flattened timestamp. The source stores the wire `u64` nanoseconds as
     /// `Utc.timestamp_nanos(nanos as i64)`, so the cast back recovers values beyond `i64::MAX`.
     ///
-    /// Returns `None` when absent or malformed.
-    fn read_timestamp(&mut self, key: &'static str) -> Option<u64> {
-        let value = self.take(key)?;
-        let nanos = match value {
-            Value::Timestamp(ts) => ts.timestamp_nanos_opt().map(i64::cast_unsigned),
-            _ => None,
-        };
-        if nanos.is_none() {
-            self.malformed::<()>(key);
+    /// Absent reads as zero, but a present value that is not a timestamp rejects the item.
+    fn read_timestamp(&mut self, key: &'static str) -> Result<u64, Malformed> {
+        match self.take(key) {
+            None => Ok(0),
+            Some(Value::Timestamp(ts)) => ts
+                .timestamp_nanos_opt()
+                .map(i64::cast_unsigned)
+                .map_or_else(|| self.reject(key), Ok),
+            Some(_) => self.reject(key),
         }
-        nanos
     }
 
-    /// Reads an enum that the protobuf decoder stores as its variant name.
+    /// Reads an enum that the protobuf decoder stores as its variant name. An integer is its
+    /// number, which also reads as itself on the wire when no variant has it.
     fn read_enum(&mut self, key: &'static str, from_name: fn(&str) -> Option<i32>) -> i32 {
         self.take(key).map_or(0, |value| {
-            into_utf8(value)
-                .and_then(|name| from_name(&name))
-                .unwrap_or_else(|| self.malformed(key))
+            match value {
+                Value::Integer(n) => i32::try_from(n).ok(),
+                value => into_utf8(value).and_then(|name| from_name(&name)),
+            }
+            .unwrap_or_else(|| self.malformed(key))
         })
     }
 
@@ -192,9 +240,10 @@ impl ResourceSpans {
             return None;
         };
         let mut fields = ConsumeFields::wrap(object, reporter);
-        let resource = fields
-            .read_object("resource")
-            .map(|object| PbResource::from_object(object, fields.reporter));
+        // A malformed `resource` drops the grouping, with its scopes, rather than relaying
+        // its spans under an empty resource.
+        let resource = fields.read_required_object("resource").ok()?;
+        let resource = resource.map(|object| PbResource::from_object(object, fields.reporter));
         let scope_spans = into_entries(fields.take("scopeSpans"));
         let (scope_spans, _) = parse_entries(
             scope_spans,
@@ -238,11 +287,10 @@ impl ScopeSpans {
             return None;
         };
         let mut fields = ConsumeFields::wrap(object, reporter);
-        let scope = fields
-            .read_object("scope")
-            .map(|object| InstrumentationScope::from_object(object, fields.reporter));
-        // A non-object entry becomes an ID-less span so the shared conversion rejects and
-        // counts it.
+        let scope = fields.read_required_object("scope").ok()?;
+        let scope = scope.map(|object| InstrumentationScope::from_object(object, fields.reporter));
+        // A span that cannot be parsed becomes an ID-less span so the shared conversion
+        // rejects and counts it.
         let spans = into_entries(fields.take("spans"))
             .into_iter()
             .map(|span| PbSpan::from_value(span, fields.reporter).unwrap_or_default())
@@ -308,6 +356,8 @@ impl PbSpan {
             return None;
         };
         let mut fields = ConsumeFields::wrap(object, reporter);
+        let start_time_unix_nano = fields.read_fixed64("startTimeUnixNano").ok()?;
+        let end_time_unix_nano = fields.read_fixed64("endTimeUnixNano").ok()?;
         let mut dropped_attributes_count = fields.read_u32("droppedAttributesCount");
         let attributes = fields.take("attributes");
         let attributes =
@@ -332,8 +382,6 @@ impl PbSpan {
         let kind = fields.read_enum("kind", |name| {
             PbSpanKind::from_str_name(name).map(i32::from)
         });
-        let start_time_unix_nano = fields.read_fixed64("startTimeUnixNano");
-        let end_time_unix_nano = fields.read_fixed64("endTimeUnixNano");
         let dropped_events_count = fields.read_u32("droppedEventsCount");
         let dropped_links_count = fields.read_u32("droppedLinksCount");
         let status = fields
@@ -361,8 +409,8 @@ impl PbSpan {
     }
 
     fn from_flattened(fields: &mut ConsumeFields<'_, impl TraceConversionReporter>) -> Self {
-        let start_time_unix_nano = fields.read_timestamp("start_time_unix_nano").unwrap_or(0);
-        let end_time_unix_nano = fields.read_timestamp("end_time_unix_nano").unwrap_or(0);
+        let start_time_unix_nano = fields.read_timestamp("start_time_unix_nano");
+        let end_time_unix_nano = fields.read_timestamp("end_time_unix_nano");
         let mut dropped_attributes_count = fields.read_u32(DROPPED_ATTRIBUTES_COUNT_KEY);
         let attributes = fields.take(ATTRIBUTES_KEY);
         let attributes =
@@ -389,6 +437,13 @@ impl PbSpan {
         let status = fields
             .read_object("status")
             .map(|object| PbStatus::from_flattened(object, fields.reporter));
+        // This record's only span has no ID when it is malformed, so the shared conversion
+        // rejects and counts it. The rest was read first so none of it reports as unmapped.
+        let (Ok(start_time_unix_nano), Ok(end_time_unix_nano)) =
+            (start_time_unix_nano, end_time_unix_nano)
+        else {
+            return Self::default();
+        };
         Self {
             trace_id,
             span_id,
@@ -416,13 +471,15 @@ impl PbEvent {
             return None;
         };
         let mut fields = ConsumeFields::wrap(object, reporter);
+        let name = fields.read_required_string("name").ok()?;
+        let time_unix_nano = fields.read_fixed64("timeUnixNano").ok()?;
         let mut dropped_attributes_count = fields.read_u32("droppedAttributesCount");
         let attributes = fields.take("attributes");
         let attributes =
             array_to_key_values(attributes, &mut dropped_attributes_count, fields.reporter);
         let event = Self {
-            time_unix_nano: fields.read_fixed64("timeUnixNano"),
-            name: fields.read_string("name"),
+            time_unix_nano,
+            name,
             attributes,
             dropped_attributes_count,
         };
@@ -435,13 +492,15 @@ impl PbEvent {
             return None;
         };
         let mut fields = ConsumeFields::wrap(object, reporter);
+        let name = fields.read_required_string("name").ok()?;
+        let time_unix_nano = fields.read_timestamp("time_unix_nano").ok()?;
         let mut dropped_attributes_count = fields.read_u32(DROPPED_ATTRIBUTES_COUNT_KEY);
         let attributes = fields.take(ATTRIBUTES_KEY);
         let attributes =
             object_to_key_values(attributes, &mut dropped_attributes_count, fields.reporter);
         let event = Self {
-            time_unix_nano: fields.read_timestamp("time_unix_nano").unwrap_or(0),
-            name: fields.read_string("name"),
+            time_unix_nano,
+            name,
             attributes,
             dropped_attributes_count,
         };
@@ -704,6 +763,34 @@ fn flattened_key_values(
 /// True when `value` is byte-like (`Value::Bytes` or `Value::String`) and non-empty.
 pub(super) fn is_nonempty_bytes(value: &Value) -> bool {
     value.as_bytes().is_some_and(|bytes| !bytes.is_empty())
+}
+
+/// Reads a string field. Besides UTF-8 text, a number or boolean converts to its text, as the
+/// legacy OTLP encoder converts it.
+fn into_string(value: Value) -> Option<String> {
+    match value {
+        Value::Integer(n) => Some(n.to_string()),
+        Value::Boolean(b) => Some(b.to_string()),
+        Value::Float(f) => Some(f.to_string()),
+        value => into_utf8(value),
+    }
+}
+
+/// Reads an integer field, which may be a decimal string as the legacy OTLP encoder accepts.
+fn into_integer(value: Value) -> Option<i64> {
+    match value {
+        Value::Integer(n) => Some(n),
+        value => into_utf8(value)?.parse().ok(),
+    }
+}
+
+/// Reads a `fixed64` field. The protobuf decoder stores a number as `u64 as i64`, and a
+/// decimal string may hold any `u64`.
+fn into_fixed64(value: Value) -> Option<u64> {
+    match value {
+        Value::Integer(n) => Some(i64::cast_unsigned(n)),
+        value => into_utf8(value)?.parse().ok(),
+    }
 }
 
 fn into_utf8(value: Value) -> Option<String> {
