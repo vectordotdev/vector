@@ -236,6 +236,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
     SecurityConfinementDisabled,
+    PrometheusKubernetesSdTargetsDiscovered,
     // Data-plane gauge names emitted by the `host_metrics` source.
     Load1,
     Load5,
@@ -319,6 +320,9 @@ impl GaugeName {
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
             Self::SecurityConfinementDisabled => "security_confinement_disabled",
+            Self::PrometheusKubernetesSdTargetsDiscovered => {
+                "prometheus_kubernetes_sd_targets_discovered"
+            }
             Self::Load1 => "load1",
             Self::Load5 => "load5",
             Self::Load15 => "load15",

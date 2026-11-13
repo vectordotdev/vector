@@ -871,6 +871,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		prometheus_kubernetes_sd_targets_discovered: {
+			description:       "The number of scrape targets that the `prometheus_scrape` source currently discovers from Kubernetes Pods."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		source_lag_time_seconds: {
 			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
 			type:              "histogram"

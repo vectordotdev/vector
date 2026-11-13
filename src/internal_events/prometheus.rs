@@ -1,6 +1,8 @@
 #[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+use vector_lib::internal_event::{GaugeName, LossyF64};
 #[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
@@ -85,5 +87,51 @@ impl InternalEvent for PrometheusInvalidMetricError {
         )
         .increment(1);
         emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesSdTargetsDiscovered {
+    pub count: usize,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
+    fn emit(self) {
+        debug!(
+            message = "Prometheus Kubernetes SD discovered targets.",
+            count = self.count,
+        );
+        vector_lib::gauge!(GaugeName::PrometheusKubernetesSdTargetsDiscovered)
+            .set(LossyF64(self.count));
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesSdAnnotationParseError<'a> {
+    pub pod: &'a str,
+    pub namespace: &'a str,
+    pub error: &'a str,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to parse prometheus.io annotations on pod.",
+            pod = %self.pod,
+            namespace = %self.namespace,
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
     }
 }
