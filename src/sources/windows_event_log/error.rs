@@ -81,6 +81,7 @@ pub enum WindowsEventLogError {
 
 impl WindowsEventLogError {
     /// Check if the error is recoverable and the operation should be retried.
+    #[must_use]
     pub const fn is_recoverable(&self) -> bool {
         match self {
             // Network/connection issues are typically recoverable
@@ -89,7 +90,8 @@ impl WindowsEventLogError {
             | Self::ResourceExhaustedError { .. }
             | Self::TimeoutError { .. }
             | Self::SeekEventsError { .. }
-            | Self::PullEventsError { .. } => true,
+            | Self::PullEventsError { .. }
+            | Self::IoError { .. } => true,
 
             // Configuration and permission issues are not recoverable
             Self::OpenChannelError { .. }
@@ -100,22 +102,18 @@ impl WindowsEventLogError {
             | Self::InvalidXPathQuery { .. }
             | Self::ConfigError { .. }
             | Self::CreateRenderContextError { .. }
-            | Self::LoadPublisherMetadataError { .. } => false,
-
-            // Parsing errors might be recoverable depending on the specific error
-            Self::ParseXmlError { .. }
+            // Parsing and filtering failures are not recoverable.
+            | Self::LoadPublisherMetadataError { .. }
+            | Self::ParseXmlError { .. }
             | Self::RenderMessageError { .. }
             | Self::FormatMessageError { .. }
-            | Self::RenderError { .. } => false,
-
-            // I/O errors could be temporary
-            Self::IoError { .. } => true,
-
-            Self::FilterError { .. } => false,
+            | Self::RenderError { .. }
+            | Self::FilterError { .. } => false,
         }
     }
 
     /// Get a user-friendly error message for logging.
+    #[must_use]
     pub fn user_message(&self) -> String {
         match self {
             Self::AccessDeniedError { channel } => {

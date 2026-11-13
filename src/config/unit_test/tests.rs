@@ -405,7 +405,7 @@ async fn test_success_multi_inputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -463,7 +463,7 @@ async fn test_success() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -516,7 +516,7 @@ async fn test_route() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -549,7 +549,7 @@ async fn test_fail_no_outputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -614,8 +614,8 @@ async fn test_fail_two_output_events() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -651,8 +651,8 @@ async fn test_no_outputs_from() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -694,8 +694,8 @@ async fn test_no_outputs_from_chained() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -746,7 +746,7 @@ async fn test_log_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -784,7 +784,7 @@ async fn test_metric_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -829,7 +829,7 @@ async fn test_success_over_gap() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -886,7 +886,7 @@ async fn test_success_tree() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -953,8 +953,8 @@ async fn test_fails() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(!tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1022,9 +1022,9 @@ async fn test_dropped_branch() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1091,8 +1091,8 @@ async fn test_task_transform() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
-    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+    assert_ne!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1130,7 +1130,7 @@ async fn test_glob_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1164,7 +1164,7 @@ async fn expected_event_count_correct() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1199,7 +1199,7 @@ async fn expected_event_count_wrong() {
 
     let mut tests = build_unit_tests(config).await.unwrap();
     let errors = tests.remove(0).run().await.errors;
-    assert!(!errors.is_empty());
+    assert_ne!(errors, [] as [String; 0]);
     assert!(
         errors
             .iter()
@@ -1237,7 +1237,7 @@ async fn expected_event_count_zero_no_conditions() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
 }
 
 #[tokio::test]
@@ -1365,5 +1365,47 @@ async fn expected_event_count_zero_split_with_conditions_rejected() {
         errs.iter()
             .any(|e| e.contains("expected_event_count of 0") && e.contains("conditions")),
         "expected config error about zero count with conditions after merge, got: {errs:?}"
+    );
+}
+#[tokio::test]
+async fn ambiguous_output_names_are_reported_as_build_errors() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = serde_yaml::from_str(indoc! {r#"
+        transforms:
+          foo:
+            inputs: []
+            type: route
+            route:
+              bar: true == true
+          foo.bar:
+            inputs: []
+            type: remap
+            source: . = .
+        tests:
+          - name: "ambiguity panic"
+            input:
+              insert_at: foo
+              value: "test"
+            outputs:
+              - extract_from: foo.bar
+                conditions:
+                  - type: vrl
+                    source: "true"
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].starts_with("Failed to build test 'ambiguity panic':"),
+        "unexpected error prefix: {}",
+        errs[0]
+    );
+    assert!(
+        errs[0].contains("Input specifier foo.bar is ambiguous"),
+        "unexpected ambiguity error: {}",
+        errs[0]
     );
 }

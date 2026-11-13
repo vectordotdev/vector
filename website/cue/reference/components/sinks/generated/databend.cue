@@ -10,7 +10,7 @@ generated: components: sinks: databend: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: "The username and password to authenticate with. Overrides the username and password in DSN."
@@ -135,8 +135,8 @@ generated: components: sinks: databend: configuration: {
 	}
 	missing_field_as: {
 		description: """
-			Defines how missing fields are handled for NDJson.
-			Refer to https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as
+			Defines how missing fields are handled for `NDJson`.
+			Refer to <https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as>
 			"""
 		required: false
 		type: string: {

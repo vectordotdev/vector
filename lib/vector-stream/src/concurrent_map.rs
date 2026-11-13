@@ -1,5 +1,4 @@
 use std::{
-    future::Future,
     num::NonZeroUsize,
     panic,
     pin::Pin,
@@ -8,6 +7,7 @@ use std::{
 
 use futures_util::{
     Stream, StreamExt,
+    future::BoxFuture,
     stream::{Fuse, FuturesOrdered},
 };
 use pin_project::pin_project;
@@ -23,7 +23,7 @@ where
     stream: Fuse<St>,
     limit: Option<NonZeroUsize>,
     in_flight: FuturesOrdered<JoinHandle<T>>,
-    f: Box<dyn Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send>,
+    f: Box<dyn Fn(St::Item) -> BoxFuture<'static, T> + Send>,
 }
 
 impl<St, T> ConcurrentMap<St, T>
@@ -33,7 +33,7 @@ where
 {
     pub fn new<F>(stream: St, limit: Option<NonZeroUsize>, f: F) -> Self
     where
-        F: Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
+        F: Fn(St::Item) -> BoxFuture<'static, T> + Send + 'static,
     {
         Self {
             stream: stream.fuse(),
@@ -100,11 +100,10 @@ where
                     if let Ok(reason) = e.try_into_panic() {
                         // Resume the panic here on the calling task.
                         panic::resume_unwind(reason);
-                    } else {
-                        // The task was cancelled, which makes no sense, because _we_ hold the join
-                        // handle. Only sensible thing to do is panic, because this is a bug.
-                        panic!("concurrent map task cancelled outside of our control");
                     }
+                    // The task was cancelled, which makes no sense, because _we_ hold the join
+                    // handle. Only sensible thing to do is panic, because this is a bug.
+                    panic!("concurrent map task cancelled outside of our control");
                 }
             },
         }

@@ -9,7 +9,7 @@ use bytes::Bytes;
 use crate::file_watcher::FileWatcher;
 use file_source_common::ReadFrom;
 
-/// Test that get_bytes_unread() returns accurate values
+/// Test that `get_bytes_unread()` returns accurate values
 #[tokio::test]
 async fn test_bytes_unread_basic() {
     let dir = tempfile::TempDir::new().expect("could not create tempdir");
@@ -58,7 +58,7 @@ async fn test_bytes_unread_basic() {
     assert_eq!(fw.get_unwatch_info().await.bytes_unread, Some(0));
 }
 
-/// Test that get_bytes_unread() still works after file is deleted
+/// Test that `get_bytes_unread()` still works after file is deleted
 /// This is the key scenario for Kubernetes log rotation
 #[cfg(unix)] // File deletion behavior differs on Windows
 #[tokio::test]
@@ -98,7 +98,7 @@ async fn test_bytes_unread_after_delete() {
     assert_eq!(fw.get_bytes_unread().await, Some(12));
 }
 
-/// Test that get_bytes_unread() tracks growing files correctly
+/// Test that `get_bytes_unread()` tracks growing files correctly
 #[tokio::test]
 async fn test_bytes_unread_growing_file() {
     let dir = tempfile::TempDir::new().expect("could not create tempdir");

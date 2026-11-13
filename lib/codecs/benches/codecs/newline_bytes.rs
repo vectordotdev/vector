@@ -61,7 +61,7 @@ fn decoding(c: &mut Criterion) {
                     },
                     |(mut decoder, mut input)| loop {
                         match decoder.decode_eof(&mut input) {
-                            Ok(Some(_)) => continue,
+                            Ok(Some(_)) => {}
                             Ok(None) => break,
                             Err(_) => {
                                 unreachable!()
@@ -69,7 +69,7 @@ fn decoding(c: &mut Criterion) {
                         }
                     },
                     BatchSize::SmallInput,
-                )
+                );
             },
         );
     }
@@ -79,7 +79,7 @@ criterion_group!(
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_secs(5))
-        .measurement_time(Duration::from_secs(120))
+        .measurement_time(Duration::from_mins(2))
         // degree of noise to ignore in measurements, here 1%
         .noise_threshold(0.01)
         // likelihood of noise registering as difference, here 5%

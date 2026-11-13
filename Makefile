@@ -37,12 +37,6 @@ export SCOPE ?=
 export CARGO_BENCH_FLAGS ?=
 # override this to put criterion output elsewhere
 export CRITERION_HOME ?= $(mkfile_dir)target/criterion
-# Override to false to disable autospawning services on integration tests.
-export AUTOSPAWN ?= true
-# Override to control if services are turned off after integration tests.
-export AUTODESPAWN ?= ${AUTOSPAWN}
-# Override autoinstalling of tools. (Eg `cargo install`)
-export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
@@ -53,6 +47,9 @@ export CURRENT_DIR = $(shell pwd)
 # Preserve any caller-supplied VDEV (e.g. CI exports the pinned prebuilt binary
 # via .github/actions/setup; falling back to `cargo vdev` recompiles vdev).
 VDEV ?= cargo vdev
+
+# Comma-separated `cargo deny` lints to allow; all other warnings are errors. Set empty to allow none.
+DENY_ALLOW ?= duplicate,source-not-allowed
 
 # Cargo writes artifacts to CARGO_TARGET_DIR when it is set, so recipes that run
 # a freshly built binary have to resolve the same directory rather than assume
@@ -136,9 +133,6 @@ ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 endif
 
 ##@ Cross Compiling
-.PHONY: cross-enable
-cross-enable: cargo-install-cross
-
 .PHONY: CARGO_HANDLES_FRESHNESS
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
@@ -179,7 +173,7 @@ cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export CFLAGS += -g0 -O3
-cross-%: cargo-install-cross
+cross-%:
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
@@ -199,7 +193,7 @@ target/%/vector: CARGO_HANDLES_FRESHNESS
 		--no-default-features \
 		--features target-${TRIPLE}
 else
-target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+target/%/vector: CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
@@ -257,9 +251,6 @@ test: ## Run the unit test suite
 test-docs: ## Run the docs test suite
 	cargo test --doc --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
-.PHONY: test-all
-test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
-
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
 	${EMPTY}
@@ -281,16 +272,6 @@ test-behavior-%: ## Runs behavioral test for a given category
 test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
-.PHONY: test-integration
-test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
-test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
-test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
-test-integration: test-integration-datadog-traces test-integration-shutdown
-
 .PHONY: test-integration-windows-event-log
 test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
 ifeq ($(OS),Windows_NT)
@@ -299,18 +280,9 @@ else
 	@echo "Skipping windows-event-log integration tests (Windows only)"
 endif
 
-test-integration-%-cleanup:
-	$(VDEV) --verbose integration stop $*
-
-test-integration-%:
-	$(VDEV) --verbose integration test $*
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-$*-cleanup
-endif
-
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests
-	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
+	scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
@@ -326,7 +298,8 @@ test-component-validation: ## Runs component validation tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
-	cargo llvm-cov report --lcov --output-path lcov.info
+	# Report every workspace package, not only Vector's non-virtual root package.
+	cargo llvm-cov report --package '*' --lcov --output-path lcov.info
 
 ##@ Benching
 
@@ -377,7 +350,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-generated-docs check-licenses
+check-all: check-actionlint check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-changelog-fragments
 check-changelog-fragments: ## Validate changelog fragments added in this branch/PR
@@ -394,6 +367,10 @@ check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	$(VDEV) check docs
+
+.PHONY: check-actionlint
+check-actionlint: ## Check GitHub Actions workflows
+	actionlint
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
@@ -439,11 +416,11 @@ check-scripts: ## Check that scripts do not have common mistakes
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	$(VDEV) check deny
+	$(VDEV) check deny --allow '$(DENY_ALLOW)'
 
 .PHONY: check-deny-licenses
 check-deny-licenses: ## Check licenses for crate dependencies
-	$(VDEV) check deny --licenses-only
+	$(VDEV) check deny --licenses-only --allow '$(DENY_ALLOW)'
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
@@ -476,10 +453,6 @@ release-docker: ## Release to Docker Hub
 release-github: ## Release to GitHub
 	@$(VDEV) release github
 
-.PHONY: release-homebrew
-release-homebrew: ## Release to vectordotdev Homebrew tap
-	@$(VDEV) release homebrew --vector-version $(VECTOR_VERSION)
-
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
@@ -510,7 +483,7 @@ clean: ## Clean everything
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
-	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
+	$(VDEV) build manifests $(if $(CHART_VERSION),--chart-version "$(CHART_VERSION)")
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
@@ -543,18 +516,9 @@ generate-example-configs: generate-component-docs ## Generate committed componen
 .PHONY: generate-docs
 generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
 
-.PHONY: signoff
-signoff: ## Signsoff all previous commits since branch creation
-	scripts/signoff.sh
-
 .PHONY: version
 version: ## Get the current Vector version
 	@$(VDEV) version
-
-.PHONY: cargo-install-%
-cargo-install-%: override TOOL = $(@:cargo-install-%=%)
-cargo-install-%:
-	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.

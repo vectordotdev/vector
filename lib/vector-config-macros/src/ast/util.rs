@@ -122,7 +122,7 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
                 buffer.push_str(s.strip_prefix(' ').unwrap_or(s));
                 buffer.push('\n');
             }
-        };
+        }
 
         grouped
     });
@@ -187,7 +187,7 @@ where
 /// If a valid ident can be constructed from the path, and the ident's value matches `other`,
 /// `true` is returned. Otherwise, `false` is returned.
 fn path_matches<S: AsRef<str>>(path: &syn::Path, other: S) -> bool {
-    path.get_ident().filter(|i| *i == &other).is_some()
+    path.get_ident().is_some_and(|ident| ident == &other)
 }
 
 /// Tries to find a specific attribute with a specific name/value pair.
@@ -212,10 +212,11 @@ fn find_name_value_attribute(
         .flat_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
-                .map(|nested| nested.into_iter())
-                // If parsing fails, return an empty iterator. By this point, `serde` has already
-                // emitted its own error, so we don't want to duplicate any error emission here.
-                .unwrap_or_else(|_| Punctuated::<NestedMeta, Comma>::new().into_iter()),
+                // Serde already reports parse errors, so avoid duplicate diagnostics.
+                .map_or_else(
+                    |_| Punctuated::<NestedMeta, Comma>::new().into_iter(),
+                    std::iter::IntoIterator::into_iter,
+                ),
             // Non-list attributes cannot contain nested meta items; return empty iterator.
             _ => Punctuated::<NestedMeta, Comma>::new().into_iter(),
         })
@@ -248,7 +249,7 @@ pub(crate) fn has_flag_attribute(
         .filter_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
-                .map(|nested| nested.into_iter())
+                .map(std::iter::IntoIterator::into_iter)
                 .ok(),
             _ => None,
         })
@@ -294,4 +295,49 @@ pub fn find_delegated_serde_deser_ty(attributes: &[syn::Attribute]) -> Option<sy
             Lit::Str(s) => s.parse::<syn::Type>().ok(),
             _ => None,
         })
+}
+
+/// Recognizes Vector's boolean-or-struct helper through its supported qualified paths.
+///
+/// Proc macros cannot resolve imports, so bare names and arbitrary aliases are intentionally
+/// excluded. Callers must qualify this helper to receive its boolean-or-object schema.
+pub fn is_bool_or_struct_deserializer(path: &syn::ExprPath) -> bool {
+    path.qself.is_none()
+        && ["crate", "vector_core", "vector_lib"].iter().any(|root| {
+            path.path.segments.len() == 3
+                && path
+                    .path
+                    .segments
+                    .iter()
+                    .zip([*root, "serde", "bool_or_struct"])
+                    .all(|(segment, expected)| {
+                        segment.ident == expected && segment.arguments.is_empty()
+                    })
+        })
+}
+
+#[cfg(test)]
+mod bool_or_struct_tests {
+    use super::is_bool_or_struct_deserializer;
+
+    #[test]
+    fn recognizes_only_supported_qualified_helpers() {
+        for (path, expected) in [
+            ("crate::serde::bool_or_struct", true),
+            ("vector_core::serde::bool_or_struct", true),
+            ("vector_lib::serde::bool_or_struct", true),
+            ("::vector_lib::serde::bool_or_struct", true),
+            ("bool_or_struct", false),
+            ("other::bool_or_struct", false),
+            ("other::serde::bool_or_struct", false),
+            ("crate::other::bool_or_struct", false),
+            ("crate::serde::other_helper", false),
+        ] {
+            assert_eq!(
+                is_bool_or_struct_deserializer(&syn::parse_str(path).unwrap()),
+                expected,
+                "{path}"
+            );
+        }
+    }
 }

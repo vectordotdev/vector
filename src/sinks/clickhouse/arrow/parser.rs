@@ -68,7 +68,7 @@ impl ClickHouseType {
         }
     }
 
-    /// Converts this ClickHouse type to an Arrow DataType.
+    /// Converts this ClickHouse type to an Arrow `DataType`.
     /// Recursively handles nested types including Nullable/LowCardinality wrappers.
     fn to_data_type(&self) -> Result<DataType, String> {
         match self {
@@ -183,16 +183,13 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 /// Parses a single tuple element (either "Type" or "name Type").
 fn tuple_element(input: &str) -> IResult<&str, (Option<String>, ClickHouseType)> {
     let (rest, name) = identifier(input)?;
-    match rest.strip_prefix(' ') {
-        Some(after_space) => {
-            let (rest, ty) = ch_type(after_space)?;
-            Ok((rest, (Some(name.to_owned()), ty)))
-        }
-        None => {
-            // No space after identifier, so re-parse as a type
-            let (rest, ty) = ch_type(input)?;
-            Ok((rest, (None, ty)))
-        }
+    if let Some(after_space) = rest.strip_prefix(' ') {
+        let (rest, ty) = ch_type(after_space)?;
+        Ok((rest, (Some(name.to_owned()), ty)))
+    } else {
+        // No space after identifier, so re-parse as a type
+        let (rest, ty) = ch_type(input)?;
+        Ok((rest, (None, ty)))
     }
 }
 

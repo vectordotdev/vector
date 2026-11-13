@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
@@ -60,12 +58,15 @@ pub struct MqttSourceConfig {
     pub topic_key: OptionalValuePath,
 }
 
+pub(super) const TOPIC_KEY: &str = "topic";
+const TIMESTAMP_KEY: &str = "timestamp";
+
 fn default_topic() -> OneOrMany<String> {
     OneOrMany::One("vector".into())
 }
 
 fn default_topic_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("topic"))
+    OptionalValuePath::from(owned_value_path!(TOPIC_KEY))
 }
 
 #[async_trait::async_trait]
@@ -91,10 +92,10 @@ impl SourceConfig for MqttSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             );
 
         vec![SourceOutput::new_maybe_logs(
@@ -125,14 +126,15 @@ impl MqttSourceConfig {
 
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+        let mut options =
+            MqttOptions::new(client_id, (self.common.host.as_str(), self.common.port));
+        options.set_keep_alive(self.common.keep_alive);
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
 
         options.set_clean_session(false);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
-                options.set_credentials(user, password);
+                options.set_credentials(user, password.clone());
             }
             (None, None) => {
                 // Credentials were not provided
@@ -154,8 +156,10 @@ impl MqttSourceConfig {
                 .as_ref()
                 .and_then(|tls| tls.options.alpn_protocols.as_ref())
                 .filter(|protocols| !protocols.is_empty())
-                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
-                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
+                .map_or_else(
+                    || vec![b"mqtt".to_vec()],
+                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
+                );
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,

@@ -28,7 +28,9 @@ impl SchemaContext {
             get_schema_metadata(&expanded, "docs::type_override").and_then(|t| t.as_str())
         {
             let mut resolved = if type_override == "ascii_char" {
-                if let Some(Value::Number(n)) = expanded.get("default") {
+                if let Some(Value::String(character)) = expanded.get("default") {
+                    json!({ "type": { type_override: { "default": character } } })
+                } else if let Some(Value::Number(n)) = expanded.get("default") {
                     if let Some(c) = n.as_u64() {
                         #[allow(clippy::cast_possible_truncation)]
                         let c_char = (c as u8) as char;
@@ -309,8 +311,9 @@ impl SchemaContext {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indexmap::IndexMap;
+
+    use super::*;
 
     fn context() -> SchemaContext {
         static INIT: std::sync::Once = std::sync::Once::new();
@@ -332,6 +335,28 @@ mod tests {
             cue_binary_path: String::new(),
             resolved_schema_cache: IndexMap::new(),
             expanded_schema_cache: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn ascii_character_docs_preserve_string_and_legacy_numeric_defaults() {
+        let mut context = context();
+
+        for (name, schema_type, default) in [
+            ("schema-aware string", "string", json!(",")),
+            ("legacy numeric storage", "integer", json!(44)),
+        ] {
+            let schema = json!({
+                "type": schema_type,
+                "default": default,
+                "description": "The delimiter.",
+                "_metadata": {"docs::type_override": "ascii_char"}
+            });
+            assert_eq!(
+                context.resolve_schema(&schema).unwrap(),
+                json!({"type": {"ascii_char": {"default": ","}}, "description": "The delimiter."}),
+                "{name}"
+            );
         }
     }
 

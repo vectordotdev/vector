@@ -11,7 +11,7 @@ use super::{
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub struct KinesisStreamRecord {
+pub(super) struct KinesisStreamRecord {
     pub record: KinesisRecord,
 }
 
@@ -33,12 +33,12 @@ impl Record for KinesisStreamRecord {
             .record
             .explicit_hash_key
             .as_ref()
-            .map(|s| s.len())
+            .map(String::len)
             .unwrap_or_default();
 
         // data is base64 encoded
         let data_len = self.record.data.as_ref().len();
-        let key_len = self.record.partition_key.len();
+        let key_len = self.record.partition_key.as_ref().map_or(0, String::len);
 
         data_len.div_ceil(3) * 4 + hash_key_size + key_len + 10
     }
@@ -49,7 +49,7 @@ impl Record for KinesisStreamRecord {
 }
 
 #[derive(Clone)]
-pub struct KinesisStreamClient {
+pub(super) struct KinesisStreamClient {
     pub client: KinesisClient,
 }
 
@@ -76,6 +76,8 @@ impl SendRecord for KinesisStreamClient {
             .await
             .map(|output: PutRecordsOutput| KinesisResponse {
                 failed_records: extract_failed_records(&output),
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_sign_loss, reason = "AWS failure counts are nonnegative")]
                 failure_count: output.failed_record_count().unwrap_or(0) as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
             })

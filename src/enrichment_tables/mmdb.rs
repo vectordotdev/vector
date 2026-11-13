@@ -33,6 +33,10 @@ impl GenerateConfig for MmdbConfig {
 }
 
 impl EnrichmentTableConfig for MmdbConfig {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
@@ -43,7 +47,7 @@ impl EnrichmentTableConfig for MmdbConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a MaxMind database.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a `MaxMind` database.
 pub struct Mmdb {
     config: MmdbConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -52,6 +56,12 @@ pub struct Mmdb {
 
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database file cannot be opened or parsed, a test lookup against
+    /// the database fails or its result cannot be decoded, or the file's modification time
+    /// cannot be read.
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 
@@ -60,7 +70,7 @@ impl Mmdb {
         let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
 
         match result {
-            Ok(_) => Ok(Mmdb {
+            Ok(()) => Ok(Mmdb {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 config,

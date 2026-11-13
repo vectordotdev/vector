@@ -6,7 +6,7 @@ use serde_json::{json, to_value};
 use vector_lib::config::{Tags, Telemetry, init_telemetry};
 use vrl::value;
 
-use super::*;
+use super::{config::NewRelicConfig, *};
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent, Metric, MetricKind, MetricValue},
@@ -75,7 +75,7 @@ fn generates_event_api_model_without_message_field() {
     let event = Event::Log(LogEvent::from(value!({
         "eventType": "TestEvent",
         "user": "Joe",
-        "user_id": 123456,
+        "user_id": 123_456,
     })));
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
@@ -85,7 +85,7 @@ fn generates_event_api_model_without_message_field() {
         json!([{
             "eventType": "TestEvent",
             "user": "Joe",
-            "user_id": 123456,
+            "user_id": 123_456,
         }])
     );
 }
@@ -95,7 +95,7 @@ fn generates_event_api_model_with_message_field() {
     let event = Event::Log(LogEvent::from(value!({
         "eventType": "TestEvent",
         "user": "Joe",
-        "user_id": 123456,
+        "user_id": 123_456,
         "message": "This is a message",
     })));
     let model =
@@ -106,7 +106,7 @@ fn generates_event_api_model_with_message_field() {
         json!([{
             "eventType": "TestEvent",
             "user": "Joe",
-            "user_id": 123456,
+            "user_id": 123_456,
             "message": "This is a message",
         }])
     );
@@ -117,7 +117,7 @@ fn generates_event_api_model_with_json_inside_message_field() {
     let event = Event::Log(LogEvent::from(value!({
         "eventType": "TestEvent",
         "user": "Joe",
-        "user_id": 123456,
+        "user_id": 123_456,
         "message": "{\"my_key\" : \"my_value\"}",
     })));
     let model =
@@ -128,7 +128,7 @@ fn generates_event_api_model_with_json_inside_message_field() {
         json!([{
             "eventType": "TestEvent",
             "user": "Joe",
-            "user_id": 123456,
+            "user_id": 123_456,
             "my_key": "my_value",
         }])
     );

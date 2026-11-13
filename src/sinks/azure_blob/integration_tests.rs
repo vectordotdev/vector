@@ -7,7 +7,7 @@ use vrl::event_path;
 use azure_core::http::{RequestContent, StatusCode, Url};
 use azure_storage_blob::BlobContainerClient;
 
-use bytes::{Buf, BytesMut};
+use bytes::Buf;
 use futures::{Stream, StreamExt, stream};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
@@ -20,18 +20,29 @@ use vector_lib::{
 
 use super::config::{AzureBlobSinkConfig, AzureBlobType};
 use crate::{
-    config::ValidatedSink,
+    config::{AcknowledgementsConfig, ValidatedSink},
     event::{Event, EventArray, LogEvent},
     sinks::{
         VectorSink, azure_blob, azure_common,
-        util::{Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{SINK_TAGS, assert_sink_compliance},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
     tls,
 };
+
+const META_PREFIX: &str = "x-ms-meta-";
+
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Blob names are case-sensitive"
+)]
+fn assert_log_suffix(blob: &str) {
+    assert!(blob.ends_with(".log"));
+}
 
 #[tokio::test]
 async fn azure_blob_uploads_one_shot_with_shared_key() {
@@ -67,7 +78,6 @@ async fn azure_blob_healthcheck_passed() {
     let client = config.build_test_client();
 
     azure_blob::config::build_healthcheck(config.container_name, client)
-        .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
 }
@@ -78,7 +88,6 @@ async fn azure_blob_healthcheck_passed_with_oauth() {
     let client = config.build_test_client();
 
     azure_blob::config::build_healthcheck(config.container_name, client)
-        .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
 }
@@ -94,7 +103,6 @@ async fn azure_blob_healthcheck_unknown_container() {
 
     assert_eq!(
         azure_blob::config::build_healthcheck(config.container_name, client)
-            .unwrap()
             .await
             .unwrap_err()
             .to_string(),
@@ -114,7 +122,7 @@ async fn assert_insert_lines_into_blob(config: AzureBlobSinkConfig) {
 
     let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
-    assert!(blobs[0].clone().ends_with(".log"));
+    assert_log_suffix(&blobs[0]);
     let (content_type, content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
     assert_eq!(content_type, Some(String::from("text/plain")));
     assert_eq!(content_encoding, None);
@@ -148,7 +156,7 @@ async fn assert_insert_json_into_blob(config: AzureBlobSinkConfig) {
 
     let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
-    assert!(blobs[0].clone().ends_with(".log"));
+    assert_log_suffix(&blobs[0]);
     let (content_type, content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
     assert_eq!(content_encoding, None);
     assert_eq!(content_type, Some(String::from("application/x-ndjson")));
@@ -169,7 +177,7 @@ async fn azure_blob_insert_json_into_blob_with_oauth() {
     assert_insert_json_into_blob(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
-#[ignore]
+#[ignore = "Azurite cannot retrieve gzip blobs: Azure/Azurite#629"]
 #[tokio::test]
 // This test fails to get the posted blob with "header not found content-length".
 // However, we inspected that the sink writes the expected contents to Azure thus this is a retrieval/test issue.
@@ -195,7 +203,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     assert_eq!(lines, blob_lines);
 }
 
-#[ignore]
+#[ignore = "Azurite cannot retrieve gzip blobs: Azure/Azurite#629"]
 #[tokio::test]
 // This test will fail with Azurite blob emulator because of this issue:
 // https://github.com/Azure/Azurite/issues/629
@@ -449,7 +457,7 @@ async fn azure_blob_append_blob_json_encoding_with_oauth() {
     assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
-/// Default hourly rotation: without explicit blob_time_format or blob_append_uuid overrides,
+/// Default hourly rotation: without explicit `blob_time_format` or `blob_append_uuid` overrides,
 /// append blobs use `%Y-%m-%dT%H` and no UUID — two batches both write to the current hour's blob.
 async fn assert_append_blob_default_hourly_rotation(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("append/hourly/{}/", random_string(10));
@@ -519,7 +527,7 @@ async fn azure_blob_append_blob_default_hourly_rotation_with_oauth() {
     .await;
 }
 
-/// Forced multi-flush: a low batch.max_bytes causes Vector to flush many small blocks within a
+/// Forced multi-flush: a low `batch.max_bytes` causes Vector to flush many small blocks within a
 /// single run. All blocks must land in one append blob and every line must be present.
 async fn assert_append_blob_multiple_forced_flushes(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("append/multiflush/{}", random_string(10));
@@ -619,7 +627,7 @@ async fn azure_blob_append_blob_with_tags_and_metadata_with_oauth() {
 }
 
 impl AzureBlobSinkConfig {
-    pub async fn new_emulator() -> AzureBlobSinkConfig {
+    async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
             auth: None,
@@ -627,7 +635,7 @@ impl AzureBlobSinkConfig {
             account_name: None,
             blob_endpoint: None,
             container_name: "logs".to_string(),
-            blob_prefix: Default::default(),
+            blob_prefix: Template::default(),
             blob_time_format: None,
             blob_append_uuid: None,
             blob_type: AzureBlobType::Block,
@@ -635,11 +643,11 @@ impl AzureBlobSinkConfig {
             compression: Compression::None,
             tags: None,
             metadata: None,
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: None,
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         config.ensure_container().await;
@@ -647,7 +655,7 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    pub async fn new_emulator_with_oauth() -> AzureBlobSinkConfig {
+    async fn new_emulator_with_oauth() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_OAUTH_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
             auth: Some(azure_common::config::AzureAuthentication::MockCredential),
@@ -655,7 +663,7 @@ impl AzureBlobSinkConfig {
             account_name: None,
             blob_endpoint: None,
             container_name: "logs".to_string(),
-            blob_prefix: Default::default(),
+            blob_prefix: Template::default(),
             blob_time_format: None,
             blob_append_uuid: None,
             blob_type: AzureBlobType::Block,
@@ -663,13 +671,13 @@ impl AzureBlobSinkConfig {
             compression: Compression::None,
             tags: None,
             metadata: None,
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: Some(azure_common::config::AzureBlobTlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             }),
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         config.ensure_container().await;
@@ -693,11 +701,11 @@ impl AzureBlobSinkConfig {
         let url = Url::parse(&container_url).expect("failed to parse container URL");
 
         azure_blob::config::build_client(
-            self.auth.clone(),
-            parsed,
+            self.auth.as_ref(),
+            &parsed,
             url,
             &crate::config::ProxyConfig::default(),
-            self.tls.clone(),
+            self.tls.as_ref(),
         )
         .expect("Failed to create client")
     }
@@ -706,7 +714,6 @@ impl AzureBlobSinkConfig {
         let client = self.build_test_client();
         let validated = self.validate().expect("Failed to validate config");
         self.build_processor(client, &validated)
-            .expect("Failed to create sink")
     }
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
@@ -716,7 +723,7 @@ impl AzureBlobSinkConfig {
             .expect("Running sink failed");
     }
 
-    pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
+    async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = self.build_test_client();
 
         // Iterate pager results and collect blob names. Filter by prefix server-side.
@@ -736,7 +743,7 @@ impl AzureBlobSinkConfig {
         names
     }
 
-    pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
+    async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
         let client = self.build_test_client();
 
         let blob_client = client.blob_client(&blob);
@@ -776,10 +783,10 @@ impl AzureBlobSinkConfig {
             .expect("Failed to read blob body");
         let data = body_bytes.to_vec();
 
-        (content_type, content_encoding, self.get_blob_content(data))
+        (content_type, content_encoding, self.get_blob_content(&data))
     }
 
-    pub async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
+    async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
         let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
         let props_resp = blob_client
@@ -787,7 +794,6 @@ impl AzureBlobSinkConfig {
             .await
             .expect("Failed to get blob properties");
 
-        const META_PREFIX: &str = "x-ms-meta-";
         props_resp
             .headers()
             .iter()
@@ -804,7 +810,7 @@ impl AzureBlobSinkConfig {
             .collect()
     }
 
-    pub async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
+    async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
         let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
         let resp = blob_client
@@ -815,8 +821,8 @@ impl AzureBlobSinkConfig {
         HashMap::from(body)
     }
 
-    fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
-        let body = BytesMut::from(data.as_slice()).freeze().reader();
+    fn get_blob_content(&self, data: &[u8]) -> Vec<String> {
+        let body = data.reader();
 
         if self.compression == Compression::None {
             BufReader::new(body).lines().map(|l| l.unwrap()).collect()
@@ -840,7 +846,7 @@ impl AzureBlobSinkConfig {
             },
         };
 
-        response.expect("Failed to create container")
+        response.expect("Failed to create container");
     }
 }
 
@@ -857,7 +863,7 @@ fn random_lines_with_stream_with_group_key(
         .enumerate()
         .map(move |(i, line)| {
             let mut log = LogEvent::from(line);
-            let i = ((i / key) + 1) as i32;
+            let i = i32::try_from((i / key) + 1).unwrap();
             log.insert(event_path!("key"), i);
             Event::from(log)
         })

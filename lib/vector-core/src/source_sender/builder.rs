@@ -26,7 +26,7 @@ impl Default for Builder {
         Self {
             buf_size: chunk_size_events(),
             default_output: None,
-            named_outputs: Default::default(),
+            named_outputs: HashMap::default(),
             output_metrics: OutputMetrics::new(
                 emit_detailed_metrics.then(|| histogram!(LAG_TIME_NAME)),
                 emit_detailed_metrics.then(|| histogram!(SEND_LATENCY_NAME)),

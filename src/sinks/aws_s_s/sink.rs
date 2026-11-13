@@ -1,5 +1,6 @@
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
 use crate::sinks::{aws_s_s::retry::SSRetryLogic, prelude::*};
+use vector_lib::internal_event::emit;
 
 #[derive(Clone)]
 pub(super) struct SSSink<C, E>
@@ -17,16 +18,16 @@ where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    pub(super) fn new(
+    pub(super) const fn new(
         request_builder: SSRequestBuilder,
         request: TowerRequestConfig,
         publisher: C,
-    ) -> crate::Result<Self> {
-        Ok(SSSink {
+    ) -> Self {
+        Self {
             request_builder,
             service: SSService::new(publisher),
             request,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -43,7 +44,7 @@ where
             )
             .filter_map(|req| async move {
                 req.map_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })
                 .ok()
             })

@@ -3,7 +3,8 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use prost::Message;
 use vector_lib::{
-    config::LogNamespace, configurable::configurable_component, prometheus::parser::proto,
+    config::LogNamespace, configurable::configurable_component, internal_event::emit,
+    prometheus::parser::proto,
 };
 use warp::http::{HeaderMap, StatusCode};
 
@@ -17,7 +18,6 @@ use crate::{
     event::Event,
     http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, decompress_body, http::HttpMethod},
@@ -64,7 +64,7 @@ pub struct PrometheusRemoteWriteConfig {
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -80,6 +80,7 @@ pub struct PrometheusRemoteWriteConfig {
 
 impl PrometheusRemoteWriteConfig {
     #[cfg(test)]
+    #[must_use]
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
@@ -156,8 +157,8 @@ struct RemoteWriteSource {
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(PrometheusRemoteWriteParseError {
-                error: error.clone()
+            emit(PrometheusRemoteWriteParseError {
+                error: error.clone(),
             });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
@@ -248,7 +249,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: tls.clone(),
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -312,7 +313,7 @@ mod test {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
-                    sum: 156.2,
+                    sum: Some(156.2),
                 },
             )
             .with_timestamp(Some(timestamp()))
@@ -445,7 +446,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -518,7 +519,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -589,7 +590,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -674,7 +675,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -727,7 +728,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -767,7 +768,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -801,7 +802,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -898,7 +899,7 @@ mod test {
         let response = send_request(address.port(), request_body).await;
 
         // Should be rejected
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     }
 }
 
@@ -937,7 +938,7 @@ mod integration_tests {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -949,6 +950,6 @@ mod integration_tests {
             &HTTP_PUSH_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

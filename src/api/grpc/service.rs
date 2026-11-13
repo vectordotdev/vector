@@ -17,6 +17,7 @@ use tokio_stream::{
     wrappers::{IntervalStream, ReceiverStream},
 };
 use tonic::{Request, Response, Status};
+use vector_common::internal_event::{InternalMetricKind, all_metrics};
 use vector_lib::tap::{
     controller::{TapController, TapPatterns, TapPayload},
     topology::WatchRx,
@@ -25,12 +26,25 @@ use vector_lib::tap::{
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
-    self, Component as ProtoComponent, ComponentType, EventNotification, TappedEvent, *,
+    self, AvailableMetric, Component as ProtoComponent, ComponentMetrics, ComponentType,
+    EventNotification, GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
+    GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest, GetComponentsResponse,
+    GetMetaRequest, GetMetaResponse, InternalMetricKind as ProtoInternalMetricKind, MetricName,
+    Output, StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
+    StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
+    StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
+    StreamUptimeRequest, StreamUptimeResponse, TappedEvent, ThroughputMetric, TotalMetric,
+    stream_component_metrics_response, stream_output_events_response,
 };
 
 type BoxStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send>>;
 
 /// Helper function to extract metric value as f64
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 fn get_metric_value(metric: &Metric) -> Option<f64> {
     match metric.value() {
         MetricValue::Counter { value } => Some(*value),
@@ -39,7 +53,7 @@ fn get_metric_value(metric: &Metric) -> Option<f64> {
     }
 }
 
-/// Helper function to filter metrics by name and group by component_id tag
+/// Helper function to filter metrics by name and group by `component_id` tag
 fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<String, f64> {
     let mut result = HashMap::new();
 
@@ -55,8 +69,8 @@ fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<St
     result
 }
 
-/// Filter metrics by name and group by (component_id, output) tag pair.
-/// Used to populate per-output metrics in GetComponents responses.
+/// Filter metrics by name and group by (`component_id`, output) tag pair.
+/// Used to populate per-output metrics in `GetComponents` responses.
 fn filter_and_group_metrics_by_output(
     metrics: &[Metric],
     metric_name: &str,
@@ -78,7 +92,12 @@ fn filter_and_group_metrics_by_output(
     result
 }
 
-/// Extract all component metrics and group by component_id
+/// Extract all component metrics and group by `component_id`
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn extract_component_metrics(metrics: &[Metric]) -> HashMap<String, ComponentMetrics> {
     let received_bytes = filter_and_group_metrics(metrics, "component_received_bytes_total");
     let received_events = filter_and_group_metrics(metrics, "component_received_events_total");
@@ -162,6 +181,11 @@ const MIN_INTERVAL_MS: i32 = 100;
 
 /// Validates `interval_ms` from a streaming request, returning the value as `u64`
 /// or a gRPC error if it is out of range.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn validate_interval_ms(interval_ms: i32) -> Result<u64, Status> {
     if interval_ms < MIN_INTERVAL_MS {
         return Err(Status::invalid_argument(format!(
@@ -176,6 +200,15 @@ fn get_controller() -> Result<&'static Controller, Status> {
 }
 
 /// Builds a stream that emits per-component totals for `metric_name` every `duration`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn metric_totals_stream(
     duration: Duration,
     metric_name: &'static str,
@@ -207,6 +240,11 @@ fn metric_totals_stream(
 }
 
 /// Builds a stream that emits per-component throughputs for `metric_name` every `duration`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn metric_throughput_stream(
     duration: Duration,
     metric_name: &'static str,
@@ -248,7 +286,12 @@ fn metric_throughput_stream(
     ))
 }
 
-/// Builds a stream that emits per-component sent_events totals with per-output breakdown.
+/// Builds a stream that emits per-component `sent_events` totals with per-output breakdown.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn sent_events_totals_stream(
     duration: Duration,
 ) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
@@ -296,7 +339,7 @@ fn sent_events_totals_stream(
     ))
 }
 
-/// Builds a stream that emits per-component sent_events throughputs with per-output breakdown.
+/// Builds a stream that emits per-component `sent_events` throughputs with per-output breakdown.
 fn sent_events_throughput_stream(
     duration: Duration,
 ) -> Result<BoxStream<StreamComponentMetricsResponse>, Status> {
@@ -372,6 +415,11 @@ fn sent_events_throughput_stream(
 /// populating `sent_events_total` from the per-output metric snapshot.
 ///
 /// `None` port means the default output (represented as `"_default"`).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn ports_to_proto_outputs(
     ports: &[Option<&str>],
     component_id: &str,
@@ -394,12 +442,12 @@ fn ports_to_proto_outputs(
 }
 
 /// gRPC observability service implementation.
-pub struct ObservabilityService {
+pub(crate) struct ObservabilityService {
     watch_rx: WatchRx,
 }
 
 impl ObservabilityService {
-    pub const fn new(watch_rx: WatchRx) -> Self {
+    pub(crate) const fn new(watch_rx: WatchRx) -> Self {
         Self { watch_rx }
     }
 }
@@ -434,6 +482,38 @@ impl observability::Service for ObservabilityService {
         }))
     }
 
+    async fn get_capabilities(
+        &self,
+        _request: Request<GetCapabilitiesRequest>,
+    ) -> Result<Response<GetCapabilitiesResponse>, Status> {
+        #[cfg(unix)]
+        let allocation_tracing_enabled =
+            crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(unix))]
+        let allocation_tracing_enabled = false;
+
+        let available_metrics = all_metrics()
+            .map(|(name, kind)| AvailableMetric {
+                name: name.to_string(),
+                kind: match kind {
+                    InternalMetricKind::Counter => ProtoInternalMetricKind::Counter as i32,
+                    InternalMetricKind::Gauge => ProtoInternalMetricKind::Gauge as i32,
+                    InternalMetricKind::Histogram => ProtoInternalMetricKind::Histogram as i32,
+                },
+            })
+            .collect();
+
+        Ok(Response::new(GetCapabilitiesResponse {
+            allocation_tracing_enabled,
+            available_metrics,
+        }))
+    }
+
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn get_components(
         &self,
         request: Request<GetComponentsRequest>,
@@ -481,7 +561,7 @@ impl observability::Service for ObservabilityService {
                 component_type: ComponentType::Source as i32,
                 on_type,
                 outputs: ports_to_proto_outputs(ports, &key_str, &sent_events_by_output),
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 
@@ -505,7 +585,7 @@ impl observability::Service for ObservabilityService {
                 component_type: component_type as i32,
                 on_type,
                 outputs,
-                metrics: component_metrics_map.get(&key_str).cloned(),
+                metrics: component_metrics_map.get(&key_str).copied(),
             });
         }
 
@@ -541,6 +621,11 @@ impl observability::Service for ObservabilityService {
 
     type StreamUptimeStream = BoxStream<StreamUptimeResponse>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn stream_uptime(
         &self,
         request: Request<StreamUptimeRequest>,
@@ -565,6 +650,11 @@ impl observability::Service for ObservabilityService {
 
     type StreamComponentAllocatedBytesStream = BoxStream<StreamComponentAllocatedBytesResponse>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn stream_component_allocated_bytes(
         &self,
         request: Request<StreamComponentAllocatedBytesRequest>,
@@ -640,6 +730,15 @@ impl observability::Service for ObservabilityService {
 
     type StreamOutputEventsStream = BoxStream<StreamOutputEventsResponse>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn stream_output_events(
         &self,
         request: Request<StreamOutputEventsRequest>,
@@ -776,7 +875,7 @@ impl Reservoir {
     }
 }
 
-/// Convert TapPayload to gRPC StreamOutputEventsResponse(s)
+/// Convert `TapPayload` to gRPC StreamOutputEventsResponse(s)
 fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsResponse> {
     use crate::event::proto::{Event, EventWrapper};
 
@@ -794,7 +893,7 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                     event: Some(stream_output_events_response::Event::TappedEvent(
                         TappedEvent {
                             component_id: output.output_id.component.id().to_string(),
-                            component_type: output.component_type.to_string(),
+                            component_type: output.component_type.clone(),
                             component_kind: output.component_kind.to_string(),
                             event: event_wrapper,
                         },
@@ -815,7 +914,7 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                     event: Some(stream_output_events_response::Event::TappedEvent(
                         TappedEvent {
                             component_id: output.output_id.component.id().to_string(),
-                            component_type: output.component_type.to_string(),
+                            component_type: output.component_type.clone(),
                             component_kind: output.component_kind.to_string(),
                             event: event_wrapper,
                         },
@@ -836,7 +935,7 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<StreamOutputEventsRe
                     event: Some(stream_output_events_response::Event::TappedEvent(
                         TappedEvent {
                             component_id: output.output_id.component.id().to_string(),
-                            component_type: output.component_type.to_string(),
+                            component_type: output.component_type.clone(),
                             component_kind: output.component_kind.to_string(),
                             event: event_wrapper,
                         },
@@ -857,5 +956,65 @@ fn create_notification_event(message: &str) -> StreamOutputEventsResponse {
                 message: message.to_string(),
             },
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::watch;
+    use tonic::Request;
+    use vector_lib::tap::topology::TapResource;
+
+    use super::{
+        GetAllocationTracingStatusRequest, GetCapabilitiesRequest, ObservabilityService,
+        ProtoInternalMetricKind, observability::Service as _,
+    };
+
+    #[tokio::test]
+    async fn capabilities_include_current_metrics_and_legacy_allocation_status() {
+        let (_tx, rx) = watch::channel(TapResource::default());
+        let service = ObservabilityService::new(rx);
+        let capabilities = service
+            .get_capabilities(Request::new(GetCapabilitiesRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        let legacy_status = service
+            .get_allocation_tracing_status(Request::new(GetAllocationTracingStatusRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        assert_eq!(
+            capabilities.allocation_tracing_enabled,
+            legacy_status.enabled
+        );
+
+        // Include metrics added since the capabilities RPC was first proposed,
+        // and verify that all three metric kinds cross the proto boundary.
+        for (name, kind) in [
+            (
+                "component_cpu_usage_ns_total",
+                ProtoInternalMetricKind::Counter,
+            ),
+            ("buffer_size_events", ProtoInternalMetricKind::Gauge),
+            (
+                "component_latency_seconds",
+                ProtoInternalMetricKind::Histogram,
+            ),
+        ] {
+            assert!(
+                capabilities
+                    .available_metrics
+                    .iter()
+                    .any(|metric| { metric.name == name && metric.kind == kind as i32 }),
+                "missing {name} with kind {kind:?}"
+            );
+        }
+        assert!(
+            capabilities
+                .available_metrics
+                .iter()
+                .all(|metric| { metric.kind != ProtoInternalMetricKind::Unspecified as i32 })
+        );
     }
 }

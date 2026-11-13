@@ -68,10 +68,20 @@ impl ResourceSpan {
         );
         trace.insert(event_path!("name"), span.name);
         trace.insert(event_path!("kind"), span.kind);
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         trace.insert(
             event_path!("start_time_unix_nano"),
             Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
         );
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         trace.insert(
             event_path!("end_time_unix_nano"),
             Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
@@ -124,6 +134,11 @@ impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("name".into(), ev.name.into());
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         obj.insert(
             "time_unix_nano".into(),
             Value::Timestamp(Utc.timestamp_nanos(ev.time_unix_nano as i64)),
@@ -131,7 +146,7 @@ impl From<SpanEvent> for Value {
         obj.insert("attributes".into(), kv_list_into_value(ev.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
-            Value::Integer(ev.dropped_attributes_count as i64),
+            Value::Integer(i64::from(ev.dropped_attributes_count)),
         );
         Value::Object(obj)
     }
@@ -146,7 +161,7 @@ impl From<Link> for Value {
         obj.insert("attributes".into(), kv_list_into_value(link.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
-            Value::Integer(link.dropped_attributes_count as i64),
+            Value::Integer(i64::from(link.dropped_attributes_count)),
         );
         Value::Object(obj)
     }

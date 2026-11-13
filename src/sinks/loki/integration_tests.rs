@@ -503,7 +503,7 @@ async fn out_of_order_drop() {
         let log = event.as_mut_log();
         log.insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            base + Duration::seconds(i as i64),
+            base + Duration::seconds(i64::try_from(i).expect("test index fits in i64")),
         );
     }
     // first event of the second batch is out-of-order.
@@ -533,7 +533,7 @@ async fn out_of_order_accept() {
         let log = event.as_mut_log();
         log.insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            base + Duration::seconds(i as i64),
+            base + Duration::seconds(i64::try_from(i).expect("test index fits in i64")),
         );
     }
     // first event of the second batch is out-of-order.
@@ -565,7 +565,7 @@ async fn out_of_order_rewrite() {
         let log = event.as_mut_log();
         log.insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            base + Duration::seconds(i as i64),
+            base + Duration::seconds(i64::try_from(i).expect("test index fits in i64")),
         );
     }
     // first event of the second batch is out-of-order.
@@ -607,7 +607,7 @@ async fn out_of_order_per_partition() {
         let log = event.as_mut_log();
         log.insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            base + Duration::seconds(i as i64),
+            base + Duration::seconds(i64::try_from(i).expect("test index fits in i64")),
         );
     }
 
@@ -658,7 +658,7 @@ async fn test_out_of_order_events(
                 .unwrap()
                 .to_string_lossy(),
             output,
-        )
+        );
     }
     for (i, ts) in timestamps.iter().enumerate() {
         assert_eq!(

@@ -1,11 +1,25 @@
-use std::{convert::Infallible, future::Future, net::SocketAddr};
-
-use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
-use hyper::{
-    Body, Client, Server,
-    service::{make_service_fn, service_fn},
+use std::{
+    convert::Infallible,
+    future::{Future, Ready, ready},
+    net::SocketAddr,
+    time::Duration,
 };
-use tokio::{sync::mpsc, task::JoinHandle, time::timeout};
+
+use bytes::Bytes;
+use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
+use http_body_util::{Either, Full};
+use hyper::{body::Incoming, client::conn, service::service_fn};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    sync::mpsc,
+    task::{JoinHandle, JoinSet},
+    time::{sleep, timeout},
+};
 
 use super::{addr::next_addr, wait_for_tcp};
 
@@ -13,10 +27,14 @@ use super::{addr::next_addr, wait_for_tcp};
 ///
 /// A random local address is chosen for the HTTP server to listen on, and the function does not return until the server
 /// is up and ready for requests. The returned `Uri` is configured for the appropriate address.
+///
+/// # Panics
+///
+/// Panics if the listener cannot be bound or its address cannot be used to construct a URI.
 pub async fn spawn_blackhole_http_server<H, F>(handler: H) -> Uri
 where
-    H: Fn(Request<Body>) -> F + Clone + Send + 'static,
-    F: Future<Output = std::result::Result<Response<Body>, Infallible>> + Send + 'static,
+    H: Fn(Request<Incoming>) -> F + Clone + Send + Sync + 'static,
+    F: Future<Output = std::result::Result<Response<Full<Bytes>>, Infallible>> + Send + 'static,
 {
     let (_guard, address) = next_addr();
 
@@ -27,18 +45,26 @@ where
         .build()
         .expect("URI should always be valid when starting from `SocketAddr`");
 
-    let make_service = make_service_fn(move |_| {
-        let handler = handler.clone();
-        let service = service_fn(handler);
-
-        async move { Ok::<_, Infallible>(service) }
-    });
-
-    let server = Server::bind(&address).serve(make_service);
+    let listener = TcpListener::bind(address).await.unwrap();
 
     tokio::spawn(async move {
-        if let Err(error) = server.await {
-            error!(message = "Blackhole HTTP server error.", ?error);
+        loop {
+            let (stream, _) = match listener.accept().await {
+                Ok(connection) => connection,
+                Err(error) => {
+                    error!(message = "Blackhole HTTP server error.", ?error);
+                    break;
+                }
+            };
+            let handler = handler.clone();
+            tokio::spawn(async move {
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service_fn(handler))
+                    .await
+                {
+                    error!(message = "Blackhole HTTP server error.", ?error);
+                }
+            });
         }
     });
 
@@ -48,8 +74,82 @@ where
 }
 
 /// Responds to every request with a 200 OK response.
-pub async fn always_200_response(_: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::empty()))
+pub fn always_200_response(
+    _: Request<Incoming>,
+) -> Ready<Result<Response<Full<Bytes>>, Infallible>> {
+    ready(Ok(Response::new(Full::default())))
+}
+
+/// How the responses of [`spawn_slow_body_http_server`] fail to finish.
+#[derive(Clone, Copy, Debug)]
+pub enum SlowBody {
+    /// Send the response headers and the first byte of the body, then nothing more.
+    Stall,
+    /// Send the body one byte at a time with the given delay between bytes.
+    Trickle(Duration),
+}
+
+/// Spawns an HTTP server whose responses send the headers right away but never finish the body
+/// in time. Every response is a `200 OK` that announces a 1 MiB body.
+///
+/// # Panics
+///
+/// Panics if the listener cannot be bound or its address cannot be used to construct a URI.
+pub async fn spawn_slow_body_http_server(body: SlowBody) -> Uri {
+    const HEAD: &[u8] =
+        b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 1048576\r\n\r\n";
+
+    let (guard, address) = next_addr();
+
+    let uri = Uri::builder()
+        .scheme(Scheme::HTTP)
+        .authority(address.to_string())
+        .path_and_query("/")
+        .build()
+        .expect("URI should always be valid when starting from `SocketAddr`");
+
+    let listener = TcpListener::bind(address).await.unwrap();
+
+    tokio::spawn(async move {
+        // Keep the port reserved for as long as the server runs.
+        let _guard = guard;
+        while let Ok((mut stream, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                // Read the request head; test requests have no body.
+                let mut buf = [0u8; 1024];
+                let mut request = Vec::new();
+                while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    match stream.read(&mut buf).await {
+                        Ok(0) | Err(_) => return,
+                        Ok(n) => request.extend_from_slice(&buf[..n]),
+                    }
+                }
+
+                if stream.write_all(HEAD).await.is_err() {
+                    return;
+                }
+
+                match body {
+                    SlowBody::Stall => {
+                        if stream.write_all(b"#").await.is_err() {
+                            return;
+                        }
+                        // Hold the connection open until the client gives up on it.
+                        while matches!(stream.read(&mut buf).await, Ok(n) if n > 0) {}
+                    }
+                    SlowBody::Trickle(delay) => {
+                        while stream.write_all(b"#").await.is_ok() {
+                            sleep(delay).await;
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    wait_for_tcp(address).await;
+
+    uri
 }
 
 const PROXY_AUTHORIZATION: &str = "Basic cHJveHktdXNlcjpwcm94eS1wYXNz";
@@ -71,11 +171,16 @@ pub struct AuthenticatedHttpProxy {
 
 impl AuthenticatedHttpProxy {
     /// Returns the proxy URL, including its test credentials.
+    #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
 
     /// Waits for the next request received by the proxy.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no request arrives within five seconds or the observation channel closes.
     pub async fn next_request(&mut self) -> ProxyRequestObservation {
         timeout(std::time::Duration::from_secs(5), self.observations.recv())
             .await
@@ -91,54 +196,107 @@ impl Drop for AuthenticatedHttpProxy {
 }
 
 /// Spawns an HTTP proxy requiring the `proxy-user`/`proxy-pass` credentials.
+#[must_use]
+///
+/// # Panics
+///
+/// Panics if binding or inspecting the listener fails. Spawned tasks panic on invalid HTTP responses.
 pub fn spawn_authenticated_http_proxy() -> AuthenticatedHttpProxy {
     let address = SocketAddr::from(([127, 0, 0, 1], 0));
-    let server = Server::bind(&address);
-    let address = server.local_addr();
+    let listener = std::net::TcpListener::bind(address).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let address = listener.local_addr().unwrap();
+    let listener = TcpListener::from_std(listener).unwrap();
     let (observations_tx, observations) = mpsc::unbounded_channel();
 
-    let make_service = make_service_fn(move |_| {
-        let observations_tx = observations_tx.clone();
-        async move {
-            Ok::<_, Infallible>(service_fn(move |mut request: Request<Body>| {
-                let observations_tx = observations_tx.clone();
-                async move {
-                    let observation = ProxyRequestObservation {
-                        method: request.method().clone(),
-                        uri: request.uri().clone(),
-                        headers: request.headers().clone(),
-                    };
-                    let authorized = observation
-                        .headers
-                        .get(header::PROXY_AUTHORIZATION)
-                        .is_some_and(|value| value.as_bytes() == PROXY_AUTHORIZATION.as_bytes());
-                    _ = observations_tx.send(observation);
-
-                    if !authorized {
-                        return Ok::<_, Infallible>(
-                            Response::builder()
-                                .status(StatusCode::PROXY_AUTHENTICATION_REQUIRED)
-                                .body(Body::empty())
-                                .unwrap(),
-                        );
-                    }
-
-                    request.headers_mut().remove(header::PROXY_AUTHORIZATION);
-                    let response = Client::new().request(request).await.unwrap_or_else(|_| {
-                        Response::builder()
-                            .status(StatusCode::BAD_GATEWAY)
-                            .body(Body::empty())
-                            .unwrap()
-                    });
-                    Ok(response)
-                }
-            }))
-        }
-    });
-
     let task = tokio::spawn(async move {
-        if let Err(error) = server.serve(make_service).await {
-            error!(message = "Test HTTP proxy error.", ?error);
+        let mut connections = JoinSet::new();
+        loop {
+            let (stream, _) = match listener.accept().await {
+                Ok(connection) => connection,
+                Err(error) => {
+                    error!(message = "Test HTTP proxy error.", ?error);
+                    break;
+                }
+            };
+            while connections.try_join_next().is_some() {}
+            let observations_tx = observations_tx.clone();
+            connections.spawn(async move {
+                let service = service_fn(move |mut request: Request<Incoming>| {
+                    let observations_tx = observations_tx.clone();
+                    async move {
+                        let observation = ProxyRequestObservation {
+                            method: request.method().clone(),
+                            uri: request.uri().clone(),
+                            headers: request.headers().clone(),
+                        };
+                        let authorized = observation
+                            .headers
+                            .get(header::PROXY_AUTHORIZATION)
+                            .is_some_and(|value| {
+                                value.as_bytes() == PROXY_AUTHORIZATION.as_bytes()
+                            });
+                        _ = observations_tx.send(observation);
+
+                        if !authorized {
+                            return Ok::<_, Infallible>(
+                                Response::builder()
+                                    .status(StatusCode::PROXY_AUTHENTICATION_REQUIRED)
+                                    .body(Either::Left(Full::<Bytes>::default()))
+                                    .unwrap(),
+                            );
+                        }
+
+                        request.headers_mut().remove(header::PROXY_AUTHORIZATION);
+                        let response = async {
+                            if request.uri().scheme() != Some(&Scheme::HTTP) {
+                                return Err("proxy requires an absolute HTTP URI".into());
+                            }
+                            let host = request.uri().host().ok_or("proxy request has no host")?;
+                            let port = request.uri().port_u16().unwrap_or(80);
+                            let stream =
+                                TcpStream::connect((host.trim_matches(['[', ']']), port)).await?;
+                            let (mut sender, connection) =
+                                conn::http1::handshake(TokioIo::new(stream)).await?;
+                            tokio::spawn(async move {
+                                if let Err(error) = connection.await {
+                                    debug!(
+                                        message = "Test HTTP proxy upstream connection closed.",
+                                        ?error
+                                    );
+                                }
+                            });
+                            if !request.headers().contains_key(header::HOST) {
+                                let authority =
+                                    request.uri().authority().unwrap().as_str().parse()?;
+                                request.headers_mut().insert(header::HOST, authority);
+                            }
+                            *request.uri_mut() = request
+                                .uri()
+                                .path_and_query()
+                                .map_or("/", |path| path.as_str())
+                                .parse()?;
+                            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+                                sender.send_request(request).await?,
+                            )
+                        }
+                        .await;
+                        Ok(match response {
+                            Ok(response) => response.map(Either::Right),
+                            Err(_) => Response::builder()
+                                .status(StatusCode::BAD_GATEWAY)
+                                .body(Either::Left(Full::default()))
+                                .unwrap(),
+                        })
+                    }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    error!(message = "Test HTTP proxy error.", ?error);
+                }
+            });
         }
     });
 

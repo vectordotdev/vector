@@ -93,9 +93,7 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
-        let path = if let Some(path) = query.external_path() {
-            path
-        } else {
+        let Some(path) = query.external_path().cloned() else {
             // Semantic meaning can only be assigned to external fields.
             let mut labels = vec![Label::primary(
                 "this path must point to an event or metadata",
@@ -136,7 +134,7 @@ impl Function for SetSemanticMeaning {
                 labels: vec![
                     Label::primary("cannot assign semantic meaning to non-existing field", span),
                     Label::context(
-                        format!("field \".{}\" is not known to exist for all events", &path),
+                        format!("field \".{path}\" is not known to exist for all events"),
                         span,
                     ),
                 ],
@@ -156,16 +154,10 @@ impl Function for SetSemanticMeaning {
                     message: "semantic meaning referencing two different fields".to_owned(),
                     labels: vec![
                         Label::primary(
-                            format!(
-                                "semantic meaning \"{}\" must reference a single field",
-                                &meaning
-                            ),
+                            format!("semantic meaning \"{meaning}\" must reference a single field"),
                             span,
                         ),
-                        Label::context(
-                            format!("already referencing field \".{}\"", &duplicate),
-                            span,
-                        ),
+                        Label::context(format!("already referencing field \".{duplicate}\""), span),
                     ],
                     notes: vec![],
                 };
@@ -174,7 +166,7 @@ impl Function for SetSemanticMeaning {
             }
 
             list.insert(meaning, path);
-        };
+        }
 
         Ok(SetSemanticMeaningFn.as_expr())
     }

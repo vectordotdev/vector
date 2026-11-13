@@ -5,6 +5,26 @@ use std::{
     process::{self, Command},
 };
 
+use crate::app::CommandExt as _;
+
+/// Arguments forwarded to a repository script.
+#[derive(clap::Args, Debug)]
+pub struct ScriptArgs {
+    /// Arguments passed to the script (use `-- --help` for the script's help).
+    #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
+    args: Vec<String>,
+}
+
+impl ScriptArgs {
+    /// Run a script from the repository's scripts directory with the forwarded arguments.
+    pub fn exec(self, script: &str) -> anyhow::Result<()> {
+        Command::script(script)
+            .args(self.args)
+            .in_repo()
+            .check_run()
+    }
+}
+
 /// Trait for chaining command arguments
 pub trait ChainArgs {
     fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString>;

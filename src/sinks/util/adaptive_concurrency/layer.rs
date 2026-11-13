@@ -6,7 +6,7 @@ use crate::sinks::util::retries::RetryLogic;
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle.
 #[derive(Debug, Clone)]
-pub struct AdaptiveConcurrencyLimitLayer<L> {
+pub(crate) struct AdaptiveConcurrencyLimitLayer<L> {
     concurrency: Option<usize>,
     options: AdaptiveConcurrencySettings,
     logic: L,
@@ -14,7 +14,7 @@ pub struct AdaptiveConcurrencyLimitLayer<L> {
 
 impl<L> AdaptiveConcurrencyLimitLayer<L> {
     /// Create a new concurrency limit layer.
-    pub const fn new(
+    pub(crate) const fn new(
         concurrency: Option<usize>,
         options: AdaptiveConcurrencySettings,
         logic: L,

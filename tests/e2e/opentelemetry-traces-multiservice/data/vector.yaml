@@ -1,0 +1,20 @@
+sources:
+  otel:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+    use_otlp_decoding: true
+
+sinks:
+  output:
+    inputs: [otel.traces]
+    type: opentelemetry
+    protocol:
+      type: http
+      uri: http://otel-collector-sink:4318/v1/traces
+      encoding:
+        codec: otlp
+    batch:
+      timeout_secs: 1

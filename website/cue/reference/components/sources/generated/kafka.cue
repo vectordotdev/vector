@@ -16,7 +16,7 @@ generated: components: sources: kafka: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	auto_offset_reset: {
 		description: """
@@ -193,7 +193,7 @@ generated: components: sources: kafka: configuration: {
 		}
 	}
 	metrics: {
-		description: "Metrics (beta) configuration."
+		description: "Metrics configuration."
 		required:    false
 		type: object: options: topic_lag_metric: {
 			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."

@@ -1,4 +1,4 @@
-use strum::{AsRefStr, Display, EnumIter};
+use strum::{AsRefStr, Display, EnumIter, IntoEnumIterator as _};
 
 /// Canonical list of all per-component internal metric names emitted by Vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -14,6 +14,7 @@ pub enum CounterName {
     ComponentErrorsTotal,
     ComponentTimedOutEventsTotal,
     ComponentTimedOutRequestsTotal,
+    ComponentLoadShedRequestsTotal,
     BufferReceivedEventsTotal,
     BufferReceivedBytesTotal,
     BufferSentEventsTotal,
@@ -81,6 +82,7 @@ pub enum CounterName {
     StoppedTotal,
     TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
+    TopologyDiskBufferLifecycleEventsTotal,
     ValueLimitReachedTotal,
     WebsocketBytesSentTotal,
     WebsocketMessagesSentTotal,
@@ -108,6 +110,7 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirations,
     MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
+    DatadogLogsEventsTruncatedTotal,
     DatadogLogsReservedAttributeConflictsTotal,
     // Data-plane counter names emitted by the `host_metrics` source.
     CpuSecondsTotal,
@@ -128,7 +131,6 @@ pub enum CounterName {
     NetworkTransmitPacketsDropTotal,
     NetworkTransmitPacketsTotal,
     NetworkTransmitErrsTotal,
-    ProcessRuntime,
     ProcessRuntimeTotal,
 }
 
@@ -203,22 +205,18 @@ impl HistogramName {
 #[strum(serialize_all = "snake_case")]
 pub enum GaugeName {
     ComponentLatencyMeanSeconds,
+    ComponentRequestActive,
+    ComponentRequestConcurrencyLimit,
     SourceBufferMaxSizeEvents,
     SourceBufferMaxSizeBytes,
-    SourceBufferMaxEventSize,
-    SourceBufferMaxByteSize,
     SourceBufferUtilizationLevel,
     SourceBufferUtilizationMean,
     TransformBufferMaxSizeEvents,
     TransformBufferMaxSizeBytes,
-    TransformBufferMaxEventSize,
-    TransformBufferMaxByteSize,
     TransformBufferUtilizationLevel,
     TransformBufferUtilizationMean,
     BufferMaxSizeEvents,
-    BufferMaxEventSize,
     BufferMaxSizeBytes,
-    BufferMaxByteSize,
     BufferSizeEvents,
     BufferSizeBytes,
     Utilization,
@@ -290,22 +288,18 @@ impl GaugeName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::ComponentRequestActive => "component_request_active",
+            Self::ComponentRequestConcurrencyLimit => "component_request_concurrency_limit",
             Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
             Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
-            Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
-            Self::SourceBufferMaxByteSize => "source_buffer_max_byte_size",
             Self::SourceBufferUtilizationLevel => "source_buffer_utilization_level",
             Self::SourceBufferUtilizationMean => "source_buffer_utilization_mean",
             Self::TransformBufferMaxSizeEvents => "transform_buffer_max_size_events",
             Self::TransformBufferMaxSizeBytes => "transform_buffer_max_size_bytes",
-            Self::TransformBufferMaxEventSize => "transform_buffer_max_event_size",
-            Self::TransformBufferMaxByteSize => "transform_buffer_max_byte_size",
             Self::TransformBufferUtilizationLevel => "transform_buffer_utilization_level",
             Self::TransformBufferUtilizationMean => "transform_buffer_utilization_mean",
             Self::BufferMaxSizeEvents => "buffer_max_size_events",
-            Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
-            Self::BufferMaxByteSize => "buffer_max_byte_size",
             Self::BufferSizeEvents => "buffer_size_events",
             Self::BufferSizeBytes => "buffer_size_bytes",
             Self::Utilization => "utilization",
@@ -388,6 +382,7 @@ impl CounterName {
             Self::ComponentErrorsTotal => "component_errors_total",
             Self::ComponentTimedOutEventsTotal => "component_timed_out_events_total",
             Self::ComponentTimedOutRequestsTotal => "component_timed_out_requests_total",
+            Self::ComponentLoadShedRequestsTotal => "component_load_shed_requests_total",
             Self::BufferReceivedEventsTotal => "buffer_received_events_total",
             Self::BufferReceivedBytesTotal => "buffer_received_bytes_total",
             Self::BufferSentEventsTotal => "buffer_sent_events_total",
@@ -458,6 +453,9 @@ impl CounterName {
             Self::StoppedTotal => "stopped_total",
             Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
+            Self::TopologyDiskBufferLifecycleEventsTotal => {
+                "topology_disk_buffer_lifecycle_events_total"
+            }
             Self::ValueLimitReachedTotal => "value_limit_reached_total",
             Self::WebsocketBytesSentTotal => "websocket_bytes_sent_total",
             Self::WebsocketMessagesSentTotal => "websocket_messages_sent_total",
@@ -497,6 +495,7 @@ impl CounterName {
                 "memory_enrichment_table_ttl_expirations_total"
             }
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsEventsTruncatedTotal => "datadog_logs_events_truncated_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }
@@ -518,10 +517,24 @@ impl CounterName {
             Self::NetworkTransmitPacketsDropTotal => "network_transmit_packets_drop_total",
             Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
             Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
-            Self::ProcessRuntime => "process_runtime",
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InternalMetricKind {
+    Counter,
+    Gauge,
+    Histogram,
+}
+
+/// Returns an iterator over every known Vector metric name paired with its kind.
+pub fn all_metrics() -> impl Iterator<Item = (&'static str, InternalMetricKind)> {
+    CounterName::iter()
+        .map(|n| (n.as_str(), InternalMetricKind::Counter))
+        .chain(GaugeName::iter().map(|n| (n.as_str(), InternalMetricKind::Gauge)))
+        .chain(HistogramName::iter().map(|n| (n.as_str(), InternalMetricKind::Histogram)))
 }
 
 #[cfg(test)]
@@ -540,7 +553,6 @@ mod tests {
             "memory_enrichment_table_failed_insertions",
             "memory_enrichment_table_failed_reads",
             "memory_enrichment_table_ttl_expirations",
-            "process_runtime",
             "aggregate_failed_updates",
         ]);
 

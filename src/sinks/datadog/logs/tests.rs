@@ -10,15 +10,15 @@ use indoc::indoc;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
-    extra_context::ExtraContext,
-    http::HttpError,
     sinks::{
+        VectorSink,
         datadog::test_utils::{ApiStatus, test_server},
         util::{
             retries::RetryLogic,
@@ -26,15 +26,14 @@ use crate::{
         },
     },
     test_util::{
-        addr::next_addr,
+        addr::{PortGuard, next_addr},
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
             run_and_assert_sink_error,
         },
-        random_lines_with_stream,
+        generate_lines_with_stream, random_lines_with_stream,
     },
-    tls::TlsError,
 };
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
@@ -50,6 +49,25 @@ enum TestType {
     Happy,
     Telemetry,
     Error,
+}
+
+async fn start_test_sink(
+    config: &str,
+    api_status: ApiStatus,
+) -> (
+    PortGuard,
+    stream_cancel::Trigger,
+    VectorSink,
+    Receiver<(Parts, Bytes)>,
+) {
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
+    let (guard, addr) = next_addr();
+    config.local_dd_common.endpoint = Some(format!("http://{addr}"));
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, trigger, server) = test_server(addr, api_status);
+    tokio::spawn(server);
+    (guard, trigger, sink, rx)
 }
 
 /// Starts a test sink with random lines running into it
@@ -83,18 +101,7 @@ async fn start_test_detail(
             default_api_key = "atoken"
             compression = "none"
         "#};
-    let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
-
-    let (_guard, addr) = next_addr();
-    // Swap out the endpoint so we can force send it
-    // to our local server
-    let endpoint = format!("http://{addr}");
-    config.local_dd_common.endpoint = Some(endpoint.clone());
-
-    let (sink, _) = config.build(cx).await.unwrap();
-
-    let (rx, _trigger, server) = test_server(addr, api_status);
-    tokio::spawn(server);
+    let (_guard, _trigger, sink, rx) = start_test_sink(config, api_status).await;
 
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
@@ -103,7 +110,7 @@ async fn start_test_detail(
         TestType::Happy => run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await,
         TestType::Error => run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await,
         TestType::Telemetry => {
-            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await
+            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
         }
     }
 
@@ -135,7 +142,7 @@ async fn start_test_error(
 
 /// Assert the basic functionality of the sink in good conditions
 ///
-/// This test rigs the sink to return OKv1 to responses, checks that all batches
+/// This test rigs the sink to return `OKv1` to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 #[tokio::test]
@@ -177,6 +184,34 @@ async fn smoke() {
     }
 }
 
+#[tokio::test]
+async fn truncates_oversized_log_over_http() {
+    let config = indoc! {r#"
+        default_api_key = "atoken"
+        compression = "none"
+
+        [truncate_oversized_logs]
+        max_log_bytes = 1000
+    "#};
+    let (_guard, _trigger, sink, rx) = start_test_sink(config, ApiStatus::OKv2).await;
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let (_, events) = generate_lines_with_stream(|_| "\"".repeat(600), 1, Some(batch));
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let output = rx.take(1).collect::<Vec<_>>().await;
+    let logs: Vec<serde_json::Value> =
+        serde_json::from_slice(&output[0].1).expect("request body should contain a JSON array");
+    assert_eq!(logs.len(), 1);
+    let message = logs[0]["message"]
+        .as_str()
+        .expect("message should be a string");
+    assert!(message.ends_with("...TRUNCATED..."));
+    assert_eq!(logs[0]["ddtags"], "truncated:single_line");
+    assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= 1000);
+}
+
 /// Assert the sink emits source and service tags when run with telemetry configured.
 #[tokio::test]
 async fn telemetry() {
@@ -187,7 +222,7 @@ async fn telemetry() {
 #[tokio::test]
 /// Assert delivery error behavior for v1 API
 ///
-/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
+/// In the event that delivery fails -- in this case because it is `BAD_REQUEST` --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
@@ -201,7 +236,7 @@ async fn handles_failure_v1() {
 #[tokio::test]
 /// Assert delivery error behavior for v2 API
 ///
-/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
+/// In the event that delivery fails -- in this case because it is `BAD_REQUEST` --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
@@ -220,7 +255,7 @@ async fn handles_failure_v2() {
 /// that, for successful transmission, the API key set in metadata is
 /// propagated.
 async fn api_key_in_metadata_v2() {
-    api_key_in_metadata_inner(ApiStatus::OKv2).await
+    api_key_in_metadata_inner(ApiStatus::OKv2).await;
 }
 
 #[tokio::test]
@@ -231,7 +266,7 @@ async fn api_key_in_metadata_v2() {
 /// that, for successful transmission, the API key set in metadata is
 /// propagated.
 async fn api_key_in_metadata_v1() {
-    api_key_in_metadata_inner(ApiStatus::OKv1).await
+    api_key_in_metadata_inner(ApiStatus::OKv1).await;
 }
 
 async fn api_key_in_metadata_inner(api_status: ApiStatus) {
@@ -299,7 +334,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 /// that, for successful transmission, per-event API keys are propagated
 /// correctly.
 async fn multiple_api_keys_v1() {
-    multiple_api_keys_inner(ApiStatus::OKv1).await
+    multiple_api_keys_inner(ApiStatus::OKv1).await;
 }
 
 #[tokio::test]
@@ -310,7 +345,7 @@ async fn multiple_api_keys_v1() {
 /// that, for successful transmission, per-event API keys are propagated
 /// correctly.
 async fn multiple_api_keys_v2() {
-    multiple_api_keys_inner(ApiStatus::OKv2).await
+    multiple_api_keys_inner(ApiStatus::OKv2).await;
 }
 
 async fn multiple_api_keys_inner(api_status: ApiStatus) {
@@ -346,7 +381,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
         .await;
 
     keys.sort();
-    assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
+    assert_eq!(keys, vec!["atoken", "pkc", "vvo"]);
 }
 
 #[tokio::test]
@@ -355,7 +390,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
 /// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
 async fn headers_v2() {
-    headers_inner(ApiStatus::OKv2).await
+    headers_inner(ApiStatus::OKv2).await;
 }
 
 #[tokio::test]
@@ -364,7 +399,7 @@ async fn headers_v2() {
 /// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
 async fn headers_v1() {
-    headers_inner(ApiStatus::OKv1).await
+    headers_inner(ApiStatus::OKv1).await;
 }
 
 async fn headers_inner(api_status: ApiStatus) {
@@ -404,35 +439,120 @@ async fn headers_inner(api_status: ApiStatus) {
 }
 
 #[tokio::test]
-/// Assert the RetryLogic implementation of LogApiRetry
+/// Assert the `RetryLogic` implementation of `LogApiRetry`
 async fn error_is_retriable() {
     let retry = LogApiRetry;
 
     // not retry-able
     assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
     assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
-    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::BuildRequest {
-            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
-        }
-    }));
-    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::MakeProxyConnector {
-            source: http::Uri::try_from("").unwrap_err()
-        }
-    }));
 
     // retry-able
     assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
     assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
-    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::BuildTlsConnector {
-            source: TlsError::MissingKey
+}
+
+#[tokio::test]
+async fn retries_transport_errors() {
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
+
+    use http::{Response, StatusCode};
+    use http_body_util::{BodyExt as _, Full};
+    use hyper::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
+    };
+
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+        default_api_key = "atoken"
+        compression = "none"
+        batch.max_events = 1
+        request.retry_attempts = 1
+        request.retry_initial_backoff_secs = 1
+    "#})
+    .unwrap();
+    let (_guard, addr) = next_addr();
+    config.local_dd_common.endpoint = Some(format!("http://{addr}"));
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let (shutdown, mut stopped) = tokio::sync::oneshot::channel();
+    let server_requests = Arc::clone(&requests);
+    let server = tokio::spawn(async move {
+        let mut connections = tokio::task::JoinSet::new();
+        loop {
+            let (stream, _) = tokio::select! {
+                accepted = listener.accept() => accepted?,
+                _ = &mut stopped => break,
+            };
+            while connections.try_join_next().is_some() {}
+            let requests = Arc::clone(&server_requests);
+            connections.spawn(async move {
+                let service = service_fn(move |request: http::Request<Incoming>| {
+                    let requests = Arc::clone(&requests);
+                    async move {
+                        let body = request.into_body().collect().await.unwrap().to_bytes();
+                        let attempt = {
+                            let mut requests = requests.lock().unwrap();
+                            requests.push(body);
+                            requests.len()
+                        };
+                        if attempt == 1 {
+                            // Reading the complete request before closing prevents a transparent client retry.
+                            Err(std::io::Error::other(
+                                "close the first connection without a response",
+                            ))
+                        } else {
+                            Ok(Response::builder()
+                                .status(StatusCode::ACCEPTED)
+                                .body(Full::new(Bytes::new()))
+                                .unwrap())
+                        }
+                    }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    tracing::debug!(message = "Test server connection closed.", %error);
+                }
+            });
         }
-    }));
-    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
-    //       but are not straightforward to instantiate due to the design of
-    //       the crates they originate from.
+        Ok::<_, std::io::Error>(())
+    });
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (batch, status) = BatchNotifier::new_with_receiver();
+    let event =
+        crate::event::Event::from(crate::event::LogEvent::from("retry after connection close"))
+            .with_batch_notifier(&batch);
+    drop(batch);
+
+    tokio::time::timeout(Duration::from_secs(10), sink.run_events([event]))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), status)
+            .await
+            .unwrap(),
+        BatchStatus::Delivered
+    );
+    shutdown.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0], requests[1]);
+    let payload: serde_json::Value = serde_json::from_slice(&requests[1]).unwrap();
+    assert_eq!(payload[0]["message"], "retry after connection close");
 }
 
 #[tokio::test]
@@ -471,13 +591,13 @@ async fn does_not_send_too_big_payloads() {
             Some((_parts, body)) = rx.next() => {
                 sizes.push(body.len());
             }
-            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+            () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
                 break;
             }
         }
     }
 
-    assert!(!sizes.is_empty());
+    assert_ne!(sizes, [] as [usize; 0]);
     for size in sizes {
         assert!(size < 5_000_000, "{size} not less than max");
     }

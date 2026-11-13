@@ -168,10 +168,10 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
                 }
             }
             assert_eq!(*count, 1);
+            let sum = sum.expect("Vector's internal histograms always report a sum");
             assert!(
-                (*sum - expected).abs() <= 0.002,
-                "Histogram sum does not match expected sum: {} vs {expected}",
-                *sum,
+                (sum - expected).abs() <= 0.002,
+                "Histogram sum does not match expected sum: {sum} vs {expected}",
             );
         }
         _ => panic!("source_lag_time_seconds has invalid type"),
@@ -356,7 +356,7 @@ fn assert_buffer_metrics(buffer_size: usize, level: usize) {
         .into_iter()
         .filter(|metric| metric.name().starts_with("source_buffer_"))
         .collect();
-    assert_eq!(metrics.len(), 5, "expected 5 utilization metrics");
+    assert_eq!(metrics.len(), 4, "expected 4 utilization metrics");
 
     let find_metric = |name: &str| {
         metrics
@@ -374,12 +374,6 @@ fn assert_buffer_metrics(buffer_size: usize, level: usize) {
         panic!("source_buffer_utilization_level should be a gauge");
     };
     assert_eq!(*value, level as f64);
-
-    let metric = find_metric("source_buffer_max_event_size");
-    let MetricValue::Gauge { value } = metric.value() else {
-        panic!("source_buffer_max_event_size should be a gauge");
-    };
-    assert_eq!(*value, buffer_size as f64);
 
     let metric = find_metric("source_buffer_max_size_events");
     let MetricValue::Gauge { value } = metric.value() else {

@@ -79,13 +79,18 @@ fn bench_add_fields(c: &mut Criterion) {
                     transformed
                 },
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 
     group.finish();
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn bench_field_filter(c: &mut Criterion) {
     let num_events = 10;
     let events = (0..num_events)
@@ -160,7 +165,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     num
                 },
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 
