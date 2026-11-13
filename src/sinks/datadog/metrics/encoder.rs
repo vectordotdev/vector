@@ -1235,7 +1235,7 @@ mod tests {
         assert!(series_proto.resources.iter().any(|resource| {
             resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
         }));
-        assert!(series_proto.tags.is_empty());
+        assert_eq!(series_proto.tags, [] as [std::string::String; 0]);
     }
 
     #[test]
@@ -1259,10 +1259,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this deterministic rate value exactly."
-    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1293,10 +1289,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this gauge value exactly."
-    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This

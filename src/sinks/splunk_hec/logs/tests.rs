@@ -219,7 +219,6 @@ fn splunk_encode_log_event_json() {
 }
 
 #[test]
-#[expect(clippy::float_cmp, reason = "Verify the exact value.")]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
     let hec_data =
@@ -392,7 +391,7 @@ fn splunk_encode_log_event_semantic_meanings() {
         Value::Timestamp(og_time),
     );
 
-    assert!(log.namespace() == LogNamespace::Vector);
+    assert_eq!(log.namespace(), LogNamespace::Vector);
 
     let event = Event::Log(log);
 

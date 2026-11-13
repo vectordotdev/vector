@@ -42,9 +42,6 @@ massif.*
 # Checkpoints
 checkpoints/*
 
-# Tilt
-tilt_modules/
-
 # Docker
 **/Dockerfile~
 **/Dockerfile.*~

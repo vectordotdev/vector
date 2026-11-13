@@ -37,7 +37,7 @@ configuration: {
 						unit: "seconds"
 					}
 				}
-				nsecs: {
+				nanos: {
 					required:    false
 					description: "The fractional number of seconds after which to expire metrics."
 					type: uint: {

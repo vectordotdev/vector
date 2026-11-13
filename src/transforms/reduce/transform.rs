@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::emit;
 
 use async_stream::stream;
 use futures::{Stream, StreamExt, future, stream};
@@ -98,7 +99,7 @@ impl ReduceState {
                 let parsed_path = match parse_target_path(&path) {
                     Ok(path) => path,
                     Err(error) => {
-                        emit!(ReduceAddEventError { error, path });
+                        emit(ReduceAddEventError { error, path });
                         continue;
                     }
                 };
@@ -240,7 +241,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.merge_states.remove(k) {
-                emit!(ReduceStaleEventFlushed);
+                emit(ReduceStaleEventFlushed);
                 emitter.emit(Event::from(t.flush()));
             }
         }

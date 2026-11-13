@@ -398,7 +398,6 @@ impl S3SinkConfig {
     }
 
     /// Builds the future that checks access to the configured bucket.
-    #[must_use]
     pub fn build_healthcheck(&self, client: S3Client) -> Healthcheck {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }

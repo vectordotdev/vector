@@ -1,4 +1,5 @@
 use std::net::{Ipv4Addr, SocketAddr};
+use vector_lib::internal_event::{emit, register};
 
 use bytes::BytesMut;
 use chrono::Utc;
@@ -185,7 +186,7 @@ pub(super) fn udp(
         let socket = try_bind_udp_socket(config.address, listenfd)
             .await
             .map_err(|error| {
-                emit!(SocketBindError {
+                emit(SocketBindError {
                     mode: SocketMode::Udp,
                     error: &error,
                 });
@@ -211,7 +212,7 @@ pub(super) fn udp(
                 socket
                     .join_multicast_v4(group_addr, interface)
                     .map_err(|error| {
-                        emit!(SocketMulticastGroupJoinError {
+                        emit(SocketMulticastGroupJoinError {
                             error: &error,
                             group_addr,
                             interface,
@@ -234,7 +235,7 @@ pub(super) fn udp(
             max_length = std::cmp::min(max_length, receive_buffer_bytes);
         }
 
-        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+        let bytes_received = register(BytesReceived::from(Protocol::UDP));
 
         info!(message = "Listening.", address = %config.address);
         // We add 1 to the max_length in order to determine if the received data has been truncated.
@@ -258,7 +259,7 @@ pub(super) fn udp(
                                 }
                             }
 
-                            emit!(SocketReceiveError {
+                            emit(SocketReceiveError {
                                 mode: SocketMode::Udp,
                                 error: &error
                             });
@@ -290,7 +291,7 @@ pub(super) fn udp(
                                 }
 
                                 let count = events.len();
-                                emit!(SocketEventsReceived {
+                                emit(SocketEventsReceived {
                                     mode: SocketMode::Udp,
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     count,
@@ -335,7 +336,7 @@ pub(super) fn udp(
                                 tokio::select!{
                                     result = out.send_batch(events) => {
                                         if result.is_err() {
-                                            emit!(StreamClosedError { count });
+                                            emit(StreamClosedError { count });
                                             return Ok(())
                                         }
                                     }

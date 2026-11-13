@@ -1,7 +1,8 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
@@ -30,7 +31,7 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketOutgoingConnectionError { error: self.error });
+        emit(SocketOutgoingConnectionError { error: self.error });
     }
 }
 
@@ -60,7 +61,7 @@ impl InternalEvent for UdpSendIncompleteError {
         // deprecated
         counter!(CounterName::ConnectionSendErrorsTotal, "mode" => "udp").increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -87,6 +88,6 @@ impl InternalEvent for UdpChunkingError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

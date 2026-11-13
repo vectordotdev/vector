@@ -445,7 +445,6 @@ impl<T: Send + 'static> LimitedReceiver<T> {
         }
     }
 
-    #[must_use]
     pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
         let mut receiver = self;
         Box::pin(stream! {

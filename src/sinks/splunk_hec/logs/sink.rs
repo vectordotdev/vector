@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use vector_lib::{
     config::{LogNamespace, log_schema},
+    internal_event::emit,
     lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
     schema::meaning,
 };
@@ -181,7 +182,7 @@ fn has_confined_partition_error(
             .and_then(|t| t.render_string(event).err())
             .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
         {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field),
                 // Count the drop once — subsequent violations on the same event
@@ -233,7 +234,7 @@ impl Partitioner for EventPartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let emit_err = |error, field| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field),
                 drop_event: false,
@@ -374,13 +375,13 @@ pub(super) fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent 
                     Some(time)
                 }
                 Some(value) => {
-                    emit!(SplunkEventTimestampInvalidType {
-                        r#type: value.kind_str()
+                    emit(SplunkEventTimestampInvalidType {
+                        r#type: value.kind_str(),
                     });
                     None
                 }
                 None => {
-                    emit!(SplunkEventTimestampMissing {});
+                    emit(SplunkEventTimestampMissing {});
                     None
                 }
             }

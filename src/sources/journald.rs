@@ -7,6 +7,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -454,7 +455,7 @@ impl JournaldSource {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
-                emit!(JournaldCheckpointFileOpenError {
+                emit(JournaldCheckpointFileOpenError {
                     error: &error,
                     path: self
                         .checkpoint_path
@@ -502,7 +503,7 @@ impl JournaldSource {
                     drop(running);
                 }
                 Err(error) => {
-                    emit!(JournaldStartJournalctlError { error });
+                    emit(JournaldStartJournalctlError { error });
                 }
             }
 
@@ -524,8 +525,8 @@ impl JournaldSource {
         finalizer: &'a Finalizer,
         mut shutdown: ShutdownSignal,
     ) -> bool {
-        let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
-        let events_received = register!(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::from("journald")));
+        let events_received = register(EventsReceived);
 
         // Spawn stderr handler task
         let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
@@ -629,7 +630,7 @@ impl<'a> Batch<'a> {
                 false
             }
             Some(Err(error)) => {
-                emit!(JournaldReadError { error });
+                emit(JournaldReadError { error });
                 false
             }
             Some(Ok(bytes)) => {
@@ -662,9 +663,9 @@ impl<'a> Batch<'a> {
                         }
                     }
                     Err(error) => {
-                        emit!(JournaldInvalidRecordError {
+                        emit(JournaldInvalidRecordError {
                             error,
-                            text: String::from_utf8_lossy(&bytes).into_owned()
+                            text: String::from_utf8_lossy(&bytes).into_owned(),
                         });
                     }
                 }
@@ -695,7 +696,7 @@ impl<'a> Batch<'a> {
                     finalizer.finalize(cursor, self.receiver).await;
                 }
             } else {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 // `out` channel is closed, don't restart journalctl.
                 self.exiting = Some(false);
             }
@@ -1138,7 +1139,7 @@ impl StatefulCheckpointer {
     async fn set(&mut self, token: impl Into<String>) {
         let token = token.into();
         if let Err(error) = self.checkpointer.set(&token).await {
-            emit!(JournaldCheckpointSetError {
+            emit(JournaldCheckpointSetError {
                 error,
                 filename: self
                     .checkpointer

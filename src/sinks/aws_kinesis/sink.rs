@@ -1,4 +1,5 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
+use vector_lib::internal_event::emit;
 
 use rand::random;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
@@ -58,7 +59,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -105,8 +106,8 @@ pub(crate) fn process_log(
         if let Some(v) = log.get((PathPrefix::Event, partition_key_field)) {
             v.to_string_lossy()
         } else {
-            emit!(AwsKinesisStreamNoPartitionKeyError {
-                partition_key_field: partition_key_field.0.to_string().as_str()
+            emit(AwsKinesisStreamNoPartitionKeyError {
+                partition_key_field: partition_key_field.0.to_string().as_str(),
             });
             return None;
         }

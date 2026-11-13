@@ -20,6 +20,7 @@ use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     cpu_time::spawn_timed,
+    internal_event::emit,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -235,20 +236,15 @@ impl TransformConfig for Ec2Metadata {
             if required {
                 return Err(error);
             }
-            emit!(AwsEc2MetadataRefreshError { error });
+            emit(AwsEc2MetadataRefreshError { error });
         }
 
-        // The metadata-refresh loop runs as its own tokio task, so the main
-        // transform task's CPU-time wrapper does not see it. Spawn the
-        // background task with the same component-tagged counter so its CPU
-        // is attributed to this transform.
         spawn_timed(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
-            context.cpu_ns.clone(),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -397,10 +393,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(()) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshError { error });
+                    emit(AwsEc2MetadataRefreshError { error });
                 }
             }
 
@@ -581,7 +577,7 @@ impl MetadataClient {
                     new_state.push((
                         MetadataKey {
                             log_path: self.keys.tags.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, tag),
                         },
                         tag_content,
                     ));

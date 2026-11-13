@@ -4,7 +4,7 @@ use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
         ComponentEventsDropped, CounterName, HistogramName, InternalEvent, LossyF64, UNINTENTIONAL,
-        error_stage, error_type,
+        emit, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -234,6 +234,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

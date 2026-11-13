@@ -11,7 +11,7 @@ mod sink {
     use vector_lib::{
         NamedInternalEvent, counter, gauge,
         internal_event::{
-            ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL,
+            ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, emit,
             error_stage, error_type,
         },
     };
@@ -43,7 +43,7 @@ mod sink {
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+            emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 

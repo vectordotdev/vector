@@ -186,7 +186,7 @@ pub async fn validate(
 
     let mut validated = true;
 
-    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
+    let Some(mut config) = Box::pin(validate_config(opts, signal_handler, &mut fmt)).await else {
         return exitcode::CONFIG;
     };
 
@@ -226,7 +226,7 @@ pub async fn validate_config(
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
 
     let mut report_error = |errors| {
-        fmt.title(format!("Failed to load {:?}", &paths_list));
+        fmt.title(format!("Failed to load {paths_list:?}"));
         fmt.sub_error(errors);
     };
 
@@ -237,7 +237,12 @@ pub async fn validate_config(
     let builder = if opts.no_environment && !opts.resolve_secrets {
         ConfigBuilderLoader::default().load_from_paths(&paths)
     } else {
-        config::loading::load_builder_from_paths_with_secrets(&paths, signal_handler, false).await
+        Box::pin(config::loading::load_builder_from_paths_with_secrets(
+            &paths,
+            signal_handler,
+            false,
+        ))
+        .await
     }
     .map_err(&mut report_error)
     .ok()?;
@@ -252,14 +257,14 @@ pub async fn validate_config(
 
     // Warnings
     if warnings.is_empty() {
-        fmt.success(format!("Loaded {:?}", &paths_list));
+        fmt.success(format!("Loaded {paths_list:?}"));
     } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
         }
 
-        fmt.title(format!("Loaded with warnings {:?}", &paths_list));
+        fmt.title(format!("Loaded with warnings {paths_list:?}"));
         fmt.sub_warning(warnings);
     }
 

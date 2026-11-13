@@ -1,4 +1,4 @@
-use strum::{AsRefStr, Display, EnumIter};
+use strum::{AsRefStr, Display, EnumIter, IntoEnumIterator as _};
 
 /// Canonical list of all per-component internal metric names emitted by Vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -131,7 +131,6 @@ pub enum CounterName {
     NetworkTransmitPacketsDropTotal,
     NetworkTransmitPacketsTotal,
     NetworkTransmitErrsTotal,
-    ProcessRuntime,
     ProcessRuntimeTotal,
 }
 
@@ -518,10 +517,24 @@ impl CounterName {
             Self::NetworkTransmitPacketsDropTotal => "network_transmit_packets_drop_total",
             Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
             Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
-            Self::ProcessRuntime => "process_runtime",
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InternalMetricKind {
+    Counter,
+    Gauge,
+    Histogram,
+}
+
+/// Returns an iterator over every known Vector metric name paired with its kind.
+pub fn all_metrics() -> impl Iterator<Item = (&'static str, InternalMetricKind)> {
+    CounterName::iter()
+        .map(|n| (n.as_str(), InternalMetricKind::Counter))
+        .chain(GaugeName::iter().map(|n| (n.as_str(), InternalMetricKind::Gauge)))
+        .chain(HistogramName::iter().map(|n| (n.as_str(), InternalMetricKind::Histogram)))
 }
 
 #[cfg(test)]
@@ -540,7 +553,6 @@ mod tests {
             "memory_enrichment_table_failed_insertions",
             "memory_enrichment_table_failed_reads",
             "memory_enrichment_table_ttl_expirations",
-            "process_runtime",
             "aggregate_failed_updates",
         ]);
 

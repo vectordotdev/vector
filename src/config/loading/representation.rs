@@ -1,7 +1,7 @@
 use serde::de::{DeserializeOwned, IntoDeserializer};
 use serde_json::{Map, Number, Value};
 
-use super::Format;
+use super::{Format, merge::ConfigNode};
 
 pub(super) type ConfigMap = Map<String, Value>;
 
@@ -166,86 +166,17 @@ fn validate_json(value: &Value) -> Result<(), Vec<String>> {
 }
 
 pub(super) fn merge_into_map(map: &mut ConfigMap, other: ConfigMap) -> Result<(), Vec<String>> {
-    merge_into_map_at_path(map, other, &mut Vec::new()).map_err(|error| vec![error])
-}
-
-fn merge_into_map_at_path(
-    map: &mut ConfigMap,
-    other: ConfigMap,
-    path: &mut Vec<String>,
-) -> Result<(), String> {
-    for (name, value) in other {
-        if let Some(existing) = map.remove(&name) {
-            path.push(name.clone());
-            let merged = merge_values_at_path(existing, value, path);
-            path.pop();
-            map.insert(name, merged?);
-        } else {
-            map.insert(name, value);
-        }
-    }
-
+    let mut tree = ConfigNode::from_map(std::mem::take(map));
+    tree.merge(ConfigNode::from_map(other))?;
+    *map = deserialize_config_value(tree.raw()?)?;
     Ok(())
 }
 
-pub(super) fn merge_values(value: Value, other: Value) -> Result<Value, Vec<String>> {
-    merge_values_at_path(value, other, &mut Vec::new()).map_err(|error| vec![error])
-}
-
-fn merge_values_at_path(
-    value: Value,
-    other: Value,
-    path: &mut Vec<String>,
-) -> Result<Value, String> {
-    match (value, other) {
-        (Value::Null, Value::Null) => Ok(Value::Null),
-        (Value::Bool(_), Value::Bool(other)) => Ok(Value::Bool(other)),
-        (Value::String(_), Value::String(other)) => Ok(Value::String(other)),
-        (Value::Number(value), Value::Number(other))
-            if number_type(&value) == number_type(&other) =>
-        {
-            Ok(Value::Number(other))
-        }
-        (Value::Array(mut value), Value::Array(other)) => {
-            value.extend(other);
-            Ok(Value::Array(value))
-        }
-        (Value::Object(mut value), Value::Object(other)) => {
-            merge_into_map_at_path(&mut value, other, path)?;
-            Ok(Value::Object(value))
-        }
-        (value, other) => {
-            let display_path = if path.is_empty() {
-                "$".to_owned()
-            } else {
-                format!("$.{}", path.join("."))
-            };
-            Err(format!(
-                "Incompatible types at path \"{display_path}\", expected \"{}\" received \"{}\".",
-                value_type(&value),
-                value_type(&other)
-            ))
-        }
-    }
-}
-
-fn value_type(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "null",
-        Value::Bool(_) => "boolean",
-        Value::Number(number) => number_type(number),
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "table",
-    }
-}
-
-fn number_type(number: &Number) -> &'static str {
-    if number.is_i64() || number.is_u64() {
-        "integer"
-    } else {
-        "float"
-    }
+#[cfg(test)]
+fn merge_values(value: Value, other: Value) -> Result<Value, Vec<String>> {
+    let mut tree = ConfigNode::from(value);
+    tree.merge(other.into())?;
+    tree.raw()
 }
 
 #[cfg(test)]
@@ -255,7 +186,10 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::{ConfigMap, deserialize_config, merge_values, parse_config_value};
-    use crate::config::Format;
+    use crate::config::{
+        Format,
+        loading::{merge::ConfigNode, schema_coercion::ValueCoercer},
+    };
 
     #[derive(Debug, Deserialize, PartialEq)]
     struct StringValue {
@@ -550,6 +484,152 @@ mod tests {
             merge_values(json!("first"), json!("second")).unwrap(),
             json!("second")
         );
+    }
+
+    #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Keep related merge cases together in one table-driven test"
+    )]
+    fn scalar_histories_preserve_merge_semantics() {
+        struct Case {
+            name: &'static str,
+            fragments: Vec<Value>,
+            expected: Result<Value, &'static str>,
+        }
+
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "a/b~c": {"type": "integer"},
+                "number": {"type": "number"},
+                "items": {"type": "array", "items": {"type": "integer"}},
+                "untyped": {},
+                "string": {"type": "string"},
+                "choice": {"enum": ["final"]}
+            }
+        });
+        for case in [
+            Case {
+                name: "the later interpolated scalar wins",
+                fragments: vec![json!({"enabled": false}), json!({"enabled": "true"})],
+                expected: Ok(json!({"enabled": true})),
+            },
+            Case {
+                name: "the later literal scalar wins",
+                fragments: vec![json!({"enabled": "true"}), json!({"enabled": false})],
+                expected: Ok(json!({"enabled": false})),
+            },
+            Case {
+                name: "overwritten invalid values are still checked",
+                fragments: vec![json!({"enabled": "invalid"}), json!({"enabled": true})],
+                expected: Err("Expected boolean at 'enabled'"),
+            },
+            Case {
+                name: "an invalid intermediate override is still checked",
+                fragments: vec![
+                    json!({"enabled": true}),
+                    json!({"enabled": "invalid"}),
+                    json!({"enabled": false}),
+                ],
+                expected: Err("Expected boolean at 'enabled'"),
+            },
+            Case {
+                name: "a later same-type string cannot hide an invalid conflict",
+                fragments: vec![
+                    json!({"enabled": true}),
+                    json!({"enabled": "invalid"}),
+                    json!({"enabled": "false"}),
+                ],
+                expected: Err("Expected boolean at 'enabled'"),
+            },
+            Case {
+                name: "string-only scalar overrides are checked",
+                fragments: vec![json!({"enabled": "invalid"}), json!({"enabled": "true"})],
+                expected: Err("Expected boolean at 'enabled'"),
+            },
+            Case {
+                name: "the later string-only scalar wins",
+                fragments: vec![json!({"enabled": "false"}), json!({"enabled": "true"})],
+                expected: Ok(json!({"enabled": true})),
+            },
+            Case {
+                name: "string-only integer and float conflicts are rejected",
+                fragments: vec![json!({"number": "1"}), json!({"number": "2.5"})],
+                expected: Err("Incompatible types at path \"$.number\""),
+            },
+            Case {
+                name: "string-only collection overrides still replace",
+                fragments: vec![json!({"items": "1"}), json!({"items": "2"})],
+                expected: Ok(json!({"items": [2]})),
+            },
+            Case {
+                name: "array concatenation and pointer escaping are preserved",
+                fragments: vec![
+                    json!({"a/b~c": "42", "items": [1]}),
+                    json!({"a/b~c": 43, "items": [2]}),
+                ],
+                expected: Ok(json!({"a/b~c": 43, "items": [1, 2]})),
+            },
+            Case {
+                name: "a schema must actually make the types compatible",
+                fragments: vec![json!({"untyped": "true"}), json!({"untyped": true})],
+                expected: Err("Incompatible types"),
+            },
+            Case {
+                name: "untyped nested fields keep raw merge rules",
+                fragments: vec![
+                    json!({"untyped": {"nested": "true"}}),
+                    json!({"untyped": {"nested": true}}),
+                ],
+                expected: Err("Incompatible types at path \"$.untyped.nested\""),
+            },
+            Case {
+                name: "scalar coercion cannot turn overrides into array concatenation",
+                fragments: vec![json!({"items": "1"}), json!({"items": 2})],
+                expected: Err("Incompatible types"),
+            },
+            Case {
+                name: "ordinary string overrides do not validate overwritten values",
+                fragments: vec![json!({"choice": "obsolete"}), json!({"choice": "final"})],
+                expected: Ok(json!({"choice": "final"})),
+            },
+            Case {
+                name: "native scalars cannot become string-field overrides",
+                fragments: vec![json!({"string": "42"}), json!({"string": 43})],
+                expected: Err("Incompatible types"),
+            },
+        ] {
+            let result = case
+                .fragments
+                .into_iter()
+                .try_fold(ConfigNode::object(), |mut tree, value| {
+                    tree.merge(value.into())?;
+                    Ok::<_, Vec<String>>(tree)
+                })
+                .and_then(|tree| {
+                    ValueCoercer::new(&schema)
+                        .coerce_tree(&tree)
+                        .map_err(|error| vec![error.to_string()])
+                });
+            match case.expected {
+                Ok(expected) => assert_eq!(
+                    result.unwrap_or_else(|errors| panic!("{}: {errors:?}", case.name)),
+                    expected,
+                    "{}",
+                    case.name
+                ),
+                Err(expected_error) => {
+                    let errors = result.unwrap_err();
+                    assert!(
+                        errors.iter().any(|error| error.contains(expected_error)),
+                        "{}: {errors:?}",
+                        case.name
+                    );
+                }
+            }
+        }
     }
 
     #[test]

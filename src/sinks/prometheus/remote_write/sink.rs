@@ -3,6 +3,7 @@ use std::fmt;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     event::Metric,
+    internal_event::emit,
     stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
 };
 
@@ -232,7 +233,7 @@ fn make_remote_write_event(
                     error,
                     crate::template::TemplateRenderingError::Confined { .. }
                 );
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("tenant_id"),
                     drop_event: confined,

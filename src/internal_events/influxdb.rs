@@ -1,5 +1,6 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
@@ -25,9 +26,9 @@ impl InternalEvent for InfluxdbEncodingError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
-            reason
+            reason,
         });
     }
 }
