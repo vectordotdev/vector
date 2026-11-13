@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: gcp_bigquery
+    inputs:
+      - my-source-or-transform-id
+    dataset: this-is-a-dataset
+    encoding:
+      protobuf:
+        desc_file: /etc/vector/protobuf_descriptor_set.desc
+        message_type: package.Message
+    endpoint: https://bigquerystorage.googleapis.com:443
+    project: vector-123456
+    table: this-is-a-table
