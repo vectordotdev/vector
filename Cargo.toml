@@ -404,7 +404,7 @@ deadpool = { version = "0.13.0", default-features = false, features = ["managed"
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
+greptimedb-ingester = { version = "0.19.1", default-features = false, features = ["tls-ring"], optional = true }
 
 # External libs
 arc-swap = { workspace = true, default-features = false }
@@ -571,8 +571,6 @@ wiremock = "0.6.4"
 zstd = { workspace = true, features = ["zdict_builder"] }
 
 [patch.crates-io]
-# Preserve inbound Prost recursion limits until GreptimeTeam/greptimedb-ingester-rust#64 is released.
-greptimedb-ingester = { git = "https://github.com/vectordotdev/greptimedb-ingester-rust.git", rev = "173e32ae82fbaf83008716857a8584c94c198d70" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
