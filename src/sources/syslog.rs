@@ -1645,10 +1645,7 @@ mod test {
         let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
         socket.send_to(b"not syslog", address).await.unwrap();
         socket
-            .send_to(
-                b"<13>1 2026-11-13T00:00:00Z host app - - - valid",
-                address,
-            )
+            .send_to(b"<13>1 2026-11-13T00:00:00Z host app - - - valid", address)
             .await
             .unwrap();
 
