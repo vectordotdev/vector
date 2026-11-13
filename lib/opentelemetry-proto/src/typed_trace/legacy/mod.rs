@@ -21,13 +21,11 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-use std::collections::btree_map::Entry;
-
 use vector_core::event::{
     EventMetadata, TraceEvent as LegacyTraceEvent, TraceLayout,
     typed_trace::{TraceConversionIssue, TraceConversionReporter, TraceEvent},
 };
-use vrl::value::{ObjectMap, Value};
+use vrl::value::{ObjectMap, ObjectMapEntry, Value};
 
 use crate::{
     proto::{RESOURCE_SPANS_JSON_FIELD, trace::v1::ResourceSpans},
@@ -207,11 +205,13 @@ fn legacy_map(legacy: LegacyTraceEvent) -> Result<(ObjectMap, EventMetadata), Fa
 /// Removes `resourceSpans` when it is an array. Any other value stays in the map.
 fn take_resource_spans(map: &mut ObjectMap) -> Option<Vec<Value>> {
     match map.entry(RESOURCE_SPANS_JSON_FIELD.into()) {
-        Entry::Occupied(entry) if matches!(entry.get(), Value::Array(_)) => match entry.remove() {
-            Value::Array(array) => Some(array),
-            _ => unreachable!("the occupied value is an array"),
-        },
-        Entry::Occupied(_) | Entry::Vacant(_) => None,
+        ObjectMapEntry::Occupied(entry) if matches!(entry.get(), Value::Array(_)) => {
+            match entry.remove_entry().1 {
+                Value::Array(array) => Some(array),
+                _ => unreachable!("the occupied value is an array"),
+            }
+        }
+        ObjectMapEntry::Occupied(_) | ObjectMapEntry::Vacant(_) => None,
     }
 }
 

@@ -12,7 +12,7 @@ mod tests;
 mod unit_test_components;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
 };
 
@@ -690,7 +690,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
 
                 let mut target = TargetValue {
                     value: value!({}),
-                    metadata: value::Value::Object(BTreeMap::new()),
+                    metadata: value::Value::Object(value::ObjectMap::new()),
                     secrets: value::Secrets::default(),
                 };
 

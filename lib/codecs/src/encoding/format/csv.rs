@@ -312,8 +312,8 @@ mod tests {
     use bytes::BytesMut;
     use chrono::DateTime;
     use ordered_float::NotNan;
-    use vector_common::btreemap;
     use vector_core::event::{LogEvent, ObjectMap, Value};
+    use vrl::objectmap;
 
     use super::*;
 
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn serialize_fields() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn serialize_order() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "field1" => Value::from("value1"),
             "field2" => Value::from("value2"),
             "field3" => Value::from("value3"),
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn correct_quoting() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "field1" => Value::from("hello world"),
             "field2" => Value::from(1),
             "field3" => Value::from("foo\"bar"),

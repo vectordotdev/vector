@@ -56,13 +56,13 @@ impl Encoder<Event> for LogfmtSerializer {
 mod tests {
     use bytes::BytesMut;
     use vector_core::event::{LogEvent, Value};
-    use vrl::btreemap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_logfmt() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
         }));
         let mut serializer = LogfmtSerializer;

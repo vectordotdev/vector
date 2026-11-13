@@ -710,7 +710,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
-    use vrl::{btreemap, event_path, value::kind::Collection};
+    use vrl::{event_path, objectmap, value::kind::Collection};
 
     use super::*;
     use crate::{
@@ -792,7 +792,7 @@ mod tests {
     #[test]
     fn remap_trace_scalar_root_drops_trace_layout() {
         let event = {
-            let mut trace = TraceEvent::from(btreemap! {
+            let mut trace = TraceEvent::from(objectmap! {
                 "host" => "a_hostname",
             });
             trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);

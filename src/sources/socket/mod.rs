@@ -358,7 +358,7 @@ mod test {
         event::EventContainer,
         lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     };
-    use vrl::{btreemap, value, value::ObjectMap};
+    use vrl::{objectmap, value};
     #[cfg(unix)]
     use {
         super::UnixConfig,
@@ -767,7 +767,7 @@ mod test {
                 "one line".into()
             );
 
-            let tls_meta: ObjectMap = btreemap!(
+            let tls_meta = objectmap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
@@ -832,7 +832,7 @@ mod test {
 
             assert_eq!(log.value(), &"one line".into());
 
-            let tls_meta: ObjectMap = btreemap!(
+            let tls_meta = objectmap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
