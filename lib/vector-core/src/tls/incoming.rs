@@ -29,6 +29,8 @@ use super::{
 };
 use crate::tcp::{self, TcpKeepaliveConfig};
 
+const SESSION_ID_CONTEXT: &[u8] = b"vector";
+
 impl TlsSettings {
     pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         if self.identity.is_none() {
@@ -37,6 +39,14 @@ impl TlsSettings {
             let mut acceptor =
                 SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptorSnafu)?;
             self.apply_context_base(&mut acceptor, true)?;
+            // When the server verifies client certificates, OpenSSL refuses to resume a session
+            // unless a session ID context is set, and aborts the handshake with a fatal
+            // `internal_error` alert instead. Clients which cache sessions would then fail every
+            // reconnect once. A fixed value suffices because each acceptor has its own session
+            // cache and ticket keys, so sessions cannot be resumed across acceptors.
+            acceptor
+                .set_session_id_context(SESSION_ID_CONTEXT)
+                .context(CreateAcceptorSnafu)?;
             Ok(acceptor.build())
         }
     }
@@ -492,7 +502,118 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 
 #[cfg(test)]
 mod test {
+    use std::{
+        net::{TcpListener as StdTcpListener, TcpStream as StdTcpStream},
+        thread,
+    };
+
+    use openssl::ssl::{SslConnector, SslFiletype, SslSession};
+
     use super::*;
+    use crate::tls::{
+        TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH, TlsConfig,
+    };
+
+    /// What the server observed on one accepted connection.
+    #[derive(Debug, PartialEq)]
+    struct Accepted {
+        session_reused: bool,
+        has_peer_certificate: bool,
+    }
+
+    /// Serves `connections` TLS connections with an acceptor which verifies client certificates.
+    fn serve_mtls(connections: usize) -> (u16, thread::JoinHandle<Vec<Result<Accepted, String>>>) {
+        let config = TlsConfig {
+            verify_certificate: Some(true),
+            ..TlsConfig::test_config()
+        };
+        let acceptor = TlsSettings::from_options_base(Some(&config), true)
+            .unwrap()
+            .acceptor()
+            .unwrap();
+        let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = thread::spawn(move || {
+            (0..connections)
+                .map(|_| {
+                    let (tcp, _) = listener.accept().unwrap();
+                    let mut stream = acceptor.accept(tcp).map_err(|error| error.to_string())?;
+                    let accepted = Accepted {
+                        session_reused: stream.ssl().session_reused(),
+                        has_peer_certificate: stream.ssl().peer_certificate().is_some(),
+                    };
+                    _ = stream.shutdown();
+                    Ok(accepted)
+                })
+                .collect()
+        });
+        (port, server)
+    }
+
+    /// A client which presents a certificate.
+    fn mtls_connector() -> SslConnector {
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+        builder
+            .set_certificate_chain_file(TEST_PEM_CLIENT_CRT_PATH)
+            .unwrap();
+        builder
+            .set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
+            .unwrap();
+        builder.build()
+    }
+
+    /// What the client observed on one connection.
+    struct Connected {
+        session_reused: bool,
+        session: SslSession,
+    }
+
+    /// Connects, offering `session` for resumption if given.
+    fn connect(
+        connector: &SslConnector,
+        port: u16,
+        session: Option<&SslSession>,
+    ) -> Result<Connected, String> {
+        let mut config = connector.configure().unwrap();
+        if let Some(session) = session {
+            // SAFETY: the session was created by a connection with the same `SslContext`.
+            unsafe { config.set_session(session) }.unwrap();
+        }
+        let tcp = StdTcpStream::connect(("127.0.0.1", port)).unwrap();
+        let mut stream = config
+            .connect("localhost", tcp)
+            .map_err(|error| error.to_string())?;
+        // Close cleanly: OpenSSL marks the session of an unclean close as not resumable.
+        _ = stream.shutdown();
+        Ok(Connected {
+            session_reused: stream.ssl().session_reused(),
+            session: stream
+                .ssl()
+                .session()
+                .expect("handshake established no session")
+                .to_owned(),
+        })
+    }
+
+    #[test]
+    fn mtls_session_resumes() {
+        let (port, server) = serve_mtls(2);
+        let connector = mtls_connector();
+        let first = connect(&connector, port, None).unwrap();
+
+        let second = connect(&connector, port, Some(&first.session));
+
+        let accepted = server.join().unwrap();
+        assert_eq!(second.map(|connected| connected.session_reused), Ok(true));
+        assert_eq!(
+            accepted[1],
+            Ok(Accepted {
+                session_reused: true,
+                has_peer_certificate: true,
+            })
+        );
+    }
 
     #[test]
     fn certificate_metadata_full() {
