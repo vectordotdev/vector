@@ -22,12 +22,15 @@ use vector_common::{
 };
 use vrl::{
     event_path, owned_value_path,
-    path::{OwnedTargetPath, PathParseError, parse_target_path},
+    path::{OwnedTargetPath, PathParseError, ValuePath, parse_target_path},
+    value::ValueSlot,
 };
 
 use super::{
     EventFinalizers, Finalizable, KeyString, MergeFinalizable, ObjectMap, Value,
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    estimated_json_encoded_size_of::{
+        COMMA_SIZE, EstimatedJsonEncodedSizeOf, estimated_json_encoded_member_size,
+    },
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
     util,
@@ -70,6 +73,88 @@ impl Inner {
 
     fn as_value(&self) -> &Value {
         &self.fields
+    }
+
+    /// Inserts `value` at `path`, updating the JSON size cache from the written and replaced
+    /// values instead of invalidating it.
+    fn insert<'a>(&mut self, path: impl ValuePath<'a>, value: Value) -> Option<Value> {
+        self.size_cache.store(None);
+        let Some(size) = self.json_encoded_size_cache.take() else {
+            return self.fields.insert(path, value);
+        };
+
+        let mut change = None;
+        let previous = self.fields.insert_with_hook(path, value, |slot, written| {
+            change = written_size_change(slot, written);
+        });
+        self.update_json_size(size, change);
+        previous
+    }
+
+    /// Removes the value at `path`, updating the JSON size cache from the removed values instead
+    /// of invalidating it.
+    fn remove<'a>(&mut self, path: impl ValuePath<'a>, prune: bool) -> Option<Value> {
+        self.size_cache.store(None);
+        let Some(size) = self.json_encoded_size_cache.take() else {
+            return self.fields.remove(path, prune);
+        };
+
+        let mut removed = Some(0);
+        let previous = self.fields.remove_with_hook(path, prune, |slot| {
+            removed = removed
+                .zip(removed_size(slot))
+                .map(|(total, size)| total + size);
+        });
+        self.update_json_size(size, removed.map(|removed| (0, removed)));
+        previous
+    }
+
+    /// Applies an `(added, removed)` size change to the cache, or leaves it invalidated when the
+    /// change is unknown.
+    fn update_json_size(&self, size: NonZeroJsonSize, change: Option<(usize, usize)>) {
+        let size = change.and_then(|(added, removed)| {
+            (JsonSize::from(size).get() + added)
+                .checked_sub(removed)
+                .and_then(|size| NonZeroJsonSize::new(JsonSize::new(size)))
+        });
+        self.json_encoded_size_cache.store(size);
+    }
+}
+
+/// Returns the `(added, removed)` JSON size change of writing `written` into `slot`.
+fn written_size_change(slot: ValueSlot<'_>, written: &Value) -> Option<(usize, usize)> {
+    let written = written.estimated_json_encoded_size_of();
+    match (slot.current(), slot) {
+        (Some(current), _) => Some((
+            written.get(),
+            current.estimated_json_encoded_size_of().get(),
+        )),
+        (None, ValueSlot::Field { object, key }) => {
+            let separator = if object.is_empty() { 0 } else { COMMA_SIZE };
+            Some((
+                estimated_json_encoded_member_size(key, written) + separator,
+                0,
+            ))
+        }
+        // Writing out of the bounds of an array pads it with nulls.
+        (None, _) => None,
+    }
+}
+
+/// Returns the JSON size removed along with the value in `slot`.
+fn removed_size(slot: ValueSlot<'_>) -> Option<usize> {
+    let current = slot.current()?.estimated_json_encoded_size_of();
+    match slot {
+        ValueSlot::Field { object, key } => {
+            let separator = if object.len() > 1 { COMMA_SIZE } else { 0 };
+            Some(estimated_json_encoded_member_size(key, current) + separator)
+        }
+        ValueSlot::Index { array, .. } => {
+            let separator = if array.len() > 1 { COMMA_SIZE } else { 0 };
+            Some(current.get() + separator)
+        }
+        // Removing the root leaves an empty container or null in its place.
+        ValueSlot::Root(_) => None,
     }
 }
 
@@ -119,10 +204,9 @@ impl Clone for Inner {
             // cache to copy it since it will be invalidated anyways.
             size_cache: None.into(),
 
-            // This clone is only ever used in combination with
-            // `Arc::make_mut`, so don't bother fetching the size
-            // cache to copy it since it will be invalidated anyways.
-            json_encoded_size_cache: None.into(),
+            // Kept so that `insert` and `remove` can update it
+            // incrementally after `Arc::make_mut`.
+            json_encoded_size_cache: self.json_encoded_size_cache.load().into(),
         }
     }
 }
@@ -393,7 +477,9 @@ impl LogEvent {
         value: impl Into<Value>,
     ) -> Option<Value> {
         match path.prefix() {
-            PathPrefix::Event => self.value_mut().insert(path.value_path(), value.into()),
+            PathPrefix::Event => {
+                Arc::make_mut(&mut self.inner).insert(path.value_path(), value.into())
+            }
             PathPrefix::Metadata => self
                 .metadata
                 .value_mut()
@@ -430,7 +516,7 @@ impl LogEvent {
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn remove_prune<'a>(&mut self, path: impl TargetPath<'a>, prune: bool) -> Option<Value> {
         match path.prefix() {
-            PathPrefix::Event => self.value_mut().remove(path.value_path(), prune),
+            PathPrefix::Event => Arc::make_mut(&mut self.inner).remove(path.value_path(), prune),
             PathPrefix::Metadata => self.metadata.value_mut().remove(path.value_path(), prune),
         }
     }
@@ -941,6 +1027,72 @@ mod test {
 
         assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
         assert_eq!(old, None);
+    }
+
+    /// Fills the JSON size cache, then inserts `value` at `path`, or removes it when `None`.
+    fn apply_with_cached_json_size(
+        log: &mut LogEvent,
+        path: &str,
+        value: Option<Value>,
+        prune: bool,
+    ) {
+        log.estimated_json_encoded_size_of();
+        let path = parse_target_path(path).unwrap();
+        match value {
+            Some(value) => _ = log.insert(&path, value),
+            None => _ = log.remove_prune(&path, prune),
+        }
+    }
+
+    #[test]
+    fn json_size_cache_is_updated_incrementally() {
+        let mut log = LogEvent::from(value!({
+            "a": 1,
+            "nested": {"empty": {}, "b": [1, {"c": true}]},
+            "obj": {"x": 1},
+        }));
+        let cases = [
+            ("a", Some(value!("replaced")), false),
+            ("new", Some(value!({"x": [1, 2]})), false),
+            ("nested.empty.first", Some(value!(1)), false),
+            ("nested.b[1].d", Some(value!("d")), false),
+            ("nested.b[-1].e", Some(value!(2.5)), false),
+            ("nested.b[0]", Some(value!(2)), false),
+            ("missing.x.y", Some(value!(1)), false),
+            ("a.x", Some(value!(1)), false),
+            ("a", None, false),
+            ("nested.empty.first", None, false),
+            ("nested.b[1].c", None, false),
+            ("nested.b[0]", None, false),
+            ("missing", None, false),
+            ("obj.x", None, true),
+            (".", Some(value!({"root": 1})), false),
+        ];
+
+        for (path, value, prune) in cases {
+            apply_with_cached_json_size(&mut log, path, value, prune);
+            let cached = log.inner.json_encoded_size_cache.load().map(JsonSize::from);
+            assert_eq!(
+                cached,
+                Some(log.value().estimated_json_encoded_size_of()),
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn json_size_cache_is_invalidated_when_change_is_unknown() {
+        let mut log = LogEvent::from(value!({"array": [1]}));
+        let cases = [
+            ("array[3]", Some(value!(2))),
+            ("array[-6]", Some(value!(2))),
+            (".", None),
+        ];
+
+        for (path, value) in cases {
+            apply_with_cached_json_size(&mut log, path, value, false);
+            assert_eq!(log.inner.json_encoded_size_cache.load(), None, "{path}");
+        }
     }
 
     #[test]

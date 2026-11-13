@@ -3,6 +3,7 @@ use std::mem;
 use lookup::{PathPrefix, path};
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use vector_common::byte_size_of::ByteSizeOf;
+use vrl::path::{OwnedSegment, OwnedValuePath};
 
 use super::*;
 use crate::event::arbitrary_impl::Name;
@@ -148,4 +149,66 @@ fn log_operation_maintains_size() {
         .tests(1_000)
         .max_tests(10_000)
         .quickcheck(inner as fn(Vec<Action>, LogEvent) -> TestResult);
+}
+
+/// Insertion, or removal with optional pruning when `value` is `None`, at a nested path drawn from a small set of keys
+/// and indices so that actions often hit existing fields.
+#[derive(Debug, Clone)]
+struct JsonSizeAction {
+    path: OwnedValuePath,
+    value: Option<Value>,
+    prune: bool,
+    /// Keeps a clone of the event alive during the action, so that the mutation copies the
+    /// shared inner value.
+    shared: bool,
+}
+
+impl Arbitrary for JsonSizeAction {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let depth = 1 + usize::arbitrary(g) % 3;
+        let segments = (0..depth)
+            .map(|_| match u8::arbitrary(g) % 5 {
+                0 => OwnedSegment::Index(isize::from(i8::arbitrary(g) % 3)),
+                n => OwnedSegment::Field(["a", "b", "c", "d"][usize::from(n - 1)].into()),
+            })
+            .collect::<Vec<_>>();
+        Self {
+            path: segments.into(),
+            value: bool::arbitrary(g).then(|| Value::arbitrary(g)),
+            prune: bool::arbitrary(g),
+            shared: bool::arbitrary(g),
+        }
+    }
+}
+
+#[test]
+fn log_operation_maintains_estimated_json_size() {
+    // Asserts that the cached estimated JSON size of a LogEvent always matches a full recompute
+    // after insertions and removals.
+    fn inner(actions: Vec<JsonSizeAction>, mut log_event: LogEvent) -> TestResult {
+        for action in actions {
+            log_event.estimated_json_encoded_size_of();
+            let shared = action.shared.then(|| log_event.clone());
+            let path = (PathPrefix::Event, &action.path);
+            match action.value {
+                Some(value) => _ = log_event.insert(path, value),
+                None => _ = log_event.remove_prune(path, action.prune),
+            }
+            drop(shared);
+
+            assert_eq!(
+                log_event.estimated_json_encoded_size_of(),
+                log_event.value().estimated_json_encoded_size_of(),
+                "{}",
+                action.path
+            );
+        }
+
+        TestResult::passed()
+    }
+
+    QuickCheck::new()
+        .tests(1_000)
+        .max_tests(10_000)
+        .quickcheck(inner as fn(Vec<JsonSizeAction>, LogEvent) -> TestResult);
 }
