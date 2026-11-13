@@ -5,6 +5,8 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
+use serde::Deserialize;
+
 /// Active deprecation notices.
 pub const DEPRECATION_DIR: &str = "deprecation.d";
 /// Enacted (removed) deprecation notices; same format plus `removed_in`.
@@ -22,6 +24,11 @@ impl fmt::Display for DeprecationVersion {
 }
 
 impl DeprecationVersion {
+    /// The first version in which a newly deprecated feature may be removed.
+    pub fn minimum_removal_version(&self) -> Version {
+        Version::new(self.0.major, self.0.minor + 2, 0)
+    }
+
     /// Returns true when this version's major.minor matches the release.
     /// Patch is ignored so `0.56` (stored as 0.56.0) matches any 0.56.x release.
     pub fn matches_release(&self, release: &Version) -> bool {
@@ -50,8 +57,6 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
         Ok(DeprecationVersion(v))
     }
 }
-
-use serde::Deserialize;
 
 /// Hugo renders these files as pages, so any other field (e.g. `draft` or
 /// `build`) could change how Hugo lists them; unknown fields are rejected.
@@ -243,7 +248,8 @@ pub struct Deprecations {
 /// Rejects, in addition to the per-directory checks of `read_deprecation_fragments`:
 ///   * active fragments that set `removed_in`
 ///   * enacted fragments without `removed_in`, or whose `removed_in` is not in a
-///     later minor release than `deprecated_since` (the deprecation policy rule)
+///     later minor release than `deprecated_since` (historical removals may
+///     predate the two-minor-version migration window)
 ///   * the same `what` in both directories (e.g. an interrupted `enact`)
 pub fn read_all(repo_root: &Path) -> Result<Deprecations> {
     let active = read_deprecation_fragments(&repo_root.join(DEPRECATION_DIR))?;
@@ -264,7 +270,7 @@ pub fn read_all(repo_root: &Path) -> Result<Deprecations> {
         };
         if !later_minor(&removed_in.0, &e.deprecated_since.0) {
             bail!(
-                "{ENACTED_DIR}/{} has removed_in ({removed_in}) that is not in a later minor release than deprecated_since ({}); the deprecation policy requires at least one minor release between announcement and removal.",
+                "{ENACTED_DIR}/{} has removed_in ({removed_in}) that is not in a later minor release than deprecated_since ({}); removal must follow the announcement release.",
                 e.filename,
                 e.deprecated_since
             );
@@ -291,7 +297,12 @@ pub fn read_all(repo_root: &Path) -> Result<Deprecations> {
 /// Enact the active fragment `filename`: move it to `ENACTED_DIR` with
 /// `removed_in` added to its frontmatter. The body is kept verbatim.
 /// Returns the path of the new file.
-pub fn enact(repo_root: &Path, filename: &str, removed_in: &Version) -> Result<PathBuf> {
+pub fn enact(
+    repo_root: &Path,
+    filename: &str,
+    removed_in: &Version,
+    allow_early_removal: bool,
+) -> Result<PathBuf> {
     if !removed_in.pre.is_empty() || !removed_in.build.is_empty() {
         bail!(
             "removed_in {removed_in} has prerelease or build metadata; only plain X.Y.Z is allowed"
@@ -305,11 +316,18 @@ pub fn enact(repo_root: &Path, filename: &str, removed_in: &Version) -> Result<P
         .find(|e| e.filename == filename)
         .ok_or_else(|| anyhow!("No deprecation fragment found at {}", src.display()))?;
 
+    let minimum = entry.deprecated_since.minimum_removal_version();
+    if !allow_early_removal && removed_in < &minimum {
+        bail!(
+            "removed_in ({removed_in}) must be {minimum} or later; \
+             the deprecation policy requires two minor version increments after {}. \
+             Use --allow-early-removal only for a policy exception.",
+            entry.deprecated_since
+        );
+    }
     if !later_minor(removed_in, &entry.deprecated_since.0) {
         bail!(
-            "removed_in ({removed_in}) must be in a later minor release than deprecated_since ({}); \
-             the deprecation policy requires at least one minor release between \
-             the announcement and removal.",
+            "removed_in ({removed_in}) must be in a later minor release than deprecated_since ({}).",
             entry.deprecated_since
         );
     }
@@ -405,78 +423,33 @@ mod tests {
     }
 
     #[test]
-    fn skips_readme() {
+    fn partitions_notices_by_release_ignoring_patch() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join("README.md"), "# ignored").unwrap();
+        for (name, since) in [("new", "0.56"), ("old", "0.53.0"), ("future", "0.99")] {
+            fs::write(
+                tmp.path().join(format!("{name}.md")),
+                format!("---\nwhat: {name}\ndeprecated_since: \"{since}\"\n---\n"),
+            )
+            .unwrap();
+        }
         let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        assert!(entries.is_empty());
-    }
-
-    #[test]
-    fn parse_two_part_version() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("short.md"),
-            "---\nwhat: Short version\ndeprecated_since: \"0.56\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
+        let new = entries.iter().find(|entry| entry.what == "new").unwrap();
         assert_eq!(
-            entries[0].deprecated_since,
+            new.deprecated_since,
             DeprecationVersion(Version::new(0, 56, 0))
         );
-    }
-
-    #[test]
-    fn matches_release_ignores_patch() {
-        let v = DeprecationVersion(Version::new(0, 56, 0));
-        assert!(v.matches_release(&Version::new(0, 56, 0)));
-        assert!(v.matches_release(&Version::new(0, 56, 1)));
-        assert!(!v.matches_release(&Version::new(0, 57, 0)));
-    }
-
-    #[test]
-    fn partition_two_buckets() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("new.md"),
-            "---\nwhat: New announcement\ndeprecated_since: \"0.56\"\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            tmp.path().join("old.md"),
-            "---\nwhat: Previously announced\ndeprecated_since: \"0.53\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        let p = partition_by_release(entries, &Version::new(0, 56, 0));
-        assert_eq!(p.announcing.len(), 1);
-        assert_eq!(p.announcing[0].what, "New announcement");
-        assert_eq!(p.planned.len(), 1);
-        assert_eq!(p.planned[0].what, "Previously announced");
-        assert!(p.future.is_empty());
-    }
-
-    #[test]
-    fn partition_separates_future_from_planned() {
-        let tmp = tempdir().unwrap();
-        fs::write(
-            tmp.path().join("future.md"),
-            "---\nwhat: Future plan\ndeprecated_since: \"0.99\"\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            tmp.path().join("old.md"),
-            "---\nwhat: Old plan\ndeprecated_since: \"0.10\"\n---\n",
-        )
-        .unwrap();
-        let entries = read_deprecation_fragments(tmp.path()).unwrap();
-        let p = partition_by_release(entries, &Version::new(0, 56, 0));
-        assert!(p.announcing.is_empty());
-        assert_eq!(p.planned.len(), 1);
-        assert_eq!(p.planned[0].what, "Old plan");
-        assert_eq!(p.future.len(), 1);
-        assert_eq!(p.future[0].what, "Future plan");
+        for patch in [0, 1] {
+            let partition = partition_by_release(entries.clone(), &Version::new(0, 56, patch));
+            for (entries, expected) in [
+                (partition.announcing, "new"),
+                (partition.planned, "old"),
+                (partition.future, "future"),
+            ] {
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].what, expected);
+            }
+        }
     }
 
     #[test]
@@ -578,7 +551,7 @@ mod tests {
             "foo.md",
             "---\nwhat: \"`foo` option\"\n# kept\ndeprecated_since: \"0.55\"\n---\n\nUse `bar`.\n\n```yaml\nbar: true\n```\n",
         );
-        let dest = enact(tmp.path(), "foo.md", &Version::new(0, 57, 0)).unwrap();
+        let dest = enact(tmp.path(), "foo.md", &Version::new(0, 57, 0), false).unwrap();
 
         assert!(!tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
         assert_eq!(dest, tmp.path().join(ENACTED_DIR).join("foo.md"));
@@ -595,18 +568,51 @@ mod tests {
     }
 
     #[test]
-    fn enact_rejects_same_minor_and_keeps_fragment() {
+    fn enact_rejects_before_minimum_version_and_keeps_fragment() {
+        for version in [
+            Version::new(0, 55, 1),
+            Version::new(0, 56, 0),
+            Version::new(0, 56, 9),
+        ] {
+            let tmp = tempdir().unwrap();
+            write_fragment(
+                tmp.path(),
+                DEPRECATION_DIR,
+                "foo.md",
+                "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
+            );
+            let error = enact(tmp.path(), "foo.md", &version, false).unwrap_err();
+            assert!(format!("{error}").contains("must be 0.57.0 or later"));
+            assert!(tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
+            assert!(!tmp.path().join(ENACTED_DIR).exists());
+        }
+    }
+
+    #[test]
+    fn minimum_removal_version_ignores_patch() {
+        for (since, minimum) in [
+            ((0, 62, 0), (0, 64, 0)),
+            ((0, 99, 3), (0, 101, 0)),
+            ((1, 9, 0), (1, 11, 0)),
+        ] {
+            let since = DeprecationVersion(Version::new(since.0, since.1, since.2));
+            assert_eq!(
+                since.minimum_removal_version(),
+                Version::new(minimum.0, minimum.1, minimum.2)
+            );
+        }
+    }
+
+    #[test]
+    fn read_all_accepts_historical_one_minor_window() {
         let tmp = tempdir().unwrap();
         write_fragment(
             tmp.path(),
-            DEPRECATION_DIR,
+            ENACTED_DIR,
             "foo.md",
-            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
+            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\nremoved_in: \"0.56.0\"\n---\n",
         );
-        let err = enact(tmp.path(), "foo.md", &Version::new(0, 55, 1)).unwrap_err();
-        assert!(format!("{err}").contains("later minor release"));
-        assert!(tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
-        assert!(!tmp.path().join(ENACTED_DIR).exists());
+        assert_eq!(read_all(tmp.path()).unwrap().enacted.len(), 1);
     }
 
     #[test]

@@ -16,7 +16,6 @@ impl InternalEvent for ThrottleEventDiscarded {
 
         debug!(message, key = %self.key);
         if self.emit_events_discarded_per_key {
-            // Deprecated.
             counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1);
         }
 

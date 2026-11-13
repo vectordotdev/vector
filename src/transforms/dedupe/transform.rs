@@ -1,4 +1,5 @@
 use std::{future::ready, num::NonZeroUsize, pin::Pin};
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -77,7 +78,7 @@ impl Dedupe {
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventsDropped { count: 1 });
+            emit(DedupeEventsDropped { count: 1 });
             None
         } else {
             Some(event)

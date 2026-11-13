@@ -31,12 +31,21 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuTimedExt, spawn_timed},
     enrichment::Table,
-    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    extra_context::ExtraContext,
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, register,
+    },
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -54,18 +63,11 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
-    extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -121,7 +123,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -581,7 +583,7 @@ impl<'a> Builder<'a> {
             // `None` when `measure_cpu_usage` is false (the default): no counter
             // is registered and no per-poll `ThreadTime` measurement takes place.
             cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
+                Some(cpu_time::register_counter())
             } else {
                 None
             },
@@ -744,7 +746,7 @@ impl<'a> Builder<'a> {
 
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
-            let events_received = register!(EventsReceived);
+            let events_received = register(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
@@ -923,7 +925,7 @@ impl<'a> Builder<'a> {
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let filtered = input_rx
             .filter(move |events| ready(filter_events_type(events, input_type)))
             .inspect(move |events| {
@@ -932,7 +934,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+        let events_sent = register(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
             component: key.clone(),
             port: None,
@@ -1257,7 +1259,7 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,
@@ -1303,7 +1305,7 @@ impl Runner {
             outputs,
             timer_tx,
             latency_recorder,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             cpu_ns,
         }
     }

@@ -88,7 +88,7 @@ impl<D: NormalizerSettings + Clone> NormalizerConfig<D> {
     pub const fn into_settings(self) -> MetricSetSettings {
         MetricSetSettings {
             max_bytes: self.max_bytes,
-            max_events: self.max_events,
+            max_series: self.max_events,
             time_to_live: self.time_to_live,
         }
     }
@@ -278,8 +278,8 @@ impl MetricEntry {
 pub struct CapacityPolicy {
     /// Maximum memory usage in bytes
     pub max_bytes: Option<usize>,
-    /// Maximum number of entries
-    pub max_events: Option<usize>,
+    /// Maximum number of distinct metric series
+    pub max_series: Option<usize>,
     /// Current memory usage tracking
     current_memory: usize,
 }
@@ -287,10 +287,10 @@ pub struct CapacityPolicy {
 impl CapacityPolicy {
     /// Creates a new capacity policy with both memory and entry limits.
     #[must_use]
-    pub const fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
+    pub const fn new(max_bytes: Option<usize>, max_series: Option<usize>) -> Self {
         Self {
             max_bytes,
-            max_events,
+            max_series,
             current_memory: 0,
         }
     }
@@ -334,8 +334,8 @@ impl CapacityPolicy {
 
     /// Checks if the given entry count exceeds entry limits.
     const fn exceeds_entry_limit(&self, entry_count: usize) -> bool {
-        if let Some(max_events) = self.max_events {
-            entry_count > max_events
+        if let Some(max_series) = self.max_series {
+            entry_count > max_series
         } else {
             false
         }
@@ -395,10 +395,17 @@ impl TtlPolicy {
     }
 }
 
+/// Capacity and expiration settings for a `MetricSet`.
+///
+/// `max_bytes` and `max_series` are eviction limits, not batch sizes: setting either one switches
+/// the set to LRU storage, which costs more on every lookup.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MetricSetSettings {
+    /// Maximum size in bytes of the stored series, excluding cache overhead.
     pub max_bytes: Option<usize>,
-    pub max_events: Option<usize>,
+    /// Maximum number of distinct metric series.
+    pub max_series: Option<usize>,
+    /// Seconds after the last update before a series expires.
     pub time_to_live: Option<u64>,
 }
 
@@ -487,7 +494,7 @@ impl<'a> Iterator for MetricSetIter<'a> {
 ///
 /// Uses `IndexMap` internally when no capacity eviction policy is configured, avoiding
 /// the per-access LRU pointer-manipulation overhead of `LruCache`. Switches to
-/// `LruCache` only when a `max_bytes` or `max_events` capacity policy is set, so that
+/// `LruCache` only when a `max_bytes` or `max_series` capacity policy is set, so that
 /// LRU eviction ordering is preserved for those cases.
 #[derive(Clone, Debug)]
 pub struct MetricSet {
@@ -503,9 +510,9 @@ impl MetricSet {
     #[must_use]
     pub fn new(settings: MetricSetSettings) -> Self {
         // Create capacity policy if any capacity limit is set
-        let capacity_policy = match (settings.max_bytes, settings.max_events) {
+        let capacity_policy = match (settings.max_bytes, settings.max_series) {
             (None, None) => None,
-            (max_bytes, max_events) => Some(CapacityPolicy::new(max_bytes, max_events)),
+            (max_bytes, max_series) => Some(CapacityPolicy::new(max_bytes, max_series)),
         };
 
         // Create TTL policy if time-to-live is set
@@ -706,7 +713,33 @@ impl MetricSet {
         self.maybe_cleanup();
         match metric.kind() {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
-            MetricKind::Incremental => Some(metric),
+            MetricKind::Incremental => {
+                if !self.is_empty() {
+                    self.absorb_increment(&metric);
+                }
+                Some(metric)
+            }
+        }
+    }
+
+    /// Adds an increment to the stored absolute baseline of its series, if any.
+    ///
+    /// Within a series, an absolute value is the full total, so increments of that series are
+    /// part of it. Without this, a series that switches from absolute to incremental and back,
+    /// for example across config reloads, would re-emit every increment passed through in
+    /// between when the next absolute value is subtracted from the stale baseline.
+    fn absorb_increment(&mut self, metric: &Metric) {
+        let Some(reference) = self.inner.get_mut(metric.series()) else {
+            return;
+        };
+        let mut new_reference = reference.clone();
+        if new_reference.data.value.add(metric.value()) {
+            new_reference.timestamp = self.create_timestamp();
+            self.insert_with_tracking(metric.series().clone(), new_reference);
+        } else {
+            // Incompatible values, such as histograms with different buckets: the baseline can no
+            // longer be trusted.
+            self.remove(metric.series());
         }
     }
 
@@ -876,11 +909,58 @@ mod tests {
         assert!(set.is_empty());
     }
 
+    fn histogram(upper_limit: f64, count: u64, kind: MetricKind) -> Metric {
+        Metric::new(
+            "latency",
+            kind,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![vector_lib::event::metric::Bucket { upper_limit, count }],
+                count,
+                sum: Some(0.0),
+            },
+        )
+    }
+
+    #[test]
+    fn increments_are_absorbed_into_absolute_baseline() {
+        let mut set = MetricSet::default();
+
+        assert!(
+            set.make_incremental(counter("hits", 10.0, MetricKind::Absolute))
+                .is_none()
+        );
+        let out = set.make_incremental(counter("hits", 3.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+        let out = set.make_incremental(counter("hits", 2.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 2.0 });
+
+        // The 15.0 total already includes the 5.0 passed through as increments.
+        let out = set.make_incremental(counter("hits", 15.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 0.0 });
+        let out = set.make_incremental(counter("hits", 18.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+    }
+
+    #[test]
+    fn incompatible_increment_drops_absolute_baseline() {
+        let mut set = MetricSet::default();
+
+        assert!(
+            set.make_incremental(histogram(1.0, 4, MetricKind::Absolute))
+                .is_none()
+        );
+        assert!(
+            set.make_incremental(histogram(2.0, 1, MetricKind::Incremental))
+                .is_some()
+        );
+        assert!(set.is_empty());
+    }
+
     // Verifies that capacity policy switches to the LruCache (Bounded) path.
     #[test]
     fn bounded_path_selected_when_capacity_policy_set() {
         let set = MetricSet::new(MetricSetSettings {
-            max_events: Some(10),
+            max_series: Some(10),
             ..Default::default()
         });
         assert!(matches!(set.inner, MetricSetInner::Bounded(_)));

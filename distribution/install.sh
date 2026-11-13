@@ -11,7 +11,7 @@
 set -u
 
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.60.0"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.61.0"}"
 # Accept either a bare release number or a Git tag name.
 VECTOR_VERSION="${VECTOR_VERSION#v}"
 

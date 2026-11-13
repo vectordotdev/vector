@@ -4,7 +4,10 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, internal_event::CounterName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::CounterName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -89,7 +92,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load network I/O counters.",
                     error,
                 });
@@ -117,7 +120,7 @@ mod tests {
             .network_metrics(&mut buffer)
             .await;
         let metrics = buffer.into_metrics();
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
         assert!(all_counters(&metrics));
 
         // All metrics are named network_*

@@ -29,6 +29,8 @@ use crate::{
 
 mod compatibility;
 
+const TEST_SOURCE_TYPE: &str = "test_source";
+
 // A test format different from standard S3 notifications.
 struct TestParser;
 
@@ -184,7 +186,11 @@ impl Fixture {
         cx.shutdown = shutdown;
         cx.acknowledgements = true;
         let source = match parser {
-            Some(parser) => config.build_with_notification_parser(cx, parser).await,
+            Some(parser) => {
+                config
+                    .build_with_notification_parser(cx, parser, TEST_SOURCE_TYPE)
+                    .await
+            }
             None => config.build(cx).await,
         }
         .unwrap();
@@ -243,7 +249,7 @@ async fn custom_parser_uses_shared_reader_and_ack_gated_deletion() {
     cx.shutdown = shutdown;
     cx.acknowledgements = true;
     let source = config
-        .build_with_notification_parser(cx, Arc::new(TestParser))
+        .build_with_notification_parser(cx, Arc::new(TestParser), TEST_SOURCE_TYPE)
         .await
         .unwrap();
     let consume = async {
@@ -252,6 +258,7 @@ async fn custom_parser_uses_shared_reader_and_ack_gated_deletion() {
             assert_eq!(event.as_log()["value"], value.into());
             assert_eq!(event.as_log()["bucket"], "synthetic".into());
             assert_eq!(event.as_log()["region"], "us-east-1".into());
+            assert_eq!(event.as_log()["source_type"], TEST_SOURCE_TYPE.into());
             if value == 3 {
                 tokio::time::sleep(Duration::from_millis(50)).await;
                 assert!(
@@ -300,8 +307,8 @@ async fn invalid_or_empty_custom_notifications_do_not_download() {
                 EventStatus::Delivered,
             )
             .await;
-        assert!(events.is_empty());
-        assert!(fixture.downloads().await.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+        assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
         assert!(fixture.calls("AmazonSQS.SendMessageBatch").await.is_empty());
         assert_eq!(
             fixture.calls("AmazonSQS.DeleteMessageBatch").await.len(),

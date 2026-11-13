@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use hyper::body::Incoming;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{Layer, Service, ServiceExt, service_fn, util::BoxCloneService};
@@ -16,11 +17,11 @@ use vector_lib::{
     internal_event::{CounterName, GaugeName},
 };
 
-/// Request served by the legacy Warp HTTP listener.
-pub(crate) type HttpRequest = http::Request<hyper::Body>;
+/// Request served by the Warp HTTP listener.
+pub(crate) type HttpRequest<B = Incoming> = http::Request<B>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http_1::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http::Request<tonic::body::Body>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -39,7 +40,10 @@ impl RequestControl {
         }
     }
 
-    pub(crate) fn http_layer<R>(&self, error_response: R) -> RequestControlLayer<R, HttpRequest> {
+    pub(crate) fn http_layer<R, B>(
+        &self,
+        error_response: R,
+    ) -> RequestControlLayer<R, HttpRequest<B>> {
         self.layer(error_response, "http")
     }
 
@@ -171,12 +175,6 @@ pub(crate) trait AcknowledgementResponse: Sized {
 
 impl<B: 'static> AcknowledgementResponse for http::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
-        self.extensions_mut().remove()
-    }
-}
-
-impl<B: 'static> AcknowledgementResponse for http_1::Response<B> {
-    fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut()
             .remove::<SharedPendingAcknowledgement<Self>>()?
             .take()
@@ -305,9 +303,9 @@ mod tests {
     };
 
     use http::StatusCode;
-    use hyper::{Body, body::HttpBody};
+    use http_body_util::BodyExt;
     use prost::Message;
-    use tonic::body::{BoxBody, empty_body};
+    use tonic::body::Body as TonicBody;
     use vector_lib::event::{BatchNotifier, Event, EventStatus, LogEvent};
 
     use super::*;
@@ -316,19 +314,21 @@ mod tests {
         http::middleware_error_response as http_error_response, status::Status,
     };
 
-    type HttpResponse = http::Response<Body>;
-    type GrpcResponse = http_1::Response<BoxBody>;
+    // Request control never reads the request body.
+    type HttpRequest = super::HttpRequest<()>;
+    type HttpResponse = warp::reply::Response;
+    type GrpcResponse = http::Response<TonicBody>;
 
     fn http_request() -> HttpRequest {
-        http::Request::new(Body::empty())
+        http::Request::new(())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http_1::Request::new(empty_body())
+        http::Request::new(TonicBody::empty())
     }
 
     fn http_ok() -> HttpResponse {
-        http::Response::new(Body::empty())
+        HttpResponse::default()
     }
 
     fn grpc_ok() -> GrpcResponse {
@@ -412,10 +412,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn omitted_controls_allow_concurrent_requests_without_timeout() {
         init_metrics();
@@ -454,10 +450,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn concurrency_limit_without_timeout() {
         init_metrics();
@@ -491,10 +483,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_without_concurrency_limit() {
         init_metrics();
@@ -538,10 +526,6 @@ mod tests {
         assert_metric_absent(CounterName::ComponentLoadShedRequestsTotal.as_str());
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test]
     async fn processing_error_releases_capacity() {
         init_metrics();
@@ -560,10 +544,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test]
     async fn http_and_grpc_share_capacity() {
         init_metrics();
@@ -613,10 +593,6 @@ mod tests {
         assert_eq!(response.headers()["grpc-status"], "0");
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_and_cancellation_release_capacity() {
         init_metrics();
@@ -649,10 +625,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_includes_waiting_for_readiness() {
         init_metrics();
@@ -677,10 +649,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn grpc_timeout_is_counted() {
         init_metrics();

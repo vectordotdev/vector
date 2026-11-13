@@ -20,6 +20,11 @@ async fn s3_sns_and_test_notifications_use_the_default_adapter() {
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
     assert_eq!(events.len(), 4);
+    assert!(
+        events
+            .iter()
+            .all(|event| event.as_log()["source_type"] == AwsS3Config::NAME.into())
+    );
     assert_eq!(
         fixture.downloads().await,
         [
@@ -46,8 +51,8 @@ async fn malformed_later_record_prevents_all_downloads() {
     let events = fixture
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(
         fixture
             .calls("AmazonSQS.DeleteMessageBatch")
@@ -101,8 +106,8 @@ async fn ignored_event_still_requires_supported_version() {
     let events = fixture
         .process(&fixture.config(false), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(
         fixture
             .calls("AmazonSQS.DeleteMessageBatch")
@@ -119,8 +124,8 @@ async fn region_validation_precedes_age_deferral() {
     let events = fixture
         .process(&fixture.config(true), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert!(fixture.calls("AmazonSQS.SendMessageBatch").await.is_empty());
     assert!(
         fixture
@@ -165,8 +170,8 @@ async fn legacy_forward_failure_still_queues_deletion() {
     let events = fixture
         .process(&fixture.config(true), None, EventStatus::Delivered)
         .await;
-    assert!(events.is_empty());
-    assert!(fixture.downloads().await.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+    assert_eq!(fixture.downloads().await, [] as [std::string::String; 0]);
     assert_eq!(fixture.calls("AmazonSQS.SendMessageBatch").await.len(), 1);
     assert_eq!(fixture.calls("AmazonSQS.DeleteMessageBatch").await.len(), 1);
 }

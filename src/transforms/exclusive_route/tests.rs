@@ -60,7 +60,7 @@ fn exclusive_routes() {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
             } else {
-                assert!(events.is_empty());
+                assert_eq!(events, [] as [vector_lib::event::Event; 0]);
             }
         }
     }
@@ -94,7 +94,10 @@ async fn route_metrics_with_output_tag() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert_eq!(
+        tests.remove(0).run().await.errors,
+        [] as [std::string::String; 0]
+    );
     // Check that metrics were emitted with output tag
     COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
 }

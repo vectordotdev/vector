@@ -8,6 +8,7 @@ use vector_lib::{
         DatadogMetricOriginMetadata, LogEvent,
         metric::{Bucket, Quantile, Sample},
     },
+    internal_event::emit,
 };
 use vrl::{
     event_path, path,
@@ -333,7 +334,7 @@ fn render_tag_into(
     let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
-            emit!(crate::internal_events::TemplateRenderingError {
+            emit(crate::internal_events::TemplateRenderingError {
                 error: err,
                 drop_event: false,
                 field: Some(key_template.get_ref()),
@@ -353,7 +354,7 @@ fn render_tag_into(
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error: value_error,
                     drop_event: false,
                     field: Some(template.get_ref()),
@@ -514,20 +515,33 @@ fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>,
     }
 }
 
+/// Accepts integers as well as floats: serializers commonly write whole numbers without a
+/// trailing `.0`.
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Metric values are f64; integers beyond 2^53 lose precision as they would in any float."
+)]
+fn value_as_float(value: &Value, path: &str) -> Result<f64, TransformError> {
+    match value {
+        Value::Float(value) => Ok(value.into_inner()),
+        Value::Integer(value) => Ok(*value as f64),
+        _ => Err(TransformError::ParseError {
+            path: path.to_string(),
+            kind: TransformParseErrorKind::FloatError,
+        }),
+    }
+}
+
 fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let counter_value = log
         .get(event_path!("counter", "value"))
         .ok_or_else(|| TransformError::PathNotFound {
             path: "counter.value".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "counter.value".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
+        })
+        .and_then(|value| value_as_float(value, "counter.value"))?;
 
     Ok(MetricValue::Counter {
-        value: *counter_value,
+        value: counter_value,
     })
 }
 
@@ -536,15 +550,9 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         .get(event_path!("gauge", "value"))
         .ok_or_else(|| TransformError::PathNotFound {
             path: "gauge.value".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "gauge.value".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
-    Ok(MetricValue::Gauge {
-        value: *gauge_value,
-    })
+        })
+        .and_then(|value| value_as_float(value, "gauge.value"))?;
+    Ok(MetricValue::Gauge { value: gauge_value })
 }
 
 fn get_set_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
@@ -598,12 +606,8 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
             .get(path!("value"))
             .ok_or_else(|| TransformError::PathNotFound {
                 path: "value".to_string(),
-            })?
-            .as_float()
-            .ok_or_else(|| TransformError::ParseError {
-                path: "value".to_string(),
-                kind: TransformParseErrorKind::FloatError,
-            })?;
+            })
+            .and_then(|value| value_as_float(value, "value"))?;
 
         let rate = e_sample
             .get(path!("rate"))
@@ -617,7 +621,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
             })?;
 
         samples.push(Sample {
-            value: *value,
+            value,
             rate: rate as u32,
         });
     }
@@ -664,12 +668,8 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             .get(path!("upper_limit"))
             .ok_or_else(|| TransformError::PathNotFound {
                 path: "aggregated_histogram.buckets.upper_limit".to_string(),
-            })?
-            .as_float()
-            .ok_or_else(|| TransformError::ParseError {
-                path: "aggregated_histogram.buckets.upper_limit".to_string(),
-                kind: TransformParseErrorKind::FloatError,
-            })?;
+            })
+            .and_then(|value| value_as_float(value, "aggregated_histogram.buckets.upper_limit"))?;
 
         let count = e_bucket
             .get(path!("count"))
@@ -683,7 +683,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             })?;
 
         buckets.push(Bucket {
-            upper_limit: *upper_limit,
+            upper_limit,
             count: count as u64,
         });
     }
@@ -699,21 +699,17 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             kind: TransformParseErrorKind::IntError,
         })?;
 
+    // A histogram is allowed to report no sum at all, so an absent path is not an error here. A
+    // path that is present but not a number still is.
     let sum = log
         .get(event_path!("aggregated_histogram", "sum"))
-        .ok_or_else(|| TransformError::PathNotFound {
-            path: "aggregated_histogram.sum".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "aggregated_histogram.sum".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
+        .map(|sum| value_as_float(sum, "aggregated_histogram.sum"))
+        .transpose()?;
 
     Ok(MetricValue::AggregatedHistogram {
         buckets,
         count: count as u64,
-        sum: *sum,
+        sum,
     })
 }
 
@@ -739,28 +735,17 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             .get(path!("quantile"))
             .ok_or_else(|| TransformError::PathNotFound {
                 path: "aggregated_summary.quantiles.quantile".to_string(),
-            })?
-            .as_float()
-            .ok_or_else(|| TransformError::ParseError {
-                path: "aggregated_summary.quantiles.quantile".to_string(),
-                kind: TransformParseErrorKind::FloatError,
-            })?;
+            })
+            .and_then(|value| value_as_float(value, "aggregated_summary.quantiles.quantile"))?;
 
         let value = e_quantile
             .get(path!("value"))
             .ok_or_else(|| TransformError::PathNotFound {
                 path: "aggregated_summary.quantiles.value".to_string(),
-            })?
-            .as_float()
-            .ok_or_else(|| TransformError::ParseError {
-                path: "aggregated_summary.quantiles.value".to_string(),
-                kind: TransformParseErrorKind::FloatError,
-            })?;
+            })
+            .and_then(|value| value_as_float(value, "aggregated_summary.quantiles.value"))?;
 
-        quantiles.push(Quantile {
-            quantile: *quantile,
-            value: *value,
-        });
+        quantiles.push(Quantile { quantile, value });
     }
 
     let count = log
@@ -778,17 +763,13 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         .get(event_path!("aggregated_summary", "sum"))
         .ok_or_else(|| TransformError::PathNotFound {
             path: "aggregated_summary.sum".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "aggregated_summary.sum".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
+        })
+        .and_then(|value| value_as_float(value, "aggregated_summary.sum"))?;
 
     Ok(MetricValue::AggregatedSummary {
         quantiles,
         count: count as u64,
-        sum: *sum,
+        sum,
     })
 }
 
@@ -812,7 +793,17 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         && let Some(el) = els.as_object()
     {
         for (key, value) in el {
-            tags.insert(key.to_string(), bytes_to_str(value));
+            match value {
+                Value::Array(arr) => {
+                    tags.set_multi_value(
+                        key.to_string(),
+                        arr.iter().map(|v| TagValue::from(bytes_to_str(v))),
+                    );
+                }
+                _ => {
+                    tags.insert(key.to_string(), bytes_to_str(value));
+                }
+            }
         }
     }
     let tags_result = Some(tags);
@@ -875,31 +866,31 @@ impl FunctionTransform for LogToMetric {
                 }
                 Err(err) => match err {
                     TransformError::MetricValueError { path, path_value } => {
-                        emit!(MetricMetadataInvalidFieldValueError {
+                        emit(MetricMetadataInvalidFieldValueError {
                             field: path.as_ref(),
-                            field_value: path_value.as_ref()
+                            field_value: path_value.as_ref(),
                         });
                     }
                     TransformError::PathNotFound { path } => {
-                        emit!(ParserMissingFieldError::<DROP_EVENT> {
-                            field: path.as_ref()
+                        emit(ParserMissingFieldError::<DROP_EVENT> {
+                            field: path.as_ref(),
                         });
                     }
                     TransformError::ParseError { path, kind } => {
-                        emit!(MetricMetadataParseError {
+                        emit(MetricMetadataParseError {
                             field: path.as_ref(),
                             kind: &kind.to_string(),
                         });
                     }
                     TransformError::MetricDetailsNotFound => {
-                        emit!(MetricMetadataMetricDetailsNotFoundError {});
+                        emit(MetricMetadataMetricDetailsNotFoundError {});
                     }
                     TransformError::PairExpansionError { key, value, error } => {
-                        emit!(PairExpansionError {
+                        emit(PairExpansionError {
                             key: &key,
                             value: &value,
                             drop_event: true,
-                            error
+                            error,
                         });
                     }
                     _ => {}
@@ -914,34 +905,34 @@ impl FunctionTransform for LogToMetric {
                     Err(err) => {
                         match err {
                             TransformError::PathNull { path } => {
-                                emit!(LogToMetricFieldNullError {
-                                    field: path.as_ref()
+                                emit(LogToMetricFieldNullError {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::PathNotFound { path } => {
-                                emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                    field: path.as_ref()
+                                emit(ParserMissingFieldError::<DROP_EVENT> {
+                                    field: path.as_ref(),
                                 });
                             }
                             TransformError::ParseFloatError { path, error } => {
-                                emit!(LogToMetricParseFloatError {
+                                emit(LogToMetricParseFloatError {
                                     field: path.as_ref(),
-                                    error
+                                    error,
                                 });
                             }
                             TransformError::TemplateRenderingError(error) => {
-                                emit!(crate::internal_events::TemplateRenderingError {
+                                emit(crate::internal_events::TemplateRenderingError {
                                     error,
                                     drop_event: true,
                                     field: None,
                                 });
                             }
                             TransformError::PairExpansionError { key, value, error } => {
-                                emit!(PairExpansionError {
+                                emit(PairExpansionError {
                                     key: &key,
                                     value: &value,
                                     drop_event: true,
-                                    error
+                                    error,
                                 });
                             }
                             _ => {}
@@ -1962,7 +1953,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     count: 5,
-                    sum: 18.0,
+                    sum: Some(18.0),
                     buckets: vec![
                         Bucket {
                             upper_limit: 1.0,
@@ -1990,6 +1981,86 @@ mod tests {
                 "host" => "localhost",
             )))
             .with_timestamp(Some(ts()))
+        );
+    }
+
+    /// A histogram is allowed to report no sum, so an absent `sum` field is not a missing-path
+    /// error. A present-but-unparseable one still is, which `transform_histogram_invalid_sum`
+    /// covers.
+    #[tokio::test]
+    async fn transform_histogram_without_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        let metric = do_transform(config, log).await.unwrap();
+        assert_eq!(
+            metric.as_metric().value(),
+            &MetricValue::AggregatedHistogram {
+                count: 3,
+                sum: None,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                ],
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn transform_histogram_invalid_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "sum": "not a number",
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        assert!(
+            do_transform(config, log).await.is_none(),
+            "a sum that is present but not a number must still be rejected"
         );
     }
 
@@ -2210,6 +2281,104 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn transform_integer_values() {
+        let cases = [
+            (
+                "counter",
+                r#"{
+                  "counter": {"value": 42},
+                  "kind": "incremental",
+                  "name": "test.transform.counter", "tags": {}
+                }"#,
+                MetricValue::Counter { value: 42.0 },
+            ),
+            (
+                "gauge",
+                r#"{
+                  "gauge": {"value": 990},
+                  "kind": "absolute",
+                  "name": "test.transform.gauge", "tags": {}
+                }"#,
+                MetricValue::Gauge { value: 990.0 },
+            ),
+            (
+                "distribution",
+                r#"{
+                  "distribution": {
+                    "samples": [{"value": 2, "rate": 3}],
+                    "statistic": "histogram"
+                  },
+                  "kind": "incremental",
+                  "name": "test.transform.distribution", "tags": {}
+                }"#,
+                MetricValue::Distribution {
+                    samples: vec![Sample {
+                        value: 2.0,
+                        rate: 3,
+                    }],
+                    statistic: StatisticKind::Histogram,
+                },
+            ),
+            (
+                "histogram",
+                r#"{
+                  "aggregated_histogram": {
+                    "sum": 18,
+                    "count": 3,
+                    "buckets": [{"upper_limit": 1, "count": 1}, {"upper_limit": 10, "count": 2}]
+                  },
+                  "kind": "absolute",
+                  "name": "test.transform.histogram", "tags": {}
+                }"#,
+                MetricValue::AggregatedHistogram {
+                    count: 3,
+                    sum: Some(18.0),
+                    buckets: vec![
+                        Bucket {
+                            upper_limit: 1.0,
+                            count: 1,
+                        },
+                        Bucket {
+                            upper_limit: 10.0,
+                            count: 2,
+                        },
+                    ],
+                },
+            ),
+            (
+                "summary",
+                r#"{
+                  "aggregated_summary": {
+                    "sum": 100,
+                    "count": 7,
+                    "quantiles": [{"quantile": 1, "value": 25}]
+                  },
+                  "kind": "absolute",
+                  "name": "test.transform.summary", "tags": {}
+                }"#,
+                MetricValue::AggregatedSummary {
+                    quantiles: vec![Quantile {
+                        quantile: 1.0,
+                        value: 25.0,
+                    }],
+                    count: 7,
+                    sum: 100.0,
+                },
+            ),
+        ];
+
+        for (name, json_str, expected) in cases {
+            let config = LogToMetricConfig {
+                metrics: None,
+                all_metrics: Some(true),
+            };
+            let log = create_log_event(json_str);
+            let metric = do_transform(config, log).await.expect(name);
+            assert_eq!(metric.as_metric().value(), &expected, "{name}");
+        }
+    }
+
+    #[tokio::test]
     async fn transform_set() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2282,5 +2451,46 @@ mod tests {
             )))
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[tokio::test]
+    async fn transform_all_metrics_multi_value_tags() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "counter": {
+            "value": 10.0
+          },
+          "kind": "incremental",
+          "name": "test.multi_value_tags",
+          "tags": {
+            "key": ["value1", "value2"],
+            "host": "localhost",
+            "env": []
+          }
+        }"#;
+
+        let event = create_log_event(json_str);
+        let metric = Box::pin(do_transform(config, event))
+            .await
+            .unwrap()
+            .into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        let mut expected_tags = MetricTags::default();
+        expected_tags.set_multi_value(
+            "key".to_string(),
+            vec![
+                TagValue::Value("value1".to_string()),
+                TagValue::Value("value2".to_string()),
+            ],
+        );
+        expected_tags.set_multi_value("env".to_string(), vec![]);
+        expected_tags.insert("host".to_string(), "localhost".to_string());
+
+        assert_eq!(tags.to_owned(), expected_tags);
     }
 }

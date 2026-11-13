@@ -119,7 +119,7 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.28.0"
+          export SMP_CRATE_VERSION="0.29.1"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -150,10 +150,8 @@ jobs:
               - "docs/**"
               - "rfcs/**"
               - "testing/**"
-              - "tilt/**"
               - "website/**"
               - "*.md"
-              - "Tiltfile"
               - "NOTICE"
               - "LICENSE-3rdparty.csv"
               - "LICENSE"
@@ -547,6 +545,18 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --output-path "${{ runner.temp }}/outputs"
+
+      - name: Render regression report locally
+        run: |
+          if [ ! -s "${{ runner.temp }}/outputs/report.v1.json" ]; then
+            echo "Missing or empty SMP report.v1.json" >&2
+            exit 1
+          fi
+
+          "${{ runner.temp }}/bin/smp" report render \
+            --builtin report.md \
+            --report "${{ runner.temp }}/outputs/report.v1.json" \
+            > "${{ runner.temp }}/outputs/report.md"
 
       - name: Read regression report
         id: read-analysis

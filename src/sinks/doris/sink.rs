@@ -1,8 +1,9 @@
 use crate::sinks::{
     doris::request_builder::DorisRequestBuilder, prelude::*, util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
-pub struct DorisSink<S> {
+pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     request_builder: DorisRequestBuilder,
@@ -17,7 +18,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
         database: ConfinedTemplate,
@@ -48,7 +49,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -78,7 +79,7 @@ where
 
 /// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct DorisPartitionKey {
+pub(super) struct DorisPartitionKey {
     pub database: String,
     pub table: String,
 }
@@ -98,7 +99,7 @@ impl DorisKeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
