@@ -268,6 +268,16 @@ impl SourceConfig for PrometheusScrapeConfig {
             errors.push(ConfigError::MultipleKubernetesTargetGroups.to_string());
         }
 
+        #[cfg(feature = "kubernetes")]
+        for target in &self.targets {
+            if let TargetConfig::Kubernetes(k8s_cfg) = target {
+                errors.extend(
+                    k8s_cfg
+                        .validate_tags(self.instance_tag.as_deref(), self.endpoint_tag.as_deref()),
+                );
+            }
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -620,6 +630,70 @@ mod validation_tests {
         assert!(errors.iter().any(|error| {
             error == "Source prometheus only one Kubernetes target group is currently supported"
         }));
+    }
+
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn rejects_conflicting_kubernetes_tags_during_config_compilation() {
+        let mut k8s_cfg = KubernetesScrapeConfig::default();
+        k8s_cfg.pod_label_tags = vec!["namespace".to_owned()];
+        let errors = compilation_errors(config_with(
+            Vec::new(),
+            vec![TargetConfig::Kubernetes(k8s_cfg)],
+        ));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.starts_with("Source prometheus ")
+                    && error.contains("`pod_label_tags` entry `namespace`")),
+            "{errors:?}"
+        );
+    }
+
+    /// A scraped metric that already has `exported_namespace` keeps the static path's behavior:
+    /// with `honor_labels` off, the metric's own `namespace` replaces it.
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn discovery_tags_follow_honor_labels_like_static_tags() {
+        use vector_lib::event::{Metric, MetricKind, MetricValue};
+
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: false,
+            instance_tag: Some("instance".to_owned()),
+            endpoint_tag: None,
+        };
+        let target = kubernetes_sd::Target {
+            uri: "http://10.0.0.1:9100/metrics".parse().unwrap(),
+            instance: "10.0.0.1:9100".to_owned(),
+            namespace: "monitoring".to_owned(),
+            pod_name: "exporter-0".to_owned(),
+            pod_uid: "uid".to_owned(),
+            node_name: None,
+            container_name: None,
+            extra_tags: std::collections::BTreeMap::new(),
+        };
+        let mut metric = Metric::new(
+            "up",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        metric.replace_tag("namespace".to_owned(), "app".to_owned());
+        metric.replace_tag("exported_namespace".to_owned(), "old".to_owned());
+        let mut events = vec![Event::Metric(metric)];
+
+        builder.context_for(&target).enrich_events(&mut events);
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.tag_value("namespace").as_deref(), Some("monitoring"));
+        assert_eq!(
+            metric.tag_value("exported_namespace").as_deref(),
+            Some("app")
+        );
+        assert_eq!(metric.tag_value("pod").as_deref(), Some("exporter-0"));
+        assert_eq!(
+            metric.tag_value("instance").as_deref(),
+            Some("10.0.0.1:9100")
+        );
     }
 }
 

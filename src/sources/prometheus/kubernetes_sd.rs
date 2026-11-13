@@ -161,15 +161,106 @@ pub(crate) struct KubernetesScrapeConfig {
 
     /// Allowlist of Pod labels to add as metric tags.
     ///
-    /// Each entry is the label key; tags are emitted with the same key on each
-    /// metric. Default is empty to avoid cardinality blow-ups.
+    /// Each entry is a label key. The tag name is the key with every character other than
+    /// letters, digits, and `_` replaced by `_`, and a leading `_` added if it starts with a
+    /// digit, so `app.kubernetes.io/name` becomes `app_kubernetes_io_name`. Default is empty to
+    /// avoid cardinality blow-ups.
     #[configurable(metadata(docs::examples = "app"))]
     #[configurable(metadata(docs::examples = "version"))]
     pub(crate) pod_label_tags: Vec<String>,
 
     /// Allowlist of Pod annotations to add as metric tags.
+    ///
+    /// Tag names are derived the same way as for `pod_label_tags`.
     #[configurable(metadata(docs::examples = "owner"))]
     pub(crate) pod_annotation_tags: Vec<String>,
+}
+
+/// Tags that discovery adds to every metric, in addition to `instance_tag` and `endpoint_tag`.
+const DISCOVERY_TAGS: [&str; 4] = ["namespace", "pod", "node", "container"];
+
+impl KubernetesScrapeConfig {
+    /// Checks that every tag a discovered target adds has its own name.
+    ///
+    /// Two tags with the same name would overwrite each other depending on their order, so
+    /// conflicts are rejected when the config is loaded. This includes `k` and `exported_k`:
+    /// when a scraped metric already has `k`, its value moves to `exported_k`.
+    pub(crate) fn validate_tags(
+        &self,
+        instance_tag: Option<&str>,
+        endpoint_tag: Option<&str>,
+    ) -> Vec<String> {
+        let mut errors = Vec::new();
+        // Tag name -> where it comes from, for error messages.
+        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut add = |name: String, origin: String, errors: &mut Vec<String>| {
+            if let Some(existing) = tags.get(&name) {
+                if *existing != origin {
+                    errors.push(format!(
+                        "{origin} and {existing} both produce the tag `{name}`"
+                    ));
+                }
+            } else {
+                tags.insert(name, origin);
+            }
+        };
+
+        for tag in DISCOVERY_TAGS {
+            add(
+                tag.to_owned(),
+                format!("the Kubernetes discovery tag `{tag}`"),
+                &mut errors,
+            );
+        }
+        for (option, tag) in [
+            ("instance_tag", instance_tag),
+            ("endpoint_tag", endpoint_tag),
+        ] {
+            if let Some(tag) = tag {
+                add(tag.to_owned(), format!("`{option}`"), &mut errors);
+            }
+        }
+        for (option, keys) in [
+            ("pod_label_tags", &self.pod_label_tags),
+            ("pod_annotation_tags", &self.pod_annotation_tags),
+        ] {
+            for key in keys {
+                add(
+                    sanitize_tag_name(key),
+                    format!("`{option}` entry `{key}`"),
+                    &mut errors,
+                );
+            }
+        }
+
+        for (name, origin) in &tags {
+            let exported = format!("exported_{name}");
+            if let Some(other) = tags.get(&exported) {
+                errors.push(format!(
+                    "{other} produces the tag `{exported}`, which Vector uses for the original value of `{name}` from {origin}"
+                ));
+            }
+        }
+        errors
+    }
+}
+
+/// Turns a Pod label or annotation key into a valid Prometheus label name.
+pub(crate) fn sanitize_tag_name(key: &str) -> String {
+    let mut name: String = key
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if name.starts_with(|c: char| c.is_ascii_digit()) {
+        name.insert(0, '_');
+    }
+    name
 }
 
 impl Default for KubernetesScrapeConfig {
@@ -629,14 +720,14 @@ fn build_extra_tags(pod: &Pod, cfg: &AnnotationParserConfig) -> BTreeMap<String,
     if let Some(labels) = pod.metadata.labels.as_ref() {
         for key in &cfg.pod_label_tags {
             if let Some(v) = labels.get(key) {
-                tags.insert(key.clone(), v.clone());
+                tags.insert(sanitize_tag_name(key), v.clone());
             }
         }
     }
     if let Some(anns) = pod.metadata.annotations.as_ref() {
         for key in &cfg.pod_annotation_tags {
             if let Some(v) = anns.get(key) {
-                tags.insert(key.clone(), v.clone());
+                tags.insert(sanitize_tag_name(key), v.clone());
             }
         }
     }
@@ -1066,23 +1157,97 @@ mod tests {
                 ("owner", "team-a"),
                 ("ignored", "x"),
             ],
-            &[("app", "myapp"), ("ignored-label", "y")],
+            &[
+                ("app", "myapp"),
+                ("app.kubernetes.io/name", "myname"),
+                ("ignored-label", "y"),
+            ],
             vec![],
             Some("10.0.0.1"),
             None,
         );
         let cfg = AnnotationParserConfig {
-            pod_label_tags: vec!["app".to_string()],
+            pod_label_tags: vec!["app".to_string(), "app.kubernetes.io/name".to_string()],
             pod_annotation_tags: vec!["owner".to_string()],
             ..default_cfg()
         };
         let t = extract_targets(&pod, &cfg).unwrap().pop().unwrap();
         assert_eq!(t.extra_tags.get("app").map(String::as_str), Some("myapp"));
         assert_eq!(
+            t.extra_tags
+                .get("app_kubernetes_io_name")
+                .map(String::as_str),
+            Some("myname")
+        );
+        assert_eq!(
             t.extra_tags.get("owner").map(String::as_str),
             Some("team-a")
         );
         assert!(!t.extra_tags.contains_key("ignored"));
+    }
+
+    #[test]
+    fn tag_names_are_valid_prometheus_label_names() {
+        assert_eq!(sanitize_tag_name("app"), "app");
+        assert_eq!(
+            sanitize_tag_name("app.kubernetes.io/name"),
+            "app_kubernetes_io_name"
+        );
+        assert_eq!(sanitize_tag_name("team-owner"), "team_owner");
+        assert_eq!(sanitize_tag_name("1app"), "_1app");
+    }
+
+    fn tag_errors(
+        labels: &[&str],
+        annotations: &[&str],
+        instance: Option<&str>,
+        endpoint: Option<&str>,
+    ) -> Vec<String> {
+        let cfg = KubernetesScrapeConfig {
+            pod_label_tags: labels.iter().map(|key| (*key).to_owned()).collect(),
+            pod_annotation_tags: annotations.iter().map(|key| (*key).to_owned()).collect(),
+            ..KubernetesScrapeConfig::default()
+        };
+        cfg.validate_tags(instance, endpoint)
+    }
+
+    #[test]
+    fn distinct_tag_names_are_accepted() {
+        let errors = tag_errors(
+            &["app", "app"],
+            &["owner"],
+            Some("instance"),
+            Some("endpoint"),
+        );
+        assert_eq!(errors, [] as [String; 0]);
+    }
+
+    #[test]
+    fn conflicting_tag_names_are_rejected() {
+        for (labels, annotations, instance, endpoint, expected) in [
+            // An instance or endpoint tag that reuses a discovery tag.
+            (&[][..], &[][..], Some("namespace"), None, "`instance_tag`"),
+            // The instance and endpoint tags with the same name.
+            (&[], &[], Some("target"), Some("target"), "`endpoint_tag`"),
+            // Two keys that become the same tag name.
+            (&["app.name", "app/name"], &[], None, None, "`app_name`"),
+            // A label and an annotation that become the same tag name.
+            (&["owner"], &["owner"], None, None, "`owner`"),
+            // An allowlist entry that reuses a discovery tag.
+            (&["pod"], &[], None, None, "`pod`"),
+            // An allowlist entry named like the tag that keeps a replaced value.
+            (
+                &[],
+                &["exported_namespace"],
+                None,
+                None,
+                "`exported_namespace`",
+            ),
+        ] {
+            let errors = tag_errors(labels, annotations, instance, endpoint);
+            assert_eq!(errors.len(), 1, "{errors:?}");
+            assert!(errors[0].contains(expected), "{errors:?}");
+        }
     }
 
     #[test]
