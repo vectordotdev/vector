@@ -170,25 +170,11 @@ updates:
         patterns:
           - "*"
         exclude-patterns:
-          - "axum"
           - "bytecheck"
-          - "headers"
-          - "http"
-          - "http-*"
-          - "hyper"
-          - "hyper-*"
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
-          - "prost"
-          - "prost-*"
-          - "reqwest"
           - "rkyv"
-          - "tokio-tungstenite"
-          - "tonic"
-          - "tonic-*"
-          - "tower-http"
-          - "warp"
         update-types:
           - "major"
       cargo-security:
