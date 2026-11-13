@@ -343,6 +343,47 @@ async fn encode_datastream_dynamic_namespace() {
 }
 
 #[tokio::test]
+async fn encode_datastream_preserves_namespace_confinement() {
+    for (dataset, rendered_dataset) in [
+        ("svc_{{ service }}", "svc_checkout"),
+        ("{{ service }}", "checkout"),
+    ] {
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(&format!(
+            r#"
+            endpoints: ["https://example.com"]
+            api_version: v8
+            mode: data_stream
+            data_stream:
+              type: logs
+              dataset: "{dataset}"
+              namespace: "tenanta_{{{{ environment }}}}"
+            "#
+        ))
+        .unwrap();
+        let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+        let mut log = LogEvent::from("hello there");
+        log.insert(event_path!("service"), "checkout");
+        log.insert(event_path!("environment"), "prod");
+        log.insert(event_path!("data_stream", "namespace"), "tenantb_prod");
+        assert!(process_log(log.clone(), &es.mode, None, &config.encoding).is_none());
+
+        log.insert(event_path!("data_stream", "namespace"), "tenanta_other");
+        let processed = process_log(log, &es.mode, None, &config.encoding).unwrap();
+        let mut encoded = Vec::new();
+        es.request_builder
+            .encoder
+            .encode_input(vec![processed], &mut encoded)
+            .unwrap();
+        let metadata = encoded.split(|&byte| byte == b'\n').next().unwrap();
+        let metadata: serde_json::Value = serde_json::from_slice(metadata).unwrap();
+        assert_eq!(
+            metadata["create"]["_index"],
+            format!("logs-{rendered_dataset}-tenanta_other")
+        );
+    }
+}
+
+#[tokio::test]
 async fn encode_datastream_mode_no_routing() {
     use chrono::{TimeZone, Utc};
 

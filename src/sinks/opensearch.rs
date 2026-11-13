@@ -107,7 +107,14 @@ mod tests {
         for sink_type in ["elasticsearch", "opensearch"] {
             for (mode, expected_fields) in [
                 ("bulk", vec!["bulk.index"]),
-                ("data_stream", vec!["data_stream"]),
+                (
+                    "data_stream",
+                    vec![
+                        "data_stream.type",
+                        "data_stream.dataset",
+                        "data_stream.namespace",
+                    ],
+                ),
             ] {
                 let config: BoxedSink = serde_yaml::from_str(&format!(
                     "type: {sink_type}\nendpoints: [http://localhost:9200]\napi_version: v7\n\

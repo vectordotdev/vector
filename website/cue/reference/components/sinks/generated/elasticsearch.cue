@@ -116,11 +116,14 @@ generated: components: sinks: elasticsearch: configuration: {
 		description: """
 			Elasticsearch data stream mode configuration.
 
-			Template confinement applies to the complete `<type>-<dataset>-<namespace>` name. For example,
-			`type: logs`, `dataset: system`, and `namespace: "{{ service }}"` confine destinations to
-			`logs-system-`, including names selected by auto-routing. Fully dynamic names still require
-			`dangerously_allow_unconfined_template_resolution: true`. Fully static configurations retain
-			unrestricted auto-routing to valid data stream names.
+			Template confinement checks each component separately. If a component references event fields
+			but has no literal prefix, the complete `<type>-<dataset>-<namespace>` name must provide one.
+			For example, `type: logs`, `dataset: system`, and `namespace: "{{ service }}"` use `logs-system-`
+			as the fallback boundary, including for auto-routed destinations. Existing component prefixes
+			remain enforced. Configurations that do not need this fallback retain their existing routing
+			behavior; static component values are fallbacks for auto-routing, not destination restrictions.
+			Names without a usable confinement prefix require
+			`dangerously_allow_unconfined_template_resolution: true`.
 			"""
 		required: false
 		type:     _schemaDefinitions["core::option::Option<vector::sinks::elasticsearch::config::DataStreamConfig>"]
