@@ -113,6 +113,11 @@ generated: components: sinks: webhdfs: configuration: {
 			syntax:  "template"
 		}
 	}
+	request: {
+		description: "Settings for outbound requests, including timeouts and retries."
+		required:    false
+		type:        _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
+	}
 	root: {
 		description: """
 			The root path for WebHDFS.
