@@ -1,3 +1,5 @@
+use vector_lib::lookup::OwnedTargetPath;
+
 use super::{
     EventRef, FixedOffset, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, Utc, Value,
     log_schema, parse_target_path,
@@ -11,7 +13,10 @@ pub(super) enum Part {
     /// A literal piece of text containing a time format string.
     Strftime(ParsedStrftime),
     /// A reference to the source event, to be copied from the relevant field or tag.
-    Reference(String),
+    Reference {
+        source: String,
+        path: OwnedTargetPath,
+    },
 }
 
 // Wrap the parsed time formatter in order to provide `impl Hash` and some convenience functions.
@@ -98,13 +103,13 @@ pub(super) fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError>
 
         let path = cap[1].trim().to_owned();
 
-        // This checks the syntax, but doesn't yet store it for use later
-        // see: https://github.com/vectordotdev/vector/issues/14864
-        if parse_target_path(&path).is_err() {
-            return Err(TemplateParseError::InvalidPathSyntax { path });
-        }
+        let parsed = parse_target_path(&path)
+            .map_err(|_| TemplateParseError::InvalidPathSyntax { path: path.clone() })?;
 
-        parts.push(Part::Reference(path));
+        parts.push(Part::Reference {
+            source: path,
+            path: parsed,
+        });
         last_end = all.end();
     }
     if src.len() > last_end {

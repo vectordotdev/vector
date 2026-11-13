@@ -54,7 +54,7 @@ impl TryFrom<Cow<'_, str>> for UnconfinedTemplate {
                 .iter()
                 .map(|part| match part {
                     Part::Literal(lit) => lit.len(),
-                    Part::Reference(_path) => 1,
+                    Part::Reference { .. } => 1,
                     Part::Strftime(parsed) => parsed.reserve_size(),
                 })
                 .sum();
@@ -124,23 +124,17 @@ impl UnconfinedTemplate {
                 Part::Strftime(items) => {
                     out.push_str(&render_timestamp(items, event, self.tz_offset));
                 }
-                Part::Reference(key) => {
+                Part::Reference { source, path } => {
                     out.push_str(
                         &match event {
-                            EventRef::Log(log) => log
-                                .parse_path_and_get_value(key)
-                                .ok()
-                                .and_then(|v| v.map(Value::to_string_lossy)),
+                            EventRef::Log(log) => log.get(path).map(Value::to_string_lossy),
                             EventRef::Metric(metric) => {
-                                render_metric_field(key, metric).map(Cow::Borrowed)
+                                render_metric_field(source, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => trace
-                                .parse_path_and_get_value(key)
-                                .ok()
-                                .and_then(|v| v.map(Value::to_string_lossy)),
+                            EventRef::Trace(trace) => trace.get(path).map(Value::to_string_lossy),
                         }
                         .unwrap_or_else(|| {
-                            missing_keys.push(key.to_owned());
+                            missing_keys.push(source.to_owned());
                             Cow::Borrowed("")
                         }),
                     );
@@ -161,8 +155,8 @@ impl UnconfinedTemplate {
             .parts
             .iter()
             .filter_map(|part| {
-                if let Part::Reference(r) = part {
-                    Some(r.to_owned())
+                if let Part::Reference { source, .. } = part {
+                    Some(source.to_owned())
                 } else {
                     None
                 }

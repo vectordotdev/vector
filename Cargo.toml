@@ -1237,6 +1237,10 @@ harness = false
 required-features = ["benches"]
 
 [[bench]]
+name = "template_paths"
+harness = false
+
+[[bench]]
 name = "dnstap"
 path = "benches/dnstap/mod.rs"
 harness = false
