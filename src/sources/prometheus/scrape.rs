@@ -657,6 +657,14 @@ mod validation_tests {
         }));
     }
 
+    #[test]
+    fn hosts_alias_still_configures_endpoints() {
+        let config: PrometheusScrapeConfig =
+            toml::from_str(r#"hosts = ["http://localhost:9090/metrics"]"#).unwrap();
+        assert_eq!(config.endpoints, ["http://localhost:9090/metrics"]);
+        assert_eq!(SourceConfig::validate_structure(&config), Ok(()));
+    }
+
     #[cfg(feature = "kubernetes")]
     #[test]
     fn rejects_conflicting_kubernetes_tags_during_config_compilation() {
@@ -1375,22 +1383,28 @@ mod kubernetes_tests {
 
     #[tokio::test]
     async fn discovered_pods_are_scraped_as_they_change() {
-        // The server records the path, query, and `x-test` header of every request.
+        // The server records the path, query, `x-test` header, and `Authorization` header of every
+        // request.
         let requests = Arc::new(Mutex::new(Vec::new()));
         let recorded = Arc::clone(&requests);
         let base = spawn_blackhole_http_server(move |request: http::Request<_>| {
             let recorded = Arc::clone(&recorded);
             async move {
-                let header = request
-                    .headers()
-                    .get("x-test")
-                    .and_then(|value| value.to_str().ok())
-                    .unwrap_or_default()
-                    .to_owned();
-                recorded
-                    .lock()
-                    .unwrap()
-                    .push(format!("{} {header}", request.uri()));
+                let header = |name: &str| {
+                    request
+                        .headers()
+                        .get(name)
+                        .and_then(|value| value.to_str().ok())
+                        .unwrap_or_default()
+                        .to_owned()
+                };
+                let line = format!(
+                    "{} {} {}",
+                    request.uri(),
+                    header("x-test"),
+                    header("authorization")
+                );
+                recorded.lock().unwrap().push(line);
                 Ok(Response::new(Full::from("up 1\n")))
             }
         })
@@ -1429,7 +1443,9 @@ mod kubernetes_tests {
             timeout: Duration::from_secs(1),
             headers,
             content_type: "text/plain".to_owned(),
-            auth: None,
+            auth: Some(Auth::Bearer {
+                token: "secret".to_owned().into(),
+            }),
         };
         let (out, rx) = SourceSender::new_test();
         let (trigger, shutdown, _done) = ShutdownSignal::new_wired();
@@ -1440,8 +1456,8 @@ mod kubernetes_tests {
         // Keep reading events so the source never blocks on a full output.
         let drain = tokio::spawn(rx.for_each(|_| async {}));
 
-        // The source query and headers apply to discovered targets too.
-        assert_scraped_paths(&requests, &["/a?key=value yes"]).await;
+        // The source query, headers, and auth apply to discovered targets too.
+        assert_scraped_paths(&requests, &["/a?key=value yes Bearer secret"]).await;
 
         // An update changes the target.
         writer.apply_watcher_event(&watcher::Event::Apply(pod("a", "/b", port)));
