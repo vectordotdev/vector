@@ -15,6 +15,7 @@ use snafu::Snafu;
 use tower::Service;
 use vector_lib::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -164,7 +165,7 @@ impl Service<DatabendRequest> for DatabendService {
             let endpoint = host_port.as_str();
             let byte_size = request.data.len();
             service.insert_with_stage(request.data).await?;
-            emit!(EndpointBytesSent {
+            emit(EndpointBytesSent {
                 byte_size,
                 protocol,
                 endpoint,

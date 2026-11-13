@@ -375,10 +375,10 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
+/// `emit(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
 /// block (which preserves comments and original formatting that `to_token_stream` strips).
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
+    Regex::new(r"(?:emit|register)\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
 });
 
 fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
@@ -391,14 +391,12 @@ fn is_grouped_drop_call(call: &syn::ExprMethodCall) -> bool {
             if event.path.segments.last().is_some_and(|segment| segment.ident == "ComponentEventsDropped"))
 }
 
-/// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
+/// `emit(EventName)` / `register(Path::EventName)` use-counting regex,
 /// applied to the raw file text so it sees calls nested inside other macros
 /// (e.g. `tokio::select!`) that `syn` does not descend into.
 static RE_USES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?:^|[^A-Za-z0-9_])(?:emit!?|register!?)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)",
-    )
-    .unwrap()
+    Regex::new(r"(?:^|[^A-Za-z0-9_])(?:emit|register)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)")
+        .unwrap()
 });
 
 /// Locator for `tracing` log-macro calls (`trace!(`, `debug!(`, `info!(`,
@@ -777,7 +775,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        // Use-counting, emit!/register! ComponentEventsDropped detection, and
+        // Use-counting, emit/register ComponentEventsDropped detection, and
         // the log-message format check run via a separate raw-source pass
         // because `syn` does not descend into the bodies of arbitrary
         // `tokio::select!` / `cfg_if!` / etc. macro invocations.
@@ -1279,7 +1277,7 @@ mod tests {
     fn split_comma_args_respects_angle_brackets() {
         // A `registered_event!` handle field with a generic type containing a
         // comma must not be split at the comma inside `<...>`.
-        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
+        let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register(X)";
         assert_eq!(split_comma_args(input), vec![input.to_string()]);
     }
 
@@ -1314,7 +1312,7 @@ mod tests {
         ] {
             let event = scan_dropped_event(body);
             assert!(event.emits_component_events_dropped, "{body}");
-            assert!(run("TestEventsDropped", event).is_empty());
+            assert_eq!(run("TestEventsDropped", event), Vec::<String>::new());
         }
     }
 
@@ -1432,7 +1430,10 @@ mod tests {
             warn!(reason);
             info!(?err, "Plain text.");
         }"#;
-        assert!(format_check_log_messages(source, "fixture.rs").is_empty());
+        assert_eq!(
+            format_check_log_messages(source, "fixture.rs"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

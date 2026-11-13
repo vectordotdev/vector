@@ -530,8 +530,7 @@ mod tests {
             let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
             assert_eq!(
                 actual_paths, expected_paths,
-                "failed for patterns {:?}",
-                &str_patterns
+                "failed for patterns {str_patterns:?}"
             );
         }
     }
@@ -582,8 +581,7 @@ mod tests {
             let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
             assert_eq!(
                 actual_paths, expected_paths,
-                "failed for patterns {:?}",
-                &str_patterns
+                "failed for patterns {str_patterns:?}"
             );
         }
     }
@@ -624,8 +622,7 @@ mod tests {
                 .collect();
             assert_eq!(
                 actual_patterns, expected_patterns,
-                "failed for dir {:?} and containers {:?}",
-                &pod_logs_dir, &containers,
+                "failed for dir {pod_logs_dir:?} and containers {containers:?}",
             );
         }
     }

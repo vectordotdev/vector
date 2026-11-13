@@ -4,7 +4,9 @@ use bytes::Bytes;
 use http::{StatusCode, Uri, response::Parts, uri::Scheme};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
+};
 
 use super::parser;
 use crate::{
@@ -309,7 +311,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                         endpoint = %url,
                     );
                 }
-                emit!(PrometheusParseError {
+                emit(PrometheusParseError {
                     error,
                     url: url.clone(),
                     body,
@@ -349,8 +351,11 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             addr::next_addr,
-            components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-            http::spawn_blackhole_http_server,
+            components::{
+                COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+                run_and_assert_source_error,
+            },
+            http::{SlowBody, spawn_blackhole_http_server, spawn_slow_body_http_server},
             start_topology, trace_init, wait_for_tcp,
         },
     };
@@ -401,7 +406,39 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_stalled_body_times_out_without_blocking_other_endpoints() {
+        let stalled = spawn_slow_body_http_server(SlowBody::Stall).await;
+
+        let (_guard, in_addr) = next_addr();
+        let healthy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
+                "#
+        });
+        tokio::spawn(warp::serve(healthy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![stalled.to_string(), format!("http://{in_addr}/metrics")],
+            interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events =
+            run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS)
+                .await;
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -436,7 +473,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -486,7 +523,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -550,7 +587,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<Metric> = events.into_iter().map(Event::into_metric).collect();
         let metric = &metrics[0];
@@ -617,7 +654,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -808,7 +845,7 @@ mod integration_tests {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 

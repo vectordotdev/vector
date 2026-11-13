@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use rdkafka::{
     ClientConfig,
@@ -85,7 +86,7 @@ impl KafkaSink {
                     self.topic
                         .render_string(&event)
                         .map_err(|error| {
-                            emit!(TemplateRenderingError {
+                            emit(TemplateRenderingError {
                                 field: None,
                                 drop_event: true,
                                 error,
@@ -99,7 +100,7 @@ impl KafkaSink {
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

@@ -45,6 +45,7 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 
 mod http2;
+mod streaming;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const INVALID_CA_PATH: &str = "tests/integration/http-client/data/certs/invalid-ca-cert.pem";
@@ -115,20 +116,20 @@ trait TestClient: Send + Sync {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum ClientVersion {
-    V1,
+enum ClientKind {
+    Http,
     #[cfg(feature = "aws-core")]
     Aws,
 }
 
-impl ClientVersion {
+impl ClientKind {
     fn build(
         self,
         tls: MaybeTlsSettings,
         proxy: &ProxyConfig,
     ) -> Result<Box<dyn TestClient>, String> {
         match self {
-            Self::V1 => Ok(Box::new(
+            Self::Http => Ok(Box::new(
                 HttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
             )),
             #[cfg(feature = "aws-core")]
@@ -501,12 +502,12 @@ fn assert_success(response: TestResponse) {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn direct_http(#[case] client_version: ClientVersion) {
+async fn direct_http(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
-    let client = client_version
+    let client = client_kind
         .build(no_tls(), &ProxyConfig::default())
         .unwrap();
 
@@ -515,12 +516,12 @@ async fn direct_http(#[case] client_version: ClientVersion) {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn direct_https_with_trusted_ca(#[case] client_version: ClientVersion) {
+async fn direct_https_with_trusted_ca(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(false)).await;
-    let client = client_version
+    let client = client_kind
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
 
@@ -528,12 +529,12 @@ async fn direct_https_with_trusted_ca(#[case] client_version: ClientVersion) {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn direct_https_rejects_untrusted_ca(#[case] client_version: ClientVersion) {
+async fn direct_https_rejects_untrusted_ca(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(false)).await;
-    let client = client_version
+    let client = client_kind
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(INVALID_CA_PATH.into()),
@@ -550,12 +551,12 @@ async fn direct_https_rejects_untrusted_ca(#[case] client_version: ClientVersion
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) {
+async fn direct_https_honors_server_name(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(false)).await;
-    let without_override = client_version
+    let without_override = client_kind
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
     without_override
@@ -563,7 +564,7 @@ async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) 
         .await
         .expect_err("the server certificate does not cover its IP address");
 
-    let with_override = client_version
+    let with_override = client_kind
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -577,12 +578,12 @@ async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) 
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
+async fn direct_https_supports_mtls(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(true)).await;
-    let without_identity = client_version
+    let without_identity = client_kind
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
     without_identity
@@ -590,7 +591,7 @@ async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
         .await
         .expect_err("the server requires a client certificate");
 
-    let with_identity = client_version
+    let with_identity = client_kind
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -614,7 +615,7 @@ fn mtls_client_tls() -> MaybeTlsSettings {
 }
 
 #[tokio::test]
-async fn v1_reload_tls_applies_to_clones() {
+async fn reload_tls_applies_to_clones() {
     let origin = spawn_origin(server_tls(true)).await;
     let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
     client
@@ -629,7 +630,7 @@ async fn v1_reload_tls_applies_to_clones() {
 }
 
 #[tokio::test]
-async fn v1_tls_reload_handle_does_not_keep_client_alive() {
+async fn tls_reload_handle_does_not_keep_client_alive() {
     let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
     let handle = client.tls_reload_handle();
     let clone = client.clone();
@@ -642,7 +643,7 @@ async fn v1_tls_reload_handle_does_not_keep_client_alive() {
 }
 
 #[tokio::test]
-async fn v1_reload_tls_does_not_reuse_pooled_connections() {
+async fn reload_tls_does_not_reuse_pooled_connections() {
     let origin = spawn_origin(server_tls(false)).await;
     let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
     assert_success(client.get(&origin.https_uri()).await.unwrap());
@@ -668,7 +669,7 @@ async fn v1_reload_tls_does_not_reuse_pooled_connections() {
 #[case::without_max_age(None, 1)]
 #[case::with_max_age(Some(Duration::from_millis(500)), 2)]
 #[tokio::test]
-async fn v1_max_connection_age_recycles_connections(
+async fn max_connection_age_recycles_connections(
     #[case] max_connection_age: Option<Duration>,
     #[case] expected_connections: usize,
 ) {
@@ -690,7 +691,7 @@ async fn v1_max_connection_age_recycles_connections(
 }
 
 #[tokio::test]
-async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
+async fn max_connection_age_fails_truncated_close_delimited_body() {
     // A close-delimited response (no `Content-Length` or `Transfer-Encoding`) whose body is
     // still streaming when the connection reaches its maximum age.
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -730,13 +731,13 @@ async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn http_via_authenticated_proxy(#[case] client_version: ClientVersion) {
+async fn http_via_authenticated_proxy(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = client_version
+    let client = client_kind
         .build(no_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -766,13 +767,13 @@ async fn http_via_authenticated_proxy(#[case] client_version: ClientVersion) {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn http_proxy_credentials_do_not_reach_origin(#[case] client_version: ClientVersion) {
+async fn http_proxy_credentials_do_not_reach_origin(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = client_version
+    let client = client_kind
         .build(no_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -793,13 +794,13 @@ async fn http_proxy_credentials_do_not_reach_origin(#[case] client_version: Clie
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn https_via_authenticated_connect_proxy(#[case] client_version: ClientVersion) {
+async fn https_via_authenticated_connect_proxy(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = client_version
+    let client = client_kind
         .build(trusted_client_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -830,10 +831,10 @@ async fn https_via_authenticated_connect_proxy(#[case] client_version: ClientVer
 }
 
 #[tokio::test]
-async fn v1_accepts_any_successful_connect_status() {
+async fn accepts_any_successful_connect_status() {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy_with_connect_status(no_tls(), false, StatusCode::CREATED).await;
-    let client = ClientVersion::V1
+    let client = ClientKind::Http
         .build(trusted_client_tls(), &proxy_config(&proxy, false, false))
         .unwrap();
 
@@ -841,14 +842,14 @@ async fn v1_accepts_any_successful_connect_status() {
 }
 
 #[tokio::test]
-async fn v1_tls_proxy_uses_http1_alpn() {
+async fn tls_proxy_uses_http1_alpn() {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(
         server_tls_with_alpn(false, Some(vec!["h2".to_owned(), "http/1.1".to_owned()])),
         false,
     )
     .await;
-    let client = ClientVersion::V1
+    let client = ClientKind::Http
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -867,43 +868,43 @@ async fn v1_tls_proxy_uses_http1_alpn() {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn no_proxy_bypasses_proxy(#[case] client_version: ClientVersion) {
+async fn no_proxy_bypasses_proxy(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
     let mut config = proxy_config(&proxy, false, false);
     config.no_proxy = "127.0.0.1".into();
-    let client = client_version.build(no_tls(), &config).unwrap();
+    let client = client_kind.build(no_tls(), &config).unwrap();
 
     assert_success(client.get(&origin.http_ip_uri()).await.unwrap());
     assert!(proxy.observations().is_empty());
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn disabled_proxy_is_bypassed(#[case] client_version: ClientVersion) {
+async fn disabled_proxy_is_bypassed(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
     let mut config = proxy_config(&proxy, false, false);
     config.enabled = false;
-    let client = client_version.build(no_tls(), &config).unwrap();
+    let client = client_kind.build(no_tls(), &config).unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
     assert!(proxy.observations().is_empty());
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn http_via_tls_proxy(#[case] client_version: ClientVersion) {
+async fn http_via_tls_proxy(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(server_tls(false), false).await;
-    let client = client_version
+    let client = client_kind
         .build(trusted_client_tls(), &proxy_config(&proxy, true, false))
         .unwrap();
 
@@ -912,13 +913,13 @@ async fn http_via_tls_proxy(#[case] client_version: ClientVersion) {
 }
 
 #[rstest]
-#[case::v1(ClientVersion::V1)]
-#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
+#[case::http(ClientKind::Http)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientKind::Aws))]
 #[tokio::test]
-async fn https_via_tls_connect_proxy(#[case] client_version: ClientVersion) {
+async fn https_via_tls_connect_proxy(#[case] client_kind: ClientKind) {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(server_tls(false), false).await;
-    let client = client_version
+    let client = client_kind
         .build(trusted_client_tls(), &proxy_config(&proxy, true, false))
         .unwrap();
 

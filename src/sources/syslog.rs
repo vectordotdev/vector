@@ -1,4 +1,5 @@
 use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -340,7 +341,6 @@ impl TcpSource for SyslogTcpSource {
     }
 }
 
-#[must_use]
 pub fn udp(
     addr: SocketListenAddr,
     _max_length: usize,
@@ -353,7 +353,7 @@ pub fn udp(
     Box::pin(async move {
         let listenfd = ListenFd::from_env();
         let socket = try_bind_udp_socket(addr, listenfd).await.map_err(|error| {
-            emit!(SocketBindError {
+            emit(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
             });
@@ -372,7 +372,7 @@ pub fn udp(
             r#type = "udp"
         );
 
-        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+        let bytes_received = register(BytesReceived::from(Protocol::UDP));
 
         let mut stream = UdpFramed::new(
             socket,
@@ -392,7 +392,7 @@ pub fn udp(
                     Ok(((mut events, byte_size), received_from)) => {
                         let count = events.len();
                         bytes_received.emit(ByteSize(byte_size));
-                        emit!(SocketEventsReceived {
+                        emit(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
@@ -402,7 +402,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(SocketReceiveError {
+                        emit(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error,
                         });
@@ -420,7 +420,7 @@ pub fn udp(
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Err(error.into())
             }
         }

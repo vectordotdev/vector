@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::{emit, register};
 
 use futures::StreamExt;
 use serde_with::serde_as;
@@ -187,8 +188,8 @@ struct InternalMetrics<'a> {
 
 impl InternalMetrics<'_> {
     async fn run(mut self) -> vector_lib::source_sender::SendResult {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -226,7 +227,7 @@ impl InternalMetrics<'_> {
             });
 
             if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(error);
             }
         }
@@ -390,7 +391,7 @@ mod tests {
         )
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         events.remove(0)
     }
 
@@ -481,8 +482,7 @@ mod tests {
         assert_eq!(gauge.kind(), MetricKind::Absolute);
         assert_eq!(gauge.value(), &MetricValue::Gauge { value: 2.0 });
 
-        // Declared a counter but non-monotonic, so it is left absolute too.
-        let cardinality = find(&metrics, vector_lib::metrics::CARDINALITY_COUNTER_KEY_NAME);
+        let cardinality = find(&metrics, "internal_metrics_cardinality");
         assert_eq!(cardinality.kind(), MetricKind::Absolute);
     }
 

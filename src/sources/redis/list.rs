@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use futures::FutureExt;
 use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
@@ -54,7 +55,7 @@ impl InputHandler {
                         let err: RedisError = error;
                         let kind = err.kind();
 
-                        emit!(RedisReceiveEventError::from(err));
+                        emit(RedisReceiveEventError::from(err));
 
                         if kind == ErrorKind::IoError && !stopping {
                             // Back off before retrying, but stay responsive to shutdown.

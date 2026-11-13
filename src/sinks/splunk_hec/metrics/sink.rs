@@ -1,4 +1,5 @@
 use std::{fmt, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use serde::Serialize;
 use vector_lib::event::{Metric, MetricValue};
@@ -130,7 +131,7 @@ impl HecMetricsProcessedEventMetadata {
         match *metric.value() {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(SplunkInvalidMetricReceivedError {
+                emit(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
                     error: "Metric kind not supported.".into(),
@@ -164,7 +165,7 @@ pub(super) fn process_metric(
         match t.render_string(&metric) {
             Ok(s) => Some(Some(s)),
             Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -172,7 +173,7 @@ pub(super) fn process_metric(
                 None
             }
             Err(error) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: false,

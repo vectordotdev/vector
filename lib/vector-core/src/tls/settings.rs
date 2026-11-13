@@ -183,10 +183,35 @@ pub struct TlsSettings {
 
 /// Identity store in PEM format
 #[derive(Clone)]
-pub(super) struct IdentityStore {
+pub struct IdentityStore {
     cert: X509,
     key: PKey<Private>,
     ca: Option<Vec<X509>>,
+}
+
+impl IdentityStore {
+    /// Serializes identity (leaf cert, private key, and optional intermediate chain)
+    /// into a DER-encoded PKCS#12 archive in memory.
+    pub fn to_pkcs12(
+        &self,
+        password: &str,
+    ) -> std::result::Result<Vec<u8>, openssl::error::ErrorStack> {
+        let mut builder = Pkcs12::builder();
+        builder.cert(&self.cert);
+        builder.pkey(&self.key);
+
+        if let Some(ca_chain) = &self.ca {
+            let mut stack = Stack::new()?;
+            for ca in ca_chain {
+                stack.push(ca.clone())?;
+            }
+            builder.ca(stack);
+        }
+
+        let p12 = builder.build2(password)?;
+        let der = p12.to_der()?;
+        Ok(der)
+    }
 }
 
 impl TlsSettings {
@@ -450,7 +475,7 @@ fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
 }
 
 impl TlsConfig {
-    fn load_authorities(&self) -> Result<Vec<X509>> {
+    pub fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {
@@ -469,7 +494,7 @@ impl TlsConfig {
         }
     }
 
-    fn load_identity(&self) -> Result<Option<IdentityStore>> {
+    pub fn load_identity(&self) -> Result<Option<IdentityStore>> {
         match (&self.crt_file, &self.key_file) {
             (None, Some(_)) => Err(TlsError::MissingCrtKeyFile),
             (None, None) => Ok(None),

@@ -10,6 +10,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -890,7 +891,7 @@ impl Source {
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
-        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        let bytes_received = register(BytesReceived::from(Protocol::HTTP));
         // The line stream and the sweep below both run on this task, so the lock is never
         // contended.
         let pod_counters = Arc::new(Mutex::new(PodCountersCache::default()));
@@ -910,7 +911,7 @@ impl Source {
 
             let event_json_size = event.estimated_json_encoded_size_of();
 
-            emit!(KubernetesLogsEventsReceived {
+            emit(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event_json_size,
                 pod: file_info
@@ -920,7 +921,7 @@ impl Source {
             });
 
             if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationError { event: &event });
+                emit(KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -928,13 +929,13 @@ impl Source {
                     && let Some(name) = namespace
                     && ns_annotator.annotate(&mut event, name).is_none()
                 {
-                    emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                    emit(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                 }
 
                 let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
 
                 if node_info.is_none() {
-                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
+                    emit(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
 
@@ -971,7 +972,7 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
+                    Err(error) => emit(KubernetesLifecycleError {
                         message: "File server exited with an error.",
                         error,
                         count: events_count,
@@ -988,10 +989,10 @@ impl Source {
             )
             .map(|result| match result {
                 Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                Ok(Err(_)) => emit!(StreamClosedError {
-                    count: events_count
+                Ok(Err(_)) => emit(StreamClosedError {
+                    count: events_count,
                 }),
-                Err(error) => emit!(KubernetesLifecycleError {
+                Err(error) => emit(KubernetesLifecycleError {
                     error,
                     message: "Event processing loop timed out during the shutdown.",
                     count: events_count,

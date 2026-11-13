@@ -496,10 +496,6 @@ mod test {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[test]
     fn sanitizing_sampling() {
         assert_eq!(1.0, sanitize_sampling(0.0));
