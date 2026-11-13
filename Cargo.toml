@@ -262,7 +262,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] , git = "https://github.com/vectordotdev/vrl.git", branch = "main" }
-zstd = { version = "0.13.0", default-features = false }
+zstd = { version = "0.14.3", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
 similar-asserts = "2.0.0"

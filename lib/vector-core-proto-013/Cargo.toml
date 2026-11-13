@@ -10,8 +10,8 @@ description = "Test-only protobuf decoders for compatibility with older Vector r
 workspace = true
 
 [dependencies]
-prost = { version = "0.13", default-features = false, features = ["std", "derive"] }
-prost-types = { version = "0.13", default-features = false }
+prost = { version = "0.14", default-features = false, features = ["std", "derive"] }
+prost-types = { version = "0.14", default-features = false }
 
 [build-dependencies]
-prost-build = { version = "0.13", default-features = false }
+prost-build = { version = "0.14", default-features = false }
