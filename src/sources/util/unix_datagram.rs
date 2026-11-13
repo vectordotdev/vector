@@ -15,6 +15,7 @@ use vector_lib::{
     codecs::{
         DecoderFramedRead, StreamDecodingError,
         decoding::format::{BoxedDeserializer, Deserializer as FormatDeserializer},
+        internal_events::DecoderDeserializeError,
     },
     config::LogNamespace,
     internal_event::{
@@ -728,10 +729,13 @@ async fn listen(
                                     return Ok(());
                                 }
                             }
-                            Err(error) => emit(SocketReceiveError {
-                                mode: SocketMode::Unix,
-                                error: &error,
-                            }),
+                            Err(error) => {
+                                emit(DecoderDeserializeError { error: &error });
+                                emit(SocketReceiveError {
+                                    mode: SocketMode::Unix,
+                                    error: &error,
+                                });
+                            }
                         }
                     }
                 } else {
@@ -759,6 +763,7 @@ async fn listen(
                                 }
                             }
                             Err(error) => {
+                                emit(DecoderDeserializeError { error: &error });
                                 emit(SocketReceiveError {
                                     mode: SocketMode::Unix,
                                     error: &error,
@@ -829,13 +834,85 @@ mod tests {
         time::{Duration, timeout},
     };
     use vector_lib::{
-        codecs::BytesDeserializerConfig, config::LogNamespace, event::EventContainer,
+        codecs::{BytesDeserializerConfig, JsonDeserializerConfig},
+        config::LogNamespace,
+        event::EventContainer,
     };
 
     use super::{
         DatagramDecoder, UnixDatagramBatchReceiver, bind_unix_datagram, listen, unnamed_socket_host,
     };
     use crate::{SourceSender, shutdown::ShutdownSignal};
+
+    #[rstest::rstest]
+    #[case::without_peer_address(false)]
+    #[case::with_peer_address(true)]
+    #[tokio::test]
+    async fn message_decoder_preserves_parser_error_metrics(#[case] capture_peer_address: bool) {
+        crate::test_util::trace_init();
+        let directory = tempfile::tempdir().unwrap();
+        let receiver_path = directory.path().join("receiver");
+        let sender_path = directory.path().join("sender");
+        let socket = UnixDatagram::bind(&receiver_path).unwrap();
+        let sender = UnixDatagram::bind(&sender_path).unwrap();
+        sender.connect(&receiver_path).unwrap();
+        sender.send(b"not json").await.unwrap();
+        sender.send(br#"{"message":"valid"}"#).await.unwrap();
+
+        let (out, mut output) = SourceSender::new_test();
+        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
+        let expected_peer =
+            capture_peer_address.then(|| sender_path.to_string_lossy().into_owned());
+        let source = tokio::spawn(listen(
+            socket,
+            1024,
+            None,
+            DatagramDecoder::Message(
+                Box::new(JsonDeserializerConfig::default().build()),
+                LogNamespace::Legacy,
+            ),
+            capture_peer_address,
+            shutdown,
+            move |_, received_from| assert_eq!(received_from, expected_peer),
+            out,
+        ));
+
+        // Receiving the valid packet also synchronizes processing of the malformed one.
+        let event = timeout(Duration::from_secs(5), output.next())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(event.as_log()["message"], "valid".into());
+        stop.cancel();
+        timeout(Duration::from_secs(5), source)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(output.next().await.is_none());
+
+        let metrics = vector_lib::metrics::Controller::get()
+            .unwrap()
+            .capture_metrics();
+        for (code, error_type, stage) in [
+            ("decoder_deserialize", "parser_failed", "processing"),
+            ("socket_receive", "reader_failed", "receiving"),
+        ] {
+            let metric = metrics
+                .iter()
+                .find(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_value("error_code").as_deref() == Some(code)
+                        && metric.tag_value("error_type").as_deref() == Some(error_type)
+                        && metric.tag_value("stage").as_deref() == Some(stage)
+                })
+                .unwrap_or_else(|| panic!("missing {code} error metric"));
+            assert_eq!(
+                metric.value(),
+                &crate::event::MetricValue::Counter { value: 1.0 }
+            );
+        }
+    }
 
     #[tokio::test]
     async fn shutdown_drains_backpressured_batch() {
