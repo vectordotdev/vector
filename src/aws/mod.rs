@@ -39,7 +39,7 @@ use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use http::{HeaderMap, HeaderName, HeaderValue};
-use http_body::{Body, Frame};
+use http_body::{Body, Frame, SizeHint};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -120,6 +120,20 @@ fn connector(
         tls_settings,
         proxy,
     )?))
+}
+
+/// Creates the HTTP client that AWS service clients use: [`connector`] behind the connector that
+/// emits the request telemetry and counts the bytes sent.
+pub(crate) fn service_http_client(
+    proxy: &ProxyConfig,
+    tls_options: Option<&TlsConfig>,
+    region: Region,
+) -> crate::Result<SharedHttpClient> {
+    Ok(SharedHttpClient::new(AwsHttpClient {
+        http: connector(proxy, tls_options)?,
+        region,
+        emit_bytes_sent: true,
+    }))
 }
 
 /// Implement for each AWS service to create the appropriate AWS sdk client.
@@ -222,14 +236,7 @@ where
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
-    let connector = connector(proxy, tls_options)?;
-
-    // Create a custom http connector that will emit the required metrics for us.
-    let connector = AwsHttpClient {
-        http: connector,
-        region: region.clone(),
-        emit_bytes_sent: true,
-    };
+    let connector = service_http_client(proxy, tls_options, region.clone())?;
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
@@ -574,6 +581,8 @@ where
     }
 }
 
+/// Counts the data bytes of an SDK request body and forwards every frame, the end-of-stream state
+/// and the size hint unchanged, so that the transport frames the body as the SDK built it.
 #[pin_project]
 struct MeasuredBody {
     #[pin]
@@ -600,18 +609,22 @@ impl Body for MeasuredBody {
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         let this = self.project();
 
-        match ready!(this.inner.poll_frame(cx)) {
-            Some(Ok(frame)) => match frame.into_data() {
-                Ok(data) => {
-                    this.shared_bytes_sent
-                        .fetch_add(data.len(), Ordering::Release);
-                    Poll::Ready(Some(Ok(Frame::data(data))))
-                }
-                // Trailers are dropped.
-                Err(_trailers) => Poll::Ready(None),
-            },
-            other => Poll::Ready(other),
+        let frame = ready!(this.inner.poll_frame(cx));
+        if let Some(Ok(frame)) = &frame
+            && let Some(data) = frame.data_ref()
+        {
+            this.shared_bytes_sent
+                .fetch_add(data.len(), Ordering::Release);
         }
+        Poll::Ready(frame)
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
     }
 }
 
@@ -694,6 +707,96 @@ mod tests {
             parts.headers
         );
         assert_eq!(body, Bytes::from_static(b"request body"));
+    }
+
+    /// The byte-counting connector used by AWS service clients sends a body of known length with
+    /// `Content-Length`, like the connector without byte telemetry, instead of chunked encoding.
+    #[tokio::test]
+    async fn byte_counting_connector_keeps_content_length() {
+        let (observed_tx, mut observed_rx) = mpsc::unbounded_channel();
+        let uri = spawn_blackhole_http_server(move |request: http::Request<Incoming>| {
+            let observed_tx = observed_tx.clone();
+            async move {
+                let (parts, body) = request.into_parts();
+                let body = body.collect().await.expect("request body").to_bytes();
+                observed_tx
+                    .send((parts, body))
+                    .expect("test receives the request");
+                Ok::<_, Infallible>(http::Response::new(Full::new(Bytes::new())))
+            }
+        })
+        .await;
+        let client = AwsHttpClient {
+            http: connector(&ProxyConfig::default(), None).expect("connector builds"),
+            region: Region::new("us-east-1"),
+            emit_bytes_sent: true,
+        };
+        let http_connector = client.http_connector(
+            &HttpConnectorSettings::default(),
+            &http_client::test_runtime_components(),
+        );
+        let request = http::Request::post(format!("{uri}path"))
+            .body(SdkBody::from("request body"))
+            .expect("valid request");
+        let request = HttpRequest::try_from(request).expect("valid SDK request");
+
+        http_connector
+            .call(request)
+            .await
+            .expect("request succeeds");
+
+        let (parts, body) = observed_rx.recv().await.expect("server saw the request");
+        assert_eq!(parts.headers["content-length"], "12");
+        assert!(
+            !parts.headers.contains_key("transfer-encoding"),
+            "a body of known length must not be chunked: {:?}",
+            parts.headers
+        );
+        assert_eq!(body, Bytes::from_static(b"request body"));
+    }
+
+    /// `MeasuredBody` counts only data bytes and forwards data, trailers, errors, the size hint
+    /// and the end-of-stream state of the SDK body.
+    #[tokio::test]
+    async fn measured_body_forwards_the_body_contract() {
+        let mut trailers = HeaderMap::new();
+        trailers.insert("x-amz-checksum-crc32", HeaderValue::from_static("AAAAAA=="));
+        let frames: Vec<Result<Frame<Bytes>, Box<dyn Error + Send + Sync>>> = vec![
+            Ok(Frame::data(Bytes::from_static(b"abc"))),
+            Ok(Frame::data(Bytes::from_static(b"de"))),
+            Ok(Frame::trailers(trailers.clone())),
+        ];
+        let bytes_sent = Arc::new(AtomicUsize::new(0));
+        let body = MeasuredBody::new(
+            SdkBody::from_body_1_x(http_body_util::StreamBody::new(futures::stream::iter(
+                frames,
+            ))),
+            Arc::clone(&bytes_sent),
+        );
+        let collected = body.collect().await.expect("body is readable");
+        assert_eq!(collected.trailers(), Some(&trailers));
+        assert_eq!(collected.to_bytes(), Bytes::from_static(b"abcde"));
+        assert_eq!(bytes_sent.load(Ordering::Acquire), 5);
+
+        let body = MeasuredBody::new(SdkBody::from("abc"), Arc::new(AtomicUsize::new(0)));
+        assert_eq!(body.size_hint().exact(), Some(3));
+        assert!(!body.is_end_stream());
+        let body = MeasuredBody::new(SdkBody::empty(), Arc::new(AtomicUsize::new(0)));
+        assert!(body.is_end_stream());
+
+        let frames: Vec<Result<Frame<Bytes>, Box<dyn Error + Send + Sync>>> =
+            vec![Err("stream failed".into())];
+        let body = MeasuredBody::new(
+            SdkBody::from_body_1_x(http_body_util::StreamBody::new(futures::stream::iter(
+                frames,
+            ))),
+            Arc::new(AtomicUsize::new(0)),
+        );
+        let error = body
+            .collect()
+            .await
+            .expect_err("the error reaches the reader");
+        assert_eq!(error.to_string(), "stream failed");
     }
 
     /// A server that reads the request but never responds makes the SDK connector fail with a

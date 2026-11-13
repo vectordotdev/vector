@@ -97,6 +97,7 @@ async fn sns_send_message_batch() {
         .await
         .unwrap();
 
+    allow_topic_to_send(&queue_client, &queue_url, &queue_arn, &topic_arn).await;
     subscribe_queue_to_topic(&topic_client, &topic_arn, &queue_arn).await;
 
     let cx = SinkContext::default();
@@ -179,6 +180,33 @@ async fn get_queue_arn(client: &SqsClient, queue_url: String) -> String {
 
 fn gen_queue_name() -> String {
     format!("test-{}", random_string(10).to_lowercase())
+}
+
+/// SNS only delivers to a queue whose policy lets the topic send to it.
+async fn allow_topic_to_send(
+    client: &SqsClient,
+    queue_url: &str,
+    queue_arn: &str,
+    topic_arn: &str,
+) {
+    let policy = serde_json::json!({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": "sns.amazonaws.com" },
+            "Action": "sqs:SendMessage",
+            "Resource": queue_arn,
+            "Condition": { "ArnEquals": { "aws:SourceArn": topic_arn } },
+        }],
+    });
+
+    client
+        .set_queue_attributes()
+        .queue_url(queue_url)
+        .attributes(QueueAttributeName::Policy, policy.to_string())
+        .send()
+        .await
+        .unwrap();
 }
 
 async fn subscribe_queue_to_topic(sns_client: &SnsClient, topic_arn: &str, queue_arn: &str) {

@@ -185,8 +185,7 @@ impl ValidatedSink for PubsubConfig {
             uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
-        let service =
-            HttpService::new(client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(client, service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings,
@@ -710,7 +709,7 @@ mod tests {
 
         let batches = batch(vec![message], size, 1000).await;
         assert_eq!(batches.len(), 1);
-        assert!(batches[0].messages.is_empty());
+        assert_eq!(batches[0].messages, [] as [std::string::String; 0]);
         assert_eq!(batches[0].event_count, 1);
 
         let message = encode(&mut encoder, log_event("message", None));

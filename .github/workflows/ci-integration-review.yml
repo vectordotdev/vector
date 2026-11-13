@@ -68,7 +68,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
+        uses: tspascoal/get-user-teams-membership@239f45b779d25e70c2e669134c6ed90826f008a1 # v4.0.3
         with:
           username: ${{ github.actor }}
           team: "Vector,Observability Pipelines,Single Machine Performance"
@@ -96,6 +96,8 @@ jobs:
       checkout_ref: ${{ github.event.review.commit_id }}
 
   integration-tests:
+    # Skip the matrix for commands that do not target integration tests instead of starting no-op jobs.
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-all')
     needs:
       - prep-pr
       - build-test-runner
@@ -192,7 +194,10 @@ jobs:
 
   e2e-tests:
     # The dedicated command also starts with the ordinary opentelemetry-traces command.
-    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: |
+      github.repository == 'vectordotdev/vector'
+      && (startsWith(github.event.review.body, '/ci-run-e2e') || startsWith(github.event.review.body, '/ci-run-all'))
+      && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
@@ -347,7 +352,7 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
+        uses: tspascoal/get-user-teams-membership@239f45b779d25e70c2e669134c6ed90826f008a1 # v4.0.3
         with:
           username: ${{ github.actor }}
           team: "Vector,Observability Pipelines,Single Machine Performance"

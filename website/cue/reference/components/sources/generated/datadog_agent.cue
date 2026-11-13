@@ -52,7 +52,7 @@ generated: components: sources: datadog_agent: configuration: {
 	disable_metrics: {
 		deprecated:         true
 		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
-		description:        "If this is set to `true`, metrics (beta) are not accepted by the component."
+		description:        "If this is set to `true`, metrics are not accepted by the component."
 		required:           false
 		type: bool: {}
 	}
@@ -80,7 +80,7 @@ generated: components: sources: datadog_agent: configuration: {
 					"""
 				llmobs:  "LLM Observability events."
 				logs:    "Logs."
-				metrics: "Metrics (beta)."
+				metrics: "Metrics."
 				traces:  "Traces (alpha)."
 			}
 			examples: ["logs", "metrics", "traces"]
@@ -104,9 +104,9 @@ generated: components: sources: datadog_agent: configuration: {
 	}
 	multiple_outputs: {
 		description: """
-			If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
+			If this is set to `true`, logs, metrics, and traces (alpha) are sent to different outputs.
 
-			For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
+			For a source component named `agent`, the received logs, metrics, and traces (alpha) can then be
 			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
 			`agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
 			sent to `agent.apm_stats`.

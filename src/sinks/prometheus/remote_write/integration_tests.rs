@@ -67,10 +67,7 @@ async fn insert_metrics(url: &str) {
 
             match metric.value() {
                 MetricValue::Gauge { value } => {
-                    #[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
-                    {
-                        assert_eq!(output["value"].as_f64().unwrap(), *value);
-                    }
+                    assert_eq!(output["value"].as_f64().unwrap(), *value);
                 }
                 _ => panic!("Unhandled metric value, fix the test"),
             }

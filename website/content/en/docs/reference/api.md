@@ -6,7 +6,35 @@ tags: ["api", "grpc"]
 ---
 
 Vector ships with a [gRPC](https://grpc.io) API that allows you to interact with a running Vector
-instance. This page covers how to configure and enable Vector's API.
+instance.
+
+## Enable local inspection
+
+The API is disabled by default. Enable it in the configuration of the Vector process you want to inspect:
+
+```yaml
+api:
+  enabled: true
+  address: "127.0.0.1:8686"
+```
+
+{{< warning >}}
+The API has no authentication. Enable it only in isolated environments or for debugging,
+and restrict access to trusted clients.
+{{< /warning >}}
+
+Start or reload Vector, then inspect it from another terminal:
+
+```shell
+vector top
+vector tap --outputs-of my_transform
+```
+
+`vector top` requires an interactive terminal and displays component activity. To sample events with `vector tap`,
+replace `my_transform` with a source or transform ID. Both commands connect to an already running Vector process.
+If the connection fails, check `api.enabled`, `api.address`, and the client's `--url`.
+
+For a walkthrough, see [Debug a pipeline with `vector top` and `vector tap`](/guides/developer/debugging/#vector-tools).
 
 ## Configuration
 

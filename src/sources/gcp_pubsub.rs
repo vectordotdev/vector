@@ -56,6 +56,9 @@ use crate::{
 
 const MIN_ACK_DEADLINE_SECS: u64 = 10;
 const MAX_ACK_DEADLINE_SECS: u64 = 600;
+const TIMESTAMP_KEY: &str = "timestamp";
+const ATTRIBUTES_KEY: &str = "attributes";
+const MESSAGE_ID_KEY: &str = "message_id";
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -333,22 +336,22 @@ impl SourceConfig for PubsubConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
-                &owned_value_path!("attributes"),
+                Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
+                &owned_value_path!(ATTRIBUTES_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
-                &owned_value_path!("message_id"),
+                Some(LegacyKey::Overwrite(owned_value_path!(MESSAGE_ID_KEY))),
+                &owned_value_path!(MESSAGE_ID_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -712,15 +715,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("message_id"))),
-                    path!("message_id"),
+                    Some(LegacyKey::Overwrite(path!(MESSAGE_ID_KEY))),
+                    path!(MESSAGE_ID_KEY),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("attributes"))),
-                    path!("attributes"),
+                    Some(LegacyKey::Overwrite(path!(ATTRIBUTES_KEY))),
+                    path!(ATTRIBUTES_KEY),
                     attributes.clone(),
                 );
             }
