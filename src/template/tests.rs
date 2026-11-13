@@ -159,6 +159,54 @@ fn render_log_metadata() {
 }
 
 #[test]
+fn render_log_and_trace_complex_reference_paths() {
+    let mut log = LogEvent::from("hello world");
+    log.insert(
+        event_path!("kubernetes", "labels", "app.kubernetes.io/name"),
+        "frontend",
+    );
+    log.insert(event_path!("requests", 0, "status"), 200);
+    log.insert(metadata_path!("tenant"), "customer-01");
+    let template = UnconfinedTemplate::try_from(
+        r#"{{ kubernetes.labels."app.kubernetes.io/name" }}/{{ requests[-1].status }}/{{ %tenant }}"#,
+    )
+    .unwrap();
+
+    for event in [Event::Log(log.clone()), Event::Trace(log.into())] {
+        assert_eq!(
+            template.render_string(&event).unwrap(),
+            "frontend/200/customer-01"
+        );
+        let unsigned = UnsignedIntTemplate::try_from("{{ requests[-1].status }}").unwrap();
+        assert_eq!(unsigned.render(&event).unwrap(), 200);
+    }
+}
+
+#[test]
+fn reference_paths_preserve_source_in_fields_and_missing_key_errors() {
+    let source = r#"{{ missing."field.with.dots" }}-{{ %missing_metadata }}"#;
+    let expected = vec![
+        r#"missing."field.with.dots""#.to_owned(),
+        "%missing_metadata".to_owned(),
+    ];
+    let template = UnconfinedTemplate::try_from(source).unwrap();
+    assert_eq!(template.get_fields(), Some(expected.clone()));
+
+    let unsigned = UnsignedIntTemplate::try_from(source).unwrap();
+    assert_eq!(unsigned.get_fields(), Some(expected.clone()));
+    for event in [
+        Event::Log(LogEvent::default()),
+        Event::Trace(LogEvent::default().into()),
+    ] {
+        let error = TemplateRenderingError::MissingKeys {
+            missing_keys: expected.clone(),
+        };
+        assert_eq!(template.render_string(&event), Err(error.clone()));
+        assert_eq!(unsigned.render(&event), Err(error));
+    }
+}
+
+#[test]
 fn render_log_dynamic_with_prefix() {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
