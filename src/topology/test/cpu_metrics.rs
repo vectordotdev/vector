@@ -33,6 +33,10 @@ const SINK_KIND: &str = "sink";
 /// exceeds that granularity on every supported platform.
 const CPU_BURN_MS: u64 = 1;
 
+/// CPU burned once by the sink healthcheck. Large enough to dwarf what the sink
+/// itself spends on `EVENT_COUNT` events.
+const HEALTHCHECK_CPU_BURN_MS: u32 = 100;
+
 fn has_component_tags(metric: &Metric, kind: &str, component_type: &str, id: &str) -> bool {
     metric.tags().is_some_and(|tags| {
         tags.get("component_id") == Some(id)
@@ -58,6 +62,18 @@ fn assert_component_cpu_counter_positive(
     id: &str,
     has_tags: impl Fn(&Metric, &str) -> bool,
 ) {
+    let value = component_cpu_counter(metrics, id, has_tags);
+    assert!(
+        value > 0.0,
+        "expected component_cpu_usage_ns_total > 0, got {value}"
+    );
+}
+
+fn component_cpu_counter(
+    metrics: &[Metric],
+    id: &str,
+    has_tags: impl Fn(&Metric, &str) -> bool,
+) -> f64 {
     let cpu_metric = metrics
         .iter()
         .find(|m| m.name() == "component_cpu_usage_ns_total" && has_tags(m, id))
@@ -73,12 +89,7 @@ fn assert_component_cpu_counter_positive(
         });
 
     match cpu_metric.value() {
-        MetricValue::Counter { value } => {
-            assert!(
-                *value > 0.0,
-                "expected component_cpu_usage_ns_total > 0, got {value}"
-            );
-        }
+        MetricValue::Counter { value } => *value,
         other => panic!("expected Counter metric, got {other:?}"),
     }
 }
@@ -92,16 +103,17 @@ fn assert_component_cpu_counter_positive(
 /// tests that share the same process-wide registry.
 ///
 /// `measure_cpu_usage` controls the transform's `measure_cpu_usage` flag.
-/// `measure_sink_cpu_usage` controls the sink's, and makes the sink burn CPU in
-/// a spawned subtask for every event.
+/// `measure_sink_cpu_usage` controls the sink's.
 ///
-/// `make_config` receives a base `NoopTransformConfig` and can apply extra
-/// options (e.g. `.with_concurrency()`) before the topology is assembled.
+/// `make_config` and `make_sink` receive the base transform and sink configs and
+/// can apply extra options (e.g. `.with_concurrency()`) before the topology is
+/// assembled.
 async fn run_cpu_topology(
     transform_id: &str,
     measure_cpu_usage: bool,
     measure_sink_cpu_usage: bool,
     make_config: impl FnOnce(NoopTransformConfig) -> NoopTransformConfig,
+    make_sink: impl FnOnce(CompletionSinkConfig) -> CompletionSinkConfig,
 ) -> Vec<Metric> {
     trace_init();
 
@@ -114,10 +126,7 @@ async fn run_cpu_topology(
 
     let (mut source_tx, source_config) = basic_source();
     let (sink_done_tx, sink_done_rx) = oneshot::channel();
-    let mut sink_config = CompletionSinkConfig::new(EVENT_COUNT, sink_done_tx);
-    if measure_sink_cpu_usage {
-        sink_config = sink_config.with_cpu_burn_ms(CPU_BURN_MS);
-    }
+    let sink_config = make_sink(CompletionSinkConfig::new(EVENT_COUNT, sink_done_tx));
 
     let mut config = Config::builder();
     config.add_source(&source_id, source_config);
@@ -142,7 +151,7 @@ async fn run_cpu_topology(
         .expect("sink not found in builder")
         .measure_cpu_usage = measure_sink_cpu_usage;
 
-    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _) = start_topology(config.build().unwrap(), true).await;
 
     for idx in 0..EVENT_COUNT {
         let event = Event::Log(LogEvent::from(format!("payload-{idx}")));
@@ -171,7 +180,8 @@ async fn run_cpu_topology(
 #[tokio::test]
 async fn component_cpu_usage_emitted_function_transform() {
     let id = "cpu_transform_fn";
-    let metrics = run_cpu_topology(id, true, false, |c| c.with_cpu_burn_ms(CPU_BURN_MS)).await;
+    let metrics =
+        run_cpu_topology(id, true, false, |c| c.with_cpu_burn_ms(CPU_BURN_MS), |s| s).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -181,9 +191,13 @@ async fn component_cpu_usage_emitted_function_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
-    let metrics = run_cpu_topology(id, true, false, |_| {
-        NoopTransformConfig::from(TransformType::Task).with_cpu_burn_ms(CPU_BURN_MS)
-    })
+    let metrics = run_cpu_topology(
+        id,
+        true,
+        false,
+        |_| NoopTransformConfig::from(TransformType::Task).with_cpu_burn_ms(CPU_BURN_MS),
+        |s| s,
+    )
     .await;
     assert_cpu_counter_positive(&metrics, id);
 }
@@ -194,9 +208,13 @@ async fn component_cpu_usage_emitted_task_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_concurrent_transform() {
     let id = "cpu_transform_concurrent";
-    let metrics = run_cpu_topology(id, true, false, |c| {
-        c.with_concurrency().with_cpu_burn_ms(CPU_BURN_MS)
-    })
+    let metrics = run_cpu_topology(
+        id,
+        true,
+        false,
+        |c| c.with_concurrency().with_cpu_burn_ms(CPU_BURN_MS),
+        |s| s,
+    )
     .await;
     assert_cpu_counter_positive(&metrics, id);
 }
@@ -206,7 +224,7 @@ async fn component_cpu_usage_emitted_concurrent_transform() {
 #[tokio::test]
 async fn component_cpu_usage_not_emitted_without_measure_cpu_usage() {
     let id = "cpu_transform_no_measure";
-    let metrics = run_cpu_topology(id, false, false, |c| c).await;
+    let metrics = run_cpu_topology(id, false, false, |c| c, |s| s).await;
 
     let sink_id = format!("{id}_sink");
     let found = metrics.iter().any(|m| {
@@ -225,6 +243,30 @@ async fn component_cpu_usage_not_emitted_without_measure_cpu_usage() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_sink() {
     let id = "cpu_sink";
-    let metrics = run_cpu_topology(id, false, true, |c| c).await;
+    let metrics =
+        run_cpu_topology(id, false, true, |c| c, |s| s.with_cpu_burn_ms(CPU_BURN_MS)).await;
     assert_component_cpu_counter_positive(&metrics, &format!("{id}_sink"), has_sink_tags);
+}
+
+/// Sink: connections opened by the healthcheck can be pooled and reused by the
+/// sink, so the tasks it spawns are charged to the sink's counter too.
+#[tokio::test]
+async fn component_cpu_usage_includes_sink_healthcheck_tasks() {
+    let id = "cpu_sink_healthcheck";
+    let metrics = run_cpu_topology(
+        id,
+        false,
+        true,
+        |c| c,
+        |s| s.with_healthcheck_cpu_burn_ms(u64::from(HEALTHCHECK_CPU_BURN_MS)),
+    )
+    .await;
+
+    // Half the burn, to absorb preemption and Windows' clock-tick granularity.
+    let min_ns = f64::from(HEALTHCHECK_CPU_BURN_MS) * 1e6 / 2.0;
+    let value = component_cpu_counter(&metrics, &format!("{id}_sink"), has_sink_tags);
+    assert!(
+        value >= min_ns,
+        "expected component_cpu_usage_ns_total >= {min_ns}, got {value}"
+    );
 }

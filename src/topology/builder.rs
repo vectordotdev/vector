@@ -765,6 +765,8 @@ impl<'a> Builder<'a> {
             .map_err(Into::into)
         };
 
+        // Connections opened by the healthcheck can be pooled and reused by the sink.
+        let healthcheck = cpu_scoped_if(healthcheck, cpu_ns.clone());
         let task = Task::new(key.clone(), typetag, cpu_timed_if(sink, cpu_ns));
 
         let component_key = key.clone();

@@ -33,6 +33,10 @@ pub struct CompletionSinkConfig {
     /// CPU time burned per event, in a task spawned with `spawn_timed`.
     #[serde(skip)]
     cpu_burn_ms: Option<u64>,
+
+    /// CPU time burned by the healthcheck, in a task spawned with `spawn_timed`.
+    #[serde(skip)]
+    healthcheck_cpu_burn_ms: Option<u64>,
 }
 
 impl_generate_config_from_default!(CompletionSinkConfig);
@@ -44,12 +48,19 @@ impl CompletionSinkConfig {
             expected,
             completion_tx: Arc::new(Mutex::new(Some(completion_tx))),
             cpu_burn_ms: None,
+            healthcheck_cpu_burn_ms: None,
         }
     }
 
     #[must_use]
     pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
         self.cpu_burn_ms = Some(cpu_burn_ms);
+        self
+    }
+
+    #[must_use]
+    pub fn with_healthcheck_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
+        self.healthcheck_cpu_burn_ms = Some(cpu_burn_ms);
         self
     }
 }
@@ -90,7 +101,14 @@ impl ValidatedSink for CompletionSinkConfig {
             completion_tx,
             cpu_burn: self.cpu_burn_ms.map(Duration::from_millis),
         };
-        let healthcheck = future::ready(Ok(())).boxed();
+        let healthcheck = match self.healthcheck_cpu_burn_ms.map(Duration::from_millis) {
+            Some(cpu_burn) => async move {
+                spawn_timed(async move { busy_spin(cpu_burn) }).await?;
+                Ok(())
+            }
+            .boxed(),
+            None => future::ready(Ok(())).boxed(),
+        };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
