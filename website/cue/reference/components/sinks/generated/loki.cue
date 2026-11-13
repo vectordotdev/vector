@@ -124,6 +124,28 @@ generated: components: sinks: loki: configuration: {
 		required: true
 		type: string: examples: ["http://localhost:3100"]
 	}
+	expanded_key_case: {
+		description: """
+			Case of label and structured metadata keys that are expanded from `*` or from a prefix ending
+			with `*`.
+
+			Loki label names and structured metadata keys are case-sensitive. Characters other than ASCII
+			letters, digits, and `_` are replaced with `_` in both modes. Keys that are not expanded are
+			never changed.
+			"""
+		required: false
+		type: string: {
+			default: "lowercase"
+			enum: {
+				lowercase: """
+					Lowercase expanded keys, for example `userId` becomes `userid`.
+
+					Keys that differ only by case collide, and the last one wins.
+					"""
+				preserve: "Keep expanded keys in the case they have in the event, for example `userId` stays `userId`."
+			}
+		}
+	}
 	labels: {
 		description: """
 			A set of labels that are attached to each batch of events.
