@@ -301,6 +301,28 @@ fn validate_captures(directory: &Path, transport: &str) -> Result<(), String> {
     }
 }
 
+/// Writes the machine-readable outcome that CI reports on the PR. It runs for every
+/// outcome, including early errors that leave no `summary.md`.
+fn write_result(directory: &Path, name: &str, result: &Result<(), String>) {
+    let failures: Vec<&str> = match result {
+        Ok(()) => Vec::new(),
+        Err(error) => error.lines().collect(),
+    };
+    let body = serde_json::json!({
+        "name": name,
+        "passed": result.is_ok(),
+        "failures": failures,
+    });
+    if let Err(error) = fs::create_dir_all(directory).and_then(|()| {
+        fs::write(
+            directory.join("result.json"),
+            serde_json::to_string_pretty(&body).unwrap(),
+        )
+    }) {
+        eprintln!("Failed to write result.json: {error}");
+    }
+}
+
 #[test]
 fn trace_round_trip() {
     let exporter = std::env::var("CONFIG_INGRESS_EXPORTER").unwrap();
@@ -310,7 +332,9 @@ fn trace_round_trip() {
         _ => panic!("Unsupported ingress exporter: {exporter}"),
     };
     let directory = Path::new(OUTPUT).join(&exporter);
-    validate_captures(&directory, transport).unwrap_or_else(|error| panic!("{error}"));
+    let result = validate_captures(&directory, transport);
+    write_result(&directory, &format!("{transport} ({exporter})"), &result);
+    result.unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[cfg(test)]
@@ -368,6 +392,33 @@ mod tests {
                 .unwrap_err()
                 .contains("Timed out draining Vector")
         );
+    }
+
+    #[test]
+    fn result_lists_each_failure_line() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("otlp");
+        write_result(
+            &path,
+            "gRPC (otlp)",
+            &Err("Missing service: ad\nMissing service: cart".into()),
+        );
+        let result: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path.join("result.json")).unwrap()).unwrap();
+        assert_eq!(
+            result,
+            serde_json::json!({
+                "name": "gRPC (otlp)",
+                "passed": false,
+                "failures": ["Missing service: ad", "Missing service: cart"],
+            })
+        );
+
+        write_result(&path, "gRPC (otlp)", &Ok(()));
+        let result: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path.join("result.json")).unwrap()).unwrap();
+        assert_eq!(result["passed"], true);
+        assert_eq!(result["failures"], serde_json::json!([]));
     }
 
     #[test]
