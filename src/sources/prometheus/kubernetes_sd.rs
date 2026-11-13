@@ -4,7 +4,13 @@
 //! target resolution (`prometheus.io/*` annotations). Used by the
 //! `prometheus_scrape` source when `targets` includes a `kubernetes` block.
 
-use std::{collections::BTreeMap, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::IpAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
 
 use futures::{StreamExt, future};
 use http::{HeaderName, HeaderValue, Uri};
@@ -127,7 +133,7 @@ pub(crate) struct KubernetesScrapeConfig {
     #[configurable(metadata(docs::examples = "metadata.namespace=monitoring"))]
     pub(crate) extra_field_selector: String,
 
-    /// Kubernetes label selector merged with the built-in `vector.dev/exclude!=true` filter.
+    /// Kubernetes label selector that limits which Pods are discovered.
     ///
     /// `extra_label_selector` is accepted as a backwards-compatible alias.
     #[configurable(metadata(docs::examples = "tier=frontend"))]
@@ -242,13 +248,8 @@ pub(crate) fn build_field_selector(self_node_name: Option<&str>, extra: &str) ->
     }
 }
 
-pub(crate) fn build_label_selector(extra: &str) -> String {
-    const BUILT_IN: &str = "vector.dev/exclude!=true";
-    if extra.is_empty() {
-        BUILT_IN.to_string()
-    } else {
-        format!("{BUILT_IN},{extra}")
-    }
+pub(crate) fn build_label_selector(label_selector: &str) -> Option<String> {
+    (!label_selector.is_empty()).then(|| label_selector.to_owned())
 }
 
 /// Watches Pods and turns them into scrape targets.
@@ -268,19 +269,21 @@ impl PodDiscovery {
         client: &Client,
         namespaces: &[String],
         field_selector: Option<String>,
-        label_selector: String,
+        label_selector: Option<String>,
         parser_cfg: AnnotationParserConfig,
     ) -> Self {
         let watcher_cfg = watcher::Config {
             field_selector,
-            label_selector: Some(label_selector),
+            label_selector,
             ..Default::default()
         };
+        // A namespace listed twice would get two watchers and every Pod in it scraped twice.
+        let namespaces: BTreeSet<&String> = namespaces.iter().collect();
         let apis = if namespaces.is_empty() {
             vec![Api::<Pod>::all(client.clone())]
         } else {
             namespaces
-                .iter()
+                .into_iter()
                 .map(|namespace| Api::<Pod>::namespaced(client.clone(), namespace))
                 .collect()
         };
@@ -425,8 +428,6 @@ pub(crate) struct AnnotationParserConfig {
 enum AnnotationError {
     #[snafu(display("invalid value for {key}: {value}"))]
     InvalidValue { key: String, value: String },
-    #[snafu(display("pod has no IP address yet"))]
-    NoPodIp,
     #[snafu(display("could not resolve port: {message}"))]
     PortResolution { message: String },
     #[snafu(display("failed to build URI: {source}"))]
@@ -453,6 +454,19 @@ fn extract_targets(
     if !is_truthy(scrape) {
         return Ok(Vec::new());
     }
+
+    // Skip Pods that can't serve metrics yet or anymore. `Unknown` is kept: it only means the
+    // control plane lost contact with the node.
+    let status = pod.status.as_ref();
+    if matches!(
+        status.and_then(|status| status.phase.as_deref()),
+        Some("Pending" | "Succeeded" | "Failed")
+    ) {
+        return Ok(Vec::new());
+    }
+    let Some(pod_ip) = status.and_then(|status| status.pod_ip.clone()) else {
+        return Ok(Vec::new());
+    };
 
     let path_key = format!("{}/path", cfg.prefix);
     let path = annotations
@@ -483,11 +497,6 @@ fn extract_targets(
         .collect();
     query_pairs.sort();
 
-    let pod_ip = pod
-        .status
-        .as_ref()
-        .and_then(|s| s.pod_ip.clone())
-        .ok_or(AnnotationError::NoPodIp)?;
     let pod_name = pod
         .metadata
         .name
@@ -583,9 +592,17 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
         ));
     }
 
-    // No annotation: prefer named "metrics"-like ports, else the first
-    // declared port.
-    let preferred: Vec<ResolvedPort> = all_ports
+    // No annotation: prefer named "metrics"-like ports, else the first declared port. Only TCP
+    // ports can serve HTTP; a port without a protocol is TCP.
+    let tcp_ports: Vec<_> = all_ports
+        .iter()
+        .filter(|(_, p)| {
+            p.protocol
+                .as_deref()
+                .is_none_or(|protocol| protocol == "TCP")
+        })
+        .collect();
+    let preferred: Vec<ResolvedPort> = tcp_ports
         .iter()
         .filter(|(_, p)| matches!(p.name.as_deref(), Some(name) if is_metrics_port_name(name)))
         .filter_map(|(container, p)| {
@@ -601,7 +618,7 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
         return Ok(preferred);
     }
 
-    if let Some((container, p)) = all_ports.first()
+    if let Some((container, p)) = tcp_ports.first()
         && let Ok(port) = u16::try_from(p.container_port)
     {
         return Ok(vec![ResolvedPort {
@@ -873,6 +890,39 @@ mod tests {
     }
 
     #[test]
+    fn automatic_port_selection_skips_non_tcp_ports() {
+        let pod = make_pod(
+            "p",
+            "ns",
+            &[("prometheus.io/scrape", "true")],
+            &[],
+            vec![
+                ContainerPort {
+                    name: Some("metrics".to_owned()),
+                    container_port: 9100,
+                    protocol: Some("UDP".to_owned()),
+                    ..Default::default()
+                },
+                ContainerPort {
+                    container_port: 5353,
+                    protocol: Some("SCTP".to_owned()),
+                    ..Default::default()
+                },
+                ContainerPort {
+                    container_port: 8080,
+                    protocol: Some("TCP".to_owned()),
+                    ..Default::default()
+                },
+            ],
+            Some("10.0.0.1"),
+            None,
+        );
+        let targets = extract_targets(&pod, &default_cfg()).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].uri.to_string(), "http://10.0.0.1:8080/metrics");
+    }
+
+    #[test]
     fn custom_path_and_https_scheme() {
         let pod = make_pod(
             "p",
@@ -969,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    fn pod_without_ip_returns_error() {
+    fn pod_without_ip_yields_no_targets() {
         let pod = make_pod(
             "p",
             "ns",
@@ -983,9 +1033,35 @@ mod tests {
             None,
         );
         let cfg = default_cfg();
-        match extract_targets(&pod, &cfg).unwrap_err() {
-            AnnotationError::NoPodIp => {}
-            other => panic!("unexpected error: {other:?}"),
+        assert_eq!(extract_targets(&pod, &cfg).unwrap(), [] as [Target; 0]);
+    }
+
+    #[test]
+    fn only_running_and_unknown_pods_are_scraped() {
+        let cfg = default_cfg();
+        for (phase, scraped) in [
+            (None, true),
+            (Some("Running"), true),
+            (Some("Unknown"), true),
+            (Some("Pending"), false),
+            (Some("Succeeded"), false),
+            (Some("Failed"), false),
+        ] {
+            let mut pod = make_pod(
+                "p",
+                "ns",
+                &[
+                    ("prometheus.io/scrape", "true"),
+                    ("prometheus.io/port", "9100"),
+                ],
+                &[],
+                vec![],
+                Some("10.0.0.1"),
+                None,
+            );
+            pod.status.as_mut().unwrap().phase = phase.map(str::to_owned);
+            let targets = extract_targets(&pod, &cfg).unwrap();
+            assert_eq!(targets.len(), usize::from(scraped), "phase {phase:?}");
         }
     }
 
@@ -1103,8 +1179,9 @@ mod tests {
     }
 
     #[test]
-    fn build_label_selector_always_has_builtin() {
-        assert_eq!(build_label_selector(""), "vector.dev/exclude!=true");
-        assert_eq!(build_label_selector("a=b"), "vector.dev/exclude!=true,a=b");
+    fn build_label_selector_only_uses_the_configured_selector() {
+        // `vector.dev/exclude` opts a Pod out of log collection, not metrics scraping.
+        assert_eq!(build_label_selector(""), None);
+        assert_eq!(build_label_selector("a=b"), Some("a=b".to_owned()));
     }
 }
