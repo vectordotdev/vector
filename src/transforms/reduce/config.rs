@@ -16,7 +16,10 @@ use crate::{
     schema::Definition,
     transforms::{
         Transform,
-        reduce::{merge_strategy::MergeStrategy, transform::Reduce},
+        reduce::{
+            merge_strategy::MergeStrategy,
+            transform::{Reduce, ShardedReduce},
+        },
     },
 };
 
@@ -54,6 +57,19 @@ pub struct ReduceConfig {
 
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
+
+    /// The number of parallel tasks used to reduce events.
+    ///
+    /// Groups are distributed across tasks by hashing their `group_by` values, so all events of a
+    /// group are always reduced by the same task, in arrival order. Only the order of output events
+    /// across different groups may change.
+    ///
+    /// Has no effect when `group_by` is empty: all events then belong to a single group, which is
+    /// reduced by a single task.
+    #[serde(default = "default_concurrency")]
+    #[derivative(Default(value = "default_concurrency()"))]
+    #[configurable(metadata(docs::human_name = "Concurrency"))]
+    pub concurrency: NonZeroUsize,
 
     /// An ordered list of fields by which to group events.
     ///
@@ -112,12 +128,22 @@ const fn default_flush_period_ms() -> Duration {
 
 impl_generate_config_from_default!(ReduceConfig);
 
+const fn default_concurrency() -> NonZeroUsize {
+    NonZeroUsize::MIN
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
-            .map(Transform::event_task)
+        let reduce = Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)?;
+        let shards =
+            (self.concurrency.get() > 1 && !self.group_by.is_empty()).then_some(self.concurrency);
+
+        Ok(match shards {
+            None => Transform::event_task(reduce),
+            Some(shards) => Transform::event_task(ShardedReduce::new(reduce, shards)),
+        })
     }
 
     fn input(&self) -> Input {

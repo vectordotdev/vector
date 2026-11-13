@@ -1,13 +1,21 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
+    hash::{BuildHasher, Hash, Hasher, RandomState},
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
 use vector_lib::internal_event::emit;
 
-use futures::Stream;
+use async_stream::stream;
+use futures::{Stream, StreamExt, future, stream};
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use tokio::{sync::mpsc, task::JoinSet};
+use tokio_stream::wrappers::ReceiverStream;
+use vector_lib::{
+    cpu_time::SpawnTimedExt,
+    stream::expiration_map::{Emitter, map_with_expiration},
+};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     path::{OwnedSegment, OwnedTargetPath, parse_target_path},
@@ -98,21 +106,9 @@ impl ReduceState {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
                 match self.fields.entry(parsed_path) {
                     Entry::Vacant(entry) => {
-                        if let Some(strategy) = maybe_strategy {
-                            match get_value_merger(value.clone(), strategy) {
-                                Ok(m) => {
-                                    entry.insert(m);
-                                }
-                                Err(error) => {
-                                    warn!(message = "Failed to merge value.", %error);
-                                }
-                            }
-                        } else {
-                            entry.insert(value.clone().into());
-                        }
+                        entry.insert(value.clone().into());
                     }
                     Entry::Occupied(mut entry) => {
                         if let Err(error) = entry.get_mut().add(value.clone()) {
@@ -177,6 +173,10 @@ impl Reduce {
     /// # Errors
     ///
     /// Returns an error for incompatible conditions, invalid merge paths, or a condition that cannot be built.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "merge strategy paths are validated by validate_merge_strategies"
+    )]
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -209,15 +209,12 @@ impl Reduce {
             merge_strategies: config
                 .merge_strategies
                 .iter()
-                .filter_map(|(path, strategy)| {
-                    // TODO Invalid paths are ignored to preserve backwards compatibility.
-                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
-                    //      which means an invalid path would result in an configuration error.
-                    let parsed_path = parse_target_path(path).ok();
-                    if parsed_path.is_none() {
-                        warn!(message = "Ignoring strategy with invalid path.", %path);
-                    }
-                    parsed_path.map(|path| (path, strategy.clone()))
+                .map(|(path, strategy)| {
+                    // There are no invalid paths here: `validate_merge_strategies` above already
+                    // returns a configuration error for any path that fails to parse.
+                    let path =
+                        parse_target_path(path).expect("validated by validate_merge_strategies");
+                    (path, strategy.clone())
                 })
                 .collect(),
             merge_states: HashMap::new(),
@@ -300,16 +297,14 @@ impl Reduce {
 
             self.push_or_new_reduce_state(&event, discriminant);
         } else if ends_here {
-            emitter.emit(
-                if let Some(mut state) = self.merge_states.remove(&discriminant) {
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                } else {
-                    let mut state = ReduceState::new();
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                },
-            );
+            emitter.emit({
+                let mut state = self
+                    .merge_states
+                    .remove(&discriminant)
+                    .unwrap_or_else(ReduceState::new);
+                state.add_event(&event, &self.merge_strategies);
+                state.flush().into()
+            });
         } else {
             self.push_or_new_reduce_state(&event, discriminant);
         }
@@ -355,6 +350,138 @@ where
             me.flush_all_into(emitter);
         },
     ))
+}
+
+// How many batches can wait in one shard's queue before the router has to wait.
+const SHARD_QUEUE_BATCHES: usize = 4;
+
+/// Maximum number of events in a batch sent from the router to a shard, or from a shard to the
+/// output. It bounds each shard queue to `SHARD_QUEUE_BATCHES * BATCH_EVENTS` events.
+pub const BATCH_EVENTS: usize = 100;
+
+// All shards send into one shared output channel, which holds
+// `shards * OUTPUT_QUEUE_BATCHES_PER_SHARD` batches. Only there to absorb bursts.
+const OUTPUT_QUEUE_BATCHES_PER_SHARD: usize = 1;
+
+#[derive(Debug)]
+pub struct ShardedReduce {
+    reduce: Reduce,
+    shards: NonZeroUsize,
+}
+
+impl ShardedReduce {
+    pub const fn new(reduce: Reduce, shards: NonZeroUsize) -> Self {
+        Self { reduce, shards }
+    }
+}
+
+impl TaskTransform<Event> for ShardedReduce {
+    fn transform(
+        self: Box<Self>,
+        input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        let mut tasks = JoinSet::new();
+
+        let (output_tx, output_rx) =
+            mpsc::channel(self.shards.get() * OUTPUT_QUEUE_BATCHES_PER_SHARD);
+        let shards_senders = (0..self.shards.get())
+            .map(|_| {
+                let (tx, rx) = mpsc::channel::<Vec<Event>>(SHARD_QUEUE_BATCHES);
+                tasks.spawn_timed(run_shard(
+                    Box::new(self.reduce.clone()),
+                    rx,
+                    output_tx.clone(),
+                ));
+                tx
+            })
+            .collect();
+
+        drop(output_tx);
+
+        tasks.spawn_timed(route(self.reduce.group_by, shards_senders, input_rx));
+
+        stream! {
+            let mut output = std::pin::pin!(ReceiverStream::new(output_rx));
+            while let Some(item) = output.next().await {
+                yield item;
+            }
+
+            // A task fails only by panicking or by being aborted. As we never abort a task ourselves,
+            // and tokio only aborts them when the `JoinSet` is dropped, an error is always a panic.
+            while let Some(result) = tasks.join_next().await {
+                match result {
+                    Ok(()) => {},
+                    Err(error) if error.is_panic() => std::panic::resume_unwind(error.into_panic()),
+                    Err(_) => {
+                        unreachable!("reduce task cancelled while its JoinSet is still owned")
+                    }
+                }
+            }
+        }
+        .flat_map(stream::iter)
+        .boxed()
+    }
+}
+
+async fn run_shard(
+    reduce: Box<Reduce>,
+    rx: mpsc::Receiver<Vec<Event>>,
+    sender: mpsc::Sender<Vec<Event>>,
+) {
+    let events = ReceiverStream::new(rx).flat_map(stream::iter).boxed();
+
+    let mut reduced = reduce.transform(events).ready_chunks(BATCH_EVENTS);
+
+    while let Some(batch) = reduced.next().await {
+        // Fails only if the topology dropped the output stream. A normal shutdown ends the input instead.
+        if sender.send(batch).await.is_err() {
+            return;
+        }
+    }
+}
+
+async fn route(
+    group_by: Vec<String>,
+    shard_senders: Vec<mpsc::Sender<Vec<Event>>>,
+    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+) {
+    let hasher = RandomState::new();
+
+    let mut input = input_rx.ready_chunks(BATCH_EVENTS);
+
+    while let Some(events) = input.next().await {
+        let mut per_shard: Vec<Vec<Event>> = vec![Vec::new(); shard_senders.len()];
+
+        for event in events {
+            let log = event.as_log();
+            let mut state = hasher.build_hasher();
+            group_by
+                .iter()
+                .map(|field| log.parse_path_and_get_value(field).ok().flatten())
+                .for_each(|value| value.hash(&mut state));
+
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "deterministic: the same hash always maps to the same shard, and the low bits stay uniform"
+            )]
+            let shard_number = (state.finish() as usize) % shard_senders.len();
+            per_shard[shard_number].push(event);
+        }
+
+        let sends = shard_senders
+            .iter()
+            .zip(per_shard)
+            .filter(|(_, shard_batch)| !shard_batch.is_empty())
+            .map(|(shard_tx, shard_batch)| shard_tx.send(shard_batch));
+
+        // Fails only if a shard stopped after the output stream was dropped.
+        if future::try_join_all(sends).await.is_err() {
+            return;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -840,6 +967,60 @@ mod test {
             assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
             assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
             assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sharded_keeps_arrival_order_within_group() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            concurrency: 4
+            merge_strategies:
+              foo: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            for (foo, request_id, end) in [
+                (1, "1", false),
+                (2, "2", false),
+                (3, "1", false),
+                (4, "2", false),
+                (5, "1", true),
+                (6, "2", true),
+            ] {
+                let mut event = LogEvent::from(format!("test message {foo}"));
+                event.insert(event_path!("foo"), foo);
+                event.insert(event_path!("request_id"), request_id);
+                if end {
+                    event.insert(event_path!("test_end"), "yep");
+                }
+                tx.send(event.into()).await.unwrap();
+            }
+
+            // Groups may reach different shards, so either group can come out first.
+            let mut outputs = [
+                out.recv().await.unwrap().into_log(),
+                out.recv().await.unwrap().into_log(),
+            ];
+            outputs.sort_by_key(|output| output["request_id"].to_string());
+
+            assert_eq!(outputs[0]["message"], "test message 1".into());
+            assert_eq!(outputs[0]["foo"], json!([1, 3, 5]).into());
+            assert_eq!(outputs[1]["message"], "test message 2".into());
+            assert_eq!(outputs[1]["foo"], json!([2, 4, 6]).into());
 
             drop(tx);
             topology.stop().await;
