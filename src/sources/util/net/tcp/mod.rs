@@ -241,7 +241,7 @@ where
                                 log_namespace,
                             );
 
-                            tokio::spawn(
+                            vector_lib::cpu_time::spawn_timed_without_span(
                                 fut.map(move |()| {
                                     drop(open_token);
                                     // Paired with the ConnectionOpen emit above:

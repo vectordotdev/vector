@@ -580,7 +580,7 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        crate::spawn_in_current_span(async move {
+        vector_lib::cpu_time::spawn_timed(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     checkpoints.update(entry.file_id, entry.offset);
@@ -666,7 +666,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move {
+        vector_lib::cpu_time::spawn_timed_without_span(async move {
             if let Ok(()) = out
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
@@ -680,11 +680,17 @@ pub fn file_source(
         });
 
         let span = info_span!("file_server");
+        // Created here: the blocking thread does not carry the source's CPU counter.
+        let file_server = vector_lib::cpu_time::inherit_cpu_timer(file_server.run(
+            tx,
+            shutdown,
+            shutdown_checkpointer,
+            checkpointer,
+        ));
         tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
             let rt = tokio::runtime::Handle::current();
-            let result =
-                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
+            let result = rt.block_on(file_server);
             emit(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and

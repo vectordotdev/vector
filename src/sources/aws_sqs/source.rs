@@ -50,7 +50,7 @@ impl SqsSource {
             let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
-            crate::spawn_in_current_span(async move {
+            vector_lib::cpu_time::spawn_timed(async move {
                 while let Some((status, receipts)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         delete_messages(client.clone(), receipts, queue_url.clone()).await;
@@ -67,7 +67,7 @@ impl SqsSource {
             let mut out = out.clone();
             let finalizer = finalizer.clone();
             let events_received = events_received.clone();
-            task_handles.push(crate::spawn_in_current_span(async move {
+            task_handles.push(vector_lib::cpu_time::spawn_timed(async move {
                 let finalizer = finalizer.as_ref();
                 pin!(shutdown);
                 loop {
