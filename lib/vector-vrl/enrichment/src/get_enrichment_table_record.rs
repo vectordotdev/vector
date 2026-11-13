@@ -269,7 +269,7 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let object: Value = BTreeMap::new().into();
+        let object = Value::Object(ObjectMap::new());
         let mut target = TargetValue {
             value: object,
             metadata: value!({}),

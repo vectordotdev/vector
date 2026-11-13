@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use indoc::indoc;
 use vector_lib::transform::TransformOutputsBuf;
-use vrl::value::ObjectMap;
+use vrl::objectmap;
 
 use crate::{
     config::{ConfigBuilder, DataType, TransformContext, TransformOutput, build_unit_tests},
@@ -51,9 +51,9 @@ fn exclusive_routes() {
 
     let (output_names, mut outputs) = get_outputs_buf();
     for service in ["a", "b", "c"] {
-        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "service" => service
-        })));
+        }));
         transform.transform(event.clone(), &mut outputs);
         for name in output_names.clone() {
             let mut events: Vec<_> = outputs.drain_named(name).collect();

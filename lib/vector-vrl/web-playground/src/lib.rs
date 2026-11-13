@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use vrl::{
@@ -9,7 +7,7 @@ use vrl::{
     },
     diagnostic::{DiagnosticList, Formatter},
     docs::{FunctionDoc, build_functions_doc},
-    value::{Secrets, Value},
+    value::{ObjectMap, Secrets, Value},
 };
 use wasm_bindgen::prelude::*;
 
@@ -121,7 +119,7 @@ fn compile(
 
     let mut target_value = TargetValue {
         value: event.clone(),
-        metadata: Value::Object(BTreeMap::new().into()),
+        metadata: Value::Object(ObjectMap::new()),
         secrets: Secrets::new(),
     };
 
@@ -227,7 +225,6 @@ mod tests {
     // `compile`/`run_vrl` can't be exercised here: they call `web_sys::window()`, which
     // panics on non-wasm targets, so they need a `wasm-bindgen-test` harness.
     use super::*;
-    use vrl::value::ObjectMap;
 
     // A scalar integer larger than f64's safe range must serialize to its exact digits.
     // JS `JSON.parse` (used when marshaling the wasm result) would round these; see

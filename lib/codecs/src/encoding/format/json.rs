@@ -144,18 +144,17 @@ mod tests {
         event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
         metric_tags,
     };
-    use vrl::btreemap;
-    use vrl::value::ObjectMap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_json_log() {
-        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "x" => Value::from("23"),
             "z" => Value::from(25),
             "a" => Value::from("0"),
-        })));
+        }));
         let bytes = serialize(JsonSerializerConfig::default(), event);
 
         assert_eq!(bytes, r#"{"a":"0","x":"23","z":25}"#);
@@ -230,9 +229,9 @@ mod tests {
 
     #[test]
     fn serialize_equals_to_json_value() {
-        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
-        })));
+        }));
         let mut serializer = JsonSerializerConfig::default().build();
         let mut bytes = BytesMut::new();
 
@@ -308,8 +307,7 @@ mod tests {
             event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
             metric_tags,
         };
-        use vrl::btreemap;
-        use vrl::value::ObjectMap;
+        use vrl::objectmap;
 
         use super::*;
 
@@ -322,9 +320,9 @@ mod tests {
 
         #[test]
         fn serialize_json_log() {
-            let event = Event::Log(LogEvent::from(ObjectMap::from(
-                btreemap! {"x" => Value::from("23"),"z" => Value::from(25),"a" => Value::from("0"),},
-            )));
+            let event = Event::Log(LogEvent::from(
+                objectmap! {"x" => Value::from("23"),"z" => Value::from(25),"a" => Value::from("0"),},
+            ));
             let bytes = serialize(get_pretty_json_config(), event);
             assert_eq!(
                 bytes,
@@ -426,9 +424,7 @@ mod tests {
         }
         #[test]
         fn serialize_equals_to_json_value() {
-            let event = Event::Log(LogEvent::from(ObjectMap::from(
-                btreemap! {"foo" => Value::from("bar")},
-            )));
+            let event = Event::Log(LogEvent::from(objectmap! {"foo" => Value::from("bar")}));
             let mut serializer = get_pretty_json_config().build();
             let mut bytes = BytesMut::new();
             serializer.encode(event.clone(), &mut bytes).unwrap();

@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    process::Command,
-};
+use std::{collections::HashMap, fs, process::Command};
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -118,7 +114,7 @@ fn examples_to_tests(
 }
 
 fn test_from_cue_example(category: &'static str, name: &str, example: Example) -> Test {
-    use vrl::value::Value;
+    use vrl::value::{ObjectMap, Value};
 
     let Example {
         title,
@@ -136,7 +132,7 @@ fn test_from_cue_example(category: &'static str, name: &str, example: Example) -
         Some(event) => {
             serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
         }
-        None => Value::Object(BTreeMap::default().into()),
+        None => Value::Object(ObjectMap::new()),
     };
 
     assert!(

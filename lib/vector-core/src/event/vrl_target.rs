@@ -787,7 +787,7 @@ mod test {
     use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::{btreemap, event_path, value::kind::Index};
+    use vrl::{btreemap, event_path, objectmap, value::kind::Index};
 
     use super::*;
     use crate::{
@@ -895,39 +895,38 @@ mod test {
     fn log_get() {
         let cases = vec![
             (
-                BTreeMap::new(),
+                ObjectMap::new(),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::new().into())),
+                Ok(Some(ObjectMap::new().into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
+                Ok(Some(ObjectMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 Ok(Some("bar".into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("bar"),
                 Ok(None),
             ),
             (
-                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
+                objectmap! { "foo" => vec![objectmap! { "bar" => true }] },
                 owned_value_path!("foo", 0, "bar"),
                 Ok(Some(true.into())),
             ),
             (
-                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
+                objectmap! { "foo" => objectmap! { "bar baz" => objectmap! { "baz" => 2 } } },
                 owned_value_path!("foo", r"bar baz", "baz"),
                 Ok(Some(2.into())),
             ),
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -953,39 +952,39 @@ mod test {
     fn log_insert() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(0),
-                btreemap! { "baz" => "qux" }.into(),
-                btreemap! { "baz" => "qux" },
+                objectmap! { "baz" => "qux" }.into(),
+                objectmap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 "baz".into(),
-                btreemap! { "foo" => "baz" },
+                objectmap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         Value::Null,
                         Value::Null,
-                        btreemap! {
-                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        objectmap! {
+                            "bar baz" => objectmap! { "a" => objectmap! { "b" => true } },
                         }.into()
                     ]
                 },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => vec![0, 1, 2] },
+                objectmap! { "foo" => vec![0, 1, 2] },
                 owned_value_path!("foo", 5),
                 "baz".into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         0.into(),
                         1.into(),
@@ -998,44 +997,43 @@ mod test {
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![]) },
+                objectmap! { "foo" => Value::Array(vec![]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 1),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1047,7 +1045,7 @@ mod test {
                 &info,
                 MetricTagMode::Single,
             );
-            let expect = LogEvent::from(ObjectMap::from(expect));
+            let expect = LogEvent::from(expect);
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
 
@@ -1077,69 +1075,68 @@ mod test {
     fn log_remove() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(btreemap! { "foo" => "bar"}.into()),
+                Some(objectmap! { "foo" => "bar"}.into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(objectmap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 false,
                 Some(
-                    btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                    objectmap! {
+                        "foo" => objectmap! { "bar baz" => Value::Array(vec![]) },
                         "bar" => "baz",
                     }
                     .into(),
                 ),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 true,
-                Some(btreemap! { "bar" => "baz" }.into()),
+                Some(objectmap! { "bar" => "baz" }.into()),
             ),
         ];
 
         for (object, path, compact, expect) in cases {
-            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1168,28 +1165,26 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use vrl::btreemap;
-
         let cases = vec![
             (
-                Value::from(btreemap! {"foo" => "bar"}),
-                vec![btreemap! {"foo" => "bar"}],
+                Value::from(objectmap! {"foo" => "bar"}),
+                vec![objectmap! {"foo" => "bar"}],
             ),
-            (Value::from(1), vec![btreemap! {"message" => 1}]),
-            (Value::from("2"), vec![btreemap! {"message" => "2"}]),
-            (Value::from(true), vec![btreemap! {"message" => true}]),
+            (Value::from(1), vec![objectmap! {"message" => 1}]),
+            (Value::from("2"), vec![objectmap! {"message" => "2"}]),
+            (Value::from(true), vec![objectmap! {"message" => true}]),
             (
                 Value::from(vec![
                     Value::from(1),
                     Value::from("2"),
                     Value::from(true),
-                    Value::from(btreemap! {"foo" => "bar"}),
+                    Value::from(objectmap! {"foo" => "bar"}),
                 ]),
                 vec![
-                    btreemap! {"message" => 1},
-                    btreemap! {"message" => "2"},
-                    btreemap! {"message" => true},
-                    btreemap! {"foo" => "bar"},
+                    objectmap! {"message" => 1},
+                    objectmap! {"message" => "2"},
+                    objectmap! {"message" => true},
+                    objectmap! {"foo" => "bar"},
                 ],
             ),
         ];
@@ -1218,7 +1213,7 @@ mod test {
                 },
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_map(v.into(), metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }
@@ -1226,7 +1221,7 @@ mod test {
 
     #[test]
     fn trace_scalar_root_into_log_drops_trace_layout() {
-        let mut trace = TraceEvent::from(ObjectMap::from(btreemap! {"foo" => "bar"}));
+        let mut trace = TraceEvent::from(objectmap! {"foo" => "bar"});
         trace
             .metadata_mut()
             .set_trace_layout(super::super::TraceLayout::Datadog);

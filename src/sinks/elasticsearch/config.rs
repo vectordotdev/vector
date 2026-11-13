@@ -1,11 +1,9 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-};
+use std::{collections::HashMap, convert::TryFrom};
 
 use futures::{FutureExt, TryFutureExt};
 use vector_lib::{
     configurable::configurable_component,
+    event::ObjectMap,
     internal_event::emit,
     lookup::{event_path, lookup_v2::ConfigValuePath},
     schema::Requirement,
@@ -599,13 +597,13 @@ impl DataStreamMode {
         let namespace = self.namespace(&*log);
 
         if log.as_map().is_none() {
-            *log.value_mut() = Value::Object(BTreeMap::new().into());
+            *log.value_mut() = Value::Object(ObjectMap::new());
         }
         let existing = log
             .as_map_mut()
             .expect("must be a map")
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Object(BTreeMap::new().into()))
+            .or_insert_with(|| Value::Object(ObjectMap::new()))
             .as_object_mut_unwrap();
 
         if let Some(dtype) = dtype {

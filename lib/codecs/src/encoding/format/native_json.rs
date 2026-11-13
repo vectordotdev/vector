@@ -63,16 +63,15 @@ mod tests {
         buckets,
         event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     };
-    use vrl::btreemap;
-    use vrl::value::ObjectMap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_json() {
-        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
-        })));
+        }));
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
 
@@ -83,9 +82,9 @@ mod tests {
 
     #[test]
     fn serialize_equals_to_json_value() {
-        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
-        })));
+        }));
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
 
