@@ -3,9 +3,13 @@ features:
 
 test_filter: ::aws_
 
+runner:
+  volumes:
+    aws_aws-emulator-credentials: /run/aws-emulator
+
 env:
-  AWS_ACCESS_KEY_ID: dummy
-  AWS_SECRET_ACCESS_KEY: dummy
+  # Written by the emulator at startup; see tests/integration/aws/data/entrypoint.sh.
+  AWS_SHARED_CREDENTIALS_FILE: /run/aws-emulator/9297/emulator_credentials
   CLOUDWATCH_ADDRESS: http://mock-aws:4566
   EC2_METADATA_ADDRESS: http://mock-ec2-metadata:1338
   ECS_ADDRESS: http://mock-ecs
