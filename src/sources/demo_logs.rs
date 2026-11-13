@@ -35,6 +35,7 @@ use crate::{
 
 const SERVICE: &str = "service";
 const HOST: &str = "host";
+
 /// Configuration for the `demo_logs` source.
 #[serde_as]
 #[configurable_component(source(
