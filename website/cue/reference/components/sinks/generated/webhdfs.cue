@@ -113,6 +113,17 @@ generated: components: sinks: webhdfs: configuration: {
 			syntax:  "template"
 		}
 	}
+	request: {
+		description: """
+			Middleware settings for outbound requests.
+
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
+			"""
+		required: false
+		type:     _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
+	}
 	root: {
 		description: """
 			The root path for WebHDFS.
