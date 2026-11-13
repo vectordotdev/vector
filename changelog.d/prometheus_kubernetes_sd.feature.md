@@ -1,16 +1,6 @@
-Added a `targets` field to `prometheus_scrape` that supports auto-discovering and
-scraping Prometheus metrics from Kubernetes Pods using Prometheus-compatible
-`prometheus.io/*` annotations.
+The `prometheus_scrape` source has a new `targets` option that can discover and scrape Kubernetes Pods.
 
-The new `targets` field accepts a `kubernetes` block that watches Pods via the
-Kubernetes API and derives scrape targets from the `prometheus.io/scrape`,
-`prometheus.io/port`, `prometheus.io/path`, `prometheus.io/scheme`, and
-`prometheus.io/param_<name>` annotations. The annotation prefix is configurable.
-
-The existing `endpoints` field is deprecated but continues to work for backwards
-compatibility. Only one of `endpoints` or `targets` can be specified.
-
-Static scrape targets can also be specified under `targets` via the `static` block:
+A `kubernetes` entry under `targets` watches Pods through the Kubernetes API and scrapes the ones annotated with `prometheus.io/scrape: "true"`. The `prometheus.io/port`, `prometheus.io/path`, `prometheus.io/scheme`, and `prometheus.io/param_<name>` annotations control each target, and the annotation prefix is configurable. `namespaces` and `label_selector` limit which Pods are considered. A `static` entry lists fixed URLs:
 
 ```yaml
 type: prometheus_scrape
@@ -23,9 +13,15 @@ targets:
       namespaces: [default, monitoring]
 ```
 
-Discovered targets are scraped on the source's configured interval and emitted
-with `namespace`, `pod`, `node`, `container`, `instance`, and `endpoint` tags.
-Pod labels and annotations can be opted-in as additional metric tags via the
-`pod_label_tags` and `pod_annotation_tags` allowlists.
+Metrics from discovered Pods get `namespace`, `pod`, `node`, and `container` tags. Pod labels and annotations can be added as tags through the `pod_label_tags` and `pod_annotation_tags` allowlists, with their keys converted to valid Prometheus label names.
 
-authors: leeteng2001 pront
+Current limitations:
+
+- Only `role: pod` is supported, and a source can have one `kubernetes` entry.
+- Pods without the scrape annotation are not scraped.
+- Pending, Succeeded, and Failed Pods, and Pods without an IP address yet, are skipped.
+- Builds without the `kubernetes` feature reject `kubernetes` targets.
+
+The existing `endpoints` option still works but is deprecated in favor of `targets`. A source sets one or the other.
+
+authors: leeteng2001 pront JinchengCao
