@@ -315,6 +315,25 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     assert_eq!(output_lines.sort(), input_lines.sort());
 }
 
+/// CloudWatch Logs can only encrypt a log group with a key whose policy lets it use the key.
+const LOGS_KMS_KEY_POLICY: &str = r#"{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::000000000000:root" },
+            "Action": "kms:*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Principal": { "Service": "logs.us-east-1.amazonaws.com" },
+            "Action": ["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+            "Resource": "*"
+        }
+    ]
+}"#;
+
 #[tokio::test]
 async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
     trace_init();
@@ -341,6 +360,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             create_kms_client_test()
                 .await
                 .create_key()
+                .policy(LOGS_KMS_KEY_POLICY)
                 .send()
                 .await
                 .unwrap()
@@ -383,10 +403,12 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 
     assert_eq!(output_lines.sort(), input_lines.sort());
 
+    // Search by prefix, not by pattern: with `logGroupNamePattern`, DescribeLogGroups returns only
+    // `arn`, `creationTime`, and `logGroupName`, so `kmsKeyId` would be missing.
     let log_group = create_client_test()
         .await
         .describe_log_groups()
-        .log_group_name_pattern(group_name.clone())
+        .log_group_name_prefix(group_name.clone())
         .limit(1)
         .send()
         .await
