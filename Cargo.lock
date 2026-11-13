@@ -1379,31 +1379,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aws-sdk-elasticsearch"
-version = "1.127.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91eb6869281501c85e9ac2eaaa9fc72f80734e504c28089f4d1d956e3b9c982"
-dependencies = [
- "arc-swap",
- "aws-credential-types",
- "aws-runtime",
- "aws-smithy-async",
- "aws-smithy-http",
- "aws-smithy-json",
- "aws-smithy-observability",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-schema",
- "aws-smithy-types",
- "aws-types",
- "bytes",
- "fastrand",
- "http 1.5.0",
- "regex-lite",
- "tracing 0.1.44",
-]
-
-[[package]]
 name = "aws-sdk-firehose"
 version = "1.128.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13306,7 +13281,6 @@ dependencies = [
  "aws-runtime",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
- "aws-sdk-elasticsearch",
  "aws-sdk-firehose",
  "aws-sdk-kinesis",
  "aws-sdk-kms",
