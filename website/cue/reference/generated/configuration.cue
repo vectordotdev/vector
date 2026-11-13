@@ -1172,35 +1172,50 @@ generated: configuration: {
 			group:    "global_options"
 		}
 		telemetry: {
-			type: object: options: tags: {
-				type: object: options: {
-					emit_service: {
-						type: bool: default: false
-						description: """
-														True if the `service` tag should be emitted
-														in the `component_received_*` and `component_sent_*`
-														telemetry.
-														"""
-						required: false
-					}
-					emit_source: {
-						type: bool: default: false
-						description: """
-														True if the `source` tag should be emitted
-														in the `component_received_*` and `component_sent_*`
-														telemetry.
-														"""
-						required: false
-					}
+			type: object: options: {
+				emit_detailed_metrics: {
+					type: bool: default: true
+					description: """
+						Whether detailed topology event-size and latency telemetry is emitted.
+
+						Disabling this skips event-size estimates for source outputs and topology
+						routing, reporting zero for their event byte-size metrics. It also omits
+						source lag and send latency histograms and component latency metrics.
+						Event counters, routing metadata, and component-specific telemetry remain
+						enabled. Defaults to `true`.
+						"""
+					required: false
 				}
-				description: "Configures whether to emit certain tags"
-				required:    false
+				tags: {
+					type: object: options: {
+						emit_service: {
+							type: bool: default: false
+							description: """
+															True if the `service` tag should be emitted
+															in the `component_received_*` and `component_sent_*`
+															telemetry.
+															"""
+							required: false
+						}
+						emit_source: {
+							type: bool: default: false
+							description: """
+															True if the `source` tag should be emitted
+															in the `component_received_*` and `component_sent_*`
+															telemetry.
+															"""
+							required: false
+						}
+					}
+					description: "Configures whether to emit certain tags"
+					required:    false
+				}
 			}
 			description: """
 				Telemetry options.
 
-				Determines whether `source` and `service` tags should be emitted with the
-				`component_sent_*` and `component_received_*` events.
+				Controls detailed topology metrics and whether `source` and `service`
+				tags are emitted with `component_sent_*` and `component_received_*` events.
 				"""
 			required: false
 			group:    "global_options"

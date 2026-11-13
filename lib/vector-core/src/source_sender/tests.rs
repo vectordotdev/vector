@@ -16,6 +16,85 @@ use crate::{
 };
 
 #[tokio::test]
+async fn disabled_detailed_metrics_preserve_events_metadata_and_acknowledgements() {
+    use crate::{
+        config::{DataType, OutputId, SourceOutput, Telemetry, init_telemetry},
+        event::{BatchNotifier, BatchStatus, EventContainer, EventStatus, Finalizable},
+        schema,
+    };
+
+    metrics::init_test();
+    init_telemetry(
+        Telemetry {
+            emit_detailed_metrics: false,
+            ..Default::default()
+        },
+        false,
+    );
+    let mut builder = SourceSender::builder();
+    let output = SourceOutput::new_maybe_logs(
+        DataType::Log,
+        schema::Definition::default_legacy_namespace(),
+    );
+    let definition = Arc::clone(output.schema_definition.as_ref().unwrap());
+    let source = crate::config::ComponentKey::from("source");
+    let mut receiver = builder.add_source_output(output, source.clone());
+    let mut sender = builder.build();
+    let (notifier, mut status) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from("message").with_batch_notifier(&notifier);
+    drop(notifier);
+    sender.send_batch(vec![event]).await.unwrap();
+    let mut event = receiver
+        .next()
+        .await
+        .unwrap()
+        .events
+        .into_events()
+        .next()
+        .unwrap();
+    assert_eq!(
+        event.as_log().get_message(),
+        Some(&crate::event::Value::from("message"))
+    );
+    assert!(Arc::ptr_eq(
+        event.metadata().schema_definition(),
+        &definition
+    ));
+    assert_eq!(
+        event.metadata().upstream_id(),
+        Some(&OutputId::from(source))
+    );
+    event
+        .take_finalizers()
+        .update_status(EventStatus::Delivered);
+    assert_eq!(status.try_recv(), Ok(BatchStatus::Delivered));
+
+    let captured = Controller::get().unwrap().capture_metrics();
+    let counter = |name| {
+        captured
+            .iter()
+            .find(|metric| metric.name() == name)
+            .unwrap()
+            .value()
+    };
+    assert_eq!(
+        counter("component_sent_events_total"),
+        &MetricValue::Counter { value: 1.0 }
+    );
+    assert_eq!(
+        counter("component_sent_event_bytes_total"),
+        &MetricValue::Counter { value: 0.0 }
+    );
+    assert!(!captured.iter().any(|metric| matches!(
+        metric.name(),
+        "source_lag_time_seconds"
+            | "source_send_latency_seconds"
+            | "source_send_batch_latency_seconds"
+    )));
+    init_telemetry(Telemetry::default(), false);
+}
+
+#[tokio::test]
 async fn emits_lag_time_for_log() {
     emit_and_test(|timestamp| {
         let mut log = LogEvent::from("Log message");

@@ -135,7 +135,7 @@ impl TransformOutputs {
             );
         }
         let count = buf.len();
-        let byte_size = buf.estimated_json_encoded_size_of();
+        let byte_size = config::telemetry().event_size(buf);
         buf.send(&mut output.fanout).await?;
         output.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())

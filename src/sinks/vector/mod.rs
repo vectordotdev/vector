@@ -905,6 +905,7 @@ mod tests {
                     emit_service: true,
                     emit_source: true,
                 },
+                ..Default::default()
             },
             true,
         );

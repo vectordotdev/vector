@@ -91,6 +91,7 @@ async fn start_test_detail(
                     emit_service: true,
                     emit_source: true,
                 },
+                ..Default::default()
             },
             true,
         );

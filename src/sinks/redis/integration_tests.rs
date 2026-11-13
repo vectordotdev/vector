@@ -456,6 +456,7 @@ async fn redis_sink_channel_data_volume_tags() {
                 emit_service: true,
                 emit_source: true,
             },
+            ..Default::default()
         },
         true,
     );

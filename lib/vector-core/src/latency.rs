@@ -13,22 +13,33 @@ const DEFAULT_LATENCY_EWMA_ALPHA: f64 = 0.9;
 
 #[derive(Debug)]
 pub struct LatencyRecorder {
+    metrics: Option<LatencyMetrics>,
+}
+
+#[derive(Debug)]
+struct LatencyMetrics {
     histogram: Histogram,
     gauge: EwmaGauge,
 }
 
 impl LatencyRecorder {
     pub fn new(ewma_alpha: Option<f64>) -> Self {
-        Self {
-            histogram: histogram!(HistogramName::ComponentLatencySeconds),
-            gauge: EwmaGauge::new(
-                gauge!(GaugeName::ComponentLatencyMeanSeconds),
-                ewma_alpha.or(Some(DEFAULT_LATENCY_EWMA_ALPHA)),
-            ),
-        }
+        let metrics = crate::config::telemetry()
+            .emit_detailed_metrics
+            .then(|| LatencyMetrics {
+                histogram: histogram!(HistogramName::ComponentLatencySeconds),
+                gauge: EwmaGauge::new(
+                    gauge!(GaugeName::ComponentLatencyMeanSeconds),
+                    ewma_alpha.or(Some(DEFAULT_LATENCY_EWMA_ALPHA)),
+                ),
+            });
+        Self { metrics }
     }
 
     pub fn on_send(&self, events: &mut EventArray, now: Instant) {
+        let Some(metrics) = &self.metrics else {
+            return;
+        };
         let mut sum = 0.0;
         let mut count = 0usize;
 
@@ -44,7 +55,7 @@ impl LatencyRecorder {
                 let latency = now.saturating_duration_since(previous).as_secs_f64();
                 sum += latency;
                 count += 1;
-                self.histogram.record(latency);
+                metrics.histogram.record(latency);
             }
 
             metadata.set_last_transform_timestamp(now);
@@ -55,7 +66,7 @@ impl LatencyRecorder {
                 reason = "losing precision is acceptable here"
             )]
             let mean = sum / count as f64;
-            self.gauge.record(mean);
+            metrics.gauge.record(mean);
         }
     }
 }

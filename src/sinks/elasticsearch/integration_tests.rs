@@ -746,6 +746,7 @@ async fn run_insert_tests(
                     emit_service: true,
                     emit_source: true,
                 },
+                ..Default::default()
             },
             true,
         );

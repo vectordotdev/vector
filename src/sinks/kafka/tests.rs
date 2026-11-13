@@ -495,6 +495,7 @@ mod integration_test {
                         emit_service: true,
                         emit_source: true,
                     },
+                    ..Default::default()
                 },
                 true,
             );

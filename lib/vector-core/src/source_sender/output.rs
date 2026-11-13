@@ -26,8 +26,7 @@ use vrl::value::Value;
 
 use super::{PostProcessor, SendError, SourceSenderItem, chunk_size_events};
 use crate::{
-    EstimatedJsonEncodedSizeOf,
-    config::{OutputId, log_schema},
+    config::{OutputId, log_schema, telemetry},
     event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
@@ -171,7 +170,11 @@ impl Output {
         events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
-        let reference = Utc::now().timestamp_millis();
+        let reference = self
+            .metrics
+            .lag_time
+            .as_ref()
+            .map_or(0, |_| Utc::now().timestamp_millis());
         self.send_inner(events, unsent_event_count, reference).await
     }
 
@@ -221,7 +224,7 @@ impl Output {
             event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
         });
 
-        let byte_size = events.estimated_json_encoded_size_of();
+        let byte_size = telemetry().event_size(&events);
         let count = events.len();
 
         let send_start = Instant::now();
@@ -296,7 +299,11 @@ impl Output {
     {
         // Capture a single reference timestamp for the entire batch so that lag time
         // measurements are not inflated by channel-send latency for later chunks.
-        let reference = Utc::now().timestamp_millis();
+        let reference = self
+            .metrics
+            .lag_time
+            .as_ref()
+            .map_or(0, |_| Utc::now().timestamp_millis());
 
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
