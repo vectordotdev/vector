@@ -25,12 +25,22 @@ fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
             .and_then(Value::as_bool)
             .unwrap_or(false);
 
-    if deprecated {
+    let output_types = get_schema_metadata(schema, "docs::output_type").map(|value| match value {
+        Value::Array(_) => value.clone(),
+        _ => json!([value]),
+    });
+
+    if deprecated || output_types.is_some() {
         let mut obj = Map::new();
         obj.insert("description".to_string(), Value::String(desc));
-        obj.insert("deprecated".to_string(), Value::Bool(true));
-        if let Some(msg) = get_schema_metadata(schema, "deprecated_message") {
-            obj.insert("deprecated_message".to_string(), msg.clone());
+        if deprecated {
+            obj.insert("deprecated".to_string(), Value::Bool(true));
+            if let Some(msg) = get_schema_metadata(schema, "deprecated_message") {
+                obj.insert("deprecated_message".to_string(), msg.clone());
+            }
+        }
+        if let Some(output_types) = output_types {
+            obj.insert("output_types".to_string(), output_types);
         }
         Value::Object(obj)
     } else {
@@ -144,7 +154,9 @@ impl SchemaContext {
                 let mut unique_tag_values: IndexMap<String, Value> = IndexMap::new();
                 let tag_field = enum_tag_field.unwrap();
 
-                for resolved_subschema in &mut resolved_subschemas {
+                for (resolved_subschema, subschema) in
+                    resolved_subschemas.iter_mut().zip(&subschemas)
+                {
                     let title = resolved_subschema.get("title").cloned();
                     let desc = resolved_subschema.get("description").cloned();
 
@@ -154,6 +166,11 @@ impl SchemaContext {
                         .as_object_mut()
                         .unwrap();
                     let mut tag_subschema = opts.shift_remove(tag_field).unwrap();
+
+                    // Output metadata describes the variant, but the rendered enum lives on its tag.
+                    if let Some(output_type) = get_schema_metadata(subschema, "docs::output_type") {
+                        tag_subschema["_metadata"] = json!({ "docs::output_type": output_type });
+                    }
 
                     if let Some(t) = title {
                         tag_subschema
@@ -468,6 +485,87 @@ mod tests {
             resolved_schema_cache: IndexMap::new(),
             expanded_schema_cache: IndexMap::new(),
         }
+    }
+
+    #[test]
+    fn enum_variant_output_types_preserve_description_and_deprecation() {
+        for (output_types, expected_types) in [
+            (json!("logs"), json!(["logs"])),
+            (json!(["logs", "traces"]), json!(["logs", "traces"])),
+        ] {
+            let schema = json!({
+                "title": "Decodes events.",
+                "description": "Preserves the event structure.",
+                "deprecated": true,
+                "_metadata": {
+                    "docs::output_type": output_types,
+                    "deprecated_message": "Use another codec."
+                }
+            });
+            assert_eq!(
+                enum_variant_value(&test_context(), &schema),
+                json!({
+                    "description": "Decodes events.\n\nPreserves the event structure.",
+                    "deprecated": true,
+                    "deprecated_message": "Use another codec.",
+                    "output_types": expected_types
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn internally_tagged_enum_retains_variant_output_types() {
+        let schema = json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "description": "Raw bytes.",
+                    "properties": { "codec": { "const": "bytes" } },
+                    "_metadata": { "docs::output_type": "logs" }
+                },
+                {
+                    "allOf": [
+                        { "type": "object", "properties": { "codec": { "const": "otlp" } } },
+                        { "type": "object", "properties": { "signal": { "type": "string" } } }
+                    ],
+                    "description": "OTLP signals.",
+                    "_metadata": { "docs::output_type": ["logs", "traces"] }
+                }
+            ],
+            "_metadata": {
+                "docs::enum_tagging": "internal",
+                "docs::enum_tag_field": "codec",
+                "docs::enum_tag_description": "The codec to use."
+            }
+        });
+        let resolved = test_context().resolve_schema(&schema).unwrap();
+        assert_eq!(
+            resolved
+                .pointer("/type/object/options/codec/type/string/enum")
+                .unwrap(),
+            &json!({
+                "bytes": { "description": "Raw bytes.", "output_types": ["logs"] },
+                "otlp": { "description": "OTLP signals.", "output_types": ["logs", "traces"] }
+            })
+        );
+    }
+
+    #[test]
+    fn enum_variant_output_metadata_is_optional() {
+        let schema = json!({ "description": "Decodes events." });
+        assert_eq!(
+            enum_variant_value(&test_context(), &schema),
+            json!("Decodes events.")
+        );
+        let schema = json!({
+            "description": "Decodes events.",
+            "_metadata": { "docs::output_type": "metrics" }
+        });
+        assert_eq!(
+            enum_variant_value(&test_context(), &schema),
+            json!({ "description": "Decodes events.", "output_types": ["metrics"] })
+        );
     }
 
     #[test]

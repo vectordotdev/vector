@@ -80,7 +80,7 @@ _values: {
 //                 text: "Encodes the data via text/plain"
 //                }
 //
-// Deprecated variants use an object form:
+// Variants with deprecation or output metadata use an object form:
 //
 //                enum: {
 //                 v1: { description: "legacy endpoint", deprecated: true }
@@ -90,6 +90,7 @@ _values: {
 	description:         string
 	deprecated?:         bool
 	deprecated_message?: string
+	output_types?: [...("logs" | "metrics" | "traces")]
 }
 
 #Enum: [Name=_]: #EnumVariant

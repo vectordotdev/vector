@@ -242,16 +242,19 @@ impl tokio_util::codec::Decoder for Framer {
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for decoding events."))]
 pub enum DeserializerConfig {
     /// Uses the raw bytes as-is.
+    #[configurable(metadata(docs::output_type = "logs"))]
     Bytes,
 
     /// Decodes the raw bytes as [JSON][json].
     ///
     /// [json]: https://www.json.org/
+    #[configurable(metadata(docs::output_type = "logs"))]
     Json(JsonDeserializerConfig),
 
     /// Decodes the raw bytes as [protobuf][protobuf].
     ///
     /// [protobuf]: https://protobuf.dev/
+    #[configurable(metadata(docs::output_type = "logs"))]
     Protobuf(ProtobufDeserializerConfig),
 
     #[cfg(feature = "opentelemetry")]
@@ -260,7 +263,10 @@ pub enum DeserializerConfig {
     /// This decoder handles the three OTLP signal types: logs, metrics, and traces.
     /// It automatically detects which type of OTLP message is being decoded.
     ///
+    /// OTLP metrics are output as log events, preserving the OTLP metric structure.
+    ///
     /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
+    #[configurable(metadata(docs::output_type = "logs", docs::output_type = "traces"))]
     Otlp(OtlpDeserializerConfig),
 
     #[cfg(feature = "syslog")]
@@ -271,26 +277,33 @@ pub enum DeserializerConfig {
     ///
     /// [rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
     /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+    #[configurable(metadata(docs::output_type = "logs"))]
     Syslog(SyslogDeserializerConfig),
 
     /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
-    ///
-    /// This decoder can output all types of events: logs, metrics, and traces.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+    #[configurable(metadata(
+        docs::output_type = "logs",
+        docs::output_type = "metrics",
+        docs::output_type = "traces"
+    ))]
     Native,
 
     /// Decodes the raw bytes as [native JSON format][vector_native_json].
-    ///
-    /// This decoder can output all types of events: logs, metrics, and traces.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+    #[configurable(metadata(
+        docs::output_type = "logs",
+        docs::output_type = "metrics",
+        docs::output_type = "traces"
+    ))]
     NativeJson(NativeJsonDeserializerConfig),
 
     /// Decodes the raw bytes as a [GELF][gelf] message.
@@ -309,16 +322,19 @@ pub enum DeserializerConfig {
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
+    #[configurable(metadata(docs::output_type = "logs"))]
     Gelf(GelfDeserializerConfig),
 
     /// Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
     ///
     /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+    #[configurable(metadata(docs::output_type = "metrics"))]
     Influxdb(InfluxdbDeserializerConfig),
 
     /// Decodes the raw bytes as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
+    #[configurable(metadata(docs::output_type = "logs"))]
     Avro {
         /// Apache Avro-specific encoder options.
         avro: AvroDeserializerOptions,
@@ -327,6 +343,7 @@ pub enum DeserializerConfig {
     /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(docs::output_type = "logs"))]
     Vrl(VrlDeserializerConfig),
 }
 
