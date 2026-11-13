@@ -45,6 +45,14 @@ _schemaDefinitions: "codecs::decoding::DeserializerConfig": object: options: {
 
 				[json]: https://www.json.org/
 				"""
+			message_pack: """
+				Decodes the raw bytes as an [MessagePack][messagepack] message.
+
+				Stream-based `socket` sources (`tcp` and `unix_stream` modes) require an explicit
+				`framing` method, such as `length_delimited`.
+
+				[messagepack]: https://msgpack.org/
+				"""
 			native: """
 				Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 

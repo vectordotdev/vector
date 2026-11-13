@@ -2910,6 +2910,8 @@ dependencies = [
  "prost-reflect",
  "rand 0.10.2",
  "regex",
+ "rmp-serde",
+ "rmpv",
  "rstest 0.28.0",
  "serde",
  "serde_json",
