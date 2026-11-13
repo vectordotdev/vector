@@ -64,6 +64,9 @@ assets = [
   ["licenses/*", "/usr/share/vector/licenses/", "644"],
   ["NOTICE", "/usr/share/vector/NOTICE", "644"],
   ["LICENSE-3rdparty.csv", "/usr/share/vector/LICENSE-3rdparty.csv", "644"],
+  ["target/completion/bash/vector", "/usr/share/bash-completion/completions/vector", "644"],
+  ["target/completion/zsh/_vector", "/usr/share/zsh/vendor-completions/_vector", "644"],
+  ["target/completion/fish/vector.fish", "/usr/share/fish/vendor_completions.d/vector.fish", "644"],
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
