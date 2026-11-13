@@ -30,6 +30,22 @@ pub(super) struct HttpEncoder {
 }
 
 impl HttpEncoder {
+    /// Whether this encoder serializes with the `otlp` codec.
+    #[cfg_attr(not(feature = "codecs-opentelemetry"), expect(clippy::unused_self))]
+    pub(super) const fn is_otlp(&self) -> bool {
+        #[cfg(feature = "codecs-opentelemetry")]
+        {
+            matches!(
+                self.encoder.serializer(),
+                vector_lib::codecs::encoding::Serializer::Otlp(_)
+            )
+        }
+        #[cfg(not(feature = "codecs-opentelemetry"))]
+        {
+            false
+        }
+    }
+
     /// Creates a new `HttpEncoder`.
     pub(super) const fn new(
         encoder: Encoder<Framer>,
