@@ -47,11 +47,21 @@ pub mod util {
             let structured_metadata: Vec<logproto::LabelPairAdapter> =
                 entry.2.into_iter().map(Into::into).collect();
 
+            // `google.protobuf.Timestamp` requires `nanos` to be in `[0, 999_999_999]`, even
+            // when `seconds` is negative. Truncating division (`/` and `%`) rounds toward zero,
+            // so a pre-epoch (negative) nanosecond timestamp would yield a negative `nanos` and
+            // a malformed message. Normalize so the remainder is non-negative, borrowing a
+            // second when needed.
+            let seconds = entry.0 / NANOS_RANGE;
+            let nanos = (entry.0 % NANOS_RANGE) as i32;
+            let (seconds, nanos) = if nanos < 0 {
+                (seconds - 1, nanos + 1_000_000_000)
+            } else {
+                (seconds, nanos)
+            };
+
             logproto::EntryAdapter {
-                timestamp: Some(prost_types::Timestamp {
-                    seconds: entry.0 / NANOS_RANGE,
-                    nanos: (entry.0 % NANOS_RANGE) as i32,
-                }),
+                timestamp: Some(prost_types::Timestamp { seconds, nanos }),
                 line,
                 structured_metadata,
                 parsed: vec![], // TODO: Remove when Loki's proto doesn't require this in the
@@ -128,6 +138,40 @@ mod tests {
             s,
             r#"{agent="vector", file="/path/to/log", host="localhost", job="file_logs"}"#
         );
+    }
+
+    #[test]
+    fn entry_timestamp_nanos_stay_in_range() {
+        use crate::logproto::EntryAdapter;
+
+        // A pre-epoch timestamp has a negative nanosecond value. The resulting
+        // `google.protobuf.Timestamp` must still keep `nanos` in `[0, 1_000_000_000)`
+        // with `seconds` adjusted down, matching the protobuf contract.
+        let nanos = -1_500_000_000_i64; // 1.5s before the Unix epoch
+        let adapter = EntryAdapter::from(Entry(nanos, "before epoch".into(), vec![]));
+        let ts = adapter.timestamp.expect("timestamp is always set");
+
+        assert_eq!(ts.seconds, -2);
+        assert_eq!(ts.nanos, 500_000_000);
+        assert!(
+            (0..1_000_000_000).contains(&ts.nanos),
+            "nanos must be in [0, 1e9), got {}",
+            ts.nanos
+        );
+        // The encoded instant must still equal the original value.
+        assert_eq!(ts.seconds * 1_000_000_000 + i64::from(ts.nanos), nanos);
+    }
+
+    #[test]
+    fn entry_timestamp_positive_nanos_unchanged() {
+        use crate::logproto::EntryAdapter;
+
+        let nanos = 1_640_244_790_500_000_000_i64;
+        let adapter = EntryAdapter::from(Entry(nanos, "after epoch".into(), vec![]));
+        let ts = adapter.timestamp.expect("timestamp is always set");
+
+        assert_eq!(ts.seconds, 1_640_244_790);
+        assert_eq!(ts.nanos, 500_000_000);
     }
 
     #[test]
