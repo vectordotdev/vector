@@ -91,6 +91,8 @@ pub enum TlsError {
     },
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
+    #[snafu(display("A reloadable TLS acceptor requires TLS to be enabled"))]
+    ReloaderWithoutTls,
     #[snafu(display("TLS handshake failed: {}", source))]
     Handshake { source: openssl::ssl::Error },
     #[snafu(display("Incoming listener failed: {}", source))]
