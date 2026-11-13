@@ -218,6 +218,8 @@ impl LinuxUdpBatchReceiver {
     }
 
     async fn recv_batch(&mut self) -> io::Result<UdpBatch<'_>> {
+        // Rejected datagrams may never reach a cooperative downstream send.
+        tokio::task::consume_budget().await;
         let received = loop {
             let mut guard = self.socket.readable().await?;
             let addresses = &mut self.addresses;
@@ -296,15 +298,14 @@ fn try_recvmmsg(
             iov_len: buffers[index].len(),
         };
         controls[index].fill(0);
-        headers[index].msg_hdr = libc::msghdr {
-            msg_name: (&raw mut addresses[index]).cast(),
-            msg_namelen: mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t,
-            msg_iov: &raw mut iovecs[index],
-            msg_iovlen: 1,
-            msg_control: controls[index].as_mut_ptr().cast(),
-            msg_controllen: UDP_CONTROL_LEN,
-            msg_flags: 0,
-        };
+        let header = &mut headers[index].msg_hdr;
+        header.msg_name = (&raw mut addresses[index]).cast();
+        header.msg_namelen = mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+        header.msg_iov = &raw mut iovecs[index];
+        header.msg_iovlen = 1;
+        header.msg_control = controls[index].as_mut_ptr().cast();
+        header.msg_controllen = UDP_CONTROL_LEN as _;
+        header.msg_flags = 0;
     }
 
     // SAFETY: all pointers in `headers` refer to live, writable buffers above, and their
@@ -364,7 +365,7 @@ fn udp_gro_segment_size(header: &libc::msghdr) -> Option<usize> {
             && control_ref.cmsg_len
                 >= unsafe {
                     // SAFETY: `CMSG_LEN` only calculates a length from the supplied value.
-                    libc::CMSG_LEN(mem::size_of::<libc::c_int>() as libc::c_uint) as usize
+                    libc::CMSG_LEN(mem::size_of::<libc::c_int>() as libc::c_uint) as _
                 }
         {
             // SAFETY: the level, type, and length checks above establish that the control
@@ -702,7 +703,7 @@ mod tests {
         // SAFETY: all fields consumed by the CMSG macros are initialized immediately below.
         let mut header: libc::msghdr = unsafe { mem::zeroed() };
         header.msg_control = control.as_mut_ptr().cast();
-        header.msg_controllen = UDP_CONTROL_LEN;
+        header.msg_controllen = UDP_CONTROL_LEN as _;
 
         // SAFETY: `header` describes the live `control` buffer with its exact length.
         let control_header = unsafe { libc::CMSG_FIRSTHDR(&raw const header) };
@@ -713,8 +714,7 @@ mod tests {
             (*control_header).cmsg_level = libc::SOL_UDP;
             (*control_header).cmsg_type = UDP_GRO;
             (*control_header).cmsg_len =
-                libc::CMSG_LEN(libc::c_uint::try_from(mem::size_of::<libc::c_int>()).unwrap())
-                    as usize;
+                libc::CMSG_LEN(libc::c_uint::try_from(mem::size_of::<libc::c_int>()).unwrap()) as _;
             ptr::write_unaligned(libc::CMSG_DATA(control_header).cast::<libc::c_int>(), 1_200);
         }
 

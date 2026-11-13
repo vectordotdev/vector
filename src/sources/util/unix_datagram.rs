@@ -217,23 +217,22 @@ impl UnixDatagramBatchReceiver {
                 iov_base: buffers[index].as_mut_ptr().cast(),
                 iov_len: buffers[index].len(),
             };
-            headers[index].msg_hdr = libc::msghdr {
-                msg_name: if capture_peer_address {
-                    (&raw mut addresses[index]).cast()
-                } else {
-                    ptr::null_mut()
-                },
-                msg_namelen: if capture_peer_address {
-                    mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t
-                } else {
-                    0
-                },
-                msg_iov: &raw mut iovecs[index],
-                msg_iovlen: 1,
-                msg_control: ptr::null_mut(),
-                msg_controllen: 0,
-                msg_flags: 0,
+            let header = &mut headers[index].msg_hdr;
+            header.msg_name = if capture_peer_address {
+                (&raw mut addresses[index]).cast()
+            } else {
+                ptr::null_mut()
             };
+            header.msg_namelen = if capture_peer_address {
+                mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t
+            } else {
+                0
+            };
+            header.msg_iov = &raw mut iovecs[index];
+            header.msg_iovlen = 1;
+            header.msg_control = ptr::null_mut();
+            header.msg_controllen = 0;
+            header.msg_flags = 0;
         }
 
         // SAFETY: `StdUnixDatagram` owns a stable, valid descriptor for its entire lifetime.
@@ -252,6 +251,8 @@ impl UnixDatagramBatchReceiver {
     }
 
     async fn recv_batch(&mut self) -> io::Result<UnixDatagramBatch<'_>> {
+        // Rejected datagrams may never reach a cooperative downstream send.
+        tokio::task::consume_budget().await;
         let last_received = self.last_received;
         let received = loop {
             let mut guard = self.socket.readable().await?;
