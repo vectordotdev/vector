@@ -1008,6 +1008,20 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		tag_cardinality_ttl_expirations_total: {
+			description: """
+				The total number of cache slots reclaimed by the `tag_cardinality_limit`
+				transform's TTL eviction, emitted only when `ttl_secs` is configured. In
+				`exact` mode a slot holds one distinct value. In `probabilistic` mode this
+				is an approximation of the distinct values that aged out of the oldest
+				rolling-bloom shard, not a bound: refresh-on-sighting can count a value
+				that is still retained in a newer shard, and a bloom false positive can
+				omit a distinct value whose insert did not increment the shard count.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after

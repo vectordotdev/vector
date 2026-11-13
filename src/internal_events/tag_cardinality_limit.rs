@@ -105,3 +105,32 @@ impl InternalEvent for TagCardinalityTrackedKeys {
         gauge!(GaugeName::TagCardinalityTrackedKeys).set(LossyF64(self.count));
     }
 }
+
+/// Emitted when TTL eviction reclaims tag values from a tracking bucket.
+///
+/// The `count` is in cache *slots*, the unit `AcceptedTagValueSet::len`
+/// measures when enforcing `value_limit`. For the exact backend a slot holds
+/// one distinct value, so the count is exact. For the probabilistic backend it
+/// is an approximation of the distinct values that aged out of the retired
+/// rolling-bloom shard, not a bound. Refresh-on-sighting can over-count,
+/// because a hot value copied into a newer shard is still included when the
+/// old shard rotates out. A bloom false positive can under-count, because
+/// `BloomFilterStorage::insert` leaves the shard count unchanged when the
+/// filter already reports the value as present.
+#[derive(NamedInternalEvent)]
+pub(crate) struct TagCardinalityTtlExpired {
+    pub count: u64,
+}
+
+impl InternalEvent for TagCardinalityTtlExpired {
+    fn emit(self) {
+        if self.count == 0 {
+            return;
+        }
+        debug!(
+            message = "Expired tag values from cardinality cache.",
+            count = self.count,
+        );
+        counter!(CounterName::TagCardinalityTtlExpirationsTotal).increment(self.count);
+    }
+}

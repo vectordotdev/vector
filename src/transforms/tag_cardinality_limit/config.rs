@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -87,6 +87,71 @@ pub struct Inner {
 
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
+
+    /// Expire tracked tag values after this many seconds since they were last
+    /// accepted into the cardinality cache.
+    ///
+    /// When unset (default) or set to `0`, values persist for the lifetime of the
+    /// process — the historical behavior. When set to a positive value, the
+    /// transform behaves like a sliding window: any tag value not accepted within
+    /// the TTL is dropped, freeing room under `value_limit` for fresh values.
+    /// Useful for bounding cost on backends (e.g. Datadog custom metrics) that
+    /// bill on a rolling unique-series window.
+    ///
+    /// "Accepted" means the value was recorded on an emitted event. With
+    /// `limit_exceeded_action: drop_tag`, every retained tag sighting refreshes
+    /// the lease. With `limit_exceeded_action: drop_event`, the pre-check uses a
+    /// non-refreshing membership test and the record pass runs only when the
+    /// whole event is kept — so a value present on every *incoming* event can
+    /// still expire if those events are rejected because another tag is over
+    /// limit. Size the TTL around the active accepted set, not raw event volume.
+    ///
+    /// In `exact` mode every value carries a precise last-accepted timestamp; in
+    /// `probabilistic` mode the underlying bloom filter is split into
+    /// `ttl_generations` rolling shards, so eviction is approximate to within
+    /// `ttl_secs / ttl_generations`.
+    ///
+    /// Not supported in `exact_fingerprint` mode, which keeps only hashes and has
+    /// nowhere to record a last-accepted time; combining the two is a configuration
+    /// error rather than a silently ignored setting.
+    #[serde(default)]
+    #[configurable(metadata(docs::human_name = "TTL (seconds)"))]
+    pub ttl_secs: Option<u64>,
+
+    /// Number of time-slices the TTL window is split into.
+    ///
+    /// In `probabilistic` mode, higher values smooth eviction (closer to a true
+    /// sliding window) at the cost of `(effective ttl_generations + 1) *
+    /// cache_size_per_key` memory per (metric, tag-key) pair. The same factor
+    /// applies to CPU. A cache miss, or a hit that lives only in an older shard,
+    /// checks every shard, and each check hashes the tag value, so lookup cost
+    /// grows linearly with the shard count. The effective generation count in
+    /// this mode is limited to 16; a higher request is rejected when `ttl_secs`
+    /// is long enough to honor it. A shorter `ttl_secs` still clamps the count
+    /// first (slices are at least 1s), and the limit applies to that clamped
+    /// count, so a request above 16 is accepted when the clamp brings it back
+    /// to 16 or below. The extra shard on top of the effective count is the one
+    /// currently being written: it covers only part of a slice, so retiring
+    /// without it would expire values after `ttl_secs - (ttl_secs /
+    /// ttl_generations)` instead of the full TTL. Explicitly setting `1`
+    /// produces a one-shard tumbling window: all tracked values are dropped at
+    /// once every `ttl_secs`, using `cache_size_per_key` memory. When `ttl_secs`
+    /// is shorter than the requested generation count, generations are clamped
+    /// but the extra shard is still kept so short TTLs do not silently tumble.
+    ///
+    /// In `exact` mode this does not change eviction precision (each value still
+    /// carries its own last-accepted timestamp). It only sets how often the
+    /// transform may proactively scan the value map (`sweep_interval ≈
+    /// ttl_secs / ttl_generations`): higher values scan more frequently. Raising
+    /// it has no benefit for correctness and can increase CPU on large
+    /// `value_limit` buckets.
+    ///
+    /// Must be at least `1` when `ttl_secs` is set, and at most 16 effective
+    /// generations in `probabilistic` mode. Ignored when `ttl_secs` is unset.
+    /// `exact` mode has no generation cap.
+    #[serde(default = "default_ttl_generations")]
+    #[configurable(metadata(docs::human_name = "TTL Generations"))]
+    pub ttl_generations: u8,
 }
 
 /// Controls the approach taken for tracking tag cardinality at the global level.
@@ -160,6 +225,23 @@ pub struct OverrideInner {
 
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
+
+    /// Per-metric TTL for tracked tag values. See [`Inner::ttl_secs`] for the
+    /// full description.
+    ///
+    /// Per-metric TTL is a **full override** of the global TTL — it does not
+    /// inherit. Leaving this unset means "no TTL for this metric", *not*
+    /// "fall back to the global `ttl_secs`". This mirrors how a per-metric
+    /// `value_limit` fully shadows the global one. If you want a metric to
+    /// share the global TTL, copy the value explicitly.
+    #[serde(default)]
+    #[configurable(metadata(docs::human_name = "TTL (seconds)"))]
+    pub ttl_secs: Option<u64>,
+
+    /// Per-metric override for `ttl_generations`. See [`Inner::ttl_generations`].
+    #[serde(default = "default_ttl_generations")]
+    #[configurable(metadata(docs::human_name = "TTL Generations"))]
+    pub ttl_generations: u8,
 }
 
 /// Controls the approach taken for tracking tag cardinality at the per-metric level.
@@ -183,6 +265,15 @@ pub enum OverrideMode {
     /// Skip cardinality tracking for this metric. All tag values pass through and nothing is
     /// limited. Other fields in this per-metric configuration are ignored when this is selected.
     Excluded,
+}
+
+impl OverrideInner {
+    /// Whether this override actually applies a TTL. `mode: excluded` ignores
+    /// every other field and allocates no storage, so a leftover `ttl_secs`
+    /// there is not a TTL (and must not be validated or counted as one).
+    pub(crate) fn ttl_active(&self) -> bool {
+        self.mode.as_mode().is_some() && ttl_duration(self.ttl_secs).is_some()
+    }
 }
 
 impl OverrideMode {
@@ -313,6 +404,67 @@ pub(crate) const fn default_cache_size() -> usize {
     5 * 1024 // 5KB
 }
 
+/// Default number of rolling-bloom shards. Four gives a reasonable middle ground:
+/// eviction granularity of `ttl/4`, and a 4x memory multiplier on
+/// `cache_size_per_key` for users who opt into TTL.
+pub(crate) const fn default_ttl_generations() -> u8 {
+    4
+}
+
+/// Largest effective generation count `probabilistic` mode will build.
+///
+/// A cache miss, and a hit that lives only in an older shard, runs a bloom
+/// membership test per shard, and each test hashes the tag value. Sliding
+/// windows keep one extra shard, so this allows at most 17 probes. That is
+/// four times the default and still splits the TTL into slices of about 6%.
+/// `exact` mode does not probe shards and is not limited by this.
+///
+/// The number is also written out in the `ttl_generations` field docs and the
+/// transform's TTL section; keep those in step with this constant.
+pub(crate) const MAX_TTL_GENERATIONS: u8 = 16;
+
+/// Resolve `ttl_secs` to a window, treating both `None` and `0` as "no expiry".
+///
+/// Backend selection and config validation both go through this so they can
+/// never disagree about whether a config has TTL enabled.
+pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
+    ttl_secs.filter(|secs| *secs > 0).map(Duration::from_secs)
+}
+
+/// Compute time-slice count and duration so `slice * generations == ttl` exactly.
+///
+/// Caps `generations` to at most one slice per second of TTL (so each slice is
+/// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
+/// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
+/// still sum to the configured window. The per-second cap saturates at
+/// `u8::MAX` rather than wrapping, so a TTL of `>= 2^8` seconds never clamps
+/// the requested generation count.
+///
+/// This is the generation count the storage backends build, so validation
+/// applies [`MAX_TTL_GENERATIONS`] to this result rather than to the raw
+/// request: a request of 255 with `ttl_secs: 10` builds 10 generations.
+pub(crate) fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u8, Duration) {
+    let requested = ttl_generations.max(1);
+    let max_for_ttl = u8::try_from(ttl.as_secs().max(1)).unwrap_or(u8::MAX);
+    let generations = requested.min(max_for_ttl);
+    let slice = ttl / u32::from(generations);
+    (generations, slice)
+}
+
+impl Config {
+    /// Whether the global config or any tracked per-metric override enables a TTL.
+    ///
+    /// Without a TTL nothing can empty a bucket (apart from intentional
+    /// `value_limit: 0` ones), so reclaiming empty buckets can be skipped.
+    pub(crate) fn any_ttl_enabled(&self) -> bool {
+        ttl_duration(self.global.ttl_secs).is_some()
+            || self
+                .per_metric_limits
+                .values()
+                .any(|per_metric| per_metric.config.ttl_active())
+    }
+}
+
 // =============================================================================
 // Transform plumbing
 // =============================================================================
@@ -325,6 +477,8 @@ impl GenerateConfig for Config {
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
                 internal_metrics: InternalMetricsConfig::default(),
+                ttl_secs: None,
+                ttl_generations: default_ttl_generations(),
             },
             tracking_scope: TrackingScope::default(),
             max_tracked_keys: None,
@@ -342,6 +496,31 @@ pub enum BuildError {
          `probabilistic`, where it has no effect. Remove the field or switch to `probabilistic` mode."
     ))]
     CacheSizeRequiresProbabilistic { tag_key: String },
+
+    #[snafu(display(
+        "ttl_secs set on {scope} but mode is `exact_fingerprint`, which stores fingerprints \
+         without last-accepted timestamps and so cannot expire them. Remove ttl_secs or switch to \
+         `exact` or `probabilistic` mode."
+    ))]
+    TtlUnsupportedInFingerprintMode { scope: String },
+
+    #[snafu(display(
+        "ttl_generations is 0 on {scope} while ttl_secs is set. Use `1` for a tumbling window \
+         or a higher value for a sliding window."
+    ))]
+    ZeroTtlGenerations { scope: String },
+
+    #[snafu(display(
+        "ttl_generations resolves to {effective} on {scope} in probabilistic mode, above the \
+         limit of {limit}. A cache miss checks every bloom shard and hashes the tag value each \
+         time, so lower ttl_generations (16 keeps slices of about ttl/16) or use `exact` mode, \
+         which is not capped."
+    ))]
+    TtlGenerationsTooHigh {
+        scope: String,
+        effective: u8,
+        limit: u8,
+    },
 }
 
 #[async_trait::async_trait]
@@ -407,10 +586,98 @@ impl TransformConfig for Config {
             }
         }
 
+        // `exact_fingerprint` keeps only hashes, with nowhere to record a last-seen
+        // time, so a TTL would silently never fire. Reject rather than mislead.
+        if ttl_duration(self.global.ttl_secs).is_some()
+            && matches!(self.global.mode, Mode::ExactFingerprint)
+        {
+            errors.push(
+                BuildError::TtlUnsupportedInFingerprintMode {
+                    scope: "the global configuration".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        if ttl_duration(self.global.ttl_secs).is_some() && self.global.ttl_generations == 0 {
+            errors.push(
+                BuildError::ZeroTtlGenerations {
+                    scope: "the global configuration".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        push_probabilistic_generation_limit(
+            &mut errors,
+            "the global configuration",
+            matches!(self.global.mode, Mode::Probabilistic(_)),
+            self.global.ttl_secs,
+            self.global.ttl_generations,
+        );
+
+        for (metric_name, per_metric) in &self.per_metric_limits {
+            let ttl_enabled = per_metric.config.ttl_active();
+            if ttl_enabled && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint) {
+                errors.push(
+                    BuildError::TtlUnsupportedInFingerprintMode {
+                        scope: format!("`per_metric_limits.{metric_name}`"),
+                    }
+                    .to_string(),
+                );
+            }
+            if ttl_enabled && per_metric.config.ttl_generations == 0 {
+                errors.push(
+                    BuildError::ZeroTtlGenerations {
+                        scope: format!("`per_metric_limits.{metric_name}`"),
+                    }
+                    .to_string(),
+                );
+            }
+            push_probabilistic_generation_limit(
+                &mut errors,
+                &format!("`per_metric_limits.{metric_name}`"),
+                matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)),
+                per_metric.config.ttl_secs,
+                per_metric.config.ttl_generations,
+            );
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
             Err(errors)
         }
+    }
+}
+
+/// Reject probabilistic configs whose built shard count would make every cache
+/// miss hash the tag value once per shard. Uses [`compute_ttl_slices`], the
+/// same count the backend builds, so a request that a short TTL clamps under
+/// the limit is allowed. `mode: excluded` never reaches here with
+/// `probabilistic == true`.
+fn push_probabilistic_generation_limit(
+    errors: &mut Vec<String>,
+    scope: &str,
+    probabilistic: bool,
+    ttl_secs: Option<u64>,
+    ttl_generations: u8,
+) {
+    if !probabilistic {
+        return;
+    }
+    let Some(ttl) = ttl_duration(ttl_secs) else {
+        return;
+    };
+    let (effective, _) = compute_ttl_slices(ttl, ttl_generations);
+    if effective > MAX_TTL_GENERATIONS {
+        errors.push(
+            BuildError::TtlGenerationsTooHigh {
+                scope: scope.to_string(),
+                effective,
+                limit: MAX_TTL_GENERATIONS,
+            }
+            .to_string(),
+        );
     }
 }
