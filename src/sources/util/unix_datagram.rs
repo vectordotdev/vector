@@ -656,20 +656,19 @@ async fn listen(
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((events, _byte_size)) => {
-                                append_events(
+                                if !append_events(
                                     events,
                                     received_from
                                         .as_ref()
                                         .and_then(|values| values[index].clone()),
                                     &handle_events,
                                     &mut output,
-                                );
-                                while output.len() >= send_batch_size {
-                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
-                                        .await
-                                    {
-                                        return Ok(());
-                                    }
+                                    &mut out,
+                                    send_batch_size,
+                                )
+                                .await
+                                {
+                                    return Ok(());
                                 }
                             }
                             Err(error) => {
@@ -715,13 +714,17 @@ async fn listen(
                     for frame in frames {
                         match parser.parse(frame, *log_namespace) {
                             Ok(events) => {
-                                append_events(events, None, &handle_events, &mut output);
-                                while output.len() >= send_batch_size {
-                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
-                                        .await
-                                    {
-                                        return Ok(());
-                                    }
+                                if !append_events(
+                                    events,
+                                    None,
+                                    &handle_events,
+                                    &mut output,
+                                    &mut out,
+                                    send_batch_size,
+                                )
+                                .await
+                                {
+                                    return Ok(());
                                 }
                             }
                             Err(error) => emit(SocketReceiveError {
@@ -739,20 +742,19 @@ async fn listen(
                             .parse(Bytes::copy_from_slice(batch.payload(index)), *log_namespace)
                         {
                             Ok(events) => {
-                                append_events(
+                                if !append_events(
                                     events,
                                     received_from
                                         .as_ref()
                                         .and_then(|values| values[index].clone()),
                                     &handle_events,
                                     &mut output,
-                                );
-                                while output.len() >= send_batch_size {
-                                    if !send_buffered_events(&mut out, &mut output, send_batch_size)
-                                        .await
-                                    {
-                                        return Ok(());
-                                    }
+                                    &mut out,
+                                    send_batch_size,
+                                )
+                                .await
+                                {
+                                    return Ok(());
                                 }
                             }
                             Err(error) => {
@@ -767,32 +769,37 @@ async fn listen(
             }
         }
 
-        while !output.is_empty() {
-            if !send_buffered_events(&mut out, &mut output, send_batch_size).await {
-                return Ok(());
-            }
+        if !output.is_empty() && !send_buffered_events(&mut out, &mut output).await {
+            return Ok(());
         }
     }
 }
 
-fn append_events(
+async fn append_events(
     mut events: impl AsMut<[Event]> + IntoIterator<Item = Event>,
     received_from: Option<String>,
     handle_events: &impl Fn(&mut [Event], Option<String>),
-    output: &mut impl Extend<Event>,
-) {
-    handle_events(events.as_mut(), received_from);
-    output.extend(events);
-}
-
-async fn send_buffered_events(
-    out: &mut SourceSender,
     output: &mut Vec<Event>,
+    out: &mut SourceSender,
     max_events: usize,
 ) -> bool {
-    let split_at = output.len().min(max_events);
-    let remainder = output.split_off(split_at);
-    let events = std::mem::replace(output, remainder);
+    handle_events(events.as_mut(), received_from);
+    // Consume each decoded frame once, filling only the current output chunk. Repeatedly
+    // splitting a large frame would copy its remaining events on every send.
+    let mut events = events.into_iter();
+    loop {
+        output.extend(events.by_ref().take(max_events - output.len()));
+        if output.len() < max_events {
+            return true;
+        }
+        if !send_buffered_events(out, output).await {
+            return false;
+        }
+    }
+}
+
+async fn send_buffered_events(out: &mut SourceSender, output: &mut Vec<Event>) -> bool {
+    let events = std::mem::take(output);
     let count = events.len();
     debug_assert!(count > 0);
 
