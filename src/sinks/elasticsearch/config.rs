@@ -353,6 +353,12 @@ impl Default for BulkConfig {
 }
 
 /// Elasticsearch data stream mode configuration.
+///
+/// Template confinement applies to the complete `<type>-<dataset>-<namespace>` name. For example,
+/// `type: logs`, `dataset: system`, and `namespace: "{{ service }}"` confine destinations to
+/// `logs-system-`, including names selected by auto-routing. Fully dynamic names still require
+/// `dangerously_allow_unconfined_template_resolution: true`. Fully static configurations retain
+/// unrestricted auto-routing to valid data stream names.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -427,45 +433,48 @@ impl DataStreamConfig {
         true
     }
 
-    /// Confine the templated fields, producing a render-capable [`DataStreamMode`].
+    /// Confine the complete data stream name, producing a render-capable [`DataStreamMode`].
     ///
-    /// This is the only way to obtain a `DataStreamMode`, so the `data_stream.*` templates can
-    /// never be rendered without first passing through confinement.
+    /// Components may have no literal prefix of their own, provided the assembled name has one.
     ///
     /// # Errors
-    /// Returns an error if any data stream template fails confinement validation.
+    /// Returns an error if the assembled data stream template fails confinement validation.
     pub fn confine(
         self,
         confinement: &ConfinementConfig,
         component_name: &'static str,
     ) -> crate::Result<DataStreamMode> {
+        let name = [&self.dtype, &self.dataset, &self.namespace]
+            .into_iter()
+            .filter(|template| !template.is_empty())
+            .map(Template::get_ref)
+            .collect::<Vec<_>>()
+            .join("-");
+        let name = Template::try_from(name)?.confine(confinement, component_name, "data_stream")?;
+
         Ok(DataStreamMode {
-            dtype: self
-                .dtype
-                .confine(confinement, component_name, "data_stream.type")?,
-            dataset: self
-                .dataset
-                .confine(confinement, component_name, "data_stream.dataset")?,
-            namespace: self.namespace.confine(
-                confinement,
-                component_name,
-                "data_stream.namespace",
-            )?,
+            // Individual components are rendered without confinement. Only the complete name
+            // selects a destination, and `index` checks it after resolving all routing overrides.
+            dtype: UnconfinedTemplate::try_from(String::from(self.dtype))?,
+            dataset: UnconfinedTemplate::try_from(String::from(self.dataset))?,
+            namespace: UnconfinedTemplate::try_from(String::from(self.namespace))?,
+            name,
             auto_routing: self.auto_routing,
             sync_fields: self.sync_fields,
         })
     }
 }
 
-/// Runtime counterpart of [`DataStreamConfig`], holding confined templates.
+/// Runtime counterpart of [`DataStreamConfig`], confining the complete destination name.
 ///
-/// Obtained via [`DataStreamConfig::confine`]. The render methods here operate on
-/// [`ConfinedTemplate`], so the confinement checker is enforced on every rendered value.
+/// Obtained via [`DataStreamConfig::confine`]. Component rendering is unconfined; [`Self::index`]
+/// enforces the assembled template's boundary on both configured and auto-routed destinations.
 #[derive(Clone, Debug)]
 pub struct DataStreamMode {
-    dtype: ConfinedTemplate,
-    dataset: ConfinedTemplate,
-    namespace: ConfinedTemplate,
+    dtype: UnconfinedTemplate,
+    dataset: UnconfinedTemplate,
+    namespace: UnconfinedTemplate,
+    name: ConfinedTemplate,
     auto_routing: bool,
     sync_fields: bool,
 }
@@ -568,23 +577,14 @@ impl DataStreamMode {
                 .get(event_path!("data_stream"))
                 .and_then(|ds| ds.as_object());
             let dtype =
-                auto_routed_value(data_stream, "type", &self.dtype, "data_stream.type", || {
-                    self.dtype(log)
+                auto_routed_value(data_stream, "type", "data_stream.type", || self.dtype(log))?;
+            let dataset = auto_routed_value(data_stream, "dataset", "data_stream.dataset", || {
+                self.dataset(log)
+            })?;
+            let namespace =
+                auto_routed_value(data_stream, "namespace", "data_stream.namespace", || {
+                    self.namespace(log)
                 })?;
-            let dataset = auto_routed_value(
-                data_stream,
-                "dataset",
-                &self.dataset,
-                "data_stream.dataset",
-                || self.dataset(log),
-            )?;
-            let namespace = auto_routed_value(
-                data_stream,
-                "namespace",
-                &self.namespace,
-                "data_stream.namespace",
-                || self.namespace(log),
-            )?;
             (dtype, dataset, namespace)
         } else {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
@@ -596,20 +596,26 @@ impl DataStreamMode {
             .collect::<Vec<_>>()
             .join("-");
 
+        self.name
+            .check_confinement(&name)
+            .map_err(|error| {
+                emit(TemplateRenderingError {
+                    error,
+                    field: Some("data_stream"),
+                    drop_event: true,
+                });
+            })
+            .ok()?;
         Some(name)
     }
 }
 
-/// Auto-routed helper: prefer the event's `data_stream.<key>` field, but run
-/// that raw value through the confinement check attached to the
-/// corresponding template so `auto_routing` can't be used to bypass the
-/// build-time confinement on `data_stream.{type,dataset,namespace}`. Falls
-/// back to `fallback` (normal template rendering) when the event field is
-/// missing.
+/// Prefer the event's `data_stream.<key>` field and validate it as an identifier. Fall back to
+/// normal template rendering when it is missing. Confinement is enforced on the assembled name
+/// in [`DataStreamMode::index`].
 fn auto_routed_value<F>(
     data_stream: Option<&std::collections::BTreeMap<vector_lib::event::KeyString, Value>>,
     key: &str,
-    template: &ConfinedTemplate,
     field: &'static str,
     fallback: F,
 ) -> Option<String>
@@ -619,28 +625,6 @@ where
     match data_stream.and_then(|ds| ds.get(key)) {
         Some(value) => {
             let s = value.to_string_lossy().into_owned();
-            // Two layers of validation:
-            //
-            // 1. If the operator-authored template has a confinement checker,
-            //    run it. That catches values that violate a `PrefixChecker`
-            //    base or contain `..` segments.
-            //
-            // 2. If the template is *static* (e.g. the default `type = "logs"`),
-            //    no checker is attached and `check_confinement` returns Ok
-            //    for anything. Data-stream names are simple identifiers per
-            //    Elasticsearch's naming rules, so anything containing a path
-            //    separator, `..`, NUL, or over 255 bytes is either an attack
-            //    or would be rejected by Elasticsearch on ingest anyway.
-            template
-                .check_confinement(&s)
-                .map_err(|error| {
-                    emit(TemplateRenderingError {
-                        error,
-                        field: Some(field),
-                        drop_event: true,
-                    });
-                })
-                .ok()?;
             if !is_valid_data_stream_component(&s, field) {
                 emit(TemplateRenderingError {
                     error: crate::template::TemplateRenderingError::Confined {
@@ -1243,6 +1227,123 @@ mod tests {
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "elasticsearch", "bulk.index");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn data_stream_confinement_allows_dynamic_components() {
+        for (dtype, dataset, namespace, expected) in [
+            ("logs", "system", "{{ service }}", "logs-system-checkout"),
+            (
+                "logs",
+                "{{ service }}",
+                "{{ environment }}",
+                "logs-checkout-prod",
+            ),
+            ("", "system", "{{ service }}", "system-checkout"),
+            ("logs", "", "{{ service }}", "logs-checkout"),
+        ] {
+            for auto_routing in [false, true] {
+                let config = DataStreamConfig {
+                    dtype: Template::try_from(dtype).unwrap(),
+                    dataset: Template::try_from(dataset).unwrap(),
+                    namespace: Template::try_from(namespace).unwrap(),
+                    auto_routing,
+                    ..Default::default()
+                };
+                let mode = config
+                    .confine(&ConfinementConfig::default(), "elasticsearch")
+                    .unwrap();
+                let mut log = LogEvent::from("test");
+                log.insert(event_path!("service"), "checkout");
+                log.insert(event_path!("environment"), "prod");
+                assert_eq!(mode.index(&log).as_deref(), Some(expected));
+            }
+        }
+    }
+
+    #[test]
+    fn data_stream_confinement_checks_auto_routed_name() {
+        let config = DataStreamConfig {
+            dataset: Template::try_from("system").unwrap(),
+            namespace: Template::try_from("{{ service }}").unwrap(),
+            ..Default::default()
+        };
+        let mode = config
+            .confine(&ConfinementConfig::default(), "elasticsearch")
+            .unwrap();
+
+        // A routing override does not need the fallback template's event field.
+        let mut log = LogEvent::from("test");
+        log.insert(event_path!("data_stream", "namespace"), "production");
+        assert_eq!(mode.index(&log).as_deref(), Some("logs-system-production"));
+
+        for (field, value) in [
+            ("type", "metrics"),
+            ("dataset", "payments"),
+            ("dataset", ""),
+            ("namespace", ""),
+            ("namespace", "../../other"),
+        ] {
+            let mut log = log.clone();
+            log.insert(event_path!("data_stream", field), value);
+            assert_eq!(mode.index(&log), None, "{field}={value:?}");
+        }
+    }
+
+    #[test]
+    fn data_stream_confinement_rejects_names_without_prefix() {
+        let config = DataStreamConfig {
+            dtype: Template::try_from("{{ type }}").unwrap(),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .confine(&ConfinementConfig::default(), "elasticsearch")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn data_stream_confinement_opt_out() {
+        for dtype in ["logs", "{{ type }}"] {
+            let config = DataStreamConfig {
+                dtype: Template::try_from(dtype).unwrap(),
+                dataset: Template::try_from("system").unwrap(),
+                namespace: Template::try_from("{{ service }}").unwrap(),
+                ..Default::default()
+            };
+            let mode = config
+                .confine(&ConfinementConfig::unconfined(), "elasticsearch")
+                .unwrap();
+            let mut log = LogEvent::from("test");
+            log.insert(event_path!("data_stream", "type"), "metrics");
+            log.insert(event_path!("data_stream", "dataset"), "payments");
+            log.insert(event_path!("data_stream", "namespace"), "prod");
+            assert_eq!(mode.index(&log).as_deref(), Some("metrics-payments-prod"));
+        }
+    }
+
+    #[test]
+    fn data_stream_confinement_rejects_invalid_rendered_name() {
+        let config = DataStreamConfig {
+            namespace: Template::try_from("{{ service }}").unwrap(),
+            auto_routing: false,
+            ..Default::default()
+        };
+        let mode = config
+            .confine(&ConfinementConfig::default(), "elasticsearch")
+            .unwrap();
+        let mut log = LogEvent::from("test");
+        for value in [
+            "../../other".to_owned(),
+            "bad\0name".to_owned(),
+            "x".repeat(1024),
+        ] {
+            log.insert(event_path!("service"), value);
+            assert_eq!(mode.index(&log), None);
+        }
+        log.remove(event_path!("service"));
+        assert_eq!(mode.index(&log), None);
     }
 
     #[test]

@@ -113,9 +113,17 @@ generated: components: sinks: opensearch: configuration: {
 		type: bool: default: false
 	}
 	data_stream: {
-		description: "Elasticsearch data stream mode configuration."
-		required:    false
-		type:        _schemaDefinitions["core::option::Option<vector::sinks::elasticsearch::config::DataStreamConfig>"]
+		description: """
+			Elasticsearch data stream mode configuration.
+
+			Template confinement applies to the complete `<type>-<dataset>-<namespace>` name. For example,
+			`type: logs`, `dataset: system`, and `namespace: "{{ service }}"` confine destinations to
+			`logs-system-`, including names selected by auto-routing. Fully dynamic names still require
+			`dangerously_allow_unconfined_template_resolution: true`. Fully static configurations retain
+			unrestricted auto-routing to valid data stream names.
+			"""
+		required: false
+		type:     _schemaDefinitions["core::option::Option<vector::sinks::elasticsearch::config::DataStreamConfig>"]
 	}
 	distribution: {
 		description: "Options for determining the health of an endpoint."

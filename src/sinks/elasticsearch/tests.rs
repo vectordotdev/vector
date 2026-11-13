@@ -283,6 +283,66 @@ async fn encode_datastream_mode() {
 }
 
 #[tokio::test]
+async fn encode_datastream_dynamic_namespace() {
+    for auto_routing in [false, true] {
+        for sync_fields in [false, true] {
+            let config = serde_yaml::from_str::<ElasticsearchConfig>(&format!(
+                r#"
+                endpoints: ["https://example.com"]
+                api_version: v8
+                mode: data_stream
+                data_stream:
+                  type: logs
+                  dataset: system
+                  namespace: "{{{{ service }}}}"
+                  auto_routing: {auto_routing}
+                  sync_fields: {sync_fields}
+                "#
+            ))
+            .unwrap();
+            let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+            for override_namespace in [false, true] {
+                let mut log = LogEvent::from("hello there");
+                log.insert(event_path!("service"), "checkout");
+                if override_namespace {
+                    log.insert(event_path!("data_stream", "namespace"), "production");
+                }
+                let namespace = if auto_routing && override_namespace {
+                    "production"
+                } else {
+                    "checkout"
+                };
+                let processed = process_log(log, &es.mode, None, &config.encoding).unwrap();
+                assert_eq!(processed.index, format!("logs-system-{namespace}"));
+                if sync_fields {
+                    assert_eq!(
+                        processed.log.get(event_path!("data_stream", "type")),
+                        Some(&Value::from("logs"))
+                    );
+                    assert_eq!(
+                        processed.log.get(event_path!("data_stream", "dataset")),
+                        Some(&Value::from("system"))
+                    );
+                }
+
+                let mut encoded = Vec::new();
+                es.request_builder
+                    .encoder
+                    .encode_input(vec![processed], &mut encoded)
+                    .unwrap();
+                let metadata = encoded.split(|&byte| byte == b'\n').next().unwrap();
+                let metadata: serde_json::Value = serde_json::from_slice(metadata).unwrap();
+                assert_eq!(
+                    metadata["create"]["_index"],
+                    format!("logs-system-{namespace}")
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn encode_datastream_mode_no_routing() {
     use chrono::{TimeZone, Utc};
 
