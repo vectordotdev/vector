@@ -1,6 +1,7 @@
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
     sync::mpsc::{Receiver, channel},
     thread,
@@ -9,7 +10,7 @@ use std::{
 
 use crate::{
     Error,
-    config::{ComponentConfig, ComponentKind},
+    config::{ComponentConfig, ComponentKey, ComponentKind},
 };
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
@@ -64,6 +65,50 @@ impl Watcher {
     }
 }
 
+/// Index keeping track of mapping of component config paths
+/// and what they resolved to at the time of setting up the watch.
+/// Inotify reports all aliases of a file under the last registered path,
+/// so events are matched to components through the canonical path.
+#[derive(Default)]
+struct WatchIndex {
+    /// Map configured path to canonical path at registration time.
+    canonical: HashMap<PathBuf, PathBuf>,
+    /// Map canonical path to components watching it.
+    components: HashMap<PathBuf, Vec<(ComponentKey, ComponentKind)>>,
+}
+
+impl WatchIndex {
+    fn new(component_configs: &[ComponentConfig]) -> Self {
+        let mut index = Self::default();
+        for config in component_configs {
+            for path in &config.config_paths {
+                let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.clone());
+                index.canonical.insert(path.clone(), canonical.clone());
+                index
+                    .components
+                    .entry(canonical)
+                    .or_default()
+                    .push((config.component_key.clone(), config.component_type));
+            }
+        }
+        index
+    }
+
+    /// Find components affected by the given reported event paths.
+    fn changed_components(
+        &self,
+        changed_paths: &HashSet<PathBuf>,
+    ) -> HashMap<ComponentKey, ComponentKind> {
+        changed_paths
+            .iter()
+            .map(|p| self.canonical.get(p).unwrap_or(p))
+            .filter_map(|canonical| self.components.get(canonical))
+            .flatten()
+            .cloned()
+            .collect()
+    }
+}
+
 /// Sends a `ReloadFromDisk` or `ReloadEnrichmentTables` on `config_path` changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
@@ -96,6 +141,7 @@ pub fn spawn_thread<'a>(
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
     let mut watcher = Some(create_watcher(&watcher_conf, &config_paths)?);
+    let mut index = WatchIndex::new(&component_configs);
 
     info!("Watching configuration files.");
 
@@ -128,11 +174,11 @@ pub fn spawn_thread<'a>(
                             delay = ?delay
                         );
 
-                        let changed_components: HashMap<_, _> = component_configs
-                            .clone()
-                            .into_iter()
-                            .filter_map(|p| p.contains(&changed_paths))
-                            .collect();
+                        let changed_components = index.changed_components(&changed_paths);
+
+                        // The watched paths changed, this means the canonicalized form might have changed too,
+                        // for example if a symlink was updated to point to a new target, re-build the watch index.
+                        index = WatchIndex::new(&component_configs);
 
                         // We need to read paths to resolve any inode changes that may have happened.
                         // And we need to do it before raising sighup to avoid missing any change.
@@ -235,6 +281,39 @@ fn create_watcher(
     };
     watcher.add_paths(config_paths)?;
     Ok((watcher, receiver))
+}
+
+#[cfg(all(test, unix))]
+mod watcher_index_tests {
+    use std::fs::File;
+
+    use super::*;
+    use crate::test_util::temp_dir;
+
+    #[test]
+    fn watch_index_matches_aliases() {
+        // Two components reaching the same file through different symlinks.
+        let dir = temp_dir();
+        std::fs::create_dir(&dir).unwrap();
+        let target = dir.join("tls.crt");
+        File::create(&target).unwrap();
+        std::os::unix::fs::symlink(&target, dir.join("a.crt")).unwrap();
+        std::os::unix::fs::symlink(&target, dir.join("b.crt")).unwrap();
+
+        let (a, b) = (ComponentKey::from("a"), ComponentKey::from("b"));
+        let configs = vec![
+            ComponentConfig::new(vec![dir.join("a.crt")], a.clone(), ComponentKind::Sink),
+            ComponentConfig::new(vec![dir.join("b.crt")], b.clone(), ComponentKind::Sink),
+        ];
+
+        let index = WatchIndex::new(&configs);
+
+        let changed = index.changed_components(&HashSet::from([dir.join("b.crt")]));
+        assert_eq!(
+            changed,
+            HashMap::from([(a, ComponentKind::Sink), (b, ComponentKind::Sink)])
+        );
+    }
 }
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
@@ -439,13 +518,17 @@ mod tests {
         )
         .unwrap();
 
-        let expected =
-            crate::signal::SignalTo::ReloadComponents(HashSet::from([component.clone()]));
+        let expected = crate::signal::SignalTo::ReloadComponents(HashSet::from([component]));
 
         // Emulate kubernetes Secret/ConfigMap atomic update.
         // See https://github.com/kubernetes/kubernetes/blob/master/pkg/volume/util/atomic_writer.go
         // Do it twice to make sure that the watch still works after the initial swap.
         for (from, to) in [("..v1", "..v2"), ("..v2", "..v3")] {
+            assert!(
+                signal_rx.try_recv().is_err(),
+                "unexpected extra reload before swapping {from} -> {to}"
+            );
+
             std::fs::create_dir(dir.join(to)).unwrap();
             File::create(dir.join(to).join("tls.crt")).unwrap();
             std::os::unix::fs::symlink(to, dir.join("..data_tmp")).unwrap();
@@ -456,11 +539,6 @@ mod tests {
             assert!(
                 signal.is_ok_and(|s| s.is_ok_and(|s| s == expected)),
                 "no reload after swapping {from} -> {to}"
-            );
-
-            assert!(
-                tokio::time::timeout(delay * 2, signal_rx.recv()).await.is_err(),
-                "more than one reload after swapping {from} -> {to}"
             );
         }
     }
