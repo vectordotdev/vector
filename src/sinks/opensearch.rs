@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -35,6 +36,10 @@ impl SinkConfig for OpenSearchConfig {
 
     fn input(&self) -> Input {
         self.0.input()
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        self.0.files_to_watch()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -218,5 +223,30 @@ mod tests {
         value["api_version"] = serde_json::json!("v7");
         let config: BoxedSink = serde_json::from_value(value).unwrap();
         assert!(config.validate_dyn().is_err());
+    }
+
+    #[test]
+    fn files_to_watch_includes_tls_files() {
+        let config: BoxedSink = serde_yaml::from_str(&format!(
+            r"
+            type: opensearch
+            endpoints: [https://localhost:9200]
+            tls:
+                ca_file: /etc/tls/ca.crt
+                crt_file: /etc/tls/tls.crt
+                key_file: /etc/tls/tls.key
+            "
+        ))
+        .unwrap();
+
+        let files: Vec<PathBuf> = config.files_to_watch().into_iter().cloned().collect();
+        assert_eq!(
+            files,
+            vec![
+                PathBuf::from("/etc/tls/ca.crt"),
+                PathBuf::from("/etc/tls/tls.crt"),
+                PathBuf::from("/etc/tls/tls.key"),
+            ],
+        );
     }
 }
