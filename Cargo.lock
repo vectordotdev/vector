@@ -2890,7 +2890,7 @@ dependencies = [
  "memchr",
  "metrics",
  "opentelemetry-proto",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "parquet",
  "pin-project",
  "proptest",
@@ -7231,7 +7231,7 @@ dependencies = [
  "hashbrown 0.16.0",
  "indexmap 2.14.2",
  "metrics",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "quanta 0.12.6",
  "radix_trie",
  "rand 0.9.4",
@@ -8254,7 +8254,7 @@ dependencies = [
  "glob",
  "hex",
  "indexmap 2.14.2",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "proptest",
  "prost 0.14.3",
  "prost-build 0.14.3",
@@ -8284,9 +8284,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "5.3.0"
+version = "5.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7d950ca161dc355eaf28f82b11345ed76c6e1f6eb1f4f4479e0323b9e2fbd0e"
+checksum = "7f59006ce1e204c30956638535b74d317bca99477b9356dfaec54c37f6f600ab"
 dependencies = [
  "num-traits",
 ]
@@ -13304,7 +13304,7 @@ dependencies = [
  "openssl",
  "openssl-probe 0.1.6",
  "openssl-src",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "parking_lot 0.12.5",
  "parquet",
  "percent-encoding",
@@ -13593,7 +13593,7 @@ dependencies = [
  "ndarray-stats",
  "noisy_float",
  "openssl",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "parking_lot 0.13.0",
  "pin-project",
  "proptest",
@@ -13921,7 +13921,7 @@ dependencies = [
  "nu-ansi-term",
  "ofb",
  "onig",
- "ordered-float 5.3.0",
+ "ordered-float 5.5.1",
  "parse-size",
  "peeking_take_while",
  "percent-encoding",
