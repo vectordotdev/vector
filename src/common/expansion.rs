@@ -95,7 +95,10 @@ mod tests {
 
     #[test]
     fn static_keys_are_never_changed() {
-        let pairs = expand("ClusterName", "prod", true);
-        assert_eq!(pairs.get("ClusterName").map(String::as_str), Some("prod"));
+        for lowercase_keys in [true, false] {
+            let pairs = expand("Cluster.Name", "prod", lowercase_keys);
+            assert_eq!(pairs.get("Cluster.Name").map(String::as_str), Some("prod"));
+            assert_eq!(pairs.len(), 1);
+        }
     }
 }

@@ -1074,6 +1074,34 @@ mod tests {
     }
 
     #[test]
+    fn encoder_keeps_expanded_label_key_case() -> Result<(), serde_json::Error> {
+        let mut labels = HashMap::default();
+        labels.insert(confined_label("*"), unconfined_value("{{ attributes }}"));
+
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels,
+            structured_metadata: HashMap::default(),
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Preserve,
+        };
+
+        let message = r#"{"attributes": {"appName": "web", "appname": "worker"}}"#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+
+        let labels: HashMap<String, String> = record.labels.into_iter().collect();
+        assert_eq!(labels.get("appName").map(String::as_str), Some("web"));
+        assert_eq!(labels.get("appname").map(String::as_str), Some("worker"));
+        Ok(())
+    }
+
+    #[test]
     fn encoder_keeps_expanded_structured_metadata_key_case() -> Result<(), serde_json::Error> {
         let structured_metadata = encode_structured_metadata_keys(ExpandedKeyCase::Preserve)?;
 

@@ -208,7 +208,7 @@ pub enum OutOfOrderAction {
 pub enum ExpandedKeyCase {
     /// Lowercase expanded keys, for example `userId` becomes `userid`.
     ///
-    /// Keys that differ only by case collide, and the last one wins.
+    /// Keys that differ only by case collide, and only one of their values is kept.
     #[default]
     Lowercase,
 

@@ -140,7 +140,7 @@ generated: components: sinks: loki: configuration: {
 				lowercase: """
 					Lowercase expanded keys, for example `userId` becomes `userid`.
 
-					Keys that differ only by case collide, and the last one wins.
+					Keys that differ only by case collide, and only one of their values is kept.
 					"""
 				preserve: "Keep expanded keys in the case they have in the event, for example `userId` stays `userId`."
 			}
