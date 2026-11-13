@@ -312,7 +312,7 @@ impl PostgresqlClient {
                     .with_context(|_| ConnectionFailedSnafu {
                         endpoint: &self.endpoint,
                     })?;
-            crate::spawn_in_current_span(connection);
+            vector_lib::cpu_time::spawn_timed(connection);
             client
         } else {
             let (client, connection) =
@@ -322,7 +322,7 @@ impl PostgresqlClient {
                     .with_context(|_| ConnectionFailedSnafu {
                         endpoint: &self.endpoint,
                     })?;
-            crate::spawn_in_current_span(connection);
+            vector_lib::cpu_time::spawn_timed(connection);
             client
         };
 

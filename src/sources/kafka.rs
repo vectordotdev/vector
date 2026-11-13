@@ -477,7 +477,7 @@ async fn kafka_source(
             log_namespace,
             span,
         );
-        crate::spawn_in_current_span(async move {
+        vector_lib::cpu_time::spawn_timed(async move {
             coordinate_kafka_callbacks(
                 consumer,
                 callback_rx,
@@ -625,7 +625,7 @@ impl ConsumerStateInner<Consuming> {
 
         let (end_tx, mut end_signal) = oneshot::channel::<()>();
 
-        let handle = join_set.spawn(async move {
+        let handle = join_set.spawn(vector_lib::cpu_time::inherit_cpu_timer(async move {
             let mut messages = p.stream();
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
 
@@ -687,7 +687,7 @@ impl ConsumerStateInner<Consuming> {
                 );
             }
             (tp, status)
-        }.instrument(self.consumer_state.span.clone()));
+        }.instrument(self.consumer_state.span.clone())));
         (end_tx, handle)
     }
 

@@ -33,15 +33,23 @@ where
     let span = info_span!("file_server");
 
     // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
+    // These will need to be separated when this source is updated
+    // to support end-to-end acknowledgements.
+    let shutdown = shutdown.shared();
+    let shutdown2 = shutdown.clone();
+    // Created here: the blocking thread does not carry the source's CPU counter.
+    let file_server = vector_lib::cpu_time::inherit_cpu_timer(file_server.run(
+        chans,
+        shutdown,
+        shutdown2,
+        checkpointer,
+    ));
+
     let join_handle = tokio::task::spawn_blocking(move || {
-        // These will need to be separated when this source is updated
-        // to support end-to-end acknowledgements.
-        let shutdown = shutdown.shared();
-        let shutdown2 = shutdown.clone();
         let _enter = span.enter();
 
         let rt = tokio::runtime::Handle::current();
-        let result = rt.block_on(file_server.run(chans, shutdown, shutdown2, checkpointer));
+        let result = rt.block_on(file_server);
         result.expect("file server exited with an error")
     });
     join_handle.await

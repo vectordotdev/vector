@@ -13,6 +13,7 @@
 //!   inheritable by tasks spawned from it, without timing the future itself.
 //! - [`spawn_timed`] / [`spawn_timed_without_span`] — spawn helpers that attach the
 //!   counter of the calling task, if any, to the spawned task.
+//!   [`inherit_cpu_timer`] does the same for futures run by other means.
 //! - `register_counter` — registers the `component_cpu_usage_ns_total` metrics
 //!   counter for a component (available on Linux, macOS, and Windows only).
 //!
@@ -400,7 +401,12 @@ impl<F: Future> CpuTimedExt for F {}
 /// Wraps `future` in a [`CpuTimedFuture`] charging the [current
 /// counter](current_counter), if any. Returns it unchanged otherwise, with no
 /// per-poll overhead.
-fn inherit_cpu_timer<F: Future>(future: F) -> Either<CpuTimedFuture<F>, F> {
+///
+/// For futures run by other means than [`spawn_timed`], e.g. a
+/// [`tokio::task::JoinSet`] or a `block_on` call on a blocking thread. Call it
+/// from the component's task: the counter is read when this is called, not
+/// when the returned future is polled.
+pub fn inherit_cpu_timer<F: Future>(future: F) -> Either<CpuTimedFuture<F>, F> {
     match current_counter() {
         Some(counter) => Either::Left(future.cpu_timed(counter)),
         None => Either::Right(future),
@@ -431,7 +437,8 @@ where
 /// spawned task.
 ///
 /// For spawn sites where the current span does not describe the spawned work,
-/// e.g. executor hooks called by third-party code.
+/// e.g. executor hooks called by third-party code, or where the caller
+/// attaches its own span.
 #[track_caller]
 pub fn spawn_timed_without_span<F>(future: F) -> tokio::task::JoinHandle<F::Output>
 where

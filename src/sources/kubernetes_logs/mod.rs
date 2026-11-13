@@ -804,7 +804,7 @@ impl Source {
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
 
-        reflectors.push(crate::spawn_in_current_span(custom_reflector(
+        reflectors.push(vector_lib::cpu_time::spawn_timed(custom_reflector(
             pod_store_w,
             pod_cacher,
             pod_watcher,
@@ -828,7 +828,7 @@ impl Source {
             )
             .backoff(watcher::DefaultBackoff::default());
 
-            reflectors.push(crate::spawn_in_current_span(custom_reflector(
+            reflectors.push(vector_lib::cpu_time::spawn_timed(custom_reflector(
                 ns_store_w,
                 MetaCache::new(),
                 ns_watcher,
@@ -853,7 +853,7 @@ impl Source {
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();
 
-        reflectors.push(crate::spawn_in_current_span(custom_reflector(
+        reflectors.push(vector_lib::cpu_time::spawn_timed(custom_reflector(
             node_store_w,
             node_cacher,
             node_watcher,
