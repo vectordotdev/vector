@@ -48,6 +48,11 @@ use crate::{
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
+/// How long a reload waits for upstream components to release a changed sink's old disk buffer
+/// before rebuilding it. A write to that buffer never finishes when the buffer is full and
+/// blocking, because its reader has already stopped.
+const DISK_BUFFER_RELEASE_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[derive(Debug, Snafu)]
 pub enum ReloadError {
     #[snafu(display("global options changed: {}", changed_fields.join(", ")))]
@@ -701,6 +706,7 @@ impl RunningTopology {
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
         // they can naturally shutdown and allow us to recover their buffers if possible.
         let mut buffer_tx = HashMap::new();
+        let mut disk_buffers_to_release = HashMap::new();
 
         let sinks_to_change = diff
             .sinks
@@ -757,6 +763,9 @@ impl RunningTopology {
                     // info about which sinks are having their buffers reused and treat them differently
                     // at other stages.
                     buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
+                } else {
+                    disk_buffers_to_release
+                        .insert((*key).clone(), self.inputs.get(key).unwrap().clone());
                 }
             }
             self.remove_inputs(key, diff, new_config);
@@ -800,6 +809,22 @@ impl RunningTopology {
                     };
 
                     buffers.insert((*key).clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
+                } else if let Some(tx) = disk_buffers_to_release.remove(*key) {
+                    // Upstream fanouts hold clones of the old buffer sender until they apply the
+                    // pause/remove sent above and finish any write it detached. The rebuilt buffer
+                    // can only lock the same directories once those clones are gone.
+                    if tokio::time::timeout(
+                        DISK_BUFFER_RELEASE_TIMEOUT,
+                        tx.wait_for_disk_writers_released(),
+                    )
+                    .await
+                    .is_err()
+                    {
+                        warn!(
+                            message = "Timed out waiting for upstream components to release the previous disk buffer. Rebuilding it may fail.",
+                            component_id = %key,
+                        );
+                    }
                 }
             }
         }

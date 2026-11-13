@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt, task::Poll, time::Instant};
+use std::{
+    collections::HashMap,
+    fmt,
+    task::{Context, Poll},
+    time::Instant,
+};
 
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
@@ -127,6 +132,20 @@ impl Fanout {
         }
     }
 
+    /// Polls for the next control message and applies it.
+    ///
+    /// Returns `Poll::Ready(true)` if a message was processed, `Poll::Ready(false)` if the control
+    /// channel was closed.
+    pub fn poll_control_message(&mut self, cx: &mut Context<'_>) -> Poll<bool> {
+        self.control_channel.poll_recv(cx).map(|msg| match msg {
+            Some(msg) => {
+                self.apply_control_message(msg);
+                true
+            }
+            None => false,
+        })
+    }
+
     /// Apply a control message directly against this instance.
     ///
     /// This method should not be used if there is an active `SendGroup` being processed.
@@ -191,10 +210,23 @@ impl Fanout {
         events: impl Stream<Item = (EventArray, Instant)>,
     ) -> crate::Result<()> {
         tokio::pin!(events);
-        while let Some((event_array, send_reference)) = events.next().await {
-            self.send(event_array, Some(send_reference)).await?;
+        let mut control_channel_open = true;
+        loop {
+            tokio::select! {
+                biased;
+                // Apply control messages while waiting for events, so that a reload does not have
+                // to wait for the next event to remove or pause a sink.
+                alive = self.recv_control_message(), if control_channel_open => {
+                    control_channel_open = alive;
+                }
+                next = events.next() => match next {
+                    Some((event_array, send_reference)) => {
+                        self.send(event_array, Some(send_reference)).await?;
+                    }
+                    None => return Ok(()),
+                },
+            }
         }
-        Ok(())
     }
 
     /// Send a batch of events to all connected sinks.
