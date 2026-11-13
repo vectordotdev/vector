@@ -406,6 +406,66 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(unix)]
+    async fn sym_file_atomic_dir_update() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+
+        // Emulate kubernetes Secret/ConfigMap volume layout:
+        //   dir/tls.crt -> ..data/tls.crt
+        //   dir/..data -> ..v1
+        //   dir/..v1/tls.crt
+        let dir = temp_dir();
+        std::fs::create_dir_all(dir.join("..v1")).unwrap();
+        File::create(dir.join("..v1/tls.crt")).unwrap();
+        std::os::unix::fs::symlink("..v1", dir.join("..data")).unwrap();
+        std::os::unix::fs::symlink("..data/tls.crt", dir.join("tls.crt")).unwrap();
+
+        let component = ComponentKey::from("sink");
+        let component_config = ComponentConfig::new(
+            vec![dir.join("tls.crt")],
+            component.clone(),
+            ComponentKind::Sink,
+        );
+
+        let (signal_tx, mut signal_rx) = broadcast::channel(128);
+        spawn_thread(
+            WatcherConfig::RecommendedWatcher,
+            signal_tx,
+            &[],
+            vec![component_config],
+            delay,
+        )
+        .unwrap();
+
+        let expected =
+            crate::signal::SignalTo::ReloadComponents(HashSet::from([component.clone()]));
+
+        // Emulate kubernetes Secret/ConfigMap atomic update.
+        // See https://github.com/kubernetes/kubernetes/blob/master/pkg/volume/util/atomic_writer.go
+        // Do it twice to make sure that the watch still works after the initial swap.
+        for (from, to) in [("..v1", "..v2"), ("..v2", "..v3")] {
+            std::fs::create_dir(dir.join(to)).unwrap();
+            File::create(dir.join(to).join("tls.crt")).unwrap();
+            std::os::unix::fs::symlink(to, dir.join("..data_tmp")).unwrap();
+            std::fs::rename(dir.join("..data_tmp"), dir.join("..data")).unwrap();
+            std::fs::remove_dir_all(dir.join(from)).unwrap();
+
+            let signal = tokio::time::timeout(delay * 5, signal_rx.recv()).await;
+            assert!(
+                signal.is_ok_and(|s| s.is_ok_and(|s| s == expected)),
+                "no reload after swapping {from} -> {to}"
+            );
+
+            assert!(
+                tokio::time::timeout(delay * 2, signal_rx.recv()).await.is_err(),
+                "more than one reload after swapping {from} -> {to}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn recursive_directory_file_update() {
         trace_init();
 

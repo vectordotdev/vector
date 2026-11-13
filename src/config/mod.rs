@@ -2,7 +2,6 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
-    fs,
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
@@ -95,13 +94,18 @@ impl ComponentConfig {
         component_key: ComponentKey,
         component_type: ComponentKind,
     ) -> Self {
-        let canonicalized_paths = config_paths
+        // Normalize to absolute path but do not resolve as a config path
+        // could be a symlink that is updated to point to another configuration.
+        //
+        // Note that this does not cover the case where the symlink is pointed to
+        // a new configuration file and the old configuration file stays as is.
+        let config_paths = config_paths
             .into_iter()
-            .filter_map(|p| fs::canonicalize(p).ok())
+            .map(|p| std::path::absolute(&p).unwrap_or(p))
             .collect();
 
         Self {
-            config_paths: canonicalized_paths,
+            config_paths,
             component_key,
             component_type,
         }
@@ -116,6 +120,44 @@ impl ComponentConfig {
             return Some((self.component_key.clone(), self.component_type));
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod component_config_tests {
+    use std::path::PathBuf;
+
+    use super::{ComponentConfig, ComponentKey, ComponentKind};
+
+    #[test]
+    fn makes_relative_paths_absolute() {
+        let config = ComponentConfig::new(
+            vec![PathBuf::from("certs/tls.crt")],
+            ComponentKey::from("sink"),
+            ComponentKind::Sink,
+        );
+        assert_eq!(
+            config.config_paths,
+            vec![std::env::current_dir().unwrap().join("certs/tls.crt")]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn does_not_resolve_symlinks() {
+        let dir = crate::test_util::temp_dir();
+        std::fs::create_dir(&dir).unwrap();
+        let target = dir.join("target.crt");
+        std::fs::File::create(&target).unwrap();
+        let link = dir.join("tls.crt");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let config = ComponentConfig::new(
+            vec![link.clone()],
+            ComponentKey::from("sink"),
+            ComponentKind::Sink,
+        );
+        assert_eq!(config.config_paths, vec![link]);
     }
 }
 
