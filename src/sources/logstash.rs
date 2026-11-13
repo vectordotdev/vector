@@ -1741,7 +1741,7 @@ mod integration_tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let log = events[0].as_log();
         assert_eq!(
@@ -1787,7 +1787,7 @@ mod integration_tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let log = events[0].as_log();
         assert!(

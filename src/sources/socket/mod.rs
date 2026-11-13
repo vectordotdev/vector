@@ -7,7 +7,7 @@ mod unix_config;
 use unix_config::UnixConfig;
 
 use vector_lib::{
-    codecs::decoding::DeserializerConfig,
+    codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
@@ -108,6 +108,23 @@ impl GenerateConfig for SocketConfig {
     }
 }
 
+/// Resolve the framing for a stream socket. `message_pack` has no default stream framing, since
+/// the default `bytes` framing would only emit an event once the connection closes.
+fn stream_framing(
+    framing: Option<FramingConfig>,
+    decoding: &DeserializerConfig,
+) -> crate::Result<FramingConfig> {
+    match framing {
+        Some(framing) => Ok(framing),
+        None if matches!(decoding, DeserializerConfig::MessagePack) => Err(
+            "`message_pack` decoding on a stream socket requires an explicit `framing` method, \
+             such as `length_delimited`."
+                .into(),
+        ),
+        None => Ok(decoding.default_stream_framing()),
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
@@ -117,15 +134,8 @@ impl SourceConfig for SocketConfig {
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
                 let decoding = config.decoding().clone();
-                let decoder = DecodingConfig::new(
-                    config
-                        .framing
-                        .clone()
-                        .unwrap_or_else(|| decoding.default_stream_framing()),
-                    decoding,
-                    log_namespace,
-                )
-                .build()?;
+                let framing = stream_framing(config.framing.clone(), &decoding)?;
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -191,15 +201,8 @@ impl SourceConfig for SocketConfig {
                     let log_namespace = cx.log_namespace(config.log_namespace);
 
                     let decoding = config.decoding.clone();
-                    let decoder = DecodingConfig::new(
-                        config
-                            .framing
-                            .clone()
-                            .unwrap_or_else(|| decoding.default_stream_framing()),
-                        decoding,
-                        log_namespace,
-                    )
-                    .build()?;
+                    let framing = stream_framing(config.framing.clone(), &decoding)?;
+                    let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                     unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
                 },
@@ -348,7 +351,10 @@ mod test {
         CharacterDelimitedDecoderConfig, decoding::CharacterDelimitedDecoderOptions,
     };
     use vector_lib::{
-        codecs::{GelfDeserializerConfig, NewlineDelimitedDecoderConfig},
+        codecs::{
+            GelfDeserializerConfig, LengthDelimitedDecoderConfig, NewlineDelimitedDecoderConfig,
+            decoding::DeserializerConfig,
+        },
         event::EventContainer,
         lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     };
@@ -587,6 +593,62 @@ mod test {
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "bar".into()
             );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn tcp_message_pack_requires_framing() {
+        let (tx, _rx) = SourceSender::new_test();
+        let (_guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_decoding(DeserializerConfig::MessagePack);
+
+        assert!(
+            SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn tcp_message_pack_length_delimited() {
+        use tokio::io::AsyncWriteExt;
+
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let (guard, addr) = next_addr();
+
+            let mut config = TcpConfig::from_address(addr.into());
+            config
+                .set_framing(Some(LengthDelimitedDecoderConfig::default().into()))
+                .set_decoding(DeserializerConfig::MessagePack);
+
+            let server = SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            wait_for_tcp_and_release(guard, addr).await;
+
+            // {"foo": 123} with a 4-byte big-endian length prefix.
+            let mut stream = TcpStream::connect(addr).await.unwrap();
+            stream
+                .write_all(b"\x00\x00\x00\x06\x81\xA3foo\x7B")
+                .await
+                .unwrap();
+
+            // The event arrives while the connection is still open.
+            let event = timeout(Duration::from_secs(5), rx.next())
+                .await
+                .expect("event not received while connection open")
+                .unwrap();
+            assert_eq!(event.as_log()["foo"], 123.into());
+
+            drop(stream);
         })
         .await;
     }

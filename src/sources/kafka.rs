@@ -67,6 +67,13 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+const MESSAGE_KEY_KEY: &str = "message_key";
+const TOPIC_KEY: &str = "topic";
+const PARTITION_KEY: &str = "partition";
+const OFFSET_KEY: &str = "offset";
+const HEADERS_KEY: &str = "headers";
+const TIMESTAMP_KEY: &str = "timestamp";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("The drain_timeout_ms ({}) must be less than session_timeout_ms ({})", value, session_timeout_ms.as_millis()))]
@@ -80,7 +87,7 @@ enum BuildError {
     SubscribeError { source: rdkafka::error::KafkaError },
 }
 
-/// Metrics (beta) configuration.
+/// Metrics configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 struct Metrics {
@@ -282,23 +289,23 @@ fn default_auto_offset_reset() -> String {
 }
 
 fn default_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("message_key"))
+    OptionalValuePath::from(owned_value_path!(MESSAGE_KEY_KEY))
 }
 
 fn default_topic_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("topic"))
+    OptionalValuePath::from(owned_value_path!(TOPIC_KEY))
 }
 
 fn default_partition_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("partition"))
+    OptionalValuePath::from(owned_value_path!(PARTITION_KEY))
 }
 
 fn default_offset_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("offset"))
+    OptionalValuePath::from(owned_value_path!(OFFSET_KEY))
 }
 
 fn default_headers_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("headers"))
+    OptionalValuePath::from(owned_value_path!(HEADERS_KEY))
 }
 
 const fn example_auto_offset_reset_values() -> [&'static str; 7] {
@@ -375,42 +382,42 @@ impl SourceConfig for KafkaSourceConfig {
             .with_source_metadata(
                 Self::NAME,
                 keys.timestamp.map(LegacyKey::Overwrite),
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.topic.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("topic"),
+                &owned_value_path!(TOPIC_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.partition.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("partition"),
+                &owned_value_path!(PARTITION_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.offset.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("offset"),
+                &owned_value_path!(OFFSET_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.headers.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("headers"),
+                &owned_value_path!(HEADERS_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.key_field.map(LegacyKey::Overwrite),
-                &owned_value_path!("message_key"),
+                &owned_value_path!(MESSAGE_KEY_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -1172,7 +1179,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.key_field.as_ref().map(LegacyKey::Overwrite),
-                path!("message_key"),
+                path!(MESSAGE_KEY_KEY),
                 self.key.clone(),
             );
 
@@ -1180,7 +1187,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.timestamp.as_ref().map(LegacyKey::Overwrite),
-                path!("timestamp"),
+                path!(TIMESTAMP_KEY),
                 self.timestamp,
             );
 
@@ -1188,7 +1195,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.topic.as_ref().map(LegacyKey::Overwrite),
-                path!("topic"),
+                path!(TOPIC_KEY),
                 self.topic.clone(),
             );
 
@@ -1196,7 +1203,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.partition.as_ref().map(LegacyKey::Overwrite),
-                path!("partition"),
+                path!(PARTITION_KEY),
                 self.partition,
             );
 
@@ -1204,7 +1211,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.offset.as_ref().map(LegacyKey::Overwrite),
-                path!("offset"),
+                path!(OFFSET_KEY),
                 self.offset,
             );
 
@@ -1212,7 +1219,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.headers.as_ref().map(LegacyKey::Overwrite),
-                path!("headers"),
+                path!(HEADERS_KEY),
                 self.headers.clone(),
             );
         }
@@ -2199,8 +2206,8 @@ mod integration_test {
 
         sleep(Duration::from_secs(1)).await;
 
-        assert!(!events1.is_empty());
-        assert!(!events2.is_empty());
+        assert_ne!(events1, [] as [vector_lib::event::EventArray; 0]);
+        assert_ne!(events2, [] as [vector_lib::event::EventArray; 0]);
 
         match fetch_tpl_offset(&group_id, &topic, 0) {
             Offset::Offset(offset) => {

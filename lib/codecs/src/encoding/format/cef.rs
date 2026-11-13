@@ -342,11 +342,11 @@ impl Encoder<Event> for CefSerializer {
 
         buffer.write_fmt(format_args!(
             "CEF:{}|{}|{}|{}|{}|{name}|{severity}",
-            &self.version,
-            &self.device.vendor,
-            &self.device.product,
-            &self.device.version,
-            &self.device.event_class_id,
+            self.version,
+            self.device.vendor,
+            self.device.product,
+            self.device.version,
+            self.device.event_class_id,
         ))?;
         if !formatted_extensions.is_empty() {
             formatted_extensions.sort();

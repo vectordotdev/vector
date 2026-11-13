@@ -645,6 +645,7 @@ where
                         if !self.reroute_dropped {
                             emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
+                                error: &error,
                             });
                         }
                         ("abort", error, self.drop_on_abort)
@@ -1160,6 +1161,41 @@ mod tests {
         let mut tform = remap(conf).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none());
+    }
+
+    #[test]
+    fn check_remap_abort_logs_message() {
+        use std::io::{Read as _, Seek as _, SeekFrom};
+
+        let conf = RemapConfig {
+            source: Some(r#"abort "col_ip invalid:\n" + "garbage""#.to_string()),
+            drop_on_abort: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let mut buffer = tempfile::tempfile().unwrap();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(buffer.try_clone().unwrap())
+            .finish();
+        let output = tracing::subscriber::with_default(subscriber, || {
+            // Another test thread may have cached the callsite as disabled before this
+            // subscriber existed.
+            tracing::callsite::rebuild_interest_cache();
+            transform_one(&mut tform, Event::Log(LogEvent::from("message")))
+        });
+
+        assert!(output.is_none());
+        let mut logs = String::new();
+        buffer.seek(SeekFrom::Start(0)).unwrap();
+        buffer.read_to_string(&mut logs).unwrap();
+        // The message is escaped, so event data cannot break the log line.
+        assert!(
+            logs.contains(r#"Event mapping aborted. error="col_ip invalid:\ngarbage""#),
+            "{logs}"
+        );
     }
 
     #[test]
@@ -1730,7 +1766,10 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
+        assert_eq!(
+            tests.remove(0).run().await.errors,
+            [] as [std::string::String; 0]
+        );
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }

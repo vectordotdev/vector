@@ -1,4 +1,4 @@
-use chrono::{Timelike, Utc, offset::TimeZone};
+use chrono::{Timelike, Utc};
 use rand::seq::SliceRandom;
 use vector_lib::metric_tags;
 
@@ -55,7 +55,6 @@ async fn cloudwatch_metrics_put_data() {
             .with_tags(Some(metric_tags!(
                 "region" => "us-west-1",
                 "production" => "true",
-                "e" => "",
             ))),
         );
         events.push(event);
@@ -84,10 +83,10 @@ async fn cloudwatch_metrics_put_data() {
                     statistic: StatisticKind::Histogram,
                 },
             )
+            // CloudWatch refuses timestamps older than two weeks.
             .with_timestamp(Some(
-                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
-                    .single()
-                    .and_then(|t| t.with_nanosecond(123_456_789))
+                Utc::now()
+                    .with_nanosecond(123_456_789)
                     .expect("invalid timestamp"),
             )),
         );

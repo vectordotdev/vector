@@ -769,7 +769,7 @@ mod integration_test {
         trace!("Receiving event...");
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let log = events[0].as_log();
         trace!("{log:?}");

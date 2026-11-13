@@ -296,7 +296,7 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
             for field in missing_prefix {
                 log.rename_key(
                     event_path!(field.as_str()),
-                    event_path!(format!("_{}", &field).as_str()),
+                    event_path!(format!("_{field}").as_str()),
                 );
             }
             log

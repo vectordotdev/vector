@@ -8,6 +8,7 @@ mod bytes;
 mod gelf;
 mod influxdb;
 mod json;
+mod msgpack;
 mod native;
 mod native_json;
 #[cfg(feature = "opentelemetry")]
@@ -23,6 +24,7 @@ use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions};
+pub use msgpack::{MsgPackDeserializer, MsgPackDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,

@@ -141,8 +141,7 @@ fn test_from_cue_example(category: &'static str, name: &str, example: Example) -
 
     assert!(
         !(returns.is_some() && output.is_some()),
-        "example must either specify return or output, not both: {category}/{}",
-        &name
+        "example must either specify return or output, not both: {category}/{name}"
     );
 
     if let Some(output) = &output {

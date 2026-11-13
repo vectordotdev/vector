@@ -1641,7 +1641,7 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
         );
 
         let events = crate::test_util::collect_ready(rx);
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = Controller::get().unwrap().capture_metrics();
         let errors = metrics
@@ -1679,7 +1679,7 @@ async fn decode_traces_idx_only_payload_emits_error() {
         );
 
         let events = crate::test_util::collect_ready(rx);
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = Controller::get().unwrap().capture_metrics();
         assert!(
@@ -1923,7 +1923,7 @@ fn test_config_outputs_with_disabled_data_types() {
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
             assert!(outputs.contains(&DataType::all_bits()));
-            assert!(outputs.len() == 1);
+            assert_eq!(outputs.len(), 1);
         }
     }
 }
@@ -2775,7 +2775,10 @@ async fn decode_series_v1_rejects_excessive_unit_event_expansion() {
         )
         .await
     );
-    assert!(crate::test_util::collect_ready(rx).is_empty());
+    assert_eq!(
+        crate::test_util::collect_ready(rx),
+        [] as [vector_lib::event::Event; 0]
+    );
 }
 
 #[tokio::test]
@@ -2806,7 +2809,10 @@ async fn decode_series_v1_skips_unit_materialization_for_zero_point_series() {
         )
         .await
     );
-    assert!(crate::test_util::collect_ready(rx).is_empty());
+    assert_eq!(
+        crate::test_util::collect_ready(rx),
+        [] as [vector_lib::event::Event; 0]
+    );
 }
 
 fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
@@ -3139,7 +3145,7 @@ fn decode_v3_skips_tag_expansion_for_zero_point_series() {
 
     let events = super::metrics::decode_ddseries_v3(Bytes::from(body), &None, false).unwrap();
 
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 #[test]
@@ -4022,7 +4028,7 @@ fn test_build_apm_stats_event_empty_body() {
         DD_API_STATS_PATH,
         &make_llmobs_source(),
     );
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 #[test]

@@ -390,17 +390,14 @@ impl AwsAuthentication {
     }
 
     #[cfg(test)]
-    /// Creates dummy authentication for tests.
+    /// Creates authentication for tests that sign with the credentials of the environment, such
+    /// as the AWS Emulator credentials file named by `AWS_SHARED_CREDENTIALS_FILE`.
     #[must_use]
     pub fn test_auth() -> AwsAuthentication {
-        AwsAuthentication::AccessKey {
-            access_key_id: "dummy".to_string().into(),
-            secret_access_key: "dummy".to_string().into(),
-            assume_role: None,
-            external_id: None,
+        AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
             region: None,
-            session_name: None,
-            session_token: None,
         }
     }
 }

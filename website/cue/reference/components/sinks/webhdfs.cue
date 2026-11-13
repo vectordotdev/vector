@@ -2,6 +2,20 @@ package metadata
 
 components: sinks: webhdfs: {
 	title: "WebHDFS"
+	how_it_works: {
+		retry_policy: {
+			body: """
+				Vector retries failed writes when OpenDAL classifies the error as temporary.
+				Errors classified as permanent are not retried. Requests that exceed
+				`request.timeout_secs` can also be retried.
+
+				Retries reuse the same destination path and encoded batch. Configure
+				the number of retries with `request.retry_attempts`, and configure
+				the delay between retries with `request.retry_initial_backoff_secs`
+				and `request.retry_max_duration_secs`.
+				"""
+		}
+	}
 
 	classes: {
 		delivery: "at_least_once"
@@ -31,8 +45,12 @@ components: sinks: webhdfs: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
-			tls: enabled:     false
+			request: {
+				enabled:                 true
+				headers:                 false
+				retry_max_duration_secs: 30
+			}
+			tls: enabled: false
 		}
 	}
 
