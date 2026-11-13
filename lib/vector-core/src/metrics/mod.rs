@@ -5,7 +5,11 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::{sync::OnceLock, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{OnceLock, PoisonError, RwLock},
+    time::Duration,
+};
 
 use chrono::Utc;
 use metric_matcher::MetricKeyMatcher;
@@ -50,6 +54,7 @@ static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
     recorder: VectorRecorder,
+    capture_intervals: RwLock<HashMap<&'static str, Duration>>,
 }
 
 fn metrics_enabled() -> bool {
@@ -96,7 +101,10 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     // copies. See `capture_metrics` and its callers for an example. Note that this is done last to
     // allow `init_test` below to use the initialization state of `CONTROLLER` to wait for the above
     // steps to complete in another thread.
-    let controller = Controller { recorder };
+    let controller = Controller {
+        recorder,
+        capture_intervals: RwLock::default(),
+    };
     CONTROLLER
         .set(controller)
         .map_err(|_| Error::AlreadyInitialized)?;
@@ -171,6 +179,25 @@ impl Controller {
             );
         });
         Ok(())
+    }
+
+    /// Sets how often the `internal_metrics` source emits the series of the named metric, instead
+    /// of on every scrape. Meant for high-cardinality metrics whose consumers only need coarse
+    /// totals. Each emission covers everything recorded since the previous one.
+    pub fn set_capture_interval(&self, name: &'static str, interval: Duration) {
+        self.capture_intervals
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(name, interval);
+    }
+
+    /// The capture intervals set with [`Self::set_capture_interval`], by metric name.
+    #[must_use]
+    pub fn capture_intervals(&self) -> HashMap<&'static str, Duration> {
+        self.capture_intervals
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric

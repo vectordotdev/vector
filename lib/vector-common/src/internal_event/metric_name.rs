@@ -11,6 +11,7 @@ pub enum CounterName {
     ComponentSentEventBytesTotal,
     ComponentSentBytesTotal,
     ComponentDiscardedEventsTotal,
+    ComponentDiscardedEventsByGroupTotal,
     ComponentErrorsTotal,
     ComponentTimedOutEventsTotal,
     ComponentTimedOutRequestsTotal,
@@ -379,6 +380,9 @@ impl CounterName {
             Self::ComponentSentEventBytesTotal => "component_sent_event_bytes_total",
             Self::ComponentSentBytesTotal => "component_sent_bytes_total",
             Self::ComponentDiscardedEventsTotal => "component_discarded_events_total",
+            Self::ComponentDiscardedEventsByGroupTotal => {
+                "component_discarded_events_by_group_total"
+            }
             Self::ComponentErrorsTotal => "component_errors_total",
             Self::ComponentTimedOutEventsTotal => "component_timed_out_events_total",
             Self::ComponentTimedOutRequestsTotal => "component_timed_out_requests_total",

@@ -30,10 +30,10 @@ pub struct ThrottleInternalMetricsConfig {
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
 
-    /// Whether or not to include the `group` tag on the `component_discarded_events_total`
-    /// internal metric.
+    /// Whether or not to also count discarded events per group, in the
+    /// `component_discarded_events_by_group_total` internal metric.
     ///
-    /// When enabled, adds a `group` tag containing the rendered `key_field` value.
+    /// The metric's `group` tag contains the rendered `key_field` value.
     /// If the `key_field` value is missing or can't be rendered, the tag value is `None`.
     ///
     /// Note that this defaults to false because the `group` tag has potentially unbounded

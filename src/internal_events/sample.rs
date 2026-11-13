@@ -29,13 +29,13 @@ mod tests {
 
     use super::SampleEventDiscarded;
 
-    fn discarded_events_counter(tags: &[(&str, &str)]) -> Option<f64> {
+    fn discarded_events_counter(name: &str, tags: &[(&str, &str)]) -> Option<f64> {
         Controller::get()
             .expect("metrics controller initialized")
             .capture_metrics()
             .into_iter()
             .find(|metric| {
-                metric.name() == "component_discarded_events_total"
+                metric.name() == name
                     && tags.iter().all(|(key, value)| {
                         metric
                             .tags()
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn emits_component_discarded_events_with_group_tag() {
+    fn emits_discarded_events_by_group_when_enabled() {
         vector_lib::metrics::init_test();
         for group in ["group-a", "group-b"] {
             SampleEventDiscarded {
@@ -67,7 +67,10 @@ mod tests {
 
         for group in ["group-a", "group-b", "None"] {
             assert_eq!(
-                discarded_events_counter(&[("intentional", "true"), ("group", group)]),
+                discarded_events_counter(
+                    "component_discarded_events_by_group_total",
+                    &[("intentional", "true"), ("group", group)]
+                ),
                 Some(1.0)
             );
         }
@@ -75,7 +78,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn emits_component_discarded_events_without_group_tag_by_default() {
+    fn emits_only_untagged_discarded_events_by_default() {
         vector_lib::metrics::init_test();
         SampleEventDiscarded {
             group: None,
@@ -84,9 +87,15 @@ mod tests {
         .emit();
 
         assert_eq!(
-            discarded_events_counter(&[("intentional", "true")]),
+            discarded_events_counter(
+                "component_discarded_events_total",
+                &[("intentional", "true")]
+            ),
             Some(1.0)
         );
-        assert_eq!(discarded_events_counter(&[("group", "group-a")]), None);
+        assert_eq!(
+            discarded_events_counter("component_discarded_events_by_group_total", &[]),
+            None
+        );
     }
 }

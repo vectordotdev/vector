@@ -29,8 +29,20 @@ impl DeltaState {
     ///
     /// Gauges are already meaningful as absolute values and pass through untouched.
     pub(super) fn convert(&mut self, metrics: &mut [Metric]) {
+        self.convert_holding(metrics, &[]);
+    }
+
+    /// Like [`Self::convert`], but `held` series were captured without being emitted: their
+    /// baselines stay unchanged so the next emission covers the whole held period.
+    pub(super) fn convert_holding(&mut self, metrics: &mut [Metric], held: &[Metric]) {
         self.generation += 1;
         let generation = self.generation;
+
+        for metric in held {
+            if let Some(entry) = self.seen.get_mut(metric.series()) {
+                entry.generation = generation;
+            }
+        }
 
         for metric in metrics {
             if !is_cumulative(metric) {
@@ -194,6 +206,16 @@ mod tests {
 
         let metric = convert_one(&mut state, counter("a", 103.0));
         assert_eq!(metric.value(), &MetricValue::Counter { value: 3.0 });
+    }
+
+    #[test]
+    fn held_series_keep_their_baseline() {
+        let mut state = DeltaState::default();
+        convert_one(&mut state, counter("a", 2.0));
+
+        state.convert_holding(&mut [], &[counter("a", 5.0)]);
+        let metric = convert_one(&mut state, counter("a", 9.0));
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 7.0 });
     }
 
     #[test]

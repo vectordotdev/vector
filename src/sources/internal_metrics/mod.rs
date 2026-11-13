@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use vector_lib::internal_event::{emit, register};
 
 use futures::StreamExt;
@@ -9,7 +9,8 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    event::Metric,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle, Protocol},
     lookup::lookup_v2::OptionalValuePath,
 };
 
@@ -190,49 +191,121 @@ impl InternalMetrics<'_> {
     async fn run(mut self) -> vector_lib::source_sender::SendResult {
         let events_received = register(EventsReceived);
         let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
-        let mut interval =
-            IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
+        let mut schedule = CaptureSchedule::default();
+        let shutdown = self.shutdown.clone();
+        let mut interval = IntervalStream::new(time::interval(self.interval)).take_until(shutdown);
         while interval.next().await.is_some() {
-            let hostname = crate::get_hostname();
-            let pid = std::process::id().to_string();
+            let intervals = self.controller.capture_intervals();
+            let (mut metrics, held) = schedule.split(
+                self.controller.capture_metrics(),
+                &intervals,
+                time::Instant::now(),
+            );
+            if let Some(deltas) = &mut self.deltas {
+                deltas.convert_holding(&mut metrics, &held);
+            }
+            self.send(metrics, &events_received, &bytes_received)
+                .await?;
+        }
 
-            let mut metrics = self.controller.capture_metrics();
+        // Metrics with a capture interval can hold back far more than a scrape interval of data,
+        // so emit them one last time instead of losing it on shutdown.
+        let intervals = self.controller.capture_intervals();
+        if !intervals.is_empty() {
+            let mut metrics: Vec<_> = self
+                .controller
+                .capture_metrics()
+                .into_iter()
+                .filter(|metric| intervals.contains_key(metric.name()))
+                .collect();
             if let Some(deltas) = &mut self.deltas {
                 deltas.convert(&mut metrics);
             }
-
-            let count = metrics.len();
-            let byte_size = metrics.size_of();
-            let json_size = metrics.estimated_json_encoded_size_of();
-
-            bytes_received.emit(ByteSize(byte_size));
-            events_received.emit(CountByteSize(count, json_size));
-
-            let batch = metrics.into_iter().map(|mut metric| {
-                // A metric starts out with a default "vector" namespace, but will be overridden
-                // if an explicit namespace is provided to this source.
-                if self.namespace != "vector" {
-                    metric = metric.with_namespace(Some(self.namespace.clone()));
-                }
-
-                if let Some(host_key) = &self.host_key.path
-                    && let Ok(hostname) = &hostname
-                {
-                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                }
-                if let Some(pid_key) = &self.pid_key {
-                    metric.replace_tag(pid_key.to_owned(), pid.clone());
-                }
-                metric
-            });
-
-            if let Err(error) = self.out.send_batch(batch).await {
-                emit(StreamClosedError { count });
-                return Err(error);
-            }
+            self.send(metrics, &events_received, &bytes_received)
+                .await?;
         }
 
         Ok(())
+    }
+
+    async fn send(
+        &mut self,
+        metrics: Vec<Metric>,
+        events_received: &impl InternalEventHandle<Data = CountByteSize>,
+        bytes_received: &impl InternalEventHandle<Data = ByteSize>,
+    ) -> vector_lib::source_sender::SendResult {
+        let hostname = crate::get_hostname();
+        let pid = std::process::id().to_string();
+
+        let count = metrics.len();
+        let byte_size = metrics.size_of();
+        let json_size = metrics.estimated_json_encoded_size_of();
+
+        bytes_received.emit(ByteSize(byte_size));
+        events_received.emit(CountByteSize(count, json_size));
+
+        let batch = metrics.into_iter().map(|mut metric| {
+            // A metric starts out with a default "vector" namespace, but will be overridden
+            // if an explicit namespace is provided to this source.
+            if self.namespace != "vector" {
+                metric = metric.with_namespace(Some(self.namespace.clone()));
+            }
+
+            if let Some(host_key) = &self.host_key.path
+                && let Ok(hostname) = &hostname
+            {
+                metric.replace_tag(host_key.to_string(), hostname.to_owned());
+            }
+            if let Some(pid_key) = &self.pid_key {
+                metric.replace_tag(pid_key.to_owned(), pid.clone());
+            }
+            metric
+        });
+
+        if let Err(error) = self.out.send_batch(batch).await {
+            emit(StreamClosedError { count });
+            return Err(error);
+        }
+        Ok(())
+    }
+}
+
+/// When each metric with a capture interval is next emitted.
+#[derive(Default)]
+struct CaptureSchedule {
+    next_due: HashMap<&'static str, time::Instant>,
+}
+
+impl CaptureSchedule {
+    /// Splits a scrape into the series to emit and those of metrics whose capture interval has
+    /// not elapsed yet. An interval starts on the first scrape after it is set.
+    fn split(
+        &mut self,
+        metrics: Vec<Metric>,
+        intervals: &HashMap<&'static str, Duration>,
+        now: time::Instant,
+    ) -> (Vec<Metric>, Vec<Metric>) {
+        if intervals.is_empty() {
+            return (metrics, Vec::new());
+        }
+        let held: Vec<&'static str> = intervals
+            .iter()
+            .filter_map(|(&name, &interval)| {
+                let due = self.next_due.entry(name).or_insert(now + interval);
+                if now >= *due {
+                    *due = now + interval;
+                    None
+                } else {
+                    Some(name)
+                }
+            })
+            .collect();
+        if held.is_empty() {
+            return (metrics, Vec::new());
+        }
+        metrics
+            .into_iter()
+            .partition(|metric| !held.iter().any(|name| *name == metric.name()))
     }
 }
 
@@ -259,6 +332,35 @@ mod tests {
             components::{SOURCE_TAGS, run_and_assert_source_compliance},
         },
     };
+
+    #[test]
+    fn capture_schedule_holds_metrics_until_their_interval_elapses() {
+        let counter = |name: &str| {
+            Metric::new(
+                name,
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+        };
+        let names = |metrics: &[Metric]| metrics.iter().map(Metric::name).collect::<Vec<_>>();
+        let intervals = HashMap::from([("slow", Duration::from_secs(60))]);
+        let mut schedule = CaptureSchedule::default();
+        let start = time::Instant::now();
+
+        for (elapsed, expected_emitted) in [
+            (0, vec!["fast"]),
+            (30, vec!["fast"]),
+            (60, vec!["fast", "slow"]),
+        ] {
+            let (emitted, held) = schedule.split(
+                vec![counter("fast"), counter("slow")],
+                &intervals,
+                start + Duration::from_secs(elapsed),
+            );
+            assert_eq!(names(&emitted), expected_emitted, "after {elapsed}s");
+            assert_eq!(emitted.len() + held.len(), 2);
+        }
+    }
 
     fn incremental_config() -> InternalMetricsConfig {
         InternalMetricsConfig {
