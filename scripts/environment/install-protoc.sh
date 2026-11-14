@@ -129,6 +129,10 @@ install_protoc() {
   fi
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
+  # protoc finds well-known types in an include directory beside its executable.
+  # Keep these files when installing outside a system protobuf development package.
+  mkdir -p "${INSTALL_PATH}/include"
+  cp -R "${TMP_DIR}/include/." "${INSTALL_PATH}/include/"
   mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"
 }
 
