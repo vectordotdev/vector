@@ -1,0 +1,180 @@
+name: Native build experiment
+
+# Keep all experiments on the dedicated PR. No release or dispatch trigger.
+# Review commands: /ci-run-native-probe, /ci-run-native-musl64, /ci-run-native-patches.
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+jobs:
+  patches:
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-patches'
+    name: Check native dependency patches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          mold: false
+          protoc: true
+          dd-rust-license-tool: true
+          prettier: true
+          markdownlint-cli2: true
+          actionlint: true
+      - name: Check patch formatting and documentation
+        run: |
+          make fmt
+          git diff --exit-code
+          make check-actionlint
+          make check-markdown
+      - name: Check patched libraries with Clippy
+        run: |
+          cargo clippy --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib
+          cargo clippy --manifest-path lib/vendored/quanta/Cargo.toml --lib
+      - name: Test patched libraries
+        env:
+          CARGO_TARGET_DIR: target/native-patches
+          PROTOC: ${{ runner.temp }}/protoc-bin/protoc
+        run: |
+          cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib --test protoc_override
+          cargo test --manifest-path lib/vendored/quanta/Cargo.toml --lib --no-default-features -- --test-threads=1
+      - name: Check license output
+        run: |
+          make build-licenses
+          git diff --exit-code -- LICENSE-3rdparty.csv
+
+  probe:
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-probe'
+    name: Probe ${{ matrix.image }} (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v5
+            image: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
+    steps:
+      - name: Check native execution (no QEMU)
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          uname -a
+          if [ -d /proc/sys/fs/binfmt_misc ]; then
+            ls -la /proc/sys/fs/binfmt_misc
+            if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+              echo '::error::QEMU is registered; this would not prove native execution'
+              exit 1
+            fi
+          fi
+          docker run --rm --platform "$PLATFORM" "$IMAGE" sh -euxc '
+            uname -a
+            if command -v apk; then
+              apk add --no-cache build-base rust cargo cmake perl linux-headers protobuf-dev protobuf
+            else
+              apt-get update
+              apt-get install -y --no-install-recommends gcc g++ libc6-dev curl ca-certificates musl-tools
+            fi
+            printf "#include <stdio.h>\nint main(void) { puts(\"native C works\"); }\n" >/tmp/probe.c
+            cc /tmp/probe.c -o /tmp/probe
+            /tmp/probe
+            cc -dumpmachine
+            if command -v rustc; then rustc -vV; fi
+            if command -v musl-gcc; then musl-gcc /tmp/probe.c -static -o /tmp/probe-musl; /tmp/probe-musl; fi
+          '
+
+  musl:
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-musl64'
+    name: Build native ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04-8core
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-8core-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          persist-credentials: false
+      - name: Build native toolchain image
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
+          docker build --pull -f scripts/native/Dockerfile.alpine \
+            --build-arg RUST_VERSION="$RUST_VERSION" \
+            --build-arg RUST_HOST="$TARGET" \
+            --build-arg RUST_TARGET="$TARGET" \
+            -t vector-native .
+      - name: Link Vector with the release feature set
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          docker run --rm -v "$PWD:/work" \
+            -e TARGET -e CARGO_PROFILE_RELEASE_LTO=thin \
+            -e CARGO_BUILD_JOBS=6 \
+            vector-native bash -euxo pipefail -c '
+              rustc -vV
+              # Use the native C/C++ toolchain and library search paths, not the
+              # libstdc++ relocation required by the old cross images.
+              CARGO_TARGET_KEY=$(echo "$TARGET" | tr "[:lower:]-" "[:upper:]_")
+              export "CARGO_TARGET_${CARGO_TARGET_KEY}_LINKER=cc"
+              export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
+              cargo build --locked --release --target "$TARGET" \
+                --no-default-features --features "target-$TARGET"
+              file="target/$TARGET/release/vector"
+              if readelf -l "$file" | grep -q INTERP; then
+                echo "musl artifact must not have a dynamic interpreter" >&2
+                exit 1
+              fi
+              if readelf -d "$file" | grep -q NEEDED; then
+                echo "musl artifact must not have dynamic dependencies" >&2
+                exit 1
+              fi
+              "$file" --version
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/vector
+          if-no-files-found: error

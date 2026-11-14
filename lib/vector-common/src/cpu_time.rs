@@ -143,10 +143,7 @@ impl Inner {
     )]
     #[allow(clippy::cast_sign_loss, reason = "Preserve clock conversions")]
     fn now() -> Self {
-        let mut ts = libc::timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
+        let mut ts = libc::timespec::default();
         // SAFETY:
         // - `ts` is a valid, zero-initialised `timespec` on the stack.
         // - `CLOCK_THREAD_CPUTIME_ID` is a valid clock ID on Linux ≥ 2.6 and

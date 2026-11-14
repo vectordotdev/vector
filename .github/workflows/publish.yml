@@ -148,25 +148,33 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts/vector*
 
+  # Preserve the job ID for existing callers; no cross-rs tools or images are used.
   build-linux-cross:
-    name: Build Vector for ${{ matrix.target }}
+    name: Build Vector for ${{ matrix.target }} (native container)
     if: github.repository == 'vectordotdev/vector'
-    runs-on: release-builder-linux
-    timeout-minutes: 60
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-musl # .tar.gz
+            runner: ubuntu-24.04-8core
           - target: aarch64-unknown-linux-musl # .tar.gz
+            runner: ubuntu-24.04-8core-arm
           - target: armv7-unknown-linux-gnueabihf # .tar.gz, .deb, .rpm
+            runner: ubuntu-24.04-8core-arm
           - target: armv7-unknown-linux-musleabihf # .tar.gz
+            runner: ubuntu-24.04-8core-arm
           - target: arm-unknown-linux-gnueabi # .tar.gz, .deb
+            runner: ubuntu-24.04-8core-arm
           - target: arm-unknown-linux-musleabi # .tar.gz
+            runner: ubuntu-24.04-8core-arm
     steps:
       - name: Checkout Vector
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -175,15 +183,14 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          cross: true
           cargo-deb: true
-          protoc: true
-          libsasl2: true
           cmark-gfm: true
           cross-binutils: true
-          rpm: ${{ endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf' }}
-      - name: Build Vector
-        run: make package-${{ matrix.target }}-all
+          rpm: ${{ matrix.target == 'armv7-unknown-linux-gnueabihf' }}
+      - name: Build and package Vector without cross-rs
+        uses: ./.github/actions/build-linux-native
+        with:
+          target: ${{ matrix.target }}
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -285,6 +292,77 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts/vector*
+
+  native-linux-verify:
+    name: Verify native archive and ARM packages (${{ matrix.target }})
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    needs:
+      - generate-publish-metadata
+      - build-linux-cross
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - target: armv7-unknown-linux-musleabihf
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - target: arm-unknown-linux-musleabi
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          - target: armv7-unknown-linux-gnueabihf
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+          - target: arm-unknown-linux-gnueabi
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v5
+            image: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.git_ref }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
+          path: target/artifacts
+      - name: Execute the packaged archive in a clean runtime
+        env:
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+            echo '::error::Runtime verification must not use QEMU'
+            exit 1
+          fi
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/work:ro" \
+            -e TARGET -e VECTOR_VERSION "$IMAGE" sh -euxc '
+              mkdir /tmp/vector-archive
+              tar -xzf "/work/target/artifacts/vector-$VECTOR_VERSION-$TARGET.tar.gz" -C /tmp/vector-archive
+              "/tmp/vector-archive/vector-$TARGET/bin/vector" --version
+              if command -v apt-get; then
+                apt-get update
+                apt-get install -y --no-install-recommends bash systemd ca-certificates
+                for package in /work/target/artifacts/*.deb; do
+                  bash /work/scripts/verify-install.sh "$package"
+                done
+              fi
+            '
 
   deb-verify:
     name: Verify DEB Packages
@@ -422,6 +500,78 @@ jobs:
           tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}.tar.gz \
             && vector-${{ matrix.target }}/bin/vector --version
 
+  verify-docker-no-push:
+    name: Verify Docker image (${{ matrix.arch }}, ${{ matrix.base }})
+    if: ${{ !cancelled() && inputs.skip_publish }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64, armv7, armv6]
+        base: [alpine, debian, distroless-static, distroless-libc]
+        exclude:
+          - arch: armv6
+            base: distroless-static
+          - arch: armv6
+            base: distroless-libc
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            gnu: x86_64-unknown-linux-gnu
+            musl: x86_64-unknown-linux-musl
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64/v8
+            gnu: aarch64-unknown-linux-gnu
+            musl: aarch64-unknown-linux-musl
+          - arch: armv7
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            gnu: armv7-unknown-linux-gnueabihf
+            musl: armv7-unknown-linux-musleabihf
+          - arch: armv6
+            runner: ubuntu-24.04-arm
+            platform: linux/arm/v6
+            gnu: arm-unknown-linux-gnueabi
+            musl: arm-unknown-linux-musleabi
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.git_ref }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ (matrix.base == 'debian' || matrix.base == 'distroless-libc') && matrix.gnu || matrix.musl }}
+          path: target/artifacts
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+      - name: Build the production Dockerfile and execute its entry point
+        env:
+          CHANNEL: test
+          BASE: ${{ matrix.base }}
+          PLATFORM: ${{ matrix.platform }}
+          REPOS: vector-ci-${{ matrix.arch }}
+          TAG: ${{ env.VECTOR_VERSION }}
+          PUSH: "false"
+          LOAD: "true"
+        run: |
+          if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+            echo '::error::Docker runtime verification must not use QEMU'
+            exit 1
+          fi
+          make release-docker
+          docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
+
   publish-docker:
     name: Publish to Docker
     if: ${{ !inputs.skip_publish }}
@@ -435,6 +585,7 @@ jobs:
       - build-linux-gnu-native
       - build-linux-cross
       - deb-verify
+      - native-linux-verify
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
@@ -586,6 +737,7 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
+      - native-linux-verify
       - build-linux-gnu-native
       - build-linux-cross
       - build-apple-darwin-packages
