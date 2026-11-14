@@ -80,8 +80,8 @@ pub(super) fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>
         errors.extend(type_errors);
     }
 
-    if let Err(e) = graph.check_for_cycles() {
-        errors.push(e);
+    if let Err(cycle_errors) = graph.check_for_cycles() {
+        errors.extend(cycle_errors);
     }
 
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them

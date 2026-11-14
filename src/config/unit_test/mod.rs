@@ -393,7 +393,7 @@ fn get_relevant_test_components(
     sources: &[&ComponentKey],
     graph: &Graph,
 ) -> Result<HashSet<String>, Vec<String>> {
-    graph.check_for_cycles().map_err(|error| vec![error])?;
+    graph.check_for_cycles()?;
     let mut errors = Vec::new();
     let mut components = HashSet::new();
     for source in sources {
