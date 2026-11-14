@@ -1,0 +1,67 @@
+name: Native build experiment
+
+# Keep all experiments on the dedicated PR. No release or dispatch trigger.
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - .github/workflows/native-build-experiment.yml
+      - scripts/native/**
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Probe ${{ matrix.platform }} on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            image: alpine:3.23
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            image: alpine:3.23
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: alpine:3.23
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v7
+            image: debian:bookworm-slim
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm/v5
+            image: debian:bookworm-slim
+    steps:
+      - name: Check native execution (no QEMU)
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          uname -a
+          if [ -d /proc/sys/fs/binfmt_misc ]; then
+            ls -la /proc/sys/fs/binfmt_misc
+            if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+              echo '::error::QEMU is registered; this would not prove native execution'
+              exit 1
+            fi
+          fi
+          docker run --rm --platform "$PLATFORM" "$IMAGE" sh -euxc '
+            uname -a
+            if command -v apk; then
+              apk add --no-cache build-base rust cargo cmake perl linux-headers protobuf-dev protobuf
+            else
+              apt-get update
+              apt-get install -y --no-install-recommends gcc g++ libc6-dev curl ca-certificates musl-tools
+            fi
+            printf "#include <stdio.h>\nint main(void) { puts(\"native C works\"); }\n" >/tmp/probe.c
+            cc /tmp/probe.c -o /tmp/probe
+            /tmp/probe
+            cc -dumpmachine
+            if command -v rustc; then rustc -vV; fi
+            if command -v musl-gcc; then musl-gcc /tmp/probe.c -static -o /tmp/probe-musl; /tmp/probe-musl; fi
+          '
