@@ -1312,7 +1312,7 @@ mod tests {
         ] {
             let event = scan_dropped_event(body);
             assert!(event.emits_component_events_dropped, "{body}");
-            assert!(run("TestEventsDropped", event).is_empty());
+            assert_eq!(run("TestEventsDropped", event), Vec::<String>::new());
         }
     }
 
@@ -1430,7 +1430,10 @@ mod tests {
             warn!(reason);
             info!(?err, "Plain text.");
         }"#;
-        assert!(format_check_log_messages(source, "fixture.rs").is_empty());
+        assert_eq!(
+            format_check_log_messages(source, "fixture.rs"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

@@ -100,11 +100,10 @@ where
                     if let Ok(reason) = e.try_into_panic() {
                         // Resume the panic here on the calling task.
                         panic::resume_unwind(reason);
-                    } else {
-                        // The task was cancelled, which makes no sense, because _we_ hold the join
-                        // handle. Only sensible thing to do is panic, because this is a bug.
-                        panic!("concurrent map task cancelled outside of our control");
                     }
+                    // The task was cancelled, which makes no sense, because _we_ hold the join
+                    // handle. Only sensible thing to do is panic, because this is a bug.
+                    panic!("concurrent map task cancelled outside of our control");
                 }
             },
         }

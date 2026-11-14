@@ -526,7 +526,6 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
     clippy::cast_precision_loss,
     reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
 )]
-#[expect(clippy::float_cmp, reason = "Fixture counts and rates are exact.")]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
