@@ -1,12 +1,31 @@
-use std::{convert::TryFrom, iter::zip};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    convert::{Infallible, TryFrom},
+    io,
+    iter::zip,
+    time::Duration,
+};
 
+use bytes::Bytes;
+use hyper::{
+    Body, Request, Response, Server, StatusCode,
+    body::HttpBody as _,
+    service::{make_service_fn, service_fn},
+};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinSet,
+};
 use vector_common::sensitive_string::SensitiveString;
-use vector_lib::lookup::PathPrefix;
+use vector_lib::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    lookup::PathPrefix,
+};
 use vrl::event_path;
 
 use crate::{
     codecs::Transformer,
-    config::ProxyConfig,
+    config::{ProxyConfig, SinkConfig, SinkContext},
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
@@ -27,6 +46,197 @@ fn parse_template(input: &str) -> Template {
 // `bulk.action` / `bulk.version` are unconfined templates.
 fn parse_unconfined(input: &str) -> UnconfinedTemplate {
     UnconfinedTemplate::try_from(input).unwrap()
+}
+
+type RetryReply = oneshot::Sender<Result<Response<Body>, io::Error>>;
+
+fn retry_bulk_message(body: &[u8]) -> String {
+    let mut lines = std::str::from_utf8(body).unwrap().lines();
+    let _action = lines.next().unwrap();
+    let document: serde_json::Value = serde_json::from_str(lines.next().unwrap()).unwrap();
+    assert!(
+        lines.next().is_none(),
+        "each bulk request must contain one event"
+    );
+    document["message"].as_str().unwrap().to_owned()
+}
+
+async fn assert_retry_backpressure(
+    requests: &mut mpsc::UnboundedReceiver<(Bytes, RetryReply)>,
+    concurrency: usize,
+    expected: &BTreeSet<String>,
+    acknowledgements: &mut BTreeMap<String, BatchStatusReceiver>,
+) {
+    let mut pending = BTreeSet::new();
+    let mut original_bodies = BTreeMap::new();
+    let mut stalled = Vec::new();
+
+    // Withhold responses until every permitted request has arrived. A retry
+    // must retain its original event instead of admitting a new pending batch.
+    for failure in 0..4 {
+        let mut replies = Vec::new();
+        let mut round = BTreeSet::new();
+        for _ in 0..concurrency {
+            let (body, reply) = requests.recv().await.unwrap();
+            let message = retry_bulk_message(&body);
+            assert!(expected.contains(&message));
+            assert!(round.insert(message.clone()), "concurrent duplicate retry");
+            if failure == 0 {
+                pending.insert(message.clone());
+                original_bodies.insert(message, body);
+            } else {
+                assert!(
+                    pending.contains(&message),
+                    "fixed concurrency {concurrency} admitted a new event \
+                     while the original requests were still awaiting retries"
+                );
+                assert_eq!(original_bodies[&message], body);
+            }
+            replies.push(reply);
+        }
+        assert_eq!(round, pending);
+        for receiver in acknowledgements.values_mut() {
+            assert_eq!(
+                receiver.try_recv(),
+                Err(oneshot::error::TryRecvError::Empty)
+            );
+        }
+        if failure == 3 {
+            // Keep the response channels open until the client times out.
+            stalled.extend(replies);
+            continue;
+        }
+        for reply in replies {
+            let response = match failure {
+                0 => Ok(Response::builder()
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .body(Body::empty())
+                    .unwrap()),
+                1 => Ok(Response::builder()
+                    .status(StatusCode::TOO_MANY_REQUESTS)
+                    .body(Body::empty())
+                    .unwrap()),
+                _ => Err(io::Error::new(
+                    io::ErrorKind::ConnectionReset,
+                    "synthetic downstream transport failure",
+                )),
+            };
+            reply.send(response).unwrap();
+        }
+    }
+
+    // Recover without rebuilding the sink, checking event identities and acks.
+    let mut delivered = BTreeSet::new();
+    for _ in 0..expected.len() {
+        let (body, reply) = requests.recv().await.unwrap();
+        let message = retry_bulk_message(&body);
+        assert!(expected.contains(&message));
+        assert!(
+            delivered.insert(message.clone()),
+            "duplicate event delivery"
+        );
+        if pending.remove(&message) {
+            assert_eq!(original_bodies[&message], body);
+        }
+        assert_eq!(
+            acknowledgements.get_mut(&message).unwrap().try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        );
+        reply
+            .send(Ok(Response::new(Body::from(r#"{"errors":false}"#))))
+            .unwrap();
+    }
+    for reply in stalled {
+        // The client may have already discarded the timed-out connection.
+        drop(reply.send(Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "discarding timed-out synthetic request",
+        ))));
+    }
+    assert!(pending.is_empty());
+    assert_eq!(&delivered, expected);
+}
+
+#[tokio::test]
+async fn fixed_concurrency_bounds_pending_retries_across_endpoints() {
+    for concurrency in [1, 2] {
+        tokio::time::timeout(Duration::from_secs(30), async {
+            let (requests_tx, mut requests) = mpsc::unbounded_channel::<(Bytes, RetryReply)>();
+            let mut servers = JoinSet::new();
+            let mut endpoints = Vec::new();
+            for _ in 0..2 {
+                let requests_tx = requests_tx.clone();
+                let service = make_service_fn(move |_| {
+                    let requests_tx = requests_tx.clone();
+                    async move {
+                        Ok::<_, Infallible>(service_fn(move |request: Request<Body>| {
+                            let requests_tx = requests_tx.clone();
+                            async move {
+                                assert_eq!(request.uri().path(), "/_bulk");
+                                let body = request.into_body().collect().await.unwrap().to_bytes();
+                                let (reply, response) = oneshot::channel();
+                                requests_tx.send((body, reply)).unwrap();
+                                response.await.unwrap()
+                            }
+                        }))
+                    }
+                });
+                let server = Server::bind(&([127, 0, 0, 1], 0).into());
+                endpoints.push(format!("http://{}", server.local_addr()));
+                servers.spawn(async move { server.serve(service).await.unwrap() });
+            }
+            drop(requests_tx);
+
+            let config: ElasticsearchConfig = serde_yaml::from_str(&format!(
+                r"
+                endpoints: {endpoints:?}
+                api_version: v8
+                compression: none
+                acknowledgements:
+                  enabled: true
+                batch:
+                  max_events: 1
+                request:
+                  concurrency: {concurrency}
+                  timeout_secs: 5
+                  retry_initial_backoff_secs: 1
+                  retry_max_duration_secs: 1
+                  retry_jitter_mode: None
+                "
+            ))
+            .unwrap();
+            let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+
+            let expected = (0..8)
+                .map(|id| format!("retry-backpressure-{id}"))
+                .collect::<BTreeSet<_>>();
+            let mut acknowledgements = BTreeMap::new();
+            let events = expected
+                .iter()
+                .map(|message| {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    let event =
+                        Event::from(LogEvent::from(message.as_str()).with_batch_notifier(&batch));
+                    acknowledgements.insert(message.clone(), receiver);
+                    event
+                })
+                .collect::<Vec<_>>();
+
+            let downstream = assert_retry_backpressure(
+                &mut requests,
+                concurrency,
+                &expected,
+                &mut acknowledgements,
+            );
+            let (result, ()) = futures::join!(sink.run_events(events), downstream);
+            result.unwrap();
+            for receiver in acknowledgements.values_mut() {
+                assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+            }
+        })
+        .await
+        .expect("Elasticsearch retry/backpressure test did not complete");
+    }
 }
 
 #[tokio::test]
