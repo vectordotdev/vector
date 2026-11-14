@@ -1,0 +1,23 @@
+# JavaScript actions run on the runner, not in this musl build environment.
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+
+RUN apk add --no-cache \
+    bash build-base ca-certificates clang cmake curl git linux-headers \
+    openssl-dev openssl-libs-static perl pkgconf protobuf protobuf-dev \
+    cyrus-sasl-dev zlib-static libstdc++-dev
+
+ARG RUST_VERSION
+ARG RUST_HOST
+ARG RUST_TARGET
+ENV CARGO_HOME=/opt/cargo RUSTUP_HOME=/opt/rustup
+ENV PATH="/opt/cargo/bin:${PATH}"
+# Upstream Rust ships musl host tools for x86-64 and ARM64.
+RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/rustup-init" -o /tmp/rustup-init \
+    && chmod +x /tmp/rustup-init \
+    && /tmp/rustup-init -y --no-modify-path --profile minimal \
+        --default-host "${RUST_HOST}" --default-toolchain "${RUST_VERSION}" \
+        --target "${RUST_TARGET}" \
+    && rm /tmp/rustup-init
+
+ENV CARGO_INCREMENTAL=0
+WORKDIR /work
