@@ -101,6 +101,10 @@ vector-common = { path = "../vector-common", default-features = false, features 
 default = []
 lua = ["dep:mlua", "vrl/lua"]
 test = ["vector-common/test", "proptest"]
+# Rustls crypto providers for `tls::install_default_crypto_provider`, preferring Ring when both are
+# enabled. Without either, the embedding application must install a process-wide provider.
+tls-aws-lc = ["rustls/aws-lc-rs", "tonic/tls-aws-lc"]
+tls-ring = ["rustls/ring", "tonic/tls-ring"]
 # Internal typed trace event (RFC 25329). Off by default until a source, transform, or sink consumes it.
 typed-trace = []
 

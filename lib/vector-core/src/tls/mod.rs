@@ -27,13 +27,22 @@ pub use settings::{
     TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
 };
 
-/// Install Ring as the process-wide Rustls provider if none is already installed.
+/// Install the built-in process-wide Rustls provider if none is already installed.
+///
+/// The `tls-ring` feature selects Ring and takes precedence over `tls-aws-lc`. Without either
+/// feature, this does nothing and the caller must install a provider before constructing TLS
+/// clients.
 ///
 /// Call before constructing TLS clients when multiple providers are enabled.
 /// Repeated or concurrent calls preserve the first installed provider.
 pub fn install_default_crypto_provider() {
+    #[cfg(any(feature = "tls-ring", feature = "tls-aws-lc"))]
     if rustls::crypto::CryptoProvider::get_default().is_none() {
-        _ = rustls::crypto::ring::default_provider().install_default();
+        #[cfg(feature = "tls-ring")]
+        let provider = rustls::crypto::ring::default_provider();
+        #[cfg(not(feature = "tls-ring"))]
+        let provider = rustls::crypto::aws_lc_rs::default_provider();
+        _ = provider.install_default();
     }
 }
 
@@ -207,4 +216,81 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
             .context(SetSniSnafu)?;
     }
     Ok(configure)
+}
+
+#[cfg(test)]
+mod tests {
+    use rustls::crypto::CryptoProvider;
+
+    use super::install_default_crypto_provider;
+
+    /// Runs `test_name` in a child process and returns `true` in the parent.
+    ///
+    /// Rustls's process-wide provider cannot be reset between test cases.
+    fn run_in_subprocess(test_name: &str) -> bool {
+        if std::env::var("__VECTOR_CORE_CRYPTO_PROVIDER_TEST").is_ok() {
+            return false;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("__VECTOR_CORE_CRYPTO_PROVIDER_TEST", "1")
+            .args(["--exact", test_name, "--nocapture"])
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "subprocess test failed:\nstdout: {stdout}\nstderr: {}",
+            String::from_utf8_lossy(&output.stderr),
+        );
+        true
+    }
+
+    fn key_provider_name(provider: &CryptoProvider) -> String {
+        format!("{:?}", provider.key_provider)
+    }
+
+    #[test]
+    fn installs_built_in_crypto_provider() {
+        if run_in_subprocess("tls::tests::installs_built_in_crypto_provider") {
+            return;
+        }
+
+        #[cfg(feature = "tls-ring")]
+        let expected = Some(rustls::crypto::ring::default_provider());
+        #[cfg(all(feature = "tls-aws-lc", not(feature = "tls-ring")))]
+        let expected = Some(rustls::crypto::aws_lc_rs::default_provider());
+        #[cfg(not(any(feature = "tls-ring", feature = "tls-aws-lc")))]
+        let expected: Option<CryptoProvider> = None;
+
+        assert!(CryptoProvider::get_default().is_none());
+        install_default_crypto_provider();
+        assert_eq!(
+            CryptoProvider::get_default().map(|provider| key_provider_name(provider)),
+            expected.as_ref().map(key_provider_name),
+        );
+    }
+
+    #[cfg(any(feature = "tls-ring", feature = "tls-aws-lc"))]
+    #[test]
+    fn preserves_installed_crypto_provider() {
+        if run_in_subprocess("tls::tests::preserves_installed_crypto_provider") {
+            return;
+        }
+
+        // Prefer a provider other than the one that would be installed.
+        #[cfg(feature = "tls-aws-lc")]
+        let mut provider = rustls::crypto::aws_lc_rs::default_provider();
+        #[cfg(not(feature = "tls-aws-lc"))]
+        let mut provider = rustls::crypto::ring::default_provider();
+        provider.cipher_suites.truncate(1);
+        provider.install_default().unwrap();
+        let original = std::sync::Arc::clone(CryptoProvider::get_default().unwrap());
+
+        install_default_crypto_provider();
+
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            CryptoProvider::get_default().unwrap(),
+        ));
+    }
 }

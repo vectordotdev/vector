@@ -224,7 +224,8 @@ rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
-rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
+# The crypto provider is selected by the `tls-ring` and `tls-aws-lc` features.
+rustls = { version = "0.23", default-features = false, features = ["logging", "std", "tls12"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
@@ -243,7 +244,7 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "1.1.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.14.9", default-features = false, features = ["transport", "router", "codegen", "tls-ring", "tls-native-roots", "gzip", "zstd"] }
+tonic = { version = "0.14.9", default-features = false, features = ["transport", "router", "codegen", "tls-native-roots", "gzip", "zstd"] }
 tonic-prost = { version = "0.14.9", default-features = false }
 tonic-prost-build = { version = "0.14.9", default-features = false, features = ["transport"] }
 tonic-health = { version = "0.14.9", default-features = false }
@@ -561,7 +562,8 @@ tokio = { workspace = true, features = ["test-util"] }
 tokio-test.workspace = true
 tower-test = "0.4.0"
 parking_lot = { version = "0.12.5", default-features = false }
-vector-lib = { workspace = true, features = ["test"] }
+# Tests built with `--no-default-features` still need a Rustls crypto provider.
+vector-lib = { workspace = true, features = ["test", "tls-ring"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
@@ -605,12 +607,18 @@ vendored = ["gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet", "tls-ring"]
 enable-api-client = ["base", "api-client"]
 default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# Rustls crypto provider installed at startup, preferring Ring when both are enabled. Builds with
+# neither must install a process-wide provider before starting Vector. Some components, such as
+# GreptimeDB, NATS, MQTT, and PostgreSQL, use Ring through their own dependencies.
+tls-aws-lc = ["vector-lib/tls-aws-lc"]
+tls-ring = ["vector-lib/tls-ring"]
 
 # VRL functions control features
 vrl-functions-env = ["vrl/enable_env_functions"]
