@@ -64,8 +64,8 @@ impl ShrinkableSemaphore {
         if *to_forget >= count {
             *to_forget -= count;
         } else {
-            self.semaphore.add_permits(count);
-            *to_forget = to_forget.saturating_sub(count);
+            self.semaphore.add_permits(count - *to_forget);
+            *to_forget = 0;
         }
     }
 }
@@ -96,5 +96,19 @@ impl Future for MaybeForgetFuture {
         }
         drop(to_forget);
         self.future.as_mut().poll(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_permits_cancels_pending_forgets_first() {
+        let semaphore = ShrinkableSemaphore::new(1);
+        let _held = semaphore.semaphore.try_acquire().unwrap();
+        semaphore.forget_permits(1);
+        semaphore.add_permits(2);
+        assert_eq!(semaphore.semaphore.available_permits(), 1);
     }
 }

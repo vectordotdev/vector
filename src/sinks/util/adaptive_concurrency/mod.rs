@@ -3,6 +3,7 @@
 mod controller;
 mod future;
 mod layer;
+mod logical;
 mod semaphore;
 mod service;
 
@@ -10,6 +11,7 @@ mod service;
 pub mod tests;
 
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
+pub(crate) use logical::LogicalConcurrencyLimit;
 pub(crate) use service::AdaptiveConcurrencyLimit;
 use vector_lib::configurable::configurable_component;
 
