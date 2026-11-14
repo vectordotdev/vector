@@ -3,19 +3,35 @@ FROM ${BASE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash build-essential ca-certificates clang cmake curl git libclang-dev \
-    libsasl2-dev libssl-dev perl pkg-config protobuf-compiler strace unzip xz-utils \
+    libsasl2-dev libssl-dev perl pkg-config protobuf-compiler unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 ARG RUST_VERSION
 ARG RUST_HOST
+ARG RUST_TARGET
 ENV CARGO_HOME=/opt/cargo
 ENV PATH="/opt/rust/bin:${PATH}"
-# The ARMv6 rustup binary stalls while syncing the channel in this environment.
-# Install the same upstream components with the system curl and GNU tar instead.
+# ARMv6 host tools stall in threaded compilation on the ARM64 runner. Run the
+# ARMv7 host compiler natively, with ARMv6 soft-float output and its own C ABI.
+RUN if [ "${RUST_TARGET}" = arm-unknown-linux-gnueabi ]; then \
+      dpkg --add-architecture armel \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends \
+        gcc-arm-linux-gnueabi g++-arm-linux-gnueabi \
+        libc6-dev:armel libssl-dev:armel zlib1g-dev:armel \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Verify and install upstream Rust archives without relying on rustup at runtime.
 RUN set -eux; \
     cd /tmp; \
-    for component in rustc cargo rust-std; do \
-      archive="${component}-${RUST_VERSION}-${RUST_HOST}.tar.xz"; \
+    set -- "rustc-${RUST_VERSION}-${RUST_HOST}" \
+      "cargo-${RUST_VERSION}-${RUST_HOST}" "rust-std-${RUST_VERSION}-${RUST_HOST}"; \
+    if [ "${RUST_TARGET}" = arm-unknown-linux-gnueabi ] && [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
+      set -- "$@" "rust-std-${RUST_VERSION}-${RUST_TARGET}"; \
+    fi; \
+    for component; do \
+      archive="${component}.tar.xz"; \
       curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
       curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
       sha256sum -c "${archive}.sha256"; \
@@ -24,6 +40,12 @@ RUN set -eux; \
       rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"; \
     done
 
+ENV CC_arm_unknown_linux_gnueabi=arm-linux-gnueabi-gcc \
+    CXX_arm_unknown_linux_gnueabi=arm-linux-gnueabi-g++ \
+    AR_arm_unknown_linux_gnueabi=arm-linux-gnueabi-ar \
+    CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER=arm-linux-gnueabi-gcc \
+    PKG_CONFIG_ALLOW_CROSS_arm_unknown_linux_gnueabi=1 \
+    PKG_CONFIG_LIBDIR_arm_unknown_linux_gnueabi=/usr/lib/arm-linux-gnueabi/pkgconfig
 ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work

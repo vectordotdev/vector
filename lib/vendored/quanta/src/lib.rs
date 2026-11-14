@@ -169,7 +169,7 @@ static GLOBAL_CALIBRATION: OnceCell<Calibration> = OnceCell::new();
 
 // Per-thread clock override, used by `quanta::with_clock`, `Instant::now`, and sometimes `Instant::recent`.
 thread_local! {
-    static CLOCK_OVERRIDE: RefCell<Option<Clock>> = RefCell::new(None);
+    static CLOCK_OVERRIDE: RefCell<Option<Clock>> = const { RefCell::new(None) };
 }
 
 // Run 500 rounds of calibration before we start actually seeing what the numbers look like.

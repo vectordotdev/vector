@@ -50,7 +50,7 @@ jobs:
           PROTOC: ${{ runner.temp }}/protoc-bin/protoc
         run: |
           cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib --test protoc_override
-          cargo test --manifest-path lib/vendored/quanta/Cargo.toml --lib --no-default-features
+          cargo test --manifest-path lib/vendored/quanta/Cargo.toml --lib --no-default-features -- --test-threads=1
       - name: Check license output
         run: |
           make build-licenses

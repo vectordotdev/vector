@@ -14,6 +14,7 @@ The MIT license is in `LICENSE`.
   the fix released in quanta 0.13.0 from
   [upstream PR 121](https://github.com/metrics-rs/quanta/pull/121).
 - Add a monotonic-clock regression test.
+- Update two option checks and a thread-local initializer for current Clippy.
 - Disable publishing in the package manifest.
 - Keep the upstream formatting and lint defaults with local configuration files.
 

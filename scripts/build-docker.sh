@@ -17,6 +17,8 @@ VERSION="${VECTOR_VERSION:-"$($vdev_cmd version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
+# Load one platform into the local daemon for CI runtime tests without a push.
+LOAD="${LOAD:-"false"}"
 REPOS="${REPOS:-"timberio/vector"}"
 IFS=, read -ra REPO_LIST <<< "$REPOS"
 
@@ -70,6 +72,8 @@ build() {
     ARGS=()
     if [[ "$PUSH" == "true" ]]; then
       ARGS+=(--push)
+    elif [[ "$LOAD" == "true" ]]; then
+      ARGS+=(--load)
     fi
 
     docker buildx build \

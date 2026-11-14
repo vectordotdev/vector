@@ -35,7 +35,7 @@ runs:
             BUILD_TARGET=armv7-alpine-linux-musleabihf
             ;;
           arm-unknown-linux-gnueabi|arm-unknown-linux-musleabi)
-            PLATFORM=linux/arm/v5
+            PLATFORM=linux/arm/v7
             DOCKERFILE=scripts/native/Dockerfile.arm-gnu
             ;;
           *) echo "Unsupported native build target: $TARGET" >&2; exit 1 ;;
@@ -59,8 +59,7 @@ runs:
         BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
         HOST="$TARGET"
         if [[ "$TARGET" == arm-unknown-linux-* ]]; then
-          BASE=arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
-          HOST=arm-unknown-linux-gnueabi
+          HOST=armv7-unknown-linux-gnueabihf
         fi
         docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
           --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \

@@ -4,10 +4,10 @@ pub fn has_counter_support() -> bool {
     let cpuid = raw_cpuid::CpuId::new();
     let has_invariant_tsc = cpuid
         .get_advanced_power_mgmt_info()
-        .map_or(false, |apm| apm.has_invariant_tsc());
+        .is_some_and(|apm| apm.has_invariant_tsc());
     let has_rdtscp = cpuid
         .get_extended_processor_and_feature_identifiers()
-        .map_or(false, |epf| epf.has_rdtscp());
+        .is_some_and(|epf| epf.has_rdtscp());
 
     has_invariant_tsc && has_rdtscp
 }
