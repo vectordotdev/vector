@@ -218,6 +218,13 @@ impl PingInterval {
     pub(crate) async fn tick(&mut self) -> time::Instant {
         std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
+
+    #[cfg(feature = "sources-websocket")]
+    pub(crate) fn reset(&mut self) {
+        if let Some(interval) = self.interval.as_mut() {
+            interval.reset();
+        }
+    }
 }
 
 /// Shared websocket configuration for sources and sinks.
