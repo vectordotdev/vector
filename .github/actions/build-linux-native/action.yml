@@ -35,7 +35,7 @@ runs:
             BUILD_TARGET=armv7-alpine-linux-musleabihf
             ;;
           arm-unknown-linux-gnueabi|arm-unknown-linux-musleabi)
-            PLATFORM=linux/arm/v7
+            PLATFORM=linux/arm64
             DOCKERFILE=scripts/native/Dockerfile.arm-gnu
             ;;
           *) echo "Unsupported native build target: $TARGET" >&2; exit 1 ;;
@@ -59,7 +59,7 @@ runs:
         BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
         HOST="$TARGET"
         if [[ "$TARGET" == arm-unknown-linux-* ]]; then
-          HOST=armv7-unknown-linux-gnueabihf
+          HOST=aarch64-unknown-linux-gnu
         fi
         docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
           --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
@@ -105,7 +105,7 @@ runs:
                 exit 1
               fi
             fi
-            "$file" --version
+            timeout 90 "$file" --version
             if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
               mkdir -p "target/$TARGET/release"
               cp "$file" "target/$TARGET/release/vector"

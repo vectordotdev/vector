@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.number == 27197 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor == 'thomasqueirozb' &&
-      contains(fromJSON('["/ci-run-native-arm", "/ci-run-native-armv6", "/ci-run-native-armv7"]'), github.event.review.body)
+      contains(fromJSON('["/ci-run-native-arm", "/ci-run-native-armv6", "/ci-run-native-armv7", "/ci-run-native-armv6-release", "/ci-run-native-armv7-release"]'), github.event.review.body)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -32,7 +32,7 @@ jobs:
                 base: 'debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc',
               },
               {
-                target: 'arm-unknown-linux-gnueabi', platform: 'linux/arm/v7',
+                target: 'arm-unknown-linux-gnueabi', platform: 'linux/arm64',
                 dockerfile: 'scripts/native/Dockerfile.arm-gnu', base: debian,
               },
               {
@@ -41,14 +41,14 @@ jobs:
                 'build-target': 'armv7-alpine-linux-musleabihf',
               },
               {
-                target: 'arm-unknown-linux-musleabi', platform: 'linux/arm/v7',
+                target: 'arm-unknown-linux-musleabi', platform: 'linux/arm64',
                 dockerfile: 'scripts/native/Dockerfile.arm-musl', base: debian,
               },
             ];
             const command = context.payload.review.body;
-            const selected = command === '/ci-run-native-armv6'
+            const selected = command.includes('armv6')
               ? targets.filter(t => t.target.startsWith('arm-'))
-              : command === '/ci-run-native-armv7'
+              : command.includes('armv7')
                 ? targets.filter(t => t.target.startsWith('armv7-'))
                 : targets;
             core.setOutput('matrix', JSON.stringify(selected));
@@ -57,7 +57,7 @@ jobs:
     needs: plan
     name: Build native ${{ matrix.target }}
     runs-on: ubuntu-24.04-8core-arm
-    timeout-minutes: 120
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -81,7 +81,7 @@ jobs:
           RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
           RUST_HOST="$TARGET"
           if [[ "$TARGET" == arm-unknown-linux-* ]]; then
-            RUST_HOST=armv7-unknown-linux-gnueabihf
+            RUST_HOST=aarch64-unknown-linux-gnu
           fi
           if [[ "$TARGET" == arm-unknown-linux-musleabi ]]; then
             docker build --pull --platform "$PLATFORM" -f scripts/native/Dockerfile.arm-gnu \
@@ -110,9 +110,10 @@ jobs:
               arm-unknown-linux-musleabi) linker=(-C linker=arm-linux-musleabi-gcc) ;;
             esac
             timeout 90 rustc --target "$BUILD_TARGET" "${linker[@]}" /tmp/probe.rs -o /tmp/probe
-            /tmp/probe
+            timeout 90 /tmp/probe
           '
       - name: Test native dependency patches
+        timeout-minutes: 10
         env:
           TARGET: ${{ matrix.target }}
           BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
@@ -124,12 +125,96 @@ jobs:
               if [[ "$TARGET" == *musl* ]]; then
                 export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
               fi
-              cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml \
+              timeout 300 cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml \
                 --target "$BUILD_TARGET" --test protoc_override
-              cargo test --manifest-path lib/vendored/quanta/Cargo.toml \
+              timeout 300 cargo test --manifest-path lib/vendored/quanta/Cargo.toml \
                 --target "$BUILD_TARGET" --lib --no-default-features -- --test-threads=1
             '
+      - name: Install packaging tools
+        if: endsWith(github.event.review.body, '-release')
+        uses: ./.github/actions/setup
+        with:
+          rust: true
+          mold: false
+          cargo-deb: true
+          cmark-gfm: true
+          cross-binutils: true
+          rpm: ${{ matrix.target == 'armv7-unknown-linux-gnueabihf' }}
+      - name: Generate release test metadata
+        if: endsWith(github.event.review.body, '-release')
+        id: metadata
+        env:
+          CHANNEL: custom
+        run: make ci-generate-publish-metadata
+      - name: Test the production build and packaging action
+        if: endsWith(github.event.review.body, '-release')
+        uses: ./.github/actions/build-linux-native
+        env:
+          CHANNEL: custom
+          VECTOR_VERSION: ${{ steps.metadata.outputs.vector_version }}
+          VECTOR_BUILD_DESC: ${{ steps.metadata.outputs.vector_build_desc }}
+        with:
+          target: ${{ matrix.target }}
+      - name: Load Docker build results for runtime tests
+        if: endsWith(github.event.review.body, '-release')
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Test production Dockerfiles without a push
+        if: endsWith(github.event.review.body, '-release')
+        env:
+          TARGET: ${{ matrix.target }}
+          VECTOR_VERSION: ${{ steps.metadata.outputs.vector_version }}
+          CHANNEL: test
+          PUSH: "false"
+          LOAD: "true"
+          REPOS: vector-ci
+        run: |
+          export TAG="$VECTOR_VERSION"
+          export PLATFORM=linux/arm/v7
+          if [[ "$TARGET" == arm-unknown-linux-* ]]; then
+            export PLATFORM=linux/arm/v6
+          fi
+          if [[ "$TARGET" == *musl* ]]; then
+            bases=(alpine distroless-static)
+          else
+            bases=(debian distroless-libc)
+          fi
+          if [[ "$TARGET" == arm-unknown-linux-* ]]; then
+            bases=("${bases[0]}")
+          fi
+          for BASE in "${bases[@]}"; do
+            export BASE
+            make release-docker
+            timeout 90 docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
+            printf 'native packaging works\n' | timeout 90 docker run --rm -i --platform "$PLATFORM" \
+              -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro" \
+              "$REPOS:$TAG-$BASE" --config /smoke.yaml > "$RUNNER_TEMP/native-smoke.json"
+            grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/native-smoke.json"
+          done
+      - name: Verify the ARMv6 CPU floor
+        if: endsWith(github.event.review.body, '-release') && startsWith(matrix.target, 'arm-')
+        env:
+          TARGET: ${{ matrix.target }}
+          VECTOR_VERSION: ${{ steps.metadata.outputs.vector_version }}
+        run: |
+          # Emulate only the final program, after the native build and runtime
+          # tests. An ARM64 CPU cannot detect accidental ARMv7 instructions.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-user-static
+          if [[ "$TARGET" == *musl* ]]; then
+            BASE=alpine
+            binary=/usr/local/bin/vector
+          else
+            BASE=debian
+            binary=/usr/bin/vector
+          fi
+          printf 'native packaging works\n' | timeout 90 docker run --rm -i --platform linux/arm/v6 \
+            -v /usr/bin/qemu-arm-static:/qemu:ro \
+            -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro" \
+            --entrypoint /qemu "vector-ci:$VECTOR_VERSION-$BASE" \
+            -cpu arm1176 "$binary" --config /smoke.yaml > "$RUNNER_TEMP/armv6-smoke.json"
+          grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/armv6-smoke.json"
       - name: Link Vector with the release feature set
+        if: ${{ !endsWith(github.event.review.body, '-release') }}
         env:
           TARGET: ${{ matrix.target }}
           BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
@@ -159,7 +244,7 @@ jobs:
                   exit 1
                 fi
               fi
-              "$file" --version
+              timeout 90 "$file" --version
               if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
                 mkdir -p "target/$TARGET/release"
                 cp "$file" "target/$TARGET/release/vector"
@@ -168,5 +253,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/vector
+          path: |
+            target/${{ matrix.target }}/release/vector
+            target/artifacts/*
           if-no-files-found: error

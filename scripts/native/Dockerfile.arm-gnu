@@ -11,8 +11,9 @@ ARG RUST_HOST
 ARG RUST_TARGET
 ENV CARGO_HOME=/opt/cargo
 ENV PATH="/opt/rust/bin:${PATH}"
-# ARMv6 host tools stall in threaded compilation on the ARM64 runner. Run the
-# ARMv7 host compiler natively, with ARMv6 soft-float output and its own C ABI.
+# ARMv6 host tools stall in threaded compilation on the ARM64 runner. Use an
+# ARM64 host for ARMv6 output: Debian supplies that host's soft-float C compiler.
+# This is cross-ABI compilation, without cross-rs or emulated build tools.
 RUN if [ "${RUST_TARGET}" = arm-unknown-linux-gnueabi ]; then \
       dpkg --add-architecture armel \
       && apt-get update \
