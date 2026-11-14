@@ -33,7 +33,8 @@ jobs:
               },
               {
                 target: 'arm-unknown-linux-gnueabi', platform: 'linux/arm64',
-                dockerfile: 'scripts/native/Dockerfile.arm-gnu', base: debian,
+                dockerfile: 'scripts/native/Dockerfile.arm-gnu',
+                base: 'debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2',
               },
               {
                 target: 'armv7-unknown-linux-musleabihf', platform: 'linux/arm/v7',
