@@ -1,0 +1,25 @@
+# Upstream Rust does not distribute an ARMv7 musl host compiler. Test Alpine's
+# native compiler at exactly Vector's Rust version, not a glibc compatibility shim.
+FROM alpine:edge@sha256:020dfcbaaf4cc1078bf2d9c7ba31a8466e334061dcd2f248001d68f79e52c000
+
+ARG RUST_VERSION
+RUN apk add --no-cache \
+    "rust=${RUST_VERSION}-r0" "cargo=${RUST_VERSION}-r0" \
+    bash build-base ca-certificates clang cmake curl git linux-headers \
+    openssl-dev openssl-libs-static perl pkgconf protobuf protobuf-dev \
+    cyrus-sasl-dev zlib-static libstdc++-dev xz
+
+# Install the official target stdlib under its release triple. Alpine's compiler
+# host triple is armv7-alpine-linux-musleabihf, not armv7-unknown-linux-musleabihf.
+RUN set -eux; \
+    archive="rust-std-${RUST_VERSION}-armv7-unknown-linux-musleabihf.tar.xz"; \
+    cd /tmp; \
+    curl --retry 5 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
+    curl --retry 5 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
+    sha256sum -c "${archive}.sha256"; \
+    tar -xJf "${archive}"; \
+    "./${archive%.tar.xz}/install.sh" --prefix=/usr --disable-ldconfig; \
+    rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"
+
+ENV CARGO_INCREMENTAL=0
+WORKDIR /work

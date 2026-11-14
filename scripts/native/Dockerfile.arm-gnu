@@ -1,0 +1,20 @@
+ARG BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+FROM ${BASE}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash build-essential ca-certificates clang cmake curl git libclang-dev \
+    libsasl2-dev libssl-dev perl pkg-config protobuf-compiler unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG RUST_VERSION
+ARG RUST_HOST
+ENV CARGO_HOME=/opt/cargo RUSTUP_HOME=/opt/rustup
+ENV PATH="/opt/cargo/bin:${PATH}"
+RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/rustup-init" -o /tmp/rustup-init \
+    && chmod +x /tmp/rustup-init \
+    && /tmp/rustup-init -y --no-modify-path --profile minimal \
+        --default-host "${RUST_HOST}" --default-toolchain "${RUST_VERSION}" \
+    && rm /tmp/rustup-init
+
+ENV CARGO_INCREMENTAL=0
+WORKDIR /work

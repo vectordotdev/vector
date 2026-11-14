@@ -1,0 +1,91 @@
+name: Native ARM build experiment
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - .github/workflows/native-arm-experiment.yml
+      - scripts/native/Dockerfile.arm*
+
+permissions:
+  contents: read
+
+jobs:
+  arm:
+    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Build native ${{ matrix.target }}
+    runs-on: ubuntu-24.04-8core-arm
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: armv7-unknown-linux-gnueabihf
+            platform: linux/arm/v7
+            dockerfile: scripts/native/Dockerfile.arm-gnu
+            base: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+          - target: arm-unknown-linux-gnueabi
+            platform: linux/arm/v5
+            dockerfile: scripts/native/Dockerfile.arm-gnu
+            base: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
+          - target: armv7-unknown-linux-musleabihf
+            platform: linux/arm/v7
+            dockerfile: scripts/native/Dockerfile.armv7-musl
+            base: unused
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Build native ARM toolchain
+        env:
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          BASE: ${{ matrix.base }}
+        run: |
+          if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+            echo '::error::This test must not use QEMU'
+            exit 1
+          fi
+          RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
+          docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
+            --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
+            --build-arg RUST_HOST="$TARGET" -t vector-native-arm .
+      - name: Compile and run a Rust smoke test
+        env:
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm --platform "$PLATFORM" -e TARGET vector-native-arm bash -euxo pipefail -c '
+            rustc -vV
+            printf "fn main() { println!(\"native ARM Rust works\"); }\n" >/tmp/probe.rs
+            rustc --target "$TARGET" /tmp/probe.rs -o /tmp/probe
+            /tmp/probe
+          '
+      - name: Link Vector with the release feature set
+        env:
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
+            -e TARGET -e CARGO_PROFILE_RELEASE_LTO=off \
+            -e CARGO_BUILD_JOBS=4 vector-native-arm bash -euxo pipefail -c '
+              # The 32-bit compiler and linker each have a 4 GiB address space.
+              # First prove linking without LTO before testing release LTO.
+              if [[ "$TARGET" == *musl* ]]; then
+                export RUSTFLAGS="-C target-feature=+crt-static"
+              fi
+              cargo build --locked --release --target "$TARGET" \
+                --no-default-features --features "target-$TARGET"
+              file="target/$TARGET/release/vector"
+              readelf -h "$file"
+              readelf -A "$file"
+              readelf --version-info "$file"
+              "$file" --version
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/vector
+          if-no-files-found: error
