@@ -686,7 +686,7 @@ fn validate_release_manifest(
     let expected: toml::Value = toml::from_str(&expected)?;
     ensure!(
         actual == expected,
-        "Cargo.toml may only change package.version to {version} and pin VRL to {vrl_version}"
+        "Cargo.toml may only change workspace.package.version to {version} and pin VRL to {vrl_version}"
     );
 
     let lock: toml::Value =
