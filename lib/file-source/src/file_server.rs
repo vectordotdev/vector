@@ -80,8 +80,10 @@ where
 {
     /// Read watched files until shutdown, forwarding their lines to the output sink.
     ///
-    /// `shutdown_data` stops output; `shutdown_checkpointer` stops the background
-    /// checkpoint writer after all acknowledgements have completed.
+    /// `shutdown_data` triggers a final read pass of watched files before stopping
+    /// output; `shutdown_checkpointer` must wait for the receiver to finish updating
+    /// offsets and for all acknowledgements to complete before stopping the
+    /// background checkpoint writer.
     ///
     /// # Errors
     /// Returns the output sink's error if sending a batch of lines fails.
@@ -177,10 +179,11 @@ where
         // we do not re-scan for major file changes (new files, moves, deletes),
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
+        let mut shutdown_token = None;
         loop {
             // Glob find files to follow, but not too often.
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time {
+            if shutdown_token.is_none() && next_glob_time <= now_time {
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
@@ -296,7 +299,8 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
-                if !watcher.should_read() {
+                // A shutdown pass must also bypass each watcher's EOF backoff.
+                if shutdown_token.is_none() && !watcher.should_read() {
                     continue;
                 }
 
@@ -362,7 +366,7 @@ where
                 }
 
                 // Do not move on to newer files if we are behind on an older file
-                if self.oldest_first && maxed_out_reading_single_file {
+                if self.oldest_first && maxed_out_reading_single_file && shutdown_token.is_none() {
                     break;
                 }
             }
@@ -408,6 +412,22 @@ where
             }
             stats.record("sending", start.elapsed());
 
+            if shutdown_token.is_some() {
+                chans
+                    .close()
+                    .await
+                    .expect("error closing file_server data channel.");
+                let checkpointer = checkpoint_task_handle
+                    .await
+                    .expect("checkpoint task has panicked");
+                if let Err(error) = checkpointer.write_checkpoints().await {
+                    error!(?error, "Error writing checkpoints before shutdown");
+                }
+                return Ok(Shutdown);
+                // Keep the shutdown token until output is closed and checkpoints
+                // are written, so the caller does not finish shutdown prematurely.
+            }
+
             let start = time::Instant::now();
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its
@@ -431,23 +451,16 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match select(shutdown_data, sleep).await {
-                Either::Left((_shutdown_token, _)) => {
-                    chans
-                        .close()
-                        .await
-                        .expect("error closing file_server data channel.");
-                    let checkpointer = checkpoint_task_handle
-                        .await
-                        .expect("checkpoint task has panicked");
-                    if let Err(error) = checkpointer.write_checkpoints().await {
-                        error!(?error, "Error writing checkpoints before shutdown");
-                    }
-                    return Ok(Shutdown);
-                    // _shutdown_token is dropped here, after checkpoints are written,
-                    // which signals shutdown_done to the caller.
+            match select(&mut shutdown_data, sleep).await {
+                Either::Left((token, _)) => {
+                    // Like Datadog Agent's readForever, read before honoring the
+                    // stop request. Wake immediately for one bounded pass over
+                    // existing watchers rather than losing lines appended during
+                    // the idle backoff. Do not discover new files or drain forever.
+                    // https://github.com/DataDog/datadog-agent/blob/7.83.1/pkg/logs/tailers/file/tailer.go#L340-L372
+                    shutdown_token = Some(token);
                 }
-                Either::Right(((), future)) => shutdown_data = future,
+                Either::Right(((), _)) => {}
             }
             stats.record("sleeping", start.elapsed());
         }
@@ -629,4 +642,119 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{convert::Infallible, io::Write, path::Path};
+
+    use bytes::BytesMut;
+    use file_source_common::FingerprintStrategy;
+    use futures::{StreamExt, channel::mpsc, sink};
+
+    use super::*;
+    use crate::paths_provider::{Glob, MatchOptions};
+
+    #[derive(Clone)]
+    struct Events;
+
+    impl FileSourceInternalEvents for Events {
+        fn emit_file_added(&self, _: &Path) {}
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+        fn emit_file_watch_error(&self, _: &Path, _: std::io::Error) {}
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
+        fn emit_file_deleted(&self, _: &Path) {}
+        fn emit_file_delete_error(&self, _: &Path, _: std::io::Error) {}
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: std::io::Error) {}
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+        fn emit_file_checksum_failed(&self, _: &Path) {}
+        fn emit_file_checkpoint_write_error(&self, _: std::io::Error) {}
+        fn emit_files_open(&self, _: usize) {}
+        fn emit_path_globbing_failed(&self, _: &Path, _: &std::io::Error) {}
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
+    }
+
+    #[tokio::test]
+    async fn reads_watched_files_once_more_before_shutdown() {
+        assert_final_read(false).await;
+    }
+
+    #[tokio::test]
+    async fn final_read_visits_all_files_with_oldest_first() {
+        assert_final_read(true).await;
+    }
+
+    async fn assert_final_read(oldest_first: bool) {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = [dir.path().join("a.log"), dir.path().join("b.log")];
+        for (i, path) in paths.iter().enumerate() {
+            std::fs::write(path, format!("tick-{i}\n")).unwrap();
+        }
+        let server = FileServer {
+            paths_provider: Glob::new(&paths, &[], MatchOptions::default(), Events).unwrap(),
+            // One line exceeds this budget: the final pass must visit both files,
+            // but must not drain the backlog indefinitely.
+            max_read_bytes: 1,
+            ignore_checkpoints: false,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: dir.path().to_owned(),
+            glob_minimum_cooldown: Duration::from_mins(1),
+            fingerprinter: Fingerprinter::new(
+                FingerprintStrategy::FirstLinesChecksum {
+                    ignored_header_bytes: 0,
+                    lines: 1,
+                },
+                1024,
+                false,
+            ),
+            oldest_first,
+            remove_after: None,
+            emitter: Events,
+            rotate_wait: Duration::from_mins(1),
+        };
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let (tx, rx) = mpsc::unbounded();
+        // Append only once the file has reached EOF, immediately before the idle
+        // wait. Making shutdown ready here avoids a timing-dependent sleep race.
+        let output = sink::unfold(
+            (tx, Some(shutdown_tx)),
+            move |(tx, mut shutdown), lines: Vec<Line>| {
+                if lines.is_empty()
+                    && let Some(shutdown) = shutdown.take()
+                {
+                    for (i, path) in paths.iter().enumerate() {
+                        let mut file = std::fs::OpenOptions::new().append(true).open(path).unwrap();
+                        writeln!(file, "FINAL-{i}\nbacklog").unwrap();
+                    }
+                    shutdown.send(()).unwrap();
+                }
+                for line in lines {
+                    tx.unbounded_send(line.text).unwrap();
+                }
+                futures::future::ready(Ok::<_, Infallible>((tx, shutdown)))
+            },
+        );
+        let checkpointer = Checkpointer::new(dir.path());
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            server.run(
+                Box::pin(output),
+                shutdown_rx,
+                futures::future::ready(()),
+                checkpointer,
+            ),
+        )
+        .await
+        .expect("file server did not shut down")
+        .unwrap();
+        let mut lines: Vec<_> = rx.collect().await;
+        lines.sort();
+        assert_eq!(
+            lines,
+            ["FINAL-0", "FINAL-1", "tick-0", "tick-1"].map(Bytes::from)
+        );
+    }
 }
