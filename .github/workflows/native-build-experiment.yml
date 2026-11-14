@@ -1,7 +1,7 @@
 name: Native build experiment
 
 # Keep all experiments on the dedicated PR. No release or dispatch trigger.
-# Review commands: /ci-run-native-probe and /ci-run-native-musl64.
+# Review commands: /ci-run-native-probe, /ci-run-native-musl64, /ci-run-native-patches.
 on:
   pull_request_review:
     types: [submitted]
@@ -10,6 +10,50 @@ permissions:
   contents: read
 
 jobs:
+  patches:
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-patches'
+    name: Check native dependency patches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          dd-rust-license-tool: true
+          prettier: true
+          markdownlint-cli2: true
+          actionlint: true
+      - name: Check patch formatting and documentation
+        run: |
+          make fmt
+          git diff --exit-code
+          make check-actionlint
+          make check-markdown
+      - name: Check patched libraries with Clippy
+        run: |
+          cargo clippy --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib
+          cargo clippy --manifest-path lib/vendored/quanta/Cargo.toml --lib
+      - name: Test patched libraries
+        env:
+          CARGO_TARGET_DIR: target/native-patches
+          PROTOC: ${{ runner.temp }}/protoc-bin/protoc
+        run: |
+          cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib --test protoc_override
+          cargo test --manifest-path lib/vendored/quanta/Cargo.toml --lib --no-default-features
+      - name: Check license output
+        run: |
+          make build-licenses
+          git diff --exit-code -- LICENSE-3rdparty.csv
+
   probe:
     if: >-
       github.event.pull_request.number == 27197 &&

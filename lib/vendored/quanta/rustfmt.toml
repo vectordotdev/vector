@@ -1,0 +1,3 @@
+# Preserve the upstream edition and formatting for this patched dependency.
+edition = "2021"
+max_width = 100

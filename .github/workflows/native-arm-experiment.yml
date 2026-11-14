@@ -102,6 +102,23 @@ jobs:
             rustc --target "$BUILD_TARGET" /tmp/probe.rs -o /tmp/probe
             /tmp/probe
           '
+      - name: Test native dependency patches
+        env:
+          TARGET: ${{ matrix.target }}
+          BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
+            -e TARGET -e BUILD_TARGET -e CARGO_TARGET_DIR=/work/target/native-patches \
+            vector-native-arm bash -euxo pipefail -c '
+              if [[ "$TARGET" == *musl* ]]; then
+                export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
+              fi
+              cargo test --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml \
+                --target "$BUILD_TARGET" --test protoc_override
+              cargo test --manifest-path lib/vendored/quanta/Cargo.toml \
+                --target "$BUILD_TARGET" --lib --no-default-features
+            '
       - name: Link Vector with the release feature set
         env:
           TARGET: ${{ matrix.target }}

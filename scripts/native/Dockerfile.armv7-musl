@@ -13,5 +13,6 @@ RUN apk add --no-cache \
 # Upstream stdlib artifacts reject Alpine's vendor-tagged compiler, even when
 # the Rust version and source commit match. Verify the release ABI in CI.
 
+ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work

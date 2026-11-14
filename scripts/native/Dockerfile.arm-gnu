@@ -24,5 +24,6 @@ RUN set -eux; \
       rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"; \
     done
 
+ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work

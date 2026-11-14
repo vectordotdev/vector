@@ -19,5 +19,6 @@ RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/
         --target "${RUST_TARGET}" \
     && rm /tmp/rustup-init
 
+ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work
