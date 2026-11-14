@@ -81,7 +81,7 @@ runs:
       run: |
         docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
           -e TARGET -e BUILD_TARGET -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
-          -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 \
+          -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 -e CFLAGS="-g0 -O3" \
           vector-native-builder bash -euxo pipefail -c '
             git config --global --add safe.directory /work
             rustc -vV
