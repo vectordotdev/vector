@@ -123,7 +123,6 @@ fn flush_final(agg: &mut Aggregate) -> Vec<Event> {
     out
 }
 
-#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_counter(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Counter { value } => assert_eq!(*value, expected),
@@ -131,7 +130,6 @@ fn assert_counter(event: &Event, expected: f64) {
     }
 }
 
-#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_gauge(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Gauge { value } => assert_eq!(*value, expected),
@@ -1257,7 +1255,7 @@ fn event_time_late_events_forward_passes_through_unchanged() {
     assert_eq!(late, out);
     assert!(agg.event_time_buckets.is_empty());
     assert_eq!(agg.watermark, watermark);
-    assert!(flush_final(&mut agg).is_empty());
+    assert_eq!(flush_final(&mut agg), [] as [vector_lib::event::Event; 0]);
 }
 
 /// With `late_events.metric_types` set, a late event is forwarded only if its
@@ -1761,7 +1759,7 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
 
     let mut out = vec![];
     agg.flush_into(&mut out);
-    assert!(out.is_empty());
+    assert_eq!(out, [] as [vector_lib::event::Event; 0]);
     assert!(agg.watermark.is_none());
 
     agg.record(make_metric_with_timestamp(
