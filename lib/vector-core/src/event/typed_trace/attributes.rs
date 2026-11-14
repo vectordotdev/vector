@@ -1,6 +1,7 @@
 //! Attribute maps mirroring OTLP `AnyValue`.
 
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 
 use bytes::Bytes;
 use vector_common::byte_size_of::ByteSizeOf;
@@ -10,7 +11,7 @@ use vrl::value::KeyString;
 pub type AttrMap = BTreeMap<KeyString, AttrValue>;
 
 /// Ordered attribute map used throughout the typed trace model.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Attributes(AttrMap);
 
 impl Attributes {
@@ -169,6 +170,24 @@ impl PartialEq for AttrValue {
 
 impl Eq for AttrValue {}
 
+impl Hash for AttrValue {
+    /// Floats hash by IEEE bits so this matches [`PartialEq`]: identical NaN payloads compare
+    /// equal, and `+0` does not compare equal to `-0`.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::String(value) => value.hash(state),
+            Self::Bytes(value) => value.hash(state),
+            Self::Bool(value) => value.hash(state),
+            Self::Integer(value) => value.hash(state),
+            Self::Float(value) => value.to_bits().hash(state),
+            Self::Array(value) => value.hash(state),
+            Self::Map(value) => value.hash(state),
+            Self::Null => {}
+        }
+    }
+}
+
 impl ByteSizeOf for AttrValue {
     fn allocated_bytes(&self) -> usize {
         match self {
@@ -219,14 +238,34 @@ impl From<f64> for AttrValue {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
     use similar_asserts::assert_eq;
 
     use super::{AttrMap, AttrValue};
+
+    fn hash_of(value: &impl Hash) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
 
     #[test]
     fn equality_uses_float_bits() {
         assert_eq!(AttrValue::Float(f64::NAN), AttrValue::Float(f64::NAN));
         assert_ne!(AttrValue::Float(0.0), AttrValue::Float(-0.0));
+    }
+
+    #[test]
+    fn hash_follows_float_bits() {
+        let nan = AttrValue::Float(f64::NAN);
+        assert_eq!(hash_of(&nan), hash_of(&AttrValue::Float(f64::NAN)));
+
+        let mut map = AttrMap::new();
+        map.insert("rate".into(), nan);
+        let nested = AttrValue::Map(map.clone());
+        assert_eq!(hash_of(&nested), hash_of(&AttrValue::Map(map)));
     }
 
     #[test]
