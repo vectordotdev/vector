@@ -1285,6 +1285,10 @@ fn create_consumer(
         }
     }
 
+    config
+        .auth
+        .enforce_protocol_version_bounds(&client_config)?;
+
     let (callbacks, callback_rx) = mpsc::unbounded_channel();
     let consumer = client_config
         .create_with_context::<_, StreamConsumer<_>>(KafkaSourceContext::new(

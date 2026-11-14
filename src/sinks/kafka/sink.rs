@@ -52,6 +52,9 @@ pub(crate) fn create_producer(
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
+        config
+            .auth
+            .enforce_protocol_version_bounds(&producer_config)?;
         let producer = create_producer(&producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;

@@ -3,7 +3,9 @@
 
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, sensitive_string::SensitiveString, tls::TlsError,
+};
 
 use crate::tls::TlsEnableableConfig;
 
@@ -18,6 +20,8 @@ pub enum NatsConfigError {
     TlsMissingCert,
     #[snafu(display("NATS Credentials file error"))]
     CredentialsFileError { source: std::io::Error },
+    #[snafu(display("NATS TLS Config Error: {}", source))]
+    ProtocolVersion { source: TlsError },
 }
 
 /// Configuration of the authentication strategy when interacting with NATS.
@@ -152,6 +156,21 @@ pub(crate) fn validate_tls_cert_key_pair(
     }
 }
 
+pub(crate) fn validate_tls_protocol_versions(
+    tls_config: &TlsEnableableConfig,
+) -> Result<(), NatsConfigError> {
+    if !tls_config.enabled.unwrap_or(false) {
+        return Ok(());
+    }
+    vector_lib::tls::enforce_protocol_version_bounds(
+        tls_config.options.min_version,
+        tls_config.options.max_version,
+        "async-nats",
+        vector_lib::tls::TLS12_TO_TLS13,
+    )
+    .context(ProtocolVersionSnafu)
+}
+
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: Option<&NatsAuthConfig>,
@@ -174,6 +193,8 @@ pub(crate) fn from_tls_auth_config(
             }
 
             validate_tls_cert_key_pair(tls_config)?;
+
+            validate_tls_protocol_versions(tls_config)?;
 
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
@@ -326,5 +347,22 @@ mod tests {
               user: foobar
         "})
         .unwrap_err();
+    }
+
+    #[test]
+    fn from_tls_auth_config_rejects_an_unenforceable_minimum() {
+        let tls_config = TlsEnableableConfig {
+            enabled: Some(true),
+            options: crate::tls::TlsConfig {
+                min_version: Some(crate::tls::TlsVersion::Tls13),
+                ..Default::default()
+            },
+        };
+        let error = from_tls_auth_config("test", None, Some(&tls_config))
+            .expect_err("async-nats cannot enforce a TLS v1.3 minimum");
+        assert!(
+            matches!(error, NatsConfigError::ProtocolVersion { .. }),
+            "unexpected error: {error}"
+        );
     }
 }

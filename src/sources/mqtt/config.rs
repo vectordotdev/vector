@@ -148,6 +148,15 @@ impl MqttSourceConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
+            let tls_options = self.common.tls.as_ref().map(|tls| &tls.options);
+            vector_lib::tls::enforce_protocol_version_bounds(
+                tls_options.and_then(|tls| tls.min_version),
+                tls_options.and_then(|tls| tls.max_version),
+                "rumqttc",
+                vector_lib::tls::TLS12_TO_TLS13,
+            )
+            .context(TlsSnafu)?;
+
             // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
             // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
             let alpn = self

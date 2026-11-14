@@ -179,6 +179,7 @@ impl ValidatedSink for AmqpSinkConfig {
             .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
             .transpose()?;
+        self.connection.enforce_protocol_version_bounds()?;
         Ok(ValidatedAmqpSink {
             exchange,
             routing_key,
@@ -222,6 +223,7 @@ mod tests {
     use crate::config::ValidatedSink;
     use crate::config::format::{Format, deserialize};
     use crate::template::{ConfinementConfig, Template};
+    use vector_lib::tls::TlsVersion;
     use vrl::event_path;
 
     #[test]
@@ -268,6 +270,25 @@ mod tests {
         assert!(
             result.is_err(),
             "validation should reject an unsupported AMQP URI scheme"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_an_unenforceable_tls_bound() {
+        let config = AmqpSinkConfig {
+            connection: AmqpConfig {
+                tls: Some(TlsConfig {
+                    min_version: Some(TlsVersion::Tls13),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "validation should reject a TLS v1.3 minimum lapin cannot enforce"
         );
     }
 

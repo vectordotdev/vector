@@ -8,17 +8,21 @@ use std::{
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, CreateAcceptorSnafu,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetTlsVersionSnafu, SetVerifyCertSnafu, TlsError,
+    X509ParseSnafu,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
-    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
+    ssl::{
+        AlpnError, ConnectConfiguration, SslContextBuilder, SslMethod, SslOptions, SslVerifyMode,
+        SslVersion, select_next_proto,
+    },
     stack::Stack,
     x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
@@ -78,6 +82,70 @@ pub struct TlsSourceConfig {
 
     #[serde(flatten)]
     pub tls_config: TlsEnableableConfig,
+}
+
+/// TLS protocol version.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TlsVersion {
+    /// TLS v1.0, deprecated by RFC 8996.
+    #[serde(rename = "TLSv1")]
+    Tls10,
+
+    /// TLS v1.1, deprecated by RFC 8996.
+    #[serde(rename = "TLSv1.1")]
+    Tls11,
+
+    /// TLS v1.2.
+    #[serde(rename = "TLSv1.2")]
+    Tls12,
+
+    /// TLS v1.3.
+    #[serde(rename = "TLSv1.3")]
+    Tls13,
+}
+
+impl TlsVersion {
+    const ALL: [Self; 4] = [Self::Tls10, Self::Tls11, Self::Tls12, Self::Tls13];
+
+    const fn as_ssl_version(self) -> SslVersion {
+        match self {
+            Self::Tls10 => SslVersion::TLS1,
+            Self::Tls11 => SslVersion::TLS1_1,
+            Self::Tls12 => SslVersion::TLS1_2,
+            Self::Tls13 => SslVersion::TLS1_3,
+        }
+    }
+
+    const fn disable_option(self) -> SslOptions {
+        match self {
+            Self::Tls10 => SslOptions::NO_TLSV1,
+            Self::Tls11 => SslOptions::NO_TLSV1_1,
+            Self::Tls12 => SslOptions::NO_TLSV1_2,
+            Self::Tls13 => SslOptions::NO_TLSV1_3,
+        }
+    }
+
+    fn from_ssl_version(version: SslVersion) -> Option<Self> {
+        match version {
+            SslVersion::TLS1 => Some(Self::Tls10),
+            SslVersion::TLS1_1 => Some(Self::Tls11),
+            SslVersion::TLS1_2 => Some(Self::Tls12),
+            SslVersion::TLS1_3 => Some(Self::Tls13),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for TlsVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Tls10 => "TLSv1",
+            Self::Tls11 => "TLSv1.1",
+            Self::Tls12 => "TLSv1.2",
+            Self::Tls13 => "TLSv1.3",
+        })
+    }
 }
 
 /// TLS configuration.
@@ -156,6 +224,24 @@ pub struct TlsConfig {
     #[configurable(metadata(docs::examples = "www.example.com"))]
     #[configurable(metadata(docs::human_name = "Server Name"))]
     pub server_name: Option<String>,
+
+    /// Minimum TLS protocol version to negotiate.
+    ///
+    /// Peers that cannot negotiate at least this version are rejected during the handshake. When
+    /// unset, the component's TLS library decides.
+    ///
+    /// Components that accept connections do not offer TLS v1.3 by default. Setting either this
+    /// option or `max_version` enables every version within the resulting window, so
+    /// `min_version: TLSv1.2` also makes TLS v1.3 available.
+    #[configurable(metadata(docs::human_name = "Minimum TLS Version"))]
+    pub min_version: Option<TlsVersion>,
+
+    /// Maximum TLS protocol version to negotiate.
+    ///
+    /// Rarely needed: use it for peers that advertise a version they cannot actually negotiate.
+    /// When unset, the component's TLS library decides.
+    #[configurable(metadata(docs::human_name = "Maximum TLS Version"))]
+    pub max_version: Option<TlsVersion>,
 }
 
 impl TlsConfig {
@@ -179,6 +265,8 @@ pub struct TlsSettings {
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
+    min_version: Option<TlsVersion>,
+    max_version: Option<TlsVersion>,
 }
 
 /// Identity store in PEM format
@@ -249,6 +337,12 @@ impl TlsSettings {
             }
         }
 
+        if let (Some(min), Some(max)) = (options.min_version, options.max_version)
+            && min > max
+        {
+            return Err(TlsError::InvalidTlsVersionRange { min, max });
+        }
+
         Ok(Self {
             verify_certificate: options.verify_certificate.unwrap_or(!for_server),
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
@@ -257,6 +351,8 @@ impl TlsSettings {
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
+            min_version: options.min_version,
+            max_version: options.max_version,
         })
     }
 
@@ -313,11 +409,59 @@ impl TlsSettings {
         self.apply_context_base(context, false)
     }
 
+    /// Constrains `context` to the configured window, only ever narrowing the host's own bounds.
+    fn apply_protocol_versions(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
+        if self.min_version.is_none() && self.max_version.is_none() {
+            return Ok(());
+        }
+
+        // Setting a bound replaces the host's `MinProtocol`/`MaxProtocol`, so only ever tighten it.
+        if let Some(min) = self.min_version
+            && context
+                .min_proto_version()
+                .is_none_or(|host| TlsVersion::from_ssl_version(host).is_none_or(|host| min > host))
+        {
+            context
+                .set_min_proto_version(Some(min.as_ssl_version()))
+                .context(SetTlsVersionSnafu)?;
+        }
+        if let Some(max) = self.max_version
+            && context.max_proto_version().is_none_or(|host| {
+                TlsVersion::from_ssl_version(host).is_some_and(|host| max < host)
+            })
+        {
+            context
+                .set_max_proto_version(Some(max.as_ssl_version()))
+                .context(SetTlsVersionSnafu)?;
+        }
+
+        // Acceptors get this veto from `mozilla_intermediate`; on connectors it is host policy.
+        if for_server
+            && self.max_version.is_none_or(|max| max == TlsVersion::Tls13)
+            && !host_disables_tls13()?
+        {
+            context.clear_options(SslOptions::NO_TLSV1_3);
+        }
+
+        // OpenSSL accepts a context with no usable version and only fails at handshake time.
+        if negotiable_range(context, host_security_level()?).is_none() {
+            return Err(TlsError::EmptyTlsVersionWindow);
+        }
+
+        Ok(())
+    }
+
     pub(super) fn apply_context_base(
         &self,
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
+        self.apply_protocol_versions(context, for_server)?;
+
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
@@ -452,6 +596,58 @@ impl TlsSettings {
         }
         Ok(())
     }
+}
+
+fn host_context() -> Result<SslContextBuilder> {
+    SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)
+}
+
+/// Whether the host's OpenSSL configuration disables TLS v1.3 for newly created contexts.
+fn host_disables_tls13() -> Result<bool> {
+    Ok(host_context()?.options().contains(SslOptions::NO_TLSV1_3))
+}
+
+/// The host's OpenSSL security level; the builder has no getter and Vector never sets one.
+fn host_security_level() -> Result<u32> {
+    Ok(host_context()?.build().security_level())
+}
+
+/// The lowest and highest TLS versions `context` can still negotiate, or `None` if none is left.
+fn negotiable_range(
+    context: &mut SslContextBuilder,
+    security_level: u32,
+) -> Option<(TlsVersion, TlsVersion)> {
+    let min = context
+        .min_proto_version()
+        .and_then(TlsVersion::from_ssl_version)
+        .unwrap_or(TlsVersion::Tls10);
+    let max = match context.max_proto_version() {
+        None => TlsVersion::Tls13,
+        // The only maximum `TlsVersion` cannot model is SSLv3, below every TLS version.
+        Some(max) => TlsVersion::from_ssl_version(max)?,
+    };
+    // Security levels above 0 refuse TLS v1.0/v1.1.
+    let floor = if security_level > 0 {
+        TlsVersion::Tls12
+    } else {
+        TlsVersion::Tls10
+    };
+    let options = context.options();
+    let mut usable = TlsVersion::ALL.into_iter().filter(|&version| {
+        version >= min.max(floor) && version <= max && !options.contains(version.disable_option())
+    });
+    usable
+        .next()
+        .map(|lowest| (lowest, usable.next_back().unwrap_or(lowest)))
+}
+
+/// The versions a fresh client context, like librdkafka's, may negotiate under the host's policy,
+/// at `security_level` when given and at the host's own level otherwise.
+pub fn host_protocol_version_range(
+    security_level: Option<u32>,
+) -> Result<(TlsVersion, TlsVersion)> {
+    let security_level = security_level.map_or_else(host_security_level, Ok)?;
+    negotiable_range(&mut host_context()?, security_level).ok_or(TlsError::EmptyTlsVersionWindow)
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
@@ -764,6 +960,8 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 
 #[cfg(test)]
 mod test {
+    use openssl::ssl::{SslAcceptor, SslConnector};
+
     use super::*;
 
     const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_client/private/localhost.p12";
@@ -971,8 +1169,6 @@ mod test {
     async fn server_name_is_used_for_hostname_verification() {
         use std::{net::SocketAddr, pin::Pin};
 
-        use openssl::ssl::{SslConnector, SslMethod};
-
         // Connects to `addr` by IP, driving `into_ssl` with `url_host` exactly as
         // `hyper-openssl` does (it passes the connection URL host).
         async fn connect(
@@ -1061,6 +1257,329 @@ mod test {
         assert!(
             error.contains("certificate verify failed"),
             "expected a certificate verification failure, got: {error}"
+        );
+
+        server.abort();
+    }
+
+    #[test]
+    fn tls_version_range_must_not_be_inverted() {
+        let options = TlsConfig {
+            min_version: Some(TlsVersion::Tls13),
+            max_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        };
+        let error = TlsSettings::from_options(Some(&options))
+            .expect_err("an inverted version range should be rejected");
+        assert!(
+            matches!(
+                error,
+                TlsError::InvalidTlsVersionRange {
+                    min: TlsVersion::Tls13,
+                    max: TlsVersion::Tls12
+                }
+            ),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn tls_versions_deserialize_from_their_config_names() {
+        for (name, expected) in [
+            ("TLSv1", TlsVersion::Tls10),
+            ("TLSv1.1", TlsVersion::Tls11),
+            ("TLSv1.2", TlsVersion::Tls12),
+            ("TLSv1.3", TlsVersion::Tls13),
+        ] {
+            let parsed: TlsVersion = serde_json::from_str(&format!("\"{name}\"")).unwrap();
+            assert_eq!(parsed, expected);
+            assert_eq!(parsed.to_string(), name);
+        }
+    }
+
+    #[test]
+    fn unset_tls_versions_leave_the_context_untouched() {
+        let settings = TlsSettings::from_options(None).unwrap();
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        let before = builder.options();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(builder.min_proto_version(), None);
+        assert_eq!(builder.max_proto_version(), None);
+        assert_eq!(builder.options(), before);
+    }
+
+    #[test]
+    fn configured_tls_versions_bound_the_context() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            min_version: Some(TlsVersion::Tls12),
+            max_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        }))
+        .unwrap();
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(builder.min_proto_version(), Some(SslVersion::TLS1_2));
+        assert_eq!(builder.max_proto_version(), Some(SslVersion::TLS1_2));
+    }
+
+    // `set_*_proto_version(None)` would clear a host's `openssl.cnf` bound on the unset side.
+    #[test]
+    fn configuring_one_bound_keeps_the_hosts_other_bound() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_version: Some(TlsVersion::Tls13),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(
+            builder.min_proto_version(),
+            Some(SslVersion::TLS1_2),
+            "an unconfigured minimum must not clear a bound already in force"
+        );
+        assert_eq!(builder.max_proto_version(), Some(SslVersion::TLS1_3));
+
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            min_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder
+            .set_max_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(builder.min_proto_version(), Some(SslVersion::TLS1_2));
+        assert_eq!(
+            builder.max_proto_version(),
+            Some(SslVersion::TLS1_2),
+            "an unconfigured maximum must not clear a bound already in force"
+        );
+    }
+
+    // A connector keeps a host's `NO_TLSV1_3`, so a TLS v1.3 minimum leaves nothing usable.
+    #[test]
+    fn disabled_protocols_count_against_the_window() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            min_version: Some(TlsVersion::Tls13),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_options(SslOptions::NO_TLSV1_3);
+
+        let error = settings
+            .apply_context(&mut builder)
+            .expect_err("a disabled TLS v1.3 leaves a TLS v1.3 minimum with nothing to negotiate");
+        assert!(
+            matches!(error, TlsError::EmptyTlsVersionWindow),
+            "unexpected error: {error}"
+        );
+    }
+
+    // Both OpenSSL setters accept an empty window, so Vector must reject it itself.
+    #[test]
+    fn empty_effective_version_window_is_rejected() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        // Stands in for a host policy of `MinProtocol = TLSv1.3`.
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_3))
+            .unwrap();
+
+        let error = settings
+            .apply_context(&mut builder)
+            .expect_err("a minimum above the maximum must be rejected");
+        assert!(
+            matches!(error, TlsError::EmptyTlsVersionWindow),
+            "unexpected error: {error}"
+        );
+    }
+
+    // The bundled OpenSSL defaults to security level 2, which refuses TLS v1.0 and v1.1.
+    #[test]
+    fn security_level_counts_against_the_window() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_version: Some(TlsVersion::Tls11),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        let error = settings
+            .apply_context(&mut builder)
+            .expect_err("TLS v1.0 and v1.1 are unusable at the default security level");
+        assert!(
+            matches!(error, TlsError::EmptyTlsVersionWindow),
+            "unexpected error: {error}"
+        );
+    }
+
+    // A lowered security level lifts only its own floor, never a protocol bound already in force.
+    #[test]
+    fn security_level_zero_keeps_an_existing_minimum() {
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        assert_eq!(
+            negotiable_range(&mut builder, 0),
+            Some((TlsVersion::Tls10, TlsVersion::Tls13))
+        );
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+        assert_eq!(
+            negotiable_range(&mut builder, 0),
+            Some((TlsVersion::Tls12, TlsVersion::Tls13))
+        );
+    }
+
+    // A window that excludes TLS v1.3 must leave the acceptor profile's `NO_TLSV1_3` in place.
+    #[test]
+    fn window_excluding_tls13_leaves_the_no_tls13_option_set() {
+        let settings = TlsSettings::from_options_base(
+            Some(&TlsConfig {
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                max_version: Some(TlsVersion::Tls12),
+                ..Default::default()
+            }),
+            true,
+        )
+        .unwrap();
+
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        settings.apply_context_base(&mut acceptor, true).unwrap();
+
+        assert!(acceptor.options().contains(SslOptions::NO_TLSV1_3));
+        assert_eq!(acceptor.max_proto_version(), Some(SslVersion::TLS1_2));
+    }
+
+    // `SslAcceptor::mozilla_intermediate` sets `NO_TLSV1_3`, which outranks min/max in OpenSSL.
+    #[test]
+    fn acceptor_tls_version_window_clears_the_no_tls13_option() {
+        let settings = TlsSettings::from_options_base(
+            Some(&TlsConfig {
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                min_version: Some(TlsVersion::Tls12),
+                ..Default::default()
+            }),
+            true,
+        )
+        .unwrap();
+
+        // Mirrors `TlsSettings::acceptor`, which starts from Mozilla's v4 intermediate profile.
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        assert!(
+            acceptor.options().contains(SslOptions::NO_TLSV1_3),
+            "precondition: the profile this test guards against disables TLS v1.3"
+        );
+
+        settings.apply_context_base(&mut acceptor, true).unwrap();
+
+        assert_eq!(acceptor.min_proto_version(), Some(SslVersion::TLS1_2));
+        assert!(
+            !acceptor.options().contains(SslOptions::NO_TLSV1_3),
+            "TLS v1.3 must be available once a version window is configured"
+        );
+    }
+
+    // A server pinned to TLS v1.2 must accept a TLS v1.2 client and reject a TLS v1.3-only one.
+    #[tokio::test]
+    async fn min_version_is_enforced_during_the_handshake() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        async fn connect(
+            client: &TlsConfig,
+            addr: SocketAddr,
+        ) -> std::result::Result<String, String> {
+            let settings = TlsSettings::from_options(Some(client)).map_err(|e| e.to_string())?;
+            let tcp = tokio::net::TcpStream::connect(addr)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+            settings
+                .apply_context(&mut builder)
+                .map_err(|e| e.to_string())?;
+            let ssl = builder
+                .build()
+                .configure()
+                .unwrap()
+                .into_ssl("localhost")
+                .map_err(|e| e.to_string())?;
+            let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(stream.ssl().version_str().to_string())
+        }
+
+        let server_settings = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    min_version: Some(TlsVersion::Tls12),
+                    max_version: Some(TlsVersion::Tls12),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = server_settings.bind(&addr).await.unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        let client = TlsConfig {
+            ca_file: Some(TEST_PEM_INTERMEDIATE_CA_PATH.into()),
+            ..Default::default()
+        };
+
+        // A client that can speak TLS v1.2 negotiates exactly that, and nothing newer.
+        let version = connect(&client, local_addr)
+            .await
+            .expect("handshake should succeed at the server's pinned version");
+        assert_eq!(version, "TLSv1.2");
+
+        // A client that will only offer TLS v1.3 has no version in common with the server.
+        let error = connect(
+            &TlsConfig {
+                min_version: Some(TlsVersion::Tls13),
+                ..client.clone()
+            },
+            local_addr,
+        )
+        .await
+        .expect_err("handshake should fail when the version windows do not overlap");
+        assert!(
+            error.contains("protocol version") || error.contains("alert"),
+            "expected a protocol version failure, got: {error}"
         );
 
         server.abort();
