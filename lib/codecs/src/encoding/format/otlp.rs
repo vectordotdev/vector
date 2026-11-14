@@ -149,8 +149,10 @@ impl Encoder<Event> for OtlpSerializer {
     }
 }
 
-/// Encodes a trace through the typed model (RFC 25329) so `typed-trace` builds exercise it end
-/// to end. Any conversion issue fails the event instead of relaying a lossy result.
+/// Encodes a trace through the typed model (RFC 25329).
+///
+/// Reported conversion issues do not fail the event: accepted spans are still encoded. The
+/// error return is reserved for a conversion that cannot interpret the legacy layout.
 #[cfg(feature = "typed-trace")]
 fn encode_typed_trace(
     trace: vector_core::event::TraceEvent,
@@ -159,23 +161,25 @@ fn encode_typed_trace(
     use opentelemetry_proto::{
         proto::collector::trace::v1::ExportTraceServiceRequest, typed_trace::legacy_to_typed,
     };
-    use vector_core::event::typed_trace::{TraceConversionIssue, TraceConversionReporter};
 
-    struct Issues(Vec<String>);
-    impl TraceConversionReporter for Issues {
-        fn report(&mut self, issue: TraceConversionIssue<'_>) {
-            self.0.push(format!("{issue:?}"));
-        }
-    }
-
-    let mut issues = Issues(Vec::new());
-    let events = legacy_to_typed(trace, &mut issues)?;
+    let mut reporter = OtlpTraceReporter;
+    let events = legacy_to_typed(trace, &mut reporter)?;
     // Sinks take finalizers before encoding, so dropping these releases nothing early.
-    let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut issues);
-    if !issues.0.is_empty() {
-        return Err(format!("typed trace conversion reported issues: {:?}", issues.0).into());
-    }
+    let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut reporter);
     request.encode(buffer).map_err(Into::into)
+}
+
+/// Reports typed-trace conversion issues while encoding continues.
+#[cfg(feature = "typed-trace")]
+struct OtlpTraceReporter;
+
+#[cfg(feature = "typed-trace")]
+impl vector_core::event::typed_trace::TraceConversionReporter for OtlpTraceReporter {
+    fn report(&mut self, issue: vector_core::event::typed_trace::TraceConversionIssue<'_>) {
+        use vector_common::internal_event::emit;
+
+        emit(crate::internal_events::OtlpTraceConversionError { issue });
+    }
 }
 
 #[cfg(test)]
@@ -361,5 +365,175 @@ mod tests {
                 .encode(Event::Metric(distribution_metric), &mut buffer)
                 .is_err()
         );
+    }
+}
+
+/// A rejected span must not fail encoding of its accepted siblings.
+#[cfg(all(test, feature = "typed-trace"))]
+mod typed_trace_tests {
+    use bytes::BytesMut;
+    use opentelemetry_proto::proto::collector::trace::v1::ExportTraceServiceRequest;
+    use prost::Message;
+    use tokio_util::codec::Encoder;
+    use vector_core::event::{Event, TraceEvent, TraceLayout};
+    use vrl::{event_path, value::ObjectMap, value::Value};
+
+    use super::OtlpSerializer;
+
+    fn raw_id(value: u128, len: usize) -> Value {
+        let bytes = value.to_be_bytes();
+        Value::Bytes(bytes[16 - len..].to_vec().into())
+    }
+
+    fn span(name: &str, trace: u128, span_id: u64) -> Value {
+        Value::Object(ObjectMap::from([
+            ("traceId".into(), raw_id(trace, 16)),
+            ("spanId".into(), raw_id(u128::from(span_id), 8)),
+            ("name".into(), Value::from(name)),
+        ]))
+    }
+
+    fn envelope(spans: Vec<Value>) -> TraceEvent {
+        let scope = Value::Object(ObjectMap::from([("spans".into(), Value::Array(spans))]));
+        let resource = Value::Object(ObjectMap::from([(
+            "scopeSpans".into(),
+            Value::Array(vec![scope]),
+        )]));
+        let mut event = TraceEvent::default();
+        event
+            .metadata_mut()
+            .set_trace_layout(TraceLayout::OtlpResourceSpans);
+        event.insert(event_path!("resourceSpans"), Value::Array(vec![resource]));
+        event
+    }
+
+    fn encode(event: TraceEvent) -> vector_common::Result<ExportTraceServiceRequest> {
+        let mut serializer = OtlpSerializer::new()?;
+        let mut buffer = BytesMut::new();
+        serializer.encode(Event::Trace(event), &mut buffer)?;
+        Ok(ExportTraceServiceRequest::decode(buffer.freeze())?)
+    }
+
+    fn span_names(request: &ExportTraceServiceRequest) -> Vec<&str> {
+        request
+            .resource_spans
+            .iter()
+            .flat_map(|resource| &resource.scope_spans)
+            .flat_map(|scope| &scope.spans)
+            .map(|span| span.name.as_str())
+            .collect()
+    }
+
+    fn counter<'a>(
+        metrics: &'a [vector_core::event::Metric],
+        name: &str,
+    ) -> Option<(&'a vector_core::event::Metric, f64)> {
+        let metric = metrics.iter().find(|metric| metric.name() == name)?;
+        let vector_core::event::MetricValue::Counter { value } = metric.value() else {
+            panic!("{name} is a counter");
+        };
+        Some((metric, *value))
+    }
+
+    fn reset_metrics() -> &'static vector_core::metrics::Controller {
+        use vector_core::metrics::{Controller, init_test};
+
+        init_test();
+        let controller = Controller::get().expect("metrics controller");
+        controller.reset();
+        controller
+    }
+
+    #[test]
+    fn encodes_accepted_spans_when_a_sibling_span_is_rejected() {
+        let request = encode(envelope(vec![span("kept", 1, 1), span("dropped", 0, 2)]))
+            .expect("a rejected sibling leaves the accepted span encodable");
+
+        assert_eq!(span_names(&request), ["kept"]);
+    }
+
+    #[test]
+    fn counts_a_rejected_span_as_an_error_and_a_discarded_span() {
+        let controller = reset_metrics();
+        let request = encode(envelope(vec![span("kept", 1, 1), span("dropped", 0, 2)]))
+            .expect("a rejected sibling leaves the accepted span encodable");
+        assert_eq!(span_names(&request), ["kept"]);
+
+        let metrics = controller.capture_metrics();
+        let (error, value) = counter(&metrics, "component_errors_total")
+            .expect("rejected span increments component_errors_total");
+        let tags = error.tags().expect("component_errors_total has tags");
+        assert_eq!(tags.get("error_code"), Some("invalid_trace_id"));
+        assert_eq!(tags.get("error_type"), Some("conversion_failed"));
+        assert_eq!(tags.get("stage"), Some("sending"));
+        assert!((value - 1.0).abs() < f64::EPSILON);
+        let (_, discarded) = counter(&metrics, "component_discarded_events_total")
+            .expect("rejected span increments component_discarded_events_total");
+        assert!((discarded - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn counts_a_malformed_grouping_as_a_discarded_span() {
+        let controller = reset_metrics();
+        let mut event = envelope(vec![span("kept", 1, 1)]);
+        let Some(Value::Array(resources)) = event.get_mut(event_path!("resourceSpans")) else {
+            panic!("envelope has a resourceSpans array");
+        };
+        resources.push(Value::from(42));
+
+        let request = encode(event).expect("a malformed grouping leaves its sibling encodable");
+        assert_eq!(span_names(&request), ["kept"]);
+
+        let metrics = controller.capture_metrics();
+        let (error, value) = counter(&metrics, "component_errors_total")
+            .expect("malformed grouping increments component_errors_total");
+        assert_eq!(
+            error.tags().and_then(|tags| tags.get("error_code")),
+            Some("discarded_span")
+        );
+        assert!((value - 1.0).abs() < f64::EPSILON);
+        let (_, discarded) = counter(&metrics, "component_discarded_events_total")
+            .expect("malformed grouping increments component_discarded_events_total");
+        assert!((discarded - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn records_an_unmapped_field_without_dropping_the_span() {
+        let controller = reset_metrics();
+        let mut kept = span("kept", 1, 1);
+        let Value::Object(fields) = &mut kept else {
+            panic!("span is an object");
+        };
+        fields.insert("not_a_field".into(), Value::from(true));
+
+        let request =
+            encode(envelope(vec![kept])).expect("an unmapped field leaves the span encodable");
+        assert_eq!(span_names(&request), ["kept"]);
+
+        let metrics = controller.capture_metrics();
+        let (error, value) = counter(&metrics, "component_errors_total")
+            .expect("unmapped field increments component_errors_total");
+        assert_eq!(
+            error.tags().and_then(|tags| tags.get("error_code")),
+            Some("legacy_layout_error")
+        );
+        assert!((value - 1.0).abs() < f64::EPSILON);
+        assert!(counter(&metrics, "component_discarded_events_total").is_none());
+    }
+
+    #[test]
+    fn returns_ok_when_every_span_is_rejected() {
+        let request = encode(envelope(vec![span("dropped", 0, 1)]))
+            .expect("rejecting every span consumes the event without failing it");
+        assert!(span_names(&request).is_empty());
+    }
+
+    #[test]
+    fn returns_err_when_the_legacy_layout_is_not_otlp() {
+        let mut event = TraceEvent::default();
+        event.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+        event.insert(event_path!("trace_id"), Value::from("1"));
+
+        assert!(encode(event).is_err());
     }
 }
