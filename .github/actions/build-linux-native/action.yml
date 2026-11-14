@@ -1,5 +1,5 @@
-name: Native Linux release build
-description: Build on the target CPU without cross-rs, then package on the runner.
+name: Linux release build without cross-rs
+description: Build with native host tools, then package on the runner. ARM32 uses ARM64-hosted cross-compilers.
 
 inputs:
   target:
@@ -25,17 +25,8 @@ runs:
             PLATFORM=linux/arm64
             DOCKERFILE=scripts/native/Dockerfile.alpine
             ;;
-          armv7-unknown-linux-gnueabihf)
-            PLATFORM=linux/arm/v7
-            DOCKERFILE=scripts/native/Dockerfile.arm-gnu
-            ;;
-          armv7-unknown-linux-musleabihf)
-            PLATFORM=linux/arm/v7
-            DOCKERFILE=scripts/native/Dockerfile.armv7-musl
-            BUILD_TARGET=armv7-alpine-linux-musleabihf
-            ;;
-          arm-unknown-linux-gnueabi|arm-unknown-linux-musleabi)
-            PLATFORM=linux/arm/v7
+          armv7-unknown-linux-gnueabihf|armv7-unknown-linux-musleabihf|arm-unknown-linux-gnueabi|arm-unknown-linux-musleabi)
+            PLATFORM=linux/arm64
             DOCKERFILE=scripts/native/Dockerfile.arm-gnu
             ;;
           *) echo "Unsupported native build target: $TARGET" >&2; exit 1 ;;
@@ -58,18 +49,27 @@ runs:
         RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
         BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
         HOST="$TARGET"
-        if [[ "$TARGET" == arm-unknown-linux-* ]]; then
-          HOST=armv7-unknown-linux-gnueabihf
+        # A 32-bit rustc cannot compile the full release feature set within its
+        # address space. Run ARM64 compilers, while preserving each ARM32 target.
+        if [[ "$TARGET" == arm* ]]; then
+          HOST=aarch64-unknown-linux-gnu
         fi
         docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
           --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
           --build-arg RUST_HOST="$HOST" --build-arg RUST_TARGET="$TARGET" \
           -t vector-native-builder .
         docker run --rm --platform "$PLATFORM" vector-native-builder timeout 90 rustc -vV
-        if [[ "$TARGET" == arm-unknown-linux-musleabi ]]; then
+        if [[ "$TARGET" == arm*-unknown-linux-musl* ]]; then
           docker tag vector-native-builder vector-native-arm-gnu
+          MUSL_ARGS=()
+          if [[ "$TARGET" == armv7-unknown-linux-musleabihf ]]; then
+            MUSL_ARGS=(--build-arg MUSL_TARGET=arm-linux-musleabihf
+              --build-arg GCC_ARCH=armv7-a --build-arg GCC_FLOAT=hard
+              --build-arg GCC_FPU=vfpv3-d16)
+          fi
           docker build --platform "$PLATFORM" -f scripts/native/Dockerfile.arm-musl \
-            --build-arg RUST_VERSION="$RUST_VERSION" -t vector-native-builder .
+            --build-arg RUST_VERSION="$RUST_VERSION" --build-arg RUST_TARGET="$TARGET" \
+            "${MUSL_ARGS[@]}" -t vector-native-builder .
         fi
 
     - name: Build and verify the release binary
@@ -81,12 +81,24 @@ runs:
       run: |
         docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
           -e TARGET -e BUILD_TARGET -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
-          -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 \
+          -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 -e CFLAGS="-g0 -O3" \
           vector-native-builder bash -euxo pipefail -c '
             git config --global --add safe.directory /work
             rustc -vV
             if [[ "$TARGET" == *musl* ]]; then
               export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
+            fi
+            if [[ "$TARGET" == arm* ]]; then
+              LINKER_VAR="CARGO_TARGET_${BUILD_TARGET^^}_LINKER"
+              LINKER_VAR="${LINKER_VAR//-/_}"
+              PROBE_FLAGS=()
+              if [[ "$TARGET" == *musl* ]]; then
+                PROBE_FLAGS=(-C target-feature=+crt-static)
+              fi
+              timeout 90 rustc --edition=2024 --target "$BUILD_TARGET" \
+                -C "linker=${!LINKER_VAR}" -C opt-level=2 "${PROBE_FLAGS[@]}" \
+                tests/data/native-release-toolchain-smoke.rs -o /tmp/vector-target-smoke
+              timeout 90 /tmp/vector-target-smoke
             fi
             # Use the actual release profile, including fat LTO.
             cargo build --locked --release --target "$BUILD_TARGET" \
@@ -105,7 +117,7 @@ runs:
                 exit 1
               fi
             fi
-            "$file" --version
+            timeout 90 "$file" --version
             if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
               mkdir -p "target/$TARGET/release"
               cp "$file" "target/$TARGET/release/vector"

@@ -11,14 +11,23 @@ ARG RUST_HOST
 ARG RUST_TARGET
 ENV CARGO_HOME=/opt/cargo
 ENV PATH="/opt/rust/bin:${PATH}"
-# ARMv6 host tools stall in threaded compilation on the ARM64 runner. Run the
-# ARMv7 host compiler natively, with ARMv6 soft-float output and its own C ABI.
-RUN if [ "${RUST_TARGET}" = arm-unknown-linux-gnueabi ]; then \
-      dpkg --add-architecture armel \
+# ARMv6 host tools stall, and ARMv7 rustc runs out of 32-bit address space with
+# the release feature set. Cross-compile ARM32 with native ARM64 host tools,
+# without cross-rs or emulated build tools. Install target libraries for both
+# linking and execution through the runner kernel's native ARM32 support.
+RUN set -eu; \
+    case "${RUST_TARGET}" in \
+      arm-unknown-linux-gnueabi) arch=armel; triple=arm-linux-gnueabi ;; \
+      armv7-unknown-linux-gnueabihf) arch=armhf; triple=arm-linux-gnueabihf ;; \
+      *) arch= ;; \
+    esac; \
+    if [ -n "${arch}" ] && [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
+      dpkg --add-architecture "${arch}" \
       && apt-get update \
       && apt-get install -y --no-install-recommends \
-        gcc-arm-linux-gnueabi g++-arm-linux-gnueabi \
-        libc6-dev:armel libssl-dev:armel zlib1g-dev:armel \
+        "gcc-${triple}" "g++-${triple}" \
+        "libc6-dev:${arch}" "libgcc-s1:${arch}" "libstdc++6:${arch}" \
+        "libsasl2-dev:${arch}" "libssl-dev:${arch}" "zlib1g-dev:${arch}" \
       && rm -rf /var/lib/apt/lists/*; \
     fi
 
@@ -27,8 +36,10 @@ RUN set -eux; \
     cd /tmp; \
     set -- "rustc-${RUST_VERSION}-${RUST_HOST}" \
       "cargo-${RUST_VERSION}-${RUST_HOST}" "rust-std-${RUST_VERSION}-${RUST_HOST}"; \
-    if [ "${RUST_TARGET}" = arm-unknown-linux-gnueabi ] && [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
-      set -- "$@" "rust-std-${RUST_VERSION}-${RUST_TARGET}"; \
+    if [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
+      case "${RUST_TARGET}" in \
+        *-gnueabi|*-gnueabihf) set -- "$@" "rust-std-${RUST_VERSION}-${RUST_TARGET}" ;; \
+      esac; \
     fi; \
     for component; do \
       archive="${component}.tar.xz"; \
@@ -46,6 +57,12 @@ ENV CC_arm_unknown_linux_gnueabi=arm-linux-gnueabi-gcc \
     CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER=arm-linux-gnueabi-gcc \
     PKG_CONFIG_ALLOW_CROSS_arm_unknown_linux_gnueabi=1 \
     PKG_CONFIG_LIBDIR_arm_unknown_linux_gnueabi=/usr/lib/arm-linux-gnueabi/pkgconfig
+ENV CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc \
+    CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++ \
+    AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar \
+    CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc \
+    PKG_CONFIG_ALLOW_CROSS_armv7_unknown_linux_gnueabihf=1 \
+    PKG_CONFIG_LIBDIR_armv7_unknown_linux_gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig
 ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work
