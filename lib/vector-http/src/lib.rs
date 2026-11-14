@@ -31,10 +31,11 @@ use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
 use hyper::body::Incoming;
 use hyper_util::{
     client::legacy::{Builder, Client},
-    rt::{TokioExecutor, TokioTimer},
+    rt::TokioTimer,
 };
 use rand::RngExt as _;
 use tower::Service;
+use vector_common::cpu_time::spawn_timed_without_span;
 use vector_core::{config::proxy::ProxyConfig, tls::MaybeTlsSettings};
 
 use crate::connector::{ForwardProxyAlpn, HttpProxyConnector, Route, RoutePlanner};
@@ -157,6 +158,22 @@ pub fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
     duration.mul_f64(random_jitter_factor)
 }
 
+/// Spawns hyper's background tasks (client and server connections, pool maintenance) so that they
+/// inherit the CPU counter of the component that created them. For clients, this is where TLS
+/// encryption and socket writes of request bodies happen.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CpuTimedExecutor;
+
+impl<F> hyper::rt::Executor<F> for CpuTimedExecutor
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    fn execute(&self, future: F) {
+        spawn_timed_without_span(future);
+    }
+}
+
 /// An HTTP/1.1 and HTTP/2 client that routes requests through the configured proxy.
 ///
 /// Sending takes two steps, so a caller can observe the request with its proxy credentials
@@ -180,7 +197,7 @@ struct Pool {
 impl Pool {
     fn new(connector: HttpProxyConnector) -> Self {
         // The pool timer closes idle connections in the background, as the Hyper 0.14 client did.
-        let client = Client::builder(TokioExecutor::new())
+        let client = Client::builder(CpuTimedExecutor)
             .pool_timer(TokioTimer::new())
             .build(connector.clone());
         Self { client, connector }

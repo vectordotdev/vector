@@ -710,7 +710,10 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.build(cx).await {
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = sink.measure_cpu_usage.then(cpu_time::register_counter);
+
+        let (sink, healthcheck) = match cpu_scoped_if(sink.build(cx), cpu_ns.clone()).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;
@@ -762,7 +765,9 @@ impl<'a> Builder<'a> {
             .map_err(Into::into)
         };
 
-        let task = Task::new(key.clone(), typetag, sink);
+        // Connections opened by the healthcheck can be pooled and reused by the sink.
+        let healthcheck = cpu_scoped_if(healthcheck, cpu_ns.clone());
+        let task = Task::new(key.clone(), typetag, cpu_timed_if(sink, cpu_ns));
 
         let component_key = key.clone();
         let healthcheck_task = async move {

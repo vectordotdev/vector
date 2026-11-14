@@ -13667,6 +13667,7 @@ dependencies = [
  "tower 0.5.3",
  "tracing 0.1.44",
  "url",
+ "vector-common",
  "vector-core",
 ]
 

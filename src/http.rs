@@ -9,7 +9,7 @@ use headers::{Authorization, HeaderMapExt};
 use http::{Request, Response, Version};
 use hyper::body::Incoming;
 use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
+    rt::TokioIo,
     server::{conn::auto::Builder as ConnectionBuilder, graceful::GracefulShutdown},
     service::TowerToHyperService,
 };
@@ -21,8 +21,10 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::Span;
+use vector_http::CpuTimedExecutor;
 use vector_lib::{
     configurable::configurable_component,
+    cpu_time::spawn_timed_without_span,
     internal_event::emit,
     sensitive_string::SensitiveString,
     tcp::TcpKeepaliveConfig,
@@ -405,7 +407,7 @@ where
     B::Data: Send,
     B::Error: Into<Box<dyn StdError + Send + Sync>>,
 {
-    let mut builder = ConnectionBuilder::new(TokioExecutor::new());
+    let mut builder = ConnectionBuilder::new(CpuTimedExecutor);
     builder.http1().header_read_timeout(None);
     builder
         .http2()
@@ -432,7 +434,7 @@ where
                 .serve_connection(TokioIo::new(stream), service)
                 .into_owned(),
         );
-        tokio::spawn(async move {
+        spawn_timed_without_span(async move {
             if let Err(error) = connection.await {
                 debug!(message = "HTTP connection error.", %error);
             }

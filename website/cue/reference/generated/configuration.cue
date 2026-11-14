@@ -826,6 +826,29 @@ generated: configuration: {
 														"""
 						required: true
 					}
+					measure_cpu_usage: {
+						type: bool: default: false
+						description: """
+														Enable CPU usage metrics for this sink.
+
+														When set to `true`, each poll of the sink task, and of the tasks it spawns (such as request
+														building or HTTP connections), is timed using the OS thread CPU clock and the accumulated
+														nanoseconds are reported as the `component_cpu_usage_ns_total` counter, tagged with
+														`component_id`, `component_kind`, and `component_type`.
+
+														Defaults to `false`. Enable only for sinks where CPU attribution is needed, as it adds a
+														`clock_gettime` call on every future poll.
+
+														CPU spent on threads or tasks that a third-party library manages on its own is not
+														included. Notably, the `kafka` sink compresses batches and performs TLS and network I/O on
+														librdkafka threads.
+
+														On Windows, `component_cpu_usage_ns_total` is a rough estimate: thread CPU time advances
+														only at the scheduler clock tick (typically 15.6 ms), so short polls are counted either as
+														zero or as a whole tick.
+														"""
+						required: false
+					}
 					proxy: {
 						type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 						description: """

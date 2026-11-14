@@ -412,7 +412,7 @@ components: sources: internal_metrics: {
 			tags:              _buffer_tags
 		}
 		component_cpu_usage_ns_total: {
-			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms only. Emitted only on Linux, macOS, and Windows. On Windows, the value is a rough estimate because thread CPU time is updated only at the scheduler clock tick."
+			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms and sinks. Emitted only on Linux, macOS, and Windows. On Windows, the value is a rough estimate because thread CPU time is updated only at the scheduler clock tick."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

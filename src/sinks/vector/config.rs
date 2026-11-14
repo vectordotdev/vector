@@ -10,7 +10,7 @@ use std::{
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
+use hyper_util::client::legacy::Builder;
 use tokio::sync::Semaphore;
 use tonic::Code::{
     AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
@@ -18,7 +18,7 @@ use tonic::Code::{
 };
 use tonic::body::Body as TonicBody;
 use tower::{Service, ServiceBuilder};
-use vector_http::Http2Client;
+use vector_http::{CpuTimedExecutor, Http2Client};
 use vector_lib::configurable::configurable_component;
 use vector_lib::stream::BatcherSettings;
 
@@ -827,7 +827,7 @@ fn new_client(
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
 ) -> crate::Result<Http2Client<TonicBody>> {
-    let mut builder = Builder::new(TokioExecutor::new());
+    let mut builder = Builder::new(CpuTimedExecutor);
     builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections

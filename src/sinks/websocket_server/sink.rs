@@ -149,7 +149,7 @@ impl WebSocketListenerSink {
         let open_gauge = OpenGauge::new();
 
         while let Ok(stream) = listener.accept().await {
-            crate::spawn_in_current_span(Self::handle_connection(
+            vector_lib::cpu_time::spawn_timed(Self::handle_connection(
                 auth.clone(),
                 message_buffering.clone(),
                 subprotocol.clone(),
@@ -390,7 +390,7 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
 
-        crate::spawn_in_current_span(Self::handle_connections(
+        vector_lib::cpu_time::spawn_timed(Self::handle_connections(
             self.auth,
             self.message_buffering.clone(),
             self.subprotocol.clone(),

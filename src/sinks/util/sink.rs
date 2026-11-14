@@ -49,6 +49,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
+use vector_lib::cpu_time::spawn_timed;
 use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
@@ -326,7 +327,7 @@ where
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();
-                    let future = crate::spawn_in_current_span(this.service.call(batch));
+                    let future = spawn_timed(this.service.call(batch));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());

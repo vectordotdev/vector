@@ -137,7 +137,7 @@ struct NoopTransform {
 
 /// Actively burns CPU on the calling thread for `duration`, unlike `sleep`
 /// which yields the thread without consuming CPU time.
-fn busy_spin(duration: Duration) {
+pub(crate) fn busy_spin(duration: Duration) {
     let start = std::time::Instant::now();
     let mut acc: u64 = 0;
     while start.elapsed() < duration {
