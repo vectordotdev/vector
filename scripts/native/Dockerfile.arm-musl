@@ -1,0 +1,36 @@
+# ARMv6 soft-float has no Alpine userspace. Keep the native ARM GNU Rust host,
+# but build a musl ABI C/C++ toolchain from source instead of using cross-rs images.
+ARG BASE=vector-native-arm-gnu
+FROM ${BASE}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bison flex gawk libtool patch texinfo wget xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin the build recipes and select maintained GCC/musl versions explicitly.
+# The recipe's default GCC is older; do not use it.
+ARG TOOLCHAIN_REV=5e8042e63de29f8473fc3b0b831a587ba284e1a8
+RUN git init /tmp/musl-toolchain \
+    && cd /tmp/musl-toolchain \
+    && git remote add origin https://github.com/richfelker/musl-cross-make.git \
+    && git fetch --depth 1 origin "${TOOLCHAIN_REV}" \
+    && git checkout --detach FETCH_HEAD \
+    && printf '%s\n' \
+        'TARGET = arm-linux-musleabi' \
+        'OUTPUT = /opt/musl' \
+        'GCC_VER = 14.3.0' \
+        'MUSL_VER = 1.2.6' \
+        'BINUTILS_VER = 2.44' \
+        'COMMON_CONFIG += --disable-nls' \
+        'GCC_CONFIG += --with-arch=armv6 --with-float=soft --disable-libsanitizer --disable-libquadmath' \
+        > config.mak \
+    && make -j4 \
+    && make install \
+    && rm -rf /tmp/musl-toolchain
+
+RUN rustup target add arm-unknown-linux-musleabi
+ENV PATH="/opt/musl/bin:${PATH}"
+ENV CC_arm_unknown_linux_musleabi=arm-linux-musleabi-gcc \
+    CXX_arm_unknown_linux_musleabi=arm-linux-musleabi-g++ \
+    AR_arm_unknown_linux_musleabi=arm-linux-musleabi-ar \
+    CARGO_TARGET_ARM_UNKNOWN_LINUX_MUSLEABI_LINKER=arm-linux-musleabi-gcc

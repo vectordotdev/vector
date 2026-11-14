@@ -1,19 +1,21 @@
 name: Native build experiment
 
 # Keep all experiments on the dedicated PR. No release or dispatch trigger.
+# Review commands: /ci-run-native-probe and /ci-run-native-musl64.
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - .github/workflows/native-build-experiment.yml
-      - scripts/native/Dockerfile.alpine
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-probe'
     name: Probe ${{ matrix.image }} (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
@@ -67,7 +69,11 @@ jobs:
           '
 
   musl:
-    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-musl64'
     name: Build native ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -82,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.review.commit_id }}
           persist-credentials: false
       - name: Build native toolchain image
         env:

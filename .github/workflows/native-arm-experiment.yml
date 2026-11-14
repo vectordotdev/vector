@@ -1,18 +1,20 @@
 name: Native ARM build experiment
 
+# Run /ci-run-native-arm in a review on this PR, not on every edit.
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - .github/workflows/native-arm-experiment.yml
-      - scripts/native/Dockerfile.arm*
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: read
 
 jobs:
   arm:
-    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-arm'
     name: Build native ${{ matrix.target }}
     runs-on: ubuntu-24.04-8core-arm
     timeout-minutes: 120
@@ -32,10 +34,15 @@ jobs:
             platform: linux/arm/v7
             dockerfile: scripts/native/Dockerfile.armv7-musl
             base: unused
+            build-target: armv7-alpine-linux-musleabihf
+          - target: arm-unknown-linux-musleabi
+            platform: linux/arm/v5
+            dockerfile: scripts/native/Dockerfile.arm-musl
+            base: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.review.commit_id }}
           persist-credentials: false
       - name: Build native ARM toolchain
         env:
@@ -49,40 +56,63 @@ jobs:
             exit 1
           fi
           RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
-          docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
-            --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
-            --build-arg RUST_HOST="$TARGET" -t vector-native-arm .
+          if [[ "$TARGET" == arm-unknown-linux-musleabi ]]; then
+            docker build --pull --platform "$PLATFORM" -f scripts/native/Dockerfile.arm-gnu \
+              --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
+              --build-arg RUST_HOST=arm-unknown-linux-gnueabi -t vector-native-arm-gnu .
+            docker build --platform "$PLATFORM" -f "$DOCKERFILE" -t vector-native-arm .
+          else
+            docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
+              --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
+              --build-arg RUST_HOST="$TARGET" -t vector-native-arm .
+          fi
       - name: Compile and run a Rust smoke test
         env:
           TARGET: ${{ matrix.target }}
+          BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
           PLATFORM: ${{ matrix.platform }}
         run: |
-          docker run --rm --platform "$PLATFORM" -e TARGET vector-native-arm bash -euxo pipefail -c '
+          docker run --rm --platform "$PLATFORM" -e TARGET -e BUILD_TARGET vector-native-arm bash -euxo pipefail -c '
             rustc -vV
             printf "fn main() { println!(\"native ARM Rust works\"); }\n" >/tmp/probe.rs
-            rustc --target "$TARGET" /tmp/probe.rs -o /tmp/probe
+            rustc --target "$BUILD_TARGET" /tmp/probe.rs -o /tmp/probe
             /tmp/probe
           '
       - name: Link Vector with the release feature set
         env:
           TARGET: ${{ matrix.target }}
+          BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
           PLATFORM: ${{ matrix.platform }}
         run: |
           docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
-            -e TARGET -e CARGO_PROFILE_RELEASE_LTO=off \
+            -e TARGET -e BUILD_TARGET -e CARGO_PROFILE_RELEASE_LTO=off \
             -e CARGO_BUILD_JOBS=4 vector-native-arm bash -euxo pipefail -c '
               # The 32-bit compiler and linker each have a 4 GiB address space.
               # First prove linking without LTO before testing release LTO.
               if [[ "$TARGET" == *musl* ]]; then
-                export RUSTFLAGS="-C target-feature=+crt-static"
+                export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
               fi
-              cargo build --locked --release --target "$TARGET" \
+              cargo build --locked --release --target "$BUILD_TARGET" \
                 --no-default-features --features "target-$TARGET"
-              file="target/$TARGET/release/vector"
+              file="target/$BUILD_TARGET/release/vector"
               readelf -h "$file"
               readelf -A "$file"
               readelf --version-info "$file"
+              if [[ "$TARGET" == *musl* ]]; then
+                if readelf -l "$file" | grep -q INTERP; then
+                  echo "musl artifact must not have a dynamic interpreter" >&2
+                  exit 1
+                fi
+                if readelf -d "$file" | grep -q NEEDED; then
+                  echo "musl artifact must not have dynamic dependencies" >&2
+                  exit 1
+                fi
+              fi
               "$file" --version
+              if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
+                mkdir -p "target/$TARGET/release"
+                cp "$file" "target/$TARGET/release/vector"
+              fi
             '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

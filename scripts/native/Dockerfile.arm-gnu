@@ -14,7 +14,7 @@ ENV RUSTUP_IO_THREADS=1 RUSTUP_UNPACK_RAM=250000000
 ENV PATH="/opt/cargo/bin:${PATH}"
 RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/rustup-init" -o /tmp/rustup-init \
     && chmod +x /tmp/rustup-init \
-    && /tmp/rustup-init -y --no-modify-path --profile minimal \
+    && timeout 300 /tmp/rustup-init -y --no-modify-path --profile minimal \
         --default-host "${RUST_HOST}" --default-toolchain "${RUST_VERSION}" \
     && rm /tmp/rustup-init
 
