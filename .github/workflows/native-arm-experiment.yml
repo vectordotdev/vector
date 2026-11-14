@@ -9,36 +9,59 @@ permissions:
   contents: read
 
 jobs:
-  arm:
+  plan:
     if: >-
       github.event.pull_request.number == 27197 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor == 'thomasqueirozb' &&
-      github.event.review.body == '/ci-run-native-arm'
+      contains(fromJSON('["/ci-run-native-arm", "/ci-run-native-armv6", "/ci-run-native-armv7"]'), github.event.review.body)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: plan
+        with:
+          script: |
+            const armel = 'arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd';
+            const targets = [
+              {
+                target: 'armv7-unknown-linux-gnueabihf', platform: 'linux/arm/v7',
+                dockerfile: 'scripts/native/Dockerfile.arm-gnu',
+                base: 'debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc',
+              },
+              {
+                target: 'arm-unknown-linux-gnueabi', platform: 'linux/arm/v5',
+                dockerfile: 'scripts/native/Dockerfile.arm-gnu', base: armel,
+              },
+              {
+                target: 'armv7-unknown-linux-musleabihf', platform: 'linux/arm/v7',
+                dockerfile: 'scripts/native/Dockerfile.armv7-musl', base: 'unused',
+                'build-target': 'armv7-alpine-linux-musleabihf',
+              },
+              {
+                target: 'arm-unknown-linux-musleabi', platform: 'linux/arm/v5',
+                dockerfile: 'scripts/native/Dockerfile.arm-musl', base: armel,
+              },
+            ];
+            const command = context.payload.review.body;
+            const selected = command === '/ci-run-native-armv6'
+              ? targets.filter(t => t.target.startsWith('arm-'))
+              : command === '/ci-run-native-armv7'
+                ? targets.filter(t => t.target.startsWith('armv7-'))
+                : targets;
+            core.setOutput('matrix', JSON.stringify(selected));
+
+  arm:
+    needs: plan
     name: Build native ${{ matrix.target }}
     runs-on: ubuntu-24.04-8core-arm
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: armv7-unknown-linux-gnueabihf
-            platform: linux/arm/v7
-            dockerfile: scripts/native/Dockerfile.arm-gnu
-            base: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
-          - target: arm-unknown-linux-gnueabi
-            platform: linux/arm/v5
-            dockerfile: scripts/native/Dockerfile.arm-gnu
-            base: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
-          - target: armv7-unknown-linux-musleabihf
-            platform: linux/arm/v7
-            dockerfile: scripts/native/Dockerfile.armv7-musl
-            base: unused
-            build-target: armv7-alpine-linux-musleabihf
-          - target: arm-unknown-linux-musleabi
-            platform: linux/arm/v5
-            dockerfile: scripts/native/Dockerfile.arm-musl
-            base: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,7 +83,8 @@ jobs:
             docker build --pull --platform "$PLATFORM" -f scripts/native/Dockerfile.arm-gnu \
               --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
               --build-arg RUST_HOST=arm-unknown-linux-gnueabi -t vector-native-arm-gnu .
-            docker build --platform "$PLATFORM" -f "$DOCKERFILE" -t vector-native-arm .
+            docker build --platform "$PLATFORM" -f "$DOCKERFILE" \
+              --build-arg RUST_VERSION="$RUST_VERSION" -t vector-native-arm .
           else
             docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
               --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \

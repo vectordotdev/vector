@@ -3,20 +3,26 @@ FROM ${BASE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash build-essential ca-certificates clang cmake curl git libclang-dev \
-    libsasl2-dev libssl-dev perl pkg-config protobuf-compiler unzip \
+    libsasl2-dev libssl-dev perl pkg-config protobuf-compiler unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 ARG RUST_VERSION
 ARG RUST_HOST
-ENV CARGO_HOME=/opt/cargo RUSTUP_HOME=/opt/rustup
-# A 32-bit rustup process cannot use the full RAM reported by an ARM64 host.
-ENV RUSTUP_IO_THREADS=1 RUSTUP_UNPACK_RAM=250000000
-ENV PATH="/opt/cargo/bin:${PATH}"
-RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/rustup-init" -o /tmp/rustup-init \
-    && chmod +x /tmp/rustup-init \
-    && timeout 300 /tmp/rustup-init -y --no-modify-path --profile minimal \
-        --default-host "${RUST_HOST}" --default-toolchain "${RUST_VERSION}" \
-    && rm /tmp/rustup-init
+ENV CARGO_HOME=/opt/cargo
+ENV PATH="/opt/rust/bin:${PATH}"
+# The ARMv6 rustup binary stalls while syncing the channel in this environment.
+# Install the same upstream components with the system curl and GNU tar instead.
+RUN set -eux; \
+    cd /tmp; \
+    for component in rustc cargo rust-std; do \
+      archive="${component}-${RUST_VERSION}-${RUST_HOST}.tar.xz"; \
+      curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
+      curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
+      sha256sum -c "${archive}.sha256"; \
+      tar -xJf "${archive}"; \
+      "./${archive%.tar.xz}/install.sh" --prefix=/opt/rust --disable-ldconfig; \
+      rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"; \
+    done
 
 ENV CARGO_INCREMENTAL=0
 WORKDIR /work

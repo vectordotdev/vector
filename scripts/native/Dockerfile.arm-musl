@@ -28,7 +28,16 @@ RUN git init /tmp/musl-toolchain \
     && make install \
     && rm -rf /tmp/musl-toolchain
 
-RUN rustup target add arm-unknown-linux-musleabi
+ARG RUST_VERSION
+RUN set -eux; \
+    cd /tmp; \
+    archive="rust-std-${RUST_VERSION}-arm-unknown-linux-musleabi.tar.xz"; \
+    curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
+    curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
+    sha256sum -c "${archive}.sha256"; \
+    tar -xJf "${archive}"; \
+    "./${archive%.tar.xz}/install.sh" --prefix=/opt/rust --disable-ldconfig; \
+    rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"
 ENV PATH="/opt/musl/bin:${PATH}"
 ENV CC_arm_unknown_linux_musleabi=arm-linux-musleabi-gcc \
     CXX_arm_unknown_linux_musleabi=arm-linux-musleabi-g++ \
