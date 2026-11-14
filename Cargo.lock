@@ -4602,6 +4602,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-v2-source"
+version = "0.1.0"
+dependencies = [
+ "async-compression",
+ "bytes",
+ "chrono",
+ "criterion",
+ "file-source-common",
+ "futures",
+ "glob",
+ "indexmap 2.14.2",
+ "libc",
+ "notify",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing 0.1.44",
+ "vector-common",
+ "vector-config",
+ "winapi",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13678,6 +13702,7 @@ dependencies = [
  "enrichment",
  "file-source",
  "file-source-common",
+ "file-v2-source",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
