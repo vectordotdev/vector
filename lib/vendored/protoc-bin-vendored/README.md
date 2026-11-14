@@ -12,6 +12,7 @@ The MIT license is in `LICENSE`, copied from the same upstream commit.
 - Return the path in `PROTOC` before selecting a bundled binary. This permits a
   native ARMv7 or musl compiler even when no compatible binary is bundled.
 - Add a regression test that checks the override in a separate process.
+- Check that the configured compiler can import standard protobuf types in CI.
 - Disable publishing and register the regression test in the package manifest.
 - Keep the upstream formatting and lint defaults with local configuration files.
 
