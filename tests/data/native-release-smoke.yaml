@@ -2,6 +2,7 @@ data_dir: /tmp
 sources:
   stdin:
     type: stdin
+    log_namespace: false
 transforms:
   uppercase:
     type: remap

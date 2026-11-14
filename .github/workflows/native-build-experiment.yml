@@ -42,7 +42,7 @@ jobs:
           make check-markdown
       - name: Check patched libraries with Clippy
         run: |
-          cargo clippy --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib
+          cargo clippy --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib --tests
           cargo clippy --manifest-path lib/vendored/quanta/Cargo.toml --lib
       - name: Test patched libraries
         env:

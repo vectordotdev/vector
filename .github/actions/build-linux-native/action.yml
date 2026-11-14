@@ -1,5 +1,5 @@
-name: Native Linux release build
-description: Build on the target CPU without cross-rs, then package on the runner.
+name: Linux release build without cross-rs
+description: Build with native host tools, then package on the runner. ARMv6 uses ARM64-hosted tools.
 
 inputs:
   target:

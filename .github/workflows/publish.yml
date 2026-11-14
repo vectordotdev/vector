@@ -150,7 +150,7 @@ jobs:
 
   # Preserve the job ID for existing callers; no cross-rs tools or images are used.
   build-linux-cross:
-    name: Build Vector for ${{ matrix.target }} (native container)
+    name: Build Vector for ${{ matrix.target }} (without cross-rs)
     if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
