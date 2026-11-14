@@ -94,6 +94,43 @@ build() {
       done
     fi
   fi
+
+  if [[ "$PUSH" == "false" && "$LOAD" == "true" ]]; then
+    local SMOKE_CONFIG SMOKE_OUTPUT
+    SMOKE_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tests/data/native-release-smoke.yaml"
+    SMOKE_OUTPUT="$(mktemp)"
+    local -a RUNTIME_ARGS=(--rm -i --volume "$SMOKE_CONFIG:/etc/vector/native-release-smoke.yaml:ro")
+    if [[ -n "$BUILDABLE_PLATFORMS" ]]; then
+      RUNTIME_ARGS+=(--platform="$BUILDABLE_PLATFORMS")
+    fi
+    printf 'native packaging works\n' | timeout 90 docker run "${RUNTIME_ARGS[@]}" \
+      "${REPO_LIST[0]}:$VERSION-$BASE" --config /etc/vector/native-release-smoke.yaml > "$SMOKE_OUTPUT"
+    grep -F '"message":"NATIVE PACKAGING WORKS"' "$SMOKE_OUTPUT"
+
+    if [[ "$BUILDABLE_PLATFORMS" == "linux/arm/v6" ]]; then
+      local QEMU_DIR VECTOR_BINARY
+      QEMU_DIR="$(mktemp -d)"
+      # Extract the emulator without installing it or registering binfmt handlers.
+      # Only the completed runtime image runs under an emulated ARMv6 CPU.
+      (
+        cd "$QEMU_DIR"
+        apt-get download qemu-user-static
+        dpkg-deb --extract ./*.deb extracted
+      )
+      case "$BASE" in
+        alpine) VECTOR_BINARY=/usr/local/bin/vector ;;
+        debian) VECTOR_BINARY=/usr/bin/vector ;;
+        *) echo "No ARMv6 runtime test for $BASE" >&2; return 1 ;;
+      esac
+      printf 'native packaging works\n' | timeout 90 docker run "${RUNTIME_ARGS[@]}" \
+        --volume "$QEMU_DIR/extracted/usr/bin/qemu-arm-static:/ci-qemu-arm-static:ro" \
+        --entrypoint /ci-qemu-arm-static "${REPO_LIST[0]}:$VERSION-$BASE" \
+        -cpu arm1176 "$VECTOR_BINARY" --config /etc/vector/native-release-smoke.yaml > "$SMOKE_OUTPUT"
+      grep -F '"message":"NATIVE PACKAGING WORKS"' "$SMOKE_OUTPUT"
+      rm -rf "$QEMU_DIR"
+    fi
+    rm -f "$SMOKE_OUTPUT"
+  fi
 }
 
 #

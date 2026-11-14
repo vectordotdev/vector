@@ -185,7 +185,11 @@ target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export CFLAGS += -g0 -O3
-ifeq ($(NATIVE),true)
+# Packaging can use a verified container-built binary without a host rebuild.
+ifeq ($(PREBUILT),true)
+target/%/vector: CARGO_HANDLES_FRESHNESS
+	@test -x "$@" || { echo "Expected a prebuilt executable at $@" >&2; exit 1; }
+else ifeq ($(NATIVE),true)
 target/%/vector: CARGO_HANDLES_FRESHNESS
 	cargo build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
