@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG RUST_VERSION
 ARG RUST_HOST
 ENV CARGO_HOME=/opt/cargo RUSTUP_HOME=/opt/rustup
+# A 32-bit rustup process cannot use the full RAM reported by an ARM64 host.
+ENV RUSTUP_IO_THREADS=1 RUSTUP_UNPACK_RAM=250000000
 ENV PATH="/opt/cargo/bin:${PATH}"
 RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/rustup-init" -o /tmp/rustup-init \
     && chmod +x /tmp/rustup-init \

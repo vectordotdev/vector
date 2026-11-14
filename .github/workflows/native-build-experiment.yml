@@ -6,7 +6,7 @@ on:
     branches: [master]
     paths:
       - .github/workflows/native-build-experiment.yml
-      - scripts/native/**
+      - scripts/native/Dockerfile.alpine
 
 permissions:
   contents: read
@@ -23,16 +23,16 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: linux/amd64
-            image: alpine:3.23
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
           - runner: ubuntu-24.04-arm
             platform: linux/arm64
-            image: alpine:3.23
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
           - runner: ubuntu-24.04-arm
             platform: linux/arm/v7
-            image: alpine:3.23
+            image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
           - runner: ubuntu-24.04-arm
             platform: linux/arm/v7
-            image: debian:bookworm-slim
+            image: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
           - runner: ubuntu-24.04-arm
             platform: linux/arm/v5
             image: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
@@ -106,9 +106,8 @@ jobs:
               # Use the native C/C++ toolchain and library search paths, not the
               # libstdc++ relocation required by the old cross images.
               CARGO_TARGET_KEY=$(echo "$TARGET" | tr "[:lower:]-" "[:upper:]_")
-              export "CARGO_TARGET_${CARGO_TARGET_KEY}_RUSTFLAGS=-C target-feature=+crt-static"
               export "CARGO_TARGET_${CARGO_TARGET_KEY}_LINKER=cc"
-              export RUSTFLAGS="-C target-feature=+crt-static"
+              export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
               cargo build --locked --release --target "$TARGET" \
                 --no-default-features --features "target-$TARGET"
               file="target/$TARGET/release/vector"
@@ -127,53 +126,3 @@ jobs:
           name: native-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/vector
           if-no-files-found: error
-
-  arm-toolchains:
-    if: github.head_ref == 'thomas/native-release-builds' && github.event.pull_request.head.repo.full_name == github.repository
-    name: Probe Rust host ${{ matrix.host }}
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: alpine:3.23
-            platform: linux/arm/v7
-            host: armv7-unknown-linux-gnueabihf
-            target: armv7-unknown-linux-musleabihf
-          - image: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
-            platform: linux/arm/v5
-            host: arm-unknown-linux-gnueabi
-            target: arm-unknown-linux-gnueabi
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - name: Install and execute the pinned Rust toolchain
-        env:
-          PLATFORM: ${{ matrix.platform }}
-          IMAGE: ${{ matrix.image }}
-          RUST_HOST: ${{ matrix.host }}
-          RUST_TARGET: ${{ matrix.target }}
-        run: |
-          RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
-          export RUST_VERSION
-          docker run --rm --platform "$PLATFORM" \
-            -e RUST_HOST -e RUST_TARGET -e RUST_VERSION "$IMAGE" sh -euxc '
-              if command -v apk; then
-                apk add --no-cache build-base curl gcompat libstdc++ bash
-              else
-                apt-get update
-                apt-get install -y --no-install-recommends build-essential curl ca-certificates
-              fi
-              curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/$RUST_HOST/rustup-init" -o /tmp/rustup-init
-              chmod +x /tmp/rustup-init
-              /tmp/rustup-init -y --no-modify-path --profile minimal \
-                --default-host "$RUST_HOST" --default-toolchain "$RUST_VERSION" --target "$RUST_TARGET"
-              export PATH="$HOME/.cargo/bin:$PATH"
-              rustc -vV
-              printf "fn main() { println!(\"native Rust works\"); }\n" >/tmp/probe.rs
-              rustc --target "$RUST_TARGET" /tmp/probe.rs -o /tmp/probe
-              /tmp/probe
-            '

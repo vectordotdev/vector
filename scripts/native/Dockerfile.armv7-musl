@@ -7,7 +7,7 @@ RUN apk add --no-cache \
     "rust=${RUST_VERSION}-r0" "cargo=${RUST_VERSION}-r0" \
     bash build-base ca-certificates clang cmake curl git linux-headers \
     openssl-dev openssl-libs-static perl pkgconf protobuf protobuf-dev \
-    cyrus-sasl-dev zlib-static libstdc++-dev xz
+    cyrus-sasl-dev zlib-static libstdc++-dev tar xz
 
 # Install the official target stdlib under its release triple. Alpine's compiler
 # host triple is armv7-alpine-linux-musleabihf, not armv7-unknown-linux-musleabihf.
@@ -17,7 +17,7 @@ RUN set -eux; \
     curl --retry 5 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
     curl --retry 5 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
     sha256sum -c "${archive}.sha256"; \
-    tar -xJf "${archive}"; \
+    xz -dc "${archive}" | tar -xf -; \
     "./${archive%.tar.xz}/install.sh" --prefix=/usr --disable-ldconfig; \
     rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"
 
