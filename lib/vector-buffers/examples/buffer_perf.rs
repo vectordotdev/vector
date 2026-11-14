@@ -428,6 +428,10 @@ async fn main() {
                     .take_finalizers()
                     .update_status(EventStatus::Delivered);
             } else {
+                reader
+                    .finish()
+                    .await
+                    .expect("buffer completion should not fail");
                 info!("[buffer-perf] reader hit end of buffer, closing...");
                 break;
             }
