@@ -485,7 +485,7 @@ mod test {
             .await
             .expect("writing test data");
 
-        let new = fingerprinter
+        let (new, _) = fingerprinter
             .fingerprint(&log_path)
             .await
             .expect("getting new checksum");
