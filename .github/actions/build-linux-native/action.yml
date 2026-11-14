@@ -139,6 +139,8 @@ runs:
       run: |
         # The binary was built and executed above. Do not rebuild it with the
         # host toolchain when creating archives and native package metadata.
+        # The build container writes root-owned files into the mounted target tree.
+        sudo chown -R "$(id -u):$(id -g)" target
         BINARY_DIGEST=$(sha256sum "target/$TARGET/release/vector")
         make PREBUILT=true VERSION="$VECTOR_VERSION" VDEV="$VDEV" "package-$TARGET-all"
         printf '%s\n' "$BINARY_DIGEST" | sha256sum --check -
