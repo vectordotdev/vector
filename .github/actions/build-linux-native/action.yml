@@ -1,0 +1,124 @@
+name: Native Linux release build
+description: Build on the target CPU without cross-rs, then package on the runner.
+
+inputs:
+  target:
+    description: Rust release target
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Select native build environment
+      id: environment
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        BUILD_TARGET="$TARGET"
+        case "$TARGET" in
+          x86_64-unknown-linux-musl)
+            PLATFORM=linux/amd64
+            DOCKERFILE=scripts/native/Dockerfile.alpine
+            ;;
+          aarch64-unknown-linux-musl)
+            PLATFORM=linux/arm64
+            DOCKERFILE=scripts/native/Dockerfile.alpine
+            ;;
+          armv7-unknown-linux-gnueabihf)
+            PLATFORM=linux/arm/v7
+            DOCKERFILE=scripts/native/Dockerfile.arm-gnu
+            ;;
+          armv7-unknown-linux-musleabihf)
+            PLATFORM=linux/arm/v7
+            DOCKERFILE=scripts/native/Dockerfile.armv7-musl
+            BUILD_TARGET=armv7-alpine-linux-musleabihf
+            ;;
+          arm-unknown-linux-gnueabi|arm-unknown-linux-musleabi)
+            PLATFORM=linux/arm/v5
+            DOCKERFILE=scripts/native/Dockerfile.arm-gnu
+            ;;
+          *) echo "Unsupported native build target: $TARGET" >&2; exit 1 ;;
+        esac
+        echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+        echo "dockerfile=$DOCKERFILE" >> "$GITHUB_OUTPUT"
+        echo "build-target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
+
+    - name: Build native toolchain image
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        PLATFORM: ${{ steps.environment.outputs.platform }}
+        DOCKERFILE: ${{ steps.environment.outputs.dockerfile }}
+      run: |
+        if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+          echo '::error::Native release builds must not use QEMU'
+          exit 1
+        fi
+        RUST_VERSION=$(awk -F '"' '/^channel/ { print $2 }' rust-toolchain.toml)
+        BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+        HOST="$TARGET"
+        if [[ "$TARGET" == arm-unknown-linux-* ]]; then
+          BASE=arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
+          HOST=arm-unknown-linux-gnueabi
+        fi
+        docker build --pull --platform "$PLATFORM" -f "$DOCKERFILE" \
+          --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
+          --build-arg RUST_HOST="$HOST" --build-arg RUST_TARGET="$TARGET" \
+          -t vector-native-builder .
+        docker run --rm --platform "$PLATFORM" vector-native-builder timeout 90 rustc -vV
+        if [[ "$TARGET" == arm-unknown-linux-musleabi ]]; then
+          docker tag vector-native-builder vector-native-arm-gnu
+          docker build --platform "$PLATFORM" -f scripts/native/Dockerfile.arm-musl \
+            --build-arg RUST_VERSION="$RUST_VERSION" -t vector-native-builder .
+        fi
+
+    - name: Build and verify the release binary
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        BUILD_TARGET: ${{ steps.environment.outputs.build-target }}
+        PLATFORM: ${{ steps.environment.outputs.platform }}
+      run: |
+        docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
+          -e TARGET -e BUILD_TARGET -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
+          -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 \
+          vector-native-builder bash -euxo pipefail -c '
+            git config --global --add safe.directory /work
+            rustc -vV
+            if [[ "$TARGET" == *musl* ]]; then
+              export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
+            fi
+            # Use the actual release profile, including fat LTO.
+            cargo build --locked --release --target "$BUILD_TARGET" \
+              --no-default-features --features "target-$TARGET"
+            file="target/$BUILD_TARGET/release/vector"
+            readelf -h "$file"
+            readelf -A "$file"
+            readelf --version-info "$file"
+            if [[ "$TARGET" == *musl* ]]; then
+              if readelf -l "$file" | grep -q INTERP; then
+                echo "musl artifact must not have a dynamic interpreter" >&2
+                exit 1
+              fi
+              if readelf -d "$file" | grep -q NEEDED; then
+                echo "musl artifact must not have dynamic dependencies" >&2
+                exit 1
+              fi
+            fi
+            "$file" --version
+            if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
+              mkdir -p "target/$TARGET/release"
+              cp "$file" "target/$TARGET/release/vector"
+            fi
+          '
+
+    - name: Package the verified binary
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        # The binary was built and executed above. Do not rebuild it with the
+        # host toolchain when creating archives and native package metadata.
+        make --assume-old="target/$TARGET/release/vector" \
+          VERSION="$VECTOR_VERSION" VDEV="$VDEV" "package-$TARGET-all"

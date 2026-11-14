@@ -21,6 +21,8 @@ RUN git init /tmp/musl-toolchain \
         'GCC_VER = 14.3.0' \
         'MUSL_VER = 1.2.6' \
         'BINUTILS_VER = 2.44' \
+        'GNU_SITE = https://ftp.gnu.org/gnu' \
+        'DL_CMD = curl --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 -fL -o' \
         'COMMON_CONFIG += --disable-nls' \
         'GCC_CONFIG += --with-arch=armv6 --with-float=soft --disable-libsanitizer --disable-libquadmath' \
         > config.mak \

@@ -23,10 +23,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.review.commit_id }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           rust: true
+          mold: false
           protoc: true
           dd-rust-license-tool: true
           prettier: true

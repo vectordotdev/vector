@@ -9,6 +9,9 @@
 # will likely look very different (and much more reasonable).
 # See Cargo.toml.orig for the original contents.
 
+# Keep upstream tests independent of Vector's workspace.
+[workspace]
+
 [package]
 edition = "2021"
 rust-version = "1.70"

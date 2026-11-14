@@ -91,15 +91,23 @@ jobs:
               --build-arg RUST_HOST="$TARGET" -t vector-native-arm .
           fi
       - name: Compile and run a Rust smoke test
+        timeout-minutes: 5
         env:
           TARGET: ${{ matrix.target }}
           BUILD_TARGET: ${{ matrix.build-target || matrix.target }}
           PLATFORM: ${{ matrix.platform }}
         run: |
           docker run --rm --platform "$PLATFORM" -e TARGET -e BUILD_TARGET vector-native-arm bash -euxo pipefail -c '
-            rustc -vV
-            printf "fn main() { println!(\"native ARM Rust works\"); }\n" >/tmp/probe.rs
-            rustc --target "$BUILD_TARGET" /tmp/probe.rs -o /tmp/probe
+            if [[ "$TARGET" == arm-unknown-linux-gnueabi ]]; then
+              trap '\''tail -100 /tmp/probe.strace'\'' EXIT
+              timeout 90 strace -f -o /tmp/probe.strace rustc -vV
+              printf "fn main() { println!(\"native ARM Rust works\"); }\n" >/tmp/probe.rs
+              timeout 90 strace -f -o /tmp/probe.strace rustc --target "$BUILD_TARGET" /tmp/probe.rs -o /tmp/probe
+            else
+              timeout 90 rustc -vV
+              printf "fn main() { println!(\"native ARM Rust works\"); }\n" >/tmp/probe.rs
+              timeout 90 rustc --target "$BUILD_TARGET" /tmp/probe.rs -o /tmp/probe
+            fi
             /tmp/probe
           '
       - name: Test native dependency patches
