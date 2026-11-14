@@ -13,8 +13,9 @@
 //!
 //! Every value the converter cannot carry into the typed model is reported: unmapped keys as
 //! [`TraceConversionIssue::UnmappedField`], wrong-typed known fields as
-//! [`TraceConversionIssue::MalformedField`] (with the field's default used instead), and
-//! malformed list entries through their item-level issue.
+//! [`TraceConversionIssue::MalformedField`], and malformed list entries through their
+//! item-level issue. The normalization of a wrong-typed field (coercion, default, or dropping
+//! its item) is documented in `parse`.
 
 mod parse;
 
