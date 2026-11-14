@@ -19,7 +19,11 @@ use indoc::indoc;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use tokio::time::timeout;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::TcpStream,
+    time::timeout,
+};
 use vector_lib::{
     codecs::{
         BytesDecoder, BytesDeserializer, CharacterDelimitedDecoderConfig,
@@ -49,9 +53,9 @@ use crate::{
     schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        APM_STATS, DatadogAgentConfig, DatadogAgentSource, LLMOBS, LOGS, LogMsg, METRICS, TRACES,
-        ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body,
-        metrics::DatadogSeriesRequest,
+        APM_STATS, ApiKeyExtractor, ApiKeyValidation, DatadogAgentConfig, DatadogAgentSource,
+        LLMOBS, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto, ddmetric_v3_proto, ddtrace_proto,
+        logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -89,7 +93,7 @@ fn make_llmobs_source() -> DatadogAgentSource {
         Deserializer::Bytes(BytesDeserializer),
     );
     DatadogAgentSource::new(
-        true,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         None,
@@ -139,7 +143,7 @@ fn test_decode_log_body() {
         );
 
         let source = DatadogAgentSource::new(
-            true,
+            ApiKeyExtractor::for_test(Vec::new(), false),
             decoder,
             "http",
             Some(test_logs_schema_definition()),
@@ -195,7 +199,7 @@ fn test_decode_log_body_parse_ddtags() {
     );
 
     let source = DatadogAgentSource::new(
-        true,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -232,7 +236,7 @@ fn test_decode_log_body_empty_object() {
     );
 
     let source = DatadogAgentSource::new(
-        true,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -367,6 +371,40 @@ async fn source_with_sender(
     (logs_output, metrics_output, address, guard)
 }
 
+async fn source_with_api_key_validation() -> (SocketAddr, PortGuard) {
+    let (_recv, address, guard) = source_with_api_key_options(true, true, false).await;
+    (address, guard)
+}
+
+async fn source_with_api_key_options(
+    store_api_key: bool,
+    drop_on_invalid_api_key: bool,
+    acknowledgements: bool,
+) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
+    let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let (guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address: "{}"
+            compression: none
+            valid_api_keys: ["{}"]
+            drop_on_invalid_api_key: {}
+            store_api_key: {}
+            acknowledgements: {}
+        "#},
+        address, DD_API_KEY, drop_on_invalid_api_key, store_api_key, acknowledgements
+    ))
+    .unwrap();
+    let schema_definitions =
+        HashMap::from([(Some(LOGS.to_owned()), test_logs_schema_definition())]);
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
+    tokio::spawn(async move {
+        config.build(context).await.unwrap().await.unwrap();
+    });
+    wait_for_tcp(address).await;
+    (recv, address, guard)
+}
+
 async fn send_with_path(
     address: SocketAddr,
     body: impl Into<reqwest::Body> + Send + 'static,
@@ -392,13 +430,14 @@ async fn send_and_collect(
     address: SocketAddr,
     body: impl Into<reqwest::Body> + Send + 'static,
     headers: HeaderMap,
-    path: &'static str,
+    path: &str,
     rx: impl Stream<Item = Event> + Unpin,
     expected_count: usize,
 ) -> Vec<Event> {
+    let path = path.to_owned();
     spawn_collect_n(
         async move {
-            assert_eq!(200, send_with_path(address, body, headers, path).await);
+            assert_eq!(200, send_with_path(address, body, headers, &path).await);
         },
         rx,
         expected_count,
@@ -1893,6 +1932,8 @@ fn test_config_outputs_with_disabled_data_types() {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
@@ -2433,6 +2474,8 @@ fn test_config_outputs() {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding,
             acknowledgements: SourceAcknowledgementsConfig::default(),
@@ -3789,6 +3832,8 @@ impl ValidatableComponent for DatadogAgentConfig {
             address: "0.0.0.0:9007".parse().unwrap(),
             tls: None,
             store_api_key: false,
+            valid_api_keys: Vec::new(),
+            drop_on_invalid_api_key: false,
             framing: CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: vector_lib::serde::AsciiChar::new(','),
@@ -4188,4 +4233,452 @@ async fn apm_stats_require_multiple_outputs() {
         error.to_string(),
         "`apm_stats` requires `multiple_outputs` to be enabled."
     );
+}
+
+#[test]
+fn api_key_validation() {
+    let valid = "0123456789abcdef0123456789abcdef".to_string();
+    let invalid = "ffffffffffffffffffffffffffffffff".to_string();
+
+    // No `valid_api_keys` configured: any key (or none) is accepted as-is.
+    let extractor = ApiKeyExtractor::for_test(vec![], false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid.clone()), None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == invalid
+    ));
+
+    // Allow list set, key matches (via header): accepted and stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid.clone()], true);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(valid.clone()), None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
+    ));
+
+    // Allow list set, key matches, but storage disabled: accepted for validation, not stored.
+    let extractor = ApiKeyExtractor::for_test_with_store_api_key(vec![valid.clone()], true, false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(valid.clone()), None),
+        ApiKeyValidation::Accepted(None)
+    ));
+
+    // Allow list set, key matches (via URL path): accepted and stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid.clone()], true);
+    assert!(matches!(
+        extractor.extract_and_validate(&format!("/v1/input/{valid}"), None, None),
+        ApiKeyValidation::Accepted(Some(key)) if key.as_ref() == valid
+    ));
+
+    // Allow list set, unknown key, drop_on_invalid_api_key = true: rejected.
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid.clone()), None),
+        ApiKeyValidation::Rejected
+    ));
+
+    // Allow list set, no key present, drop_on_invalid_api_key = true: rejected.
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", None, None),
+        ApiKeyValidation::Rejected
+    ));
+
+    // Allow list set, unknown key, drop_on_invalid_api_key = false: accepted but key not stored.
+    let extractor = ApiKeyExtractor::for_test(vec![valid], false);
+    assert!(matches!(
+        extractor.extract_and_validate("/v1/input", Some(invalid), None),
+        ApiKeyValidation::Accepted(None)
+    ));
+}
+
+#[tokio::test]
+async fn api_key_validation_rejects_before_decode() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+    let mut headers = HeaderMap::new();
+    headers.insert("dd-api-key", "invalid".parse().unwrap());
+    headers.insert("content-encoding", "br".parse().unwrap());
+
+    assert_eq!(
+        403,
+        send_with_path(addr, "not used", headers, DD_API_LOGS_V2_PATH).await
+    );
+}
+
+#[tokio::test]
+async fn api_key_validation_applies_to_trace_stats() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+
+    assert_eq!(
+        403,
+        send_with_path(addr, "", HeaderMap::new(), "/api/v0.2/stats").await
+    );
+    assert_eq!(
+        200,
+        send_with_path(addr, "", dd_api_key_headers(), "/api/v0.2/stats").await
+    );
+}
+
+#[tokio::test]
+async fn api_key_validation_rejects_before_reading_body() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+    for path in [
+        DD_API_LOGS_V1_PATH,
+        DD_API_LOGS_V2_PATH,
+        DD_API_SERIES_V1_PATH,
+        DD_API_SERIES_V2_PATH,
+        DD_API_SERIES_V3_PATH,
+        DD_API_SKETCHES_PATH,
+        DD_API_TRACES_PATH,
+        "/api/v0.2/stats",
+        "/api/v2/llmobs",
+        "/evp_proxy/v2/api/v2/llmobs",
+    ] {
+        for (query, header) in [
+            ("", ""),
+            ("", "dd-api-key: invalid\r\n"),
+            ("?dd-api-key=invalid", ""),
+        ] {
+            // Do not send the promised body: the server must reject the key without
+            // waiting for payload bytes, even for a chunked request.
+            for framing in ["Content-Length: 1", "Transfer-Encoding: chunked"] {
+                let mut stream = TcpStream::connect(addr).await.unwrap();
+                stream
+                    .write_all(
+                        format!(
+                            "POST {path}{query} HTTP/1.1\r\nHost: localhost\r\n{header}{framing}\r\nConnection: close\r\n\r\n"
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+                let mut response = String::new();
+                timeout(
+                    HTTP_REQUEST_TIMEOUT,
+                    BufReader::new(&mut stream).read_line(&mut response),
+                )
+                .await
+                .expect("API key validation waited for the request body")
+                .unwrap();
+                assert!(response.starts_with("HTTP/1.1 403 "), "{path}: {response}");
+            }
+        }
+    }
+}
+
+#[test]
+fn api_key_validation_redacts_config_debug() {
+    let config: DatadogAgentConfig = serde_yaml::from_str(&format!(
+        "address: 127.0.0.1:8080\nvalid_api_keys: [\"{DD_API_KEY}\"]\n"
+    ))
+    .unwrap();
+    assert!(!format!("{config:?}").contains(DD_API_KEY));
+}
+
+#[test]
+fn api_key_validation_preserves_precedence_and_storage_rules() {
+    let valid = "0123456789abcdef0123456789abcdef".to_owned();
+    let invalid = "ffffffffffffffffffffffffffffffff".to_owned();
+    for store in [true, false] {
+        let extractor =
+            ApiKeyExtractor::for_test_with_store_api_key(vec![valid.clone()], true, store);
+        for (path, header, query) in [
+            (
+                format!("/v1/input/{valid}"),
+                Some(invalid.clone()),
+                Some(invalid.clone()),
+            ),
+            (
+                "/api/v2/logs".to_owned(),
+                Some(invalid.clone()),
+                Some(valid.clone()),
+            ),
+            ("/api/v2/logs".to_owned(), Some(valid.clone()), None),
+        ] {
+            assert!(matches!(
+                extractor.extract_and_validate(&path, header, query),
+                ApiKeyValidation::Accepted(key) if key.as_deref() == store.then_some(valid.as_str())
+            ));
+        }
+        // A lower-precedence valid key must not rescue the rejected primary key.
+        for (path, header, query) in [
+            (
+                format!("/v1/input/{invalid}"),
+                Some(valid.clone()),
+                Some(valid.clone()),
+            ),
+            (
+                "/api/v2/logs".to_owned(),
+                Some(valid.clone()),
+                Some(invalid.clone()),
+            ),
+            ("/api/v2/logs".to_owned(), None, None),
+        ] {
+            assert!(matches!(
+                extractor.extract_and_validate(&path, header, query),
+                ApiKeyValidation::Rejected
+            ));
+        }
+        // An empty allow list never rejects a key, regardless of the drop setting.
+        let passthrough = ApiKeyExtractor::for_test_with_store_api_key(Vec::new(), true, store);
+        assert!(matches!(
+            passthrough.extract_and_validate("/api/v2/logs", Some(invalid.clone()), None),
+            ApiKeyValidation::Accepted(key) if key.as_deref() == store.then_some(invalid.as_str())
+        ));
+        assert!(matches!(
+            passthrough.extract_and_validate("/api/v2/logs", None, None),
+            ApiKeyValidation::Accepted(None)
+        ));
+        // With rejection disabled, unrecognized credentials are never stored.
+        let accept_without_key =
+            ApiKeyExtractor::for_test_with_store_api_key(vec![valid.clone()], false, store);
+        assert!(matches!(
+            accept_without_key.extract_and_validate("/api/v2/logs", Some(invalid.clone()), None),
+            ApiKeyValidation::Accepted(None)
+        ));
+    }
+}
+
+#[tokio::test]
+async fn api_key_validation_preserves_allowed_request_limits() {
+    let (addr, _guard) = source_with_api_key_validation().await;
+    let limit = crate::sources::util::decompression::max_decompressed_size_bytes();
+    for path in [
+        DD_API_LOGS_V1_PATH,
+        DD_API_LOGS_V2_PATH,
+        DD_API_SERIES_V1_PATH,
+        DD_API_SERIES_V2_PATH,
+        DD_API_SERIES_V3_PATH,
+        DD_API_SKETCHES_PATH,
+        DD_API_TRACES_PATH,
+        "/api/v2/llmobs",
+        "/evp_proxy/v2/api/v2/llmobs",
+    ] {
+        for (api_key, status) in [(DD_API_KEY, 413), ("invalid", 403)] {
+            let mut stream = TcpStream::connect(addr).await.unwrap();
+            stream.write_all(format!(
+                "POST {path} HTTP/1.1\r\nHost: localhost\r\ndd-api-key: {api_key}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                limit + 1,
+            ).as_bytes()).await.unwrap();
+            let mut response = String::new();
+            timeout(
+                HTTP_REQUEST_TIMEOUT,
+                BufReader::new(&mut stream).read_line(&mut response),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            assert!(
+                response.starts_with(&format!("HTTP/1.1 {status} ")),
+                "{path}: {response}"
+            );
+        }
+
+        let mut headers = dd_api_key_headers();
+        headers.insert("content-encoding", "br".parse().unwrap());
+        assert_eq!(
+            415,
+            send_with_path(addr, "not decoded", headers, path).await
+        );
+    }
+}
+
+#[tokio::test]
+async fn api_key_validation_disabled_preserves_stats_passthrough() {
+    let (_rx, _, _, addr, _guard) = source(EventStatus::Delivered, false, true, false, true).await;
+    assert_eq!(
+        200,
+        send_with_path(
+            addr,
+            "",
+            HeaderMap::new(),
+            "/api/v0.2/stats?dd-api-key=first&dd-api-key=second",
+        )
+        .await,
+    );
+}
+
+#[tokio::test]
+async fn api_key_validation_preserves_v3_metric_metadata() {
+    let body = ddmetric_v3_proto::Payload {
+        metadata: None,
+        metric_data: Some(minimal_v3_metric_data()),
+    }
+    .encode_to_vec();
+    for (store_api_key, drop_invalid, supplied_key, expected_key) in [
+        (true, true, DD_API_KEY, Some(DD_API_KEY)),
+        (false, true, DD_API_KEY, None),
+        (true, false, "invalid", None),
+    ] {
+        let (recv, addr, _guard) =
+            source_with_api_key_options(store_api_key, drop_invalid, false).await;
+        let mut headers = HeaderMap::new();
+        headers.insert("dd-api-key", supplied_key.parse().unwrap());
+        let events =
+            send_bytes_and_collect(addr, body.clone(), headers, DD_API_SERIES_V3_PATH, recv, 1)
+                .await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_metric().name(), "metric");
+        assert_eq!(
+            events[0].metadata().datadog_api_key().as_deref(),
+            expected_key
+        );
+    }
+}
+
+#[tokio::test]
+async fn api_key_validation_preserves_ingested_event_metadata() {
+    let body = r#"[{"message":"retained","status":"info","timestamp":0,"hostname":"example","service":"test","ddsource":"test","ddtags":""}]"#;
+    for acknowledgements in [false, true] {
+        for (store_api_key, drop_invalid, supplied_key, expected_key) in [
+            (true, true, DD_API_KEY, Some(DD_API_KEY)),
+            (false, true, DD_API_KEY, None),
+            (true, false, "invalid", None),
+            (false, false, "invalid", None),
+        ] {
+            let (recv, addr, _guard) =
+                source_with_api_key_options(store_api_key, drop_invalid, acknowledgements).await;
+            let mut headers = HeaderMap::new();
+            headers.insert("dd-api-key", supplied_key.parse().unwrap());
+            // send_and_collect drains the receiver while the request awaits its ACK.
+            let events = send_and_collect(addr, body, headers, DD_API_LOGS_V2_PATH, recv, 1).await;
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].as_log()["message"], "retained".into());
+            assert_eq!(
+                events[0].metadata().datadog_api_key().as_deref(),
+                expected_key
+            );
+        }
+    }
+}
+
+async fn apm_stats_source_with_api_key_options(
+    enabled_data_types: &str,
+    store_api_key: bool,
+    drop_on_invalid_api_key: bool,
+) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
+    let status = EventStatus::Delivered;
+    let (mut sender, _recv) = SourceSender::new_test_finalize(status);
+    let output = sender
+        .add_outputs(status, APM_STATS.to_string())
+        .flat_map(into_event_stream);
+    let (guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address: "{}"
+            multiple_outputs: true
+            enabled_data_types: {}
+            store_api_key: {}
+            valid_api_keys: ["{}"]
+            drop_on_invalid_api_key: {}
+        "#},
+        address, enabled_data_types, store_api_key, DD_API_KEY, drop_on_invalid_api_key
+    ))
+    .unwrap();
+    let source = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(source);
+    wait_for_tcp(address).await;
+    (Box::pin(output), address, guard)
+}
+
+#[tokio::test]
+async fn apm_stats_api_key_validation_precedes_body_reads() {
+    for enabled_data_types in ["[apm_stats]", "[traces, apm_stats]"] {
+        for store_api_key in [false, true] {
+            let (_recv, addr, _guard) =
+                apm_stats_source_with_api_key_options(enabled_data_types, store_api_key, true)
+                    .await;
+            for framing in ["Content-Length: 10", "Transfer-Encoding: chunked"] {
+                for credential in ["", "dd-api-key: invalid\r\n"] {
+                    let mut stream = TcpStream::connect(addr).await.unwrap();
+                    stream
+                        .write_all(
+                            format!(
+                                "POST {DD_API_STATS_PATH} HTTP/1.1\r\nHost: localhost\r\n{credential}{framing}\r\nConnection: close\r\n\r\n"
+                            )
+                            .as_bytes(),
+                        )
+                        .await
+                        .unwrap();
+                    let mut response = String::new();
+                    timeout(
+                        HTTP_REQUEST_TIMEOUT,
+                        BufReader::new(&mut stream).read_line(&mut response),
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap();
+                    assert!(
+                        response.starts_with("HTTP/1.1 403 "),
+                        "{enabled_data_types}, {store_api_key}, {framing}: {response}"
+                    );
+                }
+            }
+
+            let limit = crate::sources::util::decompression::max_decompressed_size_bytes();
+            for (api_key, status) in [(DD_API_KEY, 413), ("invalid", 403)] {
+                let mut stream = TcpStream::connect(addr).await.unwrap();
+                stream
+                    .write_all(
+                        format!(
+                            "POST {DD_API_STATS_PATH} HTTP/1.1\r\nHost: localhost\r\ndd-api-key: {api_key}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            limit + 1,
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+                let mut response = String::new();
+                timeout(
+                    HTTP_REQUEST_TIMEOUT,
+                    BufReader::new(&mut stream).read_line(&mut response),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                assert!(
+                    response.starts_with(&format!("HTTP/1.1 {status} ")),
+                    "{enabled_data_types}, {store_api_key}: {response}"
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn apm_stats_api_key_validation_preserves_payload_and_metadata() {
+    for enabled_data_types in ["[apm_stats]", "[traces, apm_stats]"] {
+        for (store_api_key, drop_invalid, supplied_key, expected_key) in [
+            (true, true, DD_API_KEY, Some(DD_API_KEY)),
+            (false, true, DD_API_KEY, None),
+            (true, false, "invalid", None),
+            (false, false, "invalid", None),
+        ] {
+            let (recv, addr, _guard) = apm_stats_source_with_api_key_options(
+                enabled_data_types,
+                store_api_key,
+                drop_invalid,
+            )
+            .await;
+            let mut headers = HeaderMap::new();
+            // Query credentials take precedence over the header for APM stats too.
+            headers.insert("dd-api-key", "invalid-header".parse().unwrap());
+            headers.insert("content-type", "application/msgpack".parse().unwrap());
+            headers.insert("content-encoding", "gzip".parse().unwrap());
+            let events = send_and_collect(
+                addr,
+                apm_stats_body().to_vec(),
+                headers,
+                &format!("{DD_API_STATS_PATH}?dd-api-key={supplied_key}"),
+                recv,
+                1,
+            )
+            .await;
+            assert_eq!(events.len(), 1);
+            let log = events[0].as_log();
+            assert_eq!(log.get_message().unwrap(), &Value::Bytes(apm_stats_body()));
+            assert_eq!(log["content_encoding"], "gzip".into());
+            assert_eq!(log["content_type"], "application/msgpack".into());
+            assert_eq!(log.metadata().datadog_api_key().as_deref(), expected_key);
+        }
+    }
 }

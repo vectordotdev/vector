@@ -11,7 +11,7 @@ use vector_lib::{
 };
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, RequestHandler};
+use super::{DatadogAgentConfig, DatadogAgentSource, RequestHandler};
 use crate::{event::Event, internal_events::HttpBytesReceived, sources::util::http::capped_body};
 
 pub(super) fn build_warp_filter(
@@ -20,24 +20,16 @@ pub(super) fn build_warp_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp_path!("api" / "v0.2" / "stats" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("content-type"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   content_encoding: Option<String>,
                   content_type: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
-                let api_key = source.api_key_extractor.extract(
-                    path.as_str(),
-                    api_token,
-                    query_params.dd_api_key,
-                );
                 let events = Ok(build_apm_stats_event(
                     body,
                     api_key,
