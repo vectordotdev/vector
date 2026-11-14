@@ -13303,7 +13303,7 @@ dependencies = [
  "opendal",
  "opendal-http-transport-reqwest",
  "openssl",
- "openssl-probe 0.1.6",
+ "openssl-probe 0.2.1",
  "openssl-src",
  "ordered-float 5.5.1",
  "parking_lot 0.12.5",
