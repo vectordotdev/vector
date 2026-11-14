@@ -1,5 +1,5 @@
-# ARMv6 soft-float has no Alpine userspace. Keep the native ARM GNU Rust host,
-# but build a musl ABI C/C++ toolchain from source instead of using cross-rs images.
+# Run ARM64 Rust and C/C++ host tools for ARM32 musl output. Build the target
+# C/C++ toolchain from pinned sources, without cross-rs images or QEMU.
 ARG BASE=vector-native-arm-gnu
 FROM ${BASE}
 
@@ -10,13 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pin the build recipes and select maintained GCC/musl versions explicitly.
 # The recipe's default GCC is older; do not use it.
 ARG TOOLCHAIN_REV=5e8042e63de29f8473fc3b0b831a587ba284e1a8
+ARG MUSL_TARGET=arm-linux-musleabi
+ARG GCC_ARCH=armv6
+ARG GCC_FLOAT=soft
+ARG GCC_FPU=
 RUN git init /tmp/musl-toolchain \
     && cd /tmp/musl-toolchain \
     && git remote add origin https://github.com/richfelker/musl-cross-make.git \
     && git fetch --depth 1 origin "${TOOLCHAIN_REV}" \
     && git checkout --detach FETCH_HEAD \
     && printf '%s\n' \
-        'TARGET = arm-linux-musleabi' \
+        "TARGET = ${MUSL_TARGET}" \
         'OUTPUT = /opt/musl' \
         'GCC_VER = 14.3.0' \
         'MUSL_VER = 1.2.6' \
@@ -24,16 +28,17 @@ RUN git init /tmp/musl-toolchain \
         'GNU_SITE = https://ftp.gnu.org/gnu' \
         'DL_CMD = curl --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 -fL -o' \
         'COMMON_CONFIG += --disable-nls' \
-        'GCC_CONFIG += --with-arch=armv6 --with-float=soft --disable-libsanitizer --disable-libquadmath' \
+        "GCC_CONFIG += --with-arch=${GCC_ARCH} --with-float=${GCC_FLOAT} ${GCC_FPU:+--with-fpu=${GCC_FPU}} --disable-libsanitizer --disable-libquadmath" \
         > config.mak \
     && make -j4 \
     && make install \
     && rm -rf /tmp/musl-toolchain
 
 ARG RUST_VERSION
+ARG RUST_TARGET=arm-unknown-linux-musleabi
 RUN set -eux; \
     cd /tmp; \
-    archive="rust-std-${RUST_VERSION}-arm-unknown-linux-musleabi.tar.xz"; \
+    archive="rust-std-${RUST_VERSION}-${RUST_TARGET}.tar.xz"; \
     curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
     curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
     sha256sum -c "${archive}.sha256"; \
@@ -41,7 +46,15 @@ RUN set -eux; \
     "./${archive%.tar.xz}/install.sh" --prefix=/opt/rust --disable-ldconfig; \
     rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"
 ENV PATH="/opt/musl/bin:${PATH}"
-ENV CC_arm_unknown_linux_musleabi=arm-linux-musleabi-gcc \
-    CXX_arm_unknown_linux_musleabi=arm-linux-musleabi-g++ \
-    AR_arm_unknown_linux_musleabi=arm-linux-musleabi-ar \
-    CARGO_TARGET_ARM_UNKNOWN_LINUX_MUSLEABI_LINKER=arm-linux-musleabi-gcc
+ENV CC_arm_unknown_linux_musleabi=${MUSL_TARGET}-gcc \
+    CXX_arm_unknown_linux_musleabi=${MUSL_TARGET}-g++ \
+    AR_arm_unknown_linux_musleabi=${MUSL_TARGET}-ar \
+    CARGO_TARGET_ARM_UNKNOWN_LINUX_MUSLEABI_LINKER=${MUSL_TARGET}-gcc \
+    PKG_CONFIG_ALLOW_CROSS_arm_unknown_linux_musleabi=1 \
+    PKG_CONFIG_LIBDIR_arm_unknown_linux_musleabi=/opt/musl/${MUSL_TARGET}/lib/pkgconfig
+ENV CC_armv7_unknown_linux_musleabihf=${MUSL_TARGET}-gcc \
+    CXX_armv7_unknown_linux_musleabihf=${MUSL_TARGET}-g++ \
+    AR_armv7_unknown_linux_musleabihf=${MUSL_TARGET}-ar \
+    CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER=${MUSL_TARGET}-gcc \
+    PKG_CONFIG_ALLOW_CROSS_armv7_unknown_linux_musleabihf=1 \
+    PKG_CONFIG_LIBDIR_armv7_unknown_linux_musleabihf=/opt/musl/${MUSL_TARGET}/lib/pkgconfig
