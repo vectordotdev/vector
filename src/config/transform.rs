@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use vector_lib::{
-    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    config::{DataType, GlobalOptions, Input, LogNamespace, TransformOutput},
     configurable::{
         Configurable, GenerateError, Metadata, NamedComponent,
         attributes::CustomAttribute,
@@ -255,6 +255,17 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         Ok(())
     }
 
+    /// Gets the port and data type of each output, when they are known without computing schema
+    /// definitions.
+    ///
+    /// Callers that only need output ports, such as config graph construction, use this instead
+    /// of [`TransformConfig::outputs`], which can be expensive: `remap` compiles its VRL program to
+    /// derive the output schema. Returning `None` (the default) makes those callers fall back to
+    /// `outputs`. Implementations must return the same ports and data types as `outputs`.
+    fn output_ports(&self) -> Option<Vec<(Option<String>, DataType)>> {
+        None
+    }
+
     /// Validates the transform configuration against the schema and enrichment context.
     /// Compiles VRL programs, builds conditions, and resolves enrichment table references.
     /// Only called from `vector validate` (via `validate_transforms`), not during normal startup
@@ -307,20 +318,25 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
     key: ComponentKey,
     global_log_namespace: LogNamespace,
 ) -> impl Iterator<Item = OutputId> + '_ {
-    transform
-        .outputs(
-            &TransformContext {
-                schema: SchemaOptions {
-                    log_namespace: Some(global_log_namespace.into()),
+    let ports: Vec<Option<String>> = match transform.output_ports() {
+        Some(ports) => ports.into_iter().map(|(port, _)| port).collect(),
+        None => transform
+            .outputs(
+                &TransformContext {
+                    schema: SchemaOptions {
+                        log_namespace: Some(global_log_namespace.into()),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            },
-            &[(key.clone().into(), schema::Definition::any())],
-        )
-        .into_iter()
-        .map(move |output| OutputId {
-            component: key.clone(),
-            port: output.port,
-        })
+                &[(key.clone().into(), schema::Definition::any())],
+            )
+            .into_iter()
+            .map(|output| output.port)
+            .collect(),
+    };
+    ports.into_iter().map(move |port| OutputId {
+        component: key.clone(),
+        port,
+    })
 }
