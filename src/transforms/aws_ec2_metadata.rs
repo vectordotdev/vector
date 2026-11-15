@@ -239,17 +239,12 @@ impl TransformConfig for Ec2Metadata {
             emit(AwsEc2MetadataRefreshError { error });
         }
 
-        // The metadata-refresh loop runs as its own tokio task, so the main
-        // transform task's CPU-time wrapper does not see it. Spawn the
-        // background task with the same component-tagged counter so its CPU
-        // is attributed to this transform.
         spawn_timed(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
-            context.cpu_ns.clone(),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -582,7 +577,7 @@ impl MetadataClient {
                     new_state.push((
                         MetadataKey {
                             log_path: self.keys.tags.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, tag),
                         },
                         tag_content,
                     ));

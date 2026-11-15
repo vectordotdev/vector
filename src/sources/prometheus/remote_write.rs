@@ -950,6 +950,6 @@ mod integration_tests {
             &HTTP_PUSH_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

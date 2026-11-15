@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use chrono::Utc;
 use serde_json::Value;
@@ -12,7 +12,7 @@ use vector_lib::{
 };
 use vrl::{
     path::OwnedValuePath,
-    value::{Kind, kind::Collection},
+    value::{Kind, ObjectMap, kind::Collection},
 };
 
 use crate::{
@@ -337,7 +337,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            vrl::value::Value::Object(BTreeMap::new()),
+                            vrl::value::Value::Object(ObjectMap::new()),
                         );
                     }
                     Some(log)

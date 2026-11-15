@@ -202,7 +202,7 @@ fn directory_cycles_only_fail_when_assembly_reaches_them() {
             );
         } else {
             let errors = result.unwrap_err();
-            assert!(!errors.is_empty());
+            assert_ne!(errors, [] as [std::string::String; 0]);
             assert!(
                 errors
                     .iter()
