@@ -101,7 +101,6 @@ configuration, hardware, and software versions.
 [docs.about.introduction]: https://vector.dev/docs/introduction/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.administration.management]: https://vector.dev/docs/administration/management/
-[docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.architecture.concurrency-model]: https://vector.dev/docs/architecture/concurrency-model/
 [docs.architecture.data-model]: https://vector.dev/docs/architecture/data-model/
