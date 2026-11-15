@@ -173,7 +173,6 @@ configuration, hardware, and software versions.
 [urls.vector_contributing_policy]: https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
-[urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
 [urls.vector_releases]: https://vector.dev/releases/
 [urls.vector_releases_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy
