@@ -69,7 +69,7 @@ pub enum GcpError {
     BuildExternalAccount {
         source: google_cloud_auth::build_errors::Error,
     },
-    #[snafu(display("Failed to get GCP external account token: {}", source))]
+    #[snafu(display("Failed to get GCP external account token: {}", error_chain(source)))]
     GetExternalAccountToken {
         source: google_cloud_auth::errors::CredentialsError,
     },
@@ -393,6 +393,15 @@ impl From<Token> for FetchedToken {
     }
 }
 
+/// `google-cloud-auth` errors leave the underlying reason (e.g. the STS response) out of their
+/// `Display`, so include the whole source chain.
+fn error_chain(error: &dyn std::error::Error) -> String {
+    std::iter::successors(Some(error), |error| error.source())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(": ")
+}
+
 /// Returns the parsed credentials file if it holds Workload Identity Federation
 /// (`external_account`) credentials. Anything else is left to `goauth`, which reports its own errors.
 fn external_account_json(path: &str) -> Option<serde_json::Value> {
@@ -567,12 +576,23 @@ mod tests {
     #[tokio::test]
     async fn external_account_rejected_fails_build() {
         let sts = MockServer::start().await;
-        mock_sts(&sts, ResponseTemplate::new(401)).await;
+        mock_sts(
+            &sts,
+            ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": "invalid_target",
+                "error_description": "The target service indicated by the \"audience\" parameters is invalid.",
+            })),
+        )
+        .await;
         let (_token_file, creds_file) = external_account_creds(&sts, None);
 
-        build_auth_from_file(&creds_file)
+        let error = build_auth_from_file(&creds_file)
             .await
             .expect_err("build should fail when STS rejects the subject token");
+        assert!(
+            error.to_string().contains("invalid_target"),
+            "error should include the STS reason: {error}"
+        );
         let requests = sts.received_requests().await.unwrap();
         assert_eq!(requests.len(), 1, "build should fail on the STS exchange");
     }
