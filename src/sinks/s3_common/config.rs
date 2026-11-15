@@ -121,8 +121,7 @@ pub struct S3Options {
     ///
     /// Directly comparable to the `Content-Type` HTTP header.
     ///
-    /// If not specified, the compression scheme used dictates this value.
-    /// When `compression` is set to `none`, the value `text/x-log` is used.
+    /// If not specified, the value `text/x-log` is used.
     #[configurable(metadata(docs::examples = "application/gzip"))]
     pub content_type: Option<String>,
 }
