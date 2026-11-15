@@ -1,0 +1,295 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "creationTimestamp": "2026-11-11T16:16:17Z",
+    "generation": 1,
+    "labels": {
+      "app": "vector"
+    },
+    "name": "vector",
+    "namespace": "vrl-kind-ab",
+    "resourceVersion": "100630",
+    "uid": "18de0846-0342-44b2-9e87-433645abb62b"
+  },
+  "spec": {
+    "containers": [
+      {
+        "args": [
+          "--config",
+          "/etc/vector/vector.yaml"
+        ],
+        "env": [
+          {
+            "name": "VECTOR_SELF_NODE_NAME",
+            "valueFrom": {
+              "fieldRef": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.nodeName"
+              }
+            }
+          }
+        ],
+        "image": "localhost/vector-k8s-bulk:ae18932a-minimal-musl",
+        "imagePullPolicy": "Never",
+        "name": "vector",
+        "ports": [
+          {
+            "containerPort": 9598,
+            "protocol": "TCP"
+          }
+        ],
+        "readinessProbe": {
+          "failureThreshold": 3,
+          "initialDelaySeconds": 3,
+          "periodSeconds": 2,
+          "successThreshold": 1,
+          "tcpSocket": {
+            "port": 9598
+          },
+          "timeoutSeconds": 1
+        },
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "250m",
+            "memory": "128Mi"
+          }
+        },
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "volumeMounts": [
+          {
+            "mountPath": "/etc/vector",
+            "name": "config",
+            "readOnly": true
+          },
+          {
+            "mountPath": "/var/log",
+            "name": "logs",
+            "readOnly": true
+          },
+          {
+            "mountPath": "/vector-data",
+            "name": "data"
+          },
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-ktt5r",
+            "readOnly": true
+          }
+        ]
+      }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeName": "vrl-kind-benchmark-control-plane",
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Never",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "vector",
+    "serviceAccountName": "vector",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+      {
+        "operator": "Exists"
+      }
+    ],
+    "volumes": [
+      {
+        "configMap": {
+          "defaultMode": 420,
+          "name": "vector"
+        },
+        "name": "config"
+      },
+      {
+        "hostPath": {
+          "path": "/var/log",
+          "type": "Directory"
+        },
+        "name": "logs"
+      },
+      {
+        "emptyDir": {},
+        "name": "data"
+      },
+      {
+        "name": "kube-api-access-ktt5r",
+        "projected": {
+          "defaultMode": 420,
+          "sources": [
+            {
+              "serviceAccountToken": {
+                "expirationSeconds": 3607,
+                "path": "token"
+              }
+            },
+            {
+              "configMap": {
+                "items": [
+                  {
+                    "key": "ca.crt",
+                    "path": "ca.crt"
+                  }
+                ],
+                "name": "kube-root-ca.crt"
+              }
+            },
+            {
+              "downwardAPI": {
+                "items": [
+                  {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    },
+                    "path": "namespace"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "status": {
+    "allocatedResources": {
+      "cpu": "250m",
+      "memory": "128Mi"
+    },
+    "conditions": [
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2026-11-11T16:16:17Z",
+        "observedGeneration": 1,
+        "status": "True",
+        "type": "PodReadyToStartContainers"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2026-11-11T16:16:17Z",
+        "observedGeneration": 1,
+        "status": "True",
+        "type": "Initialized"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2026-11-11T16:16:20Z",
+        "observedGeneration": 1,
+        "status": "True",
+        "type": "Ready"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2026-11-11T16:16:20Z",
+        "observedGeneration": 1,
+        "status": "True",
+        "type": "ContainersReady"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2026-11-11T16:16:17Z",
+        "observedGeneration": 1,
+        "status": "True",
+        "type": "PodScheduled"
+      }
+    ],
+    "containerStatuses": [
+      {
+        "allocatedResources": {
+          "cpu": "250m",
+          "memory": "128Mi"
+        },
+        "containerID": "containerd://1f1d80129c3f75cf6362bfe9e88a577f52d4fe0fb724af9b34c9e14fede141ff",
+        "image": "localhost/vector-k8s-bulk:ae18932a-minimal-musl",
+        "imageID": "docker.io/library/import-2026-11-11@sha256:bf351057e0927cce5e20a0190dd6bb71b34aca502bb66c68d1ad9c0d0cd18cc2",
+        "lastState": {},
+        "name": "vector",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "250m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-11-11T16:16:17Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 0,
+            "supplementalGroups": [
+              0
+            ],
+            "uid": 0
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/etc/vector",
+            "name": "config",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          },
+          {
+            "mountPath": "/var/log",
+            "name": "logs",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          },
+          {
+            "mountPath": "/vector-data",
+            "name": "data"
+          },
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-ktt5r",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ],
+    "hostIP": "10.89.5.3",
+    "hostIPs": [
+      {
+        "ip": "10.89.5.3"
+      }
+    ],
+    "observedGeneration": 1,
+    "phase": "Running",
+    "podIP": "10.244.0.84",
+    "podIPs": [
+      {
+        "ip": "10.244.0.84"
+      }
+    ],
+    "qosClass": "Burstable",
+    "resources": {
+      "limits": {
+        "cpu": "1",
+        "memory": "512Mi"
+      },
+      "requests": {
+        "cpu": "232m",
+        "memory": "128Mi"
+      }
+    },
+    "startTime": "2026-11-11T16:16:17Z"
+  }
+}

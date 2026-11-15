@@ -1,0 +1,9 @@
+[package]
+name = "k8s-bulk-comparison-count"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vrl = { path = "../k8s-bulk-insert/vrl-counted", default-features = false, features = ["value"] }
+
+[workspace]

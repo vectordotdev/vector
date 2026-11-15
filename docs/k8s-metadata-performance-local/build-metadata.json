@@ -1,0 +1,12 @@
+{
+  "baseline_sha256": "830a9c3fadeec90aadfc3c1511530664994e9a661ba2e6a8e2b2de6028cab89c",
+  "bulk_sha256": "cc8871ee9467bace494cad526f489ce13c08513294ebb4d002efcc4a0f00371a",
+  "features": "sinks-blackhole,sinks-prometheus,sources-file,sources-internal_metrics,sources-kubernetes_logs,tikv-jemallocator",
+  "rust": "1.96.1",
+  "lto": "thin",
+  "codegen_units": 16,
+  "cargo_jobs": 1,
+  "memory_limit": "5GiB",
+  "image": "localhost/vector-k8s-bulk:ae18932a-minimal-musl",
+  "vrl_patch": false
+}

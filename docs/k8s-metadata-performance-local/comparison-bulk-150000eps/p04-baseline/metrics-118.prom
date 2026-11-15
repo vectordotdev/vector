@@ -1,0 +1,520 @@
+# HELP vector_buffer_max_size_events buffer_max_size_events
+# TYPE vector_buffer_max_size_events gauge
+vector_buffer_max_size_events{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 500 1794414223625
+vector_buffer_max_size_events{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 500 1794414223625
+# HELP vector_buffer_received_bytes_total buffer_received_bytes_total
+# TYPE vector_buffer_received_bytes_total counter
+vector_buffer_received_bytes_total{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 15291168 1794414223625
+vector_buffer_received_bytes_total{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 104131910052 1794414223625
+# HELP vector_buffer_received_events_total buffer_received_events_total
+# TYPE vector_buffer_received_events_total counter
+vector_buffer_received_events_total{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 16772 1794414223625
+vector_buffer_received_events_total{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 17556630 1794414223625
+# HELP vector_buffer_send_duration_seconds buffer_send_duration_seconds
+# TYPE vector_buffer_send_duration_seconds histogram
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.000244140625",stage="0"} 110 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.00048828125",stage="0"} 139 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0009765625",stage="0"} 151 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.001953125",stage="0"} 185 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.00390625",stage="0"} 242 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0078125",stage="0"} 370 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.015625",stage="0"} 13013 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.03125",stage="0"} 17436 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0625",stage="0"} 17898 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.125",stage="0"} 17904 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.25",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.5",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="1",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="2",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="4",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="8",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="16",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="32",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="64",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="128",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="256",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="512",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="1024",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="2048",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="4096",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="+Inf",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_sum{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 267.03621403099817 1794414223625
+vector_buffer_send_duration_seconds_count{buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 17905 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.000244140625",stage="0"} 247 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00048828125",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0009765625",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.001953125",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00390625",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0078125",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.015625",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.03125",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0625",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.125",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.25",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.5",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="8",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="16",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="32",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="64",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="128",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="256",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="512",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1024",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2048",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4096",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_bucket{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="+Inf",stage="0"} 248 1794414223625
+vector_buffer_send_duration_seconds_sum{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 0.005390101000000001 1794414223625
+vector_buffer_send_duration_seconds_count{buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 248 1794414223625
+# HELP vector_buffer_sent_bytes_total buffer_sent_bytes_total
+# TYPE vector_buffer_sent_bytes_total counter
+vector_buffer_sent_bytes_total{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 15291168 1794414223625
+vector_buffer_sent_bytes_total{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 104125994020 1794414223625
+# HELP vector_buffer_sent_events_total buffer_sent_events_total
+# TYPE vector_buffer_sent_events_total counter
+vector_buffer_sent_events_total{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 16772 1794414223625
+vector_buffer_sent_events_total{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 17555630 1794414223625
+# HELP vector_buffer_size_bytes buffer_size_bytes
+# TYPE vector_buffer_size_bytes gauge
+vector_buffer_size_bytes{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 0 1794414223625
+vector_buffer_size_bytes{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 5916032 1794414223625
+# HELP vector_buffer_size_events buffer_size_events
+# TYPE vector_buffer_size_events gauge
+vector_buffer_size_events{buffer_id="metrics",buffer_type="memory",component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",stage="0"} 0 1794414223625
+vector_buffer_size_events{buffer_id="discard",buffer_type="memory",component_id="discard",component_kind="sink",component_type="blackhole",host="vector",stage="0"} 1000 1794414223625
+# HELP vector_build_info build_info
+# TYPE vector_build_info gauge
+vector_build_info{arch="aarch64",debug="false",host="vector",revision="ae18932a-vrl2044-minimal",rust_version="1.95",version="0.62.0-dev"} 1 1794414223625
+# HELP vector_checkpoints_total checkpoints_total
+# TYPE vector_checkpoints_total counter
+vector_checkpoints_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 1783 1794414223625
+# HELP vector_checksum_errors_total checksum_errors_total
+# TYPE vector_checksum_errors_total counter
+vector_checksum_errors_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 3 1794414223625
+# HELP vector_component_received_bytes_total component_received_bytes_total
+# TYPE vector_component_received_bytes_total counter
+vector_component_received_bytes_total{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",protocol="internal"} 13511352 1794414223625
+vector_component_received_bytes_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",protocol="http"} 3788220308 1794414223625
+# HELP vector_component_received_event_bytes_total component_received_event_bytes_total
+# TYPE vector_component_received_event_bytes_total counter
+vector_component_received_event_bytes_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 15300252 1794414223625
+vector_component_received_event_bytes_total{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 40380891747 1794414223625
+vector_component_received_event_bytes_total{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 13522420 1794414223625
+vector_component_received_event_bytes_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",pod_name="generator-1",pod_namespace="vrl-kind-ab"} 17354995392 1794414223625
+vector_component_received_event_bytes_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",pod_name="generator-0",pod_namespace="vrl-kind-ab"} 17234479822 1794414223625
+# HELP vector_component_received_events_count component_received_events_count
+# TYPE vector_component_received_events_count histogram
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.000244140625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00048828125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0009765625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.001953125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00390625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0078125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.015625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.03125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.25"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.5"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="8"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="16"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="32"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="64"} 33 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="128"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="256"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="512"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1024"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2048"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4096"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="+Inf"} 248 1794414223625
+vector_component_received_events_count_sum{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 16772 1794414223625
+vector_component_received_events_count_count{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.000244140625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00048828125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0009765625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.001953125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00390625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0078125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.015625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.03125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.25"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.5"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="8"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="16"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="32"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="64"} 33 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="128"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="256"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="512"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1024"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2048"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4096"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="+Inf"} 248 1794414223625
+vector_component_received_events_count_sum{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 16772 1794414223625
+vector_component_received_events_count_count{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 248 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.000244140625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.00048828125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0009765625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.001953125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.00390625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0078125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.015625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.03125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.0625"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.125"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.25"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="0.5"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="1"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="2"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="4"} 0 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="8"} 1 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="16"} 1 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="32"} 3 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="64"} 5 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="128"} 118 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="256"} 179 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="512"} 386 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="1024"} 17904 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="2048"} 17904 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="4096"} 17904 1794414223625
+vector_component_received_events_count_bucket{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",le="+Inf"} 17904 1794414223625
+vector_component_received_events_count_sum{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 17555630 1794414223625
+vector_component_received_events_count_count{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 17904 1794414223625
+# HELP vector_component_received_events_total component_received_events_total
+# TYPE vector_component_received_events_total counter
+vector_component_received_events_total{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 16772 1794414223625
+vector_component_received_events_total{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 17555630 1794414223625
+vector_component_received_events_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 16772 1794414223625
+vector_component_received_events_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",pod_name="generator-1",pod_namespace="vrl-kind-ab"} 8812529 1794414223625
+vector_component_received_events_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",pod_name="generator-0",pod_namespace="vrl-kind-ab"} 8745101 1794414223625
+# HELP vector_component_sent_bytes_total component_sent_bytes_total
+# TYPE vector_component_sent_bytes_total counter
+vector_component_sent_bytes_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",protocol="http"} 2918152 1794414223625
+vector_component_sent_bytes_total{component_id="discard",component_kind="sink",component_type="blackhole",host="vector",protocol="blackhole"} 40380891747 1794414223625
+# HELP vector_component_sent_event_bytes_total component_sent_event_bytes_total
+# TYPE vector_component_sent_event_bytes_total counter
+vector_component_sent_event_bytes_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 40383176748 1794414223625
+vector_component_sent_event_bytes_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 2236620 1794414223625
+vector_component_sent_event_bytes_total{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 15300252 1794414223625
+vector_component_sent_event_bytes_total{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 40380891747 1794414223625
+# HELP vector_component_sent_events_total component_sent_events_total
+# TYPE vector_component_sent_events_total counter
+vector_component_sent_events_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 2447 1794414223625
+vector_component_sent_events_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 17556630 1794414223625
+vector_component_sent_events_total{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 17555630 1794414223625
+vector_component_sent_events_total{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 16772 1794414223625
+# HELP vector_files_added_total files_added_total
+# TYPE vector_files_added_total counter
+vector_files_added_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 26 1794414223625
+# HELP vector_files_unwatched_bytes_unread_total files_unwatched_bytes_unread_total
+# TYPE vector_files_unwatched_bytes_unread_total counter
+vector_files_unwatched_bytes_unread_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",reached_eof="true"} 0 1794414223625
+# HELP vector_files_unwatched_total files_unwatched_total
+# TYPE vector_files_unwatched_total counter
+vector_files_unwatched_total{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",reached_eof="true"} 22 1794414223625
+# HELP vector_http_server_handler_duration_seconds http_server_handler_duration_seconds
+# TYPE vector_http_server_handler_duration_seconds histogram
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.000244140625",method="GET",path="/metrics",status="200"} 0 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00048828125",method="GET",path="/metrics",status="200"} 24 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0009765625",method="GET",path="/metrics",status="200"} 33 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.001953125",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.00390625",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0078125",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.015625",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.03125",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.0625",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.125",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.25",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="0.5",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="8",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="16",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="32",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="64",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="128",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="256",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="512",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="1024",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="2048",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="4096",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_bucket{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",le="+Inf",method="GET",path="/metrics",status="200"} 35 1794414223625
+vector_http_server_handler_duration_seconds_sum{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",method="GET",path="/metrics",status="200"} 0.016570559 1794414223625
+vector_http_server_handler_duration_seconds_count{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",method="GET",path="/metrics",status="200"} 35 1794414223625
+# HELP vector_http_server_requests_received_total http_server_requests_received_total
+# TYPE vector_http_server_requests_received_total counter
+vector_http_server_requests_received_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",method="GET",path="/metrics"} 35 1794414223625
+# HELP vector_http_server_responses_sent_total http_server_responses_sent_total
+# TYPE vector_http_server_responses_sent_total counter
+vector_http_server_responses_sent_total{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector",method="GET",path="/metrics",status="200"} 35 1794414223625
+# HELP vector_internal_metrics_cardinality internal_metrics_cardinality
+# TYPE vector_internal_metrics_cardinality gauge
+vector_internal_metrics_cardinality{host="vector"} 70 1794414223625
+# HELP vector_open_files open_files
+# TYPE vector_open_files gauge
+vector_open_files{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 4 1794414223625
+# HELP vector_source_buffer_max_size_events source_buffer_max_size_events
+# TYPE vector_source_buffer_max_size_events gauge
+vector_source_buffer_max_size_events{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 1000 1794414223625
+vector_source_buffer_max_size_events{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 1000 1794414223625
+# HELP vector_source_buffer_utilization source_buffer_utilization
+# TYPE vector_source_buffer_utilization histogram
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.000244140625",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00048828125",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0009765625",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.001953125",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00390625",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0078125",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.015625",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.03125",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0625",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.125",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.25",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.5",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="8",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="16",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="32",output="_default"} 248 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="64",output="_default"} 281 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="128",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="256",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="512",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1024",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2048",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4096",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="+Inf",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_sum{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 16772 1794414223625
+vector_source_buffer_utilization_count{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 496 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.000244140625",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00048828125",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0009765625",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.001953125",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00390625",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0078125",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.015625",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.03125",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0625",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.125",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.25",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.5",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4",output="_default"} 17521 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="8",output="_default"} 17529 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="16",output="_default"} 17532 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="32",output="_default"} 17542 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="64",output="_default"} 17564 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="128",output="_default"} 17699 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="256",output="_default"} 17825 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="512",output="_default"} 18140 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1024",output="_default"} 35810 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2048",output="_default"} 35810 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4096",output="_default"} 35810 1794414223625
+vector_source_buffer_utilization_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="+Inf",output="_default"} 35810 1794414223625
+vector_source_buffer_utilization_sum{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 17720783 1794414223625
+vector_source_buffer_utilization_count{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 35810 1794414223625
+# HELP vector_source_buffer_utilization_level source_buffer_utilization_level
+# TYPE vector_source_buffer_utilization_level gauge
+vector_source_buffer_utilization_level{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 0 1794414223625
+vector_source_buffer_utilization_level{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 0 1794414223625
+# HELP vector_source_buffer_utilization_mean source_buffer_utilization_mean
+# TYPE vector_source_buffer_utilization_mean gauge
+vector_source_buffer_utilization_mean{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",output="_default"} 802.5155932519489 1794414223625
+vector_source_buffer_utilization_mean{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",output="_default"} 0.00041473886840233187 1794414223625
+# HELP vector_source_lag_time_seconds source_lag_time_seconds
+# TYPE vector_source_lag_time_seconds histogram
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.000244140625"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00048828125"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0009765625"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.001953125"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00390625"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0078125"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.015625"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.03125"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0625"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.125"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.25"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.5"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1"} 0 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2"} 458800 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4"} 458800 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="8"} 1707300 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="16"} 2037708 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="32"} 4800200 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="64"} 10778553 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="128"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="256"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="512"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1024"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2048"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4096"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="+Inf"} 17557630 1794414223625
+vector_source_lag_time_seconds_sum{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 955179343.3522416 1794414223625
+vector_source_lag_time_seconds_count{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 17557630 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.000244140625"} 14436 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00048828125"} 14436 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0009765625"} 14436 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.001953125"} 16702 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00390625"} 16702 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0078125"} 16702 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.015625"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.03125"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0625"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.125"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.25"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.5"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="8"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="16"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="32"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="64"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="128"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="256"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="512"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1024"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2048"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4096"} 16772 1794414223625
+vector_source_lag_time_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="+Inf"} 16772 1794414223625
+vector_source_lag_time_seconds_sum{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 3.0359999999998664 1794414223625
+vector_source_lag_time_seconds_count{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 16772 1794414223625
+# HELP vector_source_send_batch_latency_seconds source_send_batch_latency_seconds
+# TYPE vector_source_send_batch_latency_seconds histogram
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.000244140625"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00048828125"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0009765625"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.001953125"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00390625"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0078125"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.015625"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.03125"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0625"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.125"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.25"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.5"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="8"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="16"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="32"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="64"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="128"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="256"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="512"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1024"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2048"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4096"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="+Inf"} 248 1794414223625
+vector_source_send_batch_latency_seconds_sum{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 0.007485473000000003 1794414223625
+vector_source_send_batch_latency_seconds_count{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 248 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.000244140625"} 181 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00048828125"} 243 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0009765625"} 351 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.001953125"} 540 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00390625"} 16396 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0078125"} 17409 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.015625"} 17883 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.03125"} 17900 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0625"} 17904 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.125"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.25"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.5"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="8"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="16"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="32"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="64"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="128"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="256"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="512"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1024"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2048"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4096"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="+Inf"} 17905 1794414223625
+vector_source_send_batch_latency_seconds_sum{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 54.34183190699994 1794414223625
+vector_source_send_batch_latency_seconds_count{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 17905 1794414223625
+# HELP vector_source_send_latency_seconds source_send_latency_seconds
+# TYPE vector_source_send_latency_seconds histogram
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.000244140625"} 331 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00048828125"} 362 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0009765625"} 465 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.001953125"} 1971 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.00390625"} 16857 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0078125"} 17568 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.015625"} 17895 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.03125"} 17901 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.0625"} 17904 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.125"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.25"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="0.5"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="8"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="16"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="32"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="64"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="128"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="256"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="512"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="1024"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="2048"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="4096"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector",le="+Inf"} 17905 1794414223625
+vector_source_send_latency_seconds_sum{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 45.24124223799992 1794414223625
+vector_source_send_latency_seconds_count{component_id="logs",component_kind="source",component_type="kubernetes_logs",host="vector"} 17905 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.000244140625"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00048828125"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0009765625"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.001953125"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.00390625"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0078125"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.015625"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.03125"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.0625"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.125"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.25"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="0.5"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="8"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="16"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="32"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="64"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="128"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="256"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="512"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="1024"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="2048"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="4096"} 248 1794414223625
+vector_source_send_latency_seconds_bucket{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector",le="+Inf"} 248 1794414223625
+vector_source_send_latency_seconds_sum{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 0.0009339569999999995 1794414223625
+vector_source_send_latency_seconds_count{component_id="vector_metrics",component_kind="source",component_type="internal_metrics",host="vector"} 248 1794414223625
+# HELP vector_started_total started_total
+# TYPE vector_started_total counter
+vector_started_total{host="vector"} 1 1794414223625
+# HELP vector_uptime_seconds uptime_seconds
+# TYPE vector_uptime_seconds gauge
+vector_uptime_seconds{host="vector"} 247 1794414223625
+# HELP vector_utilization utilization
+# TYPE vector_utilization gauge
+vector_utilization{component_id="metrics",component_kind="sink",component_type="prometheus_exporter",host="vector"} 0.0001 1794414223625
+vector_utilization{component_id="discard",component_kind="sink",component_type="blackhole",host="vector"} 0.1529 1794414223625

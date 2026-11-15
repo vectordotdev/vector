@@ -1,0 +1,1 @@
+["podman", "exec", "vrl-kind-benchmark-control-plane", "perf", "record", "-e", "cpu-clock:u", "-F", "99", "--call-graph", "dwarf,8192", "-p", "43712", "-o", "/var/tmp/k8s-bulk-profile/03-bulk.data", "--", "sleep", "60"]

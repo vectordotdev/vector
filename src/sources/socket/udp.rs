@@ -236,6 +236,10 @@ pub(super) fn udp(
         }
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let network_bytes_received =
+            register(vector_lib::internal_event::SourceNetworkBytesReceived {
+                protocol: "udp".into(),
+            });
 
         info!(message = "Listening.", address = %config.address);
         // We add 1 to the max_length in order to determine if the received data has been truncated.
@@ -267,6 +271,7 @@ pub(super) fn udp(
                        }
                     };
 
+                    network_bytes_received.emit(ByteSize(byte_size));
                     bytes_received.emit(ByteSize(byte_size));
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;

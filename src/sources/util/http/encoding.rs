@@ -1,7 +1,9 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
-use vector_lib::internal_event::emit;
+use vector_lib::internal_event::{
+    ByteSize, InternalEventHandle, SourceNetworkBytesReceived, emit, register,
+};
 use warp::http::StatusCode;
 use warp::{Filter, filters::BoxedFilter};
 
@@ -141,6 +143,9 @@ where
 {
     futures_util::pin_mut!(body);
 
+    let network_bytes = register(SourceNetworkBytesReceived {
+        protocol: "http".into(),
+    });
     let mut total_body_size: usize = 0;
     let mut admit_chunk_within_limit = |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
         let chunk = chunk.map_err(|error| {
@@ -150,6 +155,8 @@ where
             )
         })?;
 
+        // Count received data even when the size cap or subsequent decoding rejects it.
+        network_bytes.emit(ByteSize(chunk.remaining()));
         total_body_size = total_body_size.saturating_add(chunk.remaining());
         if total_body_size > max_body_size {
             return Err(request_body_too_large_error(max_body_size));
@@ -251,6 +258,72 @@ mod tests {
     use zstd::stream::Encoder as ZstdEncoder;
 
     use super::*;
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+    use tracing::Instrument;
+
+    #[tokio::test]
+    async fn network_bytes_count_compressed_body_before_decompression() {
+        trace_init();
+        let component = "network_http_compressed";
+        async {
+            let plaintext = vec![b'a'; 4096];
+            let compressed = gzip_payload(&plaintext);
+            let compressed_size = compressed.len();
+            let body =
+                collect_body_with_limit(stream::iter([Ok::<_, warp::Error>(compressed)]), 8192)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                decompress_body_with_limit(Some("gzip"), body, 8192).unwrap(),
+                plaintext
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_network_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                f64::from(u32::try_from(compressed_size).unwrap()).to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn network_bytes_include_rejected_body_chunks() {
+        trace_init();
+        let component = "network_http_rejected";
+        async {
+            let body = collect_body_with_limit(
+                stream::iter([
+                    Ok::<_, warp::Error>(Bytes::from_static(b"abc")),
+                    Ok(Bytes::from_static(b"def")),
+                ]),
+                4,
+            )
+            .await;
+            assert!(body.is_err());
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_network_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                6.0_f64.to_bits(),
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
 
     fn gzip_payload(plaintext: &[u8]) -> Bytes {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());

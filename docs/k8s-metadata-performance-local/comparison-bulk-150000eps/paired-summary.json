@@ -1,0 +1,31 @@
+{
+  "pairs": [
+    {
+      "pair": 1,
+      "throughput_change_pct": 31.538088802413622,
+      "cpu_per_event_change_pct": -24.036396172606544
+    },
+    {
+      "pair": 2,
+      "throughput_change_pct": 33.32938954636096,
+      "cpu_per_event_change_pct": -24.965100994707925
+    },
+    {
+      "pair": 3,
+      "throughput_change_pct": 37.28978637921807,
+      "cpu_per_event_change_pct": -27.000982382341633
+    },
+    {
+      "pair": 4,
+      "throughput_change_pct": 35.26286303804713,
+      "cpu_per_event_change_pct": -25.88584028899923
+    },
+    {
+      "pair": 5,
+      "throughput_change_pct": 31.168507154872536,
+      "cpu_per_event_change_pct": -23.78457793830291
+    }
+  ],
+  "median_throughput_change_pct": 33.32938954636096,
+  "median_cpu_per_event_change_pct": -24.965100994707925
+}

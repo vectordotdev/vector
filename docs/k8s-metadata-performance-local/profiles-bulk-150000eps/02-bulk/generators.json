@@ -1,0 +1,191 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "generator",
+        "namespace": "vrl-kind-ab"
+      },
+      "data": {
+        "generate.py": "import time,sys,json,os\ntime.sleep(20)\nstart=time.monotonic()\ncount=0\nwhile time.monotonic()-start < 120:\n    target=start+count/75000\n    wait=target-time.monotonic()\n    if wait>0: time.sleep(wait)\n    batch=''.join(json.dumps(dict(pod=os.environ['HOSTNAME'],seq=count+i,payload='x'*128),separators=(',',':'))+'\\n' for i in range(100))\n    sys.stdout.write(batch)\n    sys.stdout.flush()\n    count+=100\nprint(json.dumps(dict(summary=True,events=count,seconds=time.monotonic()-start)),file=sys.stderr,flush=True)\n"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "generator-0",
+        "namespace": "vrl-kind-ab",
+        "labels": {
+          "benchmark": "vrl-kind-ab",
+          "bench.example/key00": "value00",
+          "bench.example/key01": "value01",
+          "bench.example/key02": "value02",
+          "bench.example/key03": "value03",
+          "bench.example/key04": "value04",
+          "bench.example/key05": "value05",
+          "bench.example/key06": "value06",
+          "bench.example/key07": "value07",
+          "bench.example/key08": "value08",
+          "bench.example/key09": "value09",
+          "bench.example/key10": "value10",
+          "bench.example/key11": "value11",
+          "bench.example/key12": "value12",
+          "bench.example/key13": "value13",
+          "bench.example/key14": "value14",
+          "bench.example/key15": "value15",
+          "bench.example/key16": "value16",
+          "bench.example/key17": "value17",
+          "bench.example/key18": "value18",
+          "bench.example/key19": "value19"
+        },
+        "annotations": {
+          "bench.example/annotation00": "value00",
+          "bench.example/annotation01": "value01",
+          "bench.example/annotation02": "value02",
+          "bench.example/annotation03": "value03",
+          "bench.example/annotation04": "value04",
+          "bench.example/annotation05": "value05",
+          "bench.example/annotation06": "value06",
+          "bench.example/annotation07": "value07",
+          "bench.example/annotation08": "value08",
+          "bench.example/annotation09": "value09"
+        }
+      },
+      "spec": {
+        "restartPolicy": "Never",
+        "activeDeadlineSeconds": 180,
+        "tolerations": [
+          {
+            "operator": "Exists"
+          }
+        ],
+        "containers": [
+          {
+            "name": "generator",
+            "image": "python:3.12-alpine",
+            "command": [
+              "python",
+              "/work/generate.py"
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "32Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "128Mi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "script",
+                "mountPath": "/work",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "script",
+            "configMap": {
+              "name": "generator"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "generator-1",
+        "namespace": "vrl-kind-ab",
+        "labels": {
+          "benchmark": "vrl-kind-ab",
+          "bench.example/key00": "value00",
+          "bench.example/key01": "value01",
+          "bench.example/key02": "value02",
+          "bench.example/key03": "value03",
+          "bench.example/key04": "value04",
+          "bench.example/key05": "value05",
+          "bench.example/key06": "value06",
+          "bench.example/key07": "value07",
+          "bench.example/key08": "value08",
+          "bench.example/key09": "value09",
+          "bench.example/key10": "value10",
+          "bench.example/key11": "value11",
+          "bench.example/key12": "value12",
+          "bench.example/key13": "value13",
+          "bench.example/key14": "value14",
+          "bench.example/key15": "value15",
+          "bench.example/key16": "value16",
+          "bench.example/key17": "value17",
+          "bench.example/key18": "value18",
+          "bench.example/key19": "value19"
+        },
+        "annotations": {
+          "bench.example/annotation00": "value00",
+          "bench.example/annotation01": "value01",
+          "bench.example/annotation02": "value02",
+          "bench.example/annotation03": "value03",
+          "bench.example/annotation04": "value04",
+          "bench.example/annotation05": "value05",
+          "bench.example/annotation06": "value06",
+          "bench.example/annotation07": "value07",
+          "bench.example/annotation08": "value08",
+          "bench.example/annotation09": "value09"
+        }
+      },
+      "spec": {
+        "restartPolicy": "Never",
+        "activeDeadlineSeconds": 180,
+        "tolerations": [
+          {
+            "operator": "Exists"
+          }
+        ],
+        "containers": [
+          {
+            "name": "generator",
+            "image": "python:3.12-alpine",
+            "command": [
+              "python",
+              "/work/generate.py"
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "32Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "128Mi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "script",
+                "mountPath": "/work",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "script",
+            "configMap": {
+              "name": "generator"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

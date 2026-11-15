@@ -1,0 +1,11 @@
+{
+  "pair": 5,
+  "variant": "baseline",
+  "window_seconds": 90.42597199999727,
+  "eps": 77970.1654741429,
+  "cpu_cores": 0.9982594602356358,
+  "throttled_periods": 870,
+  "expected_events": 18000202,
+  "final_events": 18000202.0,
+  "event_count_deficit": 0.0
+}

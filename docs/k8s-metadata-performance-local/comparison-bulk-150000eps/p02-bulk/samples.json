@@ -1,0 +1,274 @@
+[
+  {
+    "time": 422198.857735583,
+    "events": 2962559.0,
+    "cpu": {
+      "usage_usec": 29496386,
+      "user_usec": 25739394,
+      "system_usec": 3756992,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 352,
+      "nr_throttled": 284,
+      "throttled_usec": 1825049,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422204.930419291,
+    "events": 3513371.0,
+    "cpu": {
+      "usage_usec": 35251321,
+      "user_usec": 30690162,
+      "system_usec": 4561158,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 409,
+      "nr_throttled": 335,
+      "throttled_usec": 1922170,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422210.500371458,
+    "events": 3998010.0,
+    "cpu": {
+      "usage_usec": 40802635,
+      "user_usec": 35544472,
+      "system_usec": 5258163,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 465,
+      "nr_throttled": 380,
+      "throttled_usec": 1960632,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422215.844210541,
+    "events": 4596232.0,
+    "cpu": {
+      "usage_usec": 46164206,
+      "user_usec": 40198115,
+      "system_usec": 5966091,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 518,
+      "nr_throttled": 423,
+      "throttled_usec": 2019442,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422221.1949015,
+    "events": 5142603.0,
+    "cpu": {
+      "usage_usec": 51502144,
+      "user_usec": 44888521,
+      "system_usec": 6613623,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 572,
+      "nr_throttled": 462,
+      "throttled_usec": 2069040,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422226.638137625,
+    "events": 5641317.0,
+    "cpu": {
+      "usage_usec": 56939162,
+      "user_usec": 49643737,
+      "system_usec": 7295424,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 626,
+      "nr_throttled": 503,
+      "throttled_usec": 2117599,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422232.056999125,
+    "events": 6262621.0,
+    "cpu": {
+      "usage_usec": 62369880,
+      "user_usec": 54429637,
+      "system_usec": 7940242,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 681,
+      "nr_throttled": 547,
+      "throttled_usec": 2171429,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422237.382540166,
+    "events": 6759427.0,
+    "cpu": {
+      "usage_usec": 67682077,
+      "user_usec": 59027692,
+      "system_usec": 8654385,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 734,
+      "nr_throttled": 596,
+      "throttled_usec": 2257203,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422242.861581166,
+    "events": 7293702.0,
+    "cpu": {
+      "usage_usec": 73230261,
+      "user_usec": 63881153,
+      "system_usec": 9349108,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 789,
+      "nr_throttled": 647,
+      "throttled_usec": 2337261,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422248.431985291,
+    "events": 7851765.0,
+    "cpu": {
+      "usage_usec": 78734024,
+      "user_usec": 68664664,
+      "system_usec": 10069359,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 844,
+      "nr_throttled": 701,
+      "throttled_usec": 2421191,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422253.927599875,
+    "events": 8476937.0,
+    "cpu": {
+      "usage_usec": 84249695,
+      "user_usec": 73486450,
+      "system_usec": 10763244,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 899,
+      "nr_throttled": 754,
+      "throttled_usec": 2514946,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422259.447782166,
+    "events": 8986294.0,
+    "cpu": {
+      "usage_usec": 89775184,
+      "user_usec": 78279145,
+      "system_usec": 11496039,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 955,
+      "nr_throttled": 808,
+      "throttled_usec": 2614146,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422264.753134791,
+    "events": 9573581.0,
+    "cpu": {
+      "usage_usec": 95059606,
+      "user_usec": 82845680,
+      "system_usec": 12213926,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 1007,
+      "nr_throttled": 855,
+      "throttled_usec": 2706230,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422270.127429958,
+    "events": 10094611.0,
+    "cpu": {
+      "usage_usec": 100469667,
+      "user_usec": 87501113,
+      "system_usec": 12968553,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 1062,
+      "nr_throttled": 906,
+      "throttled_usec": 2887565,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422275.499688,
+    "events": 10579280.0,
+    "cpu": {
+      "usage_usec": 105794772,
+      "user_usec": 92103585,
+      "system_usec": 13691187,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 1115,
+      "nr_throttled": 959,
+      "throttled_usec": 3277527,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422281.263376625,
+    "events": 11222270.0,
+    "cpu": {
+      "usage_usec": 111559401,
+      "user_usec": 97135589,
+      "system_usec": 14423811,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 1172,
+      "nr_throttled": 1015,
+      "throttled_usec": 3730987,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  {
+    "time": 422286.807273541,
+    "events": 11773855.0,
+    "cpu": {
+      "usage_usec": 117166532,
+      "user_usec": 102005745,
+      "system_usec": 15160786,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 1229,
+      "nr_throttled": 1069,
+      "throttled_usec": 4113947,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  }
+]

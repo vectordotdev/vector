@@ -1,0 +1,15 @@
+{
+  "compile_command": [
+    "rustc",
+    "+1.96.1",
+    "--edition=2024",
+    "-O",
+    "-Dwarnings",
+    "/Users/al03160720/oss/vector/docs/k8s-metadata-performance-local/prefix-bench.rs",
+    "-o",
+    "/private/var/folders/gd/rbnlxh4d7jz721_l4mbbbqvc0000gp/T/opencode/k8s-prefix-benchmark"
+  ],
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: aarch64-apple-darwin\nrelease: 1.96.1\nLLVM version: 22.1.2\n",
+  "started": "2026-11-11T16:51:14Z",
+  "caveat": "Standalone host BTreeMap experiment, not a production VRL or Vector benchmark. No cached-key production code changed."
+}

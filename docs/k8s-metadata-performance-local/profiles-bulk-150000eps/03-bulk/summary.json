@@ -1,0 +1,18 @@
+{
+  "run": 3,
+  "variant": "bulk",
+  "seconds": 60.93482641701121,
+  "events": 6021626.0,
+  "eps": 98820.76234681682,
+  "cpu_cores": 0.9983844145819422,
+  "cpu_us_per_event": 10.102982317400649,
+  "samples": 5330,
+  "sampled_user_cpu_seconds": 53.8383833,
+  "crud_self_pct": 5.140712945590995,
+  "crud_stack_union_pct": 21.913696060037523,
+  "crud_self_sampled_us_per_event": 0.45962282280566746,
+  "crud_stack_union_sampled_us_per_event": 1.9592680913759837,
+  "unwind_warning_count": 1435,
+  "expected_events": 18000202,
+  "final_events": 18000202.0
+}

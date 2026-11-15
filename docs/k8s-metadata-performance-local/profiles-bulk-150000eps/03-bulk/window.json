@@ -1,0 +1,34 @@
+{
+  "before": {
+    "time": 424752.212567583,
+    "events": 2576511.0,
+    "cpu": {
+      "usage_usec": 29954667,
+      "user_usec": 26187859,
+      "system_usec": 3766808,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 372,
+      "nr_throttled": 153,
+      "throttled_usec": 346216,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  },
+  "after": {
+    "time": 424813.147394,
+    "events": 8598137.0,
+    "cpu": {
+      "usage_usec": 90791048,
+      "user_usec": 79033258,
+      "system_usec": 11757789,
+      "nice_usec": 0,
+      "core_sched.force_idle_usec": 0,
+      "nr_periods": 981,
+      "nr_throttled": 729,
+      "throttled_usec": 1812244,
+      "nr_bursts": 0,
+      "burst_usec": 0
+    }
+  }
+}

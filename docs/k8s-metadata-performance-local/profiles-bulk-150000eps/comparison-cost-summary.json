@@ -1,0 +1,197 @@
+{
+  "runs": [
+    {
+      "run": 1,
+      "variant": "baseline",
+      "events": 3849995.0,
+      "cpu_us_per_event": 15.522641457975919,
+      "unwind_warning_count": 1662,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 19.973444613050077,
+          "sampled_us_per_event": 2.762695413890148
+        },
+        "btree_self": {
+          "sample_pct": 13.638088012139605,
+          "sampled_us_per_event": 1.886398862855666
+        },
+        "btree_stack": {
+          "sample_pct": 42.583459787556905,
+          "sampled_us_per_event": 5.890077116983268
+        },
+        "memcmp_btree": {
+          "sample_pct": 14.757207890743551,
+          "sampled_us_per_event": 2.041193762589302
+        },
+        "memcmp_crud": {
+          "sample_pct": 18.190440060698027,
+          "sampled_us_per_event": 2.516073031263677
+        },
+        "memcmp_pod": {
+          "sample_pct": 16.976479514415782,
+          "sampled_us_per_event": 2.3481599196882073
+        }
+      }
+    },
+    {
+      "run": 2,
+      "variant": "bulk",
+      "events": 6022934.0,
+      "cpu_us_per_event": 10.13818829826128,
+      "unwind_warning_count": 1378,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 11.897106109324758,
+          "sampled_us_per_event": 1.0548904055730979
+        },
+        "btree_self": {
+          "sample_pct": 13.183279742765274,
+          "sampled_us_per_event": 1.1689326115810001
+        },
+        "btree_stack": {
+          "sample_pct": 49.025912615850196,
+          "sampled_us_per_event": 4.347020558418871
+        },
+        "memcmp_btree": {
+          "sample_pct": 7.849442027614905,
+          "sampled_us_per_event": 0.6959928749011695
+        },
+        "memcmp_crud": {
+          "sample_pct": 4.217892944959334,
+          "sampled_us_per_event": 0.3739913520553272
+        },
+        "memcmp_pod": {
+          "sample_pct": 7.962927936447891,
+          "sampled_us_per_event": 0.706055422490102
+        }
+      }
+    },
+    {
+      "run": 3,
+      "variant": "bulk",
+      "events": 6021626.0,
+      "cpu_us_per_event": 10.102982317400649,
+      "unwind_warning_count": 1435,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 11.76360225140713,
+          "sampled_us_per_event": 1.0517646346684433
+        },
+        "btree_self": {
+          "sample_pct": 12.720450281425892,
+          "sampled_us_per_event": 1.1373148681103742
+        },
+        "btree_stack": {
+          "sample_pct": 49.00562851782364,
+          "sampled_us_per_event": 4.381513916673005
+        },
+        "memcmp_btree": {
+          "sample_pct": 7.448405253283302,
+          "sampled_us_per_event": 0.6659498564009123
+        },
+        "memcmp_crud": {
+          "sample_pct": 3.8649155722326456,
+          "sampled_us_per_event": 0.34555584488309304
+        },
+        "memcmp_pod": {
+          "sample_pct": 7.823639774859287,
+          "sampled_us_per_event": 0.6994989675546106
+        }
+      }
+    },
+    {
+      "run": 4,
+      "variant": "baseline",
+      "events": 4691913.0,
+      "cpu_us_per_event": 12.993170163214876,
+      "unwind_warning_count": 1760,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 21.137026239067055,
+          "sampled_us_per_event": 2.497312205064331
+        },
+        "btree_self": {
+          "sample_pct": 13.083090379008746,
+          "sampled_us_per_event": 1.545750140720853
+        },
+        "btree_stack": {
+          "sample_pct": 43.42201166180758,
+          "sampled_us_per_event": 5.130254297127845
+        },
+        "memcmp_btree": {
+          "sample_pct": 15.451895043731778,
+          "sampled_us_per_event": 1.8256213361159936
+        },
+        "memcmp_crud": {
+          "sample_pct": 19.333090379008745,
+          "sampled_us_per_event": 2.2841795254941855
+        },
+        "memcmp_pod": {
+          "sample_pct": 17.966472303207,
+          "sampled_us_per_event": 2.122715374304681
+        }
+      }
+    }
+  ],
+  "means": {
+    "baseline": {
+      "cpu_us_per_event": 14.257905810595396,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 20.555235426058566,
+          "sampled_us_per_event": 2.6300038094772393
+        },
+        "btree_self": {
+          "sample_pct": 13.360589195574175,
+          "sampled_us_per_event": 1.7160745017882595
+        },
+        "btree_stack": {
+          "sample_pct": 43.00273572468224,
+          "sampled_us_per_event": 5.510165707055556
+        },
+        "memcmp_btree": {
+          "sample_pct": 15.104551467237664,
+          "sampled_us_per_event": 1.933407549352648
+        },
+        "memcmp_crud": {
+          "sample_pct": 18.761765219853388,
+          "sampled_us_per_event": 2.400126278378931
+        },
+        "memcmp_pod": {
+          "sample_pct": 17.471475908811392,
+          "sampled_us_per_event": 2.235437646996444
+        }
+      }
+    },
+    "bulk": {
+      "cpu_us_per_event": 10.120585307830964,
+      "metrics": {
+        "memcmp_self": {
+          "sample_pct": 11.830354180365944,
+          "sampled_us_per_event": 1.0533275201207706
+        },
+        "btree_self": {
+          "sample_pct": 12.951865012095583,
+          "sampled_us_per_event": 1.1531237398456873
+        },
+        "btree_stack": {
+          "sample_pct": 49.01577056683692,
+          "sampled_us_per_event": 4.364267237545938
+        },
+        "memcmp_btree": {
+          "sample_pct": 7.6489236404491034,
+          "sampled_us_per_event": 0.6809713656510409
+        },
+        "memcmp_crud": {
+          "sample_pct": 4.04140425859599,
+          "sampled_us_per_event": 0.3597735984692101
+        },
+        "memcmp_pod": {
+          "sample_pct": 7.893283855653589,
+          "sampled_us_per_event": 0.7027771950223562
+        }
+      }
+    }
+  },
+  "caveat": "Sampling estimates CPU time, not exact comparisons. Inclusive categories overlap; unwinding and inlining limit attribution."
+}
