@@ -18,6 +18,8 @@ use crate::{
     },
 };
 
+use super::client::validate_limit;
+
 pub(crate) const INTERVAL: Duration = Duration::from_secs(10);
 
 pub(crate) const TIMEOUT: Duration = Duration::from_secs(1);
@@ -36,6 +38,14 @@ pub(crate) async fn run_compliance(config: OktaConfig) -> Vec<Event> {
 #[test]
 fn okta_generate_config() {
     test_generate_config::<OktaConfig>();
+}
+
+#[test]
+fn okta_limit_validation() {
+    assert!(validate_limit(1).is_ok());
+    assert!(validate_limit(1000).is_ok());
+    assert!(validate_limit(0).is_err());
+    assert!(validate_limit(1001).is_err());
 }
 
 impl ValidatableComponent for OktaConfig {
@@ -67,14 +77,17 @@ async fn okta_compliance() {
         .and(warp::query::<std::collections::HashMap<String, String>>())
         .map({
             move |q: std::collections::HashMap<String, String>| match q.get("after") {
-                None => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
-                    )
-                    .body(r#"[{"data":"foo"},{"data":"bar"}]"#)
-                    .unwrap(),
+                None => {
+                    assert_eq!(q.get("limit").map(String::as_str), Some("1000"));
+                    warp::http::Response::builder()
+                        .header("Content-Type", "application/json")
+                        .header(
+                            "link",
+                            format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
+                        )
+                        .body(r#"[{"data":"foo"},{"data":"bar"}]"#)
+                        .unwrap()
+                }
                 Some(_) => warp::http::Response::builder()
                     .header("Content-Type", "application/json")
                     .header(
@@ -92,6 +105,7 @@ async fn okta_compliance() {
     let events = run_compliance(OktaConfig {
         domain: format!("http://{in_addr}"),
         token: "token".to_string(),
+        limit: 1000,
         interval: INTERVAL,
         timeout: TIMEOUT,
         log_namespace: None,
