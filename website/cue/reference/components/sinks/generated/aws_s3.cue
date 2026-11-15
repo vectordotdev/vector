@@ -235,8 +235,7 @@ generated: components: sinks: aws_s3: configuration: {
 
 			Directly comparable to the `Content-Type` HTTP header.
 
-			If not specified, the compression scheme used dictates this value.
-			When `compression` is set to `none`, the value `text/x-log` is used.
+			If not specified, the value `text/x-log` is used.
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]
