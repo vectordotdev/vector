@@ -9,7 +9,10 @@ use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
 use vector_lib::{
     codecs::encoding::{Chunker, Chunking},
-    internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent, emit},
+    internal_event::{
+        ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent, SinkNetworkBytesSent,
+        emit, register,
+    },
 };
 
 #[cfg(unix)]
@@ -124,6 +127,15 @@ async fn send_datagram(socket: &mut DatagramSocket, buf: &[u8]) -> tokio::io::Re
         #[cfg(unix)]
         DatagramSocket::Unix(uds, _) => uds.send(buf).await,
     }?;
+    register(SinkNetworkBytesSent {
+        protocol: match socket {
+            DatagramSocket::Udp(_) => "udp",
+            #[cfg(unix)]
+            DatagramSocket::Unix(..) => "unix",
+        }
+        .into(),
+    })
+    .emit(ByteSize(sent));
     if sent != buf.len() {
         match socket {
             DatagramSocket::Udp(_) => emit(UdpSendIncompleteError {
@@ -138,4 +150,66 @@ async fn send_datagram(socket: &mut DatagramSocket, buf: &[u8]) -> tokio::io::Re
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use tracing::Instrument;
+    use vector_lib::internal_event::Protocol;
+
+    use super::*;
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+
+    #[tokio::test]
+    async fn network_bytes_count_udp_payload_on_send() {
+        trace_init();
+        let component = "network_udp_sent";
+        async {
+            let receiver = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let sender = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            sender
+                .connect(receiver.local_addr().unwrap())
+                .await
+                .unwrap();
+            let mut socket = DatagramSocket::Udp(sender);
+            let bytes_sent = register(BytesSent::from(Protocol::UDP));
+            let bytes = bytes::Bytes::from_static(b"payload");
+            assert!(send_and_emit(&mut socket, &bytes, &bytes_sent).await);
+            let mut buf = [0_u8; 7];
+            assert_eq!(receiver.recv(&mut buf).await.unwrap(), 7);
+            assert_eq!(&buf, b"payload");
+            for name in [
+                "component_sent_network_bytes_total",
+                "component_sent_bytes_total",
+            ] {
+                assert_eq!(
+                    counter_value_with_tags(name, &[("component_id", component)]).to_bits(),
+                    7.0_f64.to_bits(),
+                );
+            }
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn network_bytes_do_not_count_udp_payload_when_send_fails() {
+        trace_init();
+        let component = "network_udp_failed";
+        async {
+            // A UDP socket with no destination fails without transmitting a datagram.
+            let mut socket = DatagramSocket::Udp(UdpSocket::bind("127.0.0.1:0").await.unwrap());
+            assert!(send_datagram(&mut socket, b"unsent").await.is_err());
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_sent_network_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
 }

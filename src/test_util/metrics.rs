@@ -14,6 +14,36 @@ use crate::{
 };
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
+
+/// Reads a counter from the process recorder, restricted to the specified labels.
+///
+/// Tests should use a unique label value to avoid interference from concurrent tests.
+///
+/// # Panics
+///
+/// Panics if metrics are not initialized or a matching metric is not a counter.
+#[must_use]
+pub fn counter_value_with_tags(name: &str, tags: &[(&str, &str)]) -> f64 {
+    vector_lib::metrics::Controller::get()
+        .expect("metrics controller initialized")
+        .capture_metrics()
+        .into_iter()
+        .filter(|metric| {
+            metric.name() == name
+                && tags.iter().all(|(key, value)| {
+                    metric
+                        .tags()
+                        .is_some_and(|tags| tags.get(key) == Some(*value))
+                })
+        })
+        .map(|metric| match metric.value() {
+            MetricValue::Counter { value } => *value,
+            other => panic!("expected counter for {name}, got {other:?}"),
+        })
+        .reduce(|total, value| total + value)
+        .unwrap_or(0.0)
+}
+
 pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
 pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 
