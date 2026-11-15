@@ -59,7 +59,9 @@ generated: components: sources: gcp_pubsub: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] or
+			[Workload Identity Federation][gcp_workload_identity_federation] (`external_account`)
+			credentials JSON file.
 
 			Either an API key or a path to a service account credentials JSON file can be specified.
 
@@ -69,6 +71,7 @@ generated: components: sources: gcp_pubsub: configuration: {
 			credentials JSON file.
 
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+			[gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
 			"""
 		required: false
 		type: string: {}
