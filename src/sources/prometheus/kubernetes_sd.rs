@@ -510,7 +510,7 @@ fn collect_targets(
     out
 }
 
-/// A single scrape target derived from a Pod annotation set or static config.
+/// A scrape target discovered from a Pod's annotations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
     pub(crate) uri: Uri,

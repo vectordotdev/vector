@@ -330,7 +330,7 @@ impl PrometheusScrapeConfig {
     /// Builds the source when `targets` contains a Kubernetes group.
     ///
     /// Static URLs and discovered Pods are scraped by two loops that share the source's output.
-    /// The source ends when either loop ends, which also stops the Pod watchers.
+    /// The source ends when both loops end or either one fails, which also stops the Pod watchers.
     #[cfg(feature = "kubernetes")]
     async fn build_kubernetes_source(
         &self,
@@ -370,7 +370,7 @@ impl PrometheusScrapeConfig {
         let shutdown = cx.shutdown;
         let out = cx.out;
         let discovered_scrape = async move {
-            // Start once the initial Pod list is in, so the first scrape isn't empty.
+            // Wait up to one scrape interval for the initial Pod list.
             if !discovery.wait_until_ready(interval, shutdown.clone()).await {
                 return Ok(());
             }
