@@ -54,9 +54,8 @@ impl ExpansionBudget {
 
     /// Charges one copy of the Agent fields written onto every trace event.
     ///
-    /// `copies` is the number of events the request will emit. The caller uses this only when the
-    /// request contains indexed payloads, because those payloads can contain many more chunks than
-    /// the encoded body size suggests.
+    /// `copies` is the number of events converted from indexed payloads. Events from legacy payloads
+    /// are not charged, because their count is already bounded by the encoded body size.
     pub(super) fn charge_agent_metadata(
         &self,
         copies: usize,

@@ -119,6 +119,7 @@ fn handle_dd_trace_payload(
         .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
+    let legacy_event_count = trace_events.len();
     let has_idx_payloads = !decoded_payload.idx_tracer_payloads.is_empty();
     let budget = ExpansionBudget::new(source.max_trace_expansion_bytes);
     for payload in decoded_payload.idx_tracer_payloads {
@@ -149,7 +150,7 @@ fn handle_dd_trace_payload(
     };
     if has_idx_payloads
         && let Err(error) = budget.charge_agent_metadata(
-            trace_events.len(),
+            trace_events.len() - legacy_event_count,
             fields.hostname,
             fields.env,
             fields.agent_version,
