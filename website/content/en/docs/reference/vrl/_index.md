@@ -154,7 +154,7 @@ acquainted with Vector and VRL:
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
 where you can experiment with VRL.
 
-Some functions are currently unsupported on the playground.
+Some functions aren't supported in the playground.
 {{< /info >}}
 
 ## The goals of VRL {#goals}
