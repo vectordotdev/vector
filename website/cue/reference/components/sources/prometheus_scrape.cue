@@ -109,6 +109,11 @@ components: sources: prometheus_scrape: {
 
 				Metrics from discovered Pods get the `namespace`, `pod`, `node`, and `container` tags,
 				plus the labels and annotations listed in `pod_label_tags` and `pod_annotation_tags`.
+				When a scraped metric already has one of these labels, `honor_labels` decides which value
+				is kept, as it does for `instance_tag`. For exporters such as kube-state-metrics, set
+				`honor_labels: true` to preserve metric labels that conflict with discovery tags. Use a
+				separate source if other targets require different conflict handling.
+
 				Static URLs and discovered Pods can be scraped by the same source:
 
 				```yaml
