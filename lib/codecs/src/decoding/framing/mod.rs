@@ -18,7 +18,10 @@ pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
     OversizedAction,
 };
-pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions};
+pub use chunked_gelf::{
+    ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions,
+    ChunkedGelfDecompression,
+};
 use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{
