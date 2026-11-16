@@ -1191,11 +1191,29 @@ mod tests {
                 .unwrap(),
             &Value::from("-4")
         );
+    }
 
+    #[test]
+    fn sampling_mechanism_zero_adds_no_tag() {
         let strings = Strings::new();
         let span = base_span(&strings);
         let absent = convert(strings.into_payload(vec![chunk(0, 1, vec![span])]));
         assert!(!object(absent[0].as_map().get("tags").unwrap()).contains_key("_dd.p.dm"));
+    }
+
+    #[test]
+    fn sampling_mechanism_zero_keeps_an_explicit_chunk_tag() {
+        let strings = Strings::new();
+        let span = base_span(&strings);
+        let mut trace = chunk(0, 1, vec![span]);
+        trace.attributes = strings.map(vec![("_dd.p.dm", strings.string("-0"))]);
+        let events = convert(strings.into_payload(vec![trace]));
+        assert_eq!(
+            object(events[0].as_map().get("tags").unwrap())
+                .get("_dd.p.dm")
+                .unwrap(),
+            &Value::from("-0")
+        );
     }
 
     #[test]
