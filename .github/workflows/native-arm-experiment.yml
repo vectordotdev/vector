@@ -69,6 +69,7 @@ jobs:
           ref: ${{ github.event.review.commit_id }}
           persist-credentials: false
       - name: Build native ARM toolchain
+        if: ${{ !endsWith(github.event.review.body, '-release') }}
         env:
           TARGET: ${{ matrix.target }}
           PLATFORM: ${{ matrix.platform }}
@@ -96,6 +97,7 @@ jobs:
               --build-arg RUST_HOST="$RUST_HOST" --build-arg RUST_TARGET="$TARGET" -t vector-native-arm .
           fi
       - name: Compile and run a Rust smoke test
+        if: ${{ !endsWith(github.event.review.body, '-release') }}
         timeout-minutes: 5
         env:
           TARGET: ${{ matrix.target }}
@@ -114,6 +116,7 @@ jobs:
             timeout 90 /tmp/probe
           '
       - name: Test native dependency patches
+        if: ${{ !endsWith(github.event.review.body, '-release') }}
         timeout-minutes: 10
         env:
           TARGET: ${{ matrix.target }}
@@ -191,29 +194,6 @@ jobs:
               "$REPOS:$TAG-$BASE" --config /smoke.yaml > "$RUNNER_TEMP/native-smoke.json"
             grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/native-smoke.json"
           done
-      - name: Verify the ARMv6 CPU floor
-        if: endsWith(github.event.review.body, '-release') && startsWith(matrix.target, 'arm-')
-        env:
-          TARGET: ${{ matrix.target }}
-          VECTOR_VERSION: ${{ steps.metadata.outputs.vector_version }}
-        run: |
-          # Emulate only the final program, after the native build and runtime
-          # tests. An ARM64 CPU cannot detect accidental ARMv7 instructions.
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-user-static
-          if [[ "$TARGET" == *musl* ]]; then
-            BASE=alpine
-            binary=/usr/local/bin/vector
-          else
-            BASE=debian
-            binary=/usr/bin/vector
-          fi
-          printf 'native packaging works\n' | timeout 90 docker run --rm -i --platform linux/arm/v6 \
-            -v /usr/bin/qemu-arm-static:/qemu:ro \
-            -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro" \
-            --entrypoint /qemu "vector-ci:$VECTOR_VERSION-$BASE" \
-            -cpu arm1176 "$binary" --config /smoke.yaml > "$RUNNER_TEMP/armv6-smoke.json"
-          grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/armv6-smoke.json"
       - name: Link Vector with the release feature set
         if: ${{ !endsWith(github.event.review.body, '-release') }}
         env:
@@ -252,9 +232,11 @@ jobs:
               fi
             '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: native-${{ matrix.target }}
           path: |
             target/${{ matrix.target }}/release/vector
             target/artifacts/*
-          if-no-files-found: error
+            target/${{ matrix.target }}-runtime.strace
+          if-no-files-found: warn

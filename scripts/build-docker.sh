@@ -103,7 +103,7 @@ build() {
     if [[ -n "$BUILDABLE_PLATFORMS" ]]; then
       RUNTIME_ARGS+=(--platform="$BUILDABLE_PLATFORMS")
     fi
-    printf 'native packaging works\n' | timeout 90 docker run "${RUNTIME_ARGS[@]}" \
+    printf 'native packaging works\n' | timeout --kill-after=10 90 docker run "${RUNTIME_ARGS[@]}" \
       "${REPO_LIST[0]}:$VERSION-$BASE" --config /etc/vector/native-release-smoke.yaml > "$SMOKE_OUTPUT"
     grep -F '"message":"NATIVE PACKAGING WORKS"' "$SMOKE_OUTPUT"
 
@@ -122,7 +122,7 @@ build() {
         debian) VECTOR_BINARY=/usr/bin/vector ;;
         *) echo "No ARMv6 runtime test for $BASE" >&2; return 1 ;;
       esac
-      printf 'native packaging works\n' | timeout 90 docker run "${RUNTIME_ARGS[@]}" \
+      printf 'native packaging works\n' | timeout --kill-after=10 90 docker run "${RUNTIME_ARGS[@]}" \
         --volume "$QEMU_DIR/extracted/usr/bin/qemu-arm-static:/ci-qemu-arm-static:ro" \
         --entrypoint /ci-qemu-arm-static "${REPO_LIST[0]}:$VERSION-$BASE" \
         -cpu arm1176 "$VECTOR_BINARY" --config /etc/vector/native-release-smoke.yaml > "$SMOKE_OUTPUT"

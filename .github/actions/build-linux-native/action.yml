@@ -63,7 +63,7 @@ runs:
           --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
           --build-arg RUST_HOST="$HOST" --build-arg RUST_TARGET="$TARGET" \
           -t vector-native-builder .
-        docker run --rm --platform "$PLATFORM" vector-native-builder timeout 90 rustc -vV
+        docker run --rm --platform "$PLATFORM" vector-native-builder timeout --kill-after=10 90 rustc -vV
         if [[ "$TARGET" == arm*-unknown-linux-musl* ]]; then
           docker tag vector-native-builder vector-native-arm-gnu
           MUSL_ARGS=()
@@ -84,7 +84,7 @@ runs:
         BUILD_TARGET: ${{ steps.environment.outputs.build-target }}
         PLATFORM: ${{ steps.environment.outputs.platform }}
       run: |
-        docker run --rm --platform "$PLATFORM" -v "$PWD:/work" \
+        docker run --rm --platform "$PLATFORM" --cap-add SYS_PTRACE -v "$PWD:/work" \
           -e TARGET -e BUILD_TARGET -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
           -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 -e CFLAGS="-g0 -O3" \
           vector-native-builder bash -euxo pipefail -c '
@@ -100,10 +100,10 @@ runs:
               if [[ "$TARGET" == *musl* ]]; then
                 PROBE_FLAGS=(-C target-feature=+crt-static)
               fi
-              timeout 90 rustc --edition=2024 --target "$BUILD_TARGET" \
+              timeout --kill-after=10 90 rustc --edition=2024 --target "$BUILD_TARGET" \
                 -C "linker=${!LINKER_VAR}" -C opt-level=2 "${PROBE_FLAGS[@]}" \
                 tests/data/native-release-toolchain-smoke.rs -o /tmp/vector-target-smoke
-              timeout 90 /tmp/vector-target-smoke
+              timeout --kill-after=10 90 /tmp/vector-target-smoke
             fi
             # Use the actual release profile, including fat LTO.
             cargo build --locked --release --target "$BUILD_TARGET" \
@@ -122,9 +122,19 @@ runs:
                 exit 1
               fi
             fi
-            timeout 90 "$file" --version
-            printf "native packaging works\n" | timeout 90 "$file" \
-              --config tests/data/native-release-smoke.yaml > /tmp/native-release-output.json
+            timeout --kill-after=10 90 "$file" --version
+            if ! printf "native packaging works\n" | timeout --kill-after=10 90 "$file" \
+              --config tests/data/native-release-smoke.yaml > /tmp/native-release-output.json; then
+              if [[ "$TARGET" == arm-unknown-linux-* ]]; then
+                # Keep runtime failures bounded and retain syscall diagnostics.
+                trace="target/$TARGET-runtime.strace"
+                printf "native packaging works\n" | timeout --kill-after=5 20 \
+                  strace -f -tt -T -o "$trace" "$file" \
+                  --config tests/data/native-release-smoke.yaml || true
+                tail -n 100 "$trace"
+              fi
+              exit 1
+            fi
             grep -F "\"message\":\"NATIVE PACKAGING WORKS\"" /tmp/native-release-output.json
             if [[ "$BUILD_TARGET" != "$TARGET" ]]; then
               mkdir -p "target/$TARGET/release"
