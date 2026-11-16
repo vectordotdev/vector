@@ -38,7 +38,7 @@ use crate::{
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
-pub(crate) const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 const fn default_scheme() -> Scheme {
     Scheme::Http
@@ -111,7 +111,7 @@ pub(crate) struct KubernetesScrapeConfig {
     /// The source reads `<prefix>/scrape`, `<prefix>/port`, `<prefix>/path`,
     /// `<prefix>/scheme`, and `<prefix>/param_<name>` from Pod annotations.
     #[configurable(metadata(docs::examples = "prometheus.io"))]
-    pub(crate) annotation_prefix: String,
+    annotation_prefix: String,
 
     /// Restrict discovery to Pods on the current node.
     ///
@@ -119,44 +119,44 @@ pub(crate) struct KubernetesScrapeConfig {
     /// `<node>` is read from the `VECTOR_SELF_NODE_NAME` environment variable
     /// (or the `self_node_name` option). Use this when deploying Vector as a
     /// `DaemonSet`.
-    pub(crate) use_self_node_only: bool,
+    use_self_node_only: bool,
 
     /// Override for the node name used by `use_self_node_only`.
     ///
     /// If unset and `use_self_node_only` is `true`, the `VECTOR_SELF_NODE_NAME`
     /// environment variable is read instead.
     #[configurable(metadata(docs::examples = "node-01"))]
-    pub(crate) self_node_name: Option<String>,
+    self_node_name: Option<String>,
 
     /// Kubernetes field selector that further limits which Pods are discovered.
     ///
     /// When `use_self_node_only` is enabled, it is combined with `spec.nodeName=<node>`.
     #[configurable(metadata(docs::examples = "metadata.namespace=monitoring"))]
-    pub(crate) extra_field_selector: String,
+    extra_field_selector: String,
 
     /// Kubernetes label selector that limits which Pods are discovered.
     #[configurable(metadata(docs::examples = "tier=frontend"))]
-    pub(crate) label_selector: String,
+    label_selector: String,
 
     /// Restrict discovery to specific namespaces.
     ///
     /// When non-empty, only Pods in the listed namespaces are watched. When
     /// empty, all namespaces are watched (requires cluster-wide RBAC).
     #[configurable(metadata(docs::examples = "monitoring"))]
-    pub(crate) namespaces: Vec<String>,
+    namespaces: Vec<String>,
 
     /// Path to a kubeconfig file.
     ///
     /// When unset, the source falls back to the local kubeconfig followed by
     /// in-cluster service-account credentials.
-    pub(crate) kube_config_file: Option<PathBuf>,
+    kube_config_file: Option<PathBuf>,
 
     /// Default scheme when `<prefix>/scheme` is not set on a Pod.
-    pub(crate) default_scheme: Scheme,
+    default_scheme: Scheme,
 
     /// Default scrape path when `<prefix>/path` is not set on a Pod.
     #[configurable(metadata(docs::examples = "/metrics"))]
-    pub(crate) default_path: String,
+    default_path: String,
 
     /// Allowlist of Pod labels to add as metric tags.
     ///
@@ -166,19 +166,51 @@ pub(crate) struct KubernetesScrapeConfig {
     /// avoid cardinality blow-ups.
     #[configurable(metadata(docs::examples = "app"))]
     #[configurable(metadata(docs::examples = "version"))]
-    pub(crate) pod_label_tags: Vec<String>,
+    pod_label_tags: Vec<String>,
 
     /// Allowlist of Pod annotations to add as metric tags.
     ///
     /// Tag names are derived the same way as for `pod_label_tags`.
     #[configurable(metadata(docs::examples = "owner"))]
-    pub(crate) pod_annotation_tags: Vec<String>,
+    pod_annotation_tags: Vec<String>,
 }
 
 /// Tags that discovery adds to every metric, in addition to `instance_tag` and `endpoint_tag`.
 const DISCOVERY_TAGS: [&str; 4] = ["namespace", "pod", "node", "container"];
 
 impl KubernetesScrapeConfig {
+    /// Connects to Kubernetes and starts watching Pods that match this config.
+    ///
+    /// The returned [`PodDiscovery`] owns the watchers, so dropping it stops them.
+    pub(crate) async fn start_discovery(&self) -> crate::Result<PodDiscovery> {
+        let client = build_kube_client(self.kube_config_file.as_ref()).await?;
+        let self_node_name = match (self.use_self_node_only, &self.self_node_name) {
+            (false, _) => None,
+            (true, Some(name)) => Some(name.clone()),
+            (true, None) => Some(
+                std::env::var(SELF_NODE_NAME_ENV_KEY)
+                    .map_err(|_| BuildError::SelfNodeNameMissing)?,
+            ),
+        };
+        Ok(PodDiscovery::start(
+            &client,
+            &self.namespaces,
+            build_field_selector(self_node_name.as_deref(), &self.extra_field_selector),
+            build_label_selector(&self.label_selector),
+            self.parser_config(),
+        ))
+    }
+
+    fn parser_config(&self) -> AnnotationParserConfig {
+        AnnotationParserConfig {
+            prefix: self.annotation_prefix.clone(),
+            default_scheme: self.default_scheme,
+            default_path: self.default_path.clone(),
+            pod_label_tags: self.pod_label_tags.clone(),
+            pod_annotation_tags: self.pod_annotation_tags.clone(),
+        }
+    }
+
     /// Checks that every tag a discovered target adds has its own name.
     ///
     /// Two tags with the same name would overwrite each other depending on their order, so
@@ -300,7 +332,7 @@ enum BuildError {
 }
 
 /// Build a Kubernetes client mirroring the pattern used by `kubernetes_logs`.
-pub(crate) async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> crate::Result<Client> {
+async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> crate::Result<Client> {
     let mut client_config = match kube_config_file {
         Some(kc) => ClientConfig::from_custom_kubeconfig(
             config::Kubeconfig::read_from(kc)
@@ -322,7 +354,7 @@ pub(crate) async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> cra
         .map_err(|source| Box::new(BuildError::Client { source }) as crate::Error)
 }
 
-pub(crate) fn build_field_selector(self_node_name: Option<&str>, extra: &str) -> Option<String> {
+fn build_field_selector(self_node_name: Option<&str>, extra: &str) -> Option<String> {
     let mut parts = Vec::new();
     if let Some(node) = self_node_name {
         parts.push(format!("spec.nodeName={node}"));
@@ -337,7 +369,7 @@ pub(crate) fn build_field_selector(self_node_name: Option<&str>, extra: &str) ->
     }
 }
 
-pub(crate) fn build_label_selector(label_selector: &str) -> Option<String> {
+fn build_label_selector(label_selector: &str) -> Option<String> {
     (!label_selector.is_empty()).then(|| label_selector.to_owned())
 }
 
@@ -354,7 +386,7 @@ pub(crate) struct PodDiscovery {
 impl PodDiscovery {
     /// Starts one watcher per namespace, or a single cluster-wide watcher when `namespaces` is
     /// empty.
-    pub(crate) fn start(
+    fn start(
         client: &Client,
         namespaces: &[String],
         field_selector: Option<String>,
@@ -448,11 +480,11 @@ impl PodDiscovery {
     /// events through a `reflector::store::Writer`.
     pub(crate) fn from_stores(
         stores: Vec<reflector::Store<Pod>>,
-        parser_cfg: AnnotationParserConfig,
+        cfg: &KubernetesScrapeConfig,
     ) -> Self {
         Self {
             stores,
-            parser_cfg,
+            parser_cfg: cfg.parser_config(),
             _watchers: JoinSet::new(),
         }
     }
@@ -512,12 +544,12 @@ impl Target {
 
 /// Annotation-parser configuration shared across ticks.
 #[derive(Clone, Debug)]
-pub(crate) struct AnnotationParserConfig {
-    pub(crate) prefix: String,
-    pub(crate) default_scheme: Scheme,
-    pub(crate) default_path: String,
-    pub(crate) pod_label_tags: Vec<String>,
-    pub(crate) pod_annotation_tags: Vec<String>,
+struct AnnotationParserConfig {
+    prefix: String,
+    default_scheme: Scheme,
+    default_path: String,
+    pod_label_tags: Vec<String>,
+    pod_annotation_tags: Vec<String>,
 }
 
 #[derive(Debug, Snafu)]

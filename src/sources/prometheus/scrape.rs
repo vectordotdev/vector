@@ -341,40 +341,7 @@ impl PrometheusScrapeConfig {
         builder: PrometheusScrapeBuilder,
         cx: SourceContext,
     ) -> Result<sources::Source> {
-        let kube_client =
-            kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
-
-        let self_node_name = if k8s_cfg.use_self_node_only {
-            let resolved = match k8s_cfg.self_node_name.clone() {
-                Some(n) => n,
-                None => std::env::var(kubernetes_sd::SELF_NODE_NAME_ENV_KEY).map_err(|_| {
-                    format!(
-                        "self_node_name config value or {} env var must be set when use_self_node_only is true",
-                        kubernetes_sd::SELF_NODE_NAME_ENV_KEY
-                    )
-                })?,
-            };
-            Some(resolved)
-        } else {
-            None
-        };
-
-        let discovery = kubernetes_sd::PodDiscovery::start(
-            &kube_client,
-            &k8s_cfg.namespaces,
-            kubernetes_sd::build_field_selector(
-                self_node_name.as_deref(),
-                &k8s_cfg.extra_field_selector,
-            ),
-            kubernetes_sd::build_label_selector(&k8s_cfg.label_selector),
-            kubernetes_sd::AnnotationParserConfig {
-                prefix: k8s_cfg.annotation_prefix.clone(),
-                default_scheme: k8s_cfg.default_scheme,
-                default_path: k8s_cfg.default_path.clone(),
-                pod_label_tags: k8s_cfg.pod_label_tags.clone(),
-                pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
-            },
-        );
+        let discovery = k8s_cfg.start_discovery().await?;
 
         let static_scrape = (!static_urls.is_empty()).then(|| {
             call(
@@ -669,8 +636,8 @@ mod validation_tests {
     #[cfg(feature = "kubernetes")]
     #[test]
     fn rejects_conflicting_kubernetes_tags_during_config_compilation() {
-        let mut k8s_cfg = KubernetesScrapeConfig::default();
-        k8s_cfg.pod_label_tags = vec!["namespace".to_owned()];
+        let k8s_cfg: KubernetesScrapeConfig =
+            serde_json::from_value(serde_json::json!({ "pod_label_tags": ["namespace"] })).unwrap();
         let errors = compilation_errors(config_with(
             Vec::new(),
             vec![TargetConfig::Kubernetes(k8s_cfg)],
@@ -1415,13 +1382,7 @@ mod kubernetes_tests {
         let mut writer = reflector::store::Writer::<Pod>::default();
         let discovery = kubernetes_sd::PodDiscovery::from_stores(
             vec![writer.as_reader()],
-            kubernetes_sd::AnnotationParserConfig {
-                prefix: "prometheus.io".to_owned(),
-                default_scheme: kubernetes_sd::Scheme::Http,
-                default_path: "/metrics".to_owned(),
-                pod_label_tags: Vec::new(),
-                pod_annotation_tags: Vec::new(),
-            },
+            &KubernetesScrapeConfig::default(),
         );
         writer.apply_watcher_event(&watcher::Event::Init);
         writer.apply_watcher_event(&watcher::Event::InitApply(pod("a", "/a", port)));
