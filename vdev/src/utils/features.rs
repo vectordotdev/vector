@@ -410,6 +410,16 @@ mod tests {
         "});
         assert!(single_entry.contains(&"kubernetes".to_owned()));
 
+        let single_static = features(indoc! {"
+            sources:
+              static:
+                type: prometheus_scrape
+                targets:
+                  static:
+                    urls: [http://localhost:9090/metrics]
+        "});
+        assert!(!single_static.contains(&"kubernetes".to_owned()));
+
         let static_only = features(indoc! {"
             sources:
               static:
