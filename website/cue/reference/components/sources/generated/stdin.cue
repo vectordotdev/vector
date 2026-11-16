@@ -7,7 +7,7 @@ generated: components: sources: stdin: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::117ef30e93edb408973ffc00"]
 	}
 	framing: {
 		description: """

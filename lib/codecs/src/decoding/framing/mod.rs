@@ -20,7 +20,7 @@ pub use character_delimited::{
 };
 pub use chunked_gelf::{
     ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions,
-    ChunkedGelfDecompression, ChunkedGelfDecompressionError,
+    ChunkedGelfDecompression, ChunkedGelfDecompressionConfig, ChunkedGelfDecompressionError,
 };
 use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};

@@ -139,6 +139,8 @@ impl ChunkedGelfDecompressionConfig {
         clippy::trivially_copy_pass_by_ref,
         reason = "Keep the existing borrowed receiver API during the lint rollout."
     )]
+    /// Returns the decompression algorithm to use for `data`; `Auto` detects it from
+    /// the leading magic bytes.
     pub fn get_decompression(&self, data: &Bytes) -> ChunkedGelfDecompression {
         match self {
             Self::Auto => ChunkedGelfDecompression::from_magic(data),
