@@ -162,15 +162,15 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: _internal_metrics_tags & {
 				reason: {
-					description: "The error that triggered the shutdown."
+					description: "The reason for the shutdown, or `none` if no error triggered it."
 					required:    true
 					enum: {
-						"none":                     "No error triggered the shutdown, for example on a shutdown signal or once all sources have finished."
+						"none":                     "No error triggered the shutdown, such as after a shutdown signal or after all sources finish."
 						"api_failed":               "The API failed to start."
-						"reload_failed_to_restore": "A reload failed, and the previous configuration could not be restored."
-						"source_aborted":           "A source task died during execution."
-						"transform_aborted":        "A transform task died during execution."
-						"sink_aborted":             "A sink task died during execution."
+						"reload_failed_to_restore": "A reload failed, and Vector couldn't restore the previous configuration."
+						"source_aborted":           "A source task stopped unexpectedly during execution."
+						"transform_aborted":        "A transform task stopped unexpectedly during execution."
+						"sink_aborted":             "A sink task stopped unexpectedly during execution."
 					}
 				}
 			}

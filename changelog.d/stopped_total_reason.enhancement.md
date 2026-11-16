@@ -1,3 +1,3 @@
-The `stopped_total` internal metric now has a `reason` tag that tells whether an error triggered the shutdown. It is `none` for a normal shutdown, such as on a shutdown signal or once all sources have finished, and otherwise one of `source_aborted`, `transform_aborted`, `sink_aborted`, `api_failed` or `reload_failed_to_restore`.
+The `stopped_total` internal metric has a new `reason` tag that indicates whether an error triggered the shutdown. The value is `none` for a normal shutdown, such as after a shutdown signal or after all sources finish. Otherwise, the value is one of `source_aborted`, `transform_aborted`, `sink_aborted`, `api_failed`, or `reload_failed_to_restore`.
 
 authors: gwenaskell
