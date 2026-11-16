@@ -101,7 +101,6 @@ configuration, hardware, and software versions.
 [docs.about.introduction]: https://vector.dev/docs/introduction/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.administration.management]: https://vector.dev/docs/administration/management/
-[docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.architecture.concurrency-model]: https://vector.dev/docs/architecture/concurrency-model/
 [docs.architecture.data-model]: https://vector.dev/docs/architecture/data-model/
@@ -174,7 +173,6 @@ configuration, hardware, and software versions.
 [urls.vector_contributing_policy]: https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
-[urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
 [urls.vector_releases]: https://vector.dev/releases/
 [urls.vector_releases_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy
