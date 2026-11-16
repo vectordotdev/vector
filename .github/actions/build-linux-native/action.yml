@@ -5,6 +5,9 @@ inputs:
   target:
     description: Rust release target
     required: true
+  probe-only:
+    description: Only build and execute the ARM32 toolchain probe
+    default: "false"
 
 runs:
   using: composite
@@ -83,9 +86,10 @@ runs:
         TARGET: ${{ inputs.target }}
         BUILD_TARGET: ${{ steps.environment.outputs.build-target }}
         PLATFORM: ${{ steps.environment.outputs.platform }}
+        PROBE_ONLY: ${{ inputs.probe-only }}
       run: |
         docker run --rm --platform "$PLATFORM" --cap-add SYS_PTRACE -v "$PWD:/work" \
-          -e TARGET -e BUILD_TARGET -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
+          -e TARGET -e BUILD_TARGET -e PROBE_ONLY -e VECTOR_VERSION -e VECTOR_BUILD_DESC -e CHANNEL \
           -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=6 -e CFLAGS="-g0 -O3" \
           vector-native-builder bash -euxo pipefail -c '
             git config --global --add safe.directory /work
@@ -93,25 +97,47 @@ runs:
             if [[ "$TARGET" == *musl* ]]; then
               export RUSTFLAGS="-D warnings -C target-feature=+crt-static"
             fi
+            CARGO_BUILD=(cargo build)
+            CARGO_BUILD_TARGET="$BUILD_TARGET"
+            case "$TARGET" in
+              arm-unknown-linux-gnueabi|armv7-unknown-linux-gnueabihf)
+                # Preserve compatibility instead of linking against the newer
+                # GNU libraries used to run programs in this build container.
+                key="${BUILD_TARGET//-/_}"
+                unset "CC_$key" "CXX_$key" "AR_$key" "CARGO_TARGET_${key^^}_LINKER"
+                export "PKG_CONFIG_LIBDIR_$key=/opt/target-pkgconfig"
+                export LIBZ_SYS_STATIC=1
+                CARGO_BUILD=(cargo zigbuild)
+                CARGO_BUILD_TARGET="$BUILD_TARGET.2.17"
+                ;;
+            esac
             if [[ "$TARGET" == arm* ]]; then
-              LINKER_VAR="CARGO_TARGET_${BUILD_TARGET^^}_LINKER"
-              LINKER_VAR="${LINKER_VAR//-/_}"
-              PROBE_FLAGS=()
-              if [[ "$TARGET" == *musl* ]]; then
-                PROBE_FLAGS=(-C target-feature=+crt-static)
-              fi
-              timeout --kill-after=10 90 rustc --edition=2024 --target "$BUILD_TARGET" \
-                -C "linker=${!LINKER_VAR}" -C opt-level=2 "${PROBE_FLAGS[@]}" \
-                tests/data/native-release-toolchain-smoke.rs -o /tmp/vector-target-smoke
-              timeout --kill-after=10 90 /tmp/vector-target-smoke
+              CARGO_TARGET_DIR=/tmp/native-release-probe "${CARGO_BUILD[@]}" \
+                --locked --release --target "$CARGO_BUILD_TARGET" \
+                --manifest-path tests/data/native-release-toolchain-probe/Cargo.toml
+              probe="/tmp/native-release-probe/$BUILD_TARGET/release/native-release-toolchain-probe"
+              readelf --version-info "$probe"
+              timeout --kill-after=10 90 "$probe"
+            fi
+            if [[ "$PROBE_ONLY" == true ]]; then
+              exit 0
             fi
             # Use the actual release profile, including fat LTO.
-            cargo build --locked --release --target "$BUILD_TARGET" \
+            "${CARGO_BUILD[@]}" --locked --release --target "$CARGO_BUILD_TARGET" \
               --no-default-features --features "target-$TARGET"
             file="target/$BUILD_TARGET/release/vector"
             readelf -h "$file"
             readelf -A "$file"
             readelf --version-info "$file"
+            case "$TARGET" in
+              arm-unknown-linux-gnueabi|armv7-unknown-linux-gnueabihf)
+                max_glibc=$(readelf --version-info "$file" | grep -oE "GLIBC_[0-9.]+" | sort -V | tail -n 1)
+                if [[ $(printf "%s\n" "$max_glibc" GLIBC_2.17 | sort -V | tail -n 1) != GLIBC_2.17 ]]; then
+                  echo "GNU artifact exceeds the glibc 2.17 compatibility limit: $max_glibc" >&2
+                  exit 1
+                fi
+                ;;
+            esac
             if [[ "$TARGET" == *musl* ]]; then
               if readelf -l "$file" | grep -q INTERP; then
                 echo "musl artifact must not have a dynamic interpreter" >&2
@@ -143,6 +169,7 @@ runs:
           '
 
     - name: Package the verified binary
+      if: inputs.probe-only != 'true'
       shell: bash
       env:
         TARGET: ${{ inputs.target }}

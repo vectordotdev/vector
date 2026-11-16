@@ -51,6 +51,31 @@ RUN set -eux; \
       rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"; \
     done
 
+# Use a maintained native linker with versioned GNU libc support. The target
+# headers and symbol stubs come from Zig, not the runner's newer GNU sysroot.
+# Runtime libraries installed above are only for native ARM32 execution checks.
+ARG ZIG_VERSION=0.17.1
+ARG CARGO_ZIGBUILD_VERSION=0.24.1
+RUN set -eux; \
+    case "${RUST_TARGET}" in \
+      arm-unknown-linux-gnueabi|armv7-unknown-linux-gnueabihf) \
+        cd /tmp; \
+        curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLo zig.tar.xz \
+          "https://ziglang.org/download/${ZIG_VERSION}/zig-aarch64-linux-${ZIG_VERSION}.tar.xz"; \
+        echo 'a1546d5646eb184437918d6635ca6b762a0e889eac09cef720ee7a1ed3fe7795  zig.tar.xz' | sha256sum -c -; \
+        mkdir -p /opt/zig /opt/cargo/bin /opt/target-pkgconfig; \
+        tar -xJf zig.tar.xz --strip-components=1 -C /opt/zig; \
+        curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLo cargo-zigbuild.tar.xz \
+          "https://github.com/rust-cross/cargo-zigbuild/releases/download/v${CARGO_ZIGBUILD_VERSION}/cargo-zigbuild-aarch64-unknown-linux-gnu.tar.xz"; \
+        echo '70bb4c9cc71a6d16211b9079996e3cd588671053312adeff4d043499ed887601  cargo-zigbuild.tar.xz' | sha256sum -c -; \
+        tar -xJf cargo-zigbuild.tar.xz --strip-components=1 -C /opt/cargo/bin; \
+        rm zig.tar.xz cargo-zigbuild.tar.xz; \
+        /opt/zig/zig version; \
+        /opt/cargo/bin/cargo-zigbuild --version; \
+        ;; \
+    esac
+ENV PATH="/opt/zig:/opt/cargo/bin:${PATH}"
+
 ENV CC_arm_unknown_linux_gnueabi=arm-linux-gnueabi-gcc \
     CXX_arm_unknown_linux_gnueabi=arm-linux-gnueabi-g++ \
     AR_arm_unknown_linux_gnueabi=arm-linux-gnueabi-ar \

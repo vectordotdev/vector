@@ -1,0 +1,15 @@
+[package]
+name = "native-release-toolchain-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "native-release-toolchain-probe"
+path = "../native-release-toolchain-smoke.rs"
+
+[workspace]
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
