@@ -11,7 +11,7 @@ use crate::common::resolve_tags;
 use crate::common::validate_tags;
 use crate::common::{Error, MetricsStorage};
 
-static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(ObjectMap::new()));
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
         Parameter::required("function", kind::BYTES, "The aggregation function to apply to the matched metrics.")
@@ -95,7 +95,7 @@ impl Function for AggregateVectorMetrics {
         "aggregate_vector_metrics"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         const_str::concat!(
             "Aggregates internal Vector metrics, using one of 4 aggregation functions, filtering by name and optionally by tags. Returns the aggregated value. Only includes counter and gauge metrics.\n\n",
             crate::VECTOR_METRICS_EXPLAINER

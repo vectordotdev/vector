@@ -405,6 +405,7 @@ mod tests {
     use ordered_float::NotNan;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
+    use vrl::objectmap;
 
     use super::*;
 
@@ -483,7 +484,7 @@ mod tests {
 
     #[test]
     fn serialize_extensions() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "cef" => Value::from(btreemap! {
                 "severity" => Value::from(1),
                 "name" => Value::from("Event name"),

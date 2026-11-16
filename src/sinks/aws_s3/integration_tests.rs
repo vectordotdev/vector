@@ -232,7 +232,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let keys = get_keys(&bucket, prefix).await;
@@ -342,10 +342,9 @@ async fn s3_zstd() {
     assert_eq!(lines, response_lines);
 }
 
-// NOTE: this test doesn't actually validate anything because localstack
+// NOTE: this test doesn't actually validate anything because the emulator
 // doesn't enforce the required Content-MD5 header on the request for
 // buckets with object lock enabled
-// https://github.com/localstack/localstack/issues/4166
 #[tokio::test]
 async fn s3_insert_message_into_object_lock() {
     let cx = SinkContext::default();

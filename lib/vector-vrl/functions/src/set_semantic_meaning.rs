@@ -37,7 +37,7 @@ impl Function for SetSemanticMeaning {
         "set_semantic_meaning"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         indoc! {"Sets a semantic meaning for an event."}
     }
 

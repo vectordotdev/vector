@@ -1005,7 +1005,7 @@ mod integration_tests {
             s3_event.records[0].s3.object.key.clone_from(&key);
 
             // send SQS message (this is usually sent by S3 itself when an object is uploaded)
-            // This does not automatically work with localstack and the AWS SDK, so this is done manually
+            // The test doesn't configure bucket notifications, so this is done manually
             let _send_message_output = sqs_client
                 .send_message()
                 .queue_url(queue.clone())

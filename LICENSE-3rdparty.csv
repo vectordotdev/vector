@@ -76,7 +76,6 @@ aws-credential-types,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rus
 aws-runtime,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
 aws-sdk-cloudwatch,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-sdk-cloudwatchlogs,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
-aws-sdk-elasticsearch,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-sdk-firehose,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-sdk-kinesis,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-sdk-kms,https://github.com/awslabs/aws-sdk-rust,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
@@ -256,7 +255,7 @@ dirs-next,https://github.com/xdg-rs/dirs,MIT OR Apache-2.0,The @xdg-rs members
 dirs-sys-next,https://github.com/xdg-rs/dirs/tree/master/dirs-sys,MIT OR Apache-2.0,The @xdg-rs members
 dispatch2,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,"Mads Marquart <mads@marquart.dk>, Mary <mary@mary.zone>"
 displaydoc,https://github.com/yaahc/displaydoc,MIT OR Apache-2.0,Jane Lusby <jlusby@yaah.dev>
-dns-lookup,https://github.com/keeperofdakeys/dns-lookup,MIT OR Apache-2.0,Josh Driver <keeperofdakeys@gmail.com>
+dns-lookup,https://github.com/keeperofdakeys/dns-lookup,MIT OR Apache-2.0,The dns-lookup Authors
 doc-comment,https://github.com/GuillaumeGomez/doc-comment,MIT,Guillaume Gomez <guillaume1.gomez@gmail.com>
 document-features,https://github.com/slint-ui/document-features,MIT OR Apache-2.0,Slint Developers <info@slint.dev>
 domain,https://github.com/nlnetlabs/domain,BSD-3-Clause,NLnet Labs <dns-team@nlnetlabs.nl>
@@ -578,7 +577,6 @@ outref,https://github.com/Nugine/outref,MIT,The outref Authors
 owo-colors,https://github.com/owo-colors/owo-colors,MIT,jam1garner <8260240+jam1garner@users.noreply.github.com>
 p256,https://github.com/RustCrypto/elliptic-curves/tree/master/p256,Apache-2.0 OR MIT,RustCrypto Developers
 p384,https://github.com/RustCrypto/elliptic-curves/tree/master/p384,Apache-2.0 OR MIT,"RustCrypto Developers, Frank Denis <github@pureftpd.org>"
-pad,https://github.com/ogham/rust-pad,MIT,Ben S <ogham@bsago.me>
 palette,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
 palette_derive,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
 palette_math,https://github.com/Ogeon/palette,MIT OR Apache-2.0,Erik Hedvall <hello@erikhedvall.nu>
@@ -897,7 +895,7 @@ utf16_iter,https://github.com/hsivonen/utf16_iter,Apache-2.0 OR MIT,Henri Sivone
 utf8-width,https://github.com/magiclen/utf8-width,MIT,Magic Len <len@magiclen.org>
 utf8_iter,https://github.com/hsivonen/utf8_iter,Apache-2.0 OR MIT,Henri Sivonen <hsivonen@hsivonen.fi>
 utf8parse,https://github.com/alacritty/vte,Apache-2.0 OR MIT,"Joe Wilm <joe@jwilm.com>, Christian Duerr <contact@christianduerr.com>"
-uuid,https://github.com/uuid-rs/uuid,Apache-2.0 OR MIT,"Ashley Mannix<ashleymannix@live.com.au>, Dylan DPC<dylan.dpc@gmail.com>, Hunar Roop Kahlon<hunar.roop@gmail.com>"
+uuid,https://github.com/uuid-rs/uuid,Apache-2.0 OR MIT,The uuid Authors
 uuid-simd,https://github.com/Nugine/simd,MIT,The uuid-simd Authors
 valuable,https://github.com/tokio-rs/valuable,MIT,The valuable Authors
 vrl,https://github.com/vectordotdev/vrl,MPL-2.0,Vector Contributors <vector@datadoghq.com>
