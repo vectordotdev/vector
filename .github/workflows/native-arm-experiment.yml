@@ -171,7 +171,8 @@ jobs:
           # This older image is a compatibility test, never a build environment.
           PLATFORM=linux/arm/v7
           if [[ "$TARGET" == arm-unknown-linux-gnueabi ]]; then
-            PLATFORM=linux/arm/v6
+            # Debian publishes its soft-float ARM userspace as ARMv5.
+            PLATFORM=linux/arm/v5
           fi
           NAME="native-gnu-compat-$GITHUB_RUN_ID"
           trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT

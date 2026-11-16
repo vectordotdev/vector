@@ -129,7 +129,7 @@ jobs:
           digest=$(sha256sum "target/$TARGET/release/vector")
           if [[ "$TARGET" == *gnueabi ]]; then
             printf 'native packaging works\n' | timeout -k 10 90 docker run --rm -i \
-              --platform linux/arm/v6 -v "$PWD:/work:ro" \
+              --platform linux/arm/v5 -v "$PWD:/work:ro" \
               --entrypoint "/work/target/$TARGET/release/vector" debian:bullseye-slim \
               --config /work/tests/data/native-release-smoke.yaml > "$RUNNER_TEMP/gnu-compat.json"
             grep -F '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/gnu-compat.json"
