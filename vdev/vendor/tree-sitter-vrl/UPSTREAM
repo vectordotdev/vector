@@ -1,8 +1,0 @@
-Repository: https://github.com/belltoy/tree-sitter-vrl
-Commit: 8cf3be35891e366087c01bef55d3fe96750997a5
-License: MIT (see LICENSE)
-
-Unmodified generated src/parser.c and src/tree_sitter/parser.h from that commit.
-Vendored so vdev can still be published to crates.io without a Git dependency.
-When updating, copy these files and LICENSE from one pinned upstream revision,
-then run the vrl_highlights tests against the bundled highlight queries.

@@ -2,38 +2,15 @@ use std::{collections::HashMap, fs, path::PathBuf};
 
 use anyhow::{Context, Result, ensure};
 use regex::Regex;
-use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter};
+use syntect::{
+    html::{ClassStyle, ClassedHTMLGenerator},
+    parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder},
+    util::LinesWithEndings,
+};
 
 use crate::utils::paths::{find_repo_root, resolve_repo_relative_path};
 
-unsafe extern "C" {
-    fn tree_sitter_vrl() -> *const ();
-}
-
-// SAFETY: The bundled generated parser exports this function with Tree-sitter's
-// language ABI and returns a pointer to its static language definition.
-const LANGUAGE: tree_sitter_language::LanguageFn =
-    unsafe { tree_sitter_language::LanguageFn::from_raw(tree_sitter_vrl) };
-
-const CAPTURES: &[&str] = &[
-    "comment",
-    "constant",
-    "boolean",
-    "number",
-    "string",
-    "string.escape",
-    "string.regexp",
-    "function",
-    "variable",
-    "variable.builtin",
-    "variable.parameter",
-    "property",
-    "keyword",
-    "operator",
-    "punctuation",
-];
-
-/// Highlight VRL in a rendered Hugo site using the Tree-sitter VRL grammar.
+/// Highlight VRL in a rendered Hugo site using a pure Rust Syntect syntax definition.
 #[derive(clap::Args, Debug)]
 pub struct Cli {
     /// Rendered website directory, relative to the repository root.
@@ -73,8 +50,7 @@ impl Cli {
 }
 
 struct Renderer {
-    config: HighlightConfiguration,
-    highlighter: Highlighter,
+    syntaxes: SyntaxSet,
     blocks: Regex,
     spans: Regex,
     line_numbers: Regex,
@@ -83,17 +59,14 @@ struct Renderer {
 
 impl Renderer {
     fn new() -> Result<Self> {
-        let mut config = HighlightConfiguration::new(
-            LANGUAGE.into(),
-            "vrl",
-            include_str!("vrl_highlights/highlights.scm"),
-            "",
-            "",
-        )?;
-        config.configure(CAPTURES);
+        let mut syntaxes = SyntaxSetBuilder::new();
+        syntaxes.add(SyntaxDefinition::load_from_str(
+            include_str!("vrl_highlights/VRL.sublime-syntax"),
+            true,
+            None,
+        )?);
         Ok(Self {
-            config,
-            highlighter: Highlighter::new(),
+            syntaxes: syntaxes.build(),
             // Hugo emits these code elements with escaped source and span-only token markup.
             blocks: Regex::new(
                 r#"(?s)(<code\b[^>]*\bclass=(?:"language-(?:coffee|vrl)"|'language-(?:coffee|vrl)'|language-(?:coffee|vrl)\b)[^>]*>)(.*?)(</code>)"#,
@@ -139,7 +112,7 @@ impl Renderer {
                 .replace("data-lang='coffee'", "data-lang='vrl'")
                 .replace("data-lang=coffee", "data-lang=vrl");
             output.push_str(opening.trim_end_matches('>'));
-            output.push_str(" data-highlighter=\"tree-sitter-vrl\">");
+            output.push_str(" data-highlighter=\"syntect-vrl\">");
             if numbers.is_empty() {
                 output.push_str(&highlighted);
             } else {
@@ -165,26 +138,19 @@ impl Renderer {
         if let Some(html) = self.cache.get(source) {
             return Ok(html.clone());
         }
-        let events = self
-            .highlighter
-            .highlight(&self.config, source.as_bytes(), None, |_| None)?;
-        let mut html = String::new();
-        for event in events {
-            match event? {
-                HighlightEvent::Source { start, end } => {
-                    let text = source
-                        .get(start..end)
-                        .context("Invalid Tree-sitter UTF-8 boundary")?;
-                    html.push_str(&html_escape::encode_text(text));
-                }
-                HighlightEvent::HighlightStart(highlight) => {
-                    html.push_str("<span class=\"vrl-");
-                    html.push_str(&CAPTURES[highlight.0].replace('.', "-"));
-                    html.push_str("\">");
-                }
-                HighlightEvent::HighlightEnd => html.push_str("</span>"),
-            }
+        let syntax = self
+            .syntaxes
+            .find_syntax_by_extension("vrl")
+            .context("Missing VRL syntax")?;
+        let mut generator = ClassedHTMLGenerator::new_with_class_style(
+            syntax,
+            &self.syntaxes,
+            ClassStyle::SpacedPrefixed { prefix: "vrl-" },
+        );
+        for line in LinesWithEndings::from(source) {
+            generator.parse_html_for_line_which_includes_newline(line)?;
         }
+        let html = generator.finalize();
         self.cache.insert(source.to_owned(), html.clone());
         Ok(html)
     }
@@ -208,6 +174,49 @@ mod tests {
         ] {
             assert!(html.contains(token), "Missing {token} in {html}");
         }
+    }
+
+    #[test]
+    fn keeps_function_like_text_in_strings_regexes_and_comments_unhighlighted() {
+        let mut renderer = Renderer::new().unwrap();
+        let source = r#".result = parse_json!(.message)
+.text = "parse_json(.fake) # literal \" quote"
+.raw = s'parse_json(.fake)'
+.pattern = r'parse_json\(.fake\)'
+# parse_json(.fake)
+"#;
+        let html = renderer.highlight(source).unwrap();
+        assert_eq!(html.matches("class=\"vrl-function\"").count(), 1);
+        assert!(!html.contains("class=\"vrl-property\">fake"));
+        assert!(html.contains("class=\"vrl-comment\""));
+        assert!(html.contains("class=\"vrl-string-escape\""));
+        let text = renderer.spans.replace_all(&html, "");
+        assert_eq!(html_escape::decode_html_entities(&text), source);
+    }
+
+    #[test]
+    fn highlights_interpolation_and_resumes_the_enclosing_string() {
+        let mut renderer = Renderer::new().unwrap();
+        let source =
+            ".text = \"Hello {{ upcase(.name) }} # literal\"\n.when = t'2026-11-16T12:00:00Z'\n";
+        let html = renderer.highlight(source).unwrap();
+        assert!(html.contains("class=\"vrl-function\">upcase</span>"));
+        assert!(html.contains("class=\"vrl-property\">name</span>"));
+        assert!(!html.contains("class=\"vrl-comment\""));
+        assert!(html.contains("class=\"vrl-constant\""));
+        let text = renderer.spans.replace_all(&html, "");
+        assert_eq!(html_escape::decode_html_entities(&text), source);
+    }
+
+    #[test]
+    fn highlights_vrl_numeric_separators_and_at_prefixed_fields() {
+        let mut renderer = Renderer::new().unwrap();
+        let html = renderer
+            .highlight(".@timestamp = 1_000\n.value = 1_2_3._4_0_\n")
+            .unwrap();
+        assert!(html.contains("class=\"vrl-property\">@timestamp</span>"));
+        assert!(html.contains("class=\"vrl-number\">1_000</span>"));
+        assert!(html.contains("class=\"vrl-number\">1_2_3._4_0_</span>"));
     }
 
     #[test]

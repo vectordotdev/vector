@@ -203,7 +203,7 @@ test.describe("VRL highlighting without JavaScript", () => {
 
   test("ships semantic colors in the rendered HTML", async ({ page }) => {
     await page.goto("/docs/reference/vrl/");
-    const code = page.locator('code[data-highlighter="tree-sitter-vrl"]').first();
+    const code = page.locator('code[data-highlighter="syntect-vrl"]').first();
     await expect(code).toBeAttached();
     await expect(
       code
@@ -236,7 +236,7 @@ test("highlighted VRL retains its complete source when copied", async ({ context
   await page.goto("/docs/reference/vrl/");
   const block = page
     .locator(".highlight")
-    .filter({ has: page.locator('code[data-highlighter="tree-sitter-vrl"]') })
+    .filter({ has: page.locator('code[data-highlighter="syntect-vrl"]') })
     .first();
   expect((await block.locator("pre").textContent())!.replace(/\n$/, "")).toBe(source);
   await block.getByRole("button", { name: "Copy code to clipboard" }).click();

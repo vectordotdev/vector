@@ -1,6 +1,6 @@
 {{- /* Hugo 0.154 cannot override the language in HighlightCodeBlock. Use its
        CoffeeScript wrapper temporarily, retaining titles and line numbering;
-       vdev replaces the token markup with Tree-sitter VRL after Hugo. */ -}}
+       vdev replaces the token markup with Syntect VRL after Hugo. */ -}}
 {{- /* Unrecognized languages expose highlight options as generic attributes. */ -}}
 {{- $html := highlight .Inner "coffee" (merge .Attributes .Options) -}}
 {{- $html = replaceRE `(?s)^<div class="highlight">(.*)</div>\s*$` "$1" $html -}}
