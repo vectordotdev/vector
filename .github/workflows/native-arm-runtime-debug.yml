@@ -1,0 +1,86 @@
+name: ARMv6 runtime diagnostics
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  debug:
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-armv6-runtime'
+    runs-on: ubuntu-24.04-8core-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - arm-unknown-linux-gnueabi
+          - arm-unknown-linux-musleabi
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          persist-credentials: false
+      - name: Retrieve the completed production-profile binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
+        with:
+          name: native-${{ matrix.target }}
+          path: debug-data
+          github-token: ${{ github.token }}
+          run-id: 43949196956
+      - name: Build a native ARM64 debugger environment
+        run: |
+          if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
+            echo '::error::Runtime diagnostics must use the native ARM32 kernel support'
+            exit 1
+          fi
+          docker build --platform linux/arm64 -t vector-runtime-debug - <<'DOCKERFILE'
+          FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+          RUN dpkg --add-architecture armel && apt-get update \
+            && apt-get install -y --no-install-recommends \
+              bash gdb-multiarch procps libc6:armel libgcc-s1:armel zlib1g:armel \
+            && rm -rf /var/lib/apt/lists/*
+          WORKDIR /work
+          DOCKERFILE
+      - name: Capture native thread backtraces without rebuilding Vector
+        run: |
+          docker run --rm --platform linux/arm64 --cap-add SYS_PTRACE \
+            --security-opt seccomp=unconfined -v "$PWD:/work" -e TARGET \
+            vector-runtime-debug bash -euxo pipefail -c '
+              file="debug-data/$TARGET/release/vector"
+              chmod +x "$file"
+              prefix="debug-data/$TARGET"
+              printf "native packaging works\n" > /tmp/native-input
+              VECTOR_LOG=trace "$file" --config tests/data/native-release-smoke.yaml \
+                </tmp/native-input >"$prefix.stdout.txt" 2>"$prefix.stderr.txt" &
+              pid=$!
+              sleep 5
+              if kill -0 "$pid" 2>/dev/null; then
+                ps -L -p "$pid" -o pid,tid,pcpu,rss,wchan,comm >"$prefix.threads.txt"
+                timeout -k 5 30 gdb-multiarch --batch \
+                  -ex "set pagination off" -ex "thread apply all bt" \
+                  -ex "info registers" -p "$pid" >"$prefix.gdb.txt" 2>&1 || true
+                kill -KILL "$pid" 2>/dev/null || true
+              fi
+              wait "$pid" || true
+              for log in "$prefix".*.txt; do
+                printf "\n--- %s ---\n" "$log"
+                tail -n 200 "$log"
+              done
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: runtime-debug-${{ matrix.target }}
+          path: debug-data/*.txt
+          if-no-files-found: warn
