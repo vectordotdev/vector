@@ -180,14 +180,22 @@ pub fn update_runtime_schema_definition(
     log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
 ) {
     if let EventMutRef::Log(log) = &mut event {
-        if let Some(parent_component_id) = log.metadata().upstream_id() {
-            if let Some(definition) = log_schema_definitions.get(parent_component_id) {
-                log.metadata_mut().set_schema_definition(definition);
-            }
-        } else {
-            // there is no parent defined. That means this event originated from a component that
-            // isn't able to track the source, such as `reduce` or `lua`. In these cases, all of the
-            // schema definitions _must_ be the same, so the first one is picked
+        // The upstream component changes on every hop. Resolve the schema
+        // through its stable source output instead, retaining distinct meanings
+        // when two sources feed a fan-in transform and then another transform.
+        let definition = log
+            .metadata()
+            .schema_origin()
+            .and_then(|id| log_schema_definitions.get(id))
+            .or_else(|| {
+                log.metadata()
+                    .upstream_id()
+                    .and_then(|id| log_schema_definitions.get(id))
+            });
+        if let Some(definition) = definition {
+            log.metadata_mut().set_schema_definition(definition);
+        } else if log_schema_definitions.len() == 1 {
+            // Events generated within transforms can lack a source identity.
             if let Some(definition) = log_schema_definitions.values().next() {
                 log.metadata_mut().set_schema_definition(definition);
             }
@@ -213,6 +221,128 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
 mod test {
     use super::*;
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
+
+    #[test]
+    fn schema_meanings_follow_source_through_two_transform_hops() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let source_a = Arc::new(OutputId::from("source_a"));
+        let source_b = Arc::new(OutputId::from("source_b"));
+        let definition_a = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_a"), Kind::bytes(), Some("host")),
+        );
+        let definition_b = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_b"), Kind::bytes(), Some("host")),
+        );
+        let definitions = HashMap::from([
+            (source_a.as_ref().clone(), definition_a),
+            (source_b.as_ref().clone(), definition_b),
+        ]);
+        let first_hop = Arc::new(OutputId::from("fan_in"));
+        let second_hop = Arc::new(OutputId::from("pass_through"));
+
+        for (origin, expected_path) in [
+            (
+                source_a,
+                OwnedTargetPath::event(owned_value_path!("host_a")),
+            ),
+            (
+                source_b,
+                OwnedTargetPath::event(owned_value_path!("host_b")),
+            ),
+        ] {
+            let mut event = Event::Log(LogEvent::from("hello"));
+            event.metadata_mut().set_schema_origin(Arc::clone(&origin));
+            event.metadata_mut().set_upstream_id(origin);
+            update_runtime_schema_definition(event.as_mut_log().into(), &first_hop, &definitions);
+            assert_eq!(
+                event.as_log().find_key_by_meaning("host"),
+                Some(&expected_path)
+            );
+            assert_eq!(event.metadata().upstream_id(), Some(first_hop.as_ref()));
+
+            update_runtime_schema_definition(event.as_mut_log().into(), &second_hop, &definitions);
+            assert_eq!(
+                event.as_log().find_key_by_meaning("host"),
+                Some(&expected_path)
+            );
+            assert_eq!(event.metadata().upstream_id(), Some(second_hop.as_ref()));
+        }
+    }
+
+    #[test]
+    fn schema_meanings_follow_named_source_ports() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let left = OutputId {
+            component: "source".into(),
+            port: Some("left".into()),
+        };
+        let right = OutputId {
+            component: "source".into(),
+            port: Some("right".into()),
+        };
+        let definitions = HashMap::from([
+            (
+                left.clone(),
+                Arc::new(
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy],
+                    )
+                    .with_event_field(
+                        &owned_value_path!("left_host"),
+                        Kind::bytes(),
+                        Some("host"),
+                    ),
+                ),
+            ),
+            (
+                right.clone(),
+                Arc::new(
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy],
+                    )
+                    .with_event_field(
+                        &owned_value_path!("right_host"),
+                        Kind::bytes(),
+                        Some("host"),
+                    ),
+                ),
+            ),
+        ]);
+
+        for (origin, expected_path) in [
+            (left, OwnedTargetPath::event(owned_value_path!("left_host"))),
+            (
+                right,
+                OwnedTargetPath::event(owned_value_path!("right_host")),
+            ),
+        ] {
+            let mut event = Event::Log(LogEvent::from("hello"));
+            let origin = Arc::new(origin);
+            event.metadata_mut().set_schema_origin(Arc::clone(&origin));
+            event.metadata_mut().set_upstream_id(origin);
+            for hop in ["fan_in", "passthrough"] {
+                update_runtime_schema_definition(
+                    event.as_mut_log().into(),
+                    &Arc::new(OutputId::from(hop)),
+                    &definitions,
+                );
+                assert_eq!(
+                    event.as_log().find_key_by_meaning("host"),
+                    Some(&expected_path)
+                );
+            }
+        }
+    }
 
     #[test]
     fn buffers_output() {

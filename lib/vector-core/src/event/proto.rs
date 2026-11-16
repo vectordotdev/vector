@@ -713,6 +713,7 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
+                schema_origin: None,
                 schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,

@@ -219,6 +219,7 @@ impl Output {
                 event.metadata_mut().set_schema_definition(log_definition);
             }
             event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
+            event.metadata_mut().set_schema_origin(Arc::clone(&self.id));
         });
 
         let byte_size = events.estimated_json_encoded_size_of();

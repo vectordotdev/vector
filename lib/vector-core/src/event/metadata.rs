@@ -101,6 +101,13 @@ pub(super) struct Inner {
     /// in a source, and there is currently no use-case for reading the value in a sink.
     pub(crate) upstream_id: Option<Arc<OutputId>>,
 
+    /// The original source output carrying this event's schema lineage.
+    /// Unlike upstream_id, it survives each transform so that separate
+    /// source definitions remain distinguishable after multiple fan-in hops.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) schema_origin: Option<Arc<OutputId>>,
+
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     /// This definition is only currently valid for logs, and shouldn't be used for other event types.
@@ -259,7 +266,18 @@ impl EventMetadata {
         self.inner.upstream_id.as_deref()
     }
 
-    /// Sets the `source_id` in the metadata to the provided value.
+    /// Returns the output that originally defined this event's schema.
+    #[must_use]
+    pub fn schema_origin(&self) -> Option<&OutputId> {
+        self.inner.schema_origin.as_deref()
+    }
+
+    /// Record the source output defining this event's schema across transforms.
+    pub fn set_schema_origin(&mut self, output_id: Arc<OutputId>) {
+        self.get_mut().schema_origin = Some(output_id);
+    }
+
+    /// Sets the source ID in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.get_mut().source_id = Some(source_id);
     }
@@ -374,6 +392,7 @@ impl Default for Inner {
             source_id: None,
             source_type: None,
             upstream_id: None,
+            schema_origin: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             datadog_metric_unit: None,
