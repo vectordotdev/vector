@@ -122,8 +122,8 @@ components: sources: file: {
 			body: """
 				Vector will transparently detect files which have been compressed
 				using Gzip or Zstd and decompress them for reading. Vector detecs
-                compression using file signitures. Vector does not use the file's name
-                to detect compression.
+				compression using file signitures. Vector does not use the file's name
+				to detect compression.
 
 				One caveat with reading compressed files is that Vector is not able
 				to efficiently seek into them. Rather than implement a
