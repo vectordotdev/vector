@@ -696,10 +696,11 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
         }
         // Try numeric first.
         if let Ok(port) = annotation.parse::<u16>() {
-            // Optionally find owning container by matching containerPort.
+            // The port doesn't have to be declared. If it is, the container that declares it
+            // over TCP owns it, not one that uses the same number for UDP.
             let container = all_ports
                 .iter()
-                .find(|(_, p)| p.container_port == i32::from(port))
+                .find(|(_, p)| p.container_port == i32::from(port) && is_tcp(p))
                 .and_then(|(name, _)| name.clone());
             return Ok(vec![ResolvedPort { port, container }]);
         }
@@ -720,16 +721,8 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
         ));
     }
 
-    // No annotation: prefer named "metrics"-like ports, else the first declared port. Only TCP
-    // ports can serve HTTP; a port without a protocol is TCP.
-    let tcp_ports: Vec<_> = all_ports
-        .iter()
-        .filter(|(_, p)| {
-            p.protocol
-                .as_deref()
-                .is_none_or(|protocol| protocol == "TCP")
-        })
-        .collect();
+    // No annotation: prefer named "metrics"-like ports, else the first declared TCP port.
+    let tcp_ports: Vec<_> = all_ports.iter().filter(|(_, p)| is_tcp(p)).collect();
     let preferred: Vec<ResolvedPort> = tcp_ports
         .iter()
         .filter(|(_, p)| matches!(p.name.as_deref(), Some(name) if is_metrics_port_name(name)))
@@ -755,6 +748,13 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
         }]);
     }
     Ok(Vec::new())
+}
+
+/// Only TCP ports can serve HTTP. A port without a protocol is TCP.
+fn is_tcp(port: &k8s_openapi::api::core::v1::ContainerPort) -> bool {
+    port.protocol
+        .as_deref()
+        .is_none_or(|protocol| protocol == "TCP")
 }
 
 fn is_metrics_port_name(name: &str) -> bool {
@@ -1181,6 +1181,43 @@ mod tests {
         let targets = extract_targets(&pod, &default_cfg()).unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].uri.to_string(), "http://10.0.0.1:8080/metrics");
+    }
+
+    #[test]
+    fn numeric_port_annotation_is_owned_by_the_tcp_container() {
+        let mut pod = make_pod(
+            "p",
+            "ns",
+            &[
+                ("prometheus.io/scrape", "true"),
+                ("prometheus.io/port", "9100"),
+            ],
+            &[],
+            vec![ContainerPort {
+                container_port: 9100,
+                protocol: Some("UDP".to_owned()),
+                ..Default::default()
+            }],
+            Some("10.0.0.1"),
+            None,
+        );
+        // Only a UDP port has this number: the port is still scraped, with no container.
+        let targets = extract_targets(&pod, &default_cfg()).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].uri.to_string(), "http://10.0.0.1:9100/metrics");
+        assert_eq!(targets[0].container_name, None);
+
+        pod.spec.as_mut().unwrap().containers.push(Container {
+            name: "exporter".to_owned(),
+            ports: Some(vec![ContainerPort {
+                container_port: 9100,
+                ..Default::default()
+            }]),
+            ..Default::default()
+        });
+        let targets = extract_targets(&pod, &default_cfg()).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].container_name.as_deref(), Some("exporter"));
     }
 
     #[test]
