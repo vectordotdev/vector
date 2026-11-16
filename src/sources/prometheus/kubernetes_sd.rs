@@ -517,7 +517,6 @@ pub(crate) struct Target {
     pub(crate) instance: String,
     pub(crate) namespace: String,
     pub(crate) pod_name: String,
-    pub(crate) pod_uid: String,
     pub(crate) node_name: Option<String>,
     pub(crate) container_name: Option<String>,
     /// Additional metric tags to apply (pod labels/annotations allowlist).
@@ -630,7 +629,6 @@ fn extract_targets(
         .name
         .clone()
         .unwrap_or_else(|| "<unknown>".to_string());
-    let pod_uid = pod.metadata.uid.clone().unwrap_or_else(|| pod_name.clone());
     let namespace = pod.metadata.namespace.clone().unwrap_or_default();
     let node_name = pod.spec.as_ref().and_then(|s| s.node_name.clone());
 
@@ -651,7 +649,6 @@ fn extract_targets(
             instance,
             namespace: namespace.clone(),
             pod_name: pod_name.clone(),
-            pod_uid: pod_uid.clone(),
             node_name: node_name.clone(),
             container_name: port_info.container,
             extra_tags: extra_tags.clone(),
@@ -692,7 +689,7 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
     if let Some(annotation) = port_annotation {
         let annotation = annotation.trim();
         if annotation.is_empty() {
-            return Err("prometheus.io/port annotation is empty".to_string());
+            return Err("the port annotation is empty".to_string());
         }
         // Try numeric first.
         if let Ok(port) = annotation.parse::<u16>() {
@@ -705,14 +702,11 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
             return Ok(vec![ResolvedPort { port, container }]);
         }
         // Fall back to a named container port.
-        if let Some((container, p)) = all_ports
+        let named: Vec<_> = all_ports
             .iter()
-            .find(|(_, p)| p.name.as_deref() == Some(annotation))
-        {
-            // Scraping the number over TCP would reach a different port than the one named.
-            if !is_tcp(p) {
-                return Err(format!("port '{annotation}' is not a TCP port"));
-            }
+            .filter(|(_, p)| p.name.as_deref() == Some(annotation))
+            .collect();
+        if let Some((container, p)) = named.iter().find(|(_, p)| is_tcp(p)) {
             let port = u16::try_from(p.container_port)
                 .map_err(|_| format!("port {} is out of range", p.container_port))?;
             return Ok(vec![ResolvedPort {
@@ -720,9 +714,12 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
                 container: container.clone(),
             }]);
         }
-        return Err(format!(
-            "no port named or numbered '{annotation}' found on pod"
-        ));
+        // Scraping the number over TCP would reach a different port than the one named.
+        return Err(if named.is_empty() {
+            format!("no port named or numbered '{annotation}' found on pod")
+        } else {
+            format!("port '{annotation}' is not a TCP port")
+        });
     }
 
     // No annotation: prefer named "metrics"-like ports, else the first declared TCP port.
@@ -1189,7 +1186,7 @@ mod tests {
 
     #[test]
     fn named_port_annotation_must_be_tcp() {
-        let pod = make_pod(
+        let mut pod = make_pod(
             "p",
             "ns",
             &[
@@ -1210,6 +1207,21 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("port 'statsd' is not a TCP port"), "{error}");
+
+        // A TCP port with the same name in another container is the one scraped.
+        pod.spec.as_mut().unwrap().containers.push(Container {
+            name: "exporter".to_owned(),
+            ports: Some(vec![ContainerPort {
+                name: Some("statsd".to_owned()),
+                container_port: 9102,
+                ..Default::default()
+            }]),
+            ..Default::default()
+        });
+        let targets = extract_targets(&pod, &default_cfg()).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].uri.to_string(), "http://10.0.0.1:9102/metrics");
+        assert_eq!(targets[0].container_name.as_deref(), Some("exporter"));
     }
 
     #[test]

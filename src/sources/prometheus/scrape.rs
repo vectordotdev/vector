@@ -82,7 +82,7 @@ pub struct PrometheusScrapeConfig {
     /// `static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
     #[configurable(metadata(docs::examples = "static_target_example()"))]
     #[configurable(required_one_of = "targets")]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     targets: Vec<TargetConfig>,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
@@ -668,7 +668,6 @@ mod validation_tests {
             instance: "10.0.0.1:9100".to_owned(),
             namespace: "monitoring".to_owned(),
             pod_name: "exporter-0".to_owned(),
-            pod_uid: "uid".to_owned(),
             node_name: None,
             container_name: None,
             extra_tags: std::collections::BTreeMap::new(),
