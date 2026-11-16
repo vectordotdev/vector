@@ -304,12 +304,21 @@ impl ChunkedGelfDecompression {
     }
 }
 
+/// An error that can occur while decompressing a GELF message.
 #[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecompressionError {
+    /// The Gzip stream could not be decompressed.
     #[snafu(display("Gzip decompression error: {source}"))]
-    GzipDecompression { source: std::io::Error },
+    GzipDecompression {
+        /// The underlying decompression error.
+        source: std::io::Error,
+    },
+    /// The Zlib stream could not be decompressed.
     #[snafu(display("Zlib decompression error: {source}"))]
-    ZlibDecompression { source: std::io::Error },
+    ZlibDecompression {
+        /// The underlying decompression error.
+        source: std::io::Error,
+    },
 }
 
 #[derive(Debug, Snafu)]
