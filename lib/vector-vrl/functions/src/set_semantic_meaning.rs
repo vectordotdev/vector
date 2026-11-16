@@ -37,7 +37,7 @@ impl Function for SetSemanticMeaning {
         "set_semantic_meaning"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         indoc! {"Sets a semantic meaning for an event."}
     }
 
@@ -134,7 +134,7 @@ impl Function for SetSemanticMeaning {
                 labels: vec![
                     Label::primary("cannot assign semantic meaning to non-existing field", span),
                     Label::context(
-                        format!("field \".{}\" is not known to exist for all events", &path),
+                        format!("field \".{path}\" is not known to exist for all events"),
                         span,
                     ),
                 ],
@@ -154,16 +154,10 @@ impl Function for SetSemanticMeaning {
                     message: "semantic meaning referencing two different fields".to_owned(),
                     labels: vec![
                         Label::primary(
-                            format!(
-                                "semantic meaning \"{}\" must reference a single field",
-                                &meaning
-                            ),
+                            format!("semantic meaning \"{meaning}\" must reference a single field"),
                             span,
                         ),
-                        Label::context(
-                            format!("already referencing field \".{}\"", &duplicate),
-                            span,
-                        ),
+                        Label::context(format!("already referencing field \".{duplicate}\""), span),
                     ],
                     notes: vec![],
                 };

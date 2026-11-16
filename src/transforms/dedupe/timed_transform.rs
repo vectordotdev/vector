@@ -1,4 +1,5 @@
 use std::{future::ready, num::NonZeroUsize, pin::Pin, time::Instant};
+use vector_lib::internal_event::emit;
 
 use futures::{Stream, StreamExt};
 use lru::LruCache;
@@ -44,7 +45,7 @@ impl TimedDedupe {
             false
         };
         if drop_event {
-            emit!(DedupeEventsDropped { count: 1 });
+            emit(DedupeEventsDropped { count: 1 });
             None
         } else {
             Some(event)

@@ -1,6 +1,7 @@
 use crate::sinks::{
     doris::request_builder::DorisRequestBuilder, prelude::*, util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
 pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
@@ -48,7 +49,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -98,7 +99,7 @@ impl DorisKeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,

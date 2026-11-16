@@ -387,7 +387,8 @@ install_system_packages() {
         return 1
       fi
 
-      run_privileged_with_timeout apt-get update
+      # Do not silently reuse stale indexes when any repository failed to update.
+      run_privileged_with_timeout apt-get update --error-on=any
       run_privileged_with_timeout apt-get install -y --no-install-recommends "${packages[@]}"
       ;;
     Darwin)

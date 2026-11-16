@@ -570,7 +570,7 @@ impl DnsMessageParser {
             RData::NS(ns) => Ok((Some(ns.to_string_with_options(&self.options)), None)),
             RData::OPENPGPKEY(key) => {
                 if let Ok(key_string) = String::from_utf8(key.public_key.clone()) {
-                    Ok((Some(format!("({})", &key_string)), None))
+                    Ok((Some(format!("({key_string})")), None))
                 } else {
                     Err(DnsMessageParserError::SimpleError {
                         cause: String::from("Invalid OPENPGPKEY rdata"),
@@ -619,7 +619,7 @@ impl DnsMessageParser {
                 let caa_rdata = format!(
                     "{} {} \"{}\"",
                     u8::from(caa.issuer_critical),
-                    &caa.tag,
+                    caa.tag,
                     if caa.tag.eq_ignore_ascii_case("iodef") {
                         let url = caa
                             .value_as_iodef()
@@ -1449,7 +1449,7 @@ mod tests {
                 );
             }
             DnsMessageParserError::SimpleError { cause: e } => {
-                panic!("Expected TrustDnsError, got {}.", &e)
+                panic!("Expected TrustDnsError, got {e}.")
             }
             DnsMessageParserError::Utf8ParsingError { .. } => panic!("{err}."),
         }

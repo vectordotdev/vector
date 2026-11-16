@@ -12,7 +12,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::{event::EventStatus, request_metadata::RequestMetadata};
+use vector_lib::{event::EventStatus, internal_event::emit, request_metadata::RequestMetadata};
 
 use super::{
     EndpointTarget,
@@ -158,8 +158,8 @@ where
                                     Ok(()) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
-                                        emit!(SplunkIndexerAcknowledgementUnavailableError {
-                                            error
+                                        emit(SplunkIndexerAcknowledgementUnavailableError {
+                                            error,
                                         });
                                         EventStatus::Delivered
                                     }
@@ -171,7 +171,7 @@ where
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            emit!(SplunkResponseParseError { error });
+                            emit(SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }

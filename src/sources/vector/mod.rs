@@ -1,5 +1,6 @@
 //! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::TryFutureExt;
@@ -61,7 +62,7 @@ impl proto::Service for Service {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
                 Err(error) => {
-                    emit!(GrpcEventDecodeError { error: &error });
+                    emit(GrpcEventDecodeError { error: &error });
                     return Err(Status::invalid_argument(error.to_string()));
                 }
             }
@@ -83,7 +84,7 @@ impl proto::Service for Service {
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
@@ -93,7 +94,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|()| handle_batch_status(receiver))
@@ -597,7 +598,7 @@ mod tests {
             proto::ServingStatus::Serving as i32
         );
         let observations_before_expiry = max_connection_age_connection_observations();
-        assert!(!observations_before_expiry.is_empty());
+        assert_ne!(observations_before_expiry, [] as [std::net::SocketAddr; 0]);
 
         sleep(Duration::from_millis(1500)).await;
 

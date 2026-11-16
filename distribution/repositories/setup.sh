@@ -393,7 +393,7 @@ trap cleanup EXIT
 mkdir -m 700 "$work/gnupg"
 export GNUPGHOME="$work/gnupg"
 
-default_key_url=https://dd-cose-releases.s3.us-east-1.amazonaws.com/vector/keys/vector-packages.asc
+default_key_url=https://install.datadoghq.com/vector/keys/vector-packages.asc
 if [[ -n "${TESTING_KEYS_URL:-}" ]]; then
     default_key_url="$(https_url "$TESTING_KEYS_URL")/vector-packages.asc"
 fi

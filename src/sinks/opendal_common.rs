@@ -9,6 +9,7 @@
 //! - Limitation
 
 use std::{fmt, task::Poll};
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use opendal::Operator;
@@ -91,7 +92,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -264,6 +265,20 @@ impl Service<OpenDalRequest> for OpenDalService {
                 byte_size,
             })
         })
+    }
+}
+
+/// Determines which OpenDAL errors should be retried.
+#[derive(Clone, Debug)]
+pub struct OpenDalRetryLogic;
+
+impl RetryLogic for OpenDalRetryLogic {
+    type Error = opendal::Error;
+    type Request = OpenDalRequest;
+    type Response = OpenDalResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_temporary()
     }
 }
 

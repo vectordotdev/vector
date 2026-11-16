@@ -520,7 +520,7 @@ mod tests {
         HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
         let metrics = buffer.into_metrics();
 
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
         assert_eq!(count_tag(&metrics, "collector"), metrics.len());
         assert_ne!(count_name(&metrics, "cgroup_cpu_usage_seconds_total"), 0);

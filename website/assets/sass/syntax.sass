@@ -712,3 +712,13 @@ $dark-default-text-color: $gray-200
 
     // TextWhitespace
     .w
+
+// VRL examples use the CoffeeScript lexer. Distinguish its identifiers (including
+// VRL function calls and event fields) from unhighlighted code in both themes.
+.light .chroma .language-coffee
+  .nx, .nv
+    color: $light-12
+
+.dark .chroma .language-coffee
+  .nx, .nv
+    color: $dark-12

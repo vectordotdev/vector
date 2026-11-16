@@ -1,4 +1,5 @@
 use std::{fmt::Debug, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -131,7 +132,7 @@ where
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
                         Err(error) => {
-                            emit!(SinkRequestBuildError { error });
+                            emit(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),

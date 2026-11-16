@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -289,7 +290,7 @@ impl StatsdDeserializer {
         Self {
             socket_mode: Some(SocketMode::Udp),
             // The other modes emit a different `EventsReceived`.
-            events_received: Some(register!(EventsReceived)),
+            events_received: Some(register(EventsReceived)),
             parser: Parser::new(sanitize, convert_to),
         }
     }
@@ -322,7 +323,7 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         if let Some(mode) = self.socket_mode
             && mode == SocketMode::Udp
         {
-            emit!(SocketBytesReceived {
+            emit(SocketBytesReceived {
                 mode,
                 byte_size: bytes.len(),
             });
@@ -354,7 +355,7 @@ async fn statsd_udp(
     let socket = try_bind_udp_socket(config.address, listenfd)
         .await
         .map_err(|error| {
-            emit!(SocketBindError {
+            emit(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
             });
@@ -386,13 +387,13 @@ async fn statsd_udp(
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if (out.send_batch(events).await).is_err() {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                 }
             }
             Err(error) => {
-                emit!(SocketReceiveError {
+                emit(SocketReceiveError {
                     mode: SocketMode::Udp,
-                    error
+                    error,
                 });
             }
         }

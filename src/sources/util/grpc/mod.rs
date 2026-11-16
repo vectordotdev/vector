@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::emit;
 
 use futures::{FutureExt, StreamExt, future::BoxFuture};
 use http::{Request, Response};
@@ -493,11 +494,11 @@ pub fn build_grpc_trace_layer(
             )
         })
         .on_request(Box::new(|_request: &Request<TonicBody>, _span: &Span| {
-            emit!(GrpcServerRequestReceived);
+            emit(GrpcServerRequestReceived);
         }))
         .on_response(
             |response: &Response<TonicBody>, latency: Duration, _span: &Span| {
-                emit!(GrpcServerResponseSent { response, latency });
+                emit(GrpcServerResponseSent { response, latency });
             },
         )
         .on_failure(())

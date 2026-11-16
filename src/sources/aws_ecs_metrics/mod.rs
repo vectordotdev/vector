@@ -1,4 +1,5 @@
 use std::{env, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use futures::StreamExt;
 use http::{Request, StatusCode};
@@ -191,7 +192,7 @@ async fn aws_ecs_metrics(
     shutdown: ShutdownSignal,
 ) -> vector_lib::source_sender::SendResult {
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let request = Request::get(&url)
             .body(empty_body())
@@ -212,19 +213,19 @@ async fn aws_ecs_metrics(
                         match parser::parse(body.as_ref(), namespace.as_deref()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
-                                emit!(AwsEcsMetricsEventsReceived {
+                                emit(AwsEcsMetricsEventsReceived {
                                     byte_size: metrics.estimated_json_encoded_size_of(),
                                     count,
                                     endpoint: uri.path(),
                                 });
 
                                 if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { count });
+                                    emit(StreamClosedError { count });
                                     return Err(error);
                                 }
                             }
                             Err(error) => {
-                                emit!(AwsEcsMetricsParseError {
+                                emit(AwsEcsMetricsParseError {
                                     error,
                                     endpoint: &url,
                                     body: String::from_utf8_lossy(&body),
@@ -233,7 +234,7 @@ async fn aws_ecs_metrics(
                         }
                     }
                     Err(error) => {
-                        emit!(HttpClientHttpError {
+                        emit(HttpClientHttpError {
                             error: crate::Error::from(error),
                             url: url.clone(),
                         });
@@ -241,13 +242,13 @@ async fn aws_ecs_metrics(
                 }
             }
             Ok(response) => {
-                emit!(HttpClientHttpResponseError {
+                emit(HttpClientHttpResponseError {
                     code: response.status(),
                     url: url.clone(),
                 });
             }
             Err(error) => {
-                emit!(HttpClientHttpError {
+                emit(HttpClientHttpError {
                     error: crate::Error::from(error),
                     url: url.clone(),
                 });
@@ -591,7 +592,7 @@ mod test {
 
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = events
             .into_iter()
@@ -647,7 +648,7 @@ mod integration_tests {
 
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]

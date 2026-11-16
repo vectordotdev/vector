@@ -23,7 +23,7 @@ use http::uri::InvalidUri;
 use snafu::Snafu;
 use vector_lib::{
     NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,
-    sensitive_string::SensitiveString,
+    internal_event::emit, sensitive_string::SensitiveString,
 };
 
 use crate::{
@@ -212,7 +212,7 @@ impl ElasticsearchCommonMode {
                         error,
                         crate::template::TemplateRenderingError::Confined { .. }
                     ) {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: true,
@@ -220,14 +220,14 @@ impl ElasticsearchCommonMode {
                         return Err(());
                     }
                     if let Some(fallback) = template_fallback_index {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: false,
                         });
                         Ok(fallback.clone())
                     } else {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: true,
@@ -248,7 +248,7 @@ impl ElasticsearchCommonMode {
             } => bulk_action_template
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("bulk_action"),
                         drop_event: true,
@@ -269,7 +269,7 @@ impl ElasticsearchCommonMode {
             } => version
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("version"),
                         drop_event: true,
@@ -280,7 +280,7 @@ impl ElasticsearchCommonMode {
                 .and_then(|value| {
                     value
                         .parse()
-                        .map_err(|_| emit!(VersionValueParseError { value }))
+                        .map_err(|_| emit(VersionValueParseError { value }))
                         .ok()
                 }),
             _ => None,

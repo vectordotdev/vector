@@ -6,7 +6,7 @@ components: sources: eventstoredb_metrics: {
 	classes: {
 		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
