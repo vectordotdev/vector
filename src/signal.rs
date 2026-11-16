@@ -63,6 +63,7 @@ pub enum ShutdownError {
 
 impl ShutdownError {
     /// Low-cardinality label for this error, used as the `reason` tag of `stopped_total`.
+    #[must_use]
     pub const fn reason(&self) -> &'static str {
         match self {
             Self::ApiFailed { .. } => "api_failed",
