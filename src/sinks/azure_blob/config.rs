@@ -1031,7 +1031,6 @@ pub enum HealthcheckError {
 }
 
 /// Builds the container healthcheck.
-#[must_use]
 pub fn build_healthcheck(container_name: String, client: Arc<BlobContainerClient>) -> Healthcheck {
     let healthcheck = async move {
         let resp: crate::Result<()> = match client.get_properties(None).await {

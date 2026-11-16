@@ -391,7 +391,7 @@ mod tests {
         )
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         events.remove(0)
     }
 
