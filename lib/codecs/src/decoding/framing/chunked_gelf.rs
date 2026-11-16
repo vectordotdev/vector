@@ -247,11 +247,11 @@ impl PendingMessages {
 /// Compression algorithm of a GELF message.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChunkedGelfDecompression {
-    /// The message is compressed with Gzip.
+    /// Decompress the message as Gzip.
     Gzip,
-    /// The message is compressed with Zlib.
+    /// Decompress the message as Zlib.
     Zlib,
-    /// The message is not compressed.
+    /// Pass the message through unchanged.
     None,
 }
 
