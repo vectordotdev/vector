@@ -133,10 +133,7 @@ pub(crate) struct KubernetesScrapeConfig {
     pub(crate) extra_field_selector: String,
 
     /// Kubernetes label selector that limits which Pods are discovered.
-    ///
-    /// `extra_label_selector` is accepted as a backwards-compatible alias.
     #[configurable(metadata(docs::examples = "tier=frontend"))]
-    #[serde(alias = "extra_label_selector")]
     pub(crate) label_selector: String,
 
     /// Restrict discovery to specific namespaces.

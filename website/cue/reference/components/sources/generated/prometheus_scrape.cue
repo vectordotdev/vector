@@ -188,12 +188,8 @@ generated: components: sources: prometheus_scrape: configuration: {
 								type: string: {}
 							}
 							label_selector: {
-								description: """
-																			Kubernetes label selector that limits which Pods are discovered.
-
-																			`extra_label_selector` is accepted as a backwards-compatible alias.
-																			"""
-								required: false
+								description: "Kubernetes label selector that limits which Pods are discovered."
+								required:    false
 								type: string: {
 									default: ""
 									examples: ["tier=frontend"]
