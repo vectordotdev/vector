@@ -1,6 +1,25 @@
 package metadata
 
 _schemaDefinitions: "codecs::decoding::format::gelf::GelfDeserializerOptions": object: options: {
+	decompression: {
+		description: """
+			Configures the decompression of compressed messages.
+
+			Compressed messages are decompressed before parsing. Set this to `None` to reject
+			them. For datagram inputs, also set `framing.chunked_gelf.decompression` to `None`
+			to disable decompression in the framing.
+			"""
+		required: false
+		type: string: {
+			default: "Auto"
+			enum: {
+				Auto: "Automatically detect the decompression method based on the magic bytes of the message."
+				Gzip: "Use Gzip decompression."
+				None: "Do not decompress the message."
+				Zlib: "Use Zlib decompression."
+			}
+		}
+	}
 	lossy: {
 		description: """
 			Determines whether to replace invalid UTF-8 sequences instead of failing.
