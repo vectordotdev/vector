@@ -188,8 +188,6 @@ impl GenerateConfig for PrometheusScrapeConfig {
 enum ConfigError {
     #[snafu(display("exactly one of `endpoints` or `targets` must be specified"))]
     EndpointsAndTargetsConflict,
-    #[snafu(display("at least one endpoint or target must be specified"))]
-    NoEndpointsOrTargets,
     #[snafu(display("only one Kubernetes target group is currently supported"))]
     MultipleKubernetesTargetGroups,
 }
@@ -252,14 +250,12 @@ impl SourceConfig for PrometheusScrapeConfig {
     }
 
     fn validate_structure(&self) -> std::result::Result<(), Vec<String>> {
-        let has_endpoints = !self.endpoints.is_empty();
-        let has_configured_targets = self.has_any_targets();
         let mut errors = Vec::new();
 
-        if has_endpoints && has_configured_targets {
+        // Empty lists are fine: `endpoints: []` loaded before `targets` existed and scrapes
+        // nothing. The schema rejects a config that sets neither option.
+        if !self.endpoints.is_empty() && self.has_any_targets() {
             errors.push(ConfigError::EndpointsAndTargetsConflict.to_string());
-        } else if !has_endpoints && !has_configured_targets {
-            errors.push(ConfigError::NoEndpointsOrTargets.to_string());
         }
 
         #[cfg(feature = "kubernetes")]
@@ -583,12 +579,7 @@ mod validation_tests {
     }
 
     #[test]
-    fn requires_exactly_one_endpoint_or_target_during_config_compilation() {
-        let errors = compilation_errors(config_with(Vec::new(), Vec::new()));
-        assert!(errors.iter().any(|error| {
-            error == "Source prometheus at least one endpoint or target must be specified"
-        }));
-
+    fn rejects_endpoints_and_targets_together_during_config_compilation() {
         let errors = compilation_errors(config_with(
             vec!["http://localhost:9090/metrics".to_string()],
             vec![TargetConfig::Static {
@@ -615,22 +606,53 @@ mod validation_tests {
         }));
     }
 
-    /// Loads through the normal config loader, which also checks the config against the schema.
+    /// Loads and compiles a source with the given target options through the normal config
+    /// loader, which also checks the config against the schema.
+    fn load(targets: &str) -> std::result::Result<config::Config, Vec<String>> {
+        let yaml = format!(
+            "sources:\n  prom:\n    type: prometheus_scrape\n{targets}\
+             sinks:\n  out:\n    type: prometheus_exporter\n    inputs: [prom]\n"
+        );
+        config::load_from_str(&yaml, config::Format::Yaml)
+    }
+
     #[test]
     fn hosts_endpoints_and_targets_all_load() {
         for targets in [
-            "hosts: [http://localhost:9090/metrics]",
-            "endpoints: [http://localhost:9090/metrics]",
-            "targets: [{static: {urls: [http://localhost:9090/metrics]}}]",
+            "    hosts: [http://localhost:9090/metrics]\n",
+            "    endpoints: [http://localhost:9090/metrics]\n",
+            "    targets: [{static: {urls: [http://localhost:9090/metrics]}}]\n",
+            // Empty lists loaded before `targets` existed and still do.
+            "    hosts: []\n",
+            "    endpoints: []\n",
         ] {
-            let yaml = format!(
-                "sources:\n  prom:\n    type: prometheus_scrape\n    {targets}\n\
-                 sinks:\n  out:\n    type: prometheus_exporter\n    inputs: [prom]\n"
-            );
-            if let Err(errors) = config::load_from_str(&yaml, config::Format::Yaml) {
+            if let Err(errors) = load(targets) {
                 panic!("`{targets}` should load: {errors:?}");
             }
         }
+    }
+
+    #[test]
+    fn loader_rejects_missing_or_combined_targets() {
+        // The schema requires one of the two options.
+        let errors = load("").expect_err("a source without endpoints or targets");
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("No matching oneOf variant")),
+            "{errors:?}"
+        );
+
+        let errors = load(
+            "    endpoints: [http://localhost:9090/metrics]\n    \
+             targets: [{static: {urls: [http://localhost:9091/metrics]}}]\n",
+        )
+        .expect_err("a source with both endpoints and targets");
+        assert!(
+            errors.iter().any(|error| error
+                == "Source prom exactly one of `endpoints` or `targets` must be specified"),
+            "{errors:?}"
+        );
     }
 
     #[cfg(feature = "kubernetes")]
