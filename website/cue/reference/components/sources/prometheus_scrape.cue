@@ -90,7 +90,7 @@ components: sources: prometheus_scrape: {
 				| Annotation | Default | Description |
 				| --- | --- | --- |
 				| `prometheus.io/scrape` | | Must be `"true"` for the Pod to be scraped. |
-				| `prometheus.io/port` | See below | The port number or the name of a container port. |
+				| `prometheus.io/port` | See below | The port number or the name of a TCP container port. |
 				| `prometheus.io/path` | `default_path` | The path to scrape. |
 				| `prometheus.io/scheme` | `default_scheme` | `http` or `https`. |
 				| `prometheus.io/param_<name>` | | Adds `<name>` as a query parameter. |

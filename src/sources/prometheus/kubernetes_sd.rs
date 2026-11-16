@@ -709,6 +709,10 @@ fn resolve_ports(pod: &Pod, port_annotation: Option<&str>) -> Result<Vec<Resolve
             .iter()
             .find(|(_, p)| p.name.as_deref() == Some(annotation))
         {
+            // Scraping the number over TCP would reach a different port than the one named.
+            if !is_tcp(p) {
+                return Err(format!("port '{annotation}' is not a TCP port"));
+            }
             let port = u16::try_from(p.container_port)
                 .map_err(|_| format!("port {} is out of range", p.container_port))?;
             return Ok(vec![ResolvedPort {
@@ -1181,6 +1185,31 @@ mod tests {
         let targets = extract_targets(&pod, &default_cfg()).unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].uri.to_string(), "http://10.0.0.1:8080/metrics");
+    }
+
+    #[test]
+    fn named_port_annotation_must_be_tcp() {
+        let pod = make_pod(
+            "p",
+            "ns",
+            &[
+                ("prometheus.io/scrape", "true"),
+                ("prometheus.io/port", "statsd"),
+            ],
+            &[],
+            vec![ContainerPort {
+                name: Some("statsd".to_owned()),
+                container_port: 9125,
+                protocol: Some("UDP".to_owned()),
+                ..Default::default()
+            }],
+            Some("10.0.0.1"),
+            None,
+        );
+        let error = extract_targets(&pod, &default_cfg())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("port 'statsd' is not a TCP port"), "{error}");
     }
 
     #[test]
