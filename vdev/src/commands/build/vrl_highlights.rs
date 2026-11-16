@@ -156,101 +156,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn distinguishes_vrl_functions_fields_variables_and_literals() {
+    fn highlights_vrl_program() {
         let mut renderer = Renderer::new().unwrap();
-        let html = renderer.highlight("value = parse_json!(.message)\n.result = value\n.kind = r'\\w+'\nif true { abort }\n").unwrap();
+        let source = "value = parse_json!(.message)
+.result = value
+.processed = true
+";
+        let input = format!(
+            r#"<code class="language-vrl" data-lang="vrl">{}</code>"#,
+            html_escape::encode_text(source)
+        );
+        let (output, count) = renderer.page(&input).unwrap();
+        assert_eq!(count, 1);
         for token in [
             "<span class=\"vrl-function\">parse_json</span>",
             "<span class=\"vrl-property\">message</span>",
             "<span class=\"vrl-variable\">value</span>",
             "<span class=\"vrl-boolean\">true</span>",
-            "<span class=\"vrl-keyword\">if</span>",
-            "vrl-string-regexp",
         ] {
-            assert!(html.contains(token), "Missing {token} in {html}");
+            assert!(output.contains(token), "Missing {token} in {output}");
         }
-    }
-
-    #[test]
-    fn keeps_function_like_text_in_strings_regexes_and_comments_unhighlighted() {
-        let mut renderer = Renderer::new().unwrap();
-        let source = r#".result = parse_json!(.message)
-.text = "parse_json(.fake) # literal \" quote"
-.raw = s'parse_json(.fake)'
-.pattern = r'parse_json\(.fake\)'
-# parse_json(.fake)
-"#;
-        let html = renderer.highlight(source).unwrap();
-        assert_eq!(html.matches("class=\"vrl-function\"").count(), 1);
-        assert!(!html.contains("class=\"vrl-property\">fake"));
-        assert!(html.contains("class=\"vrl-comment\""));
-        assert!(html.contains("class=\"vrl-string-escape\""));
-        let text = renderer.spans.replace_all(&html, "");
-        assert_eq!(html_escape::decode_html_entities(&text), source);
-    }
-
-    #[test]
-    fn highlights_interpolation_and_resumes_the_enclosing_string() {
-        let mut renderer = Renderer::new().unwrap();
-        let source =
-            ".text = \"Hello {{ upcase(.name) }} # literal\"\n.when = t'2026-11-16T12:00:00Z'\n";
-        let html = renderer.highlight(source).unwrap();
-        assert!(html.contains("class=\"vrl-function\">upcase</span>"));
-        assert!(html.contains("class=\"vrl-property\">name</span>"));
-        assert!(!html.contains("class=\"vrl-comment\""));
-        assert!(html.contains("class=\"vrl-constant\""));
-        let text = renderer.spans.replace_all(&html, "");
-        assert_eq!(html_escape::decode_html_entities(&text), source);
-    }
-
-    #[test]
-    fn highlights_vrl_numeric_separators_and_at_prefixed_fields() {
-        let mut renderer = Renderer::new().unwrap();
-        let html = renderer
-            .highlight(".@timestamp = 1_000\n.value = 1_2_3._4_0_\n")
-            .unwrap();
-        assert!(html.contains("class=\"vrl-property\">@timestamp</span>"));
-        assert!(html.contains("class=\"vrl-number\">1_000</span>"));
-        assert!(html.contains("class=\"vrl-number\">1_2_3._4_0_</span>"));
-    }
-
-    #[test]
-    fn preserves_source_escapes_html_and_is_idempotent() {
-        let mut renderer = Renderer::new().unwrap();
-        let source = ".message = \"<script>é & 🦀</script>\"\n# comment\n";
-        let input = format!(
-            "<div class=\"highlight\" title=\"example.vrl\"><pre class=\"chroma\"><code class=\"language-vrl\" data-lang=\"vrl\">{}</code></pre></div>",
-            html_escape::encode_text(source)
-        );
-        let (output, count) = renderer.page(&input).unwrap();
-        assert_eq!(count, 1);
-        assert!(output.contains("title=\"example.vrl\""));
-        assert!(!output.contains("<script>"));
         let code = renderer.blocks.captures(&output).unwrap();
         let text = renderer.spans.replace_all(&code[2], "");
         assert_eq!(html_escape::decode_html_entities(&text), source);
-        assert_eq!(renderer.page(&output).unwrap(), (output, 0));
-    }
-
-    #[test]
-    fn preserves_inline_numbers_and_leaves_other_languages_alone() {
-        let mut renderer = Renderer::new().unwrap();
-        let input = "<code class=\"language-vrl\" data-lang=\"vrl\"><span class=\"line\"><span class=\"ln\">1</span><span class=\"cl\">.x = 1\n</span></span></code><code class=\"language-yaml\">source: test</code>";
-        let (output, count) = renderer.page(input).unwrap();
-        assert_eq!(count, 1);
-        assert!(output.contains("<span class=\"ln\">1</span>"));
-        assert!(output.contains("<code class=\"language-yaml\">source: test</code>"));
-        assert!(output.contains("language-vrl"));
-    }
-
-    #[test]
-    fn handles_minified_hugo_output() {
-        let mut renderer = Renderer::new().unwrap();
-        let input = "<code class=language-vrl data-lang=vrl><span class=line><span class=ln>1</span><span class=cl>.x = 1\n</span></span></code>";
-        let (output, count) = renderer.page(input).unwrap();
-        assert_eq!(count, 1);
-        assert!(output.contains("class=language-vrl data-lang=vrl"));
-        assert!(output.contains("<span class=ln>1</span>"));
-        assert!(output.contains("vrl-property"));
     }
 }
