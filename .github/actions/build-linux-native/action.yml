@@ -66,7 +66,7 @@ runs:
           --build-arg BASE="$BASE" --build-arg RUST_VERSION="$RUST_VERSION" \
           --build-arg RUST_HOST="$HOST" --build-arg RUST_TARGET="$TARGET" \
           -t vector-native-builder .
-        docker run --rm --platform "$PLATFORM" vector-native-builder timeout --kill-after=10 90 rustc -vV
+        docker run --rm --platform "$PLATFORM" vector-native-builder timeout -k 10 90 rustc -vV
         if [[ "$TARGET" == arm*-unknown-linux-musl* ]]; then
           docker tag vector-native-builder vector-native-arm-gnu
           MUSL_ARGS=()
@@ -117,7 +117,7 @@ runs:
                 --manifest-path tests/data/native-release-toolchain-probe/Cargo.toml
               probe="/tmp/native-release-probe/$BUILD_TARGET/release/native-release-toolchain-probe"
               readelf --version-info "$probe"
-              timeout --kill-after=10 90 "$probe"
+              timeout -k 10 90 "$probe"
             fi
             if [[ "$PROBE_ONLY" == true ]]; then
               exit 0
@@ -148,14 +148,14 @@ runs:
                 exit 1
               fi
             fi
-            timeout --kill-after=10 90 "$file" --version
-            if ! printf "native packaging works\n" | timeout --kill-after=10 90 "$file" \
+            timeout -k 10 90 "$file" --version
+            if ! printf "native packaging works\n" | timeout -k 10 90 "$file" \
               --config tests/data/native-release-smoke.yaml > /tmp/native-release-output.json; then
               if [[ "$TARGET" == arm-unknown-linux-* ]]; then
                 # Keep runtime failures bounded and retain syscall diagnostics.
                 trace="target/$TARGET-runtime.strace"
-                printf "native packaging works\n" | timeout --kill-after=5 20 \
-                  strace -f -tt -T -o "$trace" "$file" \
+                printf "native packaging works\n" | timeout -k 5 20 \
+                  env VECTOR_LOG=trace strace -f -tt -T -o "$trace" "$file" \
                   --config tests/data/native-release-smoke.yaml || true
                 tail -n 100 "$trace"
               fi

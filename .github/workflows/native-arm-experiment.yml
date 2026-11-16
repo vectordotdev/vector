@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.number == 27197 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor == 'thomasqueirozb' &&
-      contains(fromJSON('["/ci-run-native-arm", "/ci-run-native-armv6", "/ci-run-native-armv7", "/ci-run-native-armv6-release", "/ci-run-native-armv7-release"]'), github.event.review.body)
+      contains(fromJSON('["/ci-run-native-arm", "/ci-run-native-armv6", "/ci-run-native-armv7", "/ci-run-native-armv6-release", "/ci-run-native-armv7-release", "/ci-run-native-gnu-release"]'), github.event.review.body)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -47,8 +47,10 @@ jobs:
               },
             ];
             const command = context.payload.review.body;
-            const selected = command.includes('armv6')
-              ? targets.filter(t => t.target.startsWith('arm-'))
+            const selected = command.includes('native-gnu')
+              ? targets.filter(t => t.target.endsWith('gnueabi') || t.target.endsWith('gnueabihf'))
+              : command.includes('armv6')
+                ? targets.filter(t => t.target.startsWith('arm-'))
               : command.includes('armv7')
                 ? targets.filter(t => t.target.startsWith('armv7-'))
                 : targets;
@@ -159,6 +161,26 @@ jobs:
           VECTOR_BUILD_DESC: ${{ steps.metadata.outputs.vector_build_desc }}
         with:
           target: ${{ matrix.target }}
+      - name: Verify the GNU artifact on an older runtime
+        if: endsWith(github.event.review.body, '-release') && contains(matrix.target, 'gnueabi')
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          # This older image is a compatibility test, never a build environment.
+          PLATFORM=linux/arm/v7
+          if [[ "$TARGET" == arm-unknown-linux-gnueabi ]]; then
+            PLATFORM=linux/arm/v6
+          fi
+          NAME="native-gnu-compat-$GITHUB_RUN_ID"
+          trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
+          ARGS=(--rm --name "$NAME" --platform "$PLATFORM"
+            -v "$PWD/target/$TARGET/release/vector:/usr/local/bin/vector:ro"
+            -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro"
+            --entrypoint /usr/local/bin/vector)
+          timeout -k 10 90 docker run "${ARGS[@]}" debian:bullseye-slim --version
+          printf 'native packaging works\n' | timeout -k 10 90 docker run -i "${ARGS[@]}" \
+            debian:bullseye-slim --config /smoke.yaml > "$RUNNER_TEMP/gnu-compat.json"
+          grep -F '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/gnu-compat.json"
       - name: Load Docker build results for runtime tests
         if: endsWith(github.event.review.body, '-release')
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -188,8 +210,8 @@ jobs:
           for BASE in "${bases[@]}"; do
             export BASE
             make release-docker
-            timeout 90 docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
-            printf 'native packaging works\n' | timeout 90 docker run --rm -i --platform "$PLATFORM" \
+            timeout -k 10 90 docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
+            printf 'native packaging works\n' | timeout -k 10 90 docker run --rm -i --platform "$PLATFORM" \
               -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro" \
               "$REPOS:$TAG-$BASE" --config /smoke.yaml > "$RUNNER_TEMP/native-smoke.json"
             grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/native-smoke.json"
