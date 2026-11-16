@@ -32,7 +32,7 @@ fn find_metrics(
     ))
 }
 
-static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(ObjectMap::new()));
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
@@ -54,7 +54,7 @@ impl Function for FindVectorMetrics {
         "find_vector_metrics"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         const_str::concat!(
             "Searches internal Vector metrics by name and optionally by tags. Returns all matching metrics.\n\n",
             crate::VECTOR_METRICS_EXPLAINER

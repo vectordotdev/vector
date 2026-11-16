@@ -268,6 +268,20 @@ impl Service<OpenDalRequest> for OpenDalService {
     }
 }
 
+/// Determines which OpenDAL errors should be retried.
+#[derive(Clone, Debug)]
+pub struct OpenDalRetryLogic;
+
+impl RetryLogic for OpenDalRetryLogic {
+    type Error = opendal::Error;
+    type Request = OpenDalRequest;
+    type Response = OpenDalResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_temporary()
+    }
+}
+
 /// `OpenDalError` is the error returned by opendal services.
 ///
 /// # TODO

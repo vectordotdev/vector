@@ -12,7 +12,7 @@ components: transforms: exclusive_route: {
 		"""
 
 	classes: {
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

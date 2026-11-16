@@ -109,6 +109,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_metric() {
         let event = Event::Metric(Metric::new(
             "example counter",
@@ -148,6 +149,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_metric() {
         let lua_event = r#"
         {

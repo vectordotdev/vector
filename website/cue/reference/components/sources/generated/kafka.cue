@@ -57,7 +57,7 @@ generated: components: sources: kafka: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	decompression: {
 		description: """
@@ -193,7 +193,7 @@ generated: components: sources: kafka: configuration: {
 		}
 	}
 	metrics: {
-		description: "Metrics (beta) configuration."
+		description: "Metrics configuration."
 		required:    false
 		type: object: options: topic_lag_metric: {
 			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."

@@ -267,8 +267,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
             source_type_key,
         };
 
-        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token))
-            .with_response_decompression();
+        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token));
         let service = ServiceBuilder::new()
             .settings(request, http_response_retry_logic(RetryStrategy::Default))
             .service(service);

@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391": object: options: {
+_schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32": object: options: {
 	avro: {
 		description:   "Apache Avro-specific encoder options."
 		relevant_when: "codec = \"avro\""
@@ -46,6 +46,14 @@ _schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05
 					Decodes the raw bytes as [JSON][json].
 
 					[json]: https://www.json.org/
+					"""
+				message_pack: """
+					Decodes the raw bytes as an [MessagePack][messagepack] message.
+
+					Stream-based `socket` sources (`tcp` and `unix_stream` modes) require an explicit
+					`framing` method, such as `length_delimited`.
+
+					[messagepack]: https://msgpack.org/
 					"""
 				native: """
 					Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
