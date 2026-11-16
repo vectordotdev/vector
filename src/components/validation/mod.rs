@@ -365,17 +365,15 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                     }
                 }
 
-                if had_failures {
-                    panic!(
-                        "Failed to validate component '{component_name}':\n{}",
-                        details.join("")
-                    );
-                } else {
-                    info!(
-                        "Successfully validated component '{component_name}':\n{}",
-                        details.join("")
-                    );
-                }
+                assert!(
+                    !had_failures,
+                    "Failed to validate component '{component_name}':\n{}",
+                    details.join("")
+                );
+                info!(
+                    "Successfully validated component '{component_name}':\n{}",
+                    details.join("")
+                );
             }
             Err(e) => {
                 panic!("Failed to complete validation run for component '{component_name}': {e}")

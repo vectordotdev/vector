@@ -2,6 +2,7 @@ use std::{
     convert::Infallible,
     future::{Future, Ready, ready},
     net::SocketAddr,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -13,10 +14,11 @@ use hyper_util::{
     server::conn::auto,
 };
 use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::mpsc,
     task::{JoinHandle, JoinSet},
-    time::timeout,
+    time::{sleep, timeout},
 };
 
 use super::{addr::next_addr, wait_for_tcp};
@@ -76,6 +78,78 @@ pub fn always_200_response(
     _: Request<Incoming>,
 ) -> Ready<Result<Response<Full<Bytes>>, Infallible>> {
     ready(Ok(Response::new(Full::default())))
+}
+
+/// How the responses of [`spawn_slow_body_http_server`] fail to finish.
+#[derive(Clone, Copy, Debug)]
+pub enum SlowBody {
+    /// Send the response headers and the first byte of the body, then nothing more.
+    Stall,
+    /// Send the body one byte at a time with the given delay between bytes.
+    Trickle(Duration),
+}
+
+/// Spawns an HTTP server whose responses send the headers right away but never finish the body
+/// in time. Every response is a `200 OK` that announces a 1 MiB body.
+///
+/// # Panics
+///
+/// Panics if the listener cannot be bound or its address cannot be used to construct a URI.
+pub async fn spawn_slow_body_http_server(body: SlowBody) -> Uri {
+    const HEAD: &[u8] =
+        b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 1048576\r\n\r\n";
+
+    let (guard, address) = next_addr();
+
+    let uri = Uri::builder()
+        .scheme(Scheme::HTTP)
+        .authority(address.to_string())
+        .path_and_query("/")
+        .build()
+        .expect("URI should always be valid when starting from `SocketAddr`");
+
+    let listener = TcpListener::bind(address).await.unwrap();
+
+    tokio::spawn(async move {
+        // Keep the port reserved for as long as the server runs.
+        let _guard = guard;
+        while let Ok((mut stream, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                // Read the request head; test requests have no body.
+                let mut buf = [0u8; 1024];
+                let mut request = Vec::new();
+                while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    match stream.read(&mut buf).await {
+                        Ok(0) | Err(_) => return,
+                        Ok(n) => request.extend_from_slice(&buf[..n]),
+                    }
+                }
+
+                if stream.write_all(HEAD).await.is_err() {
+                    return;
+                }
+
+                match body {
+                    SlowBody::Stall => {
+                        if stream.write_all(b"#").await.is_err() {
+                            return;
+                        }
+                        // Hold the connection open until the client gives up on it.
+                        while matches!(stream.read(&mut buf).await, Ok(n) if n > 0) {}
+                    }
+                    SlowBody::Trickle(delay) => {
+                        while stream.write_all(b"#").await.is_ok() {
+                            sleep(delay).await;
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    wait_for_tcp(address).await;
+
+    uri
 }
 
 const PROXY_AUTHORIZATION: &str = "Basic cHJveHktdXNlcjpwcm94eS1wYXNz";

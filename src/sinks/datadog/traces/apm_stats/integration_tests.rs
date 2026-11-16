@@ -296,21 +296,21 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     info!("\nagent_stats : {agent_s:?}");
     info!("\nvector_stats : {vector_s:?}");
 
-    assert!(agent_s.service == vector_s.service);
-    assert!(agent_s.name == vector_s.name);
-    assert!(agent_s.resource == vector_s.resource);
-    assert!(agent_s.http_status_code == vector_s.http_status_code);
-    assert!(agent_s.r#type == vector_s.r#type);
-    assert!(agent_s.db_type == vector_s.db_type);
+    assert_eq!(agent_s.service, vector_s.service);
+    assert_eq!(agent_s.name, vector_s.name);
+    assert_eq!(agent_s.resource, vector_s.resource);
+    assert_eq!(agent_s.http_status_code, vector_s.http_status_code);
+    assert_eq!(agent_s.r#type, vector_s.r#type);
+    assert_eq!(agent_s.db_type, vector_s.db_type);
 
     // hit counts should match
-    assert!(agent_s.hits == vector_s.hits);
-    assert!(agent_s.hits == 2);
+    assert_eq!(agent_s.hits, vector_s.hits);
+    assert_eq!(agent_s.hits, 2);
 
-    assert!(agent_s.errors == vector_s.errors);
-    assert!(agent_s.duration == vector_s.duration);
-    assert!(agent_s.synthetics == vector_s.synthetics);
-    assert!(agent_s.top_level_hits == vector_s.top_level_hits);
+    assert_eq!(agent_s.errors, vector_s.errors);
+    assert_eq!(agent_s.duration, vector_s.duration);
+    assert_eq!(agent_s.synthetics, vector_s.synthetics);
+    assert_eq!(agent_s.top_level_hits, vector_s.top_level_hits);
 }
 
 /// Starts the vector instance with a datadog agent source and a datadog traces sink.

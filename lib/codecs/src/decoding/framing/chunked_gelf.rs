@@ -1435,7 +1435,7 @@ mod tests {
 
         let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
-        assert!(decoder.state.lock().unwrap().messages.len() == 1);
+        assert_eq!(decoder.state.lock().unwrap().messages.len(), 1);
 
         let frame = decoder.decode_eof(&mut three_chunks[0]);
         let error = frame.unwrap_err();
@@ -1448,7 +1448,7 @@ mod tests {
                 pending_messages_limit: 1,
             }
         ));
-        assert!(decoder.state.lock().unwrap().messages.len() == 1);
+        assert_eq!(decoder.state.lock().unwrap().messages.len(), 1);
     }
 
     #[rstest]
