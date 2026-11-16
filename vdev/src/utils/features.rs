@@ -222,16 +222,14 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
 /// `prometheus_scrape` only compiles Kubernetes discovery with the `kubernetes` feature, so a
 /// source that lists a `kubernetes` entry under `targets` needs it.
 fn scrapes_kubernetes_targets(source: &Component) -> bool {
+    let is_kubernetes = |target: &Value| target.get(PROMETHEUS_SCRAPE_KUBERNETES_KEY).is_some();
     source.r#type == PROMETHEUS_SCRAPE_TYPE
-        && source
-            .options
-            .get(PROMETHEUS_SCRAPE_TARGETS_KEY)
-            .and_then(Value::as_array)
-            .is_some_and(|targets| {
-                targets
-                    .iter()
-                    .any(|target| target.get(PROMETHEUS_SCRAPE_KUBERNETES_KEY).is_some())
-            })
+        && match source.options.get(PROMETHEUS_SCRAPE_TARGETS_KEY) {
+            Some(Value::Array(targets)) => targets.iter().any(is_kubernetes),
+            // The config loader also accepts a single entry that isn't in a list.
+            Some(target) => is_kubernetes(target),
+            None => false,
+        }
 }
 
 fn add_option<T>(features: &mut FeatureSet, name: &str, field: Option<&T>) {
@@ -401,6 +399,16 @@ mod tests {
                       role: pod
         "});
         assert!(with_kubernetes.contains(&"kubernetes".to_owned()));
+
+        let single_entry = features(indoc! {"
+            sources:
+              pods:
+                type: prometheus_scrape
+                targets:
+                  kubernetes:
+                    role: pod
+        "});
+        assert!(single_entry.contains(&"kubernetes".to_owned()));
 
         let static_only = features(indoc! {"
             sources:
