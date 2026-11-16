@@ -1,7 +1,5 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Utc};
 use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
@@ -12,7 +10,10 @@ use vector_core::{
     schema::meaning,
     serde::is_default,
 };
-use vrl::{path::OwnedValuePath, value::Value};
+use vrl::{
+    path::OwnedValuePath,
+    value::{ObjectMap, Value},
+};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
@@ -131,7 +132,7 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(ObjectMap::new()));
 
             for field in only_fields {
                 if let Some(value) = old_value.remove(field, true) {

@@ -18,12 +18,11 @@ async fn test_greptimedb_logs_sink() {
     let greptimedb_http_endpoint =
         std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned());
     let cfg = format!(
-        r#"endpoint= "{}"
+        r#"endpoint= "{greptimedb_http_endpoint}"
 table = "logs"
 dbname = "public"
 pipeline_name = "test"
-"#,
-        &greptimedb_http_endpoint
+"#
     );
 
     // This is a minimal config that is required to run the sink
@@ -64,11 +63,10 @@ async fn test_greptimedb_logs_sink_default_pipeline() {
     let greptimedb_http_endpoint =
         std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned());
     let cfg = format!(
-        r#"endpoint= "{}"
+        r#"endpoint= "{greptimedb_http_endpoint}"
 table = "logs2"
 dbname = "public"
-"#,
-        &greptimedb_http_endpoint
+"#
     );
 
     let (config, _) = load_sink::<GreptimeDBLogsConfig>(&cfg).unwrap();

@@ -31,7 +31,7 @@ pub struct Opts {
 )]
 fn check_paths(opts: &Opts) -> Result<(), String> {
     let in_metadata = fs::metadata(&opts.input_path)
-        .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", &opts.input_path));
+        .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", opts.input_path));
 
     if opts.output_path.exists() {
         return Err(format!(
@@ -76,7 +76,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
             && !base_dir.exists()
         {
             fs::create_dir_all(base_dir).unwrap_or_else(|_| {
-                panic!("Failed to create output dir(s): {:?}", &opts.output_path)
+                panic!("Failed to create output dir(s): {:?}", opts.output_path)
             });
         }
 
