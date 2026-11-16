@@ -70,7 +70,8 @@ jobs:
                 ps -L -p "$pid" -o pid,tid,pcpu,rss,wchan,comm >"$prefix.threads.txt"
                 timeout -k 5 30 gdb-multiarch --batch \
                   -ex "set pagination off" -ex "thread apply all bt" \
-                  -ex "info registers" -p "$pid" >"$prefix.gdb.txt" 2>&1 || true
+                  -ex "info registers" -ex "x/24i \$pc-32" \
+                  -p "$pid" >"$prefix.gdb.txt" 2>&1 || true
                 kill -KILL "$pid" 2>/dev/null || true
               fi
               status=0
