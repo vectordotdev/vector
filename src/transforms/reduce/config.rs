@@ -56,7 +56,6 @@ pub struct ReduceConfig {
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
 
-    // TODO: change the default value
     /// The number of parallel tasks used to reduce events.
     ///
     /// Groups are distributed across tasks by hashing their `group_by` values, so all events of a
@@ -64,7 +63,8 @@ pub struct ReduceConfig {
     /// across different groups may change.
     ///
     /// Has no effect when `group_by` is empty: all events then belong to a single group, which is
-    /// reduced by a single task. Set to `1` to always reduce in a single task.
+    /// reduced by a single task. Use at most the number of CPUs, and fewer tasks than distinct
+    /// `group_by` values: extra tasks add CPU usage without adding throughput.
     #[serde(default = "default_concurrency")]
     #[derivative(Default(value = "default_concurrency()"))]
     #[configurable(metadata(docs::human_name = "Concurrency"))]
@@ -128,7 +128,7 @@ const fn default_flush_period_ms() -> Duration {
 impl_generate_config_from_default!(ReduceConfig);
 
 const fn default_concurrency() -> NonZeroUsize {
-    NonZeroUsize::new(8).expect("the default concurrency is non-zero")
+    NonZeroUsize::MIN
 }
 
 impl ReduceConfig {
@@ -151,7 +151,6 @@ impl TransformConfig for ReduceConfig {
         Ok(Transform::event_task(Partitioned::new(
             move || reduce.clone(),
             shards,
-            context.cpu_ns.clone(),
         )))
     }
 

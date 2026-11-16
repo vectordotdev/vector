@@ -16,10 +16,9 @@ use std::{
 
 use async_stream::stream;
 use futures::{
-    Stream, StreamExt as _,
+    Stream, StreamExt as _, future,
     stream::{self, BoxStream},
 };
-use metrics::Counter;
 use tokio::{
     sync::mpsc,
     task::{JoinError, JoinSet},
@@ -65,20 +64,13 @@ pub struct Partitioned<T: KeyedTransform> {
     /// Builds a new, empty instance: one per shard, and one for the router to compute keys with.
     new_instance: Box<dyn Fn() -> T + Send>,
     shards: NonZeroUsize,
-    /// The component's CPU-time counter, so that the router's and shards' CPU time counts for it.
-    cpu_ns: Option<Counter>,
 }
 
 impl<T: KeyedTransform> Partitioned<T> {
-    pub fn new(
-        new_instance: impl Fn() -> T + Send + 'static,
-        shards: NonZeroUsize,
-        cpu_ns: Option<Counter>,
-    ) -> Self {
+    pub fn new(new_instance: impl Fn() -> T + Send + 'static, shards: NonZeroUsize) -> Self {
         Self {
             new_instance: Box::new(new_instance),
             shards,
-            cpu_ns,
         }
     }
 }
@@ -94,7 +86,6 @@ impl<T: KeyedTransform> TaskTransform<Event> for Partitioned<T> {
         let Self {
             new_instance,
             shards,
-            cpu_ns,
         } = *self;
 
         let mut tasks = JoinSet::new();
@@ -103,10 +94,7 @@ impl<T: KeyedTransform> TaskTransform<Event> for Partitioned<T> {
         let shard_senders = iter::repeat_with(|| {
             let (shard_tx, shard_rx) = mpsc::channel(SHARD_QUEUE_BATCHES);
             let shard = Box::new(new_instance());
-            tasks.spawn_timed(
-                run_shard(shard, shard_rx, output_tx.clone()),
-                cpu_ns.clone(),
-            );
+            tasks.spawn_timed(run_shard(shard, shard_rx, output_tx.clone()));
             shard_tx
         })
         .take(shards.get())
@@ -115,7 +103,7 @@ impl<T: KeyedTransform> TaskTransform<Event> for Partitioned<T> {
         // The shards now hold the only senders, so the output ends once every shard has ended.
         drop(output_tx);
 
-        tasks.spawn_timed(route(new_instance(), shard_senders, input_rx), cpu_ns);
+        tasks.spawn_timed(route(new_instance(), shard_senders, input_rx));
 
         stream! {
             let mut output = ReceiverStream::new(output_rx);
@@ -198,12 +186,17 @@ async fn route<T: KeyedTransform>(
             batches[shard].push((key, event));
         }
 
-        for (shard_tx, batch) in shard_senders.iter().zip(batches) {
-            // A shard's receiver is gone only when that shard panicked: the output stream re-raises
-            // the panic, so there is nothing left to route.
-            if !batch.is_empty() && shard_tx.send(batch).await.is_err() {
-                return;
-            }
+        // Sent concurrently, so that a shard with a full queue doesn't delay the others' batches.
+        let sends = shard_senders
+            .iter()
+            .zip(batches)
+            .filter(|(_, batch)| !batch.is_empty())
+            .map(|(shard_tx, batch)| shard_tx.send(batch));
+
+        // A shard's receiver is gone only when that shard panicked: the output stream re-raises
+        // the panic, so there is nothing left to route.
+        if future::try_join_all(sends).await.is_err() {
+            return;
         }
     }
 }
@@ -273,7 +266,7 @@ mod tests {
     fn run(
         input: impl Stream<Item = Event> + Send + 'static,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>> {
-        Box::new(Partitioned::new(|| PassThrough, SHARDS, None)).transform(input.boxed())
+        Box::new(Partitioned::new(|| PassThrough, SHARDS)).transform(input.boxed())
     }
 
     /// The events of each key, in output order.

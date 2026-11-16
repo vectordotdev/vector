@@ -99,21 +99,9 @@ impl ReduceState {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
                 match self.fields.entry(parsed_path) {
                     Entry::Vacant(entry) => {
-                        if let Some(strategy) = maybe_strategy {
-                            match get_value_merger(value.clone(), strategy) {
-                                Ok(m) => {
-                                    entry.insert(m);
-                                }
-                                Err(error) => {
-                                    warn!(message = "Failed to merge value.", %error);
-                                }
-                            }
-                        } else {
-                            entry.insert(value.clone().into());
-                        }
+                        entry.insert(value.clone().into());
                     }
                     Entry::Occupied(mut entry) => {
                         if let Err(error) = entry.get_mut().add(value.clone()) {
@@ -178,6 +166,10 @@ impl Reduce {
     /// # Errors
     ///
     /// Returns an error for incompatible conditions, invalid merge paths, or a condition that cannot be built.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "merge strategy paths are validated by validate_merge_strategies"
+    )]
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -210,15 +202,12 @@ impl Reduce {
             merge_strategies: config
                 .merge_strategies
                 .iter()
-                .filter_map(|(path, strategy)| {
-                    // TODO Invalid paths are ignored to preserve backwards compatibility.
-                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
-                    //      which means an invalid path would result in an configuration error.
-                    let parsed_path = parse_target_path(path).ok();
-                    if parsed_path.is_none() {
-                        warn!(message = "Ignoring strategy with invalid path.", %path);
-                    }
-                    parsed_path.map(|path| (path, strategy.clone()))
+                .map(|(path, strategy)| {
+                    // There are no invalid paths here: `validate_merge_strategies` above already
+                    // returns a configuration error for any path that fails to parse.
+                    let path =
+                        parse_target_path(path).expect("validated by validate_merge_strategies");
+                    (path, strategy.clone())
                 })
                 .collect(),
             merge_states: HashMap::new(),
@@ -313,16 +302,14 @@ impl Reduce {
 
             self.push_or_new_reduce_state(&event, discriminant);
         } else if ends_here {
-            emitter.emit(
-                if let Some(mut state) = self.merge_states.remove(&discriminant) {
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                } else {
-                    let mut state = ReduceState::new();
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                },
-            );
+            emitter.emit({
+                let mut state = self
+                    .merge_states
+                    .remove(&discriminant)
+                    .unwrap_or_else(ReduceState::new);
+                state.add_event(&event, &self.merge_strategies);
+                state.flush().into()
+            });
         } else {
             self.push_or_new_reduce_state(&event, discriminant);
         }
@@ -421,21 +408,6 @@ mod test {
         test_util::components::assert_transform_compliance,
         transforms::{Transform, test::create_topology},
     };
-
-    /// Receives `N` reduced events, sorted by `message`: groups reduced by different shards can be
-    /// emitted in any order.
-    async fn recv_sorted_by_message<const N: usize>(
-        out: &mut mpsc::Receiver<Event>,
-    ) -> [LogEvent; N] {
-        let mut events = Vec::with_capacity(N);
-        for _ in 0..N {
-            events.push(out.recv().await.expect("a reduced event").into_log());
-        }
-        events.sort_by_key(|event| event["message"].to_string_lossy().into_owned());
-        events
-            .try_into()
-            .unwrap_or_else(|_| unreachable!("exactly N events were received"))
-    }
 
     /// Builds the transform from `config` and runs `events` through it until they are all flushed.
     async fn run(config: &ReduceConfig, events: Vec<Event>) -> Vec<LogEvent> {
@@ -547,13 +519,15 @@ mod test {
                 tx.send(event).await.unwrap();
             }
 
-            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
+            let output_1 = out.recv().await.unwrap().into_log();
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
             for definition in schema_definitions.values() {
                 definition.assert_valid_for_event(&output_1.clone().into());
             }
+
+            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
@@ -698,10 +672,12 @@ mod test {
             e_5.insert(event_path!("test_end"), "yep");
             tx.send(e_5.into()).await.unwrap();
 
-            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
+            let output_1 = out.recv().await.unwrap().into_log();
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
+
+            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
@@ -915,10 +891,12 @@ mod test {
             e_6.insert(event_path!("test_end"), "yep");
             tx.send(e_6.into()).await.unwrap();
 
-            let [output_1, output_2] = recv_sorted_by_message(&mut out).await;
+            let output_1 = out.recv().await.unwrap().into_log();
             assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
             assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
             assert_eq!(output_1.metadata(), &metadata_1);
+
+            let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
             assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
             assert_eq!(output_2.metadata(), &metadata_2);
@@ -1117,6 +1095,60 @@ mod test {
                 "test_end" => "done"
             });
             assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn partitioned_keeps_arrival_order_within_group() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            concurrency: 4
+            merge_strategies:
+              foo: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            for (foo, request_id, end) in [
+                (1, "1", false),
+                (2, "2", false),
+                (3, "1", false),
+                (4, "2", false),
+                (5, "1", true),
+                (6, "2", true),
+            ] {
+                let mut event = LogEvent::from(format!("test message {foo}"));
+                event.insert(event_path!("foo"), foo);
+                event.insert(event_path!("request_id"), request_id);
+                if end {
+                    event.insert(event_path!("test_end"), "yep");
+                }
+                tx.send(event.into()).await.unwrap();
+            }
+
+            // Groups may reach different shards, so either group can come out first.
+            let mut outputs = [
+                out.recv().await.unwrap().into_log(),
+                out.recv().await.unwrap().into_log(),
+            ];
+            outputs.sort_by_key(|output| output["request_id"].to_string());
+
+            assert_eq!(outputs[0]["message"], "test message 1".into());
+            assert_eq!(outputs[0]["foo"], json!([1, 3, 5]).into());
+            assert_eq!(outputs[1]["message"], "test message 2".into());
+            assert_eq!(outputs[1]["foo"], json!([2, 4, 6]).into());
 
             drop(tx);
             topology.stop().await;
