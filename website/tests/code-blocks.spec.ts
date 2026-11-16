@@ -15,6 +15,7 @@ for (const { name, viewport, colorScheme } of [
       .locator("#page-content .highlight")
       .filter({ has: page.locator('code[data-lang="python"]') })
       .first();
+    await expect(server.locator(".code-block-controls .code-sample-filename")).toHaveText("http-server.py");
     const serverCode = server.locator("pre");
     const serverToggle = server.getByRole("button", { name: "Expand", exact: true });
     await expect(serverCode).toBeHidden();
@@ -120,3 +121,73 @@ test("long snippets still toggle when the Clipboard API is unavailable", async (
   await config.getByRole("button", { name: "Expand", exact: true }).click();
   await expect(config.locator("pre")).toBeVisible();
 });
+
+for (const width of [1280, 390]) {
+  for (const canCopy of [true, false]) {
+    test(`filename headers stay attached at ${width}px with clipboard ${canCopy}`, async ({
+      context,
+      page
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: width === 390 ? "dark" : "light" });
+      await context.addInitScript((enabled) => {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: enabled
+            ? {
+                async writeText(text: string) {
+                  sessionStorage.setItem("copied-code", text);
+                }
+              }
+            : undefined
+        });
+      }, canCopy);
+      await page.goto("/docs/reference/vrl/");
+      const snippet = page.locator('#page-content .highlight[title="vector.yaml"]').first();
+      const header = snippet.locator(".code-block-controls");
+      await expect(header.locator(".code-sample-filename")).toHaveText("vector.yaml");
+      await expect(snippet.getByRole("button", { name: /^(Collapse|Expand)$/ })).toHaveCount(0);
+      const blockBox = (await snippet.boundingBox())!;
+      const headerBox = (await header.boundingBox())!;
+      const codeBox = (await snippet.locator("pre").boundingBox())!;
+      expect(headerBox.y).toBeCloseTo(blockBox.y, 0);
+      expect(codeBox.y).toBeCloseTo(headerBox.y + headerBox.height, 0);
+      expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(width);
+      const copy = snippet.getByRole("button", { name: "Copy code to clipboard" });
+      if (canCopy) {
+        const source = (await snippet.locator("pre").textContent())!.replace(/\n$/, "");
+        await copy.click();
+        await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(source);
+      } else {
+        await expect(copy).toHaveCount(0);
+      }
+      await snippet.screenshot({ path: testInfo.outputPath("filename-header.png") });
+    });
+  }
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`VRL examples highlight function names and fields in ${colorScheme} mode`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme });
+    await page.goto("/docs/reference/vrl/");
+    const snippet = page
+      .locator(".highlight")
+      .filter({ has: page.locator('code[data-lang="coffee"]') })
+      .first();
+    const code = snippet.locator("code");
+    const plainColor = await code.evaluate((element) => getComputedStyle(element).color);
+    await expect(
+      code
+        .locator(".nx")
+        .filter({ hasText: /^parse_json$/ })
+        .first()
+    ).toHaveCSS("color", "rgb(147, 197, 253)");
+    await expect(
+      code
+        .locator(".nx")
+        .filter({ hasText: /^message$/ })
+        .first()
+    ).not.toHaveCSS("color", plainColor);
+    await snippet.screenshot({ path: testInfo.outputPath(`vrl-${colorScheme}.png`) });
+  });
+}
