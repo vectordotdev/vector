@@ -245,7 +245,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 								description: """
 																			Discovery role.
 
-																			Discovery role. Only `pod` is supported in this release.
+																			Only `pod` is currently supported.
 																			"""
 								required: false
 								type: string: {

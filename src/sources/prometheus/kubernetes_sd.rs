@@ -102,7 +102,7 @@ impl Scheme {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub(crate) struct KubernetesScrapeConfig {
-    /// Discovery role. Only `pod` is supported in this release.
+    /// Only `pod` is currently supported.
     role: Role,
 
     /// Annotation prefix to read scrape configuration from.
