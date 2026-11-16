@@ -1,10 +1,8 @@
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::event::{Event, TraceEvent, TraceLayout};
 use vrl::{
     event_path,
-    value::{KeyString, Value},
+    value::{ObjectMap, Value},
 };
 
 use super::{
@@ -132,7 +130,7 @@ impl ResourceSpan {
 
 impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("name".into(), ev.name.into());
         // https://github.com/vectordotdev/vector/issues/23659
         #[allow(
@@ -154,7 +152,7 @@ impl From<SpanEvent> for Value {
 
 impl From<Link> for Value {
     fn from(link: Link) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("trace_id".into(), Value::from(to_hex(&link.trace_id)));
         obj.insert("span_id".into(), Value::from(to_hex(&link.span_id)));
         obj.insert("trace_state".into(), link.trace_state.into());
@@ -169,7 +167,7 @@ impl From<Link> for Value {
 
 impl From<SpanStatus> for Value {
     fn from(status: SpanStatus) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("message".into(), status.message.into());
         obj.insert("code".into(), status.code.into());
         Value::Object(obj)

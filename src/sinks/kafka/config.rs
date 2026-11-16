@@ -85,7 +85,7 @@ pub struct KafkaSinkConfig {
 
     /// Local message timeout, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
+    #[configurable(metadata(docs::examples = 150_000, docs::examples = 450_000))]
     #[serde(default = "default_message_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Message Timeout"))]
     pub message_timeout_ms: Duration,
@@ -133,11 +133,11 @@ pub struct KafkaSinkConfig {
 }
 
 const fn default_socket_timeout_ms() -> Duration {
-    Duration::from_millis(60000) // default in librdkafka
+    Duration::from_mins(1) // default in librdkafka
 }
 
 const fn default_message_timeout_ms() -> Duration {
-    Duration::from_millis(300000) // default in librdkafka
+    Duration::from_mins(5) // default in librdkafka
 }
 
 const fn default_rate_limit_duration_secs() -> u64 {
@@ -224,7 +224,7 @@ impl KafkaSinkConfig {
             client_config.set(key, value.to_string());
         }
 
-        for (key, value) in self.librdkafka_options.iter() {
+        for (key, value) in &self.librdkafka_options {
             debug!(option = %key, value = %value, "Setting librdkafka option.");
             client_config.set(key.as_str(), value.as_str());
         }
@@ -294,16 +294,16 @@ impl GenerateConfig for KafkaSinkConfig {
             healthcheck_topic: None,
             key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
             encoding: JsonSerializerConfig::default().into(),
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             compression: KafkaCompression::None,
-            auth: Default::default(),
+            auth: KafkaAuthConfig::default(),
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             rate_limit_duration_secs: default_rate_limit_duration_secs(),
             rate_limit_num: default_rate_limit_num(),
-            librdkafka_options: Default::default(),
+            librdkafka_options: HashMap::default(),
             headers_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()

@@ -4,7 +4,7 @@ use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
     ComponentEventsDropped, CounterName, HistogramName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
-    error_stage, error_type,
+    emit, error_stage, error_type,
 };
 use vector_lib::{counter, histogram};
 
@@ -35,7 +35,7 @@ impl InternalEvent for KeyOutsideBasePrefixError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Rendered key outside base prefix.",
         });
@@ -136,7 +136,7 @@ impl InternalEvent for StreamClosedError {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: "Downstream is closed.",
         });
@@ -168,7 +168,7 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
         // message contains the sink name in `component_type` field thanks to `tracing` spans. For example:
         // "<timestamp> ERROR sink{component_kind="sink" component_id=sink0 component_type=aws_s3 component_name=sink0}: vector::internal_events::common: Failed to build request."
         error!(
-            message = format!("Failed to build request."),
+            message = "Failed to build request.".to_string(),
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,

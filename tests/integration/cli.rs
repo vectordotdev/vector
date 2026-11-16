@@ -122,6 +122,41 @@ fn validate_cleanup() {
     );
 }
 
+#[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
+#[test]
+fn validate_ignored_fields_honors_deny_warnings() {
+    const CONFIG: &str = indoc! {r#"
+        sources:
+          http:
+            type: http_server
+            address: "127.0.0.1:18080"
+        sinks:
+          out:
+            type: http
+            inputs: [http]
+            uri: "http://127.0.0.1:18081/"
+            encoding:
+              codec: json
+            request:
+              retry_atempts: 3
+    "#};
+    for (args, expected) in [
+        (vec!["--no-environment"], exitcode::OK),
+        (
+            vec!["--no-environment", "--deny-warnings"],
+            exitcode::CONFIG,
+        ),
+    ] {
+        let output = validate_output_with_args(CONFIG, &args);
+        assert_eq!(output.status.code(), Some(expected));
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains("/sinks/out/request/retry_atempts"),
+            "{stdout}"
+        );
+    }
+}
+
 #[test]
 fn validate_failing_healthcheck() {
     assert_eq!(validate(FAILING_HEALTHCHECK), exitcode::CONFIG);
@@ -130,11 +165,11 @@ fn validate_failing_healthcheck() {
 #[test]
 fn validate_ignore_healthcheck() {
     assert_eq!(
-        validate(&formatdoc! {r#"
+        validate(&formatdoc! {r"
             healthchecks:
               enabled: false
             {FAILING_HEALTHCHECK}
-        "#}),
+        "}),
         exitcode::OK
     );
 }

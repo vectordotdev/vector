@@ -16,16 +16,16 @@ use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
 
 mod common;
 
-/// A struct to manage the data_dir of an on-disk benchmark
+/// A struct to manage the `data_dir` of an on-disk benchmark
 ///
-/// The way our benchmarks function we have the choice of sharing a data_dir
-/// between benchmarks or give each benchmark its own data_dir. The first option
+/// The way our benchmarks function we have the choice of sharing a `data_dir`
+/// between benchmarks or give each benchmark its own `data_dir`. The first option
 /// will cause cross-pollution of benchmarks so that's a no-go. The second
 /// option will fill up the benchmarker's disk. Filling up disk is a no-go but
 /// is something we can manage.
 ///
 /// This struct keeps track of the current iteration of the tests and manages
-/// new sub-data_dir paths. These paths, wrapped in a [`PathGuard`]
+/// new sub-`data_dir` paths. These paths, wrapped in a [`PathGuard`]
 /// self-destruct when the benchmark drops them while this struct self-destructs
 /// when it is dropped. This keeps disk consumption to a minimum.
 struct DataDir {
@@ -37,6 +37,7 @@ struct PathGuard {
     inner: PathBuf,
 }
 
+#[derive(Clone, Copy)]
 enum BoundBy {
     Bytes,
     NumberEvents,
@@ -84,6 +85,10 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the benchmark buffer-size conversion on all target widths. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn create_in_memory_variant(bound_by: BoundBy, max_events: usize, max_size: u64) -> BufferType {
     let size = match bound_by {
         BoundBy::Bytes => MemoryBufferSize::MaxSize(NonZeroUsize::new(max_size as usize).unwrap()),
@@ -213,7 +218,7 @@ fn write_and_read(c: &mut Criterion) {
 criterion_group!(
     name = sized_records;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(60))
+        .measurement_time(Duration::from_mins(1))
         .confidence_level(0.99)
         .nresamples(500_000)
         .sample_size(100);

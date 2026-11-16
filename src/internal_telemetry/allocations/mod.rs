@@ -54,7 +54,7 @@ struct GroupMemStats {
 impl GroupMemStats {
     /// Allocates a [`GroupMemStatsStorage`], and updates the global [`THREAD_LOCAL_REFS`] registry
     /// with a reference to this newly allocated memory.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
             allocations: arr![AtomicU64::new(0) ; 256],

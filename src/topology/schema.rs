@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use snafu::Snafu;
-use vector_lib::config::SourceOutput;
+use vector_lib::{config::SourceOutput, enrichment::TableRegistry};
 
 pub(super) use crate::schema::Definition;
 use crate::{
@@ -18,10 +18,19 @@ pub enum Error {
 /// The key includes whether schema tracking is enabled and the ordered inputs.
 type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 
+/// Returns the possible schema definitions for the given inputs.
+///
+/// # Errors
+///
+/// Returns an error if an input schema contains the never type.
+///
+/// # Panics
+///
+/// Panics if a referenced component or output port is missing from the topology.
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    enrichment_tables: vector_lib::enrichment::TableRegistry,
+    enrichment_tables: &TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -60,8 +69,7 @@ pub fn possible_definitions(
 
         // If the input is a transform, the output is merged into the top-level schema
         if let Some(inputs) = config.transform_inputs(key) {
-            let input_definitions =
-                possible_definitions(inputs, config, enrichment_tables.clone(), cache)?;
+            let input_definitions = possible_definitions(inputs, config, enrichment_tables, cache)?;
 
             let mut transform_definition = input.with_definitions(
                 config
@@ -113,7 +121,7 @@ pub fn possible_definitions(
 /// 5` being expanded into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 ->
 /// Si1).
 pub(super) fn expanded_definitions(
-    enrichment_tables: vector_lib::enrichment::TableRegistry,
+    enrichment_tables: &TableRegistry,
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
@@ -166,7 +174,7 @@ pub(super) fn expanded_definitions(
         // a new pipeline.
         } else if let Some(inputs) = config.transform_inputs(key) {
             let input_definitions =
-                possible_definitions(inputs, config, enrichment_tables.clone(), &mut merged_cache)?;
+                possible_definitions(inputs, config, enrichment_tables, &mut merged_cache)?;
 
             let mut transform_definition = config
                 .transform_outputs(key, enrichment_tables.clone(), &input_definitions)
@@ -214,7 +222,7 @@ pub(super) fn expanded_definitions(
 pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
-    enrichment_tables: vector_lib::enrichment::TableRegistry,
+    enrichment_tables: &TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -255,7 +263,7 @@ pub(crate) fn input_definitions(
         // their definitions and pass it through the transform to get the new definitions.
         if let Some(inputs) = config.transform_inputs(key) {
             let transform_definitions =
-                input_definitions(inputs, config, enrichment_tables.clone(), cache)?;
+                input_definitions(inputs, config, enrichment_tables, cache)?;
 
             if contains_never(&transform_definitions) {
                 return Err(Error::ContainsNever);
@@ -310,7 +318,7 @@ pub(super) fn validate_sink_expectations(
     key: &ComponentKey,
     sink: &SinkOuter<OutputId>,
     config: &topology::Config,
-    enrichment_tables: vector_lib::enrichment::TableRegistry,
+    enrichment_tables: &TableRegistry,
 ) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
@@ -360,24 +368,27 @@ pub trait ComponentContainer {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        enrichment_tables: TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>>;
 
     /// Gets the transform output for the given port.
     ///
-    /// Returns Err(()) if there is no transform with the given key
-    /// Returns Some(None) if the source does not have an output for the port given
+    /// Returns `Ok(None)` if the transform has no output for the given port.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(())` if no transform has the given key.
     #[allow(clippy::result_unit_err)]
     fn transform_output_for_port(
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        enrichment_tables: TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<TransformOutput>, ()> {
         if let Some(outputs) = self.transform_outputs(key, enrichment_tables, input_definitions) {
-            Ok(get_output_for_port(outputs, port))
+            Ok(get_output_for_port(outputs, port.as_deref()))
         } else {
             Err(())
         }
@@ -385,8 +396,11 @@ pub trait ComponentContainer {
 
     /// Gets the source output for the given port.
     ///
-    /// Returns Err(()) if there is no source with the given key
-    /// Returns Some(None) if the source does not have an output for the port given
+    /// Returns `Ok(None)` if the source has no output for the given port.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(())` if no source has the given key.
     #[allow(clippy::result_unit_err)]
     fn source_output_for_port(
         &self,
@@ -394,7 +408,7 @@ pub trait ComponentContainer {
         port: &Option<String>,
     ) -> Result<Option<SourceOutput>, ()> {
         if let Some(outputs) = self.source_outputs(key) {
-            Ok(get_source_output_for_port(outputs, port))
+            Ok(get_source_output_for_port(outputs, port.as_deref()))
         } else {
             Err(())
         }
@@ -403,16 +417,20 @@ pub trait ComponentContainer {
 
 fn get_output_for_port(
     outputs: Vec<TransformOutput>,
-    port: &Option<String>,
+    port: Option<&str>,
 ) -> Option<TransformOutput> {
-    outputs.into_iter().find(|output| &output.port == port)
+    outputs
+        .into_iter()
+        .find(|output| output.port.as_deref() == port)
 }
 
 fn get_source_output_for_port(
     outputs: Vec<SourceOutput>,
-    port: &Option<String>,
+    port: Option<&str>,
 ) -> Option<SourceOutput> {
-    outputs.into_iter().find(|output| &output.port == port)
+    outputs
+        .into_iter()
+        .find(|output| output.port.as_deref() == port)
 }
 
 impl ComponentContainer for Config {
@@ -432,7 +450,7 @@ impl ComponentContainer for Config {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        enrichment_tables: TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
@@ -530,7 +548,7 @@ mod tests {
     type DefinitionWalker = fn(
         &[OutputId],
         &Config,
-        TableRegistry,
+        &TableRegistry,
         &mut Cache,
     ) -> Result<Vec<(OutputId, Definition)>, Error>;
 
@@ -568,7 +586,7 @@ mod tests {
                 let mut cache = HashMap::new();
                 let tables = TableRegistry::default();
 
-                let definitions = walk(&inputs, &config, tables.clone(), &mut cache).unwrap();
+                let definitions = walk(&inputs, &config, &tables, &mut cache).unwrap();
                 assert_eq!(calls.load(Ordering::Relaxed), 1);
                 assert_eq!(
                     definitions,
@@ -578,7 +596,7 @@ mod tests {
                     ]
                 );
 
-                let repeated = walk(&inputs, &config, tables, &mut cache).unwrap();
+                let repeated = walk(&inputs, &config, &tables, &mut cache).unwrap();
                 assert_eq!(repeated, definitions);
                 assert_eq!(calls.load(Ordering::Relaxed), 1);
             }
@@ -597,17 +615,12 @@ mod tests {
                 port: Some("alternate".into()),
             };
 
-            let defaults = walk(
-                std::slice::from_ref(&default),
-                &config,
-                tables.clone(),
-                &mut cache,
-            )
-            .unwrap();
+            let defaults =
+                walk(std::slice::from_ref(&default), &config, &tables, &mut cache).unwrap();
             let alternates = walk(
                 std::slice::from_ref(&alternate),
                 &config,
-                tables.clone(),
+                &tables,
                 &mut cache,
             )
             .unwrap();
@@ -617,7 +630,7 @@ mod tests {
             let ordered = walk(
                 &[alternate.clone(), default, alternate],
                 &config,
-                tables.clone(),
+                &tables,
                 &mut cache,
             )
             .unwrap();
@@ -627,7 +640,7 @@ mod tests {
             );
 
             config.schema.enabled = false;
-            let disabled = walk(&[alternates[0].0.clone()], &config, tables, &mut cache).unwrap();
+            let disabled = walk(&[alternates[0].0.clone()], &config, &tables, &mut cache).unwrap();
             assert_ne!(disabled[0].1, alternates[0].1);
         }
     }
@@ -646,7 +659,7 @@ mod tests {
 
             for _ in 0..2 {
                 assert!(matches!(
-                    walk(&inputs, &config, TableRegistry::default(), &mut cache),
+                    walk(&inputs, &config, &TableRegistry::default(), &mut cache),
                     Err(Error::ContainsNever)
                 ));
             }
@@ -654,6 +667,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting these schema expansion cases is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn test_expanded_definition() {
         struct TestCase {
             inputs: Vec<(&'static str, Option<String>)>,
@@ -678,7 +695,7 @@ mod tests {
             fn transform_outputs(
                 &self,
                 key: &ComponentKey,
-                _: vector_lib::enrichment::TableRegistry,
+                _: TableRegistry,
                 _: &[(OutputId, Definition)],
             ) -> Option<Vec<TransformOutput>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
@@ -1022,7 +1039,7 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let got = expanded_definitions(
-                vector_lib::enrichment::TableRegistry::default(),
+                &TableRegistry::default(),
                 &inputs,
                 &case,
                 &mut HashMap::default(),

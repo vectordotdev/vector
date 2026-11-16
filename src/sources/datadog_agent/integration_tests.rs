@@ -40,13 +40,11 @@ async fn wait_for_healthy(address: String) {
     let start = SystemTime::now();
     while start
         .elapsed()
-        .map(|value| value.as_secs() < AGENT_TIMEOUT)
-        .unwrap_or(false)
+        .is_ok_and(|value| value.as_secs() < AGENT_TIMEOUT)
     {
         if reqwest::get(&address)
             .await
-            .map(|res| res.status().is_success())
-            .unwrap_or(false)
+            .is_ok_and(|res| res.status().is_success())
         {
             return;
         }
@@ -59,11 +57,11 @@ async fn wait_for_healthy(address: String) {
 }
 
 async fn wait_for_healthy_agent() {
-    wait_for_healthy(agent_health_address()).await
+    wait_for_healthy(agent_health_address()).await;
 }
 
 async fn wait_for_healthy_trace_agent() {
-    wait_for_healthy(trace_agent_health_address()).await
+    wait_for_healthy(trace_agent_health_address()).await;
 }
 
 #[tokio::test]
@@ -85,7 +83,7 @@ async fn wait_for_message() {
     tokio::spawn(async move {
         let config: DatadogAgentConfig =
             serde_json::from_value(DatadogAgentConfig::generate_config()).unwrap();
-        config.build(context).await.unwrap().await.unwrap()
+        config.build(context).await.unwrap().await.unwrap();
     });
     let events = spawn_collect_n(
         async move {
@@ -128,7 +126,7 @@ async fn wait_for_traces() {
     tokio::spawn(async move {
         let config =
             serde_yaml::from_str::<DatadogAgentConfig>("address: \"0.0.0.0:8081\"").unwrap();
-        config.build(context).await.unwrap().await.unwrap()
+        config.build(context).await.unwrap().await.unwrap();
     });
     let events = spawn_collect_n(
         async move {

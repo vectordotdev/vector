@@ -27,6 +27,16 @@ pub use settings::{
     TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
 };
 
+/// Install Ring as the process-wide Rustls provider if none is already installed.
+///
+/// Call before constructing TLS clients when multiple providers are enabled.
+/// Repeated or concurrent calls preserve the first installed provider.
+pub fn install_default_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 pub type Result<T> = std::result::Result<T, TlsError>;
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;

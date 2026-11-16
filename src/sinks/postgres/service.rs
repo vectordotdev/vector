@@ -11,7 +11,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::JsonSerializerConfig,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
-    internal_event::{ComponentEventsDropped, INTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, emit},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -25,7 +25,7 @@ use crate::{
 const POSTGRES_PROTOCOL: &str = "postgres";
 
 #[derive(Clone)]
-pub struct PostgresRetryLogic;
+pub(super) struct PostgresRetryLogic;
 
 impl RetryLogic for PostgresRetryLogic {
     type Error = PostgresServiceError;
@@ -48,7 +48,7 @@ impl RetryLogic for PostgresRetryLogic {
 }
 
 #[derive(Clone)]
-pub struct PostgresService {
+pub(super) struct PostgresService {
     connection_pool: Pool<Postgres>,
     table: String,
     endpoint: String,
@@ -56,7 +56,7 @@ pub struct PostgresService {
 }
 
 impl PostgresService {
-    pub const fn new(
+    pub(super) const fn new(
         connection_pool: Pool<Postgres>,
         table: String,
         endpoint: String,
@@ -72,7 +72,7 @@ impl PostgresService {
 }
 
 #[derive(Clone)]
-pub struct PostgresRequest {
+pub(super) struct PostgresRequest {
     pub events: Vec<Event>,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -111,7 +111,7 @@ impl MetaDescriptive for PostgresRequest {
     }
 }
 
-pub struct PostgresResponse {
+pub(super) struct PostgresResponse {
     metadata: RequestMetadata,
 }
 
@@ -130,7 +130,7 @@ impl DriverResponse for PostgresResponse {
 }
 
 #[derive(Debug, Snafu)]
-pub enum PostgresServiceError {
+pub(super) enum PostgresServiceError {
     #[snafu(display("Database error: {source}"))]
     Postgres { source: sqlx::Error },
 
@@ -178,14 +178,14 @@ impl Service<PostgresRequest> for PostgresService {
                 let inserted = usize::try_from(result.rows_affected()).unwrap_or(usize::MAX);
                 let skipped = event_count.saturating_sub(inserted);
                 if skipped > 0 {
-                    emit!(ComponentEventsDropped::<INTENTIONAL> {
+                    emit(ComponentEventsDropped::<INTENTIONAL> {
                         count: skipped,
                         reason: "Row conflicts with an existing row.",
                     });
                 }
             }
 
-            emit!(EndpointBytesSent {
+            emit(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
                 protocol: POSTGRES_PROTOCOL,
                 endpoint: &service.endpoint,

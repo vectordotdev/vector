@@ -16,5 +16,5 @@ vrl.workspace = true
 vector-core = { path = "../../vector-core", default-features = false }
 vector-common = { path = "../../vector-common", default-features = false }
 tokio.workspace = true
-tokio-stream.workspace = true
+tokio-stream = { workspace = true, features = ["time"] }
 vector-vrl-category.workspace = true

@@ -1,9 +1,9 @@
 use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
+use vector_lib::internal_event::emit;
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{Quota, clock};
-use metrics::Counter;
 use snafu::Snafu;
 
 use super::{
@@ -27,7 +27,6 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
-    pub cpu_ns: Option<Counter>,
 }
 
 impl<C, I> Throttle<C, I>
@@ -35,6 +34,10 @@ where
     C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the exclusion condition cannot be built.
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
@@ -42,9 +45,8 @@ where
     ) -> crate::Result<Self> {
         let flush_keys_interval = config.window_secs;
 
-        let threshold = match NonZeroU32::new(config.threshold) {
-            Some(threshold) => threshold,
-            None => return Err(Box::new(ConfigError::NonZero)),
+        let Some(threshold) = NonZeroU32::new(config.threshold) else {
+            return Err(Box::new(ConfigError::NonZero));
         };
 
         let quota = match Quota::with_period(Duration::from_secs_f64(
@@ -66,7 +68,6 @@ where
             key_field: config.key_field.clone(),
             exclude,
             internal_metrics: config.internal_metrics.clone(),
-            cpu_ns: context.cpu_ns.clone(),
         })
     }
 
@@ -79,7 +80,7 @@ where
     }
 
     pub fn emit_event_discarded(&self, key: String) {
-        emit!(ThrottleEventDiscarded {
+        emit(ThrottleEventDiscarded {
             key,
             emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
             include_group_tag: self.internal_metrics.include_group_tag,
@@ -114,11 +115,11 @@ where
                     let key = self.key_field.as_ref().and_then(|t| {
                         t.render_string(&event)
                             .map_err(|error| {
-                                emit!(TemplateRenderingError {
+                                emit(TemplateRenderingError {
                                     error,
                                     field: Some("key_field"),
                                     drop_event: false,
-                                })
+                                });
                             })
                             .ok()
                     });
@@ -361,13 +362,13 @@ mod tests {
 
     #[tokio::test]
     async fn emits_internal_events() {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = ThrottleConfig {
                 threshold: 1,
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
-                internal_metrics: Default::default(),
+                internal_metrics: ThrottleInternalMetricsConfig::default(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -380,7 +381,7 @@ mod tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 }

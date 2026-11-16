@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Validated sink infrastructure for the sinks-only lifecycle architecture.
 //!
 //! This module implements a split between the serde/typetag-facing `SinkConfig` role
@@ -76,8 +74,11 @@ pub trait ValidatedSink {
     /// This method must be pure: no filesystem access, no network operations, no
     /// credential resolution, no spawning, and no async/await. All such environment-
     /// dependent operations belong in `build`.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Implementations return an error if the configuration is structurally invalid, such as
+    /// missing or conflicting options or values that cannot be parsed.
     fn validate(&self) -> crate::Result<Self::Validated>;
 
     /// Performs context-dependent validation that requires the enrichment tables.
@@ -85,8 +86,12 @@ pub trait ValidatedSink {
     /// Defaults to a no-op; sinks that resolve enrichment tables at compile time
     /// (e.g. custom-auth VRL programs) override this to run against the configured
     /// tables, which are only available at the config-validation layer.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Implementations return an error if context-dependent configuration, such as a VRL
+    /// program that references enrichment tables, fails to validate against `cx`. The default
+    /// implementation never returns an error.
     fn validate_with_context(&self, _cx: &SinkContext) -> crate::Result<()> {
         Ok(())
     }
@@ -109,14 +114,18 @@ pub trait ValidatedSink {
 #[async_trait]
 pub trait DynValidatedSink {
     /// Erases the validated state into a `Box<dyn Any>`.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sink's structural validation fails.
     fn validate_dyn(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
 
     /// Validates context-dependent configuration (e.g. VRL programs that resolve
     /// enrichment tables) against the given context.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context-dependent configuration fails to validate against `cx`.
     fn validate_with_context_dyn(&self, cx: &SinkContext) -> crate::Result<()>;
 
     /// Restores the validated state from `&dyn Any` and builds the sink.

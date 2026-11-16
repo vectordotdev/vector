@@ -31,7 +31,7 @@ cue-%:
 	${CUE} $*
 
 .PHONY: component-examples
-component-examples: generate-vrl-docs generate-deprecations-json
+component-examples: generate-vrl-docs
 	$(VDEV) build component-examples website/generated/example-configs
 
 .PHONY: config-examples
@@ -41,10 +41,7 @@ generate-vrl-docs: setup-vdev
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
-generate-deprecations-json: setup-vdev
-	$(VDEV) deprecation generate
-
-structured-data: generate-vrl-docs generate-deprecations-json component-examples
+structured-data: generate-vrl-docs component-examples
 
 serve: clean setup cargo-data structured-data
 	$(MAKE) serve-development

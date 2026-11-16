@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use super::{
-    ConnectorType, NetError, NetworkConnector, UnixConnectorConfig, UnixMode, net_error::*,
+    ConnectorType, NetError, NetworkConnector, UnixConnectorConfig, UnixMode,
+    net_error::{FailedToBind, FailedToConnect},
 };
 use crate::{net, sinks::util::unix::UnixEither};
 use snafu::ResultExt;
@@ -9,6 +10,10 @@ use tokio::net::{UnixDatagram, UnixStream};
 
 impl UnixConnectorConfig {
     /// Creates a [`NetworkConnector`] from this Unix Domain Socket connector configuration.
+    ///
+    /// # Errors
+    ///
+    /// This connector currently always succeeds.
     pub fn as_connector(&self) -> Result<NetworkConnector, NetError> {
         Ok(NetworkConnector {
             inner: ConnectorType::Unix(UnixConnector {
@@ -37,7 +42,7 @@ impl UnixConnector {
                         datagram
                             .connect(&self.path)
                             .context(FailedToConnect)
-                            .map(|_| UnixEither::Datagram(datagram))
+                            .map(|()| UnixEither::Datagram(datagram))
                     })?
             }
             UnixMode::Stream => UnixStream::connect(&self.path)

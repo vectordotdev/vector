@@ -2,6 +2,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use futures::{FutureExt, StreamExt, stream::BoxStream};
@@ -62,6 +63,7 @@ pub struct UdpSinkConfig {
 }
 
 impl UdpSinkConfig {
+    #[must_use]
     pub const fn from_address(address: String) -> Self {
         Self {
             address,
@@ -73,6 +75,10 @@ impl UdpSinkConfig {
     ///
     /// The address must include a port; this is a pure check (no network I/O)
     /// shared by validation and `build_connector`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or lacks a host or valid port.
     pub fn parse_address(&self) -> crate::Result<(String, u16)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -85,6 +91,11 @@ impl UdpSinkConfig {
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
+    /// Builds the sink and its healthcheck.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or lacks a host or valid port.
     pub fn build(
         &self,
         transformer: Transformer,
@@ -154,11 +165,11 @@ impl UdpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(UdpSocketConnectionEstablished {});
+                    emit(UdpSocketConnectionEstablished {});
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketOutgoingConnectionError { error });
+                    emit(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -196,7 +207,7 @@ where
             transformer,
             encoder,
             chunker,
-            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
+            bytes_sent: register(BytesSent::from(Protocol::UDP)),
         }
     }
 }

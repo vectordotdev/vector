@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
+use vector_lib::internal_event::emit;
 use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     },
 };
 
-pub struct KafkaRequestBuilder {
+pub(crate) struct KafkaRequestBuilder {
     pub key_field: Option<OwnedTargetPath>,
     pub headers_key: Option<OwnedTargetPath>,
     pub encoder: (Transformer, Encoder<()>),
@@ -66,8 +67,12 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: Option<&OwnedTargetPath>) -> Option<Bytes> {
     key_field.and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
-        Event::Trace(trace) => trace.get(key_field).map(|value| value.coerce_to_bytes()),
+        Event::Log(log) => log
+            .get(key_field)
+            .map(vector_lib::event::Value::coerce_to_bytes),
+        Event::Trace(trace) => trace
+            .get(key_field)
+            .map(vector_lib::event::Value::coerce_to_bytes),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field.to_string().as_str()))
@@ -107,16 +112,16 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                                 value: Some(value_bytes.as_ref()),
                             });
                         } else {
-                            emit!(KafkaHeaderExtractionError {
-                                header_field: headers_key
+                            emit(KafkaHeaderExtractionError {
+                                header_field: headers_key,
                             });
                         }
                     }
                     return Some(owned_headers);
                 }
                 _ => {
-                    emit!(KafkaHeaderExtractionError {
-                        header_field: headers_key
+                    emit(KafkaHeaderExtractionError {
+                        header_field: headers_key,
                     });
                 }
             }

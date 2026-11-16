@@ -203,7 +203,7 @@ pub(crate) fn resolve_tags(
             v.resolve(ctx).and_then(|v| {
                 Ok((
                     k.clone().into(),
-                    v.as_str().ok_or("Tag must be a string")?.into_owned(),
+                    v.to_str_lossy().ok_or("Tag must be a string")?.into_owned(),
                 ))
             })
         })
@@ -215,7 +215,7 @@ pub(crate) fn resolve_tags(
 mod tests {
     use vector_core::{
         compile_vrl,
-        event::{Event, LogEvent, MetricKind, MetricTagMode, MetricTags, VrlTarget},
+        event::{Event, LogEvent, MetricKind, MetricTagMode, MetricTags, ObjectMap, VrlTarget},
     };
     use vrl::{
         compiler::{
@@ -262,12 +262,12 @@ mod tests {
     }
 
     fn assert_metric_matches(
-        metric: &BTreeMap<KeyString, Value>,
+        metric: &ObjectMap,
         name: &str,
         value: f64,
         tags: Option<Vec<(&str, &str)>>,
     ) {
-        assert_eq!(metric.get("name").unwrap().as_str().unwrap(), name);
+        assert_eq!(metric.get("name").unwrap().to_str_lossy().unwrap(), name);
         assert_eq!(
             metric.get("value").unwrap().as_float().unwrap(),
             NotNan::new(value).unwrap()
@@ -283,7 +283,7 @@ mod tests {
                         .as_array_unwrap()
                         .first()
                         .unwrap()
-                        .as_str()
+                        .to_str_lossy()
                         .unwrap(),
                     value
                 );

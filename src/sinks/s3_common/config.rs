@@ -397,7 +397,6 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-#[must_use]
 pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     let healthcheck = async move {
         let req = client
@@ -426,6 +425,11 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     healthcheck.boxed()
 }
 
+/// Creates an S3 service.
+///
+/// # Errors
+///
+/// Returns an error if the S3 client cannot be created.
 pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,

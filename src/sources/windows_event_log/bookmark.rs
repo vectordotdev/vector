@@ -14,14 +14,14 @@ use windows::{
 use super::error::WindowsEventLogError;
 
 /// Maximum size for rendered bookmark XML (1 MB should be more than enough)
-const MAX_BOOKMARK_XML_SIZE: usize = 1024 * 1024;
+const MAX_BOOKMARK_XML_SIZE: u32 = 1024 * 1024;
 
 /// Manages a Windows Event Log bookmark for checkpoint tracking
 ///
 /// Bookmarks provide robust, Windows-managed position tracking in event logs.
 /// They are opaque handles that can be serialized to XML for persistence.
 #[derive(Debug)]
-pub struct BookmarkManager {
+pub(super) struct BookmarkManager {
     handle: EVT_HANDLE,
 }
 
@@ -31,7 +31,7 @@ impl BookmarkManager {
     /// # Errors
     ///
     /// Returns an error if the Windows API fails to create the bookmark.
-    pub fn new() -> Result<Self, WindowsEventLogError> {
+    pub(super) fn new() -> Result<Self, WindowsEventLogError> {
         unsafe {
             let handle = EvtCreateBookmark(None).map_err(|e| {
                 error!(message = "Failed to create bookmark.", error = %e);
@@ -55,7 +55,7 @@ impl BookmarkManager {
     /// # Errors
     ///
     /// Returns an error if the XML is invalid or the Windows API fails.
-    pub fn from_xml(xml: &str) -> Result<Self, WindowsEventLogError> {
+    pub(super) fn from_xml(xml: &str) -> Result<Self, WindowsEventLogError> {
         if xml.is_empty() {
             return Self::new(); // Empty XML = fresh bookmark
         }
@@ -87,7 +87,7 @@ impl BookmarkManager {
     /// # Errors
     ///
     /// Returns an error if the Windows API fails to update the bookmark.
-    pub fn update(&mut self, event_handle: EVT_HANDLE) -> Result<(), WindowsEventLogError> {
+    pub(super) fn update(&mut self, event_handle: EVT_HANDLE) -> Result<(), WindowsEventLogError> {
         unsafe {
             EvtUpdateBookmark(self.handle, event_handle).map_err(|e| {
                 error!(message = "Failed to update bookmark.", error = %e);
@@ -111,7 +111,7 @@ impl BookmarkManager {
     /// Note: For lock-free serialization, prefer `serialize_handle()` which
     /// allows copying the handle out of a lock before serializing.
     #[cfg(test)]
-    pub fn to_xml(&self) -> Result<String, WindowsEventLogError> {
+    pub(super) fn to_xml(&self) -> Result<String, WindowsEventLogError> {
         unsafe {
             // EvtRender params: Context, Fragment, Flags, BufferSize, Buffer, BufferUsed, PropertyCount
             // BufferUsed (6th param) receives the required size in bytes
@@ -138,7 +138,7 @@ impl BookmarkManager {
                 return Ok(String::new());
             }
 
-            if required_size > MAX_BOOKMARK_XML_SIZE as u32 {
+            if required_size > MAX_BOOKMARK_XML_SIZE {
                 return Err(WindowsEventLogError::RenderError {
                     message: format!("Bookmark buffer size too large: {required_size}"),
                 });
@@ -173,16 +173,16 @@ impl BookmarkManager {
         }
     }
 
-    /// Returns the raw Windows handle for use with EvtSubscribe
+    /// Returns the raw Windows handle for use with `EvtSubscribe`
     ///
     /// # Safety
     ///
-    /// The returned handle is only valid as long as this BookmarkManager exists.
-    pub const fn as_handle(&self) -> EVT_HANDLE {
+    /// The returned handle is only valid as long as this `BookmarkManager` exists.
+    pub(super) const fn as_handle(&self) -> EVT_HANDLE {
         self.handle
     }
 
-    /// Serialize an EVT_HANDLE directly to XML without needing a BookmarkManager reference
+    /// Serialize an `EVT_HANDLE` directly to XML without needing a `BookmarkManager` reference
     ///
     /// This is useful for serializing bookmarks outside of a lock - you can copy the handle
     /// (just an integer) while holding the lock, then call this method after releasing it.
@@ -190,9 +190,9 @@ impl BookmarkManager {
     /// # Safety
     ///
     /// The handle must be a valid bookmark handle that hasn't been closed.
-    /// Windows EVT_HANDLEs are thread-safe kernel objects, so concurrent
-    /// EvtUpdateBookmark and EvtRender calls on the same handle are safe.
-    pub fn serialize_handle(handle: EVT_HANDLE) -> Result<String, WindowsEventLogError> {
+    /// Windows `EVT_HANDLEs` are thread-safe kernel objects, so concurrent
+    /// `EvtUpdateBookmark` and `EvtRender` calls on the same handle are safe.
+    pub(super) fn serialize_handle(handle: EVT_HANDLE) -> Result<String, WindowsEventLogError> {
         unsafe {
             // First call to get required buffer size
             // EvtRender params: Context, Fragment, Flags, BufferSize, Buffer, BufferUsed, PropertyCount
@@ -218,7 +218,7 @@ impl BookmarkManager {
                 return Ok(String::new());
             }
 
-            if buffer_used > MAX_BOOKMARK_XML_SIZE as u32 {
+            if buffer_used > MAX_BOOKMARK_XML_SIZE {
                 return Err(WindowsEventLogError::RenderError {
                     message: format!("Bookmark buffer size too large: {buffer_used}"),
                 });
@@ -248,7 +248,7 @@ impl BookmarkManager {
 
     /// Closes the bookmark handle
     ///
-    /// This is called automatically when the BookmarkManager is dropped.
+    /// This is called automatically when the `BookmarkManager` is dropped.
     fn close(&mut self) {
         if self.handle.0 != 0 {
             unsafe {

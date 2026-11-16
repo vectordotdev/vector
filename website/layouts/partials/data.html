@@ -137,6 +137,11 @@
                 <div class="mt-4">
                   {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
                 </div>
+
+                {{/* Map/object fields carry their examples on the object type itself */}}
+                {{ with $v.examples }}
+                  {{ template "config-examples" (dict "examples" . "syntax" $v.syntax) }}
+                {{ end }}
               {{ else if eq $k "array" }}
                 {{/* Array */}}
                 {{ with $v.items }}

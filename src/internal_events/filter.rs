@@ -1,9 +1,11 @@
-use vector_lib::internal_event::{ComponentEventsDropped, Count, INTENTIONAL, Registered};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, Count, INTENTIONAL, Registered, register,
+};
 
 vector_lib::registered_event! (
     FilterEventsDropped => {
         events_dropped: Registered<ComponentEventsDropped<'static, INTENTIONAL>>
-            = register!(ComponentEventsDropped::<INTENTIONAL>::from(
+            = register(ComponentEventsDropped::<INTENTIONAL>::from(
                 "Events matched filter condition."
             )),
     }

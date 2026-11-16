@@ -111,6 +111,7 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
+    #[must_use]
     pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
         SocketSinkConfig {
             mode,
@@ -118,6 +119,7 @@ impl SocketSinkConfig {
         }
     }
 
+    #[must_use]
     pub fn make_basic_tcp_config(
         address: String,
         acknowledgements: AcknowledgementsConfig,
@@ -137,10 +139,10 @@ impl SocketSinkConfig {
 impl SinkConfig for SocketSinkConfig {
     fn input(&self) -> Input {
         let encoder_input_type = match &self.mode {
-            Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::Tcp(TcpMode { encoding, .. })
+            | Mode::UnixStream(UnixMode { encoding, .. })
+            | Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
-            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
-            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
     }
@@ -340,7 +342,7 @@ mod test {
                 config: TcpSinkConfig::from_address("127.0.0.1:5000".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");
@@ -354,7 +356,7 @@ mod test {
                 config: TcpSinkConfig::from_address("not a valid address".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -370,7 +372,7 @@ mod test {
                 config: TcpSinkConfig::from_address("127.0.0.1".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -386,7 +388,7 @@ mod test {
                 config: UdpSinkConfig::from_address("not a valid address".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -402,7 +404,7 @@ mod test {
                 config: UdpSinkConfig::from_address("127.0.0.1".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -418,7 +420,7 @@ mod test {
                 config: UdpSinkConfig::from_address("127.0.0.1:5000".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         config
@@ -455,11 +457,11 @@ mod test {
                 }),
                 #[cfg(all(unix, not(target_os = "macos")))]
                 DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
-                    config: UnixSinkConfig::new(path.to_path_buf()),
+                    config: UnixSinkConfig::new(path.clone()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();
@@ -526,7 +528,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let mut receiver = CountReceiver::receive_lines(addr);
@@ -549,8 +551,8 @@ mod test {
         assert_eq!(lines.len(), output.len());
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let received = json.get("message").unwrap().as_str().unwrap();
-            assert_eq!(source, received);
+            let message = json.get("message").unwrap().as_str().unwrap();
+            assert_eq!(source, message);
         }
     }
 
@@ -567,7 +569,7 @@ mod test {
                 config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (expected, events) = random_metrics_with_stream(10, None, None);
@@ -588,9 +590,9 @@ mod test {
         assert_eq!(expected.len(), output.len());
         for (source, received) in expected.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let received = json.get("metric").unwrap();
-            let received_name = received.get("name").unwrap().as_str().unwrap();
-            assert_eq!(source.as_metric().name(), received_name);
+            let metric = json.get("metric").unwrap();
+            let metric_name = metric.get("name").unwrap().as_str().unwrap();
+            assert_eq!(source.as_metric().name(), metric_name);
         }
     }
 
@@ -604,6 +606,10 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[tokio::test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Shortening this reconnect test is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn tcp_stream_detects_disconnect() {
         use std::{
             pin::Pin,
@@ -649,7 +655,7 @@ mod test {
                 ),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let context = SinkContext::default();
         let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
@@ -659,7 +665,7 @@ mod test {
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();
-            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await
+            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await;
         });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -770,7 +776,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();

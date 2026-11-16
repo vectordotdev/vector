@@ -33,7 +33,7 @@ use crate::{
     tls::TlsConfig,
 };
 
-pub struct CloudwatchLogsClientBuilder;
+pub(super) struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
     type Client = aws_sdk_cloudwatchlogs::client::Client;
@@ -46,7 +46,6 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 /// Retention policy configuration for AWS CloudWatch Log Group
-#[expect(clippy::doc_markdown, reason = "Service name")]
 pub struct Retention {
     /// Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
@@ -93,7 +92,6 @@ pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "group-{{ file }}"))]
     pub group_name: Template,
@@ -105,7 +103,6 @@ pub struct CloudwatchLogsSinkConfig {
     /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "stream-{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]

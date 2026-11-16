@@ -1,15 +1,14 @@
-use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
-use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::emit,
 };
 use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
 use warp::{
@@ -27,12 +26,12 @@ use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -53,6 +52,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
     fn name() -> &'static str;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request body cannot be decoded into events.
     fn build_events(
         &self,
         body: Bytes,
@@ -107,10 +110,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content encoding is unsupported or decompression fails.
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -146,7 +161,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             };
 
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                filter = filter.and(warp::path(s.to_string())).boxed()
+                filter = filter.and(warp::path(s.to_string())).boxed();
             }
             let body_filter = capped_body();
 
@@ -156,8 +171,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        emit!(HttpInternalError {
-                            message: "Path not found."
+                        emit(HttpInternalError {
+                            message: "Path not found.",
                         });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
@@ -195,7 +210,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|body| (body, auth_enrichment))
                             })
                             .and_then(|(body, auth_enrichment)| {
-                                emit!(HttpBytesReceived {
+                                emit(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
@@ -204,7 +219,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|events| (events, auth_enrichment))
                             })
                             .map(|(mut events, auth_enrichment)| {
-                                emit!(HttpEventsReceived {
+                                emit(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
@@ -239,51 +254,47 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {r:?}")
+                    emit(HttpInternalError {
+                        message: &format!("Internal error: {r:?}"),
                     });
                     Err(r)
                 }
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let remote_addr = conn.peer_addr();
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            remote_addr,
-                        )
-                    }))
-                    .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
-
-                        request
-                    })
-                    .service(warp::service(routes.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
 
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls
                 .bind(&address)
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
 
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
-                .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?;
+            serve(
+                listener.accept_stream(),
+                cx.shutdown.map(|_| ()),
+                move |conn| {
+                    let remote_addr = conn.peer_addr();
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                remote_addr,
+                            )
+                        }))
+                        .map_request(move |mut request: http::Request<_>| {
+                            request.extensions_mut().insert(PeerAddr::new(remote_addr));
+
+                            request
+                        })
+                        .service(warp::service(routes.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -329,14 +340,14 @@ async fn handle_request(
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest::new(error.code(), error.message()));
+            emit(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

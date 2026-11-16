@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -11,6 +10,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
+use vector_lib::internal_event::emit;
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -19,6 +19,7 @@ use tokio::{
     sync::{MutexGuard, broadcast::error::RecvError},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(feature = "api")]
 use crate::api;
@@ -27,7 +28,6 @@ use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, Component, ComponentConfig, ComponentKind, Config, ConfigPath},
-    extra_context::ExtraContext,
     heartbeat,
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
@@ -152,8 +152,8 @@ impl ApplicationConfig {
             ));
             match api_server {
                 Ok(server) => {
-                    emit!(ApiStarted {
-                        addr: server.addr()
+                    emit(ApiStarted {
+                        addr: server.addr(),
                     });
                     Some(server)
                 }
@@ -295,7 +295,7 @@ impl Application {
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
-        emit!(VectorStarted);
+        emit(VectorStarted);
         handle.spawn(heartbeat::heartbeat());
 
         let Self {
@@ -489,7 +489,7 @@ async fn reload_config_from_result(
         },
         Err(errors) => {
             handle_config_errors(errors);
-            emit!(VectorConfigLoadError);
+            emit(VectorConfigLoadError);
             None
         }
     }
@@ -540,10 +540,10 @@ impl FinishedApplication {
         mut signal_rx: SignalRx,
         clean_shutdown: bool,
     ) -> ExitStatus {
-        emit!(VectorStopping);
+        emit(VectorStopping);
         tokio::select! {
             drained = topology_controller.stop() => {
-                emit!(VectorStopped);
+                emit(VectorStopped);
                 if clean_shutdown && drained {
                     info!("All components shut down gracefully.");
                 }
@@ -562,7 +562,7 @@ impl FinishedApplication {
 
     fn quit() -> ExitStatus {
         // It is highly unlikely that this event will exit from topology.
-        emit!(VectorQuit);
+        emit(VectorQuit);
         ExitStatus::from_raw({
             #[cfg(windows)]
             {
@@ -601,7 +601,7 @@ pub fn build_runtime(
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
-    let threads = threads.unwrap_or_else(crate::num_threads);
+    let threads = threads.unwrap_or_else(vector_lib::num_threads);
     if threads == 0 {
         error!("The `threads` argument must be greater or equal to 1.");
         return Err(exitcode::CONFIG);

@@ -16,7 +16,7 @@ generated: components: sources: pulsar: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Authentication configuration."
@@ -37,7 +37,7 @@ generated: components: sources: pulsar: configuration: {
 				required:    true
 				type: object: options: {
 					audience: {
-						description: "The OAuth2 audience."
+						description: "The `OAuth2` audience."
 						required:    false
 						type: string: examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
 					}
@@ -56,7 +56,7 @@ generated: components: sources: pulsar: configuration: {
 						type: string: examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 					}
 					scope: {
-						description: "The OAuth2 scope."
+						description: "The `OAuth2` scope."
 						required:    false
 						type: string: examples: ["${OAUTH2_SCOPE}", "admin"]
 					}
@@ -106,7 +106,7 @@ generated: components: sources: pulsar: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	endpoint: {
 		description: "The endpoint to which the Pulsar client should connect to."
@@ -160,7 +160,7 @@ generated: components: sources: pulsar: configuration: {
 			}
 			verify_hostname: {
 				description: """
-					Whether hostname verification is enabled when verify_certificate is false
+					Whether hostname verification is enabled when `verify_certificate` is false
 
 					Set to true if not specified.
 					"""

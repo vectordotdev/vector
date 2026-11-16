@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     fs::{File, create_dir_all},
@@ -327,7 +326,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             Ok(()) => {
                 println!(
                     "Config file written to {:?}",
-                    &file.as_ref().unwrap().join("\n")
+                    file.as_ref().unwrap().join("\n")
                 );
             }
             Err(e) => errs.push(format!("failed to write to file: {e}")),
@@ -371,7 +370,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
-        Err(format!("{:?} already exists", &filepath).into())
+        Err(format!("{filepath:?} already exists").into())
     } else {
         if let Some(directory) = filepath.parent() {
             create_dir_all(directory)?;

@@ -153,7 +153,7 @@ impl SourceSender {
         (
             Self {
                 default_output: Some(default_output),
-                named_outputs: Default::default(),
+                named_outputs: HashMap::default(),
             },
             rx,
         )

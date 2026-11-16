@@ -59,7 +59,7 @@ Loosely, you'll need the following:
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
 
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
-- **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+- **To run integration tests:** Have `docker` available. See [Integration tests](#integration-tests) for service lifecycle controls.
 - **To run `make check-component-features`:** Have `remarshal` installed.
 - **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
@@ -71,6 +71,7 @@ bash scripts/environment/prepare.sh
 ```
 
 This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
+For cross-compilation alone, run `bash scripts/environment/prepare.sh --modules=cross` before using the Make targets.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -88,13 +89,12 @@ make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
 cargo test
 make test
-# Validate your tests pass (starting required services in Docker)
-make test-integration SCOPE="sources::example"
+# Run an integration suite (starting and stopping required services in Docker)
+cargo vdev integration run amqp
 # Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" autospawn=false
 cargo test --features docker sources::example
-# Validate all tests pass (starting required services in Docker)
-make test-integration
+# List available integration suites
+cargo vdev integration show
 # Run your benchmarks
 make bench SCOPE="transforms::example"
 cargo bench transforms::example
@@ -322,15 +322,28 @@ to run. A few rules when setting up integration tests:
       run in a Docker container.
 - [ ] The service must be configured on a unique port that is configured through
       an environment variable.
-- [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
-      ensure that it starts the service before running the integration test.
-- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
-      [`.github/workflows/integration-test.yml`](../.github/workflows/integration-test.yml) workflow.
+- [ ] Add `test.yaml` under `tests/integration/<name>/config`, and `compose.yaml`
+      if the integration needs Compose-managed services.
+- [ ] Add the integration to the service matrices in
+      [`.github/workflows/integration.yml`](../.github/workflows/integration.yml) and
+      [`.github/workflows/ci-integration-review.yml`](../.github/workflows/ci-integration-review.yml).
 
 Once complete, you can run your integration tests with:
 
 ```bash
-make test-integration-<name>
+cargo vdev integration run <name>
+```
+
+This command starts each configured environment, runs its tests, and stops it
+even when tests fail.
+
+For repeated tests or debugging, manage the environment explicitly:
+
+```bash
+cargo vdev integration start <name>
+cargo vdev integration test <name>
+# Repeat the test command while iterating, then stop the environment.
+cargo vdev integration stop <name>
 ```
 
 ### Blackbox tests
@@ -531,33 +544,6 @@ framework are at `lib/k8s-e2e-tests`.
 The Kubernetes-related distribution bit that are at `distribution/docker`,
 `distribution/kubernetes` and our Helm chart can be found at [`vectordotdev/helm-charts`](https://github.com/vectordotdev/helm-charts/).
 
-The development assistance resources are located at `Tiltfile`
-and in the `tilt` dir.
-
-#### Development
-
-There is a special flow for when you develop portions of Vector that are
-designed to work with Kubernetes, like `kubernetes_logs` source or the
-`deployment/kubernetes/*.yaml` configs.
-
-This flow facilitates building Vector and deploying it into a cluster.
-
-##### Requirements
-
-There are some extra requirements besides what you'd normally need to work on
-Vector:
-
-- [`tilt`](https://tilt.dev/)
-- [`docker`](https://www.docker.com/)
-- [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
-
-##### Automatic
-
-You can use `tilt` to detect changes, rebuild your image, and update your
-Kubernetes resource. Simply start your local Kubernetes cluster and run
-`tilt up` from Vector's root dir.
-
 #### Testing
 
 ##### Integration tests
@@ -577,7 +563,7 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
-- `cross` - `cargo install cross`
+- `cross` - `bash scripts/environment/prepare.sh --modules=cross`
 - [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
@@ -608,11 +594,9 @@ after the `:`. Replace `<your name>` with your Docker Hub username.
 
 You can also pass additional parameters to adjust the behavior of the test:
 
-- `QUICK_BUILD=true` - use development build and an image from the dev
-  flow instead of a production docker image. Significantly speeds up the
-  preparation process, but doesn't guarantee the correctness in the release
-  build. Useful for development of the tests or Vector code to speed up the
-  iteration cycles.
+- `SKIP_PACKAGE_DEB=true` - skip building the `.deb` package and reuse the one
+  already in `target/artifacts`. Useful when you already built the package and
+  only want to rebuild the docker image.
 
 - `USE_MINIKUBE_CACHE=true` - instead of pushing the built docker image to the
   registry under the specified name, directly load the image into
@@ -641,11 +625,11 @@ You can also pass additional parameters to adjust the behavior of the test:
 Passing additional commands is done like so:
 
 ```shell
-QUICK_BUILD=true USE_MINIKUBE_CACHE=true make test-e2e-kubernetes
+USE_MINIKUBE_CACHE=true make test-e2e-kubernetes
 ```
 
 or
 
 ```shell
-QUICK_BUILD=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
+SKIP_PACKAGE_DEB=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 ```

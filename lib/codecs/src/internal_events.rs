@@ -37,6 +37,35 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+/// Emitted when a decoder discards a frame that exceeds the configured maximum length.
+pub struct DecoderFrameTooLongError {
+    /// The length of the discarded frame in bytes, not including the delimiter.
+    pub length: usize,
+    /// The configured maximum frame length in bytes.
+    pub max_length: usize,
+}
+
+impl InternalEvent for DecoderFrameTooLongError {
+    fn emit(self) {
+        error!(
+            message = "Discarding frame larger than max_length.",
+            length = self.length,
+            max_length = self.max_length,
+            error_code = "decoder_frame_too_long",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "decoder_frame_too_long",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 /// Emitted when a decoder fails to deserialize a frame.
 pub struct DecoderDeserializeError<'a> {
     /// The deserialize error that occurred.

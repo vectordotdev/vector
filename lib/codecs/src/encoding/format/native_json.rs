@@ -33,11 +33,11 @@ pub struct NativeJsonSerializer;
 
 impl NativeJsonSerializer {
     /// Encode event and represent it as native JSON value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     #[allow(
         clippy::needless_pass_by_value,
         reason = "Keep the existing owned-argument API during the lint rollout."
@@ -63,13 +63,13 @@ mod tests {
         buckets,
         event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     };
-    use vrl::btreemap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_json() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
         }));
         let mut serializer = NativeJsonSerializer;
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn serialize_equals_to_json_value() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
         }));
         let mut serializer = NativeJsonSerializer;
@@ -102,7 +102,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
             },
         ));

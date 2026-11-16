@@ -81,7 +81,7 @@ impl PortForwarder {
         let mut seen_ipv6 = false;
         loop {
             self.reader.read_line(&mut buf).await?;
-            print!("{}", &buf);
+            print!("{buf}");
 
             if buf.contains(&ready_string_ipv4) {
                 seen_ipv4 = true;

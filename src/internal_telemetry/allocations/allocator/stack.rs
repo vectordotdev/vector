@@ -15,7 +15,7 @@ pub(crate) struct GroupStack<const N: usize> {
 
 impl<const N: usize> GroupStack<N> {
     /// Creates an empty [`GroupStack`].
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             current_top: 0,
             slots: [AllocationGroupId::ROOT; N],
@@ -25,12 +25,12 @@ impl<const N: usize> GroupStack<N> {
     /// Gets the currently active allocation group.
     ///
     /// If the stack is empty, then the root allocation group is the defacto active allocation group, and is returned as such.
-    pub const fn current(&self) -> AllocationGroupId {
+    pub(super) const fn current(&self) -> AllocationGroupId {
         self.slots[self.current_top]
     }
 
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
-    pub fn push(&mut self, group: AllocationGroupId) {
+    pub(super) fn push(&mut self, group: AllocationGroupId) {
         self.current_top += 1;
         assert!(
             self.current_top < self.slots.len(),
@@ -40,7 +40,7 @@ impl<const N: usize> GroupStack<N> {
     }
 
     /// Pops the previous allocation group that was on the stack.
-    pub fn pop(&mut self) {
+    pub(super) fn pop(&mut self) {
         assert!(
             self.current_top != 0,
             "tried to pop current allocation group from the stack but the stack is empty"

@@ -10,7 +10,7 @@ use serde::Serialize;
 use vector_lib::{
     config::log_schema,
     event::ObjectMap,
-    internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL, emit},
 };
 use vrl::event_path;
 
@@ -26,7 +26,7 @@ pub(super) enum NewRelicApiModel {
 
 /// The metrics API data model.
 ///
-/// Reference: https://docs.newrelic.com/docs/data-apis/ingest-apis/metric-api/report-metrics-metric-api/
+/// Reference: <https://docs.newrelic.com/docs/data-apis/ingest-apis/metric-api/report-metrics-metric-api/>
 #[derive(Debug, Serialize)]
 pub(super) struct MetricsApiModel(pub [MetricDataStore; 1]);
 
@@ -82,7 +82,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                             num_missing_interval += 1;
                             return None;
                         };
-                        (value, "count", Some(interval_ms.get() as i64))
+                        (value, "count", Some(i64::from(interval_ms.get())))
                     }
                     (MetricValue::Counter { value }, MetricKind::Absolute)
                     | (MetricValue::Gauge { value }, _) => (value, "gauge", None),
@@ -97,7 +97,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 if value.is_nan() {
                     num_nan_value += 1;
                     return None;
-                };
+                }
 
                 let timestamp = data.time.timestamp.unwrap_or_else(Utc::now);
                 Some(MetricData {
@@ -112,41 +112,41 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             .collect();
 
         if num_non_metric_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_metric_events,
-                reason: "non-metric event"
+                reason: "non-metric event",
             });
         }
         if num_unsupported_metric_type > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_unsupported_metric_type,
-                reason: "unsupported metric type"
+                reason: "unsupported metric type",
             });
         }
         if num_nan_value > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_nan_value,
-                reason: "NaN value not supported"
+                reason: "NaN value not supported",
             });
         }
         if num_missing_interval > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_missing_interval,
-                reason: "incremental counter missing interval"
+                reason: "incremental counter missing interval",
             });
         }
 
-        if !metric_array.is_empty() {
-            Ok(Self::new(metric_array))
-        } else {
+        if metric_array.is_empty() {
             Err(NewRelicSinkError::new("No valid metrics to generate"))
+        } else {
+            Ok(Self::new(metric_array))
         }
     }
 }
 
 /// The events API data mode.
 ///
-/// Reference: https://docs.newrelic.com/docs/data-apis/ingest-apis/event-api/introduction-event-api/
+/// Reference: <https://docs.newrelic.com/docs/data-apis/ingest-apis/event-api/introduction-event-api/>
 #[derive(Debug, Serialize)]
 pub(super) struct EventsApiModel(pub Vec<ObjectMap>);
 
@@ -221,29 +221,29 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             .collect();
 
         if num_non_log_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
-                reason: "non-log event"
+                reason: "non-log event",
             });
         }
         if num_nan_value > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_nan_value,
-                reason: "NaN value not supported"
+                reason: "NaN value not supported",
             });
         }
 
-        if !events_array.is_empty() {
-            Ok(Self::new(events_array))
-        } else {
+        if events_array.is_empty() {
             Err(NewRelicSinkError::new("No valid events to generate"))
+        } else {
+            Ok(Self::new(events_array))
         }
     }
 }
 
 /// The logs API data model.
 ///
-/// Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/
+/// Reference: <https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/>
 #[derive(Serialize, Debug)]
 pub(super) struct LogsApiModel(pub [LogDataStore; 1]);
 
@@ -316,22 +316,22 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
             .collect();
 
         if num_non_log_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
                 reason: "non-log event",
             });
         }
         if num_non_object_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_object_events,
                 reason: "non-object event",
             });
         }
 
-        if !logs_array.is_empty() {
-            Ok(Self::new(logs_array))
-        } else {
+        if logs_array.is_empty() {
             Err(NewRelicSinkError::new("No valid logs to generate"))
+        } else {
+            Ok(Self::new(logs_array))
         }
     }
 }
@@ -341,7 +341,12 @@ const MILLISECONDS: f64 = 1000.0;
 /// Convert a value into a timestamp value. New Relic accepts either milliseconds or seconds since
 /// epoch as an integer, or ISO8601-formatted timestamp as a string.
 ///
-/// Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#json-logs
+/// Reference: <https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#json-logs>
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the timestamp wire conversion."
+)]
 fn map_timestamp_value(value: Value) -> Option<Timestamp> {
     match value {
         Value::Timestamp(t) => Some(Timestamp::Numeric(t.timestamp_millis())),
@@ -366,9 +371,9 @@ fn get_message_string(value: Option<Value>) -> String {
 
 fn strip_arrays(obj: &mut ObjectMap) {
     obj.retain(|_key, value| !value.is_array());
-    obj.iter_mut().for_each(|(_key, value)| {
+    for value in obj.values_mut() {
         if let Some(obj) = value.as_object_mut() {
             strip_arrays(obj);
         }
-    });
+    }
 }

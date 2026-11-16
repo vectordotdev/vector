@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! The Azure Logs Ingestion [`vector_lib::sink::VectorSink`]
 //!
 //! This module contains the [`vector_lib::sink::VectorSink`] instance that is responsible for

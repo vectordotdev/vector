@@ -56,7 +56,8 @@ message ResourceLogs {
   repeated ScopeLogs scope_logs = 2;
 
   // The Schema URL, if known. This is the identifier of the Schema that the resource data
-  // is recorded in. To learn more about Schema URL see
+  // is recorded in. Notably, the last part of the URL path is the version number of the
+  // schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
   // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
   // This schema_url applies to the data in the "resource" field. It does not apply
   // to the data in the "scope_logs" field which have their own schema_url field.
@@ -74,7 +75,8 @@ message ScopeLogs {
   repeated LogRecord log_records = 2;
 
   // The Schema URL, if known. This is the identifier of the Schema that the log data
-  // is recorded in. To learn more about Schema URL see
+  // is recorded in. Notably, the last part of the URL path is the version number of the
+  // schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
   // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
   // This schema_url applies to all logs in the "logs" field.
   string schema_url = 3;
@@ -208,4 +210,18 @@ message LogRecord {
   //   - the field is not present,
   //   - the field contains an invalid value.
   bytes span_id = 10;
+
+  // A unique identifier of event category/type.
+  // All events with the same event_name are expected to conform to the same
+  // schema for both their attributes and their body.
+  //
+  // Recommended to be fully qualified and short (no longer than 256 characters).
+  //
+  // Presence of event_name on the log record identifies this record
+  // as an event.
+  //
+  // [Optional].
+  //
+  // Status: [Development]
+  string event_name = 12;
 }

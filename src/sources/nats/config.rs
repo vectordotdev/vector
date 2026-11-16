@@ -168,11 +168,13 @@ pub struct NatsSourceConfig {
     pub jetstream: Option<JetStreamConfig>,
 }
 
-pub fn default_subject_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("subject"))
+pub(super) const SUBJECT_KEY: &str = "subject";
+
+pub(super) fn default_subject_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(SUBJECT_KEY))
 }
 
-pub const fn default_subscription_capacity() -> usize {
+const fn default_subscription_capacity() -> usize {
     65536
 }
 
@@ -202,7 +204,7 @@ impl SourceConfig for NatsSourceConfig {
                 let connection = self.connect().await?;
                 let messages = create_consumer_stream(&connection, js_config).await?;
 
-                Ok(Box::pin(run_nats_jetstream(
+                Ok(crate::sources::source_with_error(run_nats_jetstream(
                     self.clone(),
                     connection,
                     messages,
@@ -215,7 +217,7 @@ impl SourceConfig for NatsSourceConfig {
             NatsMode::Core => {
                 let (connection, subscription) = create_subscription(self).await?;
 
-                Ok(Box::pin(run_nats_core(
+                Ok(crate::sources::source_with_error(run_nats_core(
                     self.clone(),
                     connection,
                     subscription,
@@ -242,7 +244,7 @@ impl SourceConfig for NatsSourceConfig {
             .with_source_metadata(
                 NatsSourceConfig::NAME,
                 legacy_subject_key_field,
-                &owned_value_path!("subject"),
+                &owned_value_path!(SUBJECT_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -296,8 +298,12 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
-            .map(|options| options.subscription_capacity(config.subscriber_capacity))
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
+        .map(|options| options.subscription_capacity(config.subscriber_capacity))
     }
 }
 

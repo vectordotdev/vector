@@ -176,11 +176,16 @@ pub enum BatchSerializerConfig {
 #[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the batch serializer from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured batch serializer cannot be built:
+    /// - `arrow_stream`: `schema` is not set, or `allow_nullable_fields` is enabled and the schema
+    ///   contains a `Map` field whose entries are not a struct of exactly two fields.
+    /// - `parquet`: `schema_file` is not set (unless `schema_mode` is `auto_infer`), cannot be
+    ///   read, is larger than 10 MB, or is not a valid Parquet schema; the schema contains binary
+    ///   columns, which the JSON-based encoder does not support; or the compression level is out
+    ///   of range for the selected codec.
     pub fn build_batch_serializer(
         &self,
     ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
@@ -293,11 +298,19 @@ impl From<TextSerializerConfig> for SerializerConfig {
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected codec cannot be built:
+    /// - `avro`: the schema cannot be parsed or its named schemas cannot be resolved.
+    /// - `cef`: `device_vendor`, `device_product`, `device_version`, or `device_event_class_id`
+    ///   exceeds its maximum length after escaping, or an extension key contains characters other
+    ///   than ASCII letters.
+    /// - `csv`: no fields are configured.
+    /// - `otlp`: the bundled OTLP descriptor set cannot be decoded or does not contain the logs,
+    ///   metrics, or traces export request message types.
+    /// - `protobuf`: `desc_file` cannot be read or decoded as a descriptor set, or does not contain
+    ///   `message_type`.
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
@@ -469,15 +482,17 @@ impl Serializer {
 
     /// Encode event and represent it as JSON value.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON. For GELF, this includes events
+    /// that are not valid GELF and cannot be coerced into it, such as events missing the `host`
+    /// field or containing fields with invalid names or value types.
+    ///
     /// # Panics
     ///
     /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
-    /// if you need to determine the capability to encode to JSON at runtime.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    /// if you need to determine the capability to encode to JSON at runtime. Also panics if the
+    /// serializer is GELF and the event is not a log event.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match self {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
