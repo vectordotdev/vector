@@ -75,7 +75,7 @@ The following VRL program demonstrates how to achieve the above:
 
 # Attempt to parse the timestamp that was in the original message.
 # Note that `.timestamp` can be `null` if it wasn't present.
-parsed_timestamp, err = parse_timestamp(.timestamp, format: "%Y-%m-%dT%H:%M:%S.%fZ")
+parsed_timestamp, err = parse_timestamp(.timestamp, format: "%+")
 
 # Check if the conversion was successful. Note here that all errors must be handled, more on that later.
 if err == null {
@@ -103,8 +103,8 @@ Finally, the resulting event:
 {
   "message": "success",
   "status": 200,
-  "timestamp": 1614644364,
-  "timestamp_str": "2021-03-02T00:19:24Z"
+  "timestamp": 1614626364,
+  "timestamp_str": "2021-03-01T19:19:24Z"
 }
 ```
 
