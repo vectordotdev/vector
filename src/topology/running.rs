@@ -143,7 +143,6 @@ impl RunningTopology {
     /// detect that the sources in the topology are no longer
     /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
-    #[must_use]
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }

@@ -205,8 +205,7 @@ impl SematextMetricsService {
         let ValidatedSematextMetrics { uri, batch, .. } = validated;
         let request = config.request.into_settings();
         let http_service =
-            HttpService::new(client, SematextMetricsRequestBuilder { uri: uri.clone() })
-                .with_response_decompression();
+            HttpService::new(client, SematextMetricsRequestBuilder { uri: uri.clone() });
         let sematext_service = SematextMetricsService {
             config,
             inner: http_service,

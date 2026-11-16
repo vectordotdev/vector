@@ -46,6 +46,10 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         Ok(channel)
     }
 
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn recycle(
         &self,
         channel: &mut Self::Type,

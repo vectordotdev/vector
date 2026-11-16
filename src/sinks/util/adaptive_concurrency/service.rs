@@ -263,7 +263,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[expect(clippy::float_cmp, reason = "These constant samples have exact means.")]
     async fn increases_limit() {
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1

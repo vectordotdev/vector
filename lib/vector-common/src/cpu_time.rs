@@ -9,21 +9,74 @@
 //! - [`CpuTimedFuture`] / [`CpuTimedExt`] — a [`Future`] adapter that
 //!   brackets every `poll` call with a [`ThreadTime`] sample and accumulates
 //!   the delta into a [`metrics::Counter`].
-//! - [`spawn_timed`] — convenience wrapper that spawns a future on the
-//!   current tokio runtime with optional CPU-time accounting attached.
+//! - [`CpuScopedFuture`] — a [`Future`] adapter that makes a counter
+//!   inheritable by tasks spawned from it, without timing the future itself.
+//! - [`spawn_timed`] / [`spawn_timed_without_span`] — spawn helpers that attach the
+//!   counter of the calling task, if any, to the spawned task.
 //! - `register_counter` — registers the `component_cpu_usage_ns_total` metrics
 //!   counter for a component (available on Linux, macOS, and Windows only).
+//!
+//! # Counter inheritance
+//!
+//! While a [`CpuTimedFuture`] or [`CpuScopedFuture`] is being polled, its
+//! counter is stored in a thread-local. [`spawn_timed`] and
+//! [`spawn_timed_without_span`] read it at spawn time, so any task spawned from a
+//! component's task (or from its `build` step) charges its CPU to the same
+//! component, transitively. Code spawned outside of such a poll, or with
+//! `tokio::spawn` / [`crate::spawn_in_current_span`], is not attributed to any
+//! component.
+//!
+//! Tasks backing resources shared across components (global clients, caches,
+//! lazily initialized singletons) are independent from the component that
+//! creates them: spawn them with [`crate::spawn_in_current_span`]. With
+//! [`spawn_timed`] they would be charged to whichever component happened to
+//! trigger their creation.
 
 use std::{
+    cell::RefCell,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
+use futures::future::Either;
 use metrics::Counter;
 use pin_project::pin_project;
 use tracing::Instrument;
+
+thread_local! {
+    static CURRENT_COUNTER: RefCell<Option<Counter>> = const { RefCell::new(None) };
+}
+
+/// Makes `counter` the inheritable counter of the current thread until dropped,
+/// then restores the previous one.
+struct CounterScope {
+    previous: Option<Counter>,
+}
+
+impl CounterScope {
+    #[inline]
+    fn enter(counter: &Counter) -> Self {
+        let previous = CURRENT_COUNTER.with(|current| current.replace(Some(counter.clone())));
+        Self { previous }
+    }
+}
+
+impl Drop for CounterScope {
+    #[inline]
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        CURRENT_COUNTER.with(|current| *current.borrow_mut() = previous);
+    }
+}
+
+/// Returns the counter of the [`CpuTimedFuture`] or [`CpuScopedFuture`]
+/// currently being polled on this thread, if any.
+#[must_use]
+pub fn current_counter() -> Option<Counter> {
+    CURRENT_COUNTER.with(|current| current.borrow().clone())
+}
 
 /// An opaque snapshot of thread CPU time.
 ///
@@ -31,8 +84,11 @@ use tracing::Instrument;
 /// only the time the calling thread was actually scheduled on a CPU (true CPU
 /// time, excluding preemption and context switches to other threads/processes).
 ///
-/// On Windows this uses `GetThreadTimes`, which provides the same guarantee
-/// with 100ns granularity.
+/// On Windows this uses `GetThreadTimes`. Its values are expressed in 100ns
+/// units but only advance at the scheduler clock tick (typically 15.6 ms):
+/// Windows charges each tick to the thread running when it fires. A poll
+/// shorter than a tick therefore usually reads zero, and occasionally a whole
+/// tick, so the counter is only a statistical estimate there.
 ///
 /// On other platforms thread CPU time is unavailable; [`ThreadTime`] is a
 /// no-op that always reports zero elapsed time. The per-component CPU metric
@@ -230,10 +286,10 @@ impl Inner {
 /// - `transform_all` (the core CPU cost)
 /// - `send_outputs` / fanout dispatch to downstream channels
 /// - Per-event schema validation and latency recording
-/// - For transforms that spawn helper tasks (e.g. `aws_ec2_metadata` IMDS
-///   refresh, `throttle`'s flush loop): those tasks' polls, via
-///   [`spawn_timed`], feed the **same** counter rather than being silently
-///   excluded.
+/// - Tasks spawned from it with [`spawn_timed`] or [`spawn_timed_without_span`]
+///   (e.g. `aws_ec2_metadata` IMDS refresh, `throttle`'s flush loop): those
+///   tasks' polls feed the **same** counter rather than being silently
+///   excluded. See [counter inheritance](self#counter-inheritance).
 ///
 /// And **does not** include:
 ///
@@ -254,6 +310,14 @@ impl Inner {
 /// The driver is measured for: input dequeue, `on_events_received`, and
 /// `send_outputs`. Each spawned task is measured for: `transform_all`.
 ///
+/// # When to use it
+///
+/// Only wrap the outermost future of a task, when spawning it. The topology
+/// does this for each component task, and [`spawn_timed`] /
+/// [`spawn_timed_without_span`] do it for the tasks they spawn from there. Futures
+/// awaited inline are already measured by the task polling them: they never
+/// need a wrapper of their own, which would count their CPU twice.
+///
 /// Construct it via [`CpuTimedExt::cpu_timed`].
 #[pin_project]
 pub struct CpuTimedFuture<F> {
@@ -271,16 +335,41 @@ impl<F: Future> Future for CpuTimedFuture<F> {
         reason = "Preserve nanosecond accounting"
     )]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
-        let t0 = ThreadTime::now();
         let this = self.project();
+        let _scope = CounterScope::enter(this.counter);
+        let t0 = ThreadTime::now();
         let result = this.inner.poll(cx);
         this.counter.increment(t0.elapsed().as_nanos() as u64);
         result
     }
 }
 
-/// Extension trait that wraps a future in [`CpuTimedFuture`] via a chained
-/// call:
+/// A [`Future`] adapter that makes `counter` inheritable by the tasks spawned
+/// while it is polled, without measuring the CPU time of the future itself.
+///
+/// Used for a component's `build` step: tasks it spawns are attributed to the
+/// component, while one-time setup costs stay out of the steady-state metric.
+///
+/// Construct it via [`CpuTimedExt::cpu_scoped`].
+#[pin_project]
+pub struct CpuScopedFuture<F> {
+    #[pin]
+    inner: F,
+    counter: Counter,
+}
+
+impl<F: Future> Future for CpuScopedFuture<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
+        let this = self.project();
+        let _scope = CounterScope::enter(this.counter);
+        this.inner.poll(cx)
+    }
+}
+
+/// Extension trait that wraps a future in [`CpuTimedFuture`] or
+/// [`CpuScopedFuture`] via a chained call:
 ///
 /// ```ignore
 /// async move { /* work */ }.cpu_timed(counter)
@@ -296,22 +385,32 @@ pub trait CpuTimedExt: Future + Sized {
             counter,
         }
     }
+
+    /// Wraps this future in a [`CpuScopedFuture`] that makes `counter`
+    /// inheritable by the tasks it spawns, without timing the future itself.
+    fn cpu_scoped(self, counter: Counter) -> CpuScopedFuture<Self> {
+        CpuScopedFuture {
+            inner: self,
+            counter,
+        }
+    }
 }
 
 impl<F: Future> CpuTimedExt for F {}
 
-/// Spawns `future` on the current tokio runtime, attaching CPU-time
-/// accounting when `counter` is [`Some`].  When [`None`], the future is
-/// spawned as-is with no per-poll overhead.
-///
-/// Equivalent to:
-///
-/// ```ignore
-/// // Some(counter):
-/// spawn_in_current_span(future.cpu_timed(counter))
-/// // None:
-/// spawn_in_current_span(future)
-/// ```
+/// Wraps `future` in a [`CpuTimedFuture`] charging the [current
+/// counter](current_counter), if any. Returns it unchanged otherwise, with no
+/// per-poll overhead.
+fn inherit_cpu_timer<F: Future>(future: F) -> Either<CpuTimedFuture<F>, F> {
+    match current_counter() {
+        Some(counter) => Either::Left(future.cpu_timed(counter)),
+        None => Either::Right(future),
+    }
+}
+
+/// Spawns `future` on the current tokio runtime, charging its CPU time to the
+/// [current counter](current_counter) if any. See
+/// [counter inheritance](self#counter-inheritance).
 ///
 /// Use this when spawning background tasks (e.g. a transform's housekeeping
 /// loop) whose CPU usage should be attributed back to a component. Wrap the
@@ -320,15 +419,27 @@ impl<F: Future> CpuTimedExt for F {}
 /// measurement.
 ///
 /// The current tracing span is attached to the spawned task.
-pub fn spawn_timed<F>(future: F, counter: Option<Counter>) -> tokio::task::JoinHandle<F::Output>
+#[track_caller]
+pub fn spawn_timed<F>(future: F) -> tokio::task::JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    match counter {
-        Some(c) => crate::spawn_in_current_span(future.cpu_timed(c)),
-        None => crate::spawn_in_current_span(future),
-    }
+    crate::spawn_in_current_span(inherit_cpu_timer(future))
+}
+
+/// Like [`spawn_timed`], but does not attach the current tracing span to the
+/// spawned task.
+///
+/// For spawn sites where the current span does not describe the spawned work,
+/// e.g. executor hooks called by third-party code.
+#[track_caller]
+pub fn spawn_timed_without_span<F>(future: F) -> tokio::task::JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    tokio::spawn(inherit_cpu_timer(future))
 }
 
 /// Extension trait that spawns a future into a [`JoinSet`] the way [`spawn_timed`] spawns a
@@ -402,7 +513,54 @@ pub fn register_counter() -> Counter {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    };
+
     use super::*;
+
+    fn test_counter() -> (Counter, Arc<AtomicU64>) {
+        let value = Arc::new(AtomicU64::new(0));
+        (Counter::from_arc(Arc::clone(&value)), value)
+    }
+
+    #[tokio::test]
+    async fn spawned_task_inherits_scoped_counter() {
+        let (counter, value) = test_counter();
+
+        async {
+            spawn_timed(async { (0u64..1_000_000).map(std::hint::black_box).sum::<u64>() })
+                .await
+                .unwrap()
+        }
+        .cpu_scoped(counter)
+        .await;
+
+        if cfg!(any(target_os = "linux", target_os = "macos")) {
+            assert!(value.load(Ordering::Relaxed) > 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn counter_is_restored_after_poll() {
+        let (outer, outer_value) = test_counter();
+        let (inner, inner_value) = test_counter();
+
+        async {
+            async { current_counter().unwrap().increment(1) }
+                .cpu_scoped(inner)
+                .await;
+            current_counter().unwrap().increment(1);
+        }
+        .cpu_scoped(outer)
+        .await;
+
+        assert_eq!(inner_value.load(Ordering::Relaxed), 1);
+        assert_eq!(outer_value.load(Ordering::Relaxed), 1);
+        assert!(current_counter().is_none());
+        assert!(matches!(inherit_cpu_timer(async {}), Either::Right(_)));
+    }
 
     #[test]
     fn elapsed_is_non_negative() {
