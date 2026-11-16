@@ -32,6 +32,8 @@ pub mod file;
     all(unix, feature = "sources-file_descriptor")
 ))]
 pub mod file_descriptors;
+#[cfg(feature = "sources-file_v2")]
+pub mod file_v2;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]

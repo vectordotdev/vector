@@ -9,7 +9,11 @@ use vector_lib::{
 pub(crate) use self::file_source::*;
 #[cfg(feature = "sinks-file")]
 pub(crate) use self::sink::*;
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 pub(crate) use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
@@ -223,20 +227,65 @@ mod file_source {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use bytes::BytesMut;
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
     use vector_lib::{
         NamedInternalEvent, counter,
-        file_source_common::internal_events::FileSourceInternalEvents,
         internal_event::{
             ComponentEventsDropped, CounterName, INTENTIONAL, emit, error_stage, error_type,
         },
     };
 
-    use super::{FileOpen, InternalEvent};
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+    use super::FileOpen;
+    use super::InternalEvent;
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct FileReadError<'a> {
+        pub file: &'a Path,
+        pub error: Error,
+        pub include_file_metric_tag: bool,
+    }
+
+    impl InternalEvent for FileReadError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Failed reading file.",
+                file = %self.file.display(),
+                error = %self.error,
+                error_code = "reading_file",
+                error_type = error_type::READER_FAILED,
+                stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    CounterName::ComponentErrorsTotal,
+                    "error_code" => "reading_file",
+                    "error_type" => error_type::READER_FAILED,
+                    "stage" => error_stage::RECEIVING,
+                    "file" => self.file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!(
+                    CounterName::ComponentErrorsTotal,
+                    "error_code" => "reading_file",
+                    "error_type" => error_type::READER_FAILED,
+                    "stage" => error_stage::RECEIVING,
+                )
+            }
+            .increment(1);
+        }
+    }
 
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct FileChecksumFailed<'a> {
@@ -262,6 +311,7 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
@@ -269,6 +319,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl InternalEvent for FileFingerprintReadError<'_> {
         fn emit(self) {
             error!(
@@ -299,8 +350,10 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     const DELETION_FAILED: &str = "deletion_failed";
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct FileDeleteError<'a> {
         pub file: &'a Path,
@@ -308,6 +361,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl InternalEvent for FileDeleteError<'_> {
         fn emit(self) {
             error!(
@@ -426,6 +480,7 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Debug, NamedInternalEvent)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
@@ -433,6 +488,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl InternalEvent for FileWatchError<'_> {
         fn emit(self) {
             error!(
@@ -534,11 +590,13 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct FileCheckpointWriteError {
         pub error: Error,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl InternalEvent for FileCheckpointWriteError {
         fn emit(self) {
             error!(
@@ -558,12 +616,14 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct PathGlobbingError<'a> {
         pub path: &'a Path,
         pub error: &'a Error,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl InternalEvent for PathGlobbingError<'_> {
         fn emit(self) {
             error!(
@@ -615,11 +675,13 @@ mod source {
         }
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     #[derive(Clone)]
     pub(crate) struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_added(&self, file: &Path) {
             emit(FileAdded {
@@ -638,6 +700,14 @@ mod source {
 
         fn emit_file_watch_error(&self, file: &Path, error: Error) {
             emit(FileWatchError {
+                file,
+                error,
+                include_file_metric_tag: self.include_file_metric_tag,
+            });
+        }
+
+        fn emit_file_read_error(&self, file: &Path, error: Error) {
+            emit(FileReadError {
                 file,
                 error,
                 include_file_metric_tag: self.include_file_metric_tag,
@@ -733,11 +803,13 @@ mod source {
                         (None, "files_unwatched_with_unknown_bytes_total", 2.0),
                     ] {
                         controller.reset();
-                        let emitter = FileSourceInternalEventsEmitter {
-                            include_file_metric_tag,
-                        };
                         for _ in 0..2 {
-                            emitter.emit_file_unwatched(file, reached_eof, bytes_unread);
+                            emit(FileUnwatched {
+                                file,
+                                include_file_metric_tag,
+                                reached_eof,
+                                bytes_unread,
+                            });
                         }
                         let metrics = controller.capture_metrics();
                         let counters: Vec<_> = metrics

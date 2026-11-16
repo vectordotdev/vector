@@ -1,0 +1,296 @@
+package metadata
+
+generated: components: sources: file_v2: configuration: {
+	acknowledgements: {
+		deprecated: true
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+	}
+	checkpoint_interval: {
+		description: """
+			The interval between persisting file checkpoints to disk, in milliseconds.
+
+			Checkpoints are also persisted during graceful shutdown.
+			When end-to-end acknowledgements are enabled, checkpoint progress waits for downstream acknowledgement.
+			A shorter interval reduces potential replay after an abrupt stop, at the cost of more frequent disk writes.
+			"""
+		required: false
+		type: uint: {
+			default: 500
+			examples: [500, 1000, 2000, 5000]
+			unit: "milliseconds"
+		}
+	}
+	data_dir: {
+		description: """
+			The directory used to persist file checkpoint positions.
+
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+			"""
+		required: false
+		type: string: examples: ["/var/local/lib/vector/"]
+	}
+	encoding: {
+		description: "Character set encoding."
+		required:    false
+		type:        _schemaDefinitions["core::option::Option<vector::sources::util::encoding_config::EncodingConfig>"]
+	}
+	exclude: {
+		description: """
+			Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
+
+			Takes precedence over the `include` option. Note: The `exclude` patterns are applied _after_ the attempt to glob everything
+			in `include`. This means that all files are first matched by `include` and then filtered by the `exclude`
+			patterns. This can be impactful if `include` contains directories with contents that are not accessible.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["/var/log/binary-file.log"]
+		}
+	}
+	file_key: {
+		description: """
+			Overrides the name of the log field used to add the file path to each event.
+
+			The value is the full path to the file where the event was a read message.
+
+			Set to `""` to suppress this key.
+			"""
+		required: false
+		type: string: {
+			default: "file"
+			examples: [
+				"path"
+			]
+		}
+	}
+	fingerprint: {
+		description: """
+			Configuration for how files should be identified.
+
+			This is important for `checkpointing` when file rotation is used.
+			"""
+		required: false
+		type: object: options: {
+			bytes: {
+				description: """
+					The number of bytes used to generate the checksum after skipping `ignored_header_bytes`.
+
+					Defaults to 1024. Must be greater than zero. Files are not read until this many bytes
+					are available. For gzip files, this refers to the uncompressed content.
+					Files with identical prefixes have the same identity even when their paths differ.
+					Changing this value changes file identities and can cause previously read data to be replayed.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {
+					default: 1024
+					unit:    "bytes"
+				}
+			}
+			ignored_header_bytes: {
+				description: """
+					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+					If the file is compressed, the number of bytes refer to the header in the uncompressed content. Only
+					gzip is supported at this time.
+
+					This can be helpful if all files share a common header that should be skipped.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {
+					default: 0
+					unit:    "bytes"
+				}
+			}
+			strategy: {
+				description: """
+					The strategy used to uniquely identify files.
+
+					This is important for checkpointing when file rotation is used.
+					"""
+				required: false
+				type: string: {
+					default: "checksum"
+					enum: {
+						checksum: "Read a fixed number of bytes from the beginning of the file and compute a checksum over them."
+						device_and_inode: """
+															Use the [device and inode][inode] as the identifier.
+
+															[inode]: https://en.wikipedia.org/wiki/Inode
+															"""
+					}
+				}
+			}
+		}
+	}
+	host_key: {
+		description: """
+			Overrides the name of the log field used to add the current hostname to each event.
+
+			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+
+			Set to `""` to suppress this key.
+
+			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+			"""
+		required: false
+		type: string: examples: ["hostname"]
+	}
+	ignore_checkpoints: {
+		description: """
+			Whether or not to ignore existing checkpoints when determining where to start reading a file.
+
+			Checkpoints are still written normally.
+			"""
+		required: false
+		type: bool: {}
+	}
+	ignore_not_found: {
+		description: """
+			Ignore missing files when fingerprinting.
+
+			This may be useful when used with source directories containing dangling symlinks.
+			"""
+		required: false
+		type: bool: default: false
+	}
+	ignore_older_secs: {
+		description: "Ignore files with a data modification date older than the specified number of seconds."
+		required:    false
+		type: uint: {
+			examples: [
+				600
+			]
+			unit: "seconds"
+		}
+	}
+	include: {
+		description: "Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported."
+		required:    true
+		type: array: items: type: string: examples: ["/var/log/**/*.log"]
+	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type:        _schemaDefinitions["vector::internal_events::file::FileInternalMetricsConfig"]
+	}
+	line_delimiter: {
+		description: "String sequence used to separate one file line from another."
+		required:    false
+		type: string: {
+			default: "\n"
+			examples: [
+				"\r\n"
+			]
+		}
+	}
+	max_line_bytes: {
+		description: """
+			The maximum size of a line before it is discarded.
+
+			This protects against malformed lines or tailing incorrect files.
+			"""
+		required: false
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
+	}
+	max_read_bytes: {
+		description: """
+			Max amount of bytes to read from a single file before switching over to the next file.
+
+			This allows distributing the reads more or less evenly across
+			the files.
+			"""
+		required: false
+		type: uint: {
+			default: 65536
+			unit:    "bytes"
+		}
+	}
+	multiline: {
+		description: """
+			Multiline aggregation configuration.
+
+			If not specified, multiline aggregation is disabled.
+			"""
+		required: false
+		type:     _schemaDefinitions["core::option::Option<vector::sources::util::multiline_config::MultilineConfig>"]
+	}
+	offset_key: {
+		description: """
+			Enables adding the file offset to each event and sets the name of the log field used.
+
+			The value is the byte offset of the start of the line within the file.
+
+			Off by default, the offset is only added to the event if this is set.
+			"""
+		required: false
+		type: string: examples: [
+			"offset"
+		]
+	}
+	read_from: {
+		description: "File position to use when reading a new file."
+		required:    false
+		type: string: {
+			default: "beginning"
+			enum: {
+				beginning: "Read from the beginning of the file."
+				end:       "Start reading from the current end of the file."
+			}
+		}
+	}
+	reader_idle_timeout_secs: {
+		description: """
+			How long to retain an idle reader for a file no longer matched by `include`.
+
+			The timeout starts at EOF after the file becomes undiscoverable. Reading new
+			bytes resets it, including bytes of an incomplete record. Readers still
+			draining data and files that remain discoverable are not retired by this timeout.
+			Writes made after the reader closes cannot be collected unless the file is discovered again.
+			"""
+		required: false
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
+	}
+	remove_after_secs: {
+		description: """
+			The minimum idle period in seconds before deleting a fully consumed file.
+
+			Deletion requires EOF with no partial record, unchanged file identity and size, and
+			delivery of all records. With acknowledgements enabled, delivery means acknowledged
+			by downstream components; otherwise it means handed to the source output.
+			Files too small to fingerprint are never deleted. Lower `fingerprint.bytes` if needed.
+
+			If not specified, files are not removed.
+			"""
+		required: false
+		type: uint: {
+			examples: [0, 5, 60]
+			unit: "seconds"
+		}
+	}
+}

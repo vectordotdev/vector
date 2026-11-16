@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: file_v2
+    include:
+      - /var/log/**/*.log
