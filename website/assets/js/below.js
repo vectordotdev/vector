@@ -3,10 +3,24 @@ import tocbot from "tocbot";
 // Table of contents for documentation pages
 const tableOfContents = () => {
   if (document.getElementById("toc")) {
+    const content = document.getElementById("page-content");
     tocbot.init({
       tocSelector: "#toc",
       contentSelector: "#page-content",
-      headingSelector: "h2,h3,h4,h5",
+      headingSelector: content?.dataset.tocHeadings || "h2,h3,h4,h5",
+      includeTitleTags: Boolean(content?.dataset.tocHeadings),
+      headingObjectCallback: (heading, element) => {
+        // Notice cards sit below their section; headings inside their bodies are excluded.
+        if (element.matches(".changelog-card")) {
+          return {
+            ...heading,
+            nodeName: "H3",
+            headingLevel: 3,
+            textContent: element.querySelector("[data-toc-title]").textContent.trim()
+          };
+        }
+        return heading;
+      },
       scrollSmoothDuration: 400,
       headingsOffset: 80,
       scrollSmoothOffset: -80,
@@ -14,6 +28,8 @@ const tableOfContents = () => {
     });
   }
 };
+
+document.addEventListener("deprecations-sorted", tableOfContents);
 
 const showCodeFilename = () => {
   var els = document.getElementsByClassName("highlight");

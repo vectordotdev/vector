@@ -27,13 +27,14 @@ up your troubleshooting experience.
 
 ## Getting Started
 
-To start, we'll reference the following base configuration, but feel free to
-substitute your own. Just note that the [Vector API] must be enabled for `vector
-tap` to work. See [under the hood](#under-the-hood) for more details.
+`vector tap` requires the [Vector API], which is disabled by default and has no authentication.
+[Enable the API](/docs/reference/api/#enable-local-inspection) and restrict access to trusted clients.
+Use a loopback address for local debugging:
 
 ```yaml
 api:
   enabled: true
+  address: "127.0.0.1:8686"
 
 sources:
   in:
@@ -58,8 +59,8 @@ notifications (sent to `stderr`) and events (sent to `stdout`) in your terminal.
 
 ```console
 [tap] Pattern "*" successfully matched.
-{"message":"test1","source_type":"demo_logs","timestamp":"2022-02-22T19:20:40.487671258Z"}
-{"message":"test2","source_type":"demo_logs","timestamp":"2022-02-22T19:20:41.486858019Z"}
+{"log":{"message":"test1","source_type":"demo_logs","timestamp":"2022-02-22T19:20:40.487671258Z"}}
+{"log":{"message":"test2","source_type":"demo_logs","timestamp":"2022-02-22T19:20:41.486858019Z"}}
 ...
 ```
 
@@ -136,9 +137,9 @@ You'll now see events from component `in-2` appear in `tap` output.
 
 ```console
 ...
-{"message":"new test2","source_type":"demo_logs","timestamp":"2022-02-22T21:07:50.106793803Z"}
-{"message":"test1","source_type":"demo_logs","timestamp":"2022-02-22T21:07:50.490873070Z"}
-{"message":"new test1","source_type":"demo_logs","timestamp":"2022-02-22T21:07:51.106744949Z"}
+{"log":{"message":"new test2","source_type":"demo_logs","timestamp":"2022-02-22T21:07:50.106793803Z"}}
+{"log":{"message":"test1","source_type":"demo_logs","timestamp":"2022-02-22T21:07:50.490873070Z"}}
+{"log":{"message":"new test1","source_type":"demo_logs","timestamp":"2022-02-22T21:07:51.106744949Z"}}
 ...
 ```
 
@@ -208,8 +209,8 @@ Are all the events being dropped instead? A quick glance with `vector tap
 a stream of all our dropped logs. On closer examination, it's clear that our
 events don't have the shape we expected.
 
-```jsonc
-{"message":"{ \"type\": \"icecream\", \"flavor\": \"strawberry\" } }
+```json
+{"log":{"message":"{ \"type\": \"icecream\", \"flavor\": \"strawberry\" }"}}
 ```
 
 There's no `.flavor` field for our conditional to run on. Instead, the entire
@@ -239,8 +240,8 @@ itself.
 
 ## Under the hood
 
-Under the hood, `vector tap` is powered by the [Vector API], specifically by the
-`outputEventsByComponentIdPatterns` subscription. If you'd like a more direct
+Under the hood, `vector tap` is powered by the gRPC [Vector API], specifically by the
+`StreamOutputEvents` RPC of the `vector.observability.v1.ObservabilityService` service. If you'd like a more direct
 and programmatic way to examine events in your pipeline, consider interacting
 with the API directly.
 

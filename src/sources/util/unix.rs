@@ -1,4 +1,5 @@
 use std::{fs, fs::remove_file, os::unix::fs::PermissionsExt, path::Path};
+use vector_lib::internal_event::emit;
 
 use crate::internal_events::UnixSocketFileDeleteError;
 
@@ -14,7 +15,7 @@ pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Resu
             Ok(()) => debug!(message = "Socket permissions updated.", permission = mode),
             Err(e) => {
                 if let Err(error) = remove_file(path) {
-                    emit!(UnixSocketFileDeleteError { path, error });
+                    emit(UnixSocketFileDeleteError { path, error });
                 }
                 return Err(Box::new(e));
             }

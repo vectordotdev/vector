@@ -208,7 +208,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "none of the values will be rounded")]
     fn ewma_update_works() {
         let mut mean = Ewma::new(0.5);
         assert_eq!(mean.average(), None);
@@ -252,7 +251,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "none of the values will be rounded")]
     fn atomic_ewma_update_works() {
         let ewma = AtomicEwma::new(0.5);
         assert_eq!(ewma.average(), None);

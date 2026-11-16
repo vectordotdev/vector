@@ -1,4 +1,5 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, StreamExt};
 use smallvec::SmallVec;
@@ -68,7 +69,7 @@ where
         change_socket_permissions(&listen_path, socket_file_mode)
             .expect("Failed to set socket permissions");
 
-        let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
+        let bytes_received = register(BytesReceived::from(Protocol::UNIX));
 
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
@@ -117,14 +118,14 @@ where
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit(ConnectionOpen { count }));
 
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((frame, _byte_size)) => {
                                 let mut events = frame.into();
 
-                                emit!(SocketEventsReceived {
+                                emit(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     count: events.len(),
@@ -134,13 +135,13 @@ where
 
                                 let count = events.len();
                                 if (out.send_batch(events).await).is_err() {
-                                    emit!(StreamClosedError { count });
+                                    emit(StreamClosedError { count });
                                 }
                             }
                             Err(error) => {
-                                emit!(UnixSocketError {
+                                emit(UnixSocketError {
                                     error: &error,
-                                    path: &listen_path
+                                    path: &listen_path,
                                 });
 
                                 if !error.can_continue() {
@@ -168,9 +169,9 @@ where
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(UnixSocketFileDeleteError {
+            emit(UnixSocketFileDeleteError {
                 path: &listen_path,
-                error
+                error,
             });
         }
 

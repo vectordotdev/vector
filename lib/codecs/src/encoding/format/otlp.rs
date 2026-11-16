@@ -1,10 +1,11 @@
 use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
 use opentelemetry_proto::metrics::metric_event_to_export_request;
+#[cfg(not(feature = "typed-trace"))]
+use opentelemetry_proto::proto::RESOURCE_SPANS_JSON_FIELD;
 use opentelemetry_proto::proto::{
     DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
-    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
-    TRACES_REQUEST_MESSAGE_TYPE,
+    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, TRACES_REQUEST_MESSAGE_TYPE,
 };
 use prost::Message;
 use tokio_util::codec::Encoder;
@@ -64,6 +65,7 @@ impl OtlpSerializerConfig {
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
+    #[cfg_attr(feature = "typed-trace", expect(dead_code))]
     traces_descriptor: ProtobufSerializer,
     options: Options,
 }
@@ -126,6 +128,9 @@ impl Encoder<Event> for OtlpSerializer {
                         .into())
                 }
             }
+            #[cfg(feature = "typed-trace")]
+            Event::Trace(trace) => encode_typed_trace(trace, buffer),
+            #[cfg(not(feature = "typed-trace"))]
             Event::Trace(trace) => {
                 if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
                     self.traces_descriptor.encode(Event::Trace(trace), buffer)
@@ -142,6 +147,35 @@ impl Encoder<Event> for OtlpSerializer {
             }
         }
     }
+}
+
+/// Encodes a trace through the typed model (RFC 25329) so `typed-trace` builds exercise it end
+/// to end. Any conversion issue fails the event instead of relaying a lossy result.
+#[cfg(feature = "typed-trace")]
+fn encode_typed_trace(
+    trace: vector_core::event::TraceEvent,
+    buffer: &mut BytesMut,
+) -> vector_common::Result<()> {
+    use opentelemetry_proto::{
+        proto::collector::trace::v1::ExportTraceServiceRequest, typed_trace::legacy_to_typed,
+    };
+    use vector_core::event::typed_trace::{TraceConversionIssue, TraceConversionReporter};
+
+    struct Issues(Vec<String>);
+    impl TraceConversionReporter for Issues {
+        fn report(&mut self, issue: TraceConversionIssue<'_>) {
+            self.0.push(format!("{issue:?}"));
+        }
+    }
+
+    let mut issues = Issues(Vec::new());
+    let events = legacy_to_typed(trace, &mut issues)?;
+    // Sinks take finalizers before encoding, so dropping these releases nothing early.
+    let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut issues);
+    if !issues.0.is_empty() {
+        return Err(format!("typed trace conversion reported issues: {:?}", issues.0).into());
+    }
+    request.encode(buffer).map_err(Into::into)
 }
 
 #[cfg(test)]

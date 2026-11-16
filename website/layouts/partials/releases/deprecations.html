@@ -33,6 +33,7 @@
     {{ $class = "opacity-75" }}
     {{ end }}
     {{ partial "releases/changelog-card.html" (dict
+      "id" .id
       "title" .what
       "body" .content
       "footer" $footer

@@ -42,7 +42,7 @@ impl TryFrom<ColumnInfo> for Field {
 }
 
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
-pub async fn fetch_table_schema(
+pub(crate) async fn fetch_table_schema(
     client: &HttpClient,
     endpoint: &str,
     database: &str,
@@ -105,7 +105,7 @@ fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
 
 /// Schema provider implementation for ClickHouse tables.
 #[derive(Clone, Debug)]
-pub struct ClickHouseSchemaProvider {
+pub(crate) struct ClickHouseSchemaProvider {
     client: HttpClient,
     endpoint: String,
     database: String,
@@ -115,7 +115,7 @@ pub struct ClickHouseSchemaProvider {
 
 impl ClickHouseSchemaProvider {
     /// Create a new ClickHouse schema provider.
-    pub const fn new(
+    pub(crate) const fn new(
         client: HttpClient,
         endpoint: String,
         database: String,

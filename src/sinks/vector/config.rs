@@ -16,7 +16,7 @@ use tonic::Code::{
     AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
     Unauthenticated, Unimplemented,
 };
-use tonic::body::BoxBody;
+use tonic::body::Body as TonicBody;
 use tower::{Service, ServiceBuilder};
 use vector_http::Http2Client;
 use vector_lib::configurable::configurable_component;
@@ -123,7 +123,7 @@ pub struct VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct VectorKeepaliveConfig {
+pub(super) struct VectorKeepaliveConfig {
     /// How often, in seconds, to send a keepalive PING on idle connections.
     ///
     /// Shorter intervals detect dead connections faster at the cost of additional traffic.
@@ -361,7 +361,7 @@ impl ValidatedSink for VectorConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum EndpointStrategy {
+pub(super) enum EndpointStrategy {
     /// Distribute requests across healthy endpoints using Vector's existing
     /// Tower distributed service. Endpoint health is tracked using
     /// `routing.health`, and unhealthy endpoints are backed off and probed
@@ -755,7 +755,7 @@ async fn healthcheck(
 }
 
 fn healthchecks(
-    client: Http2Client<BoxBody>,
+    client: Http2Client<TonicBody>,
     uris: &[Uri],
     options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
@@ -826,7 +826,7 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
-) -> crate::Result<Http2Client<BoxBody>> {
+) -> crate::Result<Http2Client<TonicBody>> {
     let mut builder = Builder::new(TokioExecutor::new());
     builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
 

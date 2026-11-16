@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
 use aws_sdk_sqs::{
@@ -439,8 +440,8 @@ impl IngestorProcess {
             shutdown,
             acknowledgements,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(Protocol::HTTP)),
+            events_received: register(EventsReceived),
             backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
@@ -476,13 +477,13 @@ impl IngestorProcess {
     async fn run_once(&mut self) -> Result<(), ()> {
         let messages = match self.receive_messages().await {
             Ok(messages) => {
-                emit!(SqsMessageReceiveSucceeded {
+                emit(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             }
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                emit(SqsMessageReceiveError { error: &err });
                 return Err(());
             }
         };
@@ -507,8 +508,8 @@ impl IngestorProcess {
                 .unwrap_or_else(|| "<unknown>".to_owned());
             match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
-                    emit!(SqsMessageProcessingSucceeded {
-                        message_id: &message_id
+                    emit(SqsMessageProcessingSucceeded {
+                        message_id: &message_id,
                     });
                     if self.state.delete_message {
                         trace!(
@@ -528,8 +529,8 @@ impl IngestorProcess {
                 Err(err) => {
                     match err {
                         ProcessingError::FileTooOld { .. } => {
-                            emit!(SqsMessageProcessingSucceeded {
-                                message_id: &message_id
+                            emit(SqsMessageProcessingSucceeded {
+                                message_id: &message_id,
                             });
                             if let Some(deferred) = &self.state.deferred {
                                 trace!(
@@ -564,7 +565,7 @@ impl IngestorProcess {
                             }
                         }
                         _ => {
-                            emit!(SqsMessageProcessingError {
+                            emit(SqsMessageProcessingError {
                                 message_id: &message_id,
                                 error: &err,
                             });
@@ -587,19 +588,19 @@ impl IngestorProcess {
             {
                 Ok(result) => {
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageSentSucceeded {
+                        emit(SqsMessageSentSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageSentPartialError {
-                            entries: result.failed
+                        emit(SqsMessageSentPartialError {
+                            entries: result.failed,
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageSendBatchError {
+                    emit(SqsMessageSendBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -614,19 +615,19 @@ impl IngestorProcess {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageDeleteSucceeded {
+                        emit(SqsMessageDeleteSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageDeletePartialError {
-                            entries: result.failed
+                        emit(SqsMessageDeletePartialError {
+                            entries: result.failed,
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageDeleteBatchError {
+                    emit(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -636,6 +637,10 @@ impl IngestorProcess {
         Ok(())
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let batches: ProcessingBatches = match &self.state.notification_parser {
             Some(parser) => {
@@ -664,6 +669,10 @@ impl IngestorProcess {
         Ok(())
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn handle_notification_batch(
         &mut self,
         batch: NotificationBatch,
@@ -690,6 +699,10 @@ impl IngestorProcess {
     #[allow(
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
     )]
     async fn handle_s3_object(
         &mut self,
@@ -815,7 +828,7 @@ impl IngestorProcess {
             Ok(()) => None,
             Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Some(SendError::Closed)
             }
             Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
@@ -829,9 +842,9 @@ impl IngestorProcess {
         let duration = download_start.elapsed();
 
         if read_error.is_some() {
-            emit!(S3ObjectProcessingFailed { bucket, duration });
+            emit(S3ObjectProcessingFailed { bucket, duration });
         } else {
-            emit!(S3ObjectProcessingSucceeded { bucket, duration });
+            emit(S3ObjectProcessingSucceeded { bucket, duration });
         }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
@@ -892,6 +905,10 @@ impl IngestorProcess {
         }
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn receive_messages(
         &mut self,
     ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
@@ -907,6 +924,10 @@ impl IngestorProcess {
             .await
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
@@ -920,6 +941,10 @@ impl IngestorProcess {
             .await
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn send_messages(
         &mut self,
         entries: Vec<SendMessageBatchRequestEntry>,
@@ -992,7 +1017,7 @@ fn s3_record_batch(
         })));
     }
     if record.event_name.kind != "ObjectCreated" {
-        emit!(SqsS3EventRecordInvalidEventIgnored {
+        emit(SqsS3EventRecordInvalidEventIgnored {
             bucket: &record.s3.bucket.name,
             key: &record.s3.object.key,
             kind: &record.event_name.kind,
@@ -1246,7 +1271,7 @@ pub struct S3Object {
 mod urlencoded_string {
     use percent_encoding::{percent_decode, utf8_percent_encode};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -1269,7 +1294,7 @@ mod urlencoded_string {
         })
     }
 
-    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {

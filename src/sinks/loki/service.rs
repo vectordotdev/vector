@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct LokiRetryLogic;
+pub(super) struct LokiRetryLogic;
 
 impl RetryLogic for LokiRetryLogic {
     type Error = LokiError;
@@ -33,7 +33,7 @@ impl RetryLogic for LokiRetryLogic {
 }
 
 #[derive(Debug, Snafu)]
-pub enum LokiError {
+pub(super) enum LokiError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
@@ -41,7 +41,7 @@ pub enum LokiError {
 }
 
 #[derive(Debug, Snafu)]
-pub struct LokiResponse {
+pub(super) struct LokiResponse {
     metadata: RequestMetadata,
 }
 
@@ -60,7 +60,7 @@ impl DriverResponse for LokiResponse {
 }
 
 #[derive(Clone)]
-pub struct LokiRequest {
+pub(super) struct LokiRequest {
     pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
@@ -85,14 +85,18 @@ impl MetaDescriptive for LokiRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct LokiService {
+pub(super) struct LokiService {
     endpoint: HttpEndpoint,
     client: HttpClient,
     auth: Option<Auth>,
 }
 
 impl LokiService {
-    pub const fn new(client: HttpClient, endpoint: HttpEndpoint, auth: Option<Auth>) -> Self {
+    pub(super) const fn new(
+        client: HttpClient,
+        endpoint: HttpEndpoint,
+        auth: Option<Auth>,
+    ) -> Self {
         Self {
             endpoint,
             client,

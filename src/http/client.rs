@@ -1,4 +1,5 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use http::{
     HeaderValue, Request, Response,
@@ -80,7 +81,7 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
-            emit!(AboutToSendHttpRequest { request: &request });
+            emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
@@ -88,16 +89,16 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    emit!(GotHttpResponse {
+                    emit(GotHttpResponse {
                         response: &response,
-                        roundtrip
+                        roundtrip,
                     });
                     Ok(response)
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning {
+                    emit(GotHttpWarning {
                         error: &error,
-                        roundtrip
+                        roundtrip,
                     });
                     Err(error)
                 }
@@ -117,6 +118,11 @@ fn default_user_agent() -> HeaderValue {
     .expect("the application name and version must form a valid user agent")
 }
 
+/// Sets `User-Agent` and `Accept-Encoding` unless the caller already set them.
+///
+/// `Accept-Encoding` defaults to `identity` because callers of [`HttpClient::send`] read the
+/// raw body. Sink services that decode compressed responses, such as
+/// `sinks::util::http::HttpService`, advertise their supported encodings before they send.
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
     if !request.headers().contains_key(USER_AGENT) {
         request.headers_mut().insert(USER_AGENT, user_agent.clone());

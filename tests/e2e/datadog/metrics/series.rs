@@ -289,10 +289,6 @@ async fn get_series_from_pipeline(
     intake
 }
 
-#[expect(
-    clippy::float_cmp,
-    reason = "The fixture requires exact equality of the summed rate values."
-)]
 fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
     // The assertions we make below can be summarized as follows:
     //   - For each metric type, we have a different set of assertions which are relevant to
