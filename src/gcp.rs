@@ -199,8 +199,15 @@ pub struct InnerCreds {
 enum TokenSource {
     ServiceAccount(Box<Credentials>, Scope),
     Metadata,
-    /// Workload Identity Federation credentials, handled by `google-cloud-auth`.
-    ExternalAccount(AccessTokenCredentials),
+    ExternalAccount(ExternalAccount),
+}
+
+/// Workload Identity Federation credentials, handled by `google-cloud-auth`.
+#[derive(Debug)]
+struct ExternalAccount {
+    json: serde_json::Value,
+    scope: String,
+    creds: RwLock<AccessTokenCredentials>,
 }
 
 #[derive(Debug)]
@@ -213,12 +220,7 @@ struct FetchedToken {
 impl GcpAuthenticator {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let source = match external_account_json(path) {
-            Some(json) => TokenSource::ExternalAccount(
-                external_account::Builder::new(json)
-                    .with_scopes([scope.url()])
-                    .build_access_token_credentials()
-                    .context(BuildExternalAccountSnafu)?,
-            ),
+            Some(json) => TokenSource::ExternalAccount(ExternalAccount::new(json, scope.url())?),
             None => TokenSource::ServiceAccount(
                 Box::new(Credentials::from_file(path).context(InvalidCredentialsSnafu)?),
                 scope,
@@ -364,18 +366,42 @@ impl TokenSource {
         Ok(match self {
             Self::ServiceAccount(creds, scope) => fetch_token(creds, scope).await?.into(),
             Self::Metadata => get_token_implicit().await?.into(),
-            Self::ExternalAccount(creds) => {
-                let token = creds
-                    .access_token()
-                    .await
-                    .context(GetExternalAccountTokenSnafu)?;
-                FetchedToken {
-                    header: format!("Bearer {}", token.token),
-                    // ponytail: google-cloud-auth refreshes its cached token 4 minutes before
-                    // expiry but doesn't expose the expiry, so poll its cache more often than that.
-                    refresh_in: EXTERNAL_ACCOUNT_REFRESH_INTERVAL,
+            Self::ExternalAccount(account) => account.fetch().await?,
+        })
+    }
+}
+
+impl ExternalAccount {
+    fn new(json: serde_json::Value, scope: String) -> crate::Result<Self> {
+        let creds = RwLock::new(Self::build(&json, &scope)?);
+        Ok(Self { json, scope, creds })
+    }
+
+    fn build(json: &serde_json::Value, scope: &str) -> crate::Result<AccessTokenCredentials> {
+        Ok(external_account::Builder::new(json.clone())
+            .with_scopes([scope])
+            .build_access_token_credentials()
+            .context(BuildExternalAccountSnafu)?)
+    }
+
+    async fn fetch(&self) -> crate::Result<FetchedToken> {
+        let creds = self.creds.read().unwrap().clone();
+        let token = match creds.access_token().await {
+            Ok(token) => token,
+            Err(error) => {
+                // After a permanent error the SDK stops refreshing and keeps returning that error,
+                // so start over with fresh credentials to let the next attempt recover.
+                if !error.is_transient() {
+                    *self.creds.write().unwrap() = Self::build(&self.json, &self.scope)?;
                 }
+                return Err(GcpError::GetExternalAccountToken { source: error }.into());
             }
+        };
+        Ok(FetchedToken {
+            header: format!("Bearer {}", token.token),
+            // ponytail: google-cloud-auth refreshes its cached token 4 minutes before
+            // expiry but doesn't expose the expiry, so poll its cache more often than that.
+            refresh_in: EXTERNAL_ACCOUNT_REFRESH_INTERVAL,
         })
     }
 }
@@ -619,6 +645,39 @@ mod tests {
         assert!(!changed);
         assert_eq!(authorization(&auth), "Bearer sts-token");
         assert_eq!(sts.received_requests().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn external_account_recovers_after_permanent_error() {
+        let sts = MockServer::start().await;
+        // The first exchange is rejected (e.g. an expired subject token), later ones succeed.
+        Mock::given(method("POST"))
+            .and(path("/v1/token"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": "invalid_grant",
+            })))
+            .up_to_n_times(1)
+            .mount(&sts)
+            .await;
+        mock_sts(
+            &sts,
+            ResponseTemplate::new(200).set_body_json(sts_token("sts-token")),
+        )
+        .await;
+        let (_token_file, creds_file) = external_account_creds(&sts, None);
+        let json = external_account_json(creds_file.path().to_str().unwrap()).unwrap();
+        let account = ExternalAccount::new(json, Scope::Compute.url()).unwrap();
+
+        account
+            .fetch()
+            .await
+            .expect_err("first exchange is rejected");
+        let token = account
+            .fetch()
+            .await
+            .expect("should recover once STS accepts the subject token");
+
+        assert_eq!(token.header, "Bearer sts-token");
     }
 
     const SUBJECT_TOKEN: &str = "oidc-subject-token";
