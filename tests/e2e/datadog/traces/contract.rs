@@ -8,6 +8,8 @@ use std::{collections::BTreeMap, fmt::Debug};
 use datadog_proto::trace::{
     AgentPayload, AttributeAnyValue, AttributeArray, AttributeArrayValue, Span, SpanEvent,
     SpanLink, TraceChunk, TracerPayload,
+    attribute_any_value::AttributeAnyValueType as AttributeType,
+    attribute_array_value::AttributeArrayValueType as ArrayType,
 };
 
 type Fields = BTreeMap<String, String>;
@@ -50,12 +52,12 @@ fn attribute(fields: &mut Fields, path: &str, value: &AttributeAnyValue) {
     } = value;
     put(fields, &format!("{path}.type"), r#type);
     // The proto is a manually tagged union. Inactive slots do not describe a value.
-    match r#type {
-        0 => put(fields, path, string_value),
-        1 => put(fields, path, bool_value),
-        2 => put(fields, path, int_value),
-        3 => double(fields, path, *double_value),
-        4 => {
+    match AttributeType::try_from(*r#type) {
+        Ok(AttributeType::StringValue) => put(fields, path, string_value),
+        Ok(AttributeType::BoolValue) => put(fields, path, bool_value),
+        Ok(AttributeType::IntValue) => put(fields, path, int_value),
+        Ok(AttributeType::DoubleValue) => double(fields, path, *double_value),
+        Ok(AttributeType::ArrayValue) => {
             let values = array_value
                 .as_ref()
                 .map(|AttributeArray { values }| values.as_slice())
@@ -71,16 +73,16 @@ fn attribute(fields: &mut Fields, path: &str, value: &AttributeAnyValue) {
                     double_value,
                 } = value;
                 put(fields, &format!("{path}.type"), r#type);
-                match r#type {
-                    0 => put(fields, &path, string_value),
-                    1 => put(fields, &path, bool_value),
-                    2 => put(fields, &path, int_value),
-                    3 => double(fields, &path, *double_value),
-                    _ => put(fields, &path, value),
+                match ArrayType::try_from(*r#type) {
+                    Ok(ArrayType::StringValue) => put(fields, &path, string_value),
+                    Ok(ArrayType::BoolValue) => put(fields, &path, bool_value),
+                    Ok(ArrayType::IntValue) => put(fields, &path, int_value),
+                    Ok(ArrayType::DoubleValue) => double(fields, &path, *double_value),
+                    Err(_) => put(fields, &path, value),
                 }
             }
         }
-        _ => put(fields, path, value),
+        Err(_) => put(fields, path, value),
     }
 }
 
@@ -315,13 +317,13 @@ fn expected_chunk(chunk: &TraceChunk) -> TraceChunk {
         // "SpanEvent.attributes typed value mapping": drop only an unknown-tagged attribute.
         for event in &mut span.span_events {
             event.attributes.retain(|_, value| {
-                (0..=4).contains(&value.r#type)
-                    && (value.r#type != 4
+                AttributeType::try_from(value.r#type).is_ok()
+                    && (value.r#type != i32::from(AttributeType::ArrayValue)
                         || value.array_value.as_ref().is_none_or(|array| {
                             array
                                 .values
                                 .iter()
-                                .all(|value| (0..=3).contains(&value.r#type))
+                                .all(|value| ArrayType::try_from(value.r#type).is_ok())
                         }))
             });
         }
