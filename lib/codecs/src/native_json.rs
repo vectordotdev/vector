@@ -53,6 +53,8 @@ pub(crate) fn to_json_value(event: Event) -> vector_common::Result<serde_json::V
     let mut envelope = DynamicMessage::new(NATIVE_JSON_DESCRIPTOR.clone());
     envelope.set_field(&event_field, Value::Message(dynamic));
 
+    // Intentionally allow the timestamp formatter to normalize Chrono leap seconds.
+    // These events remain encodable, but their leap-second representation is lost.
     let mut json = serde_json::to_value(envelope)?;
     if !fits_json_depth(&json, MAX_JSON_EVENT_DEPTH) {
         return Err("Error encoding native JSON event: JSON nesting limit exceeded".into());

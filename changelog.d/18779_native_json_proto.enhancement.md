@@ -2,6 +2,10 @@ Update the experimental `native_json` codec to emit canonical Protobuf JSON usin
 Protobuf event model. The new representation preserves transportable event metadata and omits
 deprecated Protobuf fields, while the decoder continues to accept the previous native JSON shape.
 
+Leap-second timestamps are normalized during Protobuf JSON encoding rather than rejected. For example,
+`2016-12-31T23:59:60.500Z` becomes `2017-01-01T00:00:00.500Z`. The event remains encodable, but the
+original leap-second representation is not preserved when decoded.
+
 Compatibility between versions before and after this change:
 
 | Producer → consumer | Behavior |

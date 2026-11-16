@@ -61,6 +61,8 @@ impl Encoder<Event> for NativeJsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
+    use chrono::{DateTime, Utc};
+    use rstest::rstest;
     use uuid::Uuid;
     use vector_core::{
         buckets,
@@ -112,6 +114,89 @@ mod tests {
         let json = serializer.to_json_value(event).unwrap();
 
         assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
+    }
+
+    #[rstest]
+    #[case::ordinary_nanosecond_boundary(
+        "2016-12-31T23:59:59.999999999Z",
+        "2016-12-31T23:59:59.999999999Z"
+    )]
+    #[case::leap_second_start("2016-12-31T23:59:60Z", "2017-01-01T00:00:00Z")]
+    #[case::fractional_leap_second("2016-12-31T23:59:60.500Z", "2017-01-01T00:00:00.500Z")]
+    #[case::leap_second_nanosecond_boundary(
+        "2016-12-31T23:59:60.999999999Z",
+        "2017-01-01T00:00:00.999999999Z"
+    )]
+    fn serialize_timestamps_follow_protojson_normalization(
+        #[case] input: &str,
+        #[case] expected: &str,
+    ) {
+        let timestamp = DateTime::parse_from_rfc3339(input)
+            .unwrap()
+            .with_timezone(&Utc);
+        let normalized = DateTime::parse_from_rfc3339(expected)
+            .unwrap()
+            .with_timezone(&Utc);
+        let events = |timestamp| {
+            [
+                (
+                    Event::Log(LogEvent::from(Value::Timestamp(timestamp))),
+                    "/event/log/value/timestamp",
+                ),
+                (
+                    Event::Log(LogEvent::from(btreemap! {
+                        "timestamp" => Value::Timestamp(timestamp)
+                    })),
+                    "/event/log/value/map/fields/timestamp/timestamp",
+                ),
+                (
+                    Event::Trace(TraceEvent::from(btreemap! {
+                        "timestamp" => Value::Timestamp(timestamp)
+                    })),
+                    "/event/trace/fields/timestamp/timestamp",
+                ),
+                (
+                    Event::Metric(
+                        Metric::new(
+                            "requests_total",
+                            MetricKind::Absolute,
+                            MetricValue::Counter { value: 1.0 },
+                        )
+                        .with_timestamp(Some(timestamp)),
+                    ),
+                    "/event/metric/timestamp",
+                ),
+                (
+                    Event::Log(LogEvent::new_with_metadata(
+                        EventMetadata::default_with_value(Value::Timestamp(timestamp)),
+                    )),
+                    "/event/log/metadataFull/value/timestamp",
+                ),
+            ]
+        };
+
+        for ((event, path), (normalized_event, _)) in
+            events(timestamp).into_iter().zip(events(normalized))
+        {
+            let event = with_fixed_source_event_id(event);
+            let normalized_event = with_fixed_source_event_id(normalized_event);
+            let mut serializer = NativeJsonSerializer;
+            let json = serializer.to_json_value(event.clone()).unwrap();
+            assert_eq!(json.pointer(path).unwrap(), expected, "{path}");
+
+            let mut bytes = BytesMut::new();
+            serializer.encode(event, &mut bytes).unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+                json
+            );
+
+            let decoded = NativeJsonDeserializerConfig::default()
+                .build()
+                .parse(bytes.freeze(), LogNamespace::Legacy)
+                .unwrap();
+            assert_eq!(decoded.as_slice(), &[normalized_event], "{path}");
+        }
     }
 
     #[test]
