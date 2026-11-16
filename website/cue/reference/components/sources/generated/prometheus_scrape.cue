@@ -78,7 +78,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 			Custom parameters for the scrape request query string.
 
 			One or more values for the same parameter key can be provided. The parameters provided in this option are
-			appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+			appended to any parameters already in the scrape URLs. This option is especially useful when
 			scraping the `/federate` endpoint.
 			"""
 		required: false
@@ -115,7 +115,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 	}
 	targets: {
 		description: """
-			Auto-discover scrape targets.
+			Targets to scrape metrics from: fixed URLs, or Pods discovered automatically in Kubernetes.
 
 			Each entry in the list configures a target group. Supported types are
 			`static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
@@ -170,8 +170,12 @@ generated: components: sources: prometheus_scrape: configuration: {
 								}
 							}
 							extra_field_selector: {
-								description: "Additional field selector merged with the built-in filter."
-								required:    false
+								description: """
+																			Kubernetes field selector that further limits which Pods are discovered.
+
+																			When `use_self_node_only` is enabled, it is combined with `spec.nodeName=<node>`.
+																			"""
+								required: false
 								type: string: {
 									default: ""
 									examples: ["metadata.namespace=monitoring"]

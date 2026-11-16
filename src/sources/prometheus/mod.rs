@@ -22,8 +22,6 @@ pub use scrape::PrometheusScrapeConfig;
 /// - If the metric already has the tag and `honor_label` is false, move the existing value to
 ///   `exported_<tag>` and overwrite with the new value.
 /// - If the metric does not have the tag, set it to the new value.
-///
-/// Shared by `prometheus_scrape` and `prometheus_kubernetes_sd` to guarantee identical behavior.
 #[cfg(feature = "sources-prometheus_scrape")]
 pub(crate) fn merge_honor_label_tag(
     metric: &mut vector_lib::event::Metric,

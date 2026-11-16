@@ -128,7 +128,9 @@ pub(crate) struct KubernetesScrapeConfig {
     #[configurable(metadata(docs::examples = "node-01"))]
     pub(crate) self_node_name: Option<String>,
 
-    /// Additional field selector merged with the built-in filter.
+    /// Kubernetes field selector that further limits which Pods are discovered.
+    ///
+    /// When `use_self_node_only` is enabled, it is combined with `spec.nodeName=<node>`.
     #[configurable(metadata(docs::examples = "metadata.namespace=monitoring"))]
     pub(crate) extra_field_selector: String,
 

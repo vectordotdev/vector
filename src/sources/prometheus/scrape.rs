@@ -45,7 +45,7 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
 
-/// Auto-discover scrape targets. Each entry describes a target group.
+/// A group of scrape targets.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -76,7 +76,7 @@ pub struct PrometheusScrapeConfig {
     #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
 
-    /// Auto-discover scrape targets.
+    /// Targets to scrape metrics from: fixed URLs, or Pods discovered automatically in Kubernetes.
     ///
     /// Each entry in the list configures a target group. Supported types are
     /// `static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
@@ -123,7 +123,7 @@ pub struct PrometheusScrapeConfig {
     /// Custom parameters for the scrape request query string.
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
-    /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+    /// appended to any parameters already in the scrape URLs. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "query_example()"))]
