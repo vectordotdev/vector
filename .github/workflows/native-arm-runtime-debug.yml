@@ -16,7 +16,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor == 'thomasqueirozb' &&
       github.event.review.body == '/ci-run-native-armv6-runtime'
-    runs-on: ubuntu-24.04-8core-arm
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     strategy:
       fail-fast: false
