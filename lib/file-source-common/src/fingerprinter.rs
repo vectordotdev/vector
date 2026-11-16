@@ -117,6 +117,9 @@ impl UncompressedReader for UncompressedReaderImpl {
 
             if let Err(err) = result {
                 fp.seek(SeekFrom::Start(0)).await?;
+                if err.kind() == ErrorKind::UnexpectedEof {
+                    return Ok(None);
+                }
                 return Err(err);
             }
 
