@@ -673,6 +673,34 @@ impl<'a> Builder<'a> {
             self.errors.append(&mut err);
         }
 
+        // Disk buffers serialize events without their in-memory schema definitions.
+        // Restore the corresponding source-specific definitions at the reader so
+        // semantic fields still resolve correctly after persistence and restart.
+        let buffered_log_definitions: HashMap<OutputId, Arc<Definition>> = if sink
+            .buffer
+            .stages()
+            .iter()
+            .any(|stage| matches!(stage, BufferType::DiskV2 { .. }))
+        {
+            match schema::input_definitions(
+                sink_inputs,
+                self.config,
+                enrichment_tables,
+                &mut HashMap::new(),
+            ) {
+                Ok(definitions) => definitions
+                    .into_iter()
+                    .map(|(origin, definition)| (origin, Arc::new(definition)))
+                    .collect(),
+                Err(error) => {
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
+                    return;
+                }
+            }
+        } else {
+            HashMap::new()
+        };
+
         let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
             buffer
         } else {
@@ -745,6 +773,33 @@ impl<'a> Builder<'a> {
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                    .map(move |mut events| {
+                        if !buffered_log_definitions.is_empty() {
+                            for log in events.iter_logs_mut() {
+                                let definition = log
+                                    .metadata()
+                                    .schema_origin()
+                                    .and_then(|origin| buffered_log_definitions.get(origin))
+                                    .or_else(|| {
+                                        // Older disk records have no explicit schema origin,
+                                        // but the source component ID is already persisted.
+                                        log.metadata().source_id().and_then(|source| {
+                                            buffered_log_definitions
+                                                .get(&OutputId::from(source.as_ref()))
+                                        })
+                                    })
+                                    .or_else(|| {
+                                        (buffered_log_definitions.len() == 1)
+                                            .then(|| buffered_log_definitions.values().next())
+                                            .flatten()
+                                    });
+                                if let Some(definition) = definition {
+                                    log.metadata_mut().set_schema_definition(definition);
+                                }
+                            }
+                        }
+                        events
+                    })
                     .inspect(|events| {
                         events_received.emit(CountByteSize(
                             events.len(),

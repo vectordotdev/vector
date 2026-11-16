@@ -641,6 +641,7 @@ impl From<EventMetadata> for Metadata {
             source_id,
             source_type,
             upstream_id,
+            schema_origin,
             datadog_origin_metadata,
             datadog_metric_unit,
             source_event_id,
@@ -656,6 +657,7 @@ impl From<EventMetadata> for Metadata {
             source_id: source_id.map(|s| s.to_string()),
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
+            schema_origin: schema_origin.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
             datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
@@ -673,6 +675,7 @@ impl TryFrom<Metadata> for EventMetadata {
             source_id,
             source_type,
             upstream_id,
+            schema_origin,
             secrets,
             datadog_origin_metadata,
             datadog_metric_unit,
@@ -686,6 +689,7 @@ impl TryFrom<Metadata> for EventMetadata {
         };
         let source_id = source_id.map(|s| Arc::new(s.into()));
         let upstream_id = upstream_id.map(|id| Arc::new(id.into()));
+        let schema_origin = schema_origin.map(|id| Arc::new(id.into()));
         let secrets = secrets.map(Into::into);
         let datadog_origin_metadata = datadog_origin_metadata.map(Into::into);
         let source_event_id = if source_event_id.is_empty() {
@@ -713,7 +717,7 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_origin: None,
+                schema_origin,
                 schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
@@ -1073,6 +1077,22 @@ mod tests {
         assert_eq!(log.metadata().value(), &expected);
         assert_eq!(trace.metadata().value(), &expected);
         assert_eq!(metric.metadata().value(), &expected);
+    }
+
+    #[test]
+    fn named_source_schema_origin_survives_event_protobuf_roundtrip() {
+        let origin = crate::config::OutputId {
+            component: "source".into(),
+            port: Some("named".into()),
+        };
+        let mut log = crate::event::LogEvent::from("test");
+        log.metadata_mut()
+            .set_schema_origin(Arc::new(origin.clone()));
+        let encoded = EventWrapper::from(crate::event::Event::Log(log)).encode_to_vec();
+        let decoded = EventWrapper::decode(encoded.as_slice()).unwrap();
+        let restored = crate::event::Event::try_from(decoded).unwrap();
+
+        assert_eq!(restored.metadata().schema_origin(), Some(&origin));
     }
 
     #[test]
