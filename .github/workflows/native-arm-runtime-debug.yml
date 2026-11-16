@@ -84,6 +84,20 @@ jobs:
                 exit "$status"
               fi
             '
+      - name: Test hardware execution of ARMv6 memory barriers
+        run: |
+          previous=$(sysctl -n abi.cp15_barrier)
+          trap 'sudo sysctl -w "abi.cp15_barrier=$previous"' EXIT
+          sudo sysctl -w abi.cp15_barrier=2
+          docker run --rm --platform linux/arm64 -v "$PWD:/work" -e TARGET \
+            vector-runtime-debug bash -euxo pipefail -c '
+              file="debug-data/$TARGET/release/vector"
+              timeout -k 5 20 "$file" --version
+              printf "native packaging works\n" | timeout -k 5 20 "$file" \
+                --config tests/data/native-release-smoke.yaml \
+                >"debug-data/$TARGET.hardware.stdout.txt"
+              grep -F "NATIVE PACKAGING WORKS" "debug-data/$TARGET.hardware.stdout.txt"
+            '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
