@@ -244,14 +244,19 @@ impl PendingMessages {
     }
 }
 
+/// Compression algorithm of a GELF message.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChunkedGelfDecompression {
+    /// The message is compressed with Gzip.
     Gzip,
+    /// The message is compressed with Zlib.
     Zlib,
+    /// The message is not compressed.
     None,
 }
 
 impl ChunkedGelfDecompression {
+    /// Detects the compression algorithm from the leading magic bytes of `data`.
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
             trace!("Detected Gzip compression");
@@ -277,6 +282,12 @@ impl ChunkedGelfDecompression {
         Self::None
     }
 
+    /// Decompresses `data` according to this algorithm; uncompressed data is passed through.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compressed stream cannot be fully decompressed, or exceeds the
+    /// shared decompressed-size cap.
     pub fn decompress(&self, data: Bytes) -> Result<Bytes, ChunkedGelfDecompressionError> {
         let decompressed = match self {
             Self::Gzip => CappedDecoder::gzip(data.reader())
