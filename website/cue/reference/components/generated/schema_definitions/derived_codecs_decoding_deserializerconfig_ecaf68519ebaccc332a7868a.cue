@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::117ef30e93edb408973ffc00": object: options: {
+_schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::ecaf68519ebaccc332a7868a": object: options: {
 	avro: {
 		description:   "Apache Avro-specific encoder options."
 		relevant_when: "codec = \"avro\""

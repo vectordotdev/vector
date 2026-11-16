@@ -13,10 +13,8 @@ _schemaDefinitions: "codecs::decoding::format::gelf::GelfDeserializerOptions": o
 		type: string: {
 			default: "Auto"
 			enum: {
-				Auto: "Automatically detect the decompression method based on the magic bytes of the message."
-				Gzip: "Use Gzip decompression."
-				None: "Do not decompress the message."
-				Zlib: "Use Zlib decompression."
+				Auto: "Detect compression from the magic bytes and decompress before parsing."
+				None: "Do not decompress; compressed messages are rejected as invalid JSON."
 			}
 		}
 	}

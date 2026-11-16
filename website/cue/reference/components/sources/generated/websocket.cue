@@ -20,7 +20,7 @@ generated: components: sources: websocket: configuration: {
 	decoding: {
 		description: "Decoder to use on each received message."
 		required:    false
-		type:        _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::117ef30e93edb408973ffc00"]
+		type:        _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::ecaf68519ebaccc332a7868a"]
 	}
 	framing: {
 		description: "Framing to use in the decoding."

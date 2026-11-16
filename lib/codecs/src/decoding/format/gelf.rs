@@ -18,7 +18,7 @@ use vrl::value::{Kind, Value, kind::Collection};
 use super::{Deserializer, default_lossy};
 use crate::{
     VALID_FIELD_REGEX,
-    decoding::framing::{ChunkedGelfDecompression, ChunkedGelfDecompressionConfig},
+    decoding::framing::ChunkedGelfDecompression,
     gelf::GELF_TARGET_PATHS,
     gelf_fields::{
         FACILITY, FILE, FULL_MESSAGE, GELF_VERSION, HOST, LEVEL, LINE, SHORT_MESSAGE, TIMESTAMP,
@@ -58,6 +58,21 @@ pub enum ValidationMode {
     /// This mode does not treat specification violations as errors, allowing the decoder
     /// to accept messages from sources that don't strictly follow the GELF spec.
     Relaxed,
+}
+
+/// Configures the decompression of compressed messages in the GELF decoder.
+///
+/// Unlike the framing option (`framing.chunked_gelf.decompression`), forced modes are not
+/// offered here: datagram framings already decompress by default, and a forced mode would
+/// try to decompress their plain JSON output.
+#[configurable_component]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GelfDecompressionMode {
+    /// Detect compression from the magic bytes and decompress before parsing.
+    #[default]
+    Auto,
+    /// Do not decompress; compressed messages are rejected as invalid JSON.
+    None,
 }
 
 impl GelfDeserializerConfig {
@@ -133,7 +148,7 @@ pub struct GelfDeserializerOptions {
     /// them. For datagram inputs, also set `framing.chunked_gelf.decompression` to `None`
     /// to disable decompression in the framing.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
-    pub decompression: ChunkedGelfDecompressionConfig,
+    pub decompression: GelfDecompressionMode,
 }
 
 /// Deserializer that builds an `Event` from a byte frame containing a GELF log message.
@@ -145,7 +160,7 @@ pub struct GelfDeserializer {
 
     validation: ValidationMode,
 
-    decompression: ChunkedGelfDecompressionConfig,
+    decompression: GelfDecompressionMode,
 }
 
 impl GelfDeserializer {
@@ -154,7 +169,7 @@ impl GelfDeserializer {
     pub fn new(
         lossy: bool,
         validation: ValidationMode,
-        decompression: ChunkedGelfDecompressionConfig,
+        decompression: GelfDecompressionMode,
     ) -> GelfDeserializer {
         GelfDeserializer {
             lossy,
@@ -278,11 +293,14 @@ impl Deserializer for GelfDeserializer {
         // Stream transports deliver compressed GELF frames as-is (datagram transports
         // decompress in the `chunked_gelf` framing), so decompress them here before
         // JSON parsing, honoring the `decompression` option. No-op for uncompressed JSON.
-        let bytes = match self.decompression.get_decompression(&bytes) {
-            ChunkedGelfDecompression::None => bytes,
-            compression => compression
-                .decompress(bytes)
-                .map_err(|error| format!("failed decompressing GELF message: {error}"))?,
+        let bytes = match self.decompression {
+            GelfDecompressionMode::None => bytes,
+            GelfDecompressionMode::Auto => match ChunkedGelfDecompression::from_magic(&bytes) {
+                ChunkedGelfDecompression::None => bytes,
+                compression => compression
+                    .decompress(bytes)
+                    .map_err(|error| format!("failed decompressing GELF message: {error}"))?,
+            },
         };
 
         let parsed: GelfMessage = if self.lossy {
@@ -599,7 +617,7 @@ mod tests {
         let compressed = compress_zlib(&serde_json::to_vec(&input).unwrap());
 
         let deserializer = GelfDeserializerConfig::new(GelfDeserializerOptions {
-            decompression: ChunkedGelfDecompressionConfig::None,
+            decompression: GelfDecompressionMode::None,
             ..Default::default()
         })
         .build();
@@ -616,7 +634,7 @@ mod tests {
     /// the compressed message through and the deserializer rejects it as invalid JSON.
     #[test]
     fn gelf_decode_compressed_disabled_full_decoder() {
-        use crate::decoding::framing::ChunkedGelfDecoder;
+        use crate::decoding::framing::{ChunkedGelfDecoder, ChunkedGelfDecompressionConfig};
 
         let input = json!({
             VERSION: "1.1",
@@ -633,7 +651,7 @@ mod tests {
             .expect("unchunked message must pass the framing through");
 
         let deserializer = GelfDeserializerConfig::new(GelfDeserializerOptions {
-            decompression: ChunkedGelfDecompressionConfig::None,
+            decompression: GelfDecompressionMode::None,
             ..Default::default()
         })
         .build();
