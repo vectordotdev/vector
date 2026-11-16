@@ -568,7 +568,9 @@ mod tests {
             .parse(Bytes::from(corrupt), LogNamespace::Legacy)
             .expect_err("corrupt compressed frame must fail");
         assert!(
-            error.to_string().contains("failed decompressing GELF message"),
+            error
+                .to_string()
+                .contains("failed decompressing GELF message"),
             "unexpected error: {error}"
         );
     }
