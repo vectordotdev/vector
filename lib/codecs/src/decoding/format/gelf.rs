@@ -256,14 +256,9 @@ impl Deserializer for GelfDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        // The GELF spec allows messages to be compressed with GZIP or ZLIB, and senders
-        // commonly ship compressed frames over stream transports too (e.g. null-delimited
-        // GELF over TCP), mirroring Graylog which auto-detects the compression on both
-        // transports. Datagram transports already decompress in the `chunked_gelf`
-        // framing, but stream framing delivers compressed frames as-is, so detect the
-        // magic bytes here and decompress before JSON parsing. This is a no-op for
-        // uncompressed JSON, which never starts with the GZIP or ZLIB magic bytes, and
-        // reuses `CappedDecoder` so the decompression-bomb size cap applies.
+        // Stream transports deliver compressed GELF frames as-is (datagram transports
+        // decompress in the `chunked_gelf` framing), so decompress them here before
+        // JSON parsing. No-op for uncompressed JSON: it never starts with magic bytes.
         let bytes = match ChunkedGelfDecompression::from_magic(&bytes) {
             ChunkedGelfDecompression::None => bytes,
             compression => compression
