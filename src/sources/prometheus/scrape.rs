@@ -651,8 +651,8 @@ mod validation_tests {
         );
     }
 
-    /// A scraped metric that already has `exported_namespace` keeps the static path's behavior:
-    /// with `honor_labels` off, the metric's own `namespace` replaces it.
+    /// With `honor_labels` off, discovery tags handle conflicts like `instance_tag`: the scraped
+    /// `namespace` moves to `exported_namespace`, replacing the value already there.
     #[cfg(feature = "kubernetes")]
     #[test]
     fn discovery_tags_follow_honor_labels_like_static_tags() {

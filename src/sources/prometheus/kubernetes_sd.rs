@@ -1430,6 +1430,7 @@ mod tests {
 
     #[test]
     fn distinct_tag_names_are_accepted() {
+        // Listing the same key twice doesn't conflict with itself.
         let errors = tag_errors(
             &["app", "app"],
             &["owner"],
@@ -1552,7 +1553,8 @@ mod tests {
 
     #[test]
     fn build_label_selector_only_uses_the_configured_selector() {
-        // `vector.dev/exclude` opts a Pod out of log collection, not metrics scraping.
+        // No built-in `vector.dev/exclude!=true`: that label opts a Pod out of log collection,
+        // not scraping.
         assert_eq!(build_label_selector(""), None);
         assert_eq!(build_label_selector("a=b"), Some("a=b".to_owned()));
     }

@@ -52,8 +52,6 @@ const NESTED_FEATURE_RULES: &[NestedFeatureRule] = &[
         feature: "aws-core",
     },
 ];
-/// `prometheus_scrape` only compiles Kubernetes discovery with this feature, so a source that
-/// lists a `kubernetes` entry under `targets` needs it.
 const PROMETHEUS_SCRAPE_TYPE: &str = "prometheus_scrape";
 const PROMETHEUS_SCRAPE_TARGETS_KEY: &str = "targets";
 const PROMETHEUS_SCRAPE_KUBERNETES_KEY: &str = "kubernetes";
@@ -221,6 +219,8 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     Ok(features.into_iter().collect())
 }
 
+/// `prometheus_scrape` only compiles Kubernetes discovery with the `kubernetes` feature, so a
+/// source that lists a `kubernetes` entry under `targets` needs it.
 fn scrapes_kubernetes_targets(source: &Component) -> bool {
     source.r#type == PROMETHEUS_SCRAPE_TYPE
         && source
