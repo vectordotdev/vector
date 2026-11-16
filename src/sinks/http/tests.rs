@@ -13,18 +13,22 @@ use http_body_util::Full;
 use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
+    ByteSizeOf as _,
     codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::FramingConfig,
+        JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
     finalization::AddBatchNotifier,
+    metrics::Controller,
     serde::AsciiChar,
+    stream::batcher::limiter::ItemBatchSize as _,
 };
 
 use vrl::event_path;
 
 use super::{
+    batch::HttpBatchSizer,
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
 };
@@ -130,6 +134,74 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_native_json_batch_sizing_does_not_report_dropped_events() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    let config = indoc::indoc! {r#"
+        uri: "http://127.0.0.1:8080"
+        encoding:
+          codec: native_json
+          except_fields: [bad]
+        framing:
+          method: newline_delimited
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
+    let encoder = config.build_encoder().unwrap();
+    let sizer = HttpBatchSizer {
+        encoder: encoder.clone(),
+    };
+    let expected = Event::Log(LogEvent::from("keep this event"));
+    let mut event = expected.clone();
+    let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+    event.as_mut_log().insert(event_path!("bad"), too_deep);
+
+    assert_eq!(sizer.size(&event), event.size_of());
+
+    let filtered_encoder = HttpEncoder::new(
+        encoder.clone(),
+        config.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+    let mut output = Vec::new();
+    filtered_encoder
+        .encode_input(vec![event.clone()], &mut output)
+        .expect("excluding the deeply nested field should allow encoding");
+    let decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(output.into(), crate::config::LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.as_slice(), &[expected]);
+
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        assert!(
+            !metrics.iter().any(|metric| metric.name() == name),
+            "batch sizing must not report {name} for an event that encodes after filtering"
+        );
+    }
+
+    let unfiltered_encoder = HttpEncoder::new(
+        encoder,
+        Transformer::default(),
+        String::new(),
+        String::new(),
+    );
+    assert!(
+        unfiltered_encoder
+            .encode_input(vec![event], &mut Vec::new())
+            .is_err()
+    );
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
+    }
 }
 
 #[test]
