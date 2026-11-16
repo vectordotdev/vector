@@ -970,7 +970,7 @@ mod tests {
 
         assert_eq!(
             decoded.value(),
-            &VrlValue::Object(vrl::btreemap! {
+            &VrlValue::Object(vrl::objectmap! {
                 "message" => VrlValue::from("hello")
             })
         );
@@ -1129,7 +1129,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn native_json_log_encoding_does_not_change_native_protobuf_encoding() {
-        let event = crate::event::Event::Log(crate::event::LogEvent::from(vrl::btreemap! {
+        let event = crate::event::Event::Log(crate::event::LogEvent::from(vrl::objectmap! {
             "message" => VrlValue::from("hello")
         }));
 
@@ -1169,7 +1169,7 @@ mod tests {
 
             assert_eq!(native.namespace, namespace.unwrap_or_default());
             assert_eq!(native.namespace_v2, None);
-            assert!(native_json.namespace.is_empty());
+            assert_eq!(native_json.namespace, "");
             assert_eq!(native_json.namespace_v2.as_deref(), namespace);
             assert_eq!(
                 crate::event::Metric::try_from(native_json)

@@ -13,7 +13,6 @@ use http_body_util::Full;
 use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
-    ByteSizeOf as _,
     codecs::{
         JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
         TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,

@@ -144,13 +144,13 @@ mod tests {
                     "/event/log/value/timestamp",
                 ),
                 (
-                    Event::Log(LogEvent::from(btreemap! {
+                    Event::Log(LogEvent::from(objectmap! {
                         "timestamp" => Value::Timestamp(timestamp)
                     })),
                     "/event/log/value/map/fields/timestamp/timestamp",
                 ),
                 (
-                    Event::Trace(TraceEvent::from(btreemap! {
+                    Event::Trace(TraceEvent::from(objectmap! {
                         "timestamp" => Value::Timestamp(timestamp)
                     })),
                     "/event/trace/fields/timestamp/timestamp",
@@ -274,7 +274,7 @@ mod tests {
             if arrays {
                 Value::Array(vec![value])
             } else {
-                Value::Object(btreemap! { "nested" => value })
+                Value::Object(objectmap! { "nested" => value })
             }
         });
         if metadata {
@@ -317,7 +317,7 @@ mod tests {
 
         serializer
             .encode(
-                with_fixed_source_event_id(Event::Trace(TraceEvent::from(btreemap! {
+                with_fixed_source_event_id(Event::Trace(TraceEvent::from(objectmap! {
                     "foo" => Value::from("bar")
                 }))),
                 &mut bytes,
