@@ -61,6 +61,19 @@ pub enum ShutdownError {
     SinkAborted { key: ComponentKey, error: String },
 }
 
+impl ShutdownError {
+    /// Low-cardinality label for this error, used as the `reason` tag of `stopped_total`.
+    pub const fn reason(&self) -> &'static str {
+        match self {
+            Self::ApiFailed { .. } => "api_failed",
+            Self::ReloadFailedToRestore => "reload_failed_to_restore",
+            Self::SourceAborted { .. } => "source_aborted",
+            Self::TransformAborted { .. } => "transform_aborted",
+            Self::SinkAborted { .. } => "sink_aborted",
+        }
+    }
+}
+
 /// Convenience struct for app setup handling.
 pub struct SignalPair {
     pub handler: SignalHandler,

@@ -160,7 +160,20 @@ components: sources: internal_metrics: {
 			description:       "The total number of times the Vector instance has been stopped."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags: _internal_metrics_tags & {
+				reason: {
+					description: "The error that triggered the shutdown."
+					required:    true
+					enum: {
+						"none":                     "No error triggered the shutdown, for example on a shutdown signal or once all sources have finished."
+						"api_failed":               "The API failed to start."
+						"reload_failed_to_restore": "A reload failed, and the previous configuration could not be restored."
+						"source_aborted":           "A source task died during execution."
+						"transform_aborted":        "A transform task died during execution."
+						"sink_aborted":             "A sink task died during execution."
+					}
+				}
+			}
 		}
 
 		// Metrics emitted by one or more components
