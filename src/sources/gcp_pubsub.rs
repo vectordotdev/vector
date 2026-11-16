@@ -9,17 +9,18 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
-use http_1::uri::{InvalidUri, Uri};
+use http::uri::{InvalidUri, Uri};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Code, Request, Status, body::BoxBody, metadata::MetadataValue};
+use tonic::{Code, Request, Status, body::Body as TonicBody, metadata::MetadataValue};
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     byte_size_of::ByteSizeOf,
@@ -55,6 +56,9 @@ use crate::{
 
 const MIN_ACK_DEADLINE_SECS: u64 = 10;
 const MAX_ACK_DEADLINE_SECS: u64 = 600;
+const TIMESTAMP_KEY: &str = "timestamp";
+const ATTRIBUTES_KEY: &str = "attributes";
+const MESSAGE_ID_KEY: &str = "message_id";
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -68,7 +72,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
-#[allow(warnings, clippy::clone_on_ref_ptr)]
+#[allow(warnings, unreachable_pub, clippy::clone_on_ref_ptr)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
@@ -270,7 +274,7 @@ impl SourceConfig for PubsubConfig {
         let auth = self.auth.build(Scope::PubSub).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
-        auth.apply_uri_v1(&mut uri);
+        auth.apply_uri(&mut uri);
 
         let protocol = uri
             .scheme()
@@ -284,7 +288,7 @@ impl SourceConfig for PubsubConfig {
         // Pub/Sub's configured CAs supplement system roots, as they did with Tonic.
         let tls = TlsSettings::from_options(Some(&tls_config))?.with_system_roots();
         let mut builder = Builder::new(TokioExecutor::new());
-        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
         let client = Http2Client::new(tls.into(), &cx.proxy, builder)?;
 
         let token_generator = auth.spawn_regenerate_token();
@@ -313,8 +317,8 @@ impl SourceConfig for PubsubConfig {
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(protocol)),
+            events_received: register(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| {
@@ -332,22 +336,22 @@ impl SourceConfig for PubsubConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
-                &owned_value_path!("attributes"),
+                Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
+                &owned_value_path!(ATTRIBUTES_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
-                &owned_value_path!("message_id"),
+                Some(LegacyKey::Overwrite(owned_value_path!(MESSAGE_ID_KEY))),
+                &owned_value_path!(MESSAGE_ID_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -367,7 +371,7 @@ impl_generate_config_from_default!(PubsubConfig);
 
 #[derive(Clone)]
 struct PubsubSource {
-    client: Http2Client<BoxBody>,
+    client: Http2Client<TonicBody>,
     origin: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
@@ -478,7 +482,7 @@ impl PubsubSource {
         let mut request = Request::new(self.request_stream(ack_ids_receiver));
         if let Some(token) = self.auth.make_token() {
             let Ok(authorization) = MetadataValue::try_from(&token) else {
-                emit!(GcpPubsubStreamingPullError {
+                emit(GcpPubsubStreamingPullError {
                     error: Status::new(
                         Code::FailedPrecondition,
                         "Invalid token text returned by GCP",
@@ -498,9 +502,9 @@ impl PubsubSource {
                 Err(error) => {
                     // The pooled transport connects on the first request, not at construction.
                     if is_connect_error(&error) {
-                        emit!(GcpPubsubConnectError { error });
+                        emit(GcpPubsubConnectError { error });
                     } else {
-                        emit!(GcpPubsubStreamingPullError { error });
+                        emit(GcpPubsubStreamingPullError { error });
                     }
                     return State::RetryDelay;
                 }
@@ -634,7 +638,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -711,15 +715,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("message_id"))),
-                    path!("message_id"),
+                    Some(LegacyKey::Overwrite(path!(MESSAGE_ID_KEY))),
+                    path!(MESSAGE_ID_KEY),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("attributes"))),
-                    path!("attributes"),
+                    Some(LegacyKey::Overwrite(path!(ATTRIBUTES_KEY))),
+                    path!(ATTRIBUTES_KEY),
                     attributes.clone(),
                 );
             }
@@ -739,7 +743,7 @@ fn translate_error(error: tonic::Status) -> State {
         debug!("Stream reset by server.");
         State::RetryNow
     } else {
-        emit!(GcpPubsubReceiveError { error });
+        emit(GcpPubsubReceiveError { error });
         State::RetryDelay
     }
 }
@@ -928,7 +932,7 @@ mod tests {
                         tokio::spawn(async move {
                             let mut requests = request.into_body();
                             requests.data().await.unwrap().unwrap();
-                            let response = http_1::Response::builder()
+                            let response = http::Response::builder()
                                 .header("content-type", "application/grpc")
                                 .body(())
                                 .unwrap();
@@ -1038,7 +1042,9 @@ mod tests {
         source.abort();
     }
 
-    #[tokio::test(start_paused = true)]
+    // Real TLS I/O cannot advance with Tokio's paused clock. Auto-advancing the
+    // timeout can otherwise expire before the operating system services the retry.
+    #[tokio::test]
     async fn connection_failures_keep_error_event_and_retry_delay() {
         use crate::test_util::components::{COMPONENT_TESTS_ERROR, init_test};
         use tokio::{io::AsyncReadExt as _, time::Instant};
@@ -1104,7 +1110,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();
@@ -1165,7 +1171,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();
@@ -1230,8 +1236,8 @@ mod integration_tests {
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
-    use http::method::Method;
-    use hyper::{Request, StatusCode};
+    use http::{Method, Request, StatusCode};
+    use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
     use tokio::time::{Duration, Instant};
     use vrl::{btreemap, event_path};
@@ -1395,7 +1401,7 @@ mod integration_tests {
         components::init_test();
 
         let tls_settings = TlsSettings::from_options(None).unwrap();
-        let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
+        let client = HttpClient::new(tls_settings.into(), &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
         let (rx, shutdown) = tester.spawn_source(status).await;
@@ -1514,14 +1520,11 @@ mod integration_tests {
             let request = Request::builder()
                 .method(method)
                 .uri(uri)
-                .body(body.into())
+                .body(vector_http::full_body(body))
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = http_body::Body::collect(response.into_body())
-                .await
-                .unwrap()
-                .to_bytes();
+            let body = response.into_body().collect().await.unwrap().to_bytes();
             serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 

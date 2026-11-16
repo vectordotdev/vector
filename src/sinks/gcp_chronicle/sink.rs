@@ -1,4 +1,5 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use crate::sinks::{
     gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
@@ -60,7 +61,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

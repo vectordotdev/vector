@@ -12,9 +12,10 @@ use snafu::Snafu;
 use tokio::task::JoinError;
 use vector_lib::{
     buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
+    utilization::Utilization,
 };
 
-use crate::{config::ComponentKey, utilization::Utilization};
+use crate::config::ComponentKey;
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum TaskOutput {
@@ -36,11 +37,11 @@ pub(crate) enum TaskError {
 }
 
 impl TaskError {
-    pub fn wrapped(e: crate::Error) -> Self {
+    pub(crate) fn wrapped(e: crate::Error) -> Self {
         Self::Wrapped { source: e }
     }
 
-    pub fn panicked(payload: &(dyn Any + Send)) -> Self {
+    pub(crate) fn panicked(payload: &(dyn Any + Send)) -> Self {
         let panic = payload
             .downcast_ref::<String>()
             .map(String::as_str)
@@ -85,7 +86,7 @@ pub(crate) struct Task {
 }
 
 impl Task {
-    pub fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
+    pub(crate) fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
     where
         S: Into<String>,
         Fut: Future<Output = TaskResult> + Send + 'static,
@@ -97,11 +98,11 @@ impl Task {
         }
     }
 
-    pub fn id(&self) -> &str {
+    pub(crate) fn id(&self) -> &str {
         self.key.id()
     }
 
-    pub const fn typetag(&self) -> &str {
+    pub(crate) const fn typetag(&self) -> &str {
         self.typetag.as_str()
     }
 }

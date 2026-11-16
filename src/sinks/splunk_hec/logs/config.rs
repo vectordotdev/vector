@@ -9,7 +9,7 @@ use vector_lib::{
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         splunk_hec::common::{
@@ -18,7 +18,10 @@ use crate::{
             build_healthcheck, build_http_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::{HttpEndpoint, http::RetryStrategy, http_v1::http_response_retry_logic},
+        util::{
+            HttpEndpoint,
+            http::{RetryStrategy, http_response_retry_logic},
+        },
     },
     template::ConfinementConfig,
 };

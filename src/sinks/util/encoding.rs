@@ -7,6 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
     config::telemetry,
+    internal_event::emit,
     request_metadata::GroupedCountByteSize,
 };
 
@@ -69,7 +70,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
         }
 
         let batch_suffix = encoder.batch_suffix(is_empty);
-        assert!(n_events_pending == 0);
+        assert_eq!(n_events_pending, 0);
         write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
 
@@ -132,7 +133,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
                 // events before encoding, but that only happens if a sink is
                 // misconfigured to send non-log events into a log-only encoder,
                 // so the overcount is not a practical concern.
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                emit(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: n_events,
                     reason: "Failed to batch encode events.",
                 });
@@ -181,7 +182,7 @@ pub fn write_all(
     buf: &[u8],
 ) -> io::Result<()> {
     writer.write_all(buf).inspect_err(|error| {
-        emit!(EncoderWriteError {
+        emit(EncoderWriteError {
             error,
             count: n_events_pending,
         });
@@ -223,7 +224,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, env, path::PathBuf};
+    use std::{env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
     use cfg_if::cfg_if;
@@ -237,7 +238,7 @@ mod tests {
         internal_event::CountByteSize,
         json_size::JsonSize,
     };
-    use vrl::value::{KeyString, Value};
+    use vrl::value::{KeyString, ObjectMap, Value};
 
     cfg_if! {
         if #[cfg(feature = "codecs-arrow")] {
@@ -284,7 +285,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])))];
@@ -312,15 +313,15 @@ mod tests {
         );
 
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value1"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value2"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value3"),
             )]))),
@@ -375,7 +376,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])))];
@@ -403,15 +404,15 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value1"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value2"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value3"),
             )]))),
@@ -439,7 +440,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])));
@@ -460,7 +461,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("message"),
             Value::from("value"),
         )])));
@@ -506,7 +507,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([
             (KeyString::from("id"), Value::from("123")),
             (KeyString::from("name"), Value::from("Alice")),
             (KeyString::from("age"), Value::from(30)),
@@ -562,7 +563,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
+            Event::Log(LogEvent::from(ObjectMap::from([
                 (KeyString::from("id"), Value::from("123")),
                 (KeyString::from("name"), Value::from("Alice")),
                 (KeyString::from("age"), Value::from(30)),
@@ -571,7 +572,7 @@ mod tests {
                     Value::from(vec!["alice@example.com", "alice@work.com"]),
                 ),
             ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
+            Event::Log(LogEvent::from(ObjectMap::from([
                 (KeyString::from("id"), Value::from("123")),
                 (KeyString::from("name"), Value::from("Alice")),
                 (KeyString::from("age"), Value::from(30)),
@@ -608,7 +609,7 @@ mod tests {
         let encoder = BatchEncoder::new(BatchSerializer::Arrow(serializer));
         let encoding = (Transformer::default(), encoder);
 
-        let event = Event::Log(LogEvent::from(BTreeMap::from([(
+        let event = Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("message"),
             Value::from("not_an_integer"),
         )])));

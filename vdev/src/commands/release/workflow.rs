@@ -645,12 +645,17 @@ fn validate_upgrade_guide(base: &str, files: &[ChangedFile], version: &Version) 
         .split_terminator('\0')
         .any(|file| file.ends_with(".breaking.md"))
     {
+        let inline = files.iter().any(|file| {
+            file.kind == ChangeKind::Added
+                && file.path == format!("website/content/en/releases/{version}.md")
+        }) && super::generate_cue::has_inline_upgrade_guide(Path::new("."), version)?;
         ensure!(
-            files.iter().any(|file| {
-                file.kind == ChangeKind::Added
-                    && release_highlight(&file.path, version)
-                    && Path::new(&file.path).is_file()
-            }),
+            inline
+                || files.iter().any(|file| {
+                    file.kind == ChangeKind::Added
+                        && release_highlight(&file.path, version)
+                        && Path::new(&file.path).is_file()
+                }),
             "breaking releases require a generated upgrade guide for {version}"
         );
     }

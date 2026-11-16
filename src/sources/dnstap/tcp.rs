@@ -7,6 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     ipallowlist::IpAllowlistConfig,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     tcp::TcpKeepaliveConfig,
@@ -203,10 +204,10 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
                         );
                     }
 
-                    emit!(SocketEventsReceived {
+                    emit(SocketEventsReceived {
                         mode: SocketMode::Tcp,
                         byte_size: log_event.estimated_json_encoded_size_of(),
-                        count: 1
+                        count: 1,
                     });
 
                     event = Event::from(log_event);

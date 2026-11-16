@@ -20,7 +20,7 @@ use crate::{event::metric::TagValueSet, transforms::tag_cardinality_limit::confi
 /// | `Probabilistic`      | `BloomFilter                    |
 
 #[derive(Debug)]
-pub struct AcceptedTagValueSet {
+pub(super) struct AcceptedTagValueSet {
     storage: TagValueSetStorage,
 }
 
@@ -103,7 +103,7 @@ impl fmt::Debug for TagValueSetStorage {
 
 impl AcceptedTagValueSet {
     /// Create a new `AcceptedTagValueSet` for the given mode.
-    pub fn new(mode: &Mode) -> Self {
+    pub(super) fn new(mode: &Mode) -> Self {
         let storage = match &mode {
             Mode::Exact => TagValueSetStorage::Set(HashSet::new()),
             Mode::ExactFingerprint => {
@@ -116,7 +116,7 @@ impl AcceptedTagValueSet {
         Self { storage }
     }
 
-    pub fn contains(&self, value: &TagValueSet) -> bool {
+    pub(super) fn contains(&self, value: &TagValueSet) -> bool {
         match &self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
@@ -124,7 +124,7 @@ impl AcceptedTagValueSet {
         }
     }
 
-    pub fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         match &self.storage {
             TagValueSetStorage::Set(set) => set.len(),
             TagValueSetStorage::Bloom(bloom) => bloom.count(),
@@ -132,7 +132,7 @@ impl AcceptedTagValueSet {
         }
     }
 
-    pub fn insert(&mut self, value: TagValueSet) {
+    pub(super) fn insert(&mut self, value: TagValueSet) {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => {
                 set.insert(value);

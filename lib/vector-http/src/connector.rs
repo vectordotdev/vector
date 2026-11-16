@@ -21,7 +21,7 @@ use hyper_openssl::{SslStream, client::legacy::HttpsConnector};
 use hyper_util::client::legacy::connect::{Connected, Connection, HttpConnector};
 use openssl::ssl::SslConnector;
 use percent_encoding::percent_decode_str;
-use tokio::time::{Instant, Sleep};
+use tokio::time::{Instant, Sleep, timeout};
 use tower::Service;
 use url::{Host, Url};
 use vector_core::{
@@ -200,6 +200,7 @@ pub(crate) struct HttpProxyConnector {
     tls_settings: Option<TlsSettings>,
     routes: Arc<RoutePlanner>,
     max_connection_age: Option<(Duration, f64)>,
+    connect_timeout: Option<Duration>,
 }
 
 impl HttpProxyConnector {
@@ -232,6 +233,7 @@ impl HttpProxyConnector {
             tls_settings,
             routes,
             max_connection_age: None,
+            connect_timeout: None,
         })
     }
 
@@ -240,6 +242,7 @@ impl HttpProxyConnector {
             Some(age) => Some((age, options.max_connection_age_jitter_factor)),
             None => None,
         };
+        self.connect_timeout = options.connect_timeout;
         self
     }
 
@@ -314,32 +317,43 @@ impl Service<Uri> for HttpProxyConnector {
         let destination_tls = self.destination_tls.clone();
         let tls_settings = self.tls_settings.clone();
         let max_connection_age = self.max_connection_age;
+        let connect_timeout = self.connect_timeout;
 
         Box::pin(async move {
-            let io = match route? {
-                Route::Direct { destination } => direct.call(destination).await.map(BoxedIo::new),
-                Route::ForwardProxy {
-                    proxy: proxy_uri, ..
-                } => forward_proxy
-                    .call(proxy_uri)
-                    .await
-                    .map(|stream| BoxedIo::new(ForwardProxyIo(stream))),
-                Route::ConnectProxy {
-                    proxy: proxy_uri,
-                    destination,
-                    authorization,
-                } => {
-                    Self::connect_tunnel(
-                        connect_proxy,
-                        destination_tls,
-                        tls_settings,
-                        proxy_uri,
+            let connect = async move {
+                match route? {
+                    Route::Direct { destination } => {
+                        direct.call(destination).await.map(BoxedIo::new)
+                    }
+                    Route::ForwardProxy {
+                        proxy: proxy_uri, ..
+                    } => forward_proxy
+                        .call(proxy_uri)
+                        .await
+                        .map(|stream| BoxedIo::new(ForwardProxyIo(stream))),
+                    Route::ConnectProxy {
+                        proxy: proxy_uri,
                         destination,
                         authorization,
-                    )
-                    .await
+                    } => {
+                        Self::connect_tunnel(
+                            connect_proxy,
+                            destination_tls,
+                            tls_settings,
+                            proxy_uri,
+                            destination,
+                            authorization,
+                        )
+                        .await
+                    }
                 }
-            }?;
+            };
+            let io = match connect_timeout {
+                Some(duration) => timeout(duration, connect)
+                    .await
+                    .map_err(|_elapsed| connect_timed_out(duration))??,
+                None => connect.await?,
+            };
             Ok(match max_connection_age {
                 Some((age, jitter_factor)) => BoxedIo::new(MaxAgeIo::new(
                     io,
@@ -655,17 +669,107 @@ fn invalid_input(message: impl Into<String>) -> BoxError {
     Box::new(io::Error::new(io::ErrorKind::InvalidInput, message.into()))
 }
 
+fn connect_timed_out(duration: Duration) -> BoxError {
+    Box::new(io::Error::new(
+        io::ErrorKind::TimedOut,
+        format!("HTTP connect timeout occurred after {duration:?}"),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{io::ErrorKind, time::Duration};
+    use std::{
+        error::Error,
+        io::{self, ErrorKind},
+        iter,
+        time::Duration,
+    };
 
+    use http::{HeaderValue, Request, Uri};
+    use http_body_util::BodyExt as _;
     use hyper_util::rt::TokioIo;
     use tokio::{
         io::{AsyncReadExt as _, AsyncWriteExt as _, duplex},
+        net::TcpListener,
         time::Instant,
     };
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        tls::{MaybeTls, MaybeTlsSettings},
+    };
 
-    use super::{MaxAgeIo, connect_authority, tls_host};
+    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, tls_host};
+    use crate::{ConnectionOptions, HttpClient, empty_body};
+
+    /// Returns the proxy URI and `Proxy-Authorization` value of the route to `destination`.
+    fn proxy_route(config: &ProxyConfig, destination: &str) -> (Uri, Option<HeaderValue>) {
+        let route = RoutePlanner::new(config)
+            .unwrap()
+            .route(&destination.parse().unwrap())
+            .unwrap();
+        match route {
+            Route::ForwardProxy {
+                proxy,
+                authorization,
+            }
+            | Route::ConnectProxy {
+                proxy,
+                authorization,
+                ..
+            } => (proxy, authorization),
+            Route::Direct { .. } => panic!("{destination} must be proxied"),
+        }
+    }
+
+    #[test]
+    fn routes_each_scheme_to_its_proxy() {
+        let config = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+
+        let (proxy, authorization) = proxy_route(&config, "http://example.com/");
+        assert_eq!(proxy, "http://1.2.3.4:5678/");
+        assert!(authorization.is_none());
+
+        let (proxy, authorization) = proxy_route(&config, "https://example.com/");
+        assert_eq!(proxy, "https://2.3.4.5:9876/");
+        assert!(authorization.is_none());
+    }
+
+    #[test]
+    fn proxy_credentials_become_proxy_authorization() {
+        let config = ProxyConfig {
+            http: Some("http://user:pass@1.2.3.4:5678".into()),
+            https: Some("https://user:pass@2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+
+        for (destination, expected_proxy) in [
+            ("http://example.com/", "http://1.2.3.4:5678/"),
+            ("https://example.com/", "https://2.3.4.5:9876/"),
+        ] {
+            let (proxy, authorization) = proxy_route(&config, destination);
+            // The credentials leave the proxy URI and go only into `Proxy-Authorization`.
+            assert_eq!(proxy, expected_proxy);
+            let authorization = authorization.expect("proxy credentials are configured");
+            assert_eq!(authorization, "Basic dXNlcjpwYXNz");
+            assert!(authorization.is_sensitive());
+        }
+    }
+
+    #[test]
+    fn proxy_credentials_are_percent_decoded() {
+        let config = ProxyConfig {
+            http: Some("http://user:P%40ssw0rd@1.2.3.4:5678".into()),
+            ..Default::default()
+        };
+
+        let (_, authorization) = proxy_route(&config, "http://example.com/");
+        // base64("user:P@ssw0rd")
+        assert_eq!(authorization.unwrap(), "Basic dXNlcjpQQHNzdzByZA==");
+    }
 
     #[test]
     fn connect_authority_includes_a_port() {
@@ -717,5 +821,85 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::BrokenPipe);
         let error = io.write(b"data").await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::BrokenPipe);
+    }
+
+    #[tokio::test]
+    async fn connect_timeout_bounds_a_stalled_tls_handshake() {
+        // Accept the TCP connection and hold it open without ever answering the TLS handshake.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = tokio::spawn(async move { listener.accept().await.unwrap().0 });
+
+        let client = HttpClient::new_with_options(
+            MaybeTlsSettings::enable_client().unwrap(),
+            &ProxyConfig::default(),
+            ConnectionOptions::default().connect_timeout(Some(Duration::from_millis(200))),
+        )
+        .unwrap();
+        let request = Request::get(format!("https://127.0.0.1:{port}/"))
+            .body(empty_body())
+            .unwrap();
+
+        let error = tokio::time::timeout(Duration::from_secs(10), client.send(request))
+            .await
+            .expect("the connect timeout should fail the request")
+            .unwrap_err();
+        let timed_out = iter::successors(Some(&error as &(dyn Error + 'static)), |error| {
+            (*error).source()
+        })
+        .filter_map(|error| error.downcast_ref::<io::Error>())
+        .any(|error| error.kind() == ErrorKind::TimedOut);
+        assert!(timed_out, "expected a timed out I/O error, got {error:?}");
+
+        // The TCP connection was established, so the timeout hit during the TLS handshake.
+        let _stream = accepted.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn idle_pooled_connections_are_closed_in_the_background() {
+        // Answer one keep-alive request, then report what the next read of the idle connection
+        // returns: `0` once the client closes it.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buffer = [0u8; 4096];
+            let mut request = Vec::new();
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = stream.read(&mut buffer).await.unwrap();
+                assert_ne!(
+                    read, 0,
+                    "the client closed the connection before the request"
+                );
+                request.extend_from_slice(&buffer[..read]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+                .await
+                .unwrap();
+            stream.read(&mut buffer).await.unwrap()
+        });
+
+        let client = HttpClient::new(MaybeTls::Raw(()), &ProxyConfig::default()).unwrap();
+        let request = Request::get(format!("http://127.0.0.1:{port}/"))
+            .body(empty_body())
+            .unwrap();
+        let response = client.send(request).await.unwrap();
+        response.into_body().collect().await.unwrap();
+        // Let the connection return to the pool before the clock is paused.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // The pool's default idle timeout is 90 seconds. The background check runs once per
+        // timeout, and evicts connections idle for longer than it, so the second check does.
+        tokio::time::pause();
+        tokio::time::advance(Duration::from_secs(181)).await;
+        tokio::time::resume();
+
+        let read = tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("the idle connection should be closed without another request")
+            .unwrap();
+        assert_eq!(read, 0);
+        drop(client);
     }
 }

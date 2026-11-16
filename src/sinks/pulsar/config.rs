@@ -30,7 +30,7 @@ use crate::{
 /// Configuration for the `pulsar` sink.
 #[configurable_component(sink("pulsar", "Publish observability events to Apache Pulsar topics."))]
 #[derive(Clone, Debug)]
-pub struct PulsarSinkConfig {
+pub(crate) struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
     ///
     /// The endpoint should specify the pulsar protocol and port.
@@ -132,7 +132,7 @@ pub(crate) struct PulsarAuthConfig {
 /// OAuth2-specific authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct OAuth2Config {
+pub(crate) struct OAuth2Config {
     /// The issuer URL.
     #[configurable(metadata(docs::examples = "${OAUTH2_ISSUER_URL}"))]
     #[configurable(metadata(docs::examples = "https://oauth2.issuer"))]
@@ -161,7 +161,7 @@ pub struct OAuth2Config {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum PulsarCompression {
+pub(crate) enum PulsarCompression {
     /// No compression.
     #[default]
     None,
@@ -184,7 +184,7 @@ pub enum PulsarCompression {
     description = "Custom connection retry options configuration for the Pulsar client."
 )]
 #[derive(Clone, Debug)]
-pub struct CustomConnectionRetryOptions {
+pub(crate) struct CustomConnectionRetryOptions {
     /// Minimum delay between connection retries.
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
     pub min_backoff_ms: Option<u64>,
@@ -212,7 +212,7 @@ pub struct CustomConnectionRetryOptions {
 #[configurable_component]
 #[configurable(description = "TLS options configuration for the Pulsar client.")]
 #[derive(Clone, Debug)]
-pub struct PulsarTlsOptions {
+pub(crate) struct PulsarTlsOptions {
     /// File path containing a list of PEM encoded certificates.
     #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
     pub ca_file: String,
@@ -422,7 +422,7 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedPulsarSink {
+pub(crate) struct ValidatedPulsarSink {
     topic: ConfinedTemplate,
 }
 

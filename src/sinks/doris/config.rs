@@ -5,7 +5,7 @@ use super::sink::DorisSink;
 use crate::{
     codecs::EncodingConfigWithFraming,
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         doris::{
             client::DorisSinkClient, common::DorisCommon, health::DorisHealthLogic,

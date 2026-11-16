@@ -1,0 +1,5 @@
+# Stable subset of the Saluki rustfmt configuration, so that the vendored source stays unchanged.
+reorder_imports = true
+use_field_init_shorthand = true
+max_width = 120
+fn_params_layout = "Compressed"

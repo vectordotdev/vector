@@ -3,9 +3,8 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http::Uri;
-use http_1::{
-    Request, StatusCode,
+use http::{
+    Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
@@ -20,8 +19,7 @@ use crate::{
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpResponse, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpResponse, HttpServiceRequestBuilder, RetryStrategy},
             retries::RetryAction,
         },
     },
@@ -122,7 +120,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
         let mut request = builder.body(payload).map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)

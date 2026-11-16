@@ -5,7 +5,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct InternalLogsBytesReceived {
+pub(crate) struct InternalLogsBytesReceived {
     pub byte_size: usize,
 }
 
@@ -21,7 +21,7 @@ impl InternalEvent for InternalLogsBytesReceived {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct InternalLogsEventsReceived {
+pub(crate) struct InternalLogsEventsReceived {
     pub byte_size: JsonSize,
     pub count: usize,
 }

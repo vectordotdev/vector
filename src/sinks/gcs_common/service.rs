@@ -2,11 +2,11 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
+use http::{
     Request,
     header::{HeaderName, HeaderValue},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tower::Service;
 use vector_http::{HttpError, full_body};
 use vector_lib::{
@@ -17,7 +17,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::util::HttpEndpoint,
 };
 
@@ -86,7 +86,7 @@ pub struct GcsRequestSettings {
 pub struct GcsResponse {
     /// The native client's response; delivery and retries use only its status, so the body
     /// stays unread.
-    pub inner: http_1::Response<Incoming>,
+    pub inner: http::Response<Incoming>,
     pub metadata: RequestMetadata,
 }
 
@@ -129,7 +129,7 @@ impl Service<GcsRequest> for GcsService {
             .base_url
             .append_path(&request.key)
             .expect("partition key must be a valid URI path segment")
-            .into_v1();
+            .into_uri();
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -151,7 +151,7 @@ impl Service<GcsRequest> for GcsService {
         }
 
         let mut http_request = builder.body(request.body).unwrap();
-        self.auth.apply_v1(&mut http_request);
+        self.auth.apply(&mut http_request);
 
         let client = self.client.clone();
         Box::pin(async move {

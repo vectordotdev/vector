@@ -5,7 +5,7 @@ mod tracer;
 mod tracing;
 mod tracing_allocator;
 
-pub use self::{
+pub(crate) use self::{
     token::{AllocationGroupId, AllocationGroupToken},
     tracer::Tracer,
     tracing::AllocationLayer,
@@ -21,7 +21,7 @@ pub use self::{
 #[inline(always)]
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::inline_always, reason = "Retain hot-path inlining")]
-pub fn without_allocation_tracing<F>(f: F)
+pub(crate) fn without_allocation_tracing<F>(f: F)
 where
     F: FnOnce(),
 {

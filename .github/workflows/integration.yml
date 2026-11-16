@@ -258,6 +258,7 @@ jobs:
           [
             "datadog-logs",
             "datadog-metrics",
+            "datadog-traces",
             "opentelemetry-logs",
             "opentelemetry-metrics",
             "opentelemetry-metrics-native",
