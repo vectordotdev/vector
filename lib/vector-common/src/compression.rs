@@ -1,7 +1,7 @@
 use async_compression::tokio::bufread::{GzipDecoder, ZstdDecoder};
 use tokio::io::AsyncBufRead;
 
-use crate::constants::ZSTD_MAGIC
+use crate::constants::ZSTD_MAGIC;
 
 // Zstd skippable frames dont' start with ZSTD_MAGIC. We check for them separately.
 pub fn is_zstd_header(header: &[u8]) -> bool {

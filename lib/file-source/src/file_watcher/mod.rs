@@ -20,7 +20,7 @@ use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
-use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder, is_zstd_header};
+use vector_common::compression::{gzip_multiple_decoder, is_zstd_header, zstd_multiple_decoder};
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);

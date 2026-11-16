@@ -11,7 +11,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
-use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder, is_zstd_header};
+use vector_common::compression::{gzip_multiple_decoder, is_zstd_header, zstd_multiple_decoder};
 use vector_common::constants::{GZIP_MAGIC, ZSTD_MAGIC};
 
 use crate::{
