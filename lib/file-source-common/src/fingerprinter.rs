@@ -11,7 +11,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
-use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder};
+use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder, is_zstd_header};
 use vector_common::constants::{GZIP_MAGIC, ZSTD_MAGIC};
 
 use crate::{
@@ -81,6 +81,13 @@ impl SupportedCompressionAlgorithms {
             SupportedCompressionAlgorithms::Zstd => ZSTD_MAGIC,
         }
     }
+
+    fn matches_header(self, header: &[u8]) -> bool {
+        match self {
+            Self::Gzip => header.starts_with(GZIP_MAGIC),
+            Self::Zstd => is_zstd_header(header),
+        }
+    }
 }
 
 trait UncompressedReader {
@@ -123,7 +130,7 @@ impl UncompressedReader for UncompressedReaderImpl {
                 return Err(err);
             }
 
-            if magic == magic_header_bytes {
+            if compression_algorithm.matches_header(&magic) {
                 algorithm = Some(compression_algorithm);
                 break;
             }

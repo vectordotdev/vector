@@ -14,13 +14,13 @@ use tokio::{
     time::Instant,
 };
 use tracing::debug;
-use vector_common::constants::{GZIP_MAGIC, ZSTD_MAGIC};
+use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
-use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder};
+use vector_common::compression::{gzip_multiple_decoder, zstd_multiple_decoder, is_zstd_header};
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
@@ -514,7 +514,7 @@ async fn is_compressed<R: AsyncRead + Unpin>(
     let header_bytes = r.fill_buf().await?;
     // WARN: The paired `BufReader::consume` is intentionally not called. If we
     // do we'll chop a decent part of the compressed stream off.
-    Ok(if header_bytes.starts_with(ZSTD_MAGIC) {
+    Ok(if is_zstd_header(header_bytes) {
         Some(Compression::Zstd)
     } else if header_bytes.starts_with(GZIP_MAGIC) {
         Some(Compression::Gzip)
