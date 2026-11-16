@@ -70,6 +70,8 @@ jobs:
         with:
           ref: ${{ github.event.review.commit_id }}
           persist-credentials: false
+      - uses: ./.github/actions/prepare-armv6-runtime
+        if: startsWith(matrix.target, 'arm-unknown-linux-')
       - name: Build native ARM toolchain
         if: ${{ !endsWith(github.event.review.body, '-release') }}
         env:

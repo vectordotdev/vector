@@ -1,0 +1,16 @@
+name: Prepare native ARMv6 runtime checks
+description: Execute ARMv6 memory barriers in hardware on the ARM64 runner.
+
+runs:
+  using: composite
+  steps:
+    - name: Enable hardware execution of ARMv6 memory barriers
+      shell: bash
+      run: |
+        test "$(uname -m)" = aarch64
+        # The default CP15 barrier emulation traps between LDREX and STREX.
+        # That clears the exclusive monitor and prevents atomic CAS progress.
+        # Use hardware execution, not kernel emulation, for this isolated job.
+        # GitHub discards the runner VM after the job, including this setting.
+        sudo sysctl -w abi.cp15_barrier=2
+        test "$(sysctl -n abi.cp15_barrier)" = 2

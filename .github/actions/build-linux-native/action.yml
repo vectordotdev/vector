@@ -12,6 +12,9 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/prepare-armv6-runtime
+      if: startsWith(inputs.target, 'arm-unknown-linux-')
+
     - name: Select native build environment
       id: environment
       shell: bash

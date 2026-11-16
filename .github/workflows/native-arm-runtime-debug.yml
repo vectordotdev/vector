@@ -17,13 +17,15 @@ jobs:
       github.actor == 'thomasqueirozb' &&
       github.event.review.body == '/ci-run-native-armv6-runtime'
     runs-on: ubuntu-24.04-8core-arm
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - arm-unknown-linux-gnueabi
-          - arm-unknown-linux-musleabi
+        include:
+          - target: arm-unknown-linux-gnueabi
+            source-run: 43950675022
+          - target: arm-unknown-linux-musleabi
+            source-run: 43949196956
     env:
       TARGET: ${{ matrix.target }}
     steps:
@@ -37,7 +39,7 @@ jobs:
           name: native-${{ matrix.target }}
           path: debug-data
           github-token: ${{ github.token }}
-          run-id: 43949196956
+          run-id: ${{ matrix.source-run }}
       - name: Build a native ARM64 debugger environment
         run: |
           if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
@@ -98,6 +100,48 @@ jobs:
                 >"debug-data/$TARGET.hardware.stdout.txt"
               grep -F "NATIVE PACKAGING WORKS" "debug-data/$TARGET.hardware.stdout.txt"
             '
+      - name: Install packaging tools without rebuilding Vector
+        uses: ./.github/actions/setup
+        with:
+          rust: true
+          mold: false
+          cargo-deb: true
+          cmark-gfm: true
+          cross-binutils: true
+      - name: Generate packaging test metadata
+        id: metadata
+        env:
+          CHANNEL: custom
+        run: make ci-generate-publish-metadata
+      - uses: ./.github/actions/prepare-armv6-runtime
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Package the existing binary and verify its ARM1176 image
+        env:
+          VECTOR_VERSION: ${{ steps.metadata.outputs.vector_version }}
+          CHANNEL: test
+          PUSH: "false"
+          LOAD: "true"
+          REPOS: vector-runtime-debug
+          PLATFORM: linux/arm/v6
+        run: |
+          mkdir -p "target/$TARGET/release"
+          cp "debug-data/$TARGET/release/vector" "target/$TARGET/release/vector"
+          digest=$(sha256sum "target/$TARGET/release/vector")
+          if [[ "$TARGET" == *gnueabi ]]; then
+            printf 'native packaging works\n' | timeout -k 10 90 docker run --rm -i \
+              --platform linux/arm/v6 -v "$PWD:/work:ro" \
+              --entrypoint "/work/target/$TARGET/release/vector" debian:bullseye-slim \
+              --config /work/tests/data/native-release-smoke.yaml > "$RUNNER_TEMP/gnu-compat.json"
+            grep -F '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/gnu-compat.json"
+          fi
+          make PREBUILT=true VERSION="$VECTOR_VERSION" VDEV="$(command -v vdev)" "package-$TARGET-all"
+          printf '%s\n' "$digest" | sha256sum --check -
+          export BASE=alpine
+          if [[ "$TARGET" == *gnueabi ]]; then
+            export BASE=debian
+          fi
+          export TAG="$VECTOR_VERSION"
+          make release-docker
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

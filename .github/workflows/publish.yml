@@ -340,6 +340,8 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts
+      - uses: ./.github/actions/prepare-armv6-runtime
+        if: startsWith(matrix.target, 'arm-unknown-linux-')
       - name: Execute the packaged archive in a clean runtime
         env:
           TARGET: ${{ matrix.target }}
@@ -355,8 +357,8 @@ jobs:
               mkdir /tmp/vector-archive
               tar -xzf "/work/target/artifacts/vector-$VECTOR_VERSION-$TARGET.tar.gz" -C /tmp/vector-archive
               binary="/tmp/vector-archive/vector-$TARGET/bin/vector"
-              timeout 90 "$binary" --version
-              printf "native packaging works\n" | timeout 90 "$binary" \
+              timeout -k 10 90 "$binary" --version
+              printf "native packaging works\n" | timeout -k 10 90 "$binary" \
                 --config /work/tests/data/native-release-smoke.yaml > /tmp/native-smoke.json
               grep -q '\''"message":"NATIVE PACKAGING WORKS"'\'' /tmp/native-smoke.json
               if command -v apt-get; then
@@ -559,6 +561,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           mold: false
+      - uses: ./.github/actions/prepare-armv6-runtime
+        if: matrix.arch == 'armv6'
       - name: Build the production Dockerfile and execute its entry point
         env:
           CHANNEL: test
@@ -574,8 +578,8 @@ jobs:
             exit 1
           fi
           make release-docker
-          timeout 90 docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
-          printf 'native packaging works\n' | timeout 90 docker run --rm -i --platform "$PLATFORM" \
+          timeout -k 10 90 docker run --rm --platform "$PLATFORM" "$REPOS:$TAG-$BASE" --version
+          printf 'native packaging works\n' | timeout -k 10 90 docker run --rm -i --platform "$PLATFORM" \
             -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro" \
             "$REPOS:$TAG-$BASE" --config /smoke.yaml > "$RUNNER_TEMP/native-smoke.json"
           grep -q '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/native-smoke.json"
