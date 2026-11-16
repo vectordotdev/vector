@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "./fixtures";
 
 const debuggingGuide = "/guides/developer/debugging/";
@@ -172,22 +173,72 @@ for (const colorScheme of ["light", "dark"] as const) {
     await page.goto("/docs/reference/vrl/");
     const snippet = page
       .locator(".highlight")
-      .filter({ has: page.locator('code[data-lang="coffee"]') })
+      .filter({ has: page.locator('code[data-lang="vrl"]') })
       .first();
     const code = snippet.locator("code");
     const plainColor = await code.evaluate((element) => getComputedStyle(element).color);
     await expect(
       code
-        .locator(".nx")
+        .locator(".vrl-function")
         .filter({ hasText: /^parse_json$/ })
         .first()
     ).toHaveCSS("color", "rgb(147, 197, 253)");
     await expect(
       code
-        .locator(".nx")
+        .locator(".vrl-property")
         .filter({ hasText: /^message$/ })
         .first()
     ).not.toHaveCSS("color", plainColor);
+    const functionColor = await code
+      .locator(".vrl-function")
+      .first()
+      .evaluate((element) => getComputedStyle(element).color);
+    await expect(code.locator(".vrl-property").first()).not.toHaveCSS("color", functionColor);
     await snippet.screenshot({ path: testInfo.outputPath(`vrl-${colorScheme}.png`) });
   });
 }
+
+test.describe("VRL highlighting without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("ships semantic colors in the rendered HTML", async ({ page }) => {
+    await page.goto("/docs/reference/vrl/");
+    const code = page.locator('code[data-highlighter="tree-sitter-vrl"]').first();
+    await expect(code).toBeAttached();
+    await expect(
+      code
+        .locator(".vrl-function")
+        .filter({ hasText: /^parse_json$/ })
+        .first()
+    ).toHaveCount(1);
+    await expect(
+      code
+        .locator(".vrl-property")
+        .filter({ hasText: /^message$/ })
+        .first()
+    ).toHaveCSS("color", "rgb(110, 231, 183)");
+  });
+});
+
+test("highlighted VRL retains its complete source when copied", async ({ context, page }) => {
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        async writeText(text: string) {
+          sessionStorage.setItem("copied-code", text);
+        }
+      }
+    });
+  });
+  const markdown = readFileSync(new URL("../content/en/docs/reference/vrl/_index.md", import.meta.url), "utf8");
+  const source = markdown.match(/```(?:coffee|vrl)\n([\s\S]*?)```/)![1].replace(/\n$/, "");
+  await page.goto("/docs/reference/vrl/");
+  const block = page
+    .locator(".highlight")
+    .filter({ has: page.locator('code[data-highlighter="tree-sitter-vrl"]') })
+    .first();
+  expect((await block.locator("pre").textContent())!.replace(/\n$/, "")).toBe(source);
+  await block.getByRole("button", { name: "Copy code to clipboard" }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(source);
+});

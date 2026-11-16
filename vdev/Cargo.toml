@@ -14,6 +14,8 @@ include = [
   "Cargo.toml",
   "README.md",
   "src/**",
+  "build.rs",
+  "vendor/**",
 ]
 
 [lints]
@@ -54,6 +56,9 @@ directories = "6.0.0"
 glob.workspace = true
 handlebars = { version = "6.4.4", default-features = false }
 hex = "0.4.3"
+html-escape = "0.2.13"
+tree-sitter-highlight = "0.26.6"
+tree-sitter-language = "0.1.9"
 indexmap.workspace = true
 indicatif = { version = "0.18.4", features = ["improved_unicode"] }
 itertools.workspace = true
@@ -80,6 +85,9 @@ convert_case.workspace = true
 syn = { workspace = true, features = ["printing", "parsing"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote.workspace = true
+
+[build-dependencies]
+cc = "1"
 
 [package.metadata.binstall]
 pkg-url = "https://install.datadoghq.com/vector/vdev/{ version }/{ name }-{ target }-v{ version }.tgz"

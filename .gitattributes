@@ -13,3 +13,5 @@ distribution/helm/*/charts/*.tgz filter=lfs diff=lfs merge=lfs -text
 
 lib/codecs/tests/data/** linguist-generated=true
 tests/helm-snapshots/**/snapshot.yaml linguist-generated=true
+
+vdev/vendor/** linguist-vendored
