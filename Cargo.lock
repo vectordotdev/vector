@@ -13188,7 +13188,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.62.0-dev"
+version = "0.62.0"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -13863,8 +13863,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.38.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#9da8fe4603ae7259887125b350474906842d447d"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ad74a7505d451fdedd1ea3b926c1308aa7cbb41ef23b243044e0121fb64303d"
 dependencies = [
  "aes",
  "aes-siv",
