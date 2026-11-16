@@ -235,7 +235,7 @@ test("highlighted VRL retains its complete source when copied", async ({ context
     });
   });
   const markdown = readFileSync(new URL("../content/en/docs/reference/vrl/_index.md", import.meta.url), "utf8");
-  const source = markdown.match(/```(?:coffee|vrl)\n([\s\S]*?)```/)![1].replace(/\n$/, "");
+  const source = markdown.match(/```vrl\n([\s\S]*?)```/)![1].replace(/\n$/, "");
   await page.goto("/docs/reference/vrl/");
   const block = page
     .locator(".highlight")
@@ -246,57 +246,96 @@ test("highlighted VRL retains its complete source when copied", async ({ context
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(source);
 });
 
-test("explicit VRL fences preserve language-like literals when rendered and copied", async ({ context, page }) => {
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        async writeText(text: string) {
-          sessionStorage.setItem("copied-code", text);
+for (const lineNumbers of ["false", "inline", "table"]) {
+  test(`VRL fences preserve literals and controls with line numbers ${lineNumbers}`, async ({ context, page }) => {
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          async writeText(text: string) {
+            sessionStorage.setItem("copied-code", text);
+          }
         }
-      }
+      });
     });
-  });
-  const source = '.label = "language-coffee"\n.attr = s\'data-lang="coffee"\'\n# language-coffee';
-  const directory = mkdtempSync(join(tmpdir(), "vector-vrl-fence-"));
-  try {
-    const layouts = join(directory, "layouts", "_default");
-    const markup = join(layouts, "_markup");
-    mkdirSync(markup, { recursive: true });
-    mkdirSync(join(directory, "content"));
-    writeFileSync(
-      join(directory, "hugo.toml"),
-      'baseURL = "http://localhost/"\ndisableKinds = ["home", "taxonomy", "term"]\n[markup.highlight]\nnoClasses = false\n'
-    );
-    writeFileSync(join(layouts, "single.html"), '<main id="page-content">{{ .Content }}</main>');
-    copyFileSync(
-      new URL("../layouts/_default/_markup/render-codeblock-vrl.html", import.meta.url),
-      join(markup, "render-codeblock-vrl.html")
-    );
-    writeFileSync(
-      join(directory, "content", "example.md"),
-      '+++\ntitle = "VRL regression"\n+++\n```vrl {title="literal.vrl"}\n' + source + "\n```\n"
-    );
-    execFileSync("hugo", ["--source", directory, "--destination", join(directory, "public"), "--quiet"]);
-    const rendered = readFileSync(join(directory, "public", "example", "index.html"), "utf8");
+    const source = '.label = "language-text"\n.attr = s\'data-lang="text"\'\n# language-text';
+    const directory = mkdtempSync(join(tmpdir(), "vector-vrl-fence-"));
+    try {
+      const layouts = join(directory, "layouts", "_default");
+      const markup = join(layouts, "_markup");
+      mkdirSync(markup, { recursive: true });
+      mkdirSync(join(directory, "content"));
+      mkdirSync(join(directory, "layouts", "partials"));
+      copyFileSync(
+        new URL("../layouts/partials/vrl-code.html", import.meta.url),
+        join(directory, "layouts", "partials", "vrl-code.html")
+      );
+      writeFileSync(
+        join(directory, "hugo.toml"),
+        'baseURL = "http://localhost/"\ndisableKinds = ["home", "taxonomy", "term"]\n[markup.highlight]\nnoClasses = false\n'
+      );
+      writeFileSync(join(layouts, "single.html"), '<main id="page-content">{{ .Content }}</main>');
+      copyFileSync(
+        new URL("../layouts/_default/_markup/render-codeblock-vrl.html", import.meta.url),
+        join(markup, "render-codeblock-vrl.html")
+      );
+      writeFileSync(
+        join(directory, "content", "example.md"),
+        '+++\ntitle = "VRL regression"\n+++\n```vrl {#vrl-fixture .vrl-example title="literal.vrl" linenos="' +
+          lineNumbers +
+          '" linenostart=7}\n' +
+          source +
+          "\n```\n"
+      );
+      execFileSync("hugo", ["--source", directory, "--destination", join(directory, "public"), "--quiet"]);
+      const rendered = readFileSync(join(directory, "public", "example", "index.html"), "utf8");
 
-    await page.goto("/docs/reference/vrl/");
-    const controlsScript = await page.locator('script[src*="/js/below."]').getAttribute("src");
-    expect(controlsScript).toBeTruthy();
-    await page.route("**/__tests__/vrl-source-preservation/", (route) =>
-      route.fulfill({
-        contentType: "text/html",
-        body: rendered + `<script src="${controlsScript}"></script>`
-      })
+      await page.goto("/docs/reference/vrl/");
+      const controlsScript = await page.locator('script[src*="/js/below."]').getAttribute("src");
+      expect(controlsScript).toBeTruthy();
+      await page.route("**/__tests__/vrl-source-preservation/", (route) =>
+        route.fulfill({
+          contentType: "text/html",
+          body: rendered + `<script src="${controlsScript}"></script>`
+        })
+      );
+      await page.goto("/__tests__/vrl-source-preservation/");
+      const block = page.locator('.highlight[title="literal.vrl"]');
+      const code = block.locator("code.language-vrl");
+      await expect(code).toHaveAttribute("data-lang", "vrl");
+      await expect(block).toHaveAttribute("id", "vrl-fixture");
+      await expect(block).toHaveClass(/vrl-example/);
+      const text = await code.evaluate((element) => {
+        const clone = element.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll(".ln, .lnt").forEach((number) => number.remove());
+        return clone.textContent;
+      });
+      expect(text!.replace(/\n$/, "")).toBe(source);
+      if (lineNumbers !== "false") {
+        await expect(block.locator(lineNumbers === "inline" ? ".ln" : ".lnt")).toHaveText(["7", "8", "9"]);
+      }
+      await block.getByRole("button", { name: "Copy code to clipboard" }).click();
+      await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(source);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const path of [
+  "/docs/reference/vrl/functions/",
+  "/docs/reference/vrl/examples/",
+  "/docs/reference/vrl/expressions/",
+  "/docs/reference/configuration/transforms/remap/",
+  "/highlights/2022-05-24-vrl-encryption/"
+]) {
+  test(`VRL examples use Syntect on ${path}`, async ({ page }) => {
+    await page.goto(path);
+    const snippets = page.locator('#page-content code[data-lang="vrl"]');
+    expect(await snippets.count()).toBeGreaterThan(0);
+    await expect(page.locator('#page-content code[data-lang="vrl"]:not([data-highlighter="syntect-vrl"])')).toHaveCount(
+      0
     );
-    await page.goto("/__tests__/vrl-source-preservation/");
-    const block = page.locator('.highlight[title="literal.vrl"]');
-    await expect(block.locator("code")).toHaveAttribute("class", "language-vrl");
-    await expect(block.locator("code")).toHaveAttribute("data-lang", "vrl");
-    expect((await block.locator("pre").textContent())!.replace(/\n$/, "")).toBe(source);
-    await block.getByRole("button", { name: "Copy code to clipboard" }).click();
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(source);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
+    await expect(snippets.locator(".vrl-function").first()).toBeAttached();
+  });
+}

@@ -69,7 +69,7 @@ impl Renderer {
             syntaxes: syntaxes.build(),
             // Hugo emits these code elements with escaped source and span-only token markup.
             blocks: Regex::new(
-                r#"(?s)(<code\b[^>]*\bclass=(?:"language-(?:coffee|vrl)"|'language-(?:coffee|vrl)'|language-(?:coffee|vrl)\b)[^>]*>)(.*?)(</code>)"#,
+                r#"(?s)(<code\b[^>]*\bclass=(?:"language-vrl"|'language-vrl'|language-vrl\b)[^>]*>)(.*?)(</code>)"#,
             )?,
             spans: Regex::new(r"</?span\b[^>]*>")?,
             line_numbers: Regex::new(
@@ -106,12 +106,7 @@ impl Renderer {
             let text = self.spans.replace_all(&without_numbers, "");
             let source = html_escape::decode_html_entities(&text);
             let highlighted = self.highlight(&source)?;
-            let opening = block[1]
-                .replace("language-coffee", "language-vrl")
-                .replace("data-lang=\"coffee\"", "data-lang=\"vrl\"")
-                .replace("data-lang='coffee'", "data-lang='vrl'")
-                .replace("data-lang=coffee", "data-lang=vrl");
-            output.push_str(opening.trim_end_matches('>'));
+            output.push_str(block[1].trim_end_matches('>'));
             output.push_str(" data-highlighter=\"syntect-vrl\">");
             if numbers.is_empty() {
                 output.push_str(&highlighted);
@@ -240,7 +235,7 @@ mod tests {
     #[test]
     fn preserves_inline_numbers_and_leaves_other_languages_alone() {
         let mut renderer = Renderer::new().unwrap();
-        let input = "<code class=\"language-coffee\" data-lang=\"coffee\"><span class=\"line\"><span class=\"ln\">1</span><span class=\"cl\">.x = 1\n</span></span></code><code class=\"language-yaml\">source: test</code>";
+        let input = "<code class=\"language-vrl\" data-lang=\"vrl\"><span class=\"line\"><span class=\"ln\">1</span><span class=\"cl\">.x = 1\n</span></span></code><code class=\"language-yaml\">source: test</code>";
         let (output, count) = renderer.page(input).unwrap();
         assert_eq!(count, 1);
         assert!(output.contains("<span class=\"ln\">1</span>"));
@@ -251,7 +246,7 @@ mod tests {
     #[test]
     fn handles_minified_hugo_output() {
         let mut renderer = Renderer::new().unwrap();
-        let input = "<code class=language-coffee data-lang=coffee><span class=line><span class=ln>1</span><span class=cl>.x = 1\n</span></span></code>";
+        let input = "<code class=language-vrl data-lang=vrl><span class=line><span class=ln>1</span><span class=cl>.x = 1\n</span></span></code>";
         let (output, count) = renderer.page(input).unwrap();
         assert_eq!(count, 1);
         assert!(output.contains("class=language-vrl data-lang=vrl"));
