@@ -22,6 +22,6 @@ Current limitations:
 - Pending, Succeeded, and Failed Pods, and Pods without an IP address yet, are skipped.
 - Builds without the `kubernetes` feature reject `kubernetes` targets.
 
-The existing `endpoints` option still works but is deprecated in favor of `targets`. A source sets one or the other.
+A source sets either `endpoints` or `targets`. To combine fixed URLs with discovery, list them in a `static` entry under `targets`.
 
 authors: leeteng2001 pront JinchengCao

@@ -21,8 +21,6 @@ generated: components: sources: prometheus_scrape: configuration: {
 		type: string: {}
 	}
 	endpoints: {
-		deprecated:         true
-		deprecated_message: "Use `targets` with a `static` block instead."
 		description: """
 			Endpoints to scrape metrics from.
 
@@ -33,7 +31,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 		required_one_of_group: "targets"
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["http://localhost:9090/metrics"]
 		}
 	}
 	headers: {

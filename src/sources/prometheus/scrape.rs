@@ -71,7 +71,7 @@ pub(crate) enum TargetConfig {
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
-    #[configurable(deprecated = "Use `targets` with a `static` block instead.")]
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[configurable(required_one_of = "targets")]
     #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
@@ -168,8 +168,6 @@ fn headers_example() -> serde_json::Value {
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            // `test_generate_config` parses YAML with `serde_yaml` directly, which rejects the
-            // map form of `targets` entries that Vector's config loading accepts.
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             targets: vec![],
             interval: default_interval(),
@@ -188,9 +186,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
 
 #[derive(Debug, snafu::Snafu)]
 enum ConfigError {
-    #[snafu(display(
-        "exactly one of `endpoints` or `targets` must be specified (\"endpoints\" is deprecated, prefer \"targets\")"
-    ))]
+    #[snafu(display("exactly one of `endpoints` or `targets` must be specified"))]
     EndpointsAndTargetsConflict,
     #[snafu(display("at least one endpoint or target must be specified"))]
     NoEndpointsOrTargets,
@@ -203,11 +199,6 @@ enum ConfigError {
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         warn_if_interval_too_low(self.timeout, self.interval);
-        if !self.endpoints.is_empty() {
-            warn!(
-                message = "DEPRECATED: The `endpoints` option of the `prometheus_scrape` source is deprecated. Use `targets` with a `static` block instead. See https://vector.dev/deprecations/ for migration instructions."
-            );
-        }
 
         // Collect static URLs
         let mut static_urls: Vec<Uri> = Vec::new();
@@ -638,7 +629,7 @@ mod validation_tests {
             }],
         ));
         assert!(errors.iter().any(|error| {
-            error == "Source prometheus exactly one of `endpoints` or `targets` must be specified (\"endpoints\" is deprecated, prefer \"targets\")"
+            error == "Source prometheus exactly one of `endpoints` or `targets` must be specified"
         }));
     }
 
