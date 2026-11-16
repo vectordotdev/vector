@@ -4,6 +4,7 @@ use tokio::io::AsyncBufRead;
 use crate::constants::ZSTD_MAGIC;
 
 // Zstd skippable frames dont' start with ZSTD_MAGIC. We check for them separately.
+#[must_use]
 pub fn is_zstd_header(header: &[u8]) -> bool {
     header.starts_with(ZSTD_MAGIC) || matches!(header, [0x50..=0x5f, 0x2a, 0x4d, 0x18, ..])
 }
