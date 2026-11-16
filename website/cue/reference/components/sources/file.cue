@@ -121,10 +121,9 @@ components: sources: file: {
 			title: "Compressed Files"
 			body: """
 				Vector will transparently detect files which have been compressed
-				using Gzip and decompress them for reading. This detection process
-				looks for the unique sequence of bytes in the Gzip header and does
-				not rely on the compressed files adhering to any kind of naming
-				convention.
+				using Gzip or Zstd and decompress them for reading. Vector detecs
+                compression using file signitures. Vector does not use the file's name
+                to detect compression.
 
 				One caveat with reading compressed files is that Vector is not able
 				to efficiently seek into them. Rather than implement a
