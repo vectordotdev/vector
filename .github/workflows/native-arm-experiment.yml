@@ -170,9 +170,11 @@ jobs:
         run: |
           # This older image is a compatibility test, never a build environment.
           PLATFORM=linux/arm/v7
+          IMAGE=debian:bullseye-slim
           if [[ "$TARGET" == arm-unknown-linux-gnueabi ]]; then
-            # Debian publishes its soft-float ARM userspace as ARMv5.
+            # The archived soft-float userspace is an ARMv5 runtime test only.
             PLATFORM=linux/arm/v5
+            IMAGE=debian/eol:bullseye-slim@sha256:46972b1ffd9f151253e39d75e179428419ab3ea7697c4519578a2aaecd0672b3
           fi
           NAME="native-gnu-compat-$GITHUB_RUN_ID"
           trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
@@ -180,9 +182,9 @@ jobs:
             -v "$PWD/target/$TARGET/release/vector:/usr/local/bin/vector:ro"
             -v "$PWD/tests/data/native-release-smoke.yaml:/smoke.yaml:ro"
             --entrypoint /usr/local/bin/vector)
-          timeout -k 10 90 docker run "${ARGS[@]}" debian:bullseye-slim --version
+          timeout -k 10 90 docker run "${ARGS[@]}" "$IMAGE" --version
           printf 'native packaging works\n' | timeout -k 10 90 docker run -i "${ARGS[@]}" \
-            debian:bullseye-slim --config /smoke.yaml > "$RUNNER_TEMP/gnu-compat.json"
+            "$IMAGE" --config /smoke.yaml > "$RUNNER_TEMP/gnu-compat.json"
           grep -F '"message":"NATIVE PACKAGING WORKS"' "$RUNNER_TEMP/gnu-compat.json"
       - name: Load Docker build results for runtime tests
         if: endsWith(github.event.review.body, '-release')

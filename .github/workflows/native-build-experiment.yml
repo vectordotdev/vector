@@ -55,6 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           # v0.61.0 used the same pinned GNU ARM cross images as this branch.
           gh api 'repos/vectordotdev/vector/contents/Makefile?ref=v0.61.0' \
             --jq .content | base64 --decode > "$RUNNER_TEMP/legacy-Makefile"
@@ -65,8 +66,8 @@ jobs:
             mkdir -p "$directory"
             gh release download v0.61.0 --repo vectordotdev/vector \
               --pattern "vector-0.61.0-$target.tar.gz" --dir "$directory"
-            tar -xzf "$directory/vector-0.61.0-$target.tar.gz" -C "$directory" \
-              --strip-components=2 --wildcards '*/bin/vector'
+            tar -xOzf "$directory/vector-0.61.0-$target.tar.gz" \
+              --wildcards '*/bin/vector' > "$directory/vector"
             legacy_glibc=$(readelf --version-info "$directory/vector" \
               | grep -oE 'GLIBC_[0-9.]+' | sort -V | tail -n 1)
             echo "$target: legacy $legacy_glibc; replacement ceiling GLIBC_2.17"
