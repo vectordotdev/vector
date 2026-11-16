@@ -19,9 +19,9 @@ pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
     GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
     InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
-    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
-    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
+    MsgPackDeserializer, MsgPackDeserializerConfig, NativeDeserializer, NativeDeserializerConfig,
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
+    ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
@@ -324,6 +324,14 @@ pub enum DeserializerConfig {
         avro: AvroDeserializerOptions,
     },
 
+    /// Decodes the raw bytes as an [MessagePack][messagepack] message.
+    ///
+    /// Stream-based `socket` sources (`tcp` and `unix_stream` modes) require an explicit
+    /// `framing` method, such as `length_delimited`.
+    ///
+    /// [messagepack]: https://msgpack.org/
+    MessagePack,
+
     /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
@@ -403,6 +411,9 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
             DeserializerConfig::Influxdb(config) => Ok(Deserializer::Influxdb(config.build())),
             DeserializerConfig::Vrl(config) => Ok(Deserializer::Vrl(config.build()?)),
+            DeserializerConfig::MessagePack => {
+                Ok(Deserializer::MessagePack(MsgPackDeserializer::new()))
+            }
         }
     }
 
@@ -431,6 +442,7 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
                 CharacterDelimitedDecoderConfig::new(AsciiChar::new('\0')),
             ),
+            DeserializerConfig::MessagePack => FramingConfig::Bytes,
         }
     }
 
@@ -472,6 +484,7 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => config.output_type(),
             DeserializerConfig::Vrl(config) => config.output_type(),
             DeserializerConfig::Influxdb(config) => config.output_type(),
+            DeserializerConfig::MessagePack => MsgPackDeserializerConfig.output_type(),
         }
     }
 
@@ -495,6 +508,9 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Influxdb(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Vrl(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::MessagePack => {
+                MsgPackDeserializerConfig.schema_definition(log_namespace)
+            }
         }
     }
 
@@ -542,6 +558,7 @@ impl DeserializerConfig {
             ) => "text/plain",
             #[cfg(feature = "syslog")]
             (DeserializerConfig::Syslog(_), _) => "text/plain",
+            (DeserializerConfig::MessagePack, _) => "application/msgpack",
         }
     }
 }
@@ -572,6 +589,8 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `MsgPackDeserializer` for deserialization.
+    MessagePack(MsgPackDeserializer),
     /// Uses a `InfluxdbDeserializer` for deserialization.
     Influxdb(InfluxdbDeserializer),
     /// Uses a `VrlDeserializer` for deserialization.
@@ -611,6 +630,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::MessagePack(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }

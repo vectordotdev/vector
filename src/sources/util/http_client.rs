@@ -14,7 +14,7 @@
 use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
-use futures_util::{FutureExt, StreamExt, stream};
+use futures_util::{FutureExt, Stream, StreamExt, stream, stream::BoxStream};
 use http::{
     HeaderMap, Request, StatusCode, Uri,
     header::{ACCEPT, CONTENT_TYPE, HeaderName, HeaderValue},
@@ -186,153 +186,77 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     }
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
+/// Options that apply to every request a source sends.
+pub(crate) struct RequestOptions {
+    /// Client that sends every request of the source.
+    pub client: HttpClient,
+    pub method: HttpMethod,
+    /// Timeout for each request, including reading the response body.
+    pub timeout: Duration,
+    /// Map of Header+Value to apply to each request.
+    pub headers: HeaderMap<HeaderValue>,
+    /// Content type of the request, determined by the source.
+    pub content_type: String,
+    pub auth: Option<Auth>,
+}
+
 /// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
 pub(crate) async fn call<
     B: HttpClientBuilder<Context = C> + Send + Clone,
-    C: HttpClientContext + Send,
+    C: HttpClientContext + Send + 'static,
 >(
     inputs: GenericHttpClientInputs,
     context_builder: B,
-    mut out: SourceSender,
+    out: SourceSender,
     http_method: HttpMethod,
 ) -> vector_lib::source_sender::SendResult {
-    let client = inputs.client;
-    let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
-        .take_until(inputs.shutdown)
-        .map(move |_| stream::iter(inputs.urls.clone()))
-        .flatten()
-        .map(move |base_url| {
-            let client = client.clone();
-            let endpoint = base_url.to_string();
+    let GenericHttpClientInputs {
+        urls,
+        interval,
+        timeout,
+        headers,
+        content_type,
+        auth,
+        client,
+        shutdown,
+    } = inputs;
+    let requests = IntervalStream::new(tokio::time::interval(interval))
+        .take_until(shutdown)
+        .flat_map(move |_| stream::iter(urls.clone()))
+        .map(move |url| {
+            let context = context_builder.build(&url);
+            (url, context)
+        });
+    let options = RequestOptions {
+        client,
+        method: http_method,
+        timeout,
+        headers,
+        content_type,
+        auth,
+    };
+    run(requests, options, out).await
+}
 
-            let context_builder = context_builder.clone();
-            let mut context = context_builder.build(&base_url);
-
-            // Check if we need to process the URL dynamically (for updating VRL expressions)
-            let url = context.process_url(&base_url).unwrap_or(base_url);
-
-            let mut builder = match http_method {
-                HttpMethod::Head => Request::head(&url),
-                HttpMethod::Get => Request::get(&url),
-                HttpMethod::Post => Request::post(&url),
-                HttpMethod::Put => Request::put(&url),
-                HttpMethod::Patch => Request::patch(&url),
-                HttpMethod::Delete => Request::delete(&url),
-                HttpMethod::Options => Request::options(&url),
-            };
-
-            // add user specified headers
-            for (header, value) in &inputs.headers {
-                builder = builder.header(header, value);
-            }
-
-            // set ACCEPT header if not user specified
-            if !inputs.headers.contains_key(ACCEPT) {
-                builder = builder.header(ACCEPT, &inputs.content_type);
-            }
-
-            // Get the request body from the context (if any)
-            let body = match context.get_request_body() {
-                Some(body_str) => {
-                    // Set Content-Type header if not already set
-                    if !inputs.headers.contains_key(CONTENT_TYPE) {
-                        builder = builder.header(CONTENT_TYPE, "application/json");
-                    }
-                    full_body(body_str.into())
-                }
-                None => empty_body(),
-            };
-
-            // building the request should be infallible
-            let mut request = builder.body(body).expect("error creating request");
-
-            if let Some(auth) = &inputs.auth {
-                auth.apply(&mut request);
-            }
-
-            // The timeout covers reading the body too, so a stalled body can't hang the request.
-            let fetch = async move {
-                let response = client.send(request).await?;
-                let (header, body) = response.into_parts();
-                let body = body.collect().await?.to_bytes();
-                Ok::<_, crate::Error>((header, body))
-            };
-            tokio::time::timeout(inputs.timeout, fetch)
-                .map(move |result| match result {
-                    Ok(Ok((header, body))) => {
-                        emit(EndpointBytesReceived {
-                            byte_size: body.len(),
-                            protocol: "http",
-                            endpoint: endpoint.as_str(),
-                        });
-                        Ok((header, body))
-                    }
-                    Ok(Err(error)) => Err(error),
-                    Err(_) => Err(format!(
-                        "Timeout error: request exceeded {}s",
-                        inputs.timeout.as_secs_f64()
-                    )
-                    .into()),
-                })
-                .into_stream()
-                .filter_map(move |response| {
-                    ready(match response {
-                        Ok((header, body)) if header.status == StatusCode::OK => {
-                            context.on_response(&url, &header, &body).map(|mut events| {
-                                let byte_size = if events.is_empty() {
-                                    // We need to explicitly set the byte size
-                                    // to 0 since
-                                    // `estimated_json_encoded_size_of` returns
-                                    // at least 1 for an empty collection. For
-                                    // the purposes of the
-                                    // HttpClientEventsReceived event, we should
-                                    // emit 0 when there aren't any usable
-                                    // metrics.
-                                    JsonSize::zero()
-                                } else {
-                                    events.estimated_json_encoded_size_of()
-                                };
-
-                                emit(HttpClientEventsReceived {
-                                    byte_size,
-                                    count: events.len(),
-                                    url: url.to_string(),
-                                });
-
-                                // We'll enrich after receiving the events so
-                                // that the byte sizes are accurate.
-                                context.enrich_events(&mut events);
-
-                                stream::iter(events)
-                            })
-                        }
-                        Ok((header, _)) => {
-                            context.on_http_response_error(&url, &header);
-                            emit(HttpClientHttpResponseError {
-                                code: header.status,
-                                url: url.to_string(),
-                            });
-                            None
-                        }
-                        Err(error) => {
-                            emit(HttpClientHttpError {
-                                error,
-                                url: url.to_string(),
-                            });
-                            None
-                        }
-                    })
-                })
-                .flatten()
-                .boxed()
-        })
+/// Sends every request in `requests` and forwards the events that each request's context
+/// produces.
+///
+/// Requests run concurrently, and each request's events are sent as soon as it finishes. The
+/// caller decides when to send which requests: `call` sends a fixed list of URLs at an interval.
+pub(crate) async fn run<S, C>(
+    requests: S,
+    options: RequestOptions,
+    mut out: SourceSender,
+) -> vector_lib::source_sender::SendResult
+where
+    S: Stream<Item = (Uri, C)> + Send,
+    C: HttpClientContext + Send + 'static,
+{
+    let mut stream = requests
+        .map(move |(url, context)| send_request(&options, url, context))
         .flatten_unordered(None)
         .boxed();
 
@@ -349,9 +273,204 @@ pub(crate) async fn call<
     }
 }
 
+/// Sends one request and returns the events that `context` produces from the response.
+fn send_request<C: HttpClientContext + Send + 'static>(
+    options: &RequestOptions,
+    base_url: Uri,
+    mut context: C,
+) -> BoxStream<'static, Event> {
+    let client = options.client.clone();
+    let timeout = options.timeout;
+    let endpoint = base_url.to_string();
+
+    // Check if we need to process the URL dynamically (for updating VRL expressions)
+    let url = context.process_url(&base_url).unwrap_or(base_url);
+
+    let mut builder = match options.method {
+        HttpMethod::Head => Request::head(&url),
+        HttpMethod::Get => Request::get(&url),
+        HttpMethod::Post => Request::post(&url),
+        HttpMethod::Put => Request::put(&url),
+        HttpMethod::Patch => Request::patch(&url),
+        HttpMethod::Delete => Request::delete(&url),
+        HttpMethod::Options => Request::options(&url),
+    };
+
+    // add user specified headers
+    for (header, value) in &options.headers {
+        builder = builder.header(header, value);
+    }
+
+    // set ACCEPT header if not user specified
+    if !options.headers.contains_key(ACCEPT) {
+        builder = builder.header(ACCEPT, &options.content_type);
+    }
+
+    // Get the request body from the context (if any)
+    let body = match context.get_request_body() {
+        Some(body_str) => {
+            // Set Content-Type header if not already set
+            if !options.headers.contains_key(CONTENT_TYPE) {
+                builder = builder.header(CONTENT_TYPE, "application/json");
+            }
+            full_body(body_str.into())
+        }
+        None => empty_body(),
+    };
+
+    // building the request should be infallible
+    let mut request = builder.body(body).expect("error creating request");
+
+    if let Some(auth) = &options.auth {
+        auth.apply(&mut request);
+    }
+
+    // The timeout covers reading the body too, so a stalled body can't hang the request.
+    let fetch = async move {
+        let response = client.send(request).await?;
+        let (header, body) = response.into_parts();
+        let body = body.collect().await?.to_bytes();
+        Ok::<_, crate::Error>((header, body))
+    };
+    tokio::time::timeout(timeout, fetch)
+        .map(move |result| match result {
+            Ok(Ok((header, body))) => {
+                emit(EndpointBytesReceived {
+                    byte_size: body.len(),
+                    protocol: "http",
+                    endpoint: endpoint.as_str(),
+                });
+                Ok((header, body))
+            }
+            Ok(Err(error)) => Err(error),
+            Err(_) => {
+                Err(format!("Timeout error: request exceeded {}s", timeout.as_secs_f64()).into())
+            }
+        })
+        .into_stream()
+        .filter_map(move |response| {
+            ready(match response {
+                Ok((header, body)) if header.status == StatusCode::OK => {
+                    context.on_response(&url, &header, &body).map(|mut events| {
+                        let byte_size = if events.is_empty() {
+                            // We need to explicitly set the byte size
+                            // to 0 since
+                            // `estimated_json_encoded_size_of` returns
+                            // at least 1 for an empty collection. For
+                            // the purposes of the
+                            // HttpClientEventsReceived event, we should
+                            // emit 0 when there aren't any usable
+                            // metrics.
+                            JsonSize::zero()
+                        } else {
+                            events.estimated_json_encoded_size_of()
+                        };
+
+                        emit(HttpClientEventsReceived {
+                            byte_size,
+                            count: events.len(),
+                            url: url.to_string(),
+                        });
+
+                        // We'll enrich after receiving the events so
+                        // that the byte sizes are accurate.
+                        context.enrich_events(&mut events);
+
+                        stream::iter(events)
+                    })
+                }
+                Ok((header, _)) => {
+                    context.on_http_response_error(&url, &header);
+                    emit(HttpClientHttpResponseError {
+                        code: header.status,
+                        url: url.to_string(),
+                    });
+                    None
+                }
+                Err(error) => {
+                    emit(HttpClientHttpError {
+                        error,
+                        url: url.to_string(),
+                    });
+                    None
+                }
+            })
+        })
+        .flatten()
+        .boxed()
+}
+
 #[cfg(test)]
 mod tests {
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
     use super::*;
+    use crate::{
+        config::ProxyConfig,
+        test_util::http::{always_200_response, spawn_blackhole_http_server},
+        tls::MaybeTlsSettings,
+    };
+
+    struct LabelContext {
+        label: &'static str,
+    }
+
+    impl HttpClientContext for LabelContext {
+        fn on_response(&mut self, url: &Uri, _: &Parts, _: &Bytes) -> Option<Vec<Event>> {
+            let mut log = LogEvent::default();
+            log.insert(event_path!("label"), self.label);
+            log.insert(event_path!("path"), url.path().to_owned());
+            Some(vec![log.into()])
+        }
+    }
+
+    #[tokio::test]
+    async fn run_uses_each_request_context() {
+        let base = spawn_blackhole_http_server(always_200_response).await;
+        let request = |path: &str, label| {
+            let url: Uri = format!("{base}{path}").parse().unwrap();
+            (url, LabelContext { label })
+        };
+        let requests = stream::iter([request("a", "first"), request("b", "second")]);
+        let options = RequestOptions {
+            client: HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default()).unwrap(),
+            method: HttpMethod::Get,
+            timeout: Duration::from_secs(1),
+            headers: HeaderMap::new(),
+            content_type: "text/plain".to_owned(),
+            auth: None,
+        };
+
+        let (out, rx) = SourceSender::new_test();
+        tokio::time::timeout(Duration::from_secs(5), run(requests, options, out))
+            .await
+            .expect("run should finish once the request stream ends")
+            .unwrap();
+
+        let mut seen: Vec<(String, String)> = rx
+            .map(|event| {
+                let log = event.into_log();
+                let label = log.get(event_path!("label")).unwrap();
+                let path = log.get(event_path!("path")).unwrap();
+                (
+                    label.to_string_lossy().into_owned(),
+                    path.to_string_lossy().into_owned(),
+                )
+            })
+            .collect()
+            .await;
+        seen.sort();
+
+        // Each event's label must come from the context sent with its URL.
+        assert_eq!(
+            seen,
+            [
+                ("first".to_owned(), "/a".to_owned()),
+                ("second".to_owned(), "/b".to_owned()),
+            ]
+        );
+    }
 
     #[test]
     fn headers_are_normalized_and_sensitive() {
