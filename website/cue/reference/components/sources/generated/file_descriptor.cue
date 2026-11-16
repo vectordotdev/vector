@@ -7,7 +7,7 @@ generated: components: sources: file_descriptor: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::117ef30e93edb408973ffc00"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::ecaf68519ebaccc332a7868a"]
 	}
 	fd: {
 		description: "The file descriptor number to read from."
