@@ -48,7 +48,8 @@ jobs:
           FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
           RUN dpkg --add-architecture armel && apt-get update \
             && apt-get install -y --no-install-recommends \
-              bash gdb-multiarch procps libc6:armel libgcc-s1:armel zlib1g:armel \
+              bash gdb-multiarch procps libc6:armel libgcc-s1:armel \
+              libatomic1:armel zlib1g:armel \
             && rm -rf /var/lib/apt/lists/*
           WORKDIR /work
           DOCKERFILE
@@ -72,11 +73,15 @@ jobs:
                   -ex "info registers" -p "$pid" >"$prefix.gdb.txt" 2>&1 || true
                 kill -KILL "$pid" 2>/dev/null || true
               fi
-              wait "$pid" || true
+              status=0
+              wait "$pid" || status=$?
               for log in "$prefix".*.txt; do
                 printf "\n--- %s ---\n" "$log"
                 tail -n 200 "$log"
               done
+              if [ "$status" != 0 ] && [ "$status" != 137 ]; then
+                exit "$status"
+              fi
             '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
