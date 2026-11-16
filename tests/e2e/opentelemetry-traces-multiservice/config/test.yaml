@@ -1,6 +1,8 @@
 features:
   - e2e-tests-opentelemetry
   - typed-trace
+  - sources-vector
+  - sinks-vector
 
 test: e2e
 test_filter: "opentelemetry::multiservice_traces::"
@@ -12,6 +14,7 @@ runner:
 matrix:
   collector_version: ["0.159.0"]
   ingress_exporter: ["otlphttp", "otlp"] # HTTP and gRPC into Vector, respectively.
+  pipeline: ["direct", "buffer-hop"]
 
 # Freeze both Collector captures before Rust validation starts.
 lifecycle:
@@ -28,12 +31,18 @@ lifecycle:
     - stop:
         services: [otel-collector]
         timeout_secs: 30
-    # Keep the destination alive until Vector has flushed and exited, including any late
+    # Drain A before B, keeping the destination alive for both, including any late
     # duplicate batches that the Rust comparison must be able to detect.
+    # The receiver is idle in the direct environment.
     - stop:
         services: [vector]
         # Longer than Vector's default 60-second graceful shutdown limit.
         timeout_secs: 120
+        reject_log_messages: ["Failed to gracefully shut down in time"]
+    - stop:
+        services: [vector-receiver]
+        timeout_secs: 120
+        reject_log_messages: ["Failed to gracefully shut down in time"]
     - run: { service: drain-check, timeout_secs: 180 }
     - stop:
         services: [otel-collector-sink]

@@ -19,9 +19,21 @@ services:
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
     depends_on:
+      - vector-receiver
+    volumes:
+      - ../data/vector-${CONFIG_PIPELINE}.yaml:/etc/vector/vector.yaml:ro
+      - vector_buffer:/var/lib/vector
+
+  # Idle in direct mode; keeping it present gives both environments the same lifecycle.
+  vector-receiver:
+    image: ${CONFIG_VECTOR_IMAGE}
+    command: ["vector", "--config", "/etc/vector/vector.yaml"]
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+    depends_on:
       - fakeintake-vector
     volumes:
-      - ../data/vector.yaml:/etc/vector/vector.yaml:ro
+      - ../data/vector-receiver.yaml:/etc/vector/vector.yaml:ro
 
   datadog-agent:
     image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
@@ -108,6 +120,7 @@ services:
         condition: service_healthy
 
 volumes:
+  vector_buffer:
   datadog_traces_evidence:
     external: true
 

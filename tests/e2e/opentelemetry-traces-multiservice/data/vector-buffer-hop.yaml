@@ -1,0 +1,22 @@
+data_dir: /var/lib/vector
+
+sources:
+  otel:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+    use_otlp_decoding: true
+
+sinks:
+  forward:
+    inputs: [otel.traces]
+    type: vector
+    address: http://vector-receiver:6000
+    buffer:
+      type: disk
+      # Minimum capacity with the default 128 MiB data files.
+      max_size: 268435488
+    batch:
+      timeout_secs: 1
