@@ -599,7 +599,7 @@ mod test {
                 }
             }
             for v in partitions.values() {
-                assert!(v.is_empty());
+                assert_eq!(v.as_slice(), &[] as &[u64]);
             }
         }
     }

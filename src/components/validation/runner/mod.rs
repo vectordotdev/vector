@@ -161,6 +161,7 @@ impl RunnerResults {
         &self.outputs
     }
 
+    #[must_use]
     pub fn validator_results(&self) -> &[Result<Vec<String>, Vec<String>>] {
         &self.validator_results
     }

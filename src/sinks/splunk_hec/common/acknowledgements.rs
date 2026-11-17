@@ -384,7 +384,7 @@ mod tests {
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
         let ack_request_body = ack_client.get_ack_query_body();
-        assert!(ack_request_body.acks.is_empty());
+        assert_eq!(ack_request_body.acks, [] as [u64; 0]);
     }
 
     #[tokio::test]

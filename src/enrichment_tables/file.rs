@@ -239,6 +239,10 @@ impl FileConfig {
 }
 
 impl EnrichmentTableConfig for FileConfig {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,

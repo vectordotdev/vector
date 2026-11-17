@@ -75,7 +75,7 @@ impl DatadogEventsConfig {
             endpoint,
             default_api_key: dd_common.default_api_key.clone(),
         };
-        let service = HttpService::new(client, request_builder).with_response_decompression();
+        let service = HttpService::new(client, request_builder);
 
         let request_settings = validated.request_settings.clone();
         let retry_logic = http_response_retry_logic(self.retry_strategy.clone());
