@@ -44,6 +44,12 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
+const TIMESTAMP: &str = "timestamp";
+const HOST: &str = "host";
+const APP_NAME: &str = "app_name";
+const PROC_ID: &str = "proc_id";
+const QUERY_PARAMETERS: &str = "query_parameters";
+
 /// Configuration for `heroku_logs` source.
 #[configurable_component(source(
     "heroku_logs",
@@ -102,9 +108,9 @@ impl LogplexConfig {
             .with_source_metadata(
                 LogplexConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
@@ -112,21 +118,21 @@ impl LogplexConfig {
                     .host_key()
                     .cloned()
                     .map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes(),
-                Some("host"),
+                Some(HOST),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("app_name"))),
-                &owned_value_path!("app_name"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(APP_NAME))),
+                &owned_value_path!(APP_NAME),
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("proc_id"))),
-                &owned_value_path!("proc_id"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(PROC_ID))),
+                &owned_value_path!(PROC_ID),
                 Kind::bytes(),
                 None,
             )
@@ -134,7 +140,7 @@ impl LogplexConfig {
             .with_source_metadata(
                 LogplexConfig::NAME,
                 None,
-                &owned_value_path!("query_parameters"),
+                &owned_value_path!(QUERY_PARAMETERS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
@@ -358,8 +364,8 @@ fn line_to_events(
         buffer.put(message.as_bytes());
 
         let legacy_host_key = log_schema().host_key().cloned();
-        let legacy_app_key = parse_value_path("app_name").ok();
-        let legacy_proc_key = parse_value_path("proc_id").ok();
+        let legacy_app_key = parse_value_path(APP_NAME).ok();
+        let legacy_proc_key = parse_value_path(PROC_ID).ok();
 
         loop {
             match decoder.decode_eof(&mut buffer) {
@@ -370,7 +376,7 @@ fn line_to_events(
                                 log_namespace.insert_vector_metadata(
                                     log,
                                     log_schema().timestamp_key(),
-                                    path!("timestamp"),
+                                    path!(TIMESTAMP),
                                     ts,
                                 );
                             }
@@ -379,7 +385,7 @@ fn line_to_events(
                                 LogplexConfig::NAME,
                                 log,
                                 legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("host"),
+                                path!(HOST),
                                 hostname.to_owned(),
                             );
 
@@ -387,7 +393,7 @@ fn line_to_events(
                                 LogplexConfig::NAME,
                                 log,
                                 legacy_app_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("app_name"),
+                                path!(APP_NAME),
                                 app_name.to_owned(),
                             );
 
@@ -395,7 +401,7 @@ fn line_to_events(
                                 LogplexConfig::NAME,
                                 log,
                                 legacy_proc_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("proc_id"),
+                                path!(PROC_ID),
                                 proc_id.to_owned(),
                             );
                         }
@@ -448,7 +454,7 @@ mod tests {
     };
     use vrl::value::{Kind, kind::Collection};
 
-    use super::LogplexConfig;
+    use super::{APP_NAME, HOST, LogplexConfig, PROC_ID, QUERY_PARAMETERS, TIMESTAMP};
     use crate::{
         SourceSender,
         common::http::server_auth::HttpServerAuthConfig,
@@ -759,27 +765,27 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(LogplexConfig::NAME, "timestamp"),
+                    &owned_value_path!(LogplexConfig::NAME, TIMESTAMP),
                     Kind::timestamp().or_undefined(),
-                    Some("timestamp"),
+                    Some(TIMESTAMP),
                 )
                 .with_metadata_field(
-                    &owned_value_path!(LogplexConfig::NAME, "host"),
+                    &owned_value_path!(LogplexConfig::NAME, HOST),
                     Kind::bytes(),
-                    Some("host"),
+                    Some(HOST),
                 )
                 .with_metadata_field(
-                    &owned_value_path!(LogplexConfig::NAME, "app_name"),
+                    &owned_value_path!(LogplexConfig::NAME, APP_NAME),
                     Kind::bytes(),
                     Some("service"),
                 )
                 .with_metadata_field(
-                    &owned_value_path!(LogplexConfig::NAME, "proc_id"),
+                    &owned_value_path!(LogplexConfig::NAME, PROC_ID),
                     Kind::bytes(),
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(LogplexConfig::NAME, "query_parameters"),
+                    &owned_value_path!(LogplexConfig::NAME, QUERY_PARAMETERS),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 );
@@ -806,14 +812,10 @@ mod tests {
             Some("message"),
         )
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
-        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
-        .with_event_field(
-            &owned_value_path!("app_name"),
-            Kind::bytes(),
-            Some("service"),
-        )
-        .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), Some(HOST))
+        .with_event_field(&owned_value_path!(APP_NAME), Kind::bytes(), Some("service"))
+        .with_event_field(&owned_value_path!(PROC_ID), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition));
