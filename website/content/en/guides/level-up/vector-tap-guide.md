@@ -218,7 +218,7 @@ payload from our source has been included in the default `message` field. Right,
 we forgot to parse the payload into JSON. We need to add the following line in
 our VRL source code:
 
-```coffeescript
+```vrl
 . = parse_json!(.message)
 ```
 
