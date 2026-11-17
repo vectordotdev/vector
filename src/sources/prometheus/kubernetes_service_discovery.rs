@@ -34,6 +34,7 @@ use crate::{
     internal_events::{
         PrometheusKubernetesServiceDiscoveryAnnotationParseError,
         PrometheusKubernetesServiceDiscoveryTargetsDiscovered,
+        PrometheusKubernetesServiceDiscoveryWatcherError,
     },
     sources::util::http_client::try_build_url,
 };
@@ -523,10 +524,9 @@ impl PodDiscovery {
                 reflector::reflector(writer, stream)
                     .for_each(|result| async move {
                         if let Err(error) = result {
-                            warn!(
-                                message = "Watcher stream received an error. Retrying.",
-                                ?error
-                            );
+                            emit(PrometheusKubernetesServiceDiscoveryWatcherError {
+                                error: &error,
+                            });
                         }
                     })
                     .in_current_span(),
@@ -1059,6 +1059,56 @@ mod tests {
         // with them their in-flight requests.
         drop(discovery);
         wait_for(|| open.load(Ordering::SeqCst) == 0).await;
+    }
+
+    #[tokio::test]
+    async fn watcher_errors_are_counted_and_retried() {
+        use crate::test_util::components::{COMPONENT_ERROR_TAGS, assert_source_error};
+
+        const FORBIDDEN: &str = r#"{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"Forbidden","code":403}"#;
+        const POD_LIST: &str = r#"{"kind":"PodList","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[{"metadata":{"name":"p","namespace":"ns","annotations":{"prometheus.io/scrape":"true","prometheus.io/port":"9100"}},"spec":{"containers":[{"name":"c"}]},"status":{"phase":"Running","podIP":"10.0.0.1"}}]}"#;
+
+        // The first list is forbidden, the retried one succeeds, and the watch that follows
+        // never returns.
+        let lists = Arc::new(AtomicUsize::new(0));
+        let service = {
+            let lists = Arc::clone(&lists);
+            tower::service_fn(move |request: http::Request<kube::client::Body>| {
+                let is_watch = request
+                    .uri()
+                    .query()
+                    .is_some_and(|q| q.contains("watch=true"));
+                let first_list = !is_watch && lists.fetch_add(1, Ordering::SeqCst) == 0;
+                async move {
+                    if is_watch {
+                        std::future::pending::<()>().await;
+                    }
+                    let (status, body) = if first_list {
+                        (http::StatusCode::FORBIDDEN, FORBIDDEN)
+                    } else {
+                        (http::StatusCode::OK, POD_LIST)
+                    };
+                    Ok::<_, std::convert::Infallible>(
+                        http::Response::builder()
+                            .status(status)
+                            .header(http::header::CONTENT_TYPE, "application/json")
+                            .body(http_body_util::Full::new(bytes::Bytes::from(body)))
+                            .unwrap(),
+                    )
+                }
+            })
+        };
+        let client = Client::new(service, "default");
+
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let discovery = PodDiscovery::start(&client, &[], None, None, default_cfg());
+            wait_for(|| !discovery.targets(&QueryParameters::default()).is_empty()).await;
+            assert_eq!(lists.load(Ordering::SeqCst), 2);
+            let targets = discovery.targets(&QueryParameters::default());
+            assert_eq!(targets.len(), 1, "{targets:?}");
+            assert_eq!(targets[0].uri, "http://10.0.0.1:9100/metrics");
+        })
+        .await;
     }
 
     #[tokio::test]

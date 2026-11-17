@@ -135,3 +135,27 @@ impl InternalEvent for PrometheusKubernetesServiceDiscoveryAnnotationParseError<
         .increment(1);
     }
 }
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesServiceDiscoveryWatcherError<'a> {
+    pub error: &'a kube::runtime::watcher::Error,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryWatcherError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Kubernetes Pod watcher received an error. Retrying.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
