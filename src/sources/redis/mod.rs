@@ -1,6 +1,7 @@
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -14,10 +15,10 @@ use vector_lib::{
     },
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::{Kind, Value};
+use vrl::value::Kind;
 
 use crate::{
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -25,6 +26,8 @@ use crate::{
 
 mod channel;
 mod list;
+
+const KEY: &str = "key";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -162,10 +165,10 @@ impl SourceConfig for RedisSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let bytes_received = register!(BytesReceived::from(Protocol::from(
-            connection_info.protocol
+        let bytes_received = register(BytesReceived::from(Protocol::from(
+            connection_info.protocol,
         )));
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let handler = InputHandler {
             client,
             bytes_received: bytes_received.clone(),
@@ -201,7 +204,7 @@ impl SourceConfig for RedisSourceConfig {
             .with_source_metadata(
                 Self::NAME,
                 redis_key_path,
-                &owned_value_path!("key"),
+                &owned_value_path!(KEY),
                 Kind::bytes(),
                 None,
             )
@@ -245,16 +248,9 @@ impl InputHandler {
 
                     let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
-                            self.log_namespace.insert_vector_metadata(
+                            self.log_namespace.insert_standard_vector_source_metadata(
                                 log,
-                                log_schema().source_type_key(),
-                                path!("source_type"),
-                                Value::from_static_str(RedisSourceConfig::NAME),
-                            );
-                            self.log_namespace.insert_vector_metadata(
-                                log,
-                                log_schema().timestamp_key(),
-                                path!("ingest_timestamp"),
+                                RedisSourceConfig::NAME,
                                 now,
                             );
 
@@ -262,7 +258,7 @@ impl InputHandler {
                                 RedisSourceConfig::NAME,
                                 log,
                                 self.redis_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("key"),
+                                path!(KEY),
                                 self.key.as_str(),
                             );
                         }
@@ -271,7 +267,7 @@ impl InputHandler {
                     });
 
                     if (self.cx.out.send_batch(events).await).is_err() {
-                        emit!(StreamClosedError { count });
+                        emit(StreamClosedError { count });
                         return Err(());
                     }
                 }

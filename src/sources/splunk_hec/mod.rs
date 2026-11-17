@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
@@ -502,7 +503,7 @@ impl SplunkSource {
             idx_ack,
             store_hec_token: config.store_hec_token,
             log_namespace,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             event_decoder,
             raw_decoder,
         }
@@ -570,7 +571,7 @@ impl SplunkSource {
                         } else {
                             (body.len(), String::from_utf8_lossy(body.as_ref()))
                         };
-                        emit!(HttpBytesReceived {
+                        emit(HttpBytesReceived {
                             byte_size,
                             http_path: path.as_str(),
                             protocol,
@@ -691,7 +692,7 @@ impl SplunkSource {
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
                     let decoder = decoder.clone();
-                    emit!(HttpBytesReceived {
+                    emit(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -1233,12 +1234,12 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     let error: vector_lib::Error = Box::new(error);
-                    emit!(
+                    emit(
                         vector_lib::codecs::internal_events::DecoderDeserializeError {
-                            error: &error
-                        }
+                            error: &error,
+                        },
                     );
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
                         reason: "Failed to serialize event field to bytes.",
                     });
@@ -1475,8 +1476,8 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(SplunkHecRequestBodyInvalidError {
-                    error: error.into()
+                emit(SplunkHecRequestBodyInvalidError {
+                    error: error.into(),
                 });
                 // The deserializer failed to parse the next envelope, so the failing
                 // envelope's index is the count of envelopes already processed (not
@@ -1760,7 +1761,7 @@ fn raw_event(
             Ok(data) if data.is_empty() => return Err(ApiError::NoData.into()),
             Ok(data) => Bytes::from(data),
             Err(error) => {
-                emit!(SplunkHecRequestBodyInvalidError { error });
+                emit(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -2008,7 +2009,7 @@ fn response_plain(code: StatusCode, msg: &'static str) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHecRequestError { error });
+        emit(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
                 response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)

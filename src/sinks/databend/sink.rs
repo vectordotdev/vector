@@ -3,6 +3,7 @@ use super::{
     service::{DatabendRetryLogic, DatabendService},
 };
 use crate::sinks::prelude::*;
+use vector_lib::internal_event::emit;
 
 pub(super) struct DatabendSink {
     batch_settings: BatcherSettings,
@@ -33,7 +34,7 @@ impl DatabendSink {
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

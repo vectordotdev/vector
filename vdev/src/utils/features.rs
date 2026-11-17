@@ -65,6 +65,8 @@ const KAFKA_GSSAPI_KEYS: &[&str] = &["sasl.mechanism", "sasl.mechanisms"];
 const KAFKA_GSSAPI_VALUE: &str = "GSSAPI";
 const GSSAPI_FEATURE: &str = "gssapi";
 const GSSAPI_VENDORED_FEATURE: &str = "gssapi-vendored";
+// Builds without default features still need Vector's built-in Rustls crypto provider.
+const TLS_PROVIDER_FEATURE: &str = "tls-ring";
 const AUTH_KEY: &str = "auth";
 const STRATEGY_KEY: &str = "strategy";
 const CUSTOM_STRATEGY: &str = "custom";
@@ -136,7 +138,9 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
         .into_keys()
         .collect();
 
-    from_config(&config, &declared_features)
+    let mut features = from_config(&config, &declared_features)?;
+    features.push(TLS_PROVIDER_FEATURE.into());
+    Ok(features)
 }
 
 fn contains_yaml_merge_key(value: &serde_yaml::Value) -> bool {
@@ -343,7 +347,8 @@ mod tests {
     use std::{fs, path::Path, sync::LazyLock};
 
     use super::{
-        CargoToml, FeatureConfig, FeatureSet, from_config, kafka_gssapi_feature, load_and_extract,
+        CargoToml, FeatureConfig, FeatureSet, TLS_PROVIDER_FEATURE, from_config,
+        kafka_gssapi_feature, load_and_extract,
     };
 
     static DECLARED_FEATURES: LazyLock<FeatureSet> = LazyLock::new(|| {
@@ -697,6 +702,29 @@ mod tests {
 
         assert!(error.to_string().contains("YAML merge keys"));
         assert!(error.to_string().contains("use `cargo run` instead"));
+    }
+
+    #[test]
+    fn loaded_config_includes_tls_provider() {
+        let config = tempfile::Builder::new()
+            .suffix(".yaml")
+            .tempfile()
+            .expect("temporary config must be created");
+        fs::write(
+            config.path(),
+            indoc! {"
+                sinks:
+                  output:
+                    type: console
+            "},
+        )
+        .expect("temporary config must be written");
+
+        assert_eq!(
+            load_and_extract(config.path()).expect("feature extraction must succeed"),
+            ["sinks-console", TLS_PROVIDER_FEATURE],
+        );
+        assert!(DECLARED_FEATURES.contains(TLS_PROVIDER_FEATURE));
     }
 
     #[test]

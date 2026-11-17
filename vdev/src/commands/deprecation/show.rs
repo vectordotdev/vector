@@ -112,6 +112,16 @@ fn print_entry(e: &DeprecationEntry) {
             .to_string()
             .if_supports_color(Stdout, |t| t.bright_cyan()),
     );
+    if e.removed_in.is_none() {
+        println!(
+            "  {} {}",
+            "minimum_removal_version:".if_supports_color(Stdout, |t| t.dimmed()),
+            e.deprecated_since
+                .minimum_removal_version()
+                .to_string()
+                .if_supports_color(Stdout, |t| t.bright_cyan()),
+        );
+    }
     if !e.description.is_empty() {
         println!();
         for line in e.description.lines() {

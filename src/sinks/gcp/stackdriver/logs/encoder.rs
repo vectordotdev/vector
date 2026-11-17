@@ -1,6 +1,7 @@
 //! Encoding for the `gcp_stackdriver_logs` sink.
 
 use std::{collections::HashMap, io};
+use vector_lib::internal_event::emit;
 
 use bytes::BytesMut;
 use serde_json::{Map, json, to_vec};
@@ -61,7 +62,7 @@ impl StackdriverLogsEncoder {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(crate::internal_events::TemplateRenderingError {
+                    emit(crate::internal_events::TemplateRenderingError {
                         error,
                         field: Some("labels"),
                         drop_event: true,
@@ -75,7 +76,7 @@ impl StackdriverLogsEncoder {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(crate::internal_events::TemplateRenderingError {
+                    emit(crate::internal_events::TemplateRenderingError {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -87,7 +88,7 @@ impl StackdriverLogsEncoder {
         let log_name = self
             .log_name(&event)
             .map_err(|error| {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error,
                     field: Some("log_id"),
                     drop_event: true,

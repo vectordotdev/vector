@@ -62,6 +62,9 @@ or links to further documentation. It is rendered verbatim in the release notes.
    [deprecations page](https://vector.dev/deprecations/). Deleting the file manually would drop it from that
    section.
 
+For an exception described in the [deprecation policy](../docs/DEPRECATION_POLICY.md), add `--allow-early-removal` to
+the `enact` command. This bypasses the two-minor-version check; removal must still be in a later minor release.
+
 The website reads this directory directly (see the `module.mounts` in `website/config.toml`); there is no
 generated file to update.
 

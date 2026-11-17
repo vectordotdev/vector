@@ -8,6 +8,7 @@ use vector_lib::{
     codecs::encoding::Framer,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        register,
     },
     sink::SinkError,
 };
@@ -30,8 +31,8 @@ where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), SinkError> {
-        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("console".into())));
+        let events_sent = register(EventsSent::from(Output(None)));
         while let Some(mut event) = input.next().await {
             let event_byte_size = event.estimated_json_encoded_size_of();
             self.transformer.transform(&mut event);

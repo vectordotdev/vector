@@ -1,4 +1,5 @@
 use std::collections::{HashMap, hash_map::Entry};
+use vector_lib::internal_event::emit;
 
 use chrono::{DateTime, Utc};
 use vector_lib::event::{
@@ -39,7 +40,7 @@ impl Aggregate {
 
         // Mean/Stdev ignore absolute non-gauge values (no passthrough, no bucket).
         if Self::is_silently_ignored(self.config.mode, &data) {
-            emit!(AggregateEventRecorded);
+            emit(AggregateEventRecorded);
             return None;
         }
 
@@ -58,8 +59,8 @@ impl Aggregate {
             None => match missing_timestamp {
                 MissingTimestamp::UseSystemTime => now,
                 MissingTimestamp::Drop => {
-                    emit!(AggregateEventDropped {
-                        reason: "Event missing timestamp required for event-time aggregation."
+                    emit(AggregateEventDropped {
+                        reason: "Event missing timestamp required for event-time aggregation.",
                     });
                     return None;
                 }
@@ -74,8 +75,8 @@ impl Aggregate {
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
             let drift_ms = ts.timestamp_millis().saturating_sub(now_ms);
             if drift_ms > max_future_ms {
-                emit!(AggregateEventDropped {
-                    reason: "Event timestamp too far in the future."
+                emit(AggregateEventDropped {
+                    reason: "Event timestamp too far in the future.",
                 });
                 return None;
             }
@@ -94,7 +95,7 @@ impl Aggregate {
             if self.should_forward_late(&data) {
                 return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
-            emit!(AggregateEventDropped { reason });
+            emit(AggregateEventDropped { reason });
             return None;
         }
 
@@ -103,7 +104,7 @@ impl Aggregate {
             "only storable metrics reach event-time bucketing"
         );
         self.record_into_bucket(bucket_key, series, data, metadata);
-        emit!(AggregateEventRecorded);
+        emit(AggregateEventRecorded);
         None
     }
 
@@ -204,7 +205,7 @@ impl Aggregate {
                                     metadata,
                                 );
                             } else {
-                                emit!(AggregateUpdateFailed);
+                                emit(AggregateUpdateFailed);
                                 Self::replace_entry(entry.get_mut(), data, metadata);
                             }
                         }
@@ -309,7 +310,7 @@ impl Aggregate {
                     if updated {
                         existing.1.merge(metadata);
                     } else {
-                        emit!(AggregateUpdateFailed);
+                        emit(AggregateUpdateFailed);
                         Self::replace_entry(existing, data, metadata);
                     }
                 }
@@ -338,7 +339,7 @@ impl Aggregate {
         // kind must not gate the update or mixed-kind series get undercounted.
         existing.1.merge(metadata);
         if !existing.0.update(&count_data) {
-            emit!(AggregateUpdateFailed);
+            emit(AggregateUpdateFailed);
         }
     }
 
@@ -383,7 +384,7 @@ impl Aggregate {
                             existing.1.merge(metadata);
                         }
                     } else {
-                        emit!(AggregateUpdateFailed);
+                        emit(AggregateUpdateFailed);
                         Self::replace_entry(existing, data, metadata);
                     }
                 }
@@ -458,7 +459,7 @@ impl Aggregate {
                             && metric.data().kind == prev_entry.kind
                             && !metric.subtract(prev_entry)
                         {
-                            emit!(AggregateUpdateFailed);
+                            emit(AggregateUpdateFailed);
                         }
                         output.push(Event::Metric(metric));
                         // Retain data only — drop metadata/finalizers so
@@ -487,7 +488,7 @@ impl Aggregate {
                         let (mut final_sum, mut final_metadata) = entries.first().unwrap().clone();
                         for (data, metadata) in entries.iter().skip(1) {
                             if !final_sum.update(data) {
-                                emit!(AggregateUpdateFailed);
+                                emit(AggregateUpdateFailed);
                                 continue 'outer;
                             }
                             final_metadata.merge(metadata.clone());
@@ -544,7 +545,7 @@ impl Aggregate {
         }
 
         if !output.is_empty() {
-            emit!(AggregateFlushed);
+            emit(AggregateFlushed);
         }
     }
 }

@@ -10,7 +10,7 @@ use futures::{Stream, StreamExt};
 use vector_lib::codecs::OversizedAction;
 use vector_lib::{
     config::LogNamespace,
-    internal_event::{ComponentEventsDropped, INTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, emit},
     lookup::OwnedTargetPath,
     stream::expiration_map::{Emitter, map_with_expiration},
 };
@@ -48,7 +48,7 @@ impl PartialEventMergeState {
         if let Some(bucket) = self.buckets.get_mut(file) {
             if bucket.exceeds_max_merged_line_limit {
                 if !bucket.truncated {
-                    emit!(ComponentEventsDropped::<INTENTIONAL> {
+                    emit(ComponentEventsDropped::<INTENTIONAL> {
                         count: 1,
                         reason: "Partial event arrived after merged line exceeded max_merged_line_bytes limit.",
                     });
@@ -70,10 +70,10 @@ impl PartialEventMergeState {
                     bucket.exceeds_max_merged_line_limit = true;
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            emit!(KubernetesMergedLineTooBigError {
+                            emit(KubernetesMergedLineTooBigError {
                                 event: &Value::Bytes(new_value.clone()),
                                 configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len()
+                                encountered_size_so_far: bytes_mut.len(),
                             });
                         }
                         OversizedAction::Truncate => {
@@ -85,7 +85,7 @@ impl PartialEventMergeState {
                                 bytes_mut.truncate(max_merged_line_bytes);
                             }
                             bucket.truncated = true;
-                            emit!(KubernetesMergedLineTruncated {
+                            emit(KubernetesMergedLineTruncated {
                                 configured_limit: max_merged_line_bytes,
                                 original_size,
                             });
@@ -111,10 +111,10 @@ impl PartialEventMergeState {
                     exceeds_max_merged_line_limit = true;
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            emit!(KubernetesMergedLineTooBigError {
+                            emit(KubernetesMergedLineTooBigError {
                                 event: &Value::Bytes(event_bytes.clone()),
                                 configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len()
+                                encountered_size_so_far: bytes_mut.len(),
                             });
                         }
                         OversizedAction::Truncate => {
@@ -126,7 +126,7 @@ impl PartialEventMergeState {
                                 bytes_mut.truncate(max_merged_line_bytes);
                             }
                             truncated = true;
-                            emit!(KubernetesMergedLineTruncated {
+                            emit(KubernetesMergedLineTruncated {
                                 configured_limit: max_merged_line_bytes,
                                 original_size,
                             });

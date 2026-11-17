@@ -180,8 +180,7 @@ impl<'a> ConfigDecanter<'a> {
     fn get_payload(&self) -> String {
         self.log
             .get_message()
-            .map(|v| v.to_string_lossy().to_string())
-            .unwrap_or_default()
+            .map_or_else(String::new, |v| v.to_string_lossy().to_string())
     }
 
     fn get_facility(&self, config: &SyslogSerializerOptions) -> Facility {

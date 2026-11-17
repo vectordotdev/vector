@@ -187,8 +187,7 @@ impl TableRegistry {
         match &**self.tables.load() {
             Some(tables) => tables
                 .get(table)
-                .map(|table| table.index_fields())
-                .unwrap_or_default(),
+                .map_or_else(Vec::new, |table| table.index_fields()),
             None => Vec::new(),
         }
     }
@@ -442,7 +441,7 @@ mod tests {
         registry.finish_load();
 
         // After we finish load there are no tables in the list
-        assert!(registry.table_ids().is_empty());
+        assert_eq!(registry.table_ids(), Vec::<String>::new());
 
         let mut tables: TableMap = HashMap::new();
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
@@ -466,7 +465,7 @@ mod tests {
         registry.finish_load();
 
         // After we finish load there are no tables in the list
-        assert!(registry.table_ids().is_empty());
+        assert_eq!(registry.table_ids(), Vec::<String>::new());
 
         let mut new_data = ObjectMap::new();
         new_data.insert("thing".into(), Value::Null);

@@ -1,6 +1,7 @@
 ---
 what: "`internal_metrics_cardinality_total` counter metric"
 deprecated_since: "0.24.0"
+removed_in: "0.62.0"
 ---
 
 The `internal_metrics_cardinality_total` counter emitted by the `internal_metrics` source is

@@ -1,7 +1,7 @@
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
     internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, LossyF64,
+        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, LossyF64, emit,
     },
 };
 
@@ -32,9 +32,9 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
             counter!(CounterName::TagValueLimitExceededTotal).increment(1);
         }
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
-            reason: "Tag value limit exceeded."
+            reason: "Tag value limit exceeded.",
         });
     }
 }

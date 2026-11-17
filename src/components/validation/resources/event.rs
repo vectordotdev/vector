@@ -58,7 +58,7 @@ impl EventData {
                 for (k, v) in data {
                     log_event
                         .parse_path_and_insert(&k, v)
-                        .unwrap_or_else(|_| panic!("Unable to build log event for {}", &k));
+                        .unwrap_or_else(|_| panic!("Unable to build log event for {k}"));
                 }
                 Event::Log(log_event)
             }

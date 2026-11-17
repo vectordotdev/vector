@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use rdkafka::{ClientConfig, ClientContext, Statistics, consumer::ConsumerContext};
 use snafu::Snafu;
 use tracing::Span;
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, internal_event::emit, sensitive_string::SensitiveString,
+};
 
 use crate::{
     internal_events::KafkaStatisticsReceived,
@@ -173,7 +175,7 @@ impl ClientContext for KafkaStatisticsContext {
         // This callback get executed on a separate thread within the rdkafka library, so we need
         // to propagate the span here to attach the component tags to the emitted events.
         let _entered = self.span.enter();
-        emit!(KafkaStatisticsReceived {
+        emit(KafkaStatisticsReceived {
             statistics: &statistics,
             expose_lag_metrics: self.expose_lag_metrics,
         });

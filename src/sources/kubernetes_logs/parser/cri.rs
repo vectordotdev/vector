@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     conversion,
+    internal_event::emit,
     lookup::path,
 };
 
@@ -49,14 +50,14 @@ impl FunctionTransform for Cri {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError::<DROP_EVENT> {
-                    field: &message_path.to_string()
+                emit(ParserMissingFieldError::<DROP_EVENT> {
+                    field: &message_path.to_string(),
                 });
                 return;
             }
             Some(s) => match parse_log_line(&s) {
                 None => {
-                    emit!(ParserMatchError { value: &s[..] });
+                    emit(ParserMatchError { value: &s[..] });
                     return;
                 }
                 Some(parsed_log) => {
@@ -99,7 +100,7 @@ impl FunctionTransform for Cri {
                             );
                         }
                         Err(e) => {
-                            emit!(ParserConversionError {
+                            emit(ParserConversionError {
                                 name: TIMESTAMP_KEY,
                                 error: conversion::Error::TimestampParse {
                                     s: ds.to_string(),

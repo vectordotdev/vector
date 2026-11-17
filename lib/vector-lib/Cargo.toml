@@ -1,6 +1,6 @@
 [package]
 name = "vector-lib"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
@@ -40,3 +40,5 @@ prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["codecs/test", "vector-core/test"]
+tls-aws-lc = ["vector-core/tls-aws-lc"]
+tls-ring = ["vector-core/tls-ring"]

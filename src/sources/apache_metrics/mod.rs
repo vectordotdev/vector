@@ -8,7 +8,10 @@ use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_http::empty_body;
-use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, internal_event::emit,
+    metric_tags,
+};
 
 use crate::{
     SourceSender,
@@ -191,7 +194,7 @@ fn apache_metrics(
                             Ok((header, body)) if header.status == StatusCode::OK => {
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(EndpointBytesReceived {
+                                emit(EndpointBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,
@@ -216,7 +219,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(ApacheMetricsParseError {
+                                            emit(ApacheMetricsParseError {
                                                 error: e,
                                                 endpoint: &sanitized_url,
                                             });
@@ -225,7 +228,7 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(ApacheMetricsEventsReceived {
+                                emit(ApacheMetricsEventsReceived {
                                     byte_size: metrics.estimated_json_encoded_size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
@@ -233,7 +236,7 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(HttpClientHttpResponseError {
+                                emit(HttpClientHttpResponseError {
                                     code: header.status,
                                     url: sanitized_url.clone(),
                                 });
@@ -249,7 +252,7 @@ fn apache_metrics(
                                 ]))
                             }
                             Err(error) => {
-                                emit!(HttpClientHttpError {
+                                emit(HttpClientHttpError {
                                     error,
                                     url: sanitized_url.clone(),
                                 });
@@ -278,7 +281,7 @@ fn apache_metrics(
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Err(error)
             }
         }

@@ -9,7 +9,7 @@ use prost::Message;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::TraceLayout,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
 };
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
@@ -96,13 +96,13 @@ fn handle_dd_trace_payload(
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = ddtrace_proto::AgentPayload::decode(frame)?;
     if !decoded_payload.idx_tracer_payloads.is_empty() {
-        emit!(DatadogAgentUnsupportedTracePayloadError {
+        emit(DatadogAgentUnsupportedTracePayloadError {
             error_code: "idx_tracer_payloads",
         });
     }
     if decoded_payload.tracer_payloads.is_empty() {
         if decoded_payload.idx_tracer_payloads.is_empty() {
-            emit!(DatadogAgentUnsupportedTracePayloadError {
+            emit(DatadogAgentUnsupportedTracePayloadError {
                 error_code: "empty_tracer_payloads",
             });
         }

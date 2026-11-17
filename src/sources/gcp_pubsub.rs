@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use chrono::DateTime;
 use derivative::Derivative;
@@ -55,6 +56,9 @@ use crate::{
 
 const MIN_ACK_DEADLINE_SECS: u64 = 10;
 const MAX_ACK_DEADLINE_SECS: u64 = 600;
+const TIMESTAMP_KEY: &str = "timestamp";
+const ATTRIBUTES_KEY: &str = "attributes";
+const MESSAGE_ID_KEY: &str = "message_id";
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -313,8 +317,8 @@ impl SourceConfig for PubsubConfig {
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
-            events_received: register!(EventsReceived),
+            bytes_received: register(BytesReceived::from(protocol)),
+            events_received: register(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| {
@@ -332,22 +336,22 @@ impl SourceConfig for PubsubConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
-                &owned_value_path!("attributes"),
+                Some(LegacyKey::Overwrite(owned_value_path!(ATTRIBUTES_KEY))),
+                &owned_value_path!(ATTRIBUTES_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 PubsubConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
-                &owned_value_path!("message_id"),
+                Some(LegacyKey::Overwrite(owned_value_path!(MESSAGE_ID_KEY))),
+                &owned_value_path!(MESSAGE_ID_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -478,7 +482,7 @@ impl PubsubSource {
         let mut request = Request::new(self.request_stream(ack_ids_receiver));
         if let Some(token) = self.auth.make_token() {
             let Ok(authorization) = MetadataValue::try_from(&token) else {
-                emit!(GcpPubsubStreamingPullError {
+                emit(GcpPubsubStreamingPullError {
                     error: Status::new(
                         Code::FailedPrecondition,
                         "Invalid token text returned by GCP",
@@ -498,9 +502,9 @@ impl PubsubSource {
                 Err(error) => {
                     // The pooled transport connects on the first request, not at construction.
                     if is_connect_error(&error) {
-                        emit!(GcpPubsubConnectError { error });
+                        emit(GcpPubsubConnectError { error });
                     } else {
-                        emit!(GcpPubsubStreamingPullError { error });
+                        emit(GcpPubsubStreamingPullError { error });
                     }
                     return State::RetryDelay;
                 }
@@ -634,7 +638,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => emit(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -711,15 +715,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("message_id"))),
-                    path!("message_id"),
+                    Some(LegacyKey::Overwrite(path!(MESSAGE_ID_KEY))),
+                    path!(MESSAGE_ID_KEY),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite(path!("attributes"))),
-                    path!("attributes"),
+                    Some(LegacyKey::Overwrite(path!(ATTRIBUTES_KEY))),
+                    path!(ATTRIBUTES_KEY),
                     attributes.clone(),
                 );
             }
@@ -739,7 +743,7 @@ fn translate_error(error: tonic::Status) -> State {
         debug!("Stream reset by server.");
         State::RetryNow
     } else {
-        emit!(GcpPubsubReceiveError { error });
+        emit(GcpPubsubReceiveError { error });
         State::RetryDelay
     }
 }

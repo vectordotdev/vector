@@ -1,6 +1,7 @@
 ---
 what: "host `process_runtime` counter without the `_total` suffix"
 deprecated_since: "0.59.0"
+removed_in: "0.62.0"
 ---
 
 The `host_metrics` source now also emits the process runtime counter with the `_total` suffix, matching Vector's counter naming convention:

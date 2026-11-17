@@ -890,7 +890,7 @@ proptest! {
                     if let Some((action, sut_result)) = sequencer.get_pending_write_action() {
                         match action {
                             Action::WriteRecord(record) => {
-                                let model_result = model.write_record(record.clone());
+                                let model_result = model.write_record(record);
                                 match sut_result {
                                     // The SUT made no progress, so the model should not have made
                                     // progress either.
@@ -938,7 +938,7 @@ proptest! {
                                         made_progress = true;
                                         match sut_result {
                                             ReadActionResult::Read(result) => match result {
-                                                Ok(maybe_record) => prop_assert_eq!(model_result, Progress::RecordRead(maybe_record.clone()), "expected record read"),
+                                                Ok(maybe_record) => prop_assert_eq!(model_result, Progress::RecordRead(maybe_record), "expected record read"),
                                                 Err(e) => prop_assert_eq!(model_result, Progress::ReadError(e), "expected read error"),
                                             },
                                         }
