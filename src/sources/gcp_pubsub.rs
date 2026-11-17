@@ -512,16 +512,14 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
+        // Close the finalizer explicitly after stopping reception. Passing it the shutdown
+        // signal can discard batches queued just before shutdown instead of finalizing them.
+        let (finalizer, mut ack_stream) = Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
 
         loop {
             tokio::select! {
                 biased;
-                // The ack stream ends only after shutdown starts and the finalizer has reported
-                // every batch it tracked. Batches added after that never report, so `pending_acks`
-                // may stay above zero and must not keep the stream open.
                 receipts = ack_stream.next() => match receipts {
                     Some((status, receipts)) => {
                         pending_acks -= 1;
@@ -534,6 +532,7 @@ impl PubsubSource {
                     }
                     None => return State::Shutdown,
                 },
+                _ = &mut self.shutdown => break,
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
                         self.handle_response(
@@ -544,13 +543,12 @@ impl PubsubSource {
                             busy_flag,
                         ).await;
                     }
-                    Some(Err(error)) => break translate_error(error),
-                    None => break State::RetryNow,
+                    Some(Err(error)) => return translate_error(error),
+                    None => return State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
-                    break State::RetryNow;
+                    return State::RetryNow;
                 },
                 () = tokio::time::sleep(self.keepalive) => {
                     if pending_acks == 0 {
@@ -559,7 +557,7 @@ impl PubsubSource {
                         // one.
                         if self.concurrency.load(Ordering::Relaxed) > 1 {
                             info!("Shutting down inactive stream.");
-                            break State::Shutdown;
+                            return State::Shutdown;
                         }
                         // Otherwise, mark this stream as idle.
                         busy_flag.store(false, Ordering::Relaxed);
@@ -576,6 +574,38 @@ impl PubsubSource {
                         .await
                         .unwrap_or_else(|_| unreachable!("request stream never closes"));
                 }
+            }
+        }
+
+        Self::finish_stream(finalizer, ack_stream, ack_ids_sender, stream).await;
+        State::Shutdown
+    }
+
+    async fn finish_stream(
+        finalizer: Option<Finalizer>,
+        mut ack_stream: impl Stream<Item = (BatchStatus, Vec<String>)> + Unpin,
+        ack_ids_sender: mpsc::Sender<Vec<String>>,
+        mut stream: tonic::Streaming<proto::StreamingPullResponse>,
+    ) {
+        if let Some(finalizer) = finalizer {
+            drop(finalizer);
+            while let Some((status, receipts)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    ack_ids_sender
+                        .send(receipts)
+                        .await
+                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                }
+            }
+        }
+
+        // Half-close the request stream and wait for the RPC to finish. Dropping the response
+        // immediately can reset the HTTP/2 stream before its queued acknowledgements are sent.
+        drop(ack_ids_sender);
+        while let Some(response) = stream.next().await {
+            if let Err(error) = response {
+                emit(GcpPubsubReceiveError { error });
+                break;
             }
         }
     }
@@ -788,7 +818,8 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
+    use bytes::{Buf as _, Bytes, BytesMut};
+    use prost::Message as _;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::timeout,
@@ -1131,6 +1162,107 @@ mod tests {
         assert_shuts_down(test_config(endpoint), true, ready).await;
     }
 
+    #[rstest::rstest]
+    #[tokio::test]
+    async fn flushes_acknowledgements_on_shutdown(
+        #[values(false, true)] finalize_after_shutdown: bool,
+    ) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let (observed, acknowledgements) = tokio::sync::oneshot::channel();
+        let peer = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut connection = h2::server::handshake(socket).await.unwrap();
+            let (request, mut respond) = connection.accept().await.unwrap().unwrap();
+            tokio::spawn(async move {
+                let mut requests = request.into_body();
+                requests.data().await.unwrap().unwrap();
+                let response = http::Response::builder()
+                    .header("content-type", "application/grpc")
+                    .body(())
+                    .unwrap();
+                let mut responses = respond.send_response(response, false).unwrap();
+                let message = proto::StreamingPullResponse {
+                    received_messages: vec![proto::ReceivedMessage {
+                        ack_id: "ack-id".into(),
+                        message: Some(proto::PubsubMessage {
+                            data: b"delivered".to_vec(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+                .encode_to_vec();
+                let mut frame = vec![0];
+                frame.extend_from_slice(&u32::try_from(message.len()).unwrap().to_be_bytes());
+                frame.extend_from_slice(&message);
+                responses.send_data(frame.into(), false).unwrap();
+
+                let mut buffer = BytesMut::new();
+                let mut ack_ids = Vec::new();
+                while let Some(Ok(data)) = requests.data().await {
+                    requests
+                        .flow_control()
+                        .release_capacity(data.len())
+                        .unwrap();
+                    buffer.extend_from_slice(&data);
+                    // HTTP/2 DATA boundaries need not match gRPC message boundaries.
+                    while buffer.len() >= 5 {
+                        let length = u32::from_be_bytes(buffer[1..5].try_into().unwrap()) as usize;
+                        if buffer.len() < 5 + length {
+                            break;
+                        }
+                        let mut frame = buffer.split_to(5 + length);
+                        frame.advance(5);
+                        let request = proto::StreamingPullRequest::decode(frame).unwrap();
+                        ack_ids.extend(request.ack_ids);
+                    }
+                }
+                let mut trailers = http::HeaderMap::new();
+                trailers.insert("grpc-status", "0".parse().unwrap());
+                _ = responses.send_trailers(trailers);
+                observed.send(ack_ids).unwrap();
+            });
+            while connection.accept().await.is_some() {}
+        });
+
+        let component = crate::config::ComponentKey::from("pubsub");
+        let (out, mut events) = SourceSender::new_test();
+        let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
+        context.acknowledgements = true;
+        let source = tokio::spawn(test_config(endpoint).build(context).await.unwrap());
+        let mut event = timeout(Duration::from_secs(10), events.next())
+            .await
+            .unwrap()
+            .unwrap();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        let shutdown_complete =
+            finalize_after_shutdown.then(|| shutdown.shutdown_source(&component, deadline));
+        if finalize_after_shutdown {
+            tokio::task::yield_now().await;
+            assert!(!source.is_finished(), "Shutdown must wait for finalization");
+        }
+        event
+            .metadata_mut()
+            .update_status(crate::event::EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+
+        let shutdown_complete =
+            shutdown_complete.unwrap_or_else(|| shutdown.shutdown_source(&component, deadline));
+        assert!(shutdown_complete.await);
+        source.await.unwrap().unwrap();
+        assert_eq!(
+            timeout(Duration::from_secs(10), acknowledgements)
+                .await
+                .unwrap()
+                .unwrap(),
+            ["ack-id"]
+        );
+        peer.abort();
+    }
+
     #[tokio::test]
     async fn connection_setup_and_retry_wait_shut_down() {
         for fail_connection in [false, true] {
@@ -1213,8 +1345,8 @@ mod tests {
             .unwrap();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(&component, deadline);
-        // Release the output only after shutdown starts. A source blocked in `send_batch` then adds
-        // its batch to a finalizer that has stopped. The source drops its output once it stops.
+        // Release the output only after shutdown starts. The source must finish sending and
+        // finalizing the buffered batches before dropping its output and completing shutdown.
         drop(first);
         timeout(Duration::from_secs(20), async {
             while batches.next().await.is_some() {}
@@ -1226,20 +1358,20 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "gcp-integration-tests"))]
+#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
-    use std::{
-        collections::{BTreeMap, HashSet},
-        sync::LazyLock,
-    };
+    use std::{collections::BTreeMap, sync::LazyLock};
 
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
-    use http::{Method, Request, StatusCode};
+    use http::{Method, Request, StatusCode, header::CONTENT_TYPE};
     use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
-    use tokio::time::{Duration, Instant};
+    use tokio::{
+        task::JoinHandle,
+        time::{Duration, Instant, timeout},
+    };
     use vrl::{btreemap, event_path};
 
     use super::*;
@@ -1260,26 +1392,27 @@ mod integration_tests {
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
         LazyLock::new(|| format!("{}/v1/projects/{PROJECT}", *gcp::PUBSUB_ADDRESS));
-    static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
+    // Minimum custom deadline allowed by Pub/Sub.
+    const ACK_DEADLINE: Duration = Duration::from_secs(10);
+    const TEST_TIMEOUT: Duration = Duration::from_secs(30);
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
+    #[rstest::rstest]
     #[tokio::test]
-    async fn oneshot() {
+    async fn oneshot(#[values(false, true)] acknowledgements: bool) {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, acknowledgements).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
-            receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown).await;
+            receive_events(&mut rx, &test_data).await;
+            tester.shutdown(shutdown).await;
         })
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_before_data_received() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, true).await;
 
-        tester.shutdown(shutdown).await; // Not shutdown_check because this emits nothing
+        tester.shutdown(shutdown).await;
 
         assert!(rx.next().await.is_none());
         tester.send_test_events(1, BTreeMap::new()).await;
@@ -1287,95 +1420,60 @@ mod integration_tests {
         assert_eq!(tester.pull_count(1).await, 1);
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_after_data_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, true).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
-            receive_events(&mut rx, test_data).await;
+            receive_events(&mut rx, &test_data).await;
 
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown(shutdown).await;
 
             assert!(rx.next().await.is_none());
             tester.send_test_events(1, BTreeMap::new()).await;
             assert!(rx.next().await.is_none());
-            // The following assert is there to test that the source isn't
-            // pulling anything out of the subscription after it reports
-            // shutdown. It works when there wasn't anything previously in
-            // the topic, but does not work here despite evidence that the
-            // entire tokio task has exited.
-            // assert_eq!(tester.pull_count(1).await, 1);
+            assert_eq!(tester.pull_count(1).await, 1);
         })
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn streams_data() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, true).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
-                receive_events(&mut rx, test_data).await;
+                receive_events(&mut rx, &test_data).await;
             }
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown(shutdown).await;
         })
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn sends_attributes() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, true).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
                 random_string(8) => random_string(88),
                 random_string(8) => random_string(88),
             ];
             let test_data = tester.send_test_events(1, attributes).await;
-            receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown).await;
+            receive_events(&mut rx, &test_data).await;
+            tester.shutdown(shutdown).await;
         })
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn acks_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered, true).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
-            receive_events(&mut rx, test_data).await;
-
-            tester.shutdown_check(shutdown).await;
-
-            // Make sure there are no messages left in the queue
-            assert_eq!(tester.pull_count(10).await, 0);
-
-            // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
-
-            // All messages are still acknowledged
-            assert_eq!(tester.pull_count(10).await, 0);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    // I have verified manually that the streaming code above omits the
-    // acknowledgements when events are rejected, but have been unable
-    // to verify the events are not acknowledged through the emulator.
-    #[ignore = "The emulator does not reliably expose missing acknowledgements for rejected events"]
-    async fn does_not_ack_rejected() {
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
-
-            let test_data = tester.send_test_events(1, BTreeMap::new()).await;
-            receive_events(&mut rx, test_data).await;
+            receive_events(&mut rx, &test_data).await;
 
             tester.shutdown(shutdown).await;
 
@@ -1383,28 +1481,71 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
+            tokio::time::sleep(ACK_DEADLINE + Duration::from_secs(2)).await;
 
-            // All messages are still in the queue
-            assert_eq!(tester.pull_count(10).await, 1);
+            // All messages are still acknowledged
+            assert_eq!(tester.pull_count(10).await, 0);
+        })
+        .await;
+    }
+
+    #[rstest::rstest]
+    #[case::rejected(EventStatus::Rejected)]
+    #[case::errored(EventStatus::Errored)]
+    #[tokio::test]
+    async fn does_not_ack_unsuccessful_events(#[case] status: EventStatus) {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(status, true).await;
+
+            let test_data = tester.send_test_events(1, BTreeMap::new()).await;
+            receive_events(&mut rx, &test_data).await;
+
+            tester.shutdown(shutdown).await;
+
+            // Poll with an independent consumer: redelivery is asynchronous, and it must be
+            // the original message rather than an unrelated message with the same count.
+            let messages = timeout(ACK_DEADLINE + TEST_TIMEOUT, async {
+                loop {
+                    let messages = tester.pull_messages(1).await;
+                    if !messages.is_empty() {
+                        break messages;
+                    }
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+            })
+            .await
+            .expect("Unacknowledged message was not redelivered");
+            assert_eq!(messages.len(), 1);
+            let (id, line) = test_data.messages.first_key_value().unwrap();
+            assert_eq!(messages[0]["message"]["messageId"], *id);
+            assert_eq!(messages[0]["message"]["data"], BASE64_STANDARD.encode(line));
         })
         .await;
     }
 
     async fn setup(
         status: EventStatus,
-    ) -> (
-        Tester,
-        impl Stream<Item = Event> + Unpin,
-        shutdown::SourceShutdownCoordinator,
-    ) {
+        acknowledgements: bool,
+    ) -> (Tester, impl Stream<Item = Event> + Unpin, RunningSource) {
         components::init_test();
+
+        // Compose starts the emulator process without waiting for its listening socket.
+        let endpoint: Uri = gcp::PUBSUB_ADDRESS.parse().unwrap();
+        let address = endpoint.authority().unwrap().as_str().to_owned();
+        test_util::wait_for_duration(
+            move || {
+                let address = address.clone();
+                async move { tokio::net::TcpStream::connect(address).await.is_ok() }
+            },
+            TEST_TIMEOUT,
+        )
+        .await;
 
         let tls_settings = TlsSettings::from_options(None).unwrap();
         let client = HttpClient::new(tls_settings.into(), &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
-        let (rx, shutdown) = tester.spawn_source(status).await;
+        let (rx, shutdown) = tester.spawn_source(status, acknowledgements).await;
 
         (tester, rx, shutdown)
     }
@@ -1423,9 +1564,14 @@ mod integration_tests {
     }
 
     struct TestData {
-        lines: Vec<String>,
+        messages: BTreeMap<String, String>,
         start: DateTime<Utc>,
         attributes: BTreeMap<String, String>,
+    }
+
+    struct RunningSource {
+        shutdown: shutdown::SourceShutdownCoordinator,
+        task: JoinHandle<()>,
     }
 
     impl Tester {
@@ -1441,7 +1587,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{PROJECT}/topics/{}", this.topic),
-                "ackDeadlineSeconds": *ACK_DEADLINE,
+                "ackDeadlineSeconds": ACK_DEADLINE.as_secs(),
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -1451,10 +1597,8 @@ mod integration_tests {
         async fn spawn_source(
             &self,
             status: EventStatus,
-        ) -> (
-            impl Stream<Item = Event> + Unpin + use<>,
-            shutdown::SourceShutdownCoordinator,
-        ) {
+            acknowledgements: bool,
+        ) -> (impl Stream<Item = Event> + Unpin + use<>, RunningSource) {
             let (tx, rx) = SourceSender::new_test_finalize(status);
             let config = PubsubConfig {
                 project: PROJECT.into(),
@@ -1464,15 +1608,15 @@ mod integration_tests {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: *ACK_DEADLINE,
+                ack_deadline_secs: ACK_DEADLINE,
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
-            ctx.acknowledgements = true;
+            ctx.acknowledgements = acknowledgements;
             let source = config.build(ctx).await.expect("Failed to build source");
-            tokio::spawn(async move { source.await.expect("Failed to run source") });
+            let task = tokio::spawn(async move { source.await.expect("Failed to run source") });
 
-            (rx, shutdown)
+            (rx, RunningSource { shutdown, task })
         }
 
         async fn send_test_events(
@@ -1488,17 +1632,29 @@ mod integration_tests {
                 .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
                 .collect();
             let body = json!({ "messages": messages });
-            self.request(Method::POST, "topics/{topic}:publish", body)
+            let response = self
+                .request(Method::POST, "topics/{topic}:publish", body)
                 .await;
+            let ids = response["messageIds"].as_array().unwrap();
+            assert_eq!(ids.len(), lines.len());
+            let messages = ids
+                .iter()
+                .zip(lines)
+                .map(|(id, line)| (id.as_str().unwrap().to_owned(), line))
+                .collect();
 
             TestData {
-                lines,
+                messages,
                 start,
                 attributes,
             }
         }
 
         async fn pull_count(&self, count: usize) -> usize {
+            self.pull_messages(count).await.len()
+        }
+
+        async fn pull_messages(&self, count: usize) -> Vec<Value> {
             let response = self
                 .request(
                     Method::POST,
@@ -1508,7 +1664,7 @@ mod integration_tests {
                 .await;
             response
                 .get("receivedMessages")
-                .map_or(0, |rm| rm.as_array().unwrap().len())
+                .map_or_else(Vec::new, |messages| messages.as_array().unwrap().clone())
         }
 
         async fn request(&self, method: Method, base: &str, body: Value) -> Value {
@@ -1518,48 +1674,61 @@ mod integration_tests {
             let uri = [PROJECT_URI.as_str(), &path].join("/");
             let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
             let request = Request::builder()
-                .method(method)
-                .uri(uri)
+                .method(method.clone())
+                .uri(&uri)
+                .header(CONTENT_TYPE, "application/json")
                 .body(vector_http::full_body(body))
                 .unwrap();
-            let response = self.client.send(request).await.unwrap();
-            assert_eq!(response.status(), StatusCode::OK);
-            let body = response.into_body().collect().await.unwrap().to_bytes();
-            serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
+            timeout(TEST_TIMEOUT, async {
+                let response = self.client.send(request).await.unwrap();
+                let status = response.status();
+                let body = response.into_body().collect().await.unwrap().to_bytes();
+                assert_eq!(
+                    status,
+                    StatusCode::OK,
+                    "{method} {uri}: {}",
+                    String::from_utf8_lossy(&body)
+                );
+                serde_json::from_slice(&body).unwrap()
+            })
+            .await
+            .expect("Emulator request timed out")
         }
 
-        async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {
-            self.shutdown(shutdown).await;
-            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
-        }
-
-        async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
-            let deadline = Instant::now() + Duration::from_secs(1);
-            let shutdown = shutdown.shutdown_source(&self.component, deadline);
-            assert!(shutdown.await);
+        async fn shutdown(&self, mut source: RunningSource) {
+            let deadline = Instant::now() + TEST_TIMEOUT;
+            assert!(
+                source
+                    .shutdown
+                    .shutdown_source(&self.component, deadline)
+                    .await
+            );
+            timeout(TEST_TIMEOUT, source.task).await.unwrap().unwrap();
         }
     }
 
-    async fn receive_events(rx: &mut (impl Stream<Item = Event> + Unpin), test_data: TestData) {
-        let TestData {
-            start,
-            lines,
-            attributes,
-        } = test_data;
-
-        let events: Vec<Event> = tokio::time::timeout(
-            Duration::from_secs(1),
-            test_util::collect_n_stream(rx, lines.len()),
+    async fn receive_events(rx: &mut (impl Stream<Item = Event> + Unpin), test_data: &TestData) {
+        let events: Vec<Event> = timeout(
+            TEST_TIMEOUT,
+            test_util::collect_n_stream(rx, test_data.messages.len()),
         )
         .await
         .unwrap();
 
         let end = Utc::now();
-        let mut message_ids = HashSet::new();
+        let mut messages = test_data.messages.clone();
 
-        assert_eq!(events.len(), lines.len());
-        for (message, event) in lines.into_iter().zip(events) {
+        assert_eq!(events.len(), messages.len());
+        for event in events {
             let log = event.into_log();
+            // Pub/Sub does not guarantee delivery order without ordering keys.
+            let id = log
+                .get(event_path!("message_id"))
+                .unwrap()
+                .to_string_lossy();
+            let message = messages
+                .remove(id.as_ref())
+                .expect("Unexpected or duplicate message ID");
             assert_eq!(log.get(event_path!("message")), Some(&message.into()));
             assert_eq!(
                 log.get(event_path!("source_type")),
@@ -1570,7 +1739,7 @@ mod integration_tests {
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
-                    >= &start
+                    >= &test_data.start
             );
             assert!(
                 log.get(event_path!("timestamp"))
@@ -1579,26 +1748,18 @@ mod integration_tests {
                     .unwrap()
                     <= &end
             );
-            assert!(
-                message_ids.insert(
-                    log.get(event_path!("message_id"))
-                        .unwrap()
-                        .clone()
-                        .to_string()
-                ),
-                "Message contained duplicate message_id"
-            );
             let logattr = log
                 .get(event_path!("attributes"))
                 .expect("missing attributes")
                 .as_object()
                 .unwrap()
                 .clone();
-            assert_eq!(logattr.len(), attributes.len());
-            for (a, b) in logattr.into_iter().zip(&attributes) {
+            assert_eq!(logattr.len(), test_data.attributes.len());
+            for (a, b) in logattr.into_iter().zip(&test_data.attributes) {
                 assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }
+        assert!(messages.is_empty(), "Published messages were not received");
     }
 }
