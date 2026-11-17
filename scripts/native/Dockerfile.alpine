@@ -18,7 +18,10 @@ RUN curl --retry 5 -fsSL "https://static.rust-lang.org/rustup/dist/${RUST_HOST}/
         --default-host "${RUST_HOST}" --default-toolchain "${RUST_VERSION}" \
         --target "${RUST_TARGET}" \
     && rm /tmp/rustup-init
+ARG INSTALL_CLIPPY=false
+RUN if [ "${INSTALL_CLIPPY}" = true ]; then rustup component add clippy; fi
 
 ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
+RUN git config --global --add safe.directory /work
 WORKDIR /work

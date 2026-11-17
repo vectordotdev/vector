@@ -40,10 +40,26 @@ jobs:
           git diff --exit-code
           make check-actionlint
           make check-markdown
-      - name: Check patched libraries with Clippy
+      - name: Check native builder and patched libraries with Clippy
         run: |
+          cargo clippy --locked --package vdev --all-targets
           cargo clippy --manifest-path lib/vendored/protoc-bin-vendored/Cargo.toml --lib --test protoc_override
           cargo clippy --manifest-path lib/vendored/quanta/Cargo.toml --lib
+      - name: Test native builder command plans and safety checks
+        run: cargo test --locked --package vdev commands::build::linux::tests
+      - name: Check retained Make aliases without compiling Vector
+        run: |
+          for target in \
+            x86_64-unknown-linux-gnu x86_64-unknown-linux-musl \
+            aarch64-unknown-linux-gnu aarch64-unknown-linux-musl \
+            armv7-unknown-linux-gnueabihf armv7-unknown-linux-musleabihf \
+            arm-unknown-linux-gnueabi arm-unknown-linux-musleabi; do
+            output=$(make --silent --no-print-directory CONTAINER_TOOL=docker NATIVE_VDEV=echo \
+              PROFILE=release NATIVE_VERIFY=true "cross-build-$target")
+            test "$output" = "build linux $target --command build --profile release --container-tool docker --verify"
+            output=$(make --silent --no-print-directory CONTAINER_TOOL=docker NATIVE_VDEV=echo "cross-image-$target")
+            test "$output" = "build linux $target --container-tool docker --image-only"
+          done
       - name: Test patched libraries
         env:
           CARGO_TARGET_DIR: target/native-patches
@@ -56,22 +72,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # v0.61.0 used the same pinned GNU ARM cross images as this branch.
-          gh api 'repos/vectordotdev/vector/contents/Makefile?ref=v0.61.0' \
+          # Keep the measured historical baseline independent of active builders.
+          baseline=tests/data/native-release-gnu-abi-baseline.json
+          release=$(jq -er .release "$baseline")
+          version=${release#v}
+          gh api "repos/vectordotdev/vector/contents/Makefile?ref=$release" \
             --jq .content | base64 --decode > "$RUNNER_TEMP/legacy-Makefile"
-          for target in arm-unknown-linux-gnueabi armv7-unknown-linux-gnueabihf; do
+          for target in $(jq -r '.targets | keys[]' "$baseline"); do
+            digest=$(jq -er --arg target "$target" '.targets[$target].legacy_cross_digest' "$baseline")
+            expected=$(jq -er --arg target "$target" '.targets[$target].maximum_glibc' "$baseline")
+            ceiling=$(jq -er --arg target "$target" '.targets[$target].replacement_ceiling' "$baseline")
+            test "$ceiling" = GLIBC_2.17
             key="CROSS_DIGEST_$target"
-            test "$(grep "^$key " Makefile)" = "$(grep "^$key " "$RUNNER_TEMP/legacy-Makefile")"
+            test "$(awk -v key="$key" '$1 == key { print $3 }' "$RUNNER_TEMP/legacy-Makefile")" = "$digest"
             directory="$RUNNER_TEMP/legacy-$target"
             mkdir -p "$directory"
-            gh release download v0.61.0 --repo vectordotdev/vector \
-              --pattern "vector-0.61.0-$target.tar.gz" --dir "$directory"
-            tar -xOzf "$directory/vector-0.61.0-$target.tar.gz" \
+            gh release download "$release" --repo vectordotdev/vector \
+              --pattern "vector-$version-$target.tar.gz" --dir "$directory"
+            tar -xOzf "$directory/vector-$version-$target.tar.gz" \
               --wildcards '*/bin/vector' > "$directory/vector"
             legacy_glibc=$(readelf --version-info "$directory/vector" \
               | grep -oE 'GLIBC_[0-9.]+' | sort -V | tail -n 1)
-            echo "$target: legacy $legacy_glibc; replacement ceiling GLIBC_2.17"
-            test "$(printf '%s\n' "$legacy_glibc" GLIBC_2.17 | sort -V | tail -n 1)" = "$legacy_glibc"
+            echo "$target: legacy $legacy_glibc; replacement ceiling $ceiling"
+            test "$legacy_glibc" = "$expected"
+            test "$(printf '%s\n' "$legacy_glibc" "$ceiling" | sort -V | tail -n 1)" = "$legacy_glibc"
           done
       - name: Check license output
         run: |

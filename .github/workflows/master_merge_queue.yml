@@ -102,7 +102,7 @@ jobs:
     secrets: inherit
 
   cross-linux:
-    # We run cross checks when dependencies change to ensure they still build.
+    # Link all Linux targets when dependencies or native build tooling change.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.cross-yml == 'true' }}
     uses: ./.github/workflows/cross.yml

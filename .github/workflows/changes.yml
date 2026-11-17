@@ -234,7 +234,8 @@ jobs:
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
               - 'Makefile'
-              - 'scripts/cross/**'
+              - 'scripts/native/**'
+              - 'vdev/src/commands/build/linux.rs'
               - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             deny:
@@ -352,6 +353,15 @@ jobs:
             cross-yml:
               - ".github/workflows/cross.yml"
               - ".github/workflows/changes.yml"
+              - ".github/actions/build-linux-native/**"
+              - ".github/actions/prepare-armv6-runtime/**"
+              - ".github/actions/setup/**"
+              - "scripts/native/**"
+              - "scripts/environment/install-protoc.sh"
+              - "vdev/src/commands/build/linux.rs"
+              - "vdev/src/commands/build/mod.rs"
+              - "tests/data/native-release-*"
+              - "tests/data/native-release-toolchain-probe/**"
             unit_mac-yml:
               - ".github/workflows/unit_mac.yml"
               - ".github/workflows/changes.yml"

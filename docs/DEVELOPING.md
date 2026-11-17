@@ -71,7 +71,8 @@ bash scripts/environment/prepare.sh
 ```
 
 This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
-For cross-compilation alone, run `bash scripts/environment/prepare.sh --modules=cross` before using the Make targets.
+For Linux container builds, use `cargo vdev build linux <target>` or `make native-build-<target>`.
+See [Linux container builds](native-linux-builds.md) for host requirements, compatibility checks, and the retained `cross-*` Make aliases.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -563,7 +564,7 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
-- `cross` - `bash scripts/environment/prepare.sh --modules=cross`
+- The repository's Rust toolchain for the [Linux container builder](native-linux-builds.md)
 - [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that

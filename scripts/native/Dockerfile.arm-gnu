@@ -32,10 +32,14 @@ RUN set -eu; \
     fi
 
 # Verify and install upstream Rust archives without relying on rustup at runtime.
+ARG INSTALL_CLIPPY=false
 RUN set -eux; \
     cd /tmp; \
     set -- "rustc-${RUST_VERSION}-${RUST_HOST}" \
       "cargo-${RUST_VERSION}-${RUST_HOST}" "rust-std-${RUST_VERSION}-${RUST_HOST}"; \
+    if [ "${INSTALL_CLIPPY}" = true ]; then \
+      set -- "$@" "clippy-${RUST_VERSION}-${RUST_HOST}"; \
+    fi; \
     if [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
       case "${RUST_TARGET}" in \
         *-gnueabi|*-gnueabihf) set -- "$@" "rust-std-${RUST_VERSION}-${RUST_TARGET}" ;; \
@@ -90,4 +94,5 @@ ENV CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc \
     PKG_CONFIG_LIBDIR_armv7_unknown_linux_gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig
 ENV PROTOC=/usr/bin/protoc
 ENV CARGO_INCREMENTAL=0
+RUN git config --global --add safe.directory /work
 WORKDIR /work

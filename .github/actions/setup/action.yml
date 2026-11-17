@@ -19,7 +19,7 @@ inputs:
   mold:
     required: false
     default: true
-    description: "Install mold linker and configure a rustc wrapper to speed up linking. Avoid enabling with cross."
+    description: "Install mold linker and configure a rustc wrapper for host builds."
 
   # prepare.sh - standalone and system dependencies
   protoc:
@@ -60,10 +60,6 @@ inputs:
     required: false
     default: false
     description: "Install cargo-deb."
-  cross:
-    required: false
-    default: false
-    description: "Install cross for cross-compiling Rust."
   cargo-nextest:
     required: false
     default: false
@@ -131,7 +127,6 @@ runs:
         for val in "$mold" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
-                   "${{ inputs.cross }}" \
                    "${{ inputs.cargo-nextest }}" \
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
@@ -169,9 +164,8 @@ runs:
         CARGO_OVERRIDE_DIR="${HOME}/.cargo"
         CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 
-        # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
-        # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
-        # and all of that.
+        # This wrapper applies only to host Cargo builds. The native Linux
+        # builder does not copy host Cargo configuration into its containers.
 
         # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
         # anything linking calls to use `mold` instead of `ld`, etc.
@@ -197,7 +191,6 @@ runs:
       with:
         path: |
           ~/.cargo/bin/cargo-deb
-          ~/.cargo/bin/cross
           ~/.cargo/bin/cargo-nextest
           ~/.cargo/bin/cargo-deny
           ~/.cargo/bin/cargo-msrv
@@ -232,7 +225,6 @@ runs:
         [[ "${{ inputs.rpm }}" == "true" ]] && mods+=("rpm")
         [[ "${{ inputs.lcov }}" == "true" ]] && mods+=("lcov")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
-        [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
         [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
         [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
