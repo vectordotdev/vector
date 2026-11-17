@@ -262,7 +262,7 @@ impl Cli {
                 .args(["readelf", "--version-info", &binary])
                 .check_output()?;
             if !target.musl() {
-                check_glibc(&versions, (2, 17, 0))?;
+                verify_glibc(&versions, (2, 17, 0))?;
             }
             self.run(target)
                 .args(["timeout", "-k", "10", "90", &binary])
@@ -519,7 +519,7 @@ impl Cli {
                 "musl artifact must not have dynamic dependencies"
             );
         } else {
-            check_glibc(
+            verify_glibc(
                 &versions,
                 if target.arm32() {
                     (2, 17, 0)
@@ -559,7 +559,7 @@ impl Cli {
     }
 }
 
-fn check_glibc(output: &str, ceiling: (u64, u64, u64)) -> Result<()> {
+fn check_glibc(output: &str, ceiling: (u64, u64, u64)) -> Result<(u64, u64, u64)> {
     let pattern = Regex::new(r"GLIBC_([0-9]+)\.([0-9]+)(?:\.([0-9]+))?")?;
     let mut maximum: Option<(u64, u64, u64)> = None;
     for capture in pattern.captures_iter(output) {
@@ -575,6 +575,11 @@ fn check_glibc(output: &str, ceiling: (u64, u64, u64)) -> Result<()> {
         maximum <= ceiling,
         "GNU artifact requires GLIBC_{maximum:?}, above {ceiling:?}"
     );
+    Ok(maximum)
+}
+
+fn verify_glibc(output: &str, ceiling: (u64, u64, u64)) -> Result<()> {
+    let maximum = check_glibc(output, ceiling)?;
     info!(
         "Maximum GNU symbol requirement: GLIBC_{}.{}.{}",
         maximum.0, maximum.1, maximum.2
@@ -695,7 +700,10 @@ mod tests {
 
     #[test]
     fn gnu_symbol_ceiling_is_numeric_and_fails_closed() {
-        assert!(check_glibc("GLIBC_2.4 GLIBC_2.9 GLIBC_2.17", (2, 17, 0)).is_ok());
+        assert_eq!(
+            check_glibc("GLIBC_2.4 GLIBC_2.9 GLIBC_2.17", (2, 17, 0)).unwrap(),
+            (2, 17, 0)
+        );
         assert!(check_glibc("GLIBC_2.34", (2, 17, 0)).is_err());
         assert!(check_glibc("GLIBC_2.17.1", (2, 17, 0)).is_err());
         assert!(check_glibc("no version information", (2, 17, 0)).is_err());
