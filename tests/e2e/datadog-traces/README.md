@@ -120,7 +120,6 @@ by the Agent. The workload stays small and deterministic because:
 ## Running
 
 ```shell
-unset DOCKER_HOST
 cargo vdev e2e run datadog-traces
 ```
 

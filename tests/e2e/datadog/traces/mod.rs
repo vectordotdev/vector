@@ -147,8 +147,9 @@ fn compare(input: &[AgentPayload], output: &[AgentPayload]) -> Vec<String> {
                     .collect::<Vec<_>>()
             };
             // Contextual diff puts changed fields first, rather than truncating a full
-            // expected record before the actual value can appear in CI logs.
-            Some(format!(
+            // expected record before the actual value can appear in CI logs. Strip styling
+            // so terminal color settings cannot affect assertions or the evidence files.
+            Some(strip_ansi_escapes::strip_str(format!(
                 "trace={:016x} span={:016x}\n{}",
                 key.0,
                 key.1,
@@ -158,7 +159,7 @@ fn compare(input: &[AgentPayload], output: &[AgentPayload]) -> Vec<String> {
                     "expected",
                     "actual",
                 ),
-            ))
+            )))
         })
         .collect()
 }
@@ -673,8 +674,11 @@ mod tests {
         let mut changed = input.clone();
         changed[0].tracer_payloads[0].chunks[0].spans[0].name = "changed".into();
         let error = validate_captures(directory.path(), &input, &changed).unwrap_err();
+        assert!(!error.contains('\u{1b}'), "{error:?}");
         assert!(error.contains("1 differing span identities"), "{error}");
         assert!(error.contains("name: \"changed\""), "{error}");
+        let differences = fs::read_to_string(directory.path().join("differences.txt")).unwrap();
+        assert!(!differences.contains('\u{1b}'), "{differences:?}");
 
         let mut indexed = input.clone();
         indexed[0]
