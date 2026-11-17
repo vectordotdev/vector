@@ -87,6 +87,9 @@ pub struct GcpCredentialsConfig {
     /// is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
     /// service if running on a GCE instance.
     ///
+    /// Token requests for these credentials do not use the component's `proxy` settings. To send them
+    /// through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
+    ///
     /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
     /// [gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
     pub credentials_path: Option<String>,
@@ -153,6 +156,9 @@ pub struct GcpAuthConfig {
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
     /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// Token requests for these credentials do not use the component's `proxy` settings. To send them
+    /// through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
     ///
     /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
     /// [gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
@@ -420,12 +426,36 @@ impl From<Token> for FetchedToken {
 }
 
 /// `google-cloud-auth` errors leave the underlying reason (e.g. the STS response) out of their
-/// `Display`, so include the whole source chain.
+/// `Display`, so include the whole source chain, with embedded payloads redacted.
 fn error_chain(error: &dyn std::error::Error) -> String {
     std::iter::successors(Some(error), |error| error.source())
-        .map(ToString::to_string)
+        .map(|error| redact_body(&error.to_string()))
         .collect::<Vec<_>>()
         .join(": ")
+}
+
+/// SDK messages embed raw payloads as `body=<...>`, which can be a subject token file. Keep only
+/// the fields of an OAuth error response (e.g. from STS) and redact anything else.
+fn redact_body(message: &str) -> String {
+    let Some((head, rest)) = message.split_once("body=<") else {
+        return message.to_owned();
+    };
+    // Run to the last `>` so nothing from the payload survives past the redaction.
+    let (body, tail) = rest.rsplit_once('>').unwrap_or((rest, ""));
+    let body = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .filter(|json| json.get("error").is_some())
+        .map_or_else(
+            || "redacted".to_owned(),
+            |json| {
+                serde_json::json!({
+                    "error": json["error"],
+                    "error_description": json["error_description"],
+                })
+                .to_string()
+            },
+        );
+    format!("{head}body=<{body}>{tail}")
 }
 
 /// Returns the parsed credentials file if it holds Workload Identity Federation
@@ -678,6 +708,33 @@ mod tests {
             .expect("should recover once STS accepts the subject token");
 
         assert_eq!(token.header, "Bearer sts-token");
+    }
+
+    #[tokio::test]
+    async fn external_account_errors_do_not_leak_subject_token() {
+        let mut token_file = NamedTempFile::new().unwrap();
+        write!(token_file, r#"{{"id_token":"{SUBJECT_TOKEN}"}}"#).unwrap();
+        let creds = serde_json::json!({
+            "type": "external_account",
+            "audience": "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/pool/providers/provider",
+            "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+            "token_url": "http://127.0.0.1:1/v1/token",
+            "credential_source": {
+                "file": token_file.path().to_str().unwrap(),
+                // Typo: the SDK can't find the field and reports the file contents.
+                "format": { "type": "json", "subject_token_field_name": "id_token_typo" },
+            },
+        });
+        let mut creds_file = NamedTempFile::new().unwrap();
+        write!(creds_file, "{creds}").unwrap();
+
+        let error = build_auth_from_file(&creds_file)
+            .await
+            .expect_err("build should fail to read the subject token");
+
+        let message = error.to_string();
+        assert!(message.contains("id_token_typo"), "{message}");
+        assert!(!message.contains(SUBJECT_TOKEN), "{message}");
     }
 
     const SUBJECT_TOKEN: &str = "oidc-subject-token";

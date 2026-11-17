@@ -166,6 +166,9 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
 			service if running on a GCE instance.
 
+			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
+
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			[gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
 			"""
