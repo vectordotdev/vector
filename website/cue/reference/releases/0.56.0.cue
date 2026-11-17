@@ -441,7 +441,7 @@ releases: "0.56.0": {
 
 		- The compiler now reports every unhandled-error in a single compilation pass instead of stopping at the first one. For example:
 
-		    ```coffee
+		    ```vrl
 		    {
 		    push(.x, 1)
 		    .b = push(.y, 2)
@@ -453,7 +453,7 @@ releases: "0.56.0": {
 		[PR #1760](https://github.com/vectordotdev/vrl/pull/1760) by [@pront](https://github.com/pront)
 		- Fixed a confusing compile error where a fallible call earlier in a block could cause a later, unrelated assignment to be reported as the problem. For example:
 
-		    ```coffee
+		    ```vrl
 		    {
 		    .a = 1
 		    push(.x, 1)        # the unhandled error is actually here
@@ -469,7 +469,7 @@ releases: "0.56.0": {
 		[PR #1743](https://github.com/vectordotdev/vrl/pull/1743) by [@pront](https://github.com/pront)
 		- `encode_proto` and `parse_proto` now support proto maps whose keys are integers or booleans, not just strings. Because VRL object keys are always strings, integer and boolean keys are written in their string form:
 
-		    ```coffee
+		    ```vrl
 		    encode_proto({ "by_id": { "42": "alice" } }, "schema.desc", "MyMessage")
 		    ```
 
