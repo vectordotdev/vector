@@ -14,7 +14,7 @@ use vector_lib::{
 };
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, RequestHandler};
+use super::{DatadogAgentConfig, DatadogAgentSource, RequestHandler};
 use crate::{
     common::http::ErrorMessage,
     event::{Event, LogEvent},
@@ -28,32 +28,19 @@ pub(super) fn build_warp_filter(
 ) -> BoxedFilter<(Response,)> {
     let direct = warp::post()
         .and(warp_path!("api" / "v2" / "llmobs" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             let handler = handler.clone();
             let source = source.clone();
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        decode_llmobs_body(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            &source,
-                        )
-                    });
+                    .and_then(|body| decode_llmobs_body(body, api_key, &source));
                 handler.clone().handle_request(events, super::LLMOBS)
             }
         });
@@ -62,30 +49,17 @@ pub(super) fn build_warp_filter(
         .and(warp_path!(
             "evp_proxy" / "v2" / "api" / "v2" / "llmobs" / ..
         ))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then(
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        decode_llmobs_body(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            &source,
-                        )
-                    });
+                    .and_then(|body| decode_llmobs_body(body, api_key, &source));
                 handler.clone().handle_request(events, super::LLMOBS)
             },
         );
