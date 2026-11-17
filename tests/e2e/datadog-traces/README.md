@@ -45,8 +45,13 @@ flowchart TB
   checkouts and exits.
 - [Agent config](data/agent.yaml): the Agent sends the same payload body to both
   endpoints, so `fakeintake-agent` records exactly what Vector received.
-- [Vector config](data/vector.yaml): a `datadog_agent` source feeds a `datadog_traces`
-  sink with no transforms.
+- Vector pipeline matrix, with no transforms and the same comparison in both environments:
+  - [Direct](data/vector-direct.yaml): `datadog_agent` source → `datadog_traces` sink.
+  - [Buffer-hop](data/vector-buffer-hop.yaml): Vector A's `datadog_agent` source →
+    disk-buffered `vector` sink → [Vector B](data/vector-receiver.yaml)'s `vector`
+    source → `datadog_traces` sink.
+  - Vector B starts in both environments but receives no events in direct mode. The
+    disk buffer uses a fresh Compose volume, removed on cleanup.
 - Destination: [fakeintake](https://github.com/DataDog/datadog-agent/tree/main/test/fakeintake),
   so no Datadog account or credentials are needed.
 
@@ -56,8 +61,9 @@ Compose starts the tracers only after the Agent answers `/info`, and the client 
 after the frontend and both downstream services accept connections. When the client
 exits, vdev runs the `lifecycle` steps in [test.yaml](config/test.yaml): it stops the
 services in order. Each tracer flushes on stop, then the Agent flushes to both
-endpoints, then Vector drains its sink. Any unclean exit fails the run, and so does
-Vector logging a graceful-shutdown timeout, because it exits 0 in that case. Rust then
+endpoints, then Vector A drains its sink while B still accepts events, then B drains
+its protocol sink. Any unclean exit fails the run, and so does either Vector logging a
+graceful-shutdown timeout, because it exits 0 in that case. Rust then
 reads the still-running fakeintakes, so `vdev e2e test` can be rerun against the same
 captures.
 
@@ -95,8 +101,12 @@ by the Agent. The workload stays small and deterministic because:
 ## Running
 
 ```shell
+unset DOCKER_HOST
 cargo vdev e2e run datadog-traces
 ```
+
+This runs both pipelines. Select one with `-e 7.84.6-direct` or
+`-e 7.84.6-buffer-hop`. Each run replaces the previous captures in the evidence volume.
 
 In CI, a Vector-team member can submit a PR review starting with
 `/ci-run-e2e-datadog-traces` to run it against the reviewed commit, or
@@ -107,6 +117,11 @@ The merge queue runs it automatically when the paths in
 
 ## Known gaps
 
+- The buffer-hop environment currently exercises legacy trace events. The preservation
+  contract stays the same when producers emit typed events, but enabling `typed-trace`
+  alone does not exercise `TypedTrace` wire serialization (RFC stage 3).
+- Graceful drain only: the disk buffer is exercised on every event, but crash recovery
+  and restart replay are not tested.
 - Span-level only: Agent envelope, tracer payload and chunk fields are not compared yet.
   The current relay rewrites some of them, such as tracer payload `env` and merged tags.
 - Indexed payloads: Agent 7.84+ sends them by default and Vector drops them, so the

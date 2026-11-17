@@ -45,12 +45,14 @@ flowchart TB
     class coverage,preservation check
 ```
 
-The test runs twice: once with HTTP ingress and once with gRPC ingress.
+The test runs four environments: HTTP and gRPC ingress, each with direct and buffer-hop
+pipelines. Both pipelines use the same comparison.
 Before Rust validation, vdev runs the `lifecycle` steps in [test.yaml](config/test.yaml).
 They allow Kafka consumers to finish, stop the producers and input Collector, then
-gracefully stop Vector while the output Collector still accepts traces.
-[drain_check.py](data/drain_check.py) then waits up to 120 seconds for the expected
-span count before the output Collector stops. An unclean Vector exit fails the run.
+gracefully stop Vector A while B still accepts events, then stop B while the output
+Collector still accepts traces. [drain_check.py](data/drain_check.py) then waits up to
+120 seconds for the expected span count before the output Collector stops. An unclean
+exit or graceful-shutdown timeout from either Vector fails the run.
 Rust reads the finalized files, so retries do not need a fresh environment.
 The idle `demo-ready` container keeps the environment active until harness cleanup.
 
@@ -74,10 +76,16 @@ separately with the same checks:
 
 Application logs and metrics are not forwarded to Vector.
 
-Vector runs [data/vector.yaml](data/vector.yaml), mounted as
-`/etc/vector/vector.yaml`: an `opentelemetry` source with
-`use_otlp_decoding: true` feeds `otel.traces` directly to an `opentelemetry`
-sink, which sends OTLP/HTTP to `http://otel-collector-sink:4318/v1/traces`.
+Both pipelines use an `opentelemetry` source with `use_otlp_decoding: true`:
+
+- [Direct](data/vector-direct.yaml): `otel.traces` feeds the `opentelemetry` sink.
+- [Buffer-hop](data/vector-buffer-hop.yaml): Vector A forwards `otel.traces` through a
+  disk-buffered `vector` sink to [Vector B](data/vector-receiver.yaml), whose `vector`
+  source feeds the `opentelemetry` sink.
+
+Both send OTLP/HTTP to `http://otel-collector-sink:4318/v1/traces`. Vector B starts in
+both environments but receives no events in direct mode. The disk buffer uses a fresh
+Compose volume, removed on cleanup.
 
 The destination is a [second local Collector](data/collector-sink.yaml) that
 writes `output.jsonl`.
@@ -99,6 +107,11 @@ The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
 ## Coverage and limitations
 
+- The buffer-hop environment currently exercises legacy trace events. The preservation
+  contract stays the same when producers emit typed events, but enabling `typed-trace`
+  alone does not exercise `TypedTrace` wire serialization (RFC stage 3).
+- Graceful drain only: the disk buffer is exercised on every event, but crash recovery
+  and restart replay are not tested.
 - Decoding: only `use_otlp_decoding: true` is tested.
 - Optional coverage: events, links, and scope groups with multiple trace IDs
   are reported in `coverage.json` and compared when present. They are not required,
@@ -108,13 +121,15 @@ The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
 ## Running and results
 
-With Docker available, run both transports:
+With Docker available, run both transports and pipelines:
 
 ```shell
+unset DOCKER_HOST
 cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
 ```
 
-To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
+To run one environment, add e.g. `-e 0.159.0-otlphttp-direct` (HTTP, direct) or
+`-e 0.159.0-otlp-buffer-hop` (gRPC, disk buffer and hop).
 
 In CI, a Vector-team member can submit a PR review starting with
 `/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit, or
@@ -123,5 +138,6 @@ Comments, “run all” commands, automatic PR CI, and schedules do not trigger 
 
 Read the results on the CI job's summary page. Download the
 `otel-traces-multiservice-<commit>` artifact for input/output captures, `coverage.json`,
-`differences.txt`, configs, and runner logs. Results are separated by transport;
-failed runs may leave partial results.
+`differences.txt`, configs, and runner logs. Results are separated by transport; each
+pipeline run replaces the previous captures for that transport. Failed runs may leave
+partial results.

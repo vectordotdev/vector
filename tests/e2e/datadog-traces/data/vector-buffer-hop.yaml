@@ -1,0 +1,22 @@
+data_dir: /var/lib/vector
+
+sources:
+  agent:
+    type: datadog_agent
+    address: 0.0.0.0:8181
+    multiple_outputs: true
+    enabled_data_types:
+      - traces
+    store_api_key: false
+
+sinks:
+  forward:
+    inputs: [agent.traces]
+    type: vector
+    address: http://vector-receiver:6000
+    buffer:
+      type: disk
+      # Minimum capacity with the default 128 MiB data files.
+      max_size: 268435488
+    batch:
+      timeout_secs: 1

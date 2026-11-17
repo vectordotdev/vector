@@ -1,6 +1,8 @@
 features:
   - e2e-tests-datadog
   - typed-trace
+  - sources-vector
+  - sinks-vector
 
 test: e2e
 test_filter: "datadog::traces::"
@@ -14,9 +16,11 @@ runner:
 
 matrix:
   agent_version: ["7.84.6"]
+  pipeline: ["direct", "buffer-hop"]
 
 # Stop the pipeline in dependency order so both fakeintakes hold complete captures: each
-# tracer flushes on stop, then the Agent flushes to both endpoints, then Vector drains its sink.
+# tracer flushes on stop, then the Agent flushes to both endpoints, then Vector A drains
+# its sink before Vector B stops. The receiver is idle in the direct environment.
 lifecycle:
   before_validation:
     - wait_for_success: { service: client, timeout_secs: 120 }
@@ -32,6 +36,10 @@ lifecycle:
         timeout_secs: 90
         # Vector exits 0 even when graceful shutdown times out.
         reject_log_messages: ["Failed to gracefully shut down in time"]
+    - stop:
+        services: [vector-receiver]
+        timeout_secs: 90
+        reject_log_messages: ["Failed to gracefully shut down in time"]
 
 # changes to these files/paths will invoke the e2e test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
@@ -41,6 +49,11 @@ paths:
   - "src/internal_events/datadog_*"
   - "src/sinks/datadog/traces/**"
   - "src/sinks/util/**"
+  - "src/sources/vector/**"
+  - "src/sinks/vector/**"
+  - "lib/vector-buffers/**"
+  - "lib/vector-core/proto/**"
+  - "lib/vector-core/src/event/proto.rs"
   - "lib/datadog-proto/**"
   - "lib/vector-core/src/event/trace.rs"
   - "lib/vector-core/src/event/typed_trace/**"
