@@ -34,6 +34,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Framed, length_delimited};
 use tracing::{Instrument, Span, field};
 use vector_lib::{
+    internal_event::emit,
     lookup::OwnedValuePath,
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
@@ -428,7 +429,7 @@ pub fn build_framestream_tcp_source(
         )
         .await
         .map_err(|error| {
-            emit!(SocketBindError {
+            emit(SocketBindError {
                 mode: SocketMode::Tcp,
                 error: &error,
             });
@@ -473,9 +474,9 @@ pub fn build_framestream_tcp_source(
                     let socket = match connection {
                         Ok(socket) => socket,
                         Err(error) => {
-                            emit!(SocketReceiveError {
+                            emit(SocketReceiveError {
                                 mode: SocketMode::Tcp,
-                                error: &error
+                                error: &error,
                             });
                             return;
                         }
@@ -497,7 +498,7 @@ pub fn build_framestream_tcp_source(
                         debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                         let open_token =
-                            connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                            connection_gauge.open(|count| emit(ConnectionOpen { count }));
 
                         let fut = handle_stream(
                             frame_handler_clone,
@@ -541,7 +542,7 @@ async fn handle_stream(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error, peer_addr });
+                emit(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
@@ -563,9 +564,9 @@ async fn handle_stream(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(TcpBytesReceived {
+        emit(TcpBytesReceived {
             byte_size,
-            peer_addr
+            peer_addr,
         });
     });
 
@@ -600,7 +601,7 @@ async fn handle_stream(
     let mut reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
     let mut frames = sock_stream
         .map_err(move |error| {
-            emit!(TcpSocketError {
+            emit(TcpSocketError {
                 error: &error,
                 peer_addr,
             });
@@ -815,7 +816,7 @@ pub fn build_framestream_unix_source(
                 span,
                 active_task_nums_,
                 move |error| {
-                    emit!(UnixSocketError {
+                    emit(UnixSocketError {
                         error: &error,
                         path: &listen_path,
                     });
@@ -828,7 +829,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(UnixSocketFileDeleteError { path: &path, error });
+            emit(UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())
@@ -1026,7 +1027,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
-        pub fn new(
+        fn new(
             addr: SocketAddr,
             content_type: String,
             multithreaded: bool,
@@ -1049,7 +1050,7 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockUnixFrameHandler<F> {
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
                 socket_path: tempfile::tempdir().unwrap().keep().join("unix_test"),
@@ -1065,7 +1066,7 @@ mod test {
             clippy::cast_possible_truncation,
             reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
         )]
-        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+        fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,

@@ -9,6 +9,10 @@ release notes:
 - **`deprecation_announcements`** – items deprecated in this release (announced for the first time).
 - **`planned_deprecations`** – items deprecated in an earlier release.
 
+A valid new active notice also satisfies `vdev check changelog-fragments`. Deprecation announcements
+need no separate changelog fragment or `no-changelog` label. Removing a deprecated feature still
+requires a breaking changelog fragment; see the [deprecation policy](../docs/DEPRECATION_POLICY.md).
+
 ## File format
 
 Each file must be named `<unique_slug>.md` and begin with YAML frontmatter:
@@ -57,6 +61,9 @@ or links to further documentation. It is rendered verbatim in the release notes.
    frontmatter, so the entry moves to the Past Deprecations section of the
    [deprecations page](https://vector.dev/deprecations/). Deleting the file manually would drop it from that
    section.
+
+For an exception described in the [deprecation policy](../docs/DEPRECATION_POLICY.md), add `--allow-early-removal` to
+the `enact` command. This bypasses the two-minor-version check; removal must still be in a later minor release.
 
 The website reads this directory directly (see the `module.mounts` in `website/config.toml`); there is no
 generated file to update.

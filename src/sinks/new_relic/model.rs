@@ -10,7 +10,7 @@ use serde::Serialize;
 use vector_lib::{
     config::log_schema,
     event::ObjectMap,
-    internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL, emit},
 };
 use vrl::event_path;
 
@@ -112,27 +112,27 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             .collect();
 
         if num_non_metric_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_metric_events,
-                reason: "non-metric event"
+                reason: "non-metric event",
             });
         }
         if num_unsupported_metric_type > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_unsupported_metric_type,
-                reason: "unsupported metric type"
+                reason: "unsupported metric type",
             });
         }
         if num_nan_value > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_nan_value,
-                reason: "NaN value not supported"
+                reason: "NaN value not supported",
             });
         }
         if num_missing_interval > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_missing_interval,
-                reason: "incremental counter missing interval"
+                reason: "incremental counter missing interval",
             });
         }
 
@@ -221,15 +221,15 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             .collect();
 
         if num_non_log_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
-                reason: "non-log event"
+                reason: "non-log event",
             });
         }
         if num_nan_value > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: num_nan_value,
-                reason: "NaN value not supported"
+                reason: "NaN value not supported",
             });
         }
 
@@ -316,13 +316,13 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
             .collect();
 
         if num_non_log_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
                 reason: "non-log event",
             });
         }
         if num_non_object_events > 0 {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_object_events,
                 reason: "non-object event",
             });

@@ -1,6 +1,9 @@
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, internal_event::CounterName, metric_tags};
+use vector_lib::{
+    configurable::configurable_component, internal_event::CounterName, internal_event::emit,
+    metric_tags,
+};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -66,7 +69,7 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
+                emit(HostMetricsScrapeDetailError {
                     message: "Failed to load disk I/O info.",
                     error,
                 });
@@ -95,7 +98,7 @@ mod tests {
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
         #[cfg(not(windows))]
-        assert!(!metrics.is_empty());
+        assert_ne!(metrics, [] as [vector_lib::event::Metric; 0]);
         assert!(metrics.len().is_multiple_of(4));
         assert!(all_counters(&metrics));
 

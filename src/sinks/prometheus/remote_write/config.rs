@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use http_1::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
+use http::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
 use vector_http::full_body;
 
 #[cfg(feature = "aws-core")]
@@ -11,12 +11,14 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::HttpClient,
+    http::HttpClient,
     sinks::{
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
-            HttpEndpoint, auth::Auth, http::RetryStrategy, http_v1::http_response_retry_logic,
+            HttpEndpoint,
+            auth::Auth,
+            http::{RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },
@@ -27,7 +29,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
-pub struct RemoteWriteBatchConfig {
+pub(crate) struct RemoteWriteBatchConfig {
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
@@ -45,7 +47,7 @@ pub struct RemoteWriteBatchConfig {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct RemoteWriteConfig {
+pub(crate) struct RemoteWriteConfig {
     /// The endpoint to send data to.
     ///
     /// The endpoint should include the scheme and the path to write to.
@@ -103,7 +105,7 @@ pub struct RemoteWriteConfig {
 
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
-    #[cfg(feature = "aws-config")]
+    #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[serde(
@@ -138,7 +140,7 @@ impl_generate_config_from_default!(RemoteWriteConfig);
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
-pub struct RemoteWriteRequestConfig {
+pub(crate) struct RemoteWriteRequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
 
@@ -160,8 +162,7 @@ fn remote_write_headers_examples() -> BTreeMap<String, String> {
     ])
 }
 
-/// Validates the custom headers and converts them to `http 1` types, keeping the sorted order
-/// of the shared `validate_headers`.
+/// Validates the custom headers, keeping the sorted order of the shared `validate_headers`.
 fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
@@ -170,15 +171,12 @@ fn validate_headers(
         .into_iter()
         .map(
             |(name, value)| -> crate::Result<(HeaderName, HeaderValue)> {
-                let name = HeaderName::from_bytes(name.inner().as_str().as_bytes())
-                    .map_err(|e| format!("Invalid header name '{}': {e}", name.inner()))?;
+                let name = name.inner().clone();
                 if configures_auth && name == AUTHORIZATION {
                     return Err(
                         "Authorization header can not be used with defined auth options".into(),
                     );
                 }
-                let value = HeaderValue::from_bytes(value.as_bytes())
-                    .map_err(|e| format!("Invalid header value: {e}"))?;
                 Ok((name, value))
             },
         )
@@ -220,7 +218,7 @@ impl SinkConfig for RemoteWriteConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedRemoteWrite {
+pub(crate) struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
     validated_headers: CustomHeaders,
     batch_settings: BatcherSettings,
@@ -306,9 +304,9 @@ impl ValidatedSink for RemoteWriteConfig {
             None => None,
         };
 
-        let endpoint = self.endpoint.clone().into_v1();
+        let endpoint = self.endpoint.as_uri().clone();
         let healthcheck_endpoint = match cx.healthcheck.uri {
-            Some(uri) => uri.uri_v1()?,
+            Some(uri) => uri.uri,
             None => endpoint.clone(),
         };
 

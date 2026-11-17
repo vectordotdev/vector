@@ -20,7 +20,7 @@ struct DorisStreamLoadResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct DorisRetryLogic;
+pub(super) struct DorisRetryLogic;
 
 impl RetryLogic for DorisRetryLogic {
     type Error = HttpError;

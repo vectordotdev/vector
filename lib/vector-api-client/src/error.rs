@@ -28,6 +28,7 @@ pub enum Error {
 
 impl Error {
     /// Returns true if this error is permanent and should not be retried.
+    #[must_use]
     pub fn is_fatal(&self) -> bool {
         match self {
             Error::InvalidUrl { .. } => true,

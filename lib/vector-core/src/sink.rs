@@ -97,7 +97,7 @@ impl VectorSink {
     pub fn into_sink(self) -> Box<dyn Sink<EventArray, Error = ()> + Send + Unpin> {
         match self {
             Self::Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {self:?} is not a Sink"),
+            Self::Stream(_) => panic!("Failed type coercion, {self:?} is not a Sink"),
         }
     }
 
@@ -109,7 +109,7 @@ impl VectorSink {
     pub fn into_stream(self) -> Box<dyn StreamSink<EventArray, SinkError> + Send> {
         match self {
             Self::Stream(stream) => stream,
-            _ => panic!("Failed type coercion, {self:?} is not a Stream"),
+            Self::Sink(_) => panic!("Failed type coercion, {self:?} is not a Stream"),
         }
     }
 

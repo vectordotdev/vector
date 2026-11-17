@@ -11,6 +11,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_lib::{
     event::{Event, Metric, MetricValue},
+    internal_event::emit,
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -77,7 +78,7 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         series_batch_settings: BatcherSettings,
@@ -168,7 +169,7 @@ where
                 match request {
                     Err(e) => {
                         let (reason, error_code, dropped_events) = e.into_parts();
-                        emit!(DatadogMetricsEncodingError {
+                        emit(DatadogMetricsEncodingError {
                             reason: reason.as_str(),
                             error_code,
                             dropped_events: dropped_events as usize,

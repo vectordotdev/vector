@@ -31,7 +31,6 @@ macro_rules! labels {
     }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_request() {
     let outputs = send_request("", vec![create_event("gauge-2".into(), 32.0)]).await;
     assert_eq!(outputs.len(), 1);
@@ -52,7 +51,6 @@ async fn sends_request() {
 }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_authenticated_request() {
     let outputs = send_request(
         indoc! {r#"
@@ -81,7 +79,7 @@ async fn sends_authenticated_request() {
     assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
 }
 
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn sends_authenticated_aws_request() {
     let outputs = send_request(
@@ -138,7 +136,6 @@ async fn sends_templated_x_scope_orgid_header() {
 }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_custom_headers() {
     let outputs = send_request(
         indoc! {r#"
@@ -172,7 +169,6 @@ async fn sends_custom_headers() {
 }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
@@ -201,7 +197,6 @@ async fn retains_state_between_requests() {
 }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn aggregates_batches() {
     let outputs = send_request(
         "batch:\n  max_events: 3",
@@ -228,7 +223,6 @@ async fn aggregates_batches() {
 }
 
 #[tokio::test]
-#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn doesnt_aggregate_batches() {
     let outputs = send_request(
         indoc! {"

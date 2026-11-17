@@ -19,7 +19,7 @@ enum Writer {
 }
 
 impl Writer {
-    pub fn get_ref(&self) -> &BytesMut {
+    fn get_ref(&self) -> &BytesMut {
         match self {
             Writer::Plain(inner) => inner.get_ref(),
             Writer::Gzip(inner) => inner.get_ref().get_ref().get_ref(),
@@ -29,7 +29,7 @@ impl Writer {
         }
     }
 
-    pub fn into_inner(self) -> BytesMut {
+    fn into_inner(self) -> BytesMut {
         match self {
             Writer::Plain(writer) => writer,
             Writer::Gzip(writer) => writer
@@ -52,7 +52,7 @@ impl Writer {
         .into_inner()
     }
 
-    pub fn finish(self) -> io::Result<BytesMut> {
+    fn finish(self) -> io::Result<BytesMut> {
         let buf = match self {
             Writer::Plain(writer) => writer,
             Writer::Gzip(writer) => writer.into_inner()?.finish()?,

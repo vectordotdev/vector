@@ -15,6 +15,7 @@ use snafu::Snafu;
 use tower::Service;
 use vector_lib::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -22,7 +23,7 @@ use vector_lib::{
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 
 #[derive(Clone)]
-pub struct DatabendRetryLogic;
+pub(super) struct DatabendRetryLogic;
 
 impl RetryLogic for DatabendRetryLogic {
     type Error = DatabendError;
@@ -45,7 +46,7 @@ impl RetryLogic for DatabendRetryLogic {
 }
 
 #[derive(Clone)]
-pub struct DatabendService {
+pub(super) struct DatabendService {
     client: Arc<DatabendAPIClient>,
     table: String,
     file_format_options: BTreeMap<&'static str, &'static str>,
@@ -53,7 +54,7 @@ pub struct DatabendService {
 }
 
 #[derive(Clone)]
-pub struct DatabendRequest {
+pub(super) struct DatabendRequest {
     pub data: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
@@ -76,7 +77,7 @@ impl MetaDescriptive for DatabendRequest {
 }
 
 #[derive(Debug, Snafu)]
-pub struct DatabendResponse {
+pub(super) struct DatabendResponse {
     metadata: RequestMetadata,
 }
 
@@ -164,7 +165,7 @@ impl Service<DatabendRequest> for DatabendService {
             let endpoint = host_port.as_str();
             let byte_size = request.data.len();
             service.insert_with_stage(request.data).await?;
-            emit!(EndpointBytesSent {
+            emit(EndpointBytesSent {
                 byte_size,
                 protocol,
                 endpoint,

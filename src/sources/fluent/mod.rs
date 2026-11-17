@@ -11,6 +11,7 @@ use vector_lib::{
     codecs::{BytesDeserializerConfig, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
     schema::Definition,
@@ -794,9 +795,9 @@ impl Decoder for FluentDecoder {
 
             let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
                 let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
-                emit!(FluentMessageDecodeError {
+                emit(FluentMessageDecodeError {
                     error,
-                    base64_encoded_message
+                    base64_encoded_message,
                 });
             })?;
             if let Some(item) = maybe_item {
@@ -836,7 +837,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(FluentMessageReceived { byte_size });
+            emit(FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };
