@@ -527,7 +527,7 @@ transforms:
 
 Let's step through this program one function at a time.
 
-```coffee
+```vrl
 parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 ```
 
@@ -558,7 +558,7 @@ This line will parse the `.message` field and store the results in a variable
 }
 ```
 
-```coffee
+```vrl
 . = unnest(parsed.log_events)
 ```
 
@@ -611,7 +611,7 @@ This is pretty good, but, our original events are also JSON and the `.id`,
 `.message`, and `.timestamp` fields are nested. The next function uses
 iteration to finish up our processing.
 
-```coffee
+```vrl
 . = map_values(.) -> |value| {
    event = del(value.log_events)
    value |= event

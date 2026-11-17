@@ -1,0 +1,4 @@
+{{- /* Unrecognized languages expose highlight options as generic attributes. */ -}}
+{{- $html := partial "vrl-code.html" (dict "source" .Inner "options" (merge .Attributes .Options)) -}}
+{{- $html = replaceRE `(?s)^<div class="highlight">(.*)</div>\s*$` "$1" $html -}}
+<div class="highlight{{ with .Attributes.class }} {{ . }}{{ end }}"{{ with .Attributes.title }} title="{{ . }}"{{ end }}{{ with .Attributes.id }} id="{{ . }}"{{ end }}>{{ $html | safeHTML }}</div>
