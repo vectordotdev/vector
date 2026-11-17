@@ -318,15 +318,36 @@ pub(super) fn update_vector_package_version(
     let mut doc = cargo_toml_contents
         .parse::<DocumentMut>()
         .context("Failed to parse Cargo.toml")?;
-    let current_version = doc["workspace"]["package"]["version"]
+    // Release branches cut before the workspace.package migration store a string
+    // at package.version. Later manifests use version.workspace = true.
+    let legacy_version = doc
+        .get("package")
+        .and_then(|package| package.get("version"))
+        .is_some_and(toml_edit::Item::is_str);
+    let (label, version) = if legacy_version {
+        (
+            "package.version",
+            doc.get_mut("package")
+                .and_then(|package| package.get_mut("version")),
+        )
+    } else {
+        (
+            "workspace.package.version",
+            doc.get_mut("workspace")
+                .and_then(|workspace| workspace.get_mut("package"))
+                .and_then(|package| package.get_mut("version")),
+        )
+    };
+    let version = version
+        .context("Cargo.toml package.version or workspace.package.version must be a string")?;
+    let current_version = version
         .as_str()
-        .context("workspace.package.version should be a string")?;
-
+        .with_context(|| format!("Cargo.toml {label} should be a string"))?;
     if current_version != expected_version {
-        bail!("expected workspace package version {expected_version}, found {current_version}");
+        bail!("expected {label} {expected_version}, found {current_version}");
     }
 
-    doc["workspace"]["package"]["version"] = toml_edit::value(release_version);
+    *version = toml_edit::value(release_version);
     Ok(doc.to_string())
 }
 
@@ -372,14 +393,73 @@ mod tests {
 
         let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
             .expect("should update the expected development version");
+        assert!(result.contains("version.workspace = true"));
         assert!(result.contains("version = \"0.59.0\""));
+        assert!(!result.contains("0.59.0-dev"));
 
         let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
             .expect_err("should reject an unexpected starting version");
         assert!(
             error
                 .to_string()
-                .contains("expected workspace package version 0.58.0-dev")
+                .contains("expected workspace.package.version 0.58.0-dev")
+        );
+    }
+
+    #[test]
+    fn test_update_legacy_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
+        "#};
+
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update a pre-migration manifest");
+        assert!(result.contains("version = \"0.59.0\""));
+        assert!(!result.contains("workspace"));
+        assert!(!result.contains("0.59.0-dev"));
+
+        let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
+            .expect_err("should reject an unexpected starting version");
+        assert!(
+            error
+                .to_string()
+                .contains("expected package.version 0.58.0-dev")
+        );
+    }
+
+    #[test]
+    fn test_update_vector_package_version_prefers_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
+
+            [workspace.package]
+            version = "0.1.0"
+        "#};
+
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update package.version when both layouts exist");
+        assert!(result.contains("version = \"0.59.0\""));
+        assert!(result.contains("version = \"0.1.0\""));
+        assert_eq!(
+            crate::commands::release::versions::parse_cargo_version(&result)
+                .expect("valid Cargo.toml"),
+            "0.59.0".parse().expect("valid version")
+        );
+    }
+
+    #[test]
+    fn test_update_vector_package_version_requires_a_version_string() {
+        let error =
+            update_vector_package_version("[package]\nname = \"vector\"\n", "0.59.0-dev", "0.59.0")
+                .expect_err("should reject a manifest with no version");
+        assert!(
+            error
+                .to_string()
+                .contains("package.version or workspace.package.version")
         );
     }
 }
