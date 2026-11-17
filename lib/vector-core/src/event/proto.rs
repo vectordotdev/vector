@@ -719,7 +719,11 @@ impl TryFrom<Metadata> for EventMetadata {
                         path: encoded_path.clone(),
                     }
                 })?;
-                definition = definition.with_field(&path, Kind::any(), Some(&meaning));
+                definition.try_with_meaning(path, &meaning).map_err(|_| {
+                    DecodeError::InvalidSchemaMeaningPath {
+                        path: encoded_path.clone(),
+                    }
+                })?;
             }
             Some(Arc::new(definition))
         } else {
@@ -1133,6 +1137,19 @@ mod tests {
         );
         let mut log = crate::event::LogEvent::from("test");
         log.metadata_mut().set_schema_definition(&historical_schema);
+        let batched = EventArray::from(crate::event::EventArray::from(log.clone())).encode_to_vec();
+        let restored_batch =
+            crate::event::EventArray::try_from(EventArray::decode(batched.as_slice()).unwrap())
+                .unwrap();
+        let crate::event::EventArray::Logs(logs) = restored_batch else {
+            panic!("expected disk log batch");
+        };
+        assert_eq!(
+            logs.first().unwrap().find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_before"))),
+            "batched disk-buffer codec must retain schema snapshot"
+        );
+
         let encoded = EventWrapper::from(crate::event::Event::Log(log)).encode_to_vec();
         let restored =
             crate::event::Event::try_from(EventWrapper::decode(encoded.as_slice()).unwrap())
@@ -1143,6 +1160,16 @@ mod tests {
             Some(&OwnedTargetPath::event(owned_value_path!("host_before"))),
             "disk records must not adopt the current config host_key after restart"
         );
+    }
+
+    #[test]
+    fn malformed_disk_schema_meanings_are_rejected() {
+        let mut metadata = Metadata::default();
+        metadata.schema_meanings_present = true;
+        metadata
+            .schema_meanings
+            .insert("host".into(), ".[broken".into());
+        assert!(EventMetadata::try_from(metadata).is_err());
     }
 
     #[test]

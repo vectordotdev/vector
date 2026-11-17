@@ -120,6 +120,99 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
         .unwrap_or_else(|_| panic!("double ready_array_capacity initialization"));
 }
 
+/// Restore only records that lack the schema they carried into the buffer.
+/// A sink's cached graph can be stale after an upstream hot reload.
+fn restore_buffered_schema(
+    log: &mut vector_lib::event::LogEvent,
+    definitions: &HashMap<OutputId, Arc<Definition>>,
+) {
+    if log.metadata().has_explicit_schema_definition() {
+        return;
+    }
+    let definition = log
+        .metadata()
+        .schema_origin()
+        .and_then(|lineage| definitions.get(lineage))
+        .or_else(|| {
+            // Old disk records predate route-specific schema origin.
+            log.metadata()
+                .source_id()
+                .and_then(|source| definitions.get(&OutputId::from(source.as_ref())))
+        })
+        .or_else(|| {
+            // A generated or legacy event cannot pick an arbitrary conflicting
+            // meaning from multiple inputs.
+            let first = definitions.values().next()?;
+            definitions
+                .values()
+                .all(|candidate| candidate == first)
+                .then_some(first)
+        });
+    if let Some(definition) = definition {
+        log.metadata_mut().set_schema_definition(definition);
+    }
+}
+
+#[cfg(test)]
+mod buffered_schema_restore_tests {
+    use super::*;
+    use vector_lib::{
+        config::LogNamespace,
+        event::LogEvent,
+        lookup::{OwnedTargetPath, lookup_v2::parse_target_path, owned_value_path},
+    };
+    use vrl::value::Kind;
+
+    fn meaning_schema(host_path: &str) -> Arc<Definition> {
+        Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_field(
+                    &parse_target_path(host_path).unwrap(),
+                    Kind::bytes(),
+                    Some("host"),
+                ),
+        )
+    }
+
+    #[test]
+    fn preserving_the_original_host_on_buffered_events_beats_stale_sink_config() {
+        let original = meaning_schema("host_before");
+        let current = meaning_schema("host_after");
+        let source = Arc::new(OutputId::from("source"));
+        let cached = HashMap::from([(source.as_ref().clone(), current)]);
+        let mut log = LogEvent::from("message");
+        log.metadata_mut().set_schema_origin(source);
+        log.metadata_mut().set_schema_definition(&original);
+
+        restore_buffered_schema(&mut log, &cached);
+        assert_eq!(
+            log.find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_before"))),
+        );
+    }
+
+    #[test]
+    fn legacy_buffer_fallback_must_not_pick_random_conflicting_schema() {
+        let mut log = LogEvent::from("message");
+        let ambiguous = HashMap::from([
+            (OutputId::from("left"), meaning_schema("host_a")),
+            (OutputId::from("right"), meaning_schema("host_b")),
+        ]);
+        restore_buffered_schema(&mut log, &ambiguous);
+        assert_eq!(log.find_key_by_meaning("host"), None);
+        let common = meaning_schema("host_common");
+        let identical = HashMap::from([
+            (OutputId::from("left"), Arc::clone(&common)),
+            (OutputId::from("right"), common),
+        ]);
+        restore_buffered_schema(&mut log, &identical);
+        assert_eq!(
+            log.find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_common"))),
+        );
+    }
+}
+
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
@@ -776,31 +869,7 @@ impl<'a> Builder<'a> {
                     .map(move |mut events| {
                         if !buffered_log_definitions.is_empty() {
                             for log in events.iter_logs_mut() {
-                                // Do not replace live in-memory schemas or per-record
-                                // snapshots restored from disk with a stale sink map.
-                                if log.metadata().has_explicit_schema_definition() {
-                                    continue;
-                                }
-                                let definition = log
-                                    .metadata()
-                                    .schema_origin()
-                                    .and_then(|origin| buffered_log_definitions.get(origin))
-                                    .or_else(|| {
-                                        // Older disk records have no explicit schema origin,
-                                        // but the source component ID is already persisted.
-                                        log.metadata().source_id().and_then(|source| {
-                                            buffered_log_definitions
-                                                .get(&OutputId::from(source.as_ref()))
-                                        })
-                                    })
-                                    .or_else(|| {
-                                        (buffered_log_definitions.len() == 1)
-                                            .then(|| buffered_log_definitions.values().next())
-                                            .flatten()
-                                    });
-                                if let Some(definition) = definition {
-                                    log.metadata_mut().set_schema_definition(definition);
-                                }
+                                restore_buffered_schema(log, &buffered_log_definitions);
                             }
                         }
                         events

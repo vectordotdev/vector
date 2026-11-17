@@ -38,9 +38,11 @@ impl OutputId {
                 None => digest.update([0]),
             }
         }
+        // A 128-bit prefix is sufficient for topology-scale collision resistance
+        // and saves 48 bytes per event relative to a full hexadecimal digest.
         let hash = digest.finalize();
-        let mut name = String::from("_vector_schema_route_");
-        for byte in hash {
+        let mut name = String::from("_vsr_");
+        for byte in hash.iter().take(16) {
             use std::fmt::Write;
             write!(&mut name, "{byte:02x}").expect("write to String");
         }
@@ -129,5 +131,24 @@ impl From<&str> for OutputId {
         );
         let component = ComponentKey::from(s);
         component.into()
+    }
+}
+
+#[cfg(test)]
+mod schema_route_tests {
+    use super::*;
+
+    #[test]
+    fn route_ids_are_stable_distinct_and_compact_for_disk_events() {
+        let source = OutputId::from("source");
+        let left = source.schema_route(&OutputId::from("left"));
+        let right = source.schema_route(&OutputId::from("right"));
+        assert_eq!(left, source.schema_route(&OutputId::from("left")));
+        assert_ne!(left, right);
+        assert!(left.component.to_string().len() <= 40);
+        assert_ne!(
+            left.schema_route(&OutputId::from("join")),
+            right.schema_route(&OutputId::from("join"))
+        );
     }
 }
