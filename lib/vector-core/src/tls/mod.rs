@@ -36,13 +36,14 @@ pub use settings::{
 /// Call before constructing TLS clients when multiple providers are enabled.
 /// Repeated or concurrent calls preserve the first installed provider.
 pub fn install_default_crypto_provider() {
-    #[cfg(any(feature = "tls-ring", feature = "tls-aws-lc"))]
     if rustls::crypto::CryptoProvider::get_default().is_none() {
-        #[cfg(feature = "tls-ring")]
-        let provider = rustls::crypto::ring::default_provider();
-        #[cfg(not(feature = "tls-ring"))]
-        let provider = rustls::crypto::aws_lc_rs::default_provider();
-        _ = provider.install_default();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-ring")] {
+                _ = rustls::crypto::ring::default_provider().install_default();
+            } else if #[cfg(feature = "tls-aws-lc")] {
+                _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            }
+        }
     }
 }
 
@@ -255,12 +256,15 @@ mod tests {
             return;
         }
 
-        #[cfg(feature = "tls-ring")]
-        let expected = Some(rustls::crypto::ring::default_provider());
-        #[cfg(all(feature = "tls-aws-lc", not(feature = "tls-ring")))]
-        let expected = Some(rustls::crypto::aws_lc_rs::default_provider());
-        #[cfg(not(any(feature = "tls-ring", feature = "tls-aws-lc")))]
-        let expected: Option<CryptoProvider> = None;
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-ring")] {
+                let expected = Some(rustls::crypto::ring::default_provider());
+            } else if #[cfg(feature = "tls-aws-lc")] {
+                let expected = Some(rustls::crypto::aws_lc_rs::default_provider());
+            } else {
+                let expected: Option<CryptoProvider> = None;
+            }
+        }
 
         assert!(CryptoProvider::get_default().is_none());
         install_default_crypto_provider();
@@ -278,10 +282,13 @@ mod tests {
         }
 
         // Prefer a provider other than the one that would be installed.
-        #[cfg(feature = "tls-aws-lc")]
-        let mut provider = rustls::crypto::aws_lc_rs::default_provider();
-        #[cfg(not(feature = "tls-aws-lc"))]
-        let mut provider = rustls::crypto::ring::default_provider();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-aws-lc")] {
+                let mut provider = rustls::crypto::aws_lc_rs::default_provider();
+            } else {
+                let mut provider = rustls::crypto::ring::default_provider();
+            }
+        }
         provider.cipher_suites.truncate(1);
         provider.install_default().unwrap();
         let original = std::sync::Arc::clone(CryptoProvider::get_default().unwrap());
