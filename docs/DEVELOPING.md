@@ -206,6 +206,13 @@ If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
 
+Cargo and Dependabot apply a seven-day cooldown to newly published registry versions to reduce supply-chain risk.
+For a reviewed update, override Cargo's cooldown locally for one command:
+
+```bash
+CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow cargo update -p <crate> --precise <version>
+```
+
 ### Minimum Supported Rust Version
 
 Vector's Minimum Supported Rust Version (MSRV) is indicated by the `rust-version` specified in

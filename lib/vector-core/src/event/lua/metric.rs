@@ -7,7 +7,7 @@ use super::{
         Metric, MetricKind, MetricValue, StatisticKind,
         metric::{self, MetricSketch, MetricTags, TagValue, TagValueSet},
     },
-    util::{table_to_timestamp, timestamp_to_table},
+    util::{LuaInt, table_to_timestamp, timestamp_to_table},
 };
 use crate::event::MetricTagMode;
 use crate::metrics::AgentDDSketch;
@@ -236,6 +236,10 @@ impl IntoLua for LuaMetric {
     }
 }
 
+fn ints<T>(values: Vec<LuaInt<T>>) -> Vec<T> {
+    values.into_iter().map(|LuaInt(value)| value).collect()
+}
+
 impl FromLua for Metric {
     #[allow(clippy::too_many_lines)]
     fn from_lua(value: LuaValue, _: &Lua) -> LuaResult<Self> {
@@ -255,7 +259,9 @@ impl FromLua for Metric {
             .raw_get::<Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
-        let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
+        let interval_ms = table
+            .raw_get::<Option<LuaInt<u32>>>("interval_ms")?
+            .map(|LuaInt(interval_ms)| interval_ms);
         let namespace: Option<String> = table.raw_get("namespace")?;
         let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
@@ -276,7 +282,7 @@ impl FromLua for Metric {
             }
         } else if let Some(distribution) = table.raw_get::<Option<LuaTable>>("distribution")? {
             let values: Vec<f64> = distribution.raw_get("values")?;
-            let rates: Vec<u32> = distribution.raw_get("sample_rates")?;
+            let rates = ints(distribution.raw_get("sample_rates")?);
             MetricValue::Distribution {
                 samples: metric::zip_samples(values, rates),
                 statistic: distribution.raw_get("statistic")?,
@@ -284,7 +290,7 @@ impl FromLua for Metric {
         } else if let Some(aggregated_histogram) =
             table.raw_get::<Option<LuaTable>>("aggregated_histogram")?
         {
-            let counts: Vec<u64> = aggregated_histogram.raw_get("counts")?;
+            let counts: Vec<u64> = ints(aggregated_histogram.raw_get("counts")?);
             let buckets: Vec<f64> = aggregated_histogram.raw_get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
@@ -299,20 +305,20 @@ impl FromLua for Metric {
             let values: Vec<f64> = aggregated_summary.raw_get("values")?;
             MetricValue::AggregatedSummary {
                 quantiles: metric::zip_quantiles(quantiles, values),
-                count: aggregated_summary.raw_get("count")?,
+                count: aggregated_summary.raw_get::<LuaInt<u64>>("count")?.0,
                 sum: aggregated_summary.raw_get("sum")?,
             }
         } else if let Some(sketch) = table.raw_get::<Option<LuaTable>>("sketch")? {
             let sketch_type: String = sketch.raw_get("type")?;
             match sketch_type.as_str() {
                 "ddsketch" => {
-                    let count: u32 = sketch.raw_get("count")?;
+                    let LuaInt(count) = sketch.raw_get("count")?;
                     let min: f64 = sketch.raw_get("min")?;
                     let max: f64 = sketch.raw_get("max")?;
                     let sum: f64 = sketch.raw_get("sum")?;
                     let avg: f64 = sketch.raw_get("avg")?;
-                    let k: Vec<i16> = sketch.raw_get("k")?;
-                    let n: Vec<u16> = sketch.raw_get("n")?;
+                    let k = ints(sketch.raw_get("k")?);
+                    let n = ints(sketch.raw_get("n")?);
 
                     AgentDDSketch::from_raw(count, min, max, sum, avg, &k, &n)
                         .map(|sketch| MetricValue::Sketch {
@@ -798,6 +804,65 @@ mod test {
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
+    }
+
+    #[test]
+    fn from_lua_truncates_fractional_integer_fields() {
+        let value = r#"{
+            name = "example distribution",
+            timestamp = {
+                year = 2018,
+                month = 11,
+                day = 14,
+                hour = 8,
+                min = 9,
+                sec = 10,
+                nanosec = 1e9 / 3
+            },
+            interval_ms = 1000 / 3,
+            distribution = {
+                values = { 1.0 },
+                sample_rates = { 10 / 4 },
+                statistic = "histogram"
+            }
+        }"#;
+        let expected = Metric::new(
+            "example distribution",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(333_333_333))
+                .expect("invalid timestamp"),
+        ))
+        .with_interval_ms(std::num::NonZeroU32::new(333));
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
+    }
+
+    #[test]
+    fn from_lua_truncates_fractional_numeric_strings() {
+        let value = r#"{
+            name = "example counter",
+            interval_ms = "333.9",
+            counter = { value = 1 }
+        }"#;
+        let metric = Lua::new().load(value).eval::<Metric>().unwrap();
+        assert_eq!(metric.interval_ms(), std::num::NonZeroU32::new(333));
+    }
+
+    #[test]
+    fn from_lua_rejects_out_of_range_integer_fields() {
+        let value = r#"{
+            name = "example counter",
+            interval_ms = -1.5,
+            counter = { value = 1 }
+        }"#;
+        assert!(Lua::new().load(value).eval::<Metric>().is_err());
     }
 
     #[test]

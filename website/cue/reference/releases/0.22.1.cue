@@ -57,7 +57,7 @@ releases: "0.22.1": {
 
 				For example:
 
-				```coffeescript
+				```vrl
 				thing = 5
 				if .foo == .bar {
 					thing = null
