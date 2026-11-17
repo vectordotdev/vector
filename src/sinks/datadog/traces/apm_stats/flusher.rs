@@ -7,7 +7,9 @@ use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
 use vector_http::full_body;
-use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
+use vector_lib::{
+    finalization::EventFinalizers, internal_event::emit, request_metadata::RequestMetadata,
+};
 
 use super::{
     BUCKET_DURATION_NANOSECONDS, DDTracesMetadata, DatadogTracesEndpoint,
@@ -108,7 +110,7 @@ impl ApmStatsSender {
             }
         } && let Err(error) = self.compress_and_send(payload, api_key).await
         {
-            emit!(DatadogTracesAPMStatsError { error });
+            emit(DatadogTracesAPMStatsError { error });
         }
     }
 

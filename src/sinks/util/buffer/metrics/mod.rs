@@ -54,14 +54,10 @@ impl Batch for MetricsBuffer {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            let max_events = self.max_events;
+            // `max_events` is a batch-full check, not a cache limit: the set never holds more
+            // than `max_events` series, so it never evicts and needs no LRU bookkeeping.
             self.metrics
-                .get_or_insert_with(|| {
-                    MetricSet::new(MetricSetSettings {
-                        max_events: Some(max_events),
-                        ..Default::default()
-                    })
-                })
+                .get_or_insert_with(MetricSet::default)
                 .insert_update(item);
             PushResult::Ok(self.num_items() >= self.max_events)
         }

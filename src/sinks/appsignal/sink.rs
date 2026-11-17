@@ -1,4 +1,5 @@
 use futures_util::future::ready;
+use vector_lib::internal_event::emit;
 
 use super::{normalizer::AppsignalMetricsNormalizer, request_builder::AppsignalRequestBuilder};
 use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer, util::http::HttpRequest};
@@ -36,7 +37,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

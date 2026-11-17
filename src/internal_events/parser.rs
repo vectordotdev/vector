@@ -1,7 +1,8 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
@@ -35,7 +36,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
         .increment(1);
 
         if DROP_EVENT {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+            emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 }

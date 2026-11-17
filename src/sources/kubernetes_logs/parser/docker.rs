@@ -4,6 +4,7 @@ use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
+    internal_event::emit,
     lookup::{self, OwnedTargetPath, path},
 };
 
@@ -40,11 +41,11 @@ impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log, self.log_namespace) {
-            emit!(KubernetesLogsDockerFormatParseError { error: &err });
+            emit(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log, self.log_namespace) {
-            emit!(KubernetesLogsDockerFormatParseError { error: &err });
+            emit(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         output.push(event);

@@ -8,6 +8,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::emit,
 };
 use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
 use warp::{
@@ -170,8 +171,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        emit!(HttpInternalError {
-                            message: "Path not found."
+                        emit(HttpInternalError {
+                            message: "Path not found.",
                         });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
@@ -209,7 +210,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|body| (body, auth_enrichment))
                             })
                             .and_then(|(body, auth_enrichment)| {
-                                emit!(HttpBytesReceived {
+                                emit(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
@@ -218,7 +219,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|events| (events, auth_enrichment))
                             })
                             .map(|(mut events, auth_enrichment)| {
-                                emit!(HttpEventsReceived {
+                                emit(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
@@ -253,8 +254,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {r:?}")
+                    emit(HttpInternalError {
+                        message: &format!("Internal error: {r:?}"),
                     });
                     Err(r)
                 }
@@ -339,14 +340,14 @@ async fn handle_request(
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
                 .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest::new(error.code(), error.message()));
+            emit(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

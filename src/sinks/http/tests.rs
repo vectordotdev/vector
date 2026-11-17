@@ -593,7 +593,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             unreachable!("There should be no successful requests")
         })
         .await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -620,7 +620,7 @@ async fn fails_on_permanent_error() {
 
         let output_lines =
             get_received_gzip(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }

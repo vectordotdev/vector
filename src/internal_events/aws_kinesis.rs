@@ -2,7 +2,8 @@ use vector_lib::NamedInternalEvent;
 /// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
 use vector_lib::counter;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -28,6 +29,6 @@ impl InternalEvent for AwsKinesisStreamNoPartitionKeyError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

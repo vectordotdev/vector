@@ -8,6 +8,7 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
@@ -462,8 +463,8 @@ impl PrometheusExporter {
         }
 
         let handler = Handler {
-            bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
-            events_sent: register!(EventsSent::from(Output(None))),
+            bytes_sent: register(BytesSent::from(Protocol::HTTP)),
+            events_sent: register(EventsSent::from(Output(None))),
             default_namespace: self.config.default_namespace.clone(),
             buckets: self.config.buckets.clone().into(),
             quantiles: self.config.quantiles.clone().into(),
@@ -610,7 +611,7 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
                 &metric,
                 self.config.default_namespace.as_deref(),
             ) {
-                emit!(PrometheusInvalidMetricError {});
+                emit(PrometheusInvalidMetricError {});
                 finalizers.update_status(EventStatus::Rejected);
                 continue;
             }

@@ -9,7 +9,7 @@ use vector_lib::{
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatusReceiver, Event},
-    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered, emit},
     opentelemetry::proto::collector::{
         logs::v1::{
             ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
@@ -171,7 +171,7 @@ impl Service {
             .send_batch_named(log_name, events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .await?;

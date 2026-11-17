@@ -85,7 +85,7 @@ To do so, we can make use of the [`get_enrichment_table_record`][get_enrichment_
 type = "remap"
 inputs = ["datadog_agents"]
 source = '''
-. = parse_json!(.status_message)
+. = parse_json!(.message)
 
 status_code = del(.status_code)
 

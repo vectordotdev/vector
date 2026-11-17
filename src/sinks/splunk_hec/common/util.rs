@@ -7,6 +7,7 @@ use vector_http::empty_body;
 use vector_lib::{
     config::proxy::ProxyConfig,
     event::EventRef,
+    internal_event::emit,
     lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath},
 };
 
@@ -103,7 +104,6 @@ pub fn build_http_service(
             auto_extract_timestamp,
         },
     )
-    .with_response_decompression()
 }
 
 /// Checks the HEC endpoint.
@@ -192,10 +192,10 @@ pub fn render_template_string<'a>(
     template
         .render_string(event)
         .map_err(|error| {
-            emit!(TemplateRenderingError {
+            emit(TemplateRenderingError {
                 error,
                 field: Some(field_name),
-                drop_event: false
+                drop_event: false,
             });
         })
         .ok()

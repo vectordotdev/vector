@@ -78,7 +78,7 @@ releases: "0.24.0": {
 				The VRL compiler now rejects assignments to fields on values known not to be
 				objects or arrays. For example, this now fails:
 
-				```coffeescript
+				```vrl
 				foo = 1
 				foo.bar = 2
 				```
@@ -121,7 +121,7 @@ releases: "0.24.0": {
 				A `filter` function was added to VRL to allow easy removal of keys from objects or
 				elements from arrays. It can be used like:
 
-				```coffeescript
+				```vrl
 				.kubernetes.pod_annotations = filter(.kubernetes.pod_annotations) { |key, _value|
 					!starts_with(key, "checksum")
 				}

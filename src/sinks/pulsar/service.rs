@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use pulsar::{
@@ -141,15 +142,15 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
                             .into_events_estimated_json_encoded_byte_size(),
                     }),
                     Err(e) => {
-                        emit!(PulsarSendingError {
+                        emit(PulsarSendingError {
                             error: Box::new(PulsarError::Custom("failed to send".to_string())),
-                            count: 1
+                            count: 1,
                         });
                         Err(e)
                     }
                 },
                 Err(e) => {
-                    emit!(PulsarSendingError {
+                    emit(PulsarSendingError {
                         error: Box::new(PulsarError::Custom("failed to send".to_string())),
                         count: 1,
                     });

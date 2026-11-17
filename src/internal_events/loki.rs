@@ -1,5 +1,5 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, error_stage, error_type,
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, emit, error_stage, error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
@@ -41,7 +41,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
             stage = error_stage::PROCESSING,
         );
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: self.count,
             reason,
         });
@@ -86,7 +86,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
             stage = error_stage::PROCESSING,
         );
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
 
         counter!(
             CounterName::ComponentErrorsTotal,
