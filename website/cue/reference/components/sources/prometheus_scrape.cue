@@ -262,8 +262,8 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		http_client_responses_total:                 components.sources.internal_metrics.output.metrics.http_client_responses_total
-		http_client_response_rtt_seconds:            components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
-		prometheus_kubernetes_sd_targets_discovered: components.sources.internal_metrics.output.metrics.prometheus_kubernetes_sd_targets_discovered
+		http_client_responses_total:                                components.sources.internal_metrics.output.metrics.http_client_responses_total
+		http_client_response_rtt_seconds:                           components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
+		prometheus_kubernetes_service_discovery_targets_discovered: components.sources.internal_metrics.output.metrics.prometheus_kubernetes_service_discovery_targets_discovered
 	}
 }

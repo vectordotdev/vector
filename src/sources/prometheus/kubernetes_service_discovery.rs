@@ -32,7 +32,8 @@ use crate::{
     built_info::{PKG_NAME, PKG_VERSION},
     http::QueryParameters,
     internal_events::{
-        PrometheusKubernetesSdAnnotationParseError, PrometheusKubernetesSdTargetsDiscovered,
+        PrometheusKubernetesServiceDiscoveryAnnotationParseError,
+        PrometheusKubernetesServiceDiscoveryTargetsDiscovered,
     },
     sources::util::http_client::build_url,
 };
@@ -467,7 +468,7 @@ impl PodDiscovery {
         for target in &mut targets {
             target.uri = build_url(&target.uri, query);
         }
-        emit(PrometheusKubernetesSdTargetsDiscovered {
+        emit(PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
             count: targets.len(),
         });
         targets
@@ -499,7 +500,7 @@ fn collect_targets(
         match extract_targets(&pod, parser_cfg) {
             Ok(mut targets) => out.append(&mut targets),
             Err(error) => {
-                emit(PrometheusKubernetesSdAnnotationParseError {
+                emit(PrometheusKubernetesServiceDiscoveryAnnotationParseError {
                     pod: pod.metadata.name.as_deref().unwrap_or("<unknown>"),
                     namespace: pod.metadata.namespace.as_deref().unwrap_or(""),
                     error: &error.to_string(),

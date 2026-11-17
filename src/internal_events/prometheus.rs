@@ -92,32 +92,32 @@ impl InternalEvent for PrometheusInvalidMetricError {
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
-pub(crate) struct PrometheusKubernetesSdTargetsDiscovered {
+pub(crate) struct PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
     pub count: usize,
 }
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
-impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
     fn emit(self) {
         debug!(
-            message = "Prometheus Kubernetes SD discovered targets.",
+            message = "Prometheus Kubernetes service discovery found targets.",
             count = self.count,
         );
-        vector_lib::gauge!(GaugeName::PrometheusKubernetesSdTargetsDiscovered)
+        vector_lib::gauge!(GaugeName::PrometheusKubernetesServiceDiscoveryTargetsDiscovered)
             .set(LossyF64(self.count));
     }
 }
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
-pub(crate) struct PrometheusKubernetesSdAnnotationParseError<'a> {
+pub(crate) struct PrometheusKubernetesServiceDiscoveryAnnotationParseError<'a> {
     pub pod: &'a str,
     pub namespace: &'a str,
     pub error: &'a str,
 }
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
-impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryAnnotationParseError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to parse prometheus.io annotations on pod.",

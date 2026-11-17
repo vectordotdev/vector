@@ -1,7 +1,7 @@
 pub(crate) mod parser;
 
 #[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
-pub(crate) mod kubernetes_sd;
+pub(crate) mod kubernetes_service_discovery;
 #[cfg(feature = "sources-prometheus_pushgateway")]
 mod pushgateway;
 #[cfg(feature = "sources-prometheus_remote_write")]

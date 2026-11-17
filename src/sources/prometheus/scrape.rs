@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt, stream};
 use tokio_stream::wrappers::IntervalStream;
 
 #[cfg(feature = "kubernetes")]
-use super::kubernetes_sd::{self, KubernetesScrapeConfig};
+use super::kubernetes_service_discovery::{self, KubernetesScrapeConfig};
 use super::parser;
 #[cfg(feature = "kubernetes")]
 use crate::sources::util::http_client::{RequestOptions, run};
@@ -456,7 +456,7 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
 /// The requests for discovered Pods: on every tick, one request per current target.
 #[cfg(feature = "kubernetes")]
 fn discovered_requests<'a>(
-    discovery: &'a kubernetes_sd::PodDiscovery,
+    discovery: &'a kubernetes_service_discovery::PodDiscovery,
     builder: &'a PrometheusScrapeBuilder,
     query: &'a QueryParameters,
     interval: Duration,
@@ -474,7 +474,10 @@ fn discovered_requests<'a>(
 #[cfg(feature = "kubernetes")]
 impl PrometheusScrapeBuilder {
     /// Builds the context for a discovered Pod target, which adds the Pod's tags.
-    fn context_for(&self, target: &kubernetes_sd::Target) -> PrometheusScrapeContext {
+    fn context_for(
+        &self,
+        target: &kubernetes_service_discovery::Target,
+    ) -> PrometheusScrapeContext {
         let mut context = self.context(&target.uri, target.instance.clone());
         context.discovery_tags = target.discovery_tags();
         context
@@ -685,7 +688,7 @@ mod validation_tests {
             instance_tag: Some("instance".to_owned()),
             endpoint_tag: None,
         };
-        let target = kubernetes_sd::Target {
+        let target = kubernetes_service_discovery::Target {
             uri: "http://10.0.0.1:9100/metrics".parse().unwrap(),
             instance: "10.0.0.1:9100".to_owned(),
             namespace: "monitoring".to_owned(),
@@ -1401,7 +1404,7 @@ mod kubernetes_tests {
         let port = base.port_u16().unwrap();
 
         let mut writer = reflector::store::Writer::<Pod>::default();
-        let discovery = kubernetes_sd::PodDiscovery::from_stores(
+        let discovery = kubernetes_service_discovery::PodDiscovery::from_stores(
             vec![writer.as_reader()],
             &KubernetesScrapeConfig::default(),
         );

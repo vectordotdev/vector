@@ -871,7 +871,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		prometheus_kubernetes_sd_targets_discovered: {
+		prometheus_kubernetes_service_discovery_targets_discovered: {
 			description:       "The number of scrape targets that the `prometheus_scrape` source currently discovers from Kubernetes Pods."
 			type:              "gauge"
 			default_namespace: "vector"
