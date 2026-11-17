@@ -159,7 +159,7 @@ fn detection_matches_hinted_conversion_and_rejects_datadog() {
         assert!(is_historical_otlp_layout(&legacy));
         let mut hintless = legacy.clone();
         hintless.metadata_mut().clear_trace_layout();
-        assert_eq!(convert_legacy(hintless), convert_hinted(legacy.clone()));
+        assert_eq!(convert_legacy(hintless), convert_hinted(legacy));
     }
 
     let mut datadog = LegacyTraceEvent::default();
