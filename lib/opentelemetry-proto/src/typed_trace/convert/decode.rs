@@ -188,8 +188,7 @@ impl<'a, R: TraceConversionReporter> AttributeDecoder<'a, R> {
         let span_type = self.lift(DATADOG_SPAN_TYPE, AttrValue::into_string);
         let meta_struct = self
             .lift(DATADOG_SPAN_META_STRUCT, AttrValue::into_map)
-            .map(|map| self.lift_meta_struct(map))
-            .unwrap_or_default();
+            .map_or_else(BTreeMap::new, |map| self.lift_meta_struct(map));
         let chunk = SpanChunkKeys {
             priority: self
                 .lift(DATADOG_CHUNK_PRIORITY, |value| {
