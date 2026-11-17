@@ -29,7 +29,7 @@ use crate::{
     test_util::{
         self,
         addr::next_addr,
-        mock::{basic_sink, oneshot_sink},
+        mock::{basic_sink, basic_source, basic_transform, oneshot_sink},
         start_topology, temp_dir, wait_for_tcp,
     },
     topology::ReloadError::*,
@@ -460,6 +460,63 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
         () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_disk_buffer_config_change_behind_idle_transform() {
+    // An idle transform applies fanout control messages only when its next event arrives, so its
+    // fanout still holds the old disk buffer writer while the changed sink's buffer is rebuilt in
+    // the same directory. The reload must release that writer instead of failing to lock the
+    // buffer.
+    test_util::trace_init();
+
+    let data_dir = temp_dir();
+    std::fs::create_dir(&data_dir).unwrap();
+
+    let (mut source_tx, source) = basic_source();
+    let (sink_rx, sink) = basic_sink(10);
+    let mut sink_rx = std::pin::pin!(sink_rx);
+
+    let mut old_config = Config::builder();
+    old_config.global.data_dir = Some(data_dir);
+    old_config.add_source("in", source);
+    old_config.add_transform("t", &["in"], basic_transform("", 0.0));
+    old_config.add_sink("out", &["t"], sink);
+
+    let sink_key = ComponentKey::from("out");
+    old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
+        when_full: WhenFull::Block,
+    });
+
+    let mut new_config = old_config.clone();
+    new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(536_870_912).unwrap(),
+        when_full: WhenFull::Block,
+    });
+
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default()),
+    )
+    .await
+    .expect("reload should not stall")
+    .expect("reload should rebuild the changed disk buffer");
+
+    // Events must flow through the rebuilt buffer.
+    source_tx
+        .send_event(Event::Log(LogEvent::from("after reload")))
+        .await
+        .unwrap();
+    let item = tokio::time::timeout(Duration::from_secs(5), sink_rx.next())
+        .await
+        .expect("event should reach the sink after reload")
+        .expect("sink stream should not end");
+    assert_eq!(1, item.events.len());
+
+    topology.stop().await;
 }
 
 #[tokio::test]

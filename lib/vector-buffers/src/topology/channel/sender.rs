@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
@@ -12,6 +15,9 @@ use crate::{
     internal_events::BufferSendDuration,
     variants::disk_v2::{self, DiskBufferUsageSnapshot, ProductionFilesystem, TryWriteOutcome},
 };
+
+/// How often [`BufferSender::wait_for_disk_writers_released`] checks for remaining clones.
+const DISK_WRITER_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Adapter for papering over various sender backends.
 #[derive(Clone, Debug)]
@@ -304,6 +310,26 @@ impl<T: Bufferable> BufferSender<T> {
         }
         Some(usage)
     }
+
+    /// Drops this sender and waits until every clone of it has been dropped as well, which
+    /// releases the writers of its disk stages.
+    ///
+    /// Returns at once if the buffer has no disk stage.
+    pub async fn wait_for_disk_writers_released(self) {
+        let mut writers = Vec::new();
+        let mut stage = Some(&self);
+        while let Some(sender) = stage {
+            if let SenderAdapter::DiskV2(writer) = &sender.base {
+                writers.push(Arc::downgrade(writer));
+            }
+            stage = sender.overflow.as_deref();
+        }
+        drop(self);
+
+        while writers.iter().any(|writer| writer.strong_count() > 0) {
+            tokio::time::sleep(DISK_WRITER_RELEASE_POLL_INTERVAL).await;
+        }
+    }
 }
 
 impl<T: Bufferable> BufferSender<T> {
@@ -410,13 +436,54 @@ impl<T: Bufferable> BufferSender<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::{
+        num::{NonZeroU64, NonZeroUsize},
+        time::Duration,
+    };
 
     use tempfile::tempdir;
+    use tokio_test::{assert_pending, task::spawn};
     use tracing::Span;
 
     use super::SenderAdapter;
     use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn disk_writers_released_only_after_every_clone_is_dropped() {
+        let config = BufferConfig::Chained(vec![
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()),
+                when_full: WhenFull::Overflow,
+            },
+            BufferType::DiskV2 {
+                max_size: NonZeroU64::new(268_435_488).unwrap(),
+                when_full: WhenFull::Block,
+            },
+        ]);
+        let data_dir = tempdir().unwrap();
+        let build = || {
+            config.build::<SizedRecord>(
+                Some(data_dir.path().to_path_buf()),
+                "release".into(),
+                Span::none(),
+            )
+        };
+
+        let (sender, receiver) = build().await.unwrap();
+        let clone = sender.clone();
+        drop(receiver);
+
+        let mut released = spawn(sender.wait_for_disk_writers_released());
+        assert_pending!(released.poll());
+
+        drop(clone);
+        tokio::time::timeout(Duration::from_secs(1), released)
+            .await
+            .expect("writers should be released once the last clone is dropped");
+        build()
+            .await
+            .expect("buffer should reopen once its writers are released");
+    }
 
     #[tokio::test]
     async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
