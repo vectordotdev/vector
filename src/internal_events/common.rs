@@ -168,7 +168,7 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
         // message contains the sink name in `component_type` field thanks to `tracing` spans. For example:
         // "<timestamp> ERROR sink{component_kind="sink" component_id=sink0 component_type=aws_s3 component_name=sink0}: vector::internal_events::common: Failed to build request."
         error!(
-            message = format!("Failed to build request."),
+            message = "Failed to build request.".to_string(),
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,

@@ -1199,7 +1199,7 @@ mod integration_tests {
             let metric = event.into_metric();
 
             if let Some(db) = metric.tags().unwrap().get("db") {
-                assert!(db == "template1");
+                assert_eq!(db, "template1");
             }
         }
     }

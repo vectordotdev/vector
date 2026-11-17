@@ -293,11 +293,11 @@ async fn topology_readd_input() {
     topology.stop().await;
 
     // sink should not crash
-    assert!(
+    assert_eq!(
         UnboundedReceiverStream::new(crash)
             .collect::<Vec<_>>()
-            .await
-            .is_empty()
+            .await,
+        [] as [crate::signal::ShutdownError; 0]
     );
 }
 
@@ -621,7 +621,7 @@ async fn topology_reload_reuses_removed_enrichment_table_source_key() {
                 .expect("old table source must send output before reload")
                 .into_events()
                 .collect::<Vec<_>>();
-            assert!(!events.is_empty());
+            assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         },
         () = tokio::time::sleep(Duration::from_secs(5)) => {
             panic!("old table source never produced output")

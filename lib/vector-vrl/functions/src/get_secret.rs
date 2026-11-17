@@ -27,7 +27,7 @@ impl Function for GetSecret {
         "get_secret"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         "Returns the value of the given secret from an event."
     }
 
