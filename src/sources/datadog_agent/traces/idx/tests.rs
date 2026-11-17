@@ -10,8 +10,8 @@ use vrl::value;
 
 use super::{
     super::{super::ddtrace_proto, handler::convert_dd_tracer_payload},
-    ExpansionBudget, IdxConversionError, convert_idx_tracer_payload, format_f64_fixed,
-    json_string_len, lossy_utf8_len,
+    ExpansionBudget, IdxConversionError, convert_idx_tracer_payload, format_f64, json_string_len,
+    lossy_utf8_len,
 };
 use crate::event::{ObjectMap, TraceEvent, Value};
 use ddtrace_proto::idx::{
@@ -809,12 +809,11 @@ proptest! {
     }
 
     /// Parsing the output must recover the input bits, so digit placement cannot
-    /// drift; the literal cases in `chunk_attribute_doubles_match_the_agent_as_string`
-    /// pin Go's tie-breaking, which this cannot observe on its own (`f64::parse`
-    /// accepts both the tied spellings and ryu's own scientific-notation layout).
+    /// drift. The literal cases in `chunk_attribute_doubles_match_the_agent_as_string`
+    /// pin Go's tie-breaking, which `f64::parse` cannot observe on its own.
     #[test]
-    fn format_f64_fixed_round_trips(value in POSITIVE | NEGATIVE | NORMAL | SUBNORMAL | ZERO) {
-        let formatted = format_f64_fixed(value);
+    fn format_f64_round_trips(value in POSITIVE | NEGATIVE | NORMAL | SUBNORMAL | ZERO) {
+        let formatted = format_f64(value);
         prop_assert!(!formatted.contains('e'));
         prop_assert_eq!(formatted.parse::<f64>().unwrap().to_bits(), value.to_bits());
     }

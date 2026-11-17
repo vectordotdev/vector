@@ -50,8 +50,8 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         APM_STATS, DatadogAgentConfig, DatadogAgentSource, LLMOBS, LOGS, LogMsg, METRICS, TRACES,
-        ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body,
-        metrics::DatadogSeriesRequest,
+        ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, default_max_trace_expansion_bytes,
+        logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},

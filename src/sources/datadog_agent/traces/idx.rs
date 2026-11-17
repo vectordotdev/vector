@@ -3,6 +3,7 @@ use std::{cell::Cell, collections::BTreeMap, fmt};
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use fixed_decimal::{Decimal, FloatPrecision};
 use ordered_float::NotNan;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use vrl::{event_path, value};
@@ -634,7 +635,9 @@ fn json_text(value: &JsonValue) -> String {
 /// Renders `value` the way the Agent's `AnyValue.AsString` does.
 ///
 /// That accessor uses `strconv.FormatFloat(value, 'f', -1, 64)`. Non-finite values use
-/// Go's spellings. Finite values delegate to [`format_f64_fixed`].
+/// Go's spellings (`NaN`, `+Inf`, `-Inf`). A finite value goes through [`Decimal`]: the
+/// shortest round-trip digits come from the same Ryu algorithm Go uses, so an exact tie
+/// breaks to even, and the string is fixed point, including `-0`.
 fn format_f64(value: f64) -> String {
     if value.is_nan() {
         "NaN".to_owned()
@@ -646,75 +649,10 @@ fn format_f64(value: f64) -> String {
         }
         .to_owned()
     } else {
-        format_f64_fixed(value)
+        Decimal::try_from_f64(value, FloatPrecision::RoundTrip)
+            .expect("a finite f64 is within Decimal's magnitude limits")
+            .to_string()
     }
-}
-
-/// Renders a finite `value` like Go's `strconv.FormatFloat(value, 'f', -1, 64)`.
-///
-/// Digits come from `ryu`, a line-by-line port of the same Ryu algorithm Go's `strconv`
-/// uses, so it breaks an exact tie between two equally short round-trip spellings to
-/// even, the way Go does (`f64::to_string` instead rounds such a tie away from zero).
-/// `ryu`'s own layout differs from Go's fixed-point `'f'`, though: it appends `.0` to
-/// integers and switches to scientific notation outside roughly `1e-5..1e16`. This
-/// re-parses its digits and expands them into Go's always-fixed layout instead of using
-/// that string directly.
-fn format_f64_fixed(value: f64) -> String {
-    debug_assert!(value.is_finite(), "format_f64 handles non-finite values");
-    if value == 0.0 {
-        return if value.is_sign_negative() { "-0" } else { "0" }.to_owned();
-    }
-
-    let mut buffer = ryu::Buffer::new();
-    let shortest = buffer.format_finite(value);
-    let (sign, shortest) = shortest
-        .strip_prefix('-')
-        .map_or(("", shortest), |rest| ("-", rest));
-
-    // Split into significant digits and a decimal point position: `|value| = 0.<digits>
-    // * 10^point`, so the point sits `point` places after the first digit (negative
-    // means leading zeros after `"0."`), before trimming insignificant zeros below.
-    let (mantissa, exponent) =
-        shortest
-            .split_once('e')
-            .map_or((shortest, 0), |(mantissa, exponent)| {
-                (
-                    mantissa,
-                    exponent
-                        .parse()
-                        .expect("ryu exponent is a valid base-10 integer"),
-                )
-            });
-    let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
-    let mut digits: Vec<u8> = int_part.bytes().chain(frac_part.bytes()).collect();
-    let mut point = i32::try_from(int_part.len()).expect("mantissa fits in i32") + exponent;
-    while digits.len() > 1 && digits.first() == Some(&b'0') {
-        digits.remove(0);
-        point -= 1;
-    }
-    while digits.len() > 1 && digits.last() == Some(&b'0') {
-        digits.pop();
-    }
-    let length = i32::try_from(digits.len()).expect("digit count fits in i32");
-
-    let body = if point <= 0 {
-        let leading_zeros = usize::try_from(-point).expect("point <= 0 here");
-        format!("0.{}{}", "0".repeat(leading_zeros), ascii_digits(&digits))
-    } else if point >= length {
-        let trailing_zeros = usize::try_from(point - length).expect("point >= length here");
-        format!("{}{}", ascii_digits(&digits), "0".repeat(trailing_zeros))
-    } else {
-        let split = usize::try_from(point).expect("0 < point < length here");
-        let (whole, fraction) = digits.split_at(split);
-        format!("{}.{}", ascii_digits(whole), ascii_digits(fraction))
-    };
-    format!("{sign}{body}")
-}
-
-/// Interprets `bytes` as ASCII decimal digits, which is how [`format_f64_fixed`]
-/// builds its working buffer.
-fn ascii_digits(bytes: &[u8]) -> &str {
-    std::str::from_utf8(bytes).expect("ryu digits are ASCII")
 }
 
 fn promoted_span_kind(kind: i32) -> Option<&'static str> {
