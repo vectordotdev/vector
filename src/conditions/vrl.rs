@@ -28,6 +28,14 @@ pub struct VrlConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
+
+    /// Backend for all regex operators in this VRL condition.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub(crate) regex_engine: crate::config::RegexEngine,
+
+    /// Materialization policy for regex capture maps in this condition.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub(crate) regex_capture_map: crate::config::RegexCaptureMap,
 }
 
 impl_generate_config_from_default!(VrlConfig);
@@ -56,6 +64,10 @@ impl ConditionalConfig for VrlConfig {
         config.set_custom(enrichment_tables.clone());
         config.set_custom(metrics_storage.clone());
         config.set_read_only();
+        let regex_engine = self.regex_engine.vrl();
+        regex_engine.ensure_available()?;
+        config.set_custom(regex_engine);
+        config.set_custom(self.regex_capture_map.vrl());
 
         let CompilationResult {
             program,
@@ -255,6 +267,8 @@ mod test {
             let config = VrlConfig {
                 source,
                 runtime: VrlRuntime::default(),
+                regex_engine: crate::config::RegexEngine::default(),
+                regex_capture_map: crate::config::RegexCaptureMap::default(),
             };
 
             assert_eq!(

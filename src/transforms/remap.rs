@@ -46,7 +46,12 @@ use crate::{
 };
 
 const DROPPED: &str = "dropped";
-type CacheKey = (TableRegistry, schema::Definition);
+type CacheKey = (
+    TableRegistry,
+    schema::Definition,
+    crate::config::RegexCaptureMap,
+    crate::config::RegexEngine,
+);
 type CacheValue = (Program, String, MeaningList);
 
 /// Configuration for the `remap` transform.
@@ -98,6 +103,15 @@ pub struct RemapConfig {
     /// underlying shape of metrics that mix single- and multi-value tags.
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
+
+    /// Materialization of regex capture maps: independent owned strings or shared full-match bytes.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub regex_capture_map: crate::config::RegexCaptureMap,
+
+    /// Backend for VRL regex matching, captures, replacement, splitting, sets, redaction and sieve.
+    /// Rust is the default. PCRE2 JIT validates literal support at configuration time.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub regex_engine: crate::config::RegexEngine,
 
     /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
     /// time zone.
@@ -171,6 +185,8 @@ impl Clone for RemapConfig {
             file: self.file.clone(),
             files: self.files.clone(),
             metric_tag_values: self.metric_tag_values,
+            regex_capture_map: self.regex_capture_map,
+            regex_engine: self.regex_engine,
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
@@ -188,13 +204,12 @@ impl RemapConfig {
         metrics_storage: MetricsStorage,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, MeaningList)> {
-        if let Some((_, res)) = self
-            .cache
-            .lock()
-            .expect("Data poisoned")
-            .iter()
-            .find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition)
-        {
+        if let Some((_, res)) = self.cache.lock().expect("Data poisoned").iter().find(|v| {
+            v.0.0 == enrichment_tables
+                && v.0.1 == merged_schema_definition
+                && v.0.2 == self.regex_capture_map
+                && v.0.3 == self.regex_engine
+        }) {
             return res.clone().map_err(Into::into);
         }
 
@@ -225,6 +240,10 @@ impl RemapConfig {
         config.set_custom(enrichment_tables.clone());
         config.set_custom(metrics_storage);
         config.set_custom(MeaningList::default());
+        config.set_custom(self.regex_capture_map.vrl());
+        let regex_engine = self.regex_engine.vrl();
+        regex_engine.ensure_available()?;
+        config.set_custom(regex_engine);
 
         let res = compile_vrl(&source, &vector_vrl_functions::all(), &state, config)
             .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
@@ -236,10 +255,15 @@ impl RemapConfig {
                 )
             });
 
-        self.cache
-            .lock()
-            .expect("Data poisoned")
-            .push(((enrichment_tables, merged_schema_definition), res.clone()));
+        self.cache.lock().expect("Data poisoned").push((
+            (
+                enrichment_tables,
+                merged_schema_definition,
+                self.regex_capture_map,
+                self.regex_engine,
+            ),
+            res.clone(),
+        ));
 
         res.map_err(Into::into)
     }
@@ -726,6 +750,53 @@ mod tests {
         },
         transforms::{OutputBuffer, test::create_topology},
     };
+
+    #[test]
+    #[cfg(feature = "vrl-pcre2-jit")]
+    fn regex_engines_have_separate_compilation_cache_entries() {
+        let mut config = RemapConfig {
+            source: Some(".matched = match(\"abc\", r'^a')".into()),
+            ..Default::default()
+        };
+        let context = TransformContext::default();
+        for engine in [
+            crate::config::RegexEngine::Rust,
+            crate::config::RegexEngine::Pcre2Jit,
+        ] {
+            config.regex_engine = engine;
+            config
+                .compile_vrl_program(
+                    context.enrichment_tables.clone(),
+                    context.metrics_storage.clone(),
+                    context.merged_schema_definition.clone(),
+                )
+                .unwrap();
+        }
+        assert_eq!(config.cache.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn regex_capture_policy_has_a_separate_compilation_cache_entry() {
+        let mut config = RemapConfig {
+            source: Some(". = parse_regex!(\"ab\", r'(?P<a>a)(?P<b>b)')".into()),
+            ..Default::default()
+        };
+        let context = TransformContext::default();
+        for mode in [
+            crate::config::RegexCaptureMap::Owned,
+            crate::config::RegexCaptureMap::Shared,
+        ] {
+            config.regex_capture_map = mode;
+            config
+                .compile_vrl_program(
+                    context.enrichment_tables.clone(),
+                    context.metrics_storage.clone(),
+                    context.merged_schema_definition.clone(),
+                )
+                .unwrap();
+        }
+        assert_eq!(config.cache.lock().unwrap().len(), 2);
+    }
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_event_field(

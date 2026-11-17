@@ -227,6 +227,8 @@ impl AnyCondition {
                 let vrl_config = VrlConfig {
                     source: s.clone(),
                     runtime: Default::default(),
+                    regex_engine: crate::config::RegexEngine::default(),
+                    regex_capture_map: crate::config::RegexCaptureMap::default(),
                 };
                 vrl_config.build(enrichment_tables, metrics_storage)
             }
@@ -285,7 +287,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
+            r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast, regex_engine: Rust, regex_capture_map: Owned }))"#,
             format!("{:?}", conf.condition)
         );
     }

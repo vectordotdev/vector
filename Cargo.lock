@@ -8571,6 +8571,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pcre2-sys"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18b9073c1a2549bd409bf4a32c94d903bb1a09bf845bc306ae148897fa0760a4"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13946,8 +13957,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.38.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#9da8fe4603ae7259887125b350474906842d447d"
+version = "0.39.0"
+source = "git+https://github.com/X4BNet/vrl.git?rev=4dbc9547ec70ae4a18f1dbf8ee27032903920743#4dbc9547ec70ae4a18f1dbf8ee27032903920743"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13999,6 +14010,7 @@ dependencies = [
  "lalrpop-util",
  "lz4_flex 0.14.0",
  "md-5 0.11.0",
+ "metrics",
  "mlua",
  "nom 8.0.0",
  "nom-language",
@@ -14007,6 +14019,7 @@ dependencies = [
  "onig",
  "ordered-float 5.5.1",
  "parse-size",
+ "pcre2-sys",
  "peeking_take_while",
  "percent-encoding",
  "pest",
@@ -14024,6 +14037,8 @@ dependencies = [
  "quoted_printable",
  "rand 0.10.3",
  "regex",
+ "regex-automata",
+ "regex-syntax",
  "relative-path 2.0.1",
  "reqwest 0.13.5",
  "reqwest-middleware",
@@ -14048,6 +14063,7 @@ dependencies = [
  "syslog_loose",
  "termcolor",
  "thiserror 2.0.18",
+ "thread_local",
  "tokio",
  "tracing 0.1.44",
  "ua-parser",
