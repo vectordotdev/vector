@@ -776,6 +776,11 @@ impl<'a> Builder<'a> {
                     .map(move |mut events| {
                         if !buffered_log_definitions.is_empty() {
                             for log in events.iter_logs_mut() {
+                                // Do not replace live in-memory schemas or per-record
+                                // snapshots restored from disk with a stale sink map.
+                                if log.metadata().has_explicit_schema_definition() {
+                                    continue;
+                                }
                                 let definition = log
                                     .metadata()
                                     .schema_origin()
@@ -987,12 +992,19 @@ impl<'a> Builder<'a> {
 
         // The stream is built inside the task so that helper tasks spawned by
         // `transform()` inherit the component's CPU counter.
+        let schema_routes =
+            vector_lib::transform::schema_lineage_routes(&output_id, &schema_definition_map);
         let transform = async move {
             let stream = t
                 .transform(Box::pin(filtered))
                 .map(move |mut events| {
                     for event in events.iter_events_mut() {
-                        update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+                        update_runtime_schema_definition(
+                            event,
+                            &output_id,
+                            &schema_definition_map,
+                            &schema_routes,
+                        );
                     }
                     let now = Instant::now();
                     latency_recorder.on_send(&mut events, now);

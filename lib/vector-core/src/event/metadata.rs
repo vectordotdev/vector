@@ -101,9 +101,9 @@ pub(super) struct Inner {
     /// in a source, and there is currently no use-case for reading the value in a sink.
     pub(crate) upstream_id: Option<Arc<OutputId>>,
 
-    /// The original source output carrying this event's schema lineage.
-    /// Unlike upstream_id, it survives each transform so that separate
-    /// source definitions remain distinguishable after multiple fan-in hops.
+    /// Stable schema lineage for this event's current route.
+    /// Each transform advances it deterministically from the previous lineage,
+    /// allowing multiple branches of one source to reconverge without aliasing.
     #[derivative(PartialEq = "ignore")]
     #[serde(default, skip)]
     pub(crate) schema_origin: Option<Arc<OutputId>>,
@@ -114,7 +114,8 @@ pub(super) struct Inner {
     /// `None` stands for the shared default definition, so creating an event allocates nothing
     /// for it.
     ///
-    /// TODO(Jean): must not skip serialization to track schemas across restarts.
+    /// The full type definition is not serialized; protobuf disk records carry
+    /// a snapshot of semantic meanings for correct sink normalization after reload.
     #[derivative(PartialEq(compare_with = "schema_definition_eq"))]
     #[serde(default, skip)]
     pub(crate) schema_definition: Option<Arc<schema::Definition>>,
@@ -588,6 +589,13 @@ impl EventMetadata {
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
         resolve_schema_definition(self.inner.schema_definition.as_ref())
+    }
+
+    /// Whether this event carries a runtime schema rather than the shared
+    /// fallback. Disk records with snapshotted meanings also set this bit.
+    #[must_use]
+    pub fn has_explicit_schema_definition(&self) -> bool {
+        self.inner.schema_definition.is_some()
     }
 
     /// Set the schema definition.

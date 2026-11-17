@@ -108,8 +108,11 @@ message Metadata {
   bytes source_event_id = 7;
   optional TraceLayout trace_layout = 8;
   optional string datadog_metric_unit = 9;
-  // Stable source output identity for restoring schema semantics after disk buffering.
+  // Route-specific schema lineage, distinct even for reconverging source branches.
   OutputId schema_origin = 10;
+  // Per-event meaning paths must outlive schema reloads and disk-buffer restarts.
+  map<string, string> schema_meanings = 11;
+  bool schema_meanings_present = 12;
 }
 
 message Metric {

@@ -1,5 +1,7 @@
 use std::fmt;
 
+use sha2::{Digest, Sha256};
+
 use vector_common::config::ComponentKey;
 
 use super::configurable_component;
@@ -17,6 +19,37 @@ pub struct OutputId {
 }
 
 impl OutputId {
+    /// A deterministic, route-specific schema key. Multiple branches from one
+    /// source must not alias when they reconverge downstream.
+    #[must_use]
+    pub fn schema_route(&self, output: &OutputId) -> Self {
+        let mut digest = Sha256::new();
+        digest.update(b"vector-schema-route-v1");
+        for id in [self, output] {
+            let component = id.component.to_string();
+            digest.update((component.len() as u64).to_be_bytes());
+            digest.update(component.as_bytes());
+            match &id.port {
+                Some(port) => {
+                    digest.update([1]);
+                    digest.update((port.len() as u64).to_be_bytes());
+                    digest.update(port.as_bytes());
+                }
+                None => digest.update([0]),
+            }
+        }
+        let hash = digest.finalize();
+        let mut name = String::from("_vector_schema_route_");
+        for byte in hash {
+            use std::fmt::Write;
+            write!(&mut name, "{byte:02x}").expect("write to String");
+        }
+        Self {
+            component: name.into(),
+            port: None,
+        }
+    }
+
     /// Some situations, for example when validating a config file requires running the
     /// `transforms::output` function to retrieve the outputs, but we don't have an
     /// `OutputId` from a source. This gives us an `OutputId` that we can use.

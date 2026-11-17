@@ -87,6 +87,7 @@ pub fn possible_definitions(
                 })
                 .schema_definitions(config.schema_enabled())
                 .into_iter()
+                .map(|(origin, definition)| (origin.schema_route(input), definition))
                 .collect::<Vec<_>>();
 
             if contains_never(&transform_definition) {
@@ -184,6 +185,9 @@ pub(super) fn expanded_definitions(
                             output
                                 .schema_definitions(config.schema_enabled())
                                 .into_iter()
+                                .map(|(origin, definition)| {
+                                    (origin.schema_route(input), definition)
+                                })
                                 .collect::<Vec<_>>(),
                         )
                     } else {
@@ -281,6 +285,7 @@ pub(crate) fn input_definitions(
                 })
                 .schema_definitions(config.schema_enabled())
                 .into_iter()
+                .map(|(origin, definition)| (origin.schema_route(input), definition))
                 .collect::<Vec<_>>();
 
             if contains_never(&transform_definitions) {
@@ -539,6 +544,13 @@ mod tests {
         }
     }
 
+    /// Expected schema lineage after a succession of output hops.
+    fn lineage(source: &str, outputs: &[&str]) -> OutputId {
+        outputs.iter().fold(OutputId::from(source), |id, output| {
+            id.schema_route(&OutputId::from(*output))
+        })
+    }
+
     type DefinitionWalker = fn(
         &[OutputId],
         &Config,
@@ -585,8 +597,14 @@ mod tests {
                 assert_eq!(
                     definitions,
                     vec![
-                        ("source".into(), Definition::default_legacy_namespace()),
-                        ("source".into(), Definition::default_legacy_namespace()),
+                        (
+                            lineage("source", &["shared", "left"]),
+                            Definition::default_legacy_namespace()
+                        ),
+                        (
+                            lineage("source", &["shared", "right"]),
+                            Definition::default_legacy_namespace()
+                        ),
                     ]
                 );
 
@@ -594,6 +612,28 @@ mod tests {
                 assert_eq!(repeated, definitions);
                 assert_eq!(calls.load(Ordering::Relaxed), 1);
             }
+        }
+    }
+
+    #[test]
+    fn diamond_branches_keep_distinct_schema_lineages() {
+        for walk in DEFINITION_WALKERS {
+            let (config, _) = diamond_config(true);
+            let definitions = walk(
+                &["left".into(), "right".into()],
+                &config,
+                &TableRegistry::default(),
+                &mut HashMap::new(),
+            )
+            .unwrap();
+            let lineages: std::collections::HashSet<_> =
+                definitions.iter().map(|(id, _)| id).collect();
+            assert_eq!(definitions.len(), 2);
+            assert_eq!(
+                lineages.len(),
+                2,
+                "branches from one source must retain different runtime schema keys"
+            );
         }
     }
 
@@ -620,9 +660,10 @@ mod tests {
                 definitions.into_iter().map(|(id, _)| id).collect();
             assert_eq!(
                 origins,
-                std::collections::HashSet::from(
-                    [OutputId::from("src_a"), OutputId::from("src_b"),]
-                ),
+                std::collections::HashSet::from([
+                    lineage("src_a", &["fan_in", "second_hop"]),
+                    lineage("src_b", &["fan_in", "second_hop"]),
+                ]),
                 "the second transform must not collapse two source definitions"
             );
         }
@@ -658,13 +699,13 @@ mod tests {
 
             assert_eq!(definitions.len(), 2);
             assert_eq!(
-                definitions[&OutputId::from("src_a")].meaning_path("host"),
+                definitions[&lineage("src_a", &["fan_in", "second_hop"])].meaning_path("host"),
                 Some(&vector_lib::lookup::OwnedTargetPath::event(
                     owned_value_path!("host_a")
                 )),
             );
             assert_eq!(
-                definitions[&OutputId::from("src_b")].meaning_path("host"),
+                definitions[&lineage("src_b", &["fan_in", "second_hop"])].meaning_path("host"),
                 Some(&vector_lib::lookup::OwnedTargetPath::event(
                     owned_value_path!("host_b")
                 )),
@@ -927,7 +968,7 @@ mod tests {
                             ),
                         ),
                         (
-                            "source-foo".into(),
+                            lineage("source-foo", &["transform-baz"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("baz"),
                                 Kind::regex(),
@@ -1068,7 +1109,7 @@ mod tests {
                     want: vec![
                         // Pipeline 1
                         (
-                            "Source 1".into(),
+                            lineage("Source 1", &["Transform 1"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-1"),
                                 Kind::regex(),
@@ -1077,7 +1118,7 @@ mod tests {
                         ),
                         // Pipeline 2
                         (
-                            "Source 2".into(),
+                            lineage("Source 2", &["Transform 2"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-2"),
                                 Kind::float().or_null(),
@@ -1086,7 +1127,7 @@ mod tests {
                         ),
                         // Pipeline 3
                         (
-                            "Transform 3".into(),
+                            lineage("Transform 3", &["Transform 5"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-5"),
                                 Kind::boolean(),

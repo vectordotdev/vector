@@ -181,6 +181,8 @@ pub enum DecodeError {
     NanFloat,
     #[snafu(display("event protobuf contained an invalid timestamp"))]
     InvalidTimestamp,
+    #[snafu(display("event protobuf contained an invalid schema meaning path: {path}"))]
+    InvalidSchemaMeaningPath { path: String },
     #[snafu(display(
         "event protobuf contained an AgentDDSketch whose k and n bin lists have different lengths"
     ))]
