@@ -134,9 +134,9 @@ jobs:
       - name: Check that Ring is absent
         if: ${{ matrix.check-no-ring }}
         run: |
-          ring="$(cargo tree --locked -p vector-core --no-default-features --features "${FEATURES}" -e normal --target all -i ring --depth 0)"
-          if [[ -n "${ring}" ]]; then
-            echo "Ring is in the normal dependency tree: ${ring}" >&2
+          tree="$(cargo tree --locked -p vector-core --no-default-features --features "${FEATURES}" -e normal --target all --prefix none)"
+          if grep -E '^ring v' <<<"${tree}"; then
+            echo "Ring is in the normal dependency tree" >&2
             exit 1
           fi
         env:
