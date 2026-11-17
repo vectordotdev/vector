@@ -35,7 +35,7 @@ use crate::{
         PrometheusKubernetesServiceDiscoveryAnnotationParseError,
         PrometheusKubernetesServiceDiscoveryTargetsDiscovered,
     },
-    sources::util::http_client::build_url,
+    sources::util::http_client::try_build_url,
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
@@ -562,15 +562,30 @@ impl PodDiscovery {
 
     /// Lists the targets of the Pods the watchers currently know about, with the source's
     /// `query` parameters added to each URL.
+    ///
+    /// A target whose URL becomes invalid with `query`, for example too long, is skipped.
     pub(crate) fn targets(&self, query: &QueryParameters) -> Vec<Target> {
-        let mut targets: Vec<Target> = self
+        let targets: Vec<Target> = self
             .stores
             .iter()
             .flat_map(|store| collect_targets(store, &self.parser_cfg))
+            .filter_map(|mut target| match try_build_url(&target.uri, query) {
+                Ok(uri) => {
+                    target.uri = uri;
+                    Some(target)
+                }
+                Err(error) => {
+                    emit(PrometheusKubernetesServiceDiscoveryAnnotationParseError {
+                        pod: &target.pod_name,
+                        namespace: &target.namespace,
+                        error: &format!(
+                            "failed to add the source's `query` to the target URL: {error}"
+                        ),
+                    });
+                    None
+                }
+            })
             .collect();
-        for target in &mut targets {
-            target.uri = build_url(&target.uri, query);
-        }
         emit(PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
             count: targets.len(),
         });
@@ -1719,6 +1734,50 @@ mod tests {
                 Err(BuildError::InvalidSelfNodeName { .. })
             ));
         }
+    }
+
+    #[test]
+    fn target_too_long_with_source_query_is_skipped() {
+        use crate::http::{ParameterValue, QueryParameterValue, QueryParameters};
+
+        let make = |name: &str, param: &str| {
+            make_pod(
+                name,
+                "ns",
+                &[
+                    ("prometheus.io/scrape", "true"),
+                    ("prometheus.io/port", "9100"),
+                    ("prometheus.io/param_q", param),
+                ],
+                &[],
+                vec![],
+                Some("10.0.0.1"),
+                None,
+            )
+        };
+        // The Pod's own URL fits the URI length limit, but not with the source's `query` added.
+        let long = "a".repeat(usize::from(u16::MAX) - 100);
+        let mut writer = reflector::store::Writer::<Pod>::default();
+        writer.apply_watcher_event(&watcher::Event::Apply(make("long", &long)));
+        writer.apply_watcher_event(&watcher::Event::Apply(make("short", "b")));
+        let discovery =
+            PodDiscovery::from_stores(vec![writer.as_reader()], &KubernetesScrapeConfig::default());
+        assert_eq!(
+            extract_targets(&make("long", &long), &default_cfg())
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let query: QueryParameters = [(
+            "source".to_owned(),
+            QueryParameterValue::SingleParam(ParameterValue::String("x".repeat(200))),
+        )]
+        .into();
+        let targets = discovery.targets(&query);
+        assert_eq!(targets.len(), 1, "{targets:?}");
+        assert_eq!(targets[0].pod_name, "short");
+        assert!(targets[0].uri.query().unwrap().contains("source=x"));
     }
 
     #[test]
