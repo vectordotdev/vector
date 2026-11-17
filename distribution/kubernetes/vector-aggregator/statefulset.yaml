@@ -8,8 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.61.0-distroless-libc"
+    app.kubernetes.io/component: aggregator
+    app.kubernetes.io/version: "0.62.0-distroless-libc"
   annotations: {}
 spec:
   replicas: 1
@@ -18,7 +18,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
-      app.kubernetes.io/component: Aggregator
+      app.kubernetes.io/component: aggregator
   minReadySeconds: 0
   serviceName: vector-headless
   template:
@@ -27,14 +27,14 @@ spec:
       labels:
         app.kubernetes.io/name: vector
         app.kubernetes.io/instance: vector
-        app.kubernetes.io/component: Aggregator
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:
       serviceAccountName: vector
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "docker.io/timberio/vector:0.61.0-distroless-libc"
+          image: "docker.io/timberio/vector:0.62.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir
