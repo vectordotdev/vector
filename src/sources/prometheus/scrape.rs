@@ -19,8 +19,9 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
-                build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, Redirects,
+                build_headers, build_url, call, default_interval, default_timeout,
+                warn_if_interval_too_low,
             },
         },
     },
@@ -102,10 +103,28 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "headers_example()"))]
     headers: HashMap<String, Vec<String>>,
 
+    /// HTTP redirect configuration.
+    ///
+    /// Redirects are followed by default, which matches the behavior of Prometheus.
+    #[serde(default)]
+    redirects: Redirects,
+
     tls: Option<TlsConfig>,
 
     auth: Option<Auth>,
 }
+
+/// The headers that are not forwarded to a different origin by default.
+///
+/// Prometheus re-applies the `Authorization` header when it follows a redirect, so that header is
+/// forwarded to match its behavior. The other headers that carry credentials are not.
+const PROMETHEUS_NOT_FORWARD_HEADERS: &[&str] = &[
+    "www-authenticate",
+    "cookie",
+    "cookie2",
+    "proxy-authorization",
+    "proxy-authenticate",
+];
 
 fn query_example() -> serde_json::Value {
     serde_json::json! ({
@@ -133,6 +152,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             honor_labels: false,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Redirects::default(),
             tls: None,
             auth: None,
         })
@@ -152,6 +172,9 @@ impl SourceConfig for PrometheusScrapeConfig {
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let headers = build_headers(&self.headers)?;
+        let redirects = self
+            .redirects
+            .resolve(true, PROMETHEUS_NOT_FORWARD_HEADERS)?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
@@ -166,6 +189,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers,
+            redirects,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             client: HttpClient::new(tls.into(), &cx.proxy)?,
@@ -396,6 +420,7 @@ mod test {
                 ),
                 ("X-My-Header".to_string(), vec!["custom-value".to_string()]),
             ]),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };
@@ -463,6 +488,7 @@ mod test {
             honor_labels: true,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };
@@ -513,6 +539,7 @@ mod test {
             honor_labels: false,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };
@@ -577,6 +604,7 @@ mod test {
             honor_labels: true,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };
@@ -644,6 +672,7 @@ mod test {
                 ),
             ]),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };
@@ -739,6 +768,7 @@ mod test {
                 honor_labels: false,
                 query: HashMap::new(),
                 headers: HashMap::new(),
+                redirects: Default::default(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
                 tls: None,
@@ -835,6 +865,7 @@ mod integration_tests {
             honor_labels: false,
             query: HashMap::new(),
             headers: HashMap::new(),
+            redirects: Default::default(),
             auth: None,
             tls: None,
         };

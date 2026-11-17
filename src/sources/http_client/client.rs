@@ -41,8 +41,9 @@ use crate::{
         http::HttpMethod,
         http_client,
         http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, build_headers, build_url, call,
-            default_interval, default_timeout, warn_if_interval_too_low,
+            DEFAULT_NOT_FORWARD_HEADERS, GenericHttpClientInputs, HttpClientBuilder, Redirects,
+            build_headers, build_url, call, default_interval, default_timeout,
+            warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -121,6 +122,12 @@ pub struct HttpClientConfig {
     /// `application/json` unless explicitly overridden in the `headers` configuration.
     #[serde(default)]
     pub body: Option<ParameterValue>,
+
+    /// HTTP redirect configuration.
+    ///
+    /// Redirects are not followed by default.
+    #[serde(default)]
+    pub redirects: Redirects,
 
     /// TLS configuration.
     pub tls: Option<TlsConfig>,
@@ -221,6 +228,7 @@ impl Default for HttpClientConfig {
             headers: HashMap::new(),
             method: default_http_method(),
             body: None,
+            redirects: Redirects::default(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -362,6 +370,7 @@ impl SourceConfig for HttpClientConfig {
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
         let headers = build_headers(&self.headers)?;
+        let redirects = self.redirects.resolve(false, DEFAULT_NOT_FORWARD_HEADERS)?;
 
         // Create context with the config for dynamic query parameter and body evaluation
         let context = HttpClientContext {
@@ -378,6 +387,7 @@ impl SourceConfig for HttpClientConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers,
+            redirects,
             content_type,
             auth: self.auth.clone(),
             client: HttpClient::new(tls.into(), &cx.proxy)?,
