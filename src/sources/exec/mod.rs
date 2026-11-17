@@ -1,4 +1,5 @@
 use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -197,6 +198,7 @@ const STDERR: &str = "stderr";
 const STREAM_KEY: &str = "stream";
 const PID_KEY: &str = "pid";
 const COMMAND_KEY: &str = "command";
+const HOST_KEY: &str = "host";
 
 impl_generate_config_from_default!(ExecConfig);
 
@@ -297,9 +299,9 @@ impl SourceConfig for ExecConfig {
                         .host_key()
                         .map_or(OwnedValuePath::root(), Clone::clone),
                 )),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST_KEY),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
@@ -366,14 +368,14 @@ async fn run_scheduled(
         match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(ExecFailedError {
+                    emit(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(error) => {
-                emit!(ExecTimeoutError {
+                emit(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                     error,
@@ -414,7 +416,7 @@ async fn run_streaming(
 
             // handle command finished
             if let Err(command_error) = output {
-                emit!(ExecFailedError {
+                emit(ExecFailedError {
                     command: config.command_line().as_str(),
                     error: command_error,
                 });
@@ -437,7 +439,7 @@ async fn run_streaming(
         .await;
 
         if let Err(command_error) = output {
-            emit!(ExecFailedError {
+            emit(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -492,7 +494,7 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
 
     'outer: loop {
         tokio::select! {
@@ -517,7 +519,7 @@ async fn run_command(
                         bytes_received.emit(ByteSize(byte_size));
 
                         let count = events.len();
-                        emit!(ExecEventsReceived {
+                        emit(ExecEventsReceived {
                             count,
                             command: config.command_line().as_str(),
                             byte_size: events.estimated_json_encoded_size_of(),
@@ -527,7 +529,7 @@ async fn run_command(
                             handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace);
                         }
                         if (out.send_batch(events).await).is_err() {
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             break;
                         }
                     },
@@ -561,7 +563,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(ExecCommandExecuted {
+    emit(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -577,9 +579,9 @@ fn shutdown_child(child: &mut tokio::process::Child, command: &tokio::process::C
                 nix::unistd::Pid::from_raw(pid),
                 nix::sys::signal::Signal::SIGTERM,
             ) {
-                emit!(ExecFailedToSignalChildError {
+                emit(ExecFailedToSignalChildError {
                     command,
-                    error: ExecFailedToSignalChild::SignalError(error)
+                    error: ExecFailedToSignalChild::SignalError(error),
                 });
                 false
             } else {
@@ -587,16 +589,16 @@ fn shutdown_child(child: &mut tokio::process::Child, command: &tokio::process::C
             }
         }
         Some(Err(err)) => {
-            emit!(ExecFailedToSignalChildError {
+            emit(ExecFailedToSignalChildError {
                 command,
-                error: ExecFailedToSignalChild::FailedToMarshalPid(err)
+                error: ExecFailedToSignalChild::FailedToMarshalPid(err),
             });
             false
         }
         None => {
-            emit!(ExecFailedToSignalChildError {
+            emit(ExecFailedToSignalChildError {
                 command,
-                error: ExecFailedToSignalChild::NoPid
+                error: ExecFailedToSignalChild::NoPid,
             });
             false
         }
@@ -612,9 +614,9 @@ async fn shutdown_child(
     match child.kill().await {
         Ok(()) => true,
         Err(err) => {
-            emit!(ExecFailedToSignalChildError {
+            emit(ExecFailedToSignalChildError {
                 command: &command,
-                error: ExecFailedToSignalChild::IoError(err)
+                error: ExecFailedToSignalChild::IoError(err),
             });
             false
         }
@@ -706,7 +708,7 @@ fn handle_event(
                 ExecConfig::NAME,
                 log,
                 log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-                path!("host"),
+                path!(HOST_KEY),
                 hostname.clone(),
             );
         }
@@ -754,7 +756,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     if sender.send(message).await.is_err() {
                         // If the receive half of the channel is closed, either due to close being
                         // called or the Receiver handle dropping, the function returns an error.
-                        emit!(ExecChannelClosedError);
+                        emit(ExecChannelClosedError);
                         break;
                     }
                 }

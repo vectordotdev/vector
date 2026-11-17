@@ -1,7 +1,7 @@
 use futures::TryFutureExt;
 use prost::Message;
 use smallvec::SmallVec;
-use tonic::{Request, Response, Status, body::BoxBody};
+use tonic::{Request, Response, Status, body::Body as TonicBody};
 use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
 use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 use vector_lib::{
@@ -9,7 +9,7 @@ use vector_lib::{
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatusReceiver, Event},
-    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered, emit},
     opentelemetry::proto::collector::{
         logs::v1::{
             ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
@@ -37,7 +37,7 @@ use crate::{
     },
 };
 
-pub(crate) fn middleware_error_response(error: MiddlewareError) -> http::Response<BoxBody> {
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> http::Response<TonicBody> {
     Status::unavailable(error.message()).into_http()
 }
 
@@ -171,7 +171,7 @@ impl Service {
             .send_batch_named(log_name, events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .await?;
@@ -186,7 +186,7 @@ fn response_with_acknowledgement<T>(
     let mut response = Response::new(message);
     if let Some(receiver) = receiver {
         // Request control looks this slot up by the native gRPC response type.
-        let pending = PendingAcknowledgement::<http::Response<BoxBody>>::new(
+        let pending = PendingAcknowledgement::<http::Response<TonicBody>>::new(
             receiver,
             acknowledgement_failure_response,
         );
@@ -197,7 +197,7 @@ fn response_with_acknowledgement<T>(
     response
 }
 
-fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<BoxBody> {
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<TonicBody> {
     match status {
         AcknowledgementFailure::Errored => Status::internal("Delivery error"),
         AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),

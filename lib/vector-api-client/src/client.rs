@@ -1,7 +1,7 @@
 use http::{Uri, uri::Scheme};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio_stream::{Stream, StreamExt};
-use tonic::body::BoxBody;
+use tonic::body::Body as TonicBody;
 use tonic_health::pb::{
     HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
 };
@@ -16,7 +16,8 @@ use crate::{
     error::{Error, Result},
     proto::{
         GetAllocationTracingStatusRequest, GetAllocationTracingStatusResponse,
-        GetComponentsRequest, GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
+        GetCapabilitiesRequest, GetCapabilitiesResponse, GetComponentsRequest,
+        GetComponentsResponse, GetMetaRequest, GetMetaResponse, MetricName,
         StreamComponentAllocatedBytesRequest, StreamComponentAllocatedBytesResponse,
         StreamComponentMetricsRequest, StreamComponentMetricsResponse, StreamHeartbeatRequest,
         StreamHeartbeatResponse, StreamOutputEventsRequest, StreamOutputEventsResponse,
@@ -26,7 +27,7 @@ use crate::{
 };
 
 /// Sends tonic's gRPC requests over Vector's shared HTTP/2 client.
-type Transport = GrpcTransport<BoxBody>;
+type Transport = GrpcTransport<TonicBody>;
 
 /// gRPC client for the Vector observability API
 ///
@@ -163,6 +164,20 @@ impl Client {
         let response = client
             .get_components(GetComponentsRequest { limit })
             .await?;
+        Ok(response.into_inner())
+    }
+
+    /// Get capabilities of the connected Vector instance.
+    ///
+    /// Returns allocation tracing status and all registered metric names with their kinds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the RPC fails, including
+    /// `Unimplemented` on older servers that do not support this RPC.
+    pub async fn get_capabilities(&mut self) -> Result<GetCapabilitiesResponse> {
+        let client = self.ensure_connected()?;
+        let response = client.get_capabilities(GetCapabilitiesRequest {}).await?;
         Ok(response.into_inner())
     }
 
@@ -320,6 +335,8 @@ mod tests {
     async fn test_not_connected_error() {
         let mut client = Client::new("http://localhost:9999".parse().unwrap());
         let result = client.health().await;
+        assert!(matches!(result, Err(Error::NotConnected)));
+        let result = client.get_capabilities().await;
         assert!(matches!(result, Err(Error::NotConnected)));
     }
 

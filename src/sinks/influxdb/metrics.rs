@@ -11,6 +11,7 @@ use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     finalization::{EventFinalizers, EventStatus},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
@@ -37,8 +38,7 @@ use crate::{
         util::{
             BatchConfig, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{
-                MetricNormalize, MetricNormalizer, MetricSet, MetricSetSettings,
-                compress_distribution,
+                MetricNormalize, MetricNormalizer, MetricSet, compress_distribution,
             },
             builder::SinkBuilderExt,
             encode_namespace,
@@ -205,7 +205,7 @@ impl ValidatedSink for InfluxDbConfig {
             tags: self.tags.clone(),
             quantiles: self.quantiles.clone(),
         };
-        let service = HttpService::new(client, request_builder).with_response_decompression();
+        let service = HttpService::new(client, request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 self.request.into_settings(),
@@ -240,14 +240,10 @@ struct MetricBatch {
     json_size: JsonSize,
 }
 
-fn metric_set(max_events: usize) -> MetricSet {
-    MetricSet::new(MetricSetSettings {
-        max_events: Some(max_events),
-        ..Default::default()
-    })
-}
-
 /// Aggregates metrics by series until a batch holds `max_events` series.
+///
+/// The batch is taken as soon as it holds `max_events` series, so the set never needs to evict and
+/// uses the default `MetricSet` without LRU bookkeeping.
 struct MetricBatchConfig {
     metrics: MetricSet,
     finalizers: EventFinalizers,
@@ -260,7 +256,7 @@ struct MetricBatchConfig {
 impl MetricBatchConfig {
     fn new(settings: BatcherSettings) -> Self {
         Self {
-            metrics: metric_set(settings.item_limit),
+            metrics: MetricSet::default(),
             finalizers: EventFinalizers::default(),
             count: 0,
             byte_size: 0,
@@ -279,7 +275,7 @@ impl StreamBatchConfig<NormalizedMetric> for MetricBatchConfig {
     }
 
     fn take_batch(&mut self) -> MetricBatch {
-        let metrics = mem::replace(&mut self.metrics, metric_set(self.settings.item_limit));
+        let metrics = mem::take(&mut self.metrics);
         let mut metrics = metrics.into_metrics();
         for metric in &mut metrics {
             if let MetricValue::Distribution { samples, .. } = metric.data_mut().value_mut() {
@@ -482,7 +478,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(InfluxdbEncodingError {
+            emit(InfluxdbEncodingError {
                 error_message,
                 count,
             });

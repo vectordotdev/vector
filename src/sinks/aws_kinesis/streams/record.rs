@@ -11,7 +11,7 @@ use super::{
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub struct KinesisStreamRecord {
+pub(super) struct KinesisStreamRecord {
     pub record: KinesisRecord,
 }
 
@@ -49,7 +49,7 @@ impl Record for KinesisStreamRecord {
 }
 
 #[derive(Clone)]
-pub struct KinesisStreamClient {
+pub(super) struct KinesisStreamClient {
     pub client: KinesisClient,
 }
 

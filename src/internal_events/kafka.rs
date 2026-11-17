@@ -1,6 +1,6 @@
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, GaugeName, InternalEvent},
+    internal_event::{CounterName, GaugeName, InternalEvent, LossyF64},
 };
 
 #[cfg(feature = "sinks-kafka")]
@@ -16,11 +16,10 @@ pub(crate) struct KafkaStatisticsReceived<'a> {
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
-        gauge!(GaugeName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
-        gauge!(GaugeName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
+        gauge!(GaugeName::KafkaQueueMessages).set(LossyF64(self.statistics.msg_cnt));
+        gauge!(GaugeName::KafkaQueueMessagesBytes).set(LossyF64(self.statistics.msg_size));
         counter!(CounterName::KafkaRequestsTotal).absolute(self.statistics.tx as u64);
         counter!(CounterName::KafkaRequestsBytesTotal).absolute(self.statistics.tx_bytes as u64);
         counter!(CounterName::KafkaResponsesTotal).absolute(self.statistics.rx as u64);
@@ -40,7 +39,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
                         "topic_id" => topic_id.clone(),
                         "partition_id" => partition_id.to_string(),
                     )
-                    .set(partition.consumer_lag as f64);
+                    .set(LossyF64(partition.consumer_lag));
                 }
             }
         }

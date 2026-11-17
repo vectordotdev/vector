@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -285,16 +286,16 @@ pub(crate) struct StatsdDeserializer {
 }
 
 impl StatsdDeserializer {
-    pub fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
             // The other modes emit a different `EventsReceived`.
-            events_received: Some(register!(EventsReceived)),
+            events_received: Some(register(EventsReceived)),
             parser: Parser::new(sanitize, convert_to),
         }
     }
 
-    pub const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: None,
             events_received: None,
@@ -303,7 +304,7 @@ impl StatsdDeserializer {
     }
 
     #[cfg(unix)]
-    pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
+    pub(crate) const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
             events_received: None,
@@ -322,7 +323,7 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         if let Some(mode) = self.socket_mode
             && mode == SocketMode::Udp
         {
-            emit!(SocketBytesReceived {
+            emit(SocketBytesReceived {
                 mode,
                 byte_size: bytes.len(),
             });
@@ -354,7 +355,7 @@ async fn statsd_udp(
     let socket = try_bind_udp_socket(config.address, listenfd)
         .await
         .map_err(|error| {
-            emit!(SocketBindError {
+            emit(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
             });
@@ -386,13 +387,13 @@ async fn statsd_udp(
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if (out.send_batch(events).await).is_err() {
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                 }
             }
             Err(error) => {
-                emit!(SocketReceiveError {
+                emit(SocketReceiveError {
                     mode: SocketMode::Udp,
-                    error
+                    error,
                 });
             }
         }

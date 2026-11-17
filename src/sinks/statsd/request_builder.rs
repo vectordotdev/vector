@@ -18,14 +18,14 @@ use crate::{
 };
 
 /// Incremental request builder specific to `StatsD`.
-pub struct StatsdRequestBuilder {
+pub(super) struct StatsdRequestBuilder {
     encoder: StatsdEncoder,
     request_max_size: usize,
     encode_buf: BytesMut,
 }
 
 impl StatsdRequestBuilder {
-    pub fn new(default_namespace: Option<String>, socket_mode: SocketMode) -> Self {
+    pub(super) fn new(default_namespace: Option<String>, socket_mode: SocketMode) -> Self {
         let encoder = StatsdEncoder::new(default_namespace);
         let request_max_size = match socket_mode {
             // Following the recommended advice [1], we use a datagram size that should reasonably

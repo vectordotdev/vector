@@ -96,7 +96,7 @@ pub(crate) struct BucketAggregationKey {
     pub(crate) synthetics: bool,
 }
 
-pub struct Aggregator {
+pub(crate) struct Aggregator {
     /// The key represents the timestamp (in nanoseconds) of the beginning of the time window (that lasts 10 seconds) on
     /// which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
@@ -123,7 +123,7 @@ pub struct Aggregator {
 impl Aggregator {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(clippy::cast_sign_loss, reason = "Preserve timestamp conversions.")]
-    pub fn new(default_api_key: Arc<str>) -> Self {
+    pub(crate) fn new(default_api_key: Arc<str>) -> Self {
         Self {
             buckets: BTreeMap::new(),
             oldest_timestamp: align_timestamp(
