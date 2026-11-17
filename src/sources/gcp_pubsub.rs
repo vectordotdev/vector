@@ -517,7 +517,7 @@ impl PubsubSource {
         let (finalizer, mut ack_stream) = Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
 
-        loop {
+        let shutdown_token = loop {
             tokio::select! {
                 biased;
                 receipts = ack_stream.next() => match receipts {
@@ -532,7 +532,7 @@ impl PubsubSource {
                     }
                     None => return State::Shutdown,
                 },
-                _ = &mut self.shutdown => break,
+                token = &mut self.shutdown => break token,
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
                         self.handle_response(
@@ -575,9 +575,12 @@ impl PubsubSource {
                         .unwrap_or_else(|_| unreachable!("request stream never closes"));
                 }
             }
-        }
+        };
 
+        // Keep shutdown incomplete while draining so the coordinator can still enforce its
+        // deadline if downstream finalization or RPC completion stalls.
         Self::finish_stream(finalizer, ack_stream, ack_ids_sender, stream).await;
+        drop(shutdown_token);
         State::Shutdown
     }
 
@@ -822,14 +825,19 @@ mod tests {
     use prost::Message as _;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
+        sync::oneshot,
+        task::JoinHandle,
         time::timeout,
     };
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
-    use crate::tls::{
-        MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH,
-        TlsEnableableConfig,
+    use crate::{
+        shutdown::SourceShutdownCoordinator,
+        tls::{
+            MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH,
+            TlsEnableableConfig,
+        },
     };
 
     #[test]
@@ -1162,14 +1170,16 @@ mod tests {
         assert_shuts_down(test_config(endpoint), true, ready).await;
     }
 
-    #[rstest::rstest]
-    #[tokio::test]
-    async fn flushes_acknowledgements_on_shutdown(
-        #[values(false, true)] finalize_after_shutdown: bool,
+    async fn acknowledgement_peer() -> (
+        String,
+        oneshot::Receiver<Vec<String>>,
+        oneshot::Sender<()>,
+        JoinHandle<()>,
     ) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
-        let (observed, acknowledgements) = tokio::sync::oneshot::channel();
+        let (observed, acknowledgements) = oneshot::channel();
+        let (finish, finish_rx) = oneshot::channel();
         let peer = tokio::spawn(async move {
             let (socket, _) = listener.accept().await.unwrap();
             let mut connection = h2::server::handshake(socket).await.unwrap();
@@ -1219,47 +1229,108 @@ mod tests {
                         ack_ids.extend(request.ack_ids);
                     }
                 }
+                observed.send(ack_ids).unwrap();
+                // Keep the RPC open after the request is half-closed so the test can verify
+                // shutdown coordination while the source waits for the server to finish.
+                finish_rx.await.unwrap();
                 let mut trailers = http::HeaderMap::new();
                 trailers.insert("grpc-status", "0".parse().unwrap());
                 _ = responses.send_trailers(trailers);
-                observed.send(ack_ids).unwrap();
             });
             while connection.accept().await.is_some() {}
         });
 
+        (endpoint, acknowledgements, finish, peer)
+    }
+
+    #[rstest::rstest]
+    #[case::finalize_before_shutdown(false, false)]
+    #[case::finalize_after_shutdown(true, false)]
+    #[case::deadline_during_finalization(true, true)]
+    #[case::deadline_during_rpc(false, true)]
+    #[tokio::test]
+    async fn flushes_acknowledgements_on_shutdown(
+        #[case] finalize_after_shutdown: bool,
+        #[case] force_after_deadline: bool,
+    ) {
+        let (endpoint, mut acknowledgements, finish, peer) = acknowledgement_peer().await;
         let component = crate::config::ComponentKey::from("pubsub");
         let (out, mut events) = SourceSender::new_test();
-        let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
+        let mut shutdown = SourceShutdownCoordinator::default();
+        let (signal, force_shutdown) = shutdown.register_source(&component, false);
+        let mut context = SourceContext::new_test(out, None);
+        context.key = component.clone();
+        context.shutdown = signal;
         context.acknowledgements = true;
         let source = tokio::spawn(test_config(endpoint).build(context).await.unwrap());
         let mut event = timeout(Duration::from_secs(10), events.next())
             .await
             .unwrap()
             .unwrap();
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-        let shutdown_complete =
-            finalize_after_shutdown.then(|| shutdown.shutdown_source(&component, deadline));
-        if finalize_after_shutdown {
-            tokio::task::yield_now().await;
-            assert!(!source.is_finished(), "Shutdown must wait for finalization");
+        let finalize = |event: &mut Event| {
+            event
+                .metadata_mut()
+                .update_status(crate::event::EventStatus::Delivered);
+            event.metadata_mut().update_sources();
+        };
+        if !finalize_after_shutdown {
+            finalize(&mut event);
         }
-        event
-            .metadata_mut()
-            .update_status(crate::event::EventStatus::Delivered);
-        event.metadata_mut().update_sources();
-        drop(event);
 
-        let shutdown_complete =
-            shutdown_complete.unwrap_or_else(|| shutdown.shutdown_source(&component, deadline));
-        assert!(shutdown_complete.await);
-        source.await.unwrap().unwrap();
-        assert_eq!(
-            timeout(Duration::from_secs(10), acknowledgements)
+        let deadline = tokio::time::Instant::now()
+            + Duration::from_secs(if force_after_deadline { 1 } else { 10 });
+        let shutdown_complete = shutdown.shutdown_source(&component, deadline);
+        tokio::pin!(shutdown_complete);
+        if !finalize_after_shutdown {
+            assert_eq!(
+                timeout(Duration::from_secs(10), &mut acknowledgements)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                ["ack-id"]
+            );
+        }
+
+        if force_after_deadline {
+            assert!(
+                !timeout(Duration::from_secs(10), &mut shutdown_complete)
+                    .await
+                    .unwrap(),
+                "An unfinished source must reach the shutdown deadline"
+            );
+            timeout(Duration::from_secs(10), force_shutdown)
                 .await
-                .unwrap()
-                .unwrap(),
-            ["ack-id"]
-        );
+                .expect("The shutdown deadline must trigger forced shutdown");
+        } else {
+            assert!(
+                timeout(Duration::from_millis(100), &mut shutdown_complete)
+                    .await
+                    .is_err(),
+                "The coordinator must wait for finalization and RPC completion"
+            );
+        }
+
+        // Observe the force signal without cancelling the source, then release both stalls
+        // so the test can join the source and verify acknowledgement delivery.
+        if finalize_after_shutdown {
+            finalize(&mut event);
+            assert_eq!(
+                timeout(Duration::from_secs(10), &mut acknowledgements)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                ["ack-id"]
+            );
+        }
+        finish.send(()).unwrap();
+        if !force_after_deadline {
+            assert!(shutdown_complete.await);
+        }
+        timeout(Duration::from_secs(10), source)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
         peer.abort();
     }
 
