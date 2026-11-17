@@ -9,6 +9,7 @@
     - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
+  - [Dependency cooldown](#dependency-cooldown)
   - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
@@ -204,6 +205,21 @@ see how dependencies are reviewed in the
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
+
+### Dependency cooldown
+
+Routine dependency updates use a seven-day cooldown in Cargo and Dependabot.
+Use the pinned toolchain so Cargo enforces the cooldown. Versions already in `Cargo.lock` are retained;
+the Cargo cooldown does not apply to Git dependencies, registry versions without publication timestamps,
+or `cargo install`.
+
+For an urgent, reviewed update, override the Cargo cooldown for that command:
+
+```bash
+CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow cargo update -p <crate> --precise <version>
+```
+
+Dependabot security updates bypass its cooldown automatically.
 
 ### Minimum Supported Rust Version
 

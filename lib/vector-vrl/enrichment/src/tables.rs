@@ -187,8 +187,7 @@ impl TableRegistry {
         match &**self.tables.load() {
             Some(tables) => tables
                 .get(table)
-                .map(|table| table.index_fields())
-                .unwrap_or_default(),
+                .map_or_else(Vec::new, |table| table.index_fields()),
             None => Vec::new(),
         }
     }

@@ -1523,7 +1523,7 @@ mod tests {
             let mut next_pending = Vec::new();
             let mut hit_limit = false;
             for metric in pending.drain(..) {
-                match encoder.try_encode(metric.clone()) {
+                match encoder.try_encode(metric) {
                     Ok(None) => {}
                     Ok(Some(returned_metric)) => {
                         hit_limit = true;
