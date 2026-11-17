@@ -375,6 +375,8 @@ mod test {
 
     fn get_condition(message: &str) -> AnyCondition {
         AnyCondition::from(ConditionConfig::Vrl(VrlConfig {
+            regex_engine: crate::config::RegexEngine::default(),
+            regex_capture_map: crate::config::RegexCaptureMap::default(),
             source: format!(r#".message == "{message}""#),
             runtime: VrlRuntime::default(),
         }))

@@ -620,6 +620,9 @@ tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 tls-aws-lc = ["vector-lib/tls-aws-lc"]
 tls-ring = ["vector-lib/tls-ring"]
 
+# Optional native execution backend for VRL regex operators.
+vrl-pcre2-jit = ["vrl/pcre2-jit"]
+
 # VRL functions control features
 vrl-functions-env = ["vrl/enable_env_functions"]
 vrl-functions-system = ["vrl/enable_system_functions"]

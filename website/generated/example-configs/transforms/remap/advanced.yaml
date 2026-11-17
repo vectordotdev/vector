@@ -7,6 +7,8 @@ transforms:
     drop_on_error: false
     measure_cpu_usage: false
     metric_tag_values: single
+    regex_capture_map: owned
+    regex_engine: rust
     reroute_dropped: false
     source: |-
       . = parse_json!(.message)

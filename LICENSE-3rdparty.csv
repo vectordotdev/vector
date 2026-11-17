@@ -234,7 +234,6 @@ data-encoding,https://github.com/ia0/data-encoding,MIT,The data-encoding Authors
 data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
 databend-client,https://github.com/databendlabs/bendsql,Apache-2.0,Databend Authors <opensource@databend.com>
 databricks-zerobus-ingest-sdk,https://github.com/databricks/zerobus-sdk,Apache-2.0,Databricks
-datadog-agent-metrics-v3,https://github.com/DataDog/saluki,Apache-2.0,"Datadog, Inc."
 dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 deadpool,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
 deadpool-runtime,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
@@ -589,6 +588,7 @@ parquet,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.ap
 parse-size,https://github.com/kennytm/parse-size,MIT,kennytm <kennytm@gmail.com>
 pastey,https://github.com/as1100k/pastey,MIT OR Apache-2.0,"Aditya Kumar <git@adityais.dev>, David Tolnay <dtolnay@gmail.com>"
 pbkdf2,https://github.com/RustCrypto/password-hashes,MIT OR Apache-2.0,RustCrypto Developers
+pcre2-sys,https://github.com/BurntSushi/rust-pcre2,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 peeking_take_while,https://github.com/fitzgen/peeking_take_while,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
 pem,https://github.com/jcreekmore/pem-rs,MIT,Jonathan Creekmore <jonathan@thecreekmores.org>
 pem-rfc7468,https://github.com/RustCrypto/formats/tree/master/pem-rfc7468,Apache-2.0 OR MIT,RustCrypto Developers

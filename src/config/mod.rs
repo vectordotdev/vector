@@ -1474,4 +1474,4 @@ mod resource_config_tests {
 }
 
 mod regex;
-pub use self::regex::RegexCaptureMap;
+pub use self::regex::{RegexCaptureMap, RegexEngine};

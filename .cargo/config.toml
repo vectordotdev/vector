@@ -2,6 +2,8 @@
 vdev = "run --quiet --package vdev --"
 
 [env]
+# Bundle PCRE2 with the fork rather than adding a runtime shared-library dependency.
+PCRE2_SYS_STATIC = { value = "1", force = true }
 # Build jemalloc assuming 64K pages so binaries also run on aarch64 hosts whose
 # kernels ship with a 64K page size (notably EL8 aarch64). On 4K-page hosts this
 # coarsens jemalloc's allocation granularity; no regression was measured in

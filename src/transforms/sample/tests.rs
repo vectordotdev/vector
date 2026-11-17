@@ -891,6 +891,8 @@ fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),
         runtime: VrlRuntime::default(),
+        regex_engine: crate::config::RegexEngine::default(),
+        regex_capture_map: crate::config::RegexCaptureMap::default(),
     };
 
     vrl_config

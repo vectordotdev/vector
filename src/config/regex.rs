@@ -21,3 +21,24 @@ impl RegexCaptureMap {
         }
     }
 }
+
+/// Execution backend for all VRL regex operators in a compiled program.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum RegexEngine {
+    /// Preserve the existing Rust regex implementation.
+    #[default]
+    Rust,
+    /// Compile regex literals with PCRE2 JIT; requires the vrl-pcre2-jit build feature.
+    Pcre2Jit,
+}
+
+impl RegexEngine {
+    pub(crate) const fn vrl(self) -> vrl::value::regex_engine::RegexEngine {
+        match self {
+            Self::Rust => vrl::value::regex_engine::RegexEngine::Rust,
+            Self::Pcre2Jit => vrl::value::regex_engine::RegexEngine::Pcre2Jit,
+        }
+    }
+}

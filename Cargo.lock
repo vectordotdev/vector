@@ -8571,6 +8571,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pcre2-sys"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18b9073c1a2549bd409bf4a32c94d903bb1a09bf845bc306ae148897fa0760a4"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13999,6 +14010,7 @@ dependencies = [
  "lalrpop-util",
  "lz4_flex 0.14.0",
  "md-5 0.11.0",
+ "metrics",
  "mlua",
  "nom 8.0.0",
  "nom-language",
@@ -14007,6 +14019,7 @@ dependencies = [
  "onig",
  "ordered-float 5.5.1",
  "parse-size",
+ "pcre2-sys",
  "peeking_take_while",
  "percent-encoding",
  "pest",
@@ -14025,6 +14038,7 @@ dependencies = [
  "rand 0.10.3",
  "regex",
  "regex-automata",
+ "regex-syntax",
  "relative-path 2.0.1",
  "reqwest 0.13.5",
  "reqwest-middleware",

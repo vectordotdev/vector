@@ -95,6 +95,34 @@ generated: components: transforms: remap: configuration: {
 			}
 		}
 	}
+	regex_capture_map: {
+		description: "Materialization of regex capture maps: independent owned strings or shared full-match bytes."
+		required:    false
+		type: string: {
+			default: "owned"
+			enum: {
+				owned: "Copy captured strings independently, retaining the existing ownership policy."
+				shared: """
+					Share one owned copy of each full match between its captured fields.
+					Retains that full match while any captured field remains live.
+					"""
+			}
+		}
+	}
+	regex_engine: {
+		description: """
+			Backend for VRL regex matching, captures, replacement, splitting, sets, redaction and sieve.
+			Rust is the default. PCRE2 JIT validates literal support at configuration time.
+			"""
+		required: false
+		type: string: {
+			default: "rust"
+			enum: {
+				pcre2_jit: "Compile regex literals with PCRE2 JIT; requires the vrl-pcre2-jit build feature."
+				rust:      "Preserve the existing Rust regex implementation."
+			}
+		}
+	}
 	reroute_dropped: {
 		description: """
 			Reroutes dropped events to a named output instead of halting processing on them.
