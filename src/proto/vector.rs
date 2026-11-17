@@ -3,5 +3,8 @@
 
 tonic::include_proto!("vector");
 
+mod copying_codec;
+use copying_codec::CopyingProstCodec;
+
 pub use vector_client::VectorClient as Client;
 pub use vector_server::{Vector as Service, VectorServer as Server};
