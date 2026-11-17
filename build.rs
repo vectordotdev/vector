@@ -172,8 +172,6 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        // Vector events can outlive their incoming RPC and be split across sink batches.
-        // Give only that service a copying decoder; keep other gRPC services unchanged.
         prost_build
             .service_generator(Box::new(GrpcServiceGenerator))
             .protoc_arg("--experimental_allow_proto3_optional")
