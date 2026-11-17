@@ -289,7 +289,7 @@ pub enum FingerprintConfig {
     Checksum {
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         /// If the file is compressed, the number of bytes refer to the header in the uncompressed content. Only
-        /// gzip is supported at this time.
+        /// gzip and zstd are supported at this time.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
         #[serde(default = "default_ignored_header_bytes")]
@@ -299,7 +299,7 @@ pub enum FingerprintConfig {
         /// The number of lines to read for generating the checksum.
         ///
         /// The number of lines are determined from the uncompressed content if the file is compressed. Only
-        /// gzip is supported at this time.
+        /// gzip and zstd supported at this time.
         ///
         /// If the file has less than this amount of lines, it won’t be read at all.
         #[serde(default = "default_lines")]
