@@ -143,6 +143,9 @@ generated: components: sources: prometheus_scrape: configuration: {
 																			Defaults to `prometheus.io`, matching the de-facto Prometheus convention.
 																			The source reads `<prefix>/scrape`, `<prefix>/port`, `<prefix>/path`,
 																			`<prefix>/scheme`, and `<prefix>/param_<name>` from Pod annotations.
+
+																			Must be a DNS subdomain, as Kubernetes requires for annotation prefixes. Uppercase letters
+																			are allowed, as in Kubernetes annotation keys.
 																			"""
 								required: false
 								type: string: {
@@ -151,8 +154,13 @@ generated: components: sources: prometheus_scrape: configuration: {
 								}
 							}
 							default_path: {
-								description: "Default scrape path when `<prefix>/path` is not set on a Pod."
-								required:    false
+								description: """
+																			Default scrape path when `<prefix>/path` is not set on a Pod.
+
+																			A leading `/` is added if missing. This path and the `<prefix>/path` annotation can't
+																			contain `?` or `#`; set query parameters with `<prefix>/param_<name>` annotations instead.
+																			"""
+								required: false
 								type: string: {
 									default: "/metrics"
 									examples: ["/metrics"]

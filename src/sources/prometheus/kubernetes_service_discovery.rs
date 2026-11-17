@@ -111,6 +111,9 @@ pub(crate) struct KubernetesScrapeConfig {
     /// Defaults to `prometheus.io`, matching the de-facto Prometheus convention.
     /// The source reads `<prefix>/scrape`, `<prefix>/port`, `<prefix>/path`,
     /// `<prefix>/scheme`, and `<prefix>/param_<name>` from Pod annotations.
+    ///
+    /// Must be a DNS subdomain, as Kubernetes requires for annotation prefixes. Uppercase letters
+    /// are allowed, as in Kubernetes annotation keys.
     #[configurable(metadata(docs::examples = "prometheus.io"))]
     annotation_prefix: String,
 
@@ -156,6 +159,9 @@ pub(crate) struct KubernetesScrapeConfig {
     default_scheme: Scheme,
 
     /// Default scrape path when `<prefix>/path` is not set on a Pod.
+    ///
+    /// A leading `/` is added if missing. This path and the `<prefix>/path` annotation can't
+    /// contain `?` or `#`; set query parameters with `<prefix>/param_<name>` annotations instead.
     #[configurable(metadata(docs::examples = "/metrics"))]
     default_path: String,
 
@@ -184,15 +190,12 @@ impl KubernetesScrapeConfig {
     ///
     /// The returned [`PodDiscovery`] owns the watchers, so dropping it stops them.
     pub(crate) async fn start_discovery(&self) -> crate::Result<PodDiscovery> {
+        let self_node_name = resolve_self_node_name(
+            self.use_self_node_only,
+            self.self_node_name.as_deref(),
+            std::env::var(SELF_NODE_NAME_ENV_KEY).ok(),
+        )?;
         let client = build_kube_client(self.kube_config_file.as_ref()).await?;
-        let self_node_name = match (self.use_self_node_only, &self.self_node_name) {
-            (false, _) => None,
-            (true, Some(name)) => Some(name.clone()),
-            (true, None) => Some(
-                std::env::var(SELF_NODE_NAME_ENV_KEY)
-                    .map_err(|_| BuildError::SelfNodeNameMissing)?,
-            ),
-        };
         Ok(PodDiscovery::start(
             &client,
             &self.namespaces,
@@ -212,16 +215,55 @@ impl KubernetesScrapeConfig {
         }
     }
 
+    /// Checks the options that don't depend on the environment, so misconfigured sources fail
+    /// when the config is loaded instead of discovering nothing.
+    ///
+    /// The node name from `VECTOR_SELF_NODE_NAME` is checked when the source is built.
+    pub(crate) fn validate(
+        &self,
+        instance_tag: Option<&str>,
+        endpoint_tag: Option<&str>,
+    ) -> Vec<String> {
+        let mut errors = Vec::new();
+        // Kubernetes lowercases annotation keys before validating them, so `Prometheus.io` is a
+        // valid prefix. Annotations are still looked up with the prefix as configured.
+        if !is_dns_subdomain(&self.annotation_prefix.to_ascii_lowercase()) {
+            errors.push(format!(
+                "`annotation_prefix` must be a DNS subdomain such as `prometheus.io`, got `{}`",
+                self.annotation_prefix
+            ));
+        }
+        if self.use_self_node_only
+            && let Some(name) = &self.self_node_name
+            && !is_dns_subdomain(name)
+        {
+            errors.push(format!(
+                "`self_node_name` must be a valid Kubernetes node name, got `{name}`"
+            ));
+        }
+        for namespace in &self.namespaces {
+            if !is_dns_label(namespace) {
+                errors.push(format!(
+                    "`namespaces` entry `{namespace}` is not a valid Kubernetes namespace name"
+                ));
+            }
+        }
+        if let Err(reason) = validate_scrape_path(&self.default_path) {
+            errors.push(format!(
+                "`default_path` {reason}, got `{}`",
+                self.default_path
+            ));
+        }
+        errors.extend(self.validate_tags(instance_tag, endpoint_tag));
+        errors
+    }
+
     /// Checks that every tag a discovered target adds has its own name.
     ///
     /// Two tags with the same name would overwrite each other depending on their order, so
     /// conflicts are rejected when the config is loaded. This includes `k` and `exported_k`:
     /// when a scraped metric already has `k`, its value moves to `exported_k`.
-    pub(crate) fn validate_tags(
-        &self,
-        instance_tag: Option<&str>,
-        endpoint_tag: Option<&str>,
-    ) -> Vec<String> {
+    fn validate_tags(&self, instance_tag: Option<&str>, endpoint_tag: Option<&str>) -> Vec<String> {
         let mut errors = Vec::new();
         // Tag name -> where it comes from, for error messages.
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
@@ -277,6 +319,63 @@ impl KubernetesScrapeConfig {
     }
 }
 
+/// Returns the node name to filter Pods by, or `None` when `use_self_node_only` is off.
+///
+/// A configured `self_node_name` is checked by [`KubernetesScrapeConfig::validate`]; a name from
+/// the environment is checked here.
+fn resolve_self_node_name(
+    use_self_node_only: bool,
+    configured: Option<&str>,
+    from_env: Option<String>,
+) -> Result<Option<String>, BuildError> {
+    if !use_self_node_only {
+        return Ok(None);
+    }
+    if let Some(name) = configured {
+        return Ok(Some(name.to_owned()));
+    }
+    let name = from_env.ok_or(BuildError::SelfNodeNameMissing)?;
+    if !is_dns_subdomain(&name) {
+        return Err(BuildError::InvalidSelfNodeName { name });
+    }
+    Ok(Some(name))
+}
+
+/// Whether `name` is an RFC 1123 label, as Kubernetes requires for namespace names.
+fn is_dns_label(name: &str) -> bool {
+    name.len() <= 63 && is_dns_subdomain_part(name)
+}
+
+/// Whether `name` is an RFC 1123 subdomain, as Kubernetes requires for node names and, after
+/// lowercasing, annotation prefixes.
+fn is_dns_subdomain(name: &str) -> bool {
+    name.len() <= 253 && name.split('.').all(is_dns_subdomain_part)
+}
+
+/// Whether `part` is non-empty, has only lowercase letters, digits, and `-`, and starts and ends
+/// with a letter or digit.
+fn is_dns_subdomain_part(part: &str) -> bool {
+    let is_alphanumeric = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
+    part.starts_with(is_alphanumeric)
+        && part.ends_with(is_alphanumeric)
+        && part.chars().all(|c| is_alphanumeric(c) || c == '-')
+}
+
+/// Checks a scrape path from `default_path` or the `<prefix>/path` annotation.
+///
+/// A missing leading `/` is added when the URI is built. The path can't carry a query string,
+/// because the source appends the `<prefix>/param_<name>` annotations to it after a `?`.
+fn validate_scrape_path(path: &str) -> Result<(), &'static str> {
+    if path.contains(['?', '#']) {
+        return Err(
+            "must not contain `?` or `#`; set query parameters with `<prefix>/param_<name>` Pod annotations",
+        );
+    }
+    http::uri::PathAndQuery::try_from(format!("/{}", path.trim_start_matches('/')))
+        .map(|_| ())
+        .map_err(|_| "is not a valid URI path")
+}
+
 /// Turns a Pod label or annotation key into a valid Prometheus label name.
 pub(crate) fn sanitize_tag_name(key: &str) -> String {
     let mut name: String = key
@@ -320,6 +419,10 @@ enum BuildError {
         "self_node_name config value or {SELF_NODE_NAME_ENV_KEY} env var must be set when use_self_node_only is true"
     ))]
     SelfNodeNameMissing,
+    #[snafu(display(
+        "{SELF_NODE_NAME_ENV_KEY} env var must be a valid Kubernetes node name, got `{name}`"
+    ))]
+    InvalidSelfNodeName { name: String },
     #[snafu(display("failed to read kubeconfig: {source}"))]
     Kubeconfig {
         source: kube::config::KubeconfigError,
@@ -597,10 +700,17 @@ fn extract_targets(
     };
 
     let path_key = format!("{}/path", cfg.prefix);
-    let path = annotations
-        .get(&path_key)
-        .map_or(cfg.default_path.as_str(), |s| s.as_str())
-        .to_owned();
+    let path = match annotations.get(&path_key) {
+        Some(v) => {
+            validate_scrape_path(v).map_err(|_| AnnotationError::InvalidValue {
+                key: path_key.clone(),
+                value: (*v).clone(),
+            })?;
+            v.as_str()
+        }
+        None => cfg.default_path.as_str(),
+    }
+    .to_owned();
 
     let scheme_key = format!("{}/scheme", cfg.prefix);
     let scheme = match annotations.get(&scheme_key) {
@@ -1468,6 +1578,168 @@ mod tests {
             ..KubernetesScrapeConfig::default()
         };
         cfg.validate_tags(instance, endpoint)
+    }
+
+    #[test]
+    fn valid_options_are_accepted() {
+        for cfg in [
+            KubernetesScrapeConfig::default(),
+            KubernetesScrapeConfig {
+                annotation_prefix: "metrics.example-1.com".to_owned(),
+                use_self_node_only: true,
+                self_node_name: Some("ip-10-0-0-1.ec2.internal".to_owned()),
+                namespaces: vec!["monitoring".to_owned(), "team-a1".to_owned()],
+                default_path: "metrics".to_owned(),
+                ..KubernetesScrapeConfig::default()
+            },
+            // Kubernetes accepts uppercase letters in annotation prefixes.
+            KubernetesScrapeConfig {
+                annotation_prefix: "Prometheus.io".to_owned(),
+                ..KubernetesScrapeConfig::default()
+            },
+            // An unused node name isn't checked.
+            KubernetesScrapeConfig {
+                self_node_name: Some(String::new()),
+                ..KubernetesScrapeConfig::default()
+            },
+        ] {
+            assert_eq!(cfg.validate(None, None), [] as [String; 0], "{cfg:?}");
+        }
+    }
+
+    #[test]
+    fn invalid_options_are_rejected() {
+        let default = KubernetesScrapeConfig::default;
+        for (cfg, expected) in [
+            (
+                KubernetesScrapeConfig {
+                    annotation_prefix: String::new(),
+                    ..default()
+                },
+                "`annotation_prefix`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    annotation_prefix: "prometheus.io/".to_owned(),
+                    ..default()
+                },
+                "`annotation_prefix`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    annotation_prefix: "prometheus_io".to_owned(),
+                    ..default()
+                },
+                "`annotation_prefix`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    use_self_node_only: true,
+                    self_node_name: Some(String::new()),
+                    ..default()
+                },
+                "`self_node_name`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    use_self_node_only: true,
+                    self_node_name: Some("node_1".to_owned()),
+                    ..default()
+                },
+                "`self_node_name`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    namespaces: vec![String::new()],
+                    ..default()
+                },
+                "`namespaces` entry ``",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    namespaces: vec!["team.a".to_owned()],
+                    ..default()
+                },
+                "`namespaces` entry `team.a`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    namespaces: vec!["-team".to_owned()],
+                    ..default()
+                },
+                "`namespaces` entry `-team`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    default_path: "/metrics?format=text".to_owned(),
+                    ..default()
+                },
+                "`default_path`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    default_path: "/metrics#section".to_owned(),
+                    ..default()
+                },
+                "`default_path`",
+            ),
+            (
+                KubernetesScrapeConfig {
+                    default_path: "/my metrics".to_owned(),
+                    ..default()
+                },
+                "`default_path`",
+            ),
+        ] {
+            let errors = cfg.validate(None, None);
+            assert_eq!(errors.len(), 1, "{cfg:?}: {errors:?}");
+            assert!(errors[0].contains(expected), "{errors:?}");
+        }
+    }
+
+    #[test]
+    fn self_node_name_resolution() {
+        let env = |name: &str| Some(name.to_owned());
+        assert_eq!(resolve_self_node_name(false, None, None).unwrap(), None);
+        assert_eq!(
+            resolve_self_node_name(true, Some("node-a"), env("node-b")).unwrap(),
+            Some("node-a".to_owned())
+        );
+        assert_eq!(
+            resolve_self_node_name(true, None, env("node-b.internal")).unwrap(),
+            Some("node-b.internal".to_owned())
+        );
+        assert!(matches!(
+            resolve_self_node_name(true, None, None),
+            Err(BuildError::SelfNodeNameMissing)
+        ));
+        for name in ["", "Node_B"] {
+            assert!(matches!(
+                resolve_self_node_name(true, None, env(name)),
+                Err(BuildError::InvalidSelfNodeName { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn invalid_path_annotation_is_rejected() {
+        let pod = make_pod(
+            "p",
+            "ns",
+            &[
+                ("prometheus.io/scrape", "true"),
+                ("prometheus.io/port", "9100"),
+                ("prometheus.io/path", "/metrics?format=text"),
+            ],
+            &[],
+            vec![],
+            Some("10.0.0.1"),
+            None,
+        );
+        assert!(matches!(
+            extract_targets(&pod, &default_cfg()),
+            Err(AnnotationError::InvalidValue { key, .. }) if key == "prometheus.io/path"
+        ));
     }
 
     #[test]

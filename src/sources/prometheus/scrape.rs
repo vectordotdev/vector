@@ -273,8 +273,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         for target in &self.targets {
             if let TargetConfig::Kubernetes(k8s_cfg) = target {
                 errors.extend(
-                    k8s_cfg
-                        .validate_tags(self.instance_tag.as_deref(), self.endpoint_tag.as_deref()),
+                    k8s_cfg.validate(self.instance_tag.as_deref(), self.endpoint_tag.as_deref()),
                 );
             }
         }
