@@ -1019,7 +1019,6 @@ fn representative_idx_payload() -> ddtrace_proto::idx::TracerPayload {
             name_ref: strings.intern("exception"),
             attributes: strings.map(vec![("exception.message", strings.string("boom"))]),
         }],
-        ..base_span(&strings)
     };
 
     let child = ddtrace_proto::idx::Span {

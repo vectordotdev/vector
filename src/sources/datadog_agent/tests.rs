@@ -1965,7 +1965,7 @@ async fn decode_traces_idx_expansion_over_limit_is_rejected() {
         );
 
         let events = crate::test_util::collect_ready(rx);
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = Controller::get().unwrap().capture_metrics();
         assert!(
@@ -2047,7 +2047,10 @@ async fn decode_traces_idx_agent_metadata_copies_count_against_the_budget() {
             422,
             send_with_path(address, idx_body, dd_api_key_headers(), DD_API_TRACES_PATH).await
         );
-        assert!(crate::test_util::collect_ready(rx).is_empty());
+        assert_eq!(
+            crate::test_util::collect_ready(rx),
+            [] as [vector_lib::event::Event; 0]
+        );
 
         let metrics = Controller::get().unwrap().capture_metrics();
         assert!(
