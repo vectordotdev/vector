@@ -89,24 +89,12 @@ where
         // SAFETY: The `CheckBytes` contract guarantees that `value` is aligned and points to enough
         // bytes for `Self`; each field is validated before the final reference is created.
         unsafe {
-            Archived::<u32>::check_bytes(addr_of!((*value).checksum), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "checksum",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            Archived::<u64>::check_bytes(addr_of!((*value).id), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "id",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            Archived::<u32>::check_bytes(addr_of!((*value).metadata), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "schema_metadata",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
+            Archived::<u32>::check_bytes(addr_of!((*value).checksum), context)
+                .unwrap_or_else(|error| match error {});
+            Archived::<u64>::check_bytes(addr_of!((*value).id), context)
+                .unwrap_or_else(|error| match error {});
+            Archived::<u32>::check_bytes(addr_of!((*value).metadata), context)
+                .unwrap_or_else(|error| match error {});
             ArchivedBox::<[u8]>::check_bytes(addr_of!((*value).payload), context).map_err(|e| {
                 StructCheckError {
                     field_name: "payload",

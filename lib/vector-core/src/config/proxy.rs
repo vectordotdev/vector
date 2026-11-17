@@ -93,7 +93,7 @@ impl ProxyConfig {
             enabled: true,
             http: from_env("HTTP_PROXY"),
             https: from_env("HTTPS_PROXY"),
-            no_proxy: from_env("NO_PROXY").map(NoProxy::from).unwrap_or_default(),
+            no_proxy: from_env("NO_PROXY").map_or_else(NoProxy::default, NoProxy::from),
         }
     }
 
