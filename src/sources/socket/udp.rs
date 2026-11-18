@@ -292,10 +292,12 @@ pub(super) fn udp(
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => return Err(error),
                 Err(error) => {
+                    let reason = error.to_string();
                     emit(SocketReceiveTaskFailed {
                         mode: SocketMode::Udp,
                         error,
                     });
+                    return Err(SourceError::from(std::io::Error::other(reason)));
                 }
             }
         }

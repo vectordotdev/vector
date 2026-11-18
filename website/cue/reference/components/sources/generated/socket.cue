@@ -170,10 +170,10 @@ generated: components: sources: socket: configuration: {
 	}
 	receive_concurrency: {
 		description: """
-			Number of concurrent readers draining the receive buffer.
+			Number of concurrent socket readers.
 
-			A single reader processes datagrams sequentially, capping receive throughput at
-			one CPU core per socket. Increase this to decode and forward datagrams in parallel.
+			A single reader caps throughput at one CPU core per socket; multiple readers
+			parallelize datagram decoding.
 			"""
 		relevant_when: "mode = \"udp\""
 		required:      false
