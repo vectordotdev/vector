@@ -852,6 +852,7 @@ mod integration_tests {
                 run_and_assert_sink_error,
             },
             random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
+            wait_for_duration,
         },
     };
 
@@ -963,6 +964,17 @@ mod integration_tests {
     }
 
     async fn create_topic_subscription() -> (String, String) {
+        let endpoint: Uri = gcp::PUBSUB_ADDRESS.parse().unwrap();
+        let address = endpoint.authority().unwrap().as_str().to_owned();
+        wait_for_duration(
+            move || {
+                let address = address.clone();
+                async move { tokio::net::TcpStream::connect(address).await.is_ok() }
+            },
+            Duration::from_secs(30),
+        )
+        .await;
+
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
         request(Method::PUT, &format!("topics/{topic}"), json!({}))

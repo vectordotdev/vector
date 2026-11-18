@@ -408,6 +408,59 @@ async fn receive_loop(
                                         address.port()
                                     );
                                 }
+
+                                if events.is_empty() {
+                                    continue;
+                                }
+
+                                let count = events.len();
+                                emit(SocketEventsReceived {
+                                    mode: SocketMode::Udp,
+                                    byte_size: events.estimated_json_encoded_size_of(),
+                                    count,
+                                });
+
+                                let now = Utc::now();
+
+                                for event in &mut events {
+                                    if let Event::Log(log) = event {
+                                        log_namespace.insert_standard_vector_source_metadata(
+                                            log,
+                                            SocketConfig::NAME,
+                                            now,
+                                        );
+
+                                        let legacy_host_key = host_key.clone().path;
+
+                                        log_namespace.insert_source_metadata(
+                                            SocketConfig::NAME,
+                                            log,
+                                            legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            path!(HOST),
+                                            address.ip().to_string()
+                                        );
+
+                                        let legacy_port_key = port_key.clone().path;
+
+                                        log_namespace.insert_source_metadata(
+                                            SocketConfig::NAME,
+                                            log,
+                                            legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                            path!(PORT),
+                                            address.port()
+                                        );
+                                    }
+                                }
+
+                                tokio::select!{
+                                    result = out.send_batch(events) => {
+                                        if result.is_err() {
+                                            emit(StreamClosedError { count });
+                                            return Ok(())
+                                        }
+                                    }
+                                    _ = &mut shutdown => return Ok(()),
+                                }
                             }
 
                             tokio::select!{
