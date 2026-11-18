@@ -52,7 +52,7 @@ serve-development:
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 	yarn concurrently --kill-others --success first --names hugo,pagefind \
 		"hugo server --bind $(SERVER_BIND) --port $(SERVER_PORT) --buildDrafts --buildFuture --environment development" \
 		"yarn pagefind:watch"
@@ -62,7 +62,7 @@ production-build:
 	hugo \
 	--environment "production" \
 	--minify
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 
 ci-production-build: setup cargo-data structured-data production-build
 
@@ -74,7 +74,7 @@ preview-build:
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 
 ci-preview-build: setup cargo-data structured-data preview-build
 
@@ -86,6 +86,12 @@ run-external-link-checker:
 
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
+
+# Highlight VRL in rendered pages before indexing or serving them.
+.PHONY: highlight-vrl
+highlight-vrl:
+	# Installed vdev binaries may predate this command; use the checkout's version.
+	cargo vdev build vrl-highlights
 
 # Search
 pagefind:

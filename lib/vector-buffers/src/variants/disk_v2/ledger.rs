@@ -669,16 +669,11 @@ where
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if last_flush.elapsed() > self.config.flush_interval
+        last_flush.elapsed() > self.config.flush_interval
             && self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
                 .is_ok()
-        {
-            return true;
-        }
-
-        false
     }
 
     /// Flushes the memory-mapped file backing the ledger to disk.
