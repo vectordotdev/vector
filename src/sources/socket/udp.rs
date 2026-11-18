@@ -17,7 +17,7 @@ use vector_lib::{
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 
-use super::default_host_key;
+use super::{HOST, PORT, default_host_key};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -119,7 +119,7 @@ pub struct UdpConfig {
 }
 
 fn default_port_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("port"))
+    OptionalValuePath::from(owned_value_path!(PORT))
 }
 
 const fn default_max_length() -> usize {
@@ -317,7 +317,7 @@ pub(super) fn udp(
                                             SocketConfig::NAME,
                                             log,
                                             legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("host"),
+                                            path!(HOST),
                                             address.ip().to_string()
                                         );
 
@@ -327,7 +327,7 @@ pub(super) fn udp(
                                             SocketConfig::NAME,
                                             log,
                                             legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                            path!("port"),
+                                            path!(PORT),
                                             address.port()
                                         );
                                     }

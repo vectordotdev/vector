@@ -977,7 +977,7 @@ mod tests {
         let local_dir = tempdir().unwrap();
 
         let mut config = Config::default();
-        config.global.data_dir = global_dir.keep().into();
+        config.global.data_dir = Some(global_dir.path().to_path_buf());
 
         // local path given -- local should win
         let local_data_dir = Some(local_dir.path().to_path_buf());
@@ -1172,7 +1172,7 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
@@ -1227,7 +1227,7 @@ mod tests {
 
         let path = dir.path().join("file");
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             writeln!(&mut file, "line for checkpointing").unwrap();
@@ -1253,7 +1253,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -1316,7 +1316,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -1388,7 +1388,7 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
             let mut file3 = File::create(&path3).unwrap();
@@ -1443,7 +1443,7 @@ mod tests {
 
         let path1 = dir.path().join("a//b/a.log.1");
         let path2 = dir.path().join("a//b/test.log.1");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             std::fs::create_dir_all(dir.path().join("a/b")).unwrap();
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
@@ -1496,16 +1496,15 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received =
-                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
-                    let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, acks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-                    writeln!(&mut file, "hello there").unwrap();
-                    file.flush().unwrap();
+                writeln!(&mut file, "hello there").unwrap();
+                file.flush().unwrap();
 
-                    sleep_500_millis().await;
-                })
-                .await;
+                sleep_500_millis().await;
+            })
+            .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1524,16 +1523,15 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received =
-                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
-                    let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, acks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-                    writeln!(&mut file, "hello there").unwrap();
-                    file.flush().unwrap();
+                writeln!(&mut file, "hello there").unwrap();
+                file.flush().unwrap();
 
-                    sleep_500_millis().await;
-                })
-                .await;
+                sleep_500_millis().await;
+            })
+            .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1551,16 +1549,15 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received =
-                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
-                    let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, acks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-                    writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1606,28 +1603,26 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let received =
-                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
-                    writeln!(&mut file, "first line").unwrap();
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+            let received = run_file_source(&config, acking, LogNamespace::Legacy, None, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let received =
-                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
-                    writeln!(&mut file, "second line").unwrap();
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+            let received = run_file_source(&config, acking, LogNamespace::Legacy, None, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1640,14 +1635,13 @@ mod tests {
                 read_from: ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
-            let received =
-                run_file_source(&config, false, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
-                    writeln!(&mut file, "third line").unwrap();
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+            let received = run_file_source(&config, acking, LogNamespace::Legacy, None, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "third line").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(
@@ -1673,7 +1667,6 @@ mod tests {
         // First time server runs it picks up existing lines.
         let received = run_file_source(
             &config,
-            false,
             Unfinalized,
             LogNamespace::Legacy,
             None,
@@ -1686,7 +1679,6 @@ mod tests {
         // Restart server, it re-reads file since the events were not acknowledged before shutdown
         let received = run_file_source(
             &config,
-            false,
             Unfinalized,
             LogNamespace::Legacy,
             None,
@@ -1717,7 +1709,6 @@ mod tests {
         // First time server runs it should pick up a bunch of lines
         let received = run_file_source(
             &config,
-            true,
             Acks,
             LogNamespace::Legacy,
             None,
@@ -1739,7 +1730,6 @@ mod tests {
         let event_count = Arc::new(AtomicUsize::new(0));
         let received = run_file_source(
             &config,
-            true,
             Acks,
             LogNamespace::Legacy,
             Some(Arc::clone(&event_count)),
@@ -1780,14 +1770,13 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received =
-                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
-                    let mut file = File::create(&path).unwrap();
-                    writeln!(&mut file, "first line").unwrap();
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+            let received = run_file_source(&config, acking, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
+                writeln!(&mut file, "first line").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
@@ -1797,14 +1786,13 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received =
-                run_file_source(&config, false, acking, LogNamespace::Legacy, None, async {
-                    let mut file = File::create(&path).unwrap();
-                    writeln!(&mut file, "second line").unwrap();
-                    file.flush().unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+            let received = run_file_source(&config, acking, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
+                writeln!(&mut file, "second line").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1871,7 +1859,7 @@ mod tests {
         before_file.sync_all().unwrap();
         after_file.sync_all().unwrap();
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             sleep_500_millis().await;
             writeln!(&mut before_file, "second line").unwrap();
             writeln!(&mut after_file, "_second line").unwrap();
@@ -1910,7 +1898,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             writeln!(&mut file, "short").unwrap();
@@ -1955,7 +1943,6 @@ mod tests {
         let event_count = Arc::new(AtomicUsize::new(0));
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             Some(Arc::clone(&event_count)),
@@ -2026,7 +2013,6 @@ mod tests {
         let event_count = Arc::new(AtomicUsize::new(0));
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             Some(Arc::clone(&event_count)),
@@ -2102,11 +2088,10 @@ mod tests {
 
         file.sync_all().unwrap();
 
-        // Read and aggregate existing lines. wait_shutdown=true ensures the
-        // checkpoint is fully written to disk before the second run reads it.
+        // Read and aggregate existing lines. The helper waits for the checkpoint
+        // to be fully written before the second run reads it.
         let received = run_file_source(
             &config,
-            true,
             Acks,
             LogNamespace::Legacy,
             None,
@@ -2121,7 +2106,7 @@ mod tests {
 
         // After restart, we should not see any part of the previously aggregated lines
         let received_after_restart =
-            run_file_source(&config, false, Acks, LogNamespace::Legacy, None, async {
+            run_file_source(&config, Acks, LogNamespace::Legacy, None, async {
                 writeln!(&mut file, "INFO goodbye").unwrap();
                 file.flush().unwrap();
                 sleep_500_millis().await;
@@ -2163,7 +2148,6 @@ mod tests {
 
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             None,
@@ -2226,7 +2210,6 @@ mod tests {
 
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             None,
@@ -2264,7 +2247,7 @@ mod tests {
         writeln!(&mut file, "hello i am a normal line").unwrap();
         file.sync_all().unwrap();
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             sleep_500_millis().await;
 
             write!(&mut file, "i am not a full line").unwrap();
@@ -2308,7 +2291,6 @@ mod tests {
 
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             None,
@@ -2341,7 +2323,6 @@ mod tests {
 
         let received = run_file_source(
             &config,
-            false,
             NoAcks,
             LogNamespace::Legacy,
             None,
@@ -2373,7 +2354,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             write!(&mut file, "hello i am a line\r\n").unwrap();
@@ -2412,7 +2393,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await;
@@ -2497,7 +2478,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, Acks, LogNamespace::Legacy, None, async {
+        let received = run_file_source(&config, Acks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -2528,7 +2509,7 @@ mod tests {
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AckingMode {
         NoAcks,      // No acknowledgement handling and no finalization
-        Unfinalized, // Acknowledgement handling but no finalization
+        Unfinalized, // Acknowledgement handling with rejected events
         Acks,        // Full acknowledgements and proper finalization
     }
     use AckingMode::*;
@@ -2536,7 +2517,6 @@ mod tests {
 
     async fn run_file_source(
         config: &FileConfig,
-        wait_shutdown: bool,
         acking_mode: AckingMode,
         log_namespace: LogNamespace,
         // When `Some`, events are relayed through an unbounded channel and the
@@ -2566,11 +2546,11 @@ mod tests {
                 }
             };
 
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let (trigger_shutdown, shutdown, _shutdown_done) = ShutdownSignal::new_wired();
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
-            tokio::spawn(file::file_source(
+            let source = tokio::spawn(file::file_source(
                 config,
                 data_dir,
                 shutdown,
@@ -2607,22 +2587,20 @@ mod tests {
                 inner.await;
                 drop(trigger_shutdown);
 
-                if acking_mode == Unfinalized {
-                    rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                        .collect::<Vec<_>>()
-                        .await
-                } else {
-                    timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                        .await
-                        .expect(
-                            "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                        )
-                }
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                    .await
+                    .expect(
+                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                    )
             };
 
-            if wait_shutdown {
-                shutdown_done.await;
-            }
+            // Closing the output precedes the final checkpoint write. Wait for the
+            // source task before allowing the caller to reuse or remove its directory.
+            timeout(Duration::from_secs(5), source)
+                .await
+                .expect("File source did not shut down")
+                .expect("File source panicked")
+                .expect("File source failed");
 
             result
         })
