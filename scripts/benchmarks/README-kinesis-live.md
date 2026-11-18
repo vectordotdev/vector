@@ -39,11 +39,11 @@ Endpoints are fixed to the requested region's AWS service endpoints.
 ## Permissions and resources
 
 The test creates one stream named `vector-aggregation-live-<random UUID>`, using
-PROVISIONED mode with one shard and the tag `Purpose=vector-aggregation-live-test`.
+PROVISIONED mode with one shard. It does not require stream-tagging permission.
 Restrict the test principal's Kinesis permissions to
 `arn:aws:kinesis:REGION:ACCOUNT_ID:stream/vector-aggregation-live-*`:
 
-- `kinesis:CreateStream` and `kinesis:AddTagsToStream`
+- `kinesis:CreateStream`
 - `kinesis:DescribeStream` and `kinesis:DescribeStreamSummary`
 - `kinesis:ListShards`, `kinesis:GetShardIterator`, and `kinesis:GetRecords`
 - `kinesis:PutRecords` and `kinesis:DeleteStream`

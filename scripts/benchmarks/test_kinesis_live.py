@@ -79,13 +79,16 @@ class PayloadChecks(unittest.TestCase):
 
 class StreamOwnership(unittest.TestCase):
     class Aws:
-        def __init__(self, fail_create=False, fail_delete=False):
+        def __init__(self, fail_create=False, fail_delete=False, deny_tags=False):
             self.calls = []
             self.fail_create = fail_create
             self.fail_delete = fail_delete
+            self.deny_tags = deny_tags
 
         def call(self, service, action, *args):
             self.calls.append((service, action, *args))
+            if self.deny_tags and "--tags" in args:
+                raise RuntimeError("AddTagsToStream permission denied")
             if action == "create-stream" and self.fail_create:
                 raise RuntimeError("name collision")
             if action == "delete-stream" and self.fail_delete:
@@ -107,6 +110,12 @@ class StreamOwnership(unittest.TestCase):
             with live.temporary_stream(aws, "vector-aggregation-live-unique", report):
                 self.fail("must not enter")
         self.assertFalse(any(call[1] == "delete-stream" for call in aws.calls))
+
+    def test_stream_creation_does_not_require_tagging_permission(self):
+        aws, report = self.Aws(deny_tags=True), {}
+        with live.temporary_stream(aws, "vector-aggregation-live-unique", report):
+            pass
+        self.assertEqual(report["cleanup"], "deleted")
 
     def test_cleanup_failure_is_reported_and_cannot_pass(self):
         aws, report = self.Aws(fail_delete=True), {}

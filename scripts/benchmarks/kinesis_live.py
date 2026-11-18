@@ -99,8 +99,7 @@ def temporary_stream(aws, name, report):
     report["cleanup"] = "not_created"
     report["creation_attempted"] = True
     aws.call("kinesis", "create-stream", "--stream-name", name, "--shard-count", "1",
-             "--stream-mode-details", "StreamMode=PROVISIONED",
-             "--tags", json.dumps({"Purpose": "vector-aggregation-live-test"}))
+             "--stream-mode-details", "StreamMode=PROVISIONED")
     report["cleanup"] = "pending"
     try:
         yield
