@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "pagefind": "pagefind",
-    "pagefind:watch": "chokidar 'public/**/*.html' -c 'make pagefind' --debounce 1000 --silent",
+    "pagefind:watch": "chokidar 'public/**/*.html' -c 'make highlight-vrl pagefind' --initial --debounce 1000 --silent",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",

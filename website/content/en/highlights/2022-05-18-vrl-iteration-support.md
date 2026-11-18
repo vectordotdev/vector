@@ -49,7 +49,7 @@ Let’s assume we want to achieve the following results:
 
 Here’s how we would solve these individual tasks:
 
-```coffee
+```vrl
 # 1. Upcase all keys in the object.
 . = map_keys(., recursive: true) -> |key| { upcase(key) }
 

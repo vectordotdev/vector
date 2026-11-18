@@ -1,7 +1,11 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use vector_vrl_category::Category;
-use vrl::prelude::{expression::Expr, *};
+use vrl::prelude::{
+    example, expression::Expr, indoc, kind, state, ArgumentList, Compiled, Context,
+    DiagnosticMessage, Example, Expression, ExpressionError, Function, FunctionCompileContext,
+    FunctionExpression, KeyString, ObjectMap, Parameter, Resolved, TypeDef, TypeState, Value,
+};
 
 use crate::common::{
     metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
