@@ -6,6 +6,7 @@ use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
+use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -258,33 +259,51 @@ pub(super) fn udp(
         let socket = Arc::new(socket);
         let host_key = config.host_key.clone().unwrap_or(default_host_key());
         let port_key = config.port_key.clone();
+        let receive_concurrency = config.receive_concurrency;
 
-        let mut tasks = Vec::with_capacity(config.receive_concurrency);
-        for _ in 0..config.receive_concurrency {
-            tasks.push(tokio::spawn(receive_loop(
-                Arc::clone(&socket),
-                decoder.clone(),
-                shutdown.clone(),
-                out.clone(),
-                max_length,
-                host_key.clone(),
-                port_key.clone(),
-                log_namespace,
+        if receive_concurrency == 0 {
+            return Err(SourceError::from(std::io::Error::other(
+                "receive_concurrency must be at least 1",
             )));
+        }
+
+        // Capture the current span so spawned tasks inherit the component labels
+        // (component_id, component_kind, component_type) used by metrics.
+        let span = tracing::Span::current();
+
+        let mut join_set = tokio::task::JoinSet::new();
+        for _ in 0..receive_concurrency {
+            join_set.spawn(
+                receive_loop(
+                    Arc::clone(&socket),
+                    decoder.clone(),
+                    shutdown.clone(),
+                    out.clone(),
+                    max_length,
+                    host_key.clone(),
+                    port_key.clone(),
+                    log_namespace,
+                )
+                .instrument(span.clone()),
+            );
         }
 
         // The original signal and sender are dropped here, leaving one completion token
         // per task; the source completes when the last task finishes.
-        match futures::future::try_join_all(tasks).await {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                emit(SocketReceiveTaskFailed {
-                    mode: SocketMode::Udp,
-                    error,
-                });
-                Ok(())
+        while let Some(result) = join_set.join_next().await {
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => return Err(error),
+                Err(error) => {
+                    emit(SocketReceiveTaskFailed {
+                        mode: SocketMode::Udp,
+                        error,
+                    });
+                }
             }
         }
+
+        Ok(())
     })
 }
 
@@ -298,7 +317,7 @@ async fn receive_loop(
     host_key: OptionalValuePath,
     port_key: OptionalValuePath,
     log_namespace: LogNamespace,
-) {
+) -> Result<(), SourceError> {
     let bytes_received = register(BytesReceived::from(Protocol::UDP));
 
     // We add 1 to the max_length in order to determine if the received data has been truncated.
@@ -326,7 +345,7 @@ async fn receive_loop(
                             mode: SocketMode::Udp,
                             error: &error
                         });
-                        return;
+                        return Err(SourceError::from(error));
                    }
                 };
 
@@ -396,10 +415,10 @@ async fn receive_loop(
                                 result = out.send_batch(events) => {
                                     if result.is_err() {
                                         emit(StreamClosedError { count });
-                                        return
+                                        return Ok(());
                                     }
                                 }
-                                _ = &mut shutdown => return,
+                                _ = &mut shutdown => return Ok(()),
                             }
                         }
                         Err(error) => {
@@ -412,7 +431,7 @@ async fn receive_loop(
                     }
                 }
             }
-            _ = &mut shutdown => return,
+            _ = &mut shutdown => return Ok(()),
         }
     }
 }
