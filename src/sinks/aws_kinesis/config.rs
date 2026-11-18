@@ -83,6 +83,7 @@ pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
     partition_key_field: Option<ConfigValuePath>,
     batch_settings: BatcherSettings,
+    aggregation: Option<super::aggregation::Settings>,
     client: C,
     retry_logic: RT,
 ) -> crate::Result<VectorSink>
@@ -121,6 +122,7 @@ where
 
     let sink = KinesisSink {
         batch_settings,
+        aggregation,
         service,
         request_builder,
         partition_key_field,

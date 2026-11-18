@@ -69,6 +69,11 @@ pub struct KinesisStreamsSinkConfig {
 
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
+
+    /// Combine multiple logs into each Kinesis record using newline or KPL framing.
+    /// Separate from `batch`, which groups Kinesis records into API requests.
+    #[serde(default)]
+    pub aggregation: Option<super::super::newline::AggregationConfig>,
 }
 
 impl KinesisStreamsSinkConfig {
@@ -132,6 +137,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedKinesisStreams {
     batch_settings: BatcherSettings,
+    aggregation: Option<super::super::aggregation::Settings>,
 }
 
 #[async_trait::async_trait]
@@ -139,6 +145,12 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
     type Validated = ValidatedKinesisStreams;
 
     fn validate(&self) -> crate::Result<ValidatedKinesisStreams> {
+        let aggregation = self
+            .aggregation
+            .as_ref()
+            .map(|config| config.settings(self.base.encoding.config()))
+            .transpose()?
+            .flatten();
         let batch_settings = self
             .batch
             .validate()?
@@ -147,7 +159,10 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
             .into_batcher_settings()?;
         self.base.encoding.validate()?;
 
-        Ok(ValidatedKinesisStreams { batch_settings })
+        Ok(ValidatedKinesisStreams {
+            batch_settings,
+            aggregation,
+        })
     }
 
     async fn build(
@@ -156,6 +171,21 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
+        if validated
+            .aggregation
+            .is_some_and(|settings| settings.format == super::super::aggregation::Format::Kpl)
+        {
+            // Mandatory even when optional healthchecks are disabled. The newer
+            // distribution field is only returned by DescribeStreamSummary.
+            client
+                .describe_stream_summary()
+                .stream_name(&self.base.stream_name)
+                .customize()
+                .interceptor(super::kpl_compatibility::KplCompatibility)
+                .send()
+                .await
+                .map_err(|error| format!("KPL stream compatibility check failed: {error:?}"))?;
+        }
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let sink = build_sink::<
@@ -168,6 +198,7 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
             &self.base,
             self.base.partition_key_field.clone(),
             validated.batch_settings,
+            validated.aggregation,
             KinesisStreamClient { client },
             KinesisRetryLogic {
                 retry_partial: self.base.request_retry_partial,
@@ -245,6 +276,290 @@ impl RetryLogic for KinesisRetryLogic {
 mod tests {
     use super::*;
     use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
+    use crate::{
+        codecs::{Encoder, Transformer},
+        event::{BatchNotifier, BatchStatus, Event, EventStatus, Finalizable, LogEvent},
+        sinks::{
+            aws_kinesis::{
+                aggregation::Settings, newline::requests, request_builder::KinesisRequestBuilder,
+                service::RecordResult, streams::KinesisStreamRecord,
+            },
+            util::{
+                Compression,
+                retries::{RetryAction, RetryLogic},
+            },
+        },
+    };
+    use futures::StreamExt;
+    use std::{marker::PhantomData, time::Duration};
+    use vector_lib::{
+        codecs::TextSerializerConfig,
+        request_metadata::{MetaDescriptive, RequestMetadata},
+    };
+
+    #[tokio::test]
+    async fn partial_retry_retains_whole_aggregate_metadata_and_finalizers() {
+        for format in [
+            super::super::super::aggregation::Format::Newline,
+            super::super::super::aggregation::Format::Kpl,
+        ] {
+            let mut statuses = Vec::new();
+            let events = (0..6)
+                .map(|i| {
+                    let (batch, status) = BatchNotifier::new_with_receiver();
+                    statuses.push(status);
+                    Event::Log(LogEvent::from(i.to_string()).with_batch_notifier(&batch))
+                })
+                .collect::<Vec<_>>();
+            let builder = KinesisRequestBuilder::<KinesisStreamRecord> {
+                compression: Compression::None,
+                encoder: (
+                    Transformer::default(),
+                    Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                ),
+                _phantom: PhantomData,
+            };
+            let records = requests(
+                futures::stream::iter(events).boxed(),
+                builder,
+                None,
+                Settings {
+                    format,
+                    max_events: 2,
+                    max_bytes: 1000,
+                    timeout: Duration::from_secs(1),
+                },
+            )
+            .collect::<Vec<_>>()
+            .await;
+            let metadata = RequestMetadata::from_batch(
+                records.iter().map(|record| record.get_metadata().clone()),
+            );
+            let mut original = super::BatchKinesisRequest {
+                events: records,
+                metadata,
+            };
+            let response = super::KinesisResponse {
+                failure_count: 1,
+                events_byte_size: GroupedCountByteSize::default(),
+                failed_records: vec![RecordResult {
+                    index: 1,
+                    success: false,
+                    error_code: None,
+                    error_message: None,
+                }],
+            };
+            let RetryAction::RetryPartial(select) = (super::KinesisRetryLogic {
+                retry_partial: true,
+            })
+            .should_retry_response(&response) else {
+                panic!("expected partial retry");
+            };
+            let retry = select(original.clone());
+            assert_eq!(original.get_metadata().event_count(), 6);
+            assert_eq!(retry.events.len(), 1);
+            assert_eq!(retry.get_metadata().event_count(), 2);
+            let record = &retry.events[0].record.record;
+            match format {
+                super::super::super::aggregation::Format::Newline => {
+                    assert_eq!(record.data().as_ref(), b"2\n3\n");
+                }
+                super::super::super::aggregation::Format::Kpl => assert_eq!(
+                    super::super::super::kpl::test_support::decode(
+                        record.data().as_ref(),
+                        record.partition_key().expect("aggregate has a key")
+                    ),
+                    [b"2".to_vec(), b"3".to_vec()]
+                ),
+            }
+            assert_eq!(retry.events[0].finalizers.len(), 2);
+            retry.events[0]
+                .finalizers
+                .update_status(EventStatus::Rejected);
+            original
+                .take_finalizers()
+                .update_status(EventStatus::Delivered);
+            drop((retry, original));
+            for (i, status) in statuses.into_iter().enumerate() {
+                assert_eq!(
+                    status.await,
+                    if i == 2 || i == 3 {
+                        BatchStatus::Rejected
+                    } else {
+                        BatchStatus::Delivered
+                    }
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn kpl_build_rejects_auto_distribution_even_without_healthcheck_execution() {
+        let uri = crate::test_util::http::spawn_blackhole_http_server(|_| async {
+            Ok(http::Response::new(http_body_util::Full::new(bytes::Bytes::from_static(br#"{"StreamDescriptionSummary":{"StreamName":"logs","StreamARN":"arn:aws:kinesis:us-east-1:123456789012:stream/logs","StreamStatus":"ACTIVE","RetentionPeriodHours":24,"StreamCreationTimestamp":0,"EnhancedMonitoring":[],"OpenShardCount":1,"RecordDistributionStrategy":"AUTO"}}"#))))
+        }).await;
+        let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+            "stream_name = 'logs'\nregion = 'us-east-1'\nendpoint = '{uri}'\nencoding.codec = 'json'\nauth.access_key_id = 'test'\nauth.secret_access_key = 'test'\n[aggregation]\nenabled = true\nformat = 'kpl'\n"
+        )).unwrap();
+        let result =
+            crate::config::SinkConfig::build(&config, crate::config::SinkContext::default()).await;
+        assert!(
+            result.is_err(),
+            "KPL on AUTO must fail before starting the sink"
+        );
+    }
+
+    #[tokio::test]
+    async fn kpl_build_checks_chunked_summary_and_leaves_other_modes_offline() {
+        for (strategy, allowed) in [
+            (None, true),
+            (Some(serde_json::json!("USER_PARTITION_KEY")), true),
+            (Some(serde_json::json!("AUTO")), false),
+            (Some(serde_json::json!("FUTURE")), false),
+            (Some(serde_json::Value::Null), false),
+            (Some(serde_json::json!(1)), false),
+        ] {
+            let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let mut summary = serde_json::json!({"StreamDescriptionSummary": {"StreamName": "logs", "StreamARN": "arn:aws:kinesis:us-east-1:123456789012:stream/logs", "StreamStatus": "ACTIVE", "RetentionPeriodHours": 24, "StreamCreationTimestamp": 0, "EnhancedMonitoring": [], "OpenShardCount": 1}});
+            if let Some(strategy) = strategy {
+                summary["StreamDescriptionSummary"]["RecordDistributionStrategy"] = strategy;
+            }
+            let body = serde_json::to_vec(&summary).unwrap();
+            let uri = chunked_summary_endpoint(body, std::sync::Arc::clone(&calls)).await;
+            for (enabled, format) in [(false, "kpl"), (true, "newline"), (true, "kpl")] {
+                let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+                    "stream_name = 'logs'\nregion = 'us-east-1'\nendpoint = '{uri}'\nencoding.codec = 'json'\nauth.access_key_id = 'test'\nauth.secret_access_key = 'test'\n[aggregation]\nenabled = {enabled}\nformat = '{format}'\n"
+                )).unwrap();
+                let is_kpl = enabled && format == "kpl";
+                let result = crate::config::SinkConfig::build(
+                    &config,
+                    crate::config::SinkContext::default(),
+                )
+                .await;
+                assert_eq!(
+                    result.is_ok(),
+                    !is_kpl || allowed,
+                    "summary: {summary}, format: {format}, enabled: {enabled}"
+                );
+                assert_eq!(
+                    calls.load(std::sync::atomic::Ordering::SeqCst),
+                    usize::from(is_kpl)
+                );
+            }
+        }
+    }
+
+    async fn chunked_summary_endpoint(
+        body: Vec<u8>,
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    ) -> http::Uri {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let body = body.clone();
+                let calls = std::sync::Arc::clone(&calls);
+                tokio::spawn(async move {
+                    let mut request = Vec::new();
+                    let mut buffer = [0; 1024];
+                    let header_end = loop {
+                        let size = socket.read(&mut buffer).await.unwrap();
+                        assert_ne!(size, 0);
+                        request.extend_from_slice(&buffer[..size]);
+                        if let Some(end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                            break end + 4;
+                        }
+                    };
+                    let headers = String::from_utf8_lossy(&request[..header_end]);
+                    assert!(headers.contains("DescribeStreamSummary"));
+                    let length = headers
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap();
+                    while request.len() < header_end + length {
+                        let size = socket.read(&mut buffer).await.unwrap();
+                        assert_ne!(size, 0);
+                        request.extend_from_slice(&buffer[..size]);
+                    }
+                    calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/x-amz-json-1.1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n").await.unwrap();
+                    for chunk in [&body[..body.len() / 2], &body[body.len() / 2..]] {
+                        socket
+                            .write_all(format!("{:x}\r\n", chunk.len()).as_bytes())
+                            .await
+                            .unwrap();
+                        socket.write_all(chunk).await.unwrap();
+                        socket.write_all(b"\r\n").await.unwrap();
+                        tokio::task::yield_now().await;
+                    }
+                    socket.write_all(b"0\r\n\r\n").await.unwrap();
+                });
+            }
+        });
+        format!("http://{address}/").parse().unwrap()
+    }
+
+    #[test]
+    fn kpl_accepts_other_codecs_and_validates_event_limits() {
+        for (enabled, max_events, valid) in [
+            (true, 1000, true),
+            (true, 1001, false),
+            (true, 0, false),
+            (false, 1001, true),
+        ] {
+            let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+                "stream_name = 'logs'\nencoding.codec = 'json'\nencoding.json.pretty = true\n[aggregation]\nenabled = {enabled}\nformat = 'kpl'\nmax_events = {max_events}\n"
+            )).unwrap();
+            assert_eq!(
+                config
+                    .aggregation
+                    .as_ref()
+                    .unwrap()
+                    .settings(config.base.encoding.config())
+                    .is_ok(),
+                valid
+            );
+        }
+    }
+
+    #[test]
+    fn newline_aggregation_is_optional_and_validated() {
+        let base = "stream_name = 'logs'\nencoding.codec = 'text'\n";
+        let config: KinesisStreamsSinkConfig = toml::from_str(base).unwrap();
+        assert!(config.aggregation.is_none());
+        let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+            "{base}\n[aggregation]\nenabled = true\nmax_events = 2\n"
+        ))
+        .unwrap();
+        assert_eq!(
+            config
+                .aggregation
+                .unwrap()
+                .settings(config.base.encoding.config())
+                .unwrap()
+                .unwrap()
+                .max_events,
+            2
+        );
+        let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+            "{base}\n[aggregation]\nenabled = true\nmax_events = 0\n"
+        ))
+        .unwrap();
+        assert!(
+            config
+                .aggregation
+                .unwrap()
+                .settings(config.base.encoding.config())
+                .is_err()
+        );
+    }
 
     #[test]
     fn generate_config() {
@@ -254,6 +569,7 @@ mod tests {
     #[test]
     fn validate_produces_batch_settings() {
         let config = KinesisStreamsSinkConfig {
+            aggregation: None,
             batch: BatchConfig::<KinesisDefaultBatchSettings>::default(),
             base: KinesisSinkBaseConfig {
                 stream_name: String::from("test"),

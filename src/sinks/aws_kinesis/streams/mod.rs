@@ -7,6 +7,7 @@ use aws_sdk_kinesis::{
 };
 
 pub use self::config::KinesisStreamsSinkConfig;
+pub use self::record::KinesisStreamRecord;
 pub use super::{
     config::{KinesisSinkBaseConfig, build_sink},
     record::{Record, SendRecord},
@@ -18,3 +19,4 @@ pub use super::{
 pub type KinesisError = PutRecordsError;
 pub type KinesisRecord = PutRecordsRequestEntry;
 pub type KinesisClient = Client;
+mod kpl_compatibility;
