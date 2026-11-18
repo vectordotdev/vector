@@ -55,7 +55,7 @@ ultimately delivered at least once.
 
 While rare, it is possible for an event to be delivered more than
 once. See the [Does Vector support exactly-once
-delivery?](#faq-at-least-once) FAQ below).
+delivery?](#does-vector-support-exactly-once-delivery) FAQ below.
 
 {{< warning >}}
 In order to achieve at-least-once delivery between restarts,
@@ -67,7 +67,7 @@ sinks:
     buffer:
       type: "disk"
       when_full: "block"
-      max_size: 104900000 # 100MiB
+      max_size: 536870912 # 512 MiB
 ```
 
 Refer to each [sink's][sinks] documentation for further guidance on its buffer options.

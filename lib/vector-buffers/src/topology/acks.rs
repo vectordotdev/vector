@@ -813,7 +813,7 @@ mod tests {
                         let sut_result = apply_action_sut(&mut sut, action);
                         match sut_result {
                             ActionResult::AddMarker(result) => {
-                                prop_assert_eq!(expected_result, result.clone());
+                                prop_assert_eq!(&expected_result, &result);
 
                                 // If adding the pending marker actually succeeded, now we need to track it.
                                 if result.is_ok() {
