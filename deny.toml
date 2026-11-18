@@ -39,6 +39,6 @@ ignore = [
   { id = "RUSTSEC-2026-0403", reason = "zstd-safe 7 via zstd 0.13 (same dependents as RUSTSEC-2026-0391), which only decompress through stream::read::Decoder, decode_all, and bulk, which the advisory lists as unaffected. Fixed only in zstd-safe 8" },
   { id = "RUSTSEC-2026-0441", reason = "pin-utils is unmaintained with no safe upgrade - transitive dep via heim (unmaintained) and wasmtimer (https://github.com/whizsid/wasmtimer-rs/pull/32)" },
   { id = "RUSTSEC-2026-0542", reason = "humantime is unmaintained because it wraps chrono (RUSTSEC-2026-0543); used directly and widely transitively with no maintained drop-in replacement yet" },
-  { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained; used pervasively by Vector, VRL, and many dependencies, so migrating to jiff or time is a large effort" },
+  { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained; used by Vector, VRL's Value, and many dependencies, so migrating is a large effort" },
   { id = "RUSTSEC-2026-0555", reason = "chrono-tz is unmaintained alongside chrono (RUSTSEC-2026-0543); migrates together with chrono" },
 ]
