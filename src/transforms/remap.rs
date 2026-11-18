@@ -1240,6 +1240,61 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_metric_value_read() {
+        let gauge = |value| {
+            Event::Metric(Metric::new(
+                "queue_depth",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            ))
+        };
+
+        // Values can be used in expressions.
+        let mut tform = remap(RemapConfig {
+            source: Some(".tags.scaled = to_string(float!(.gauge.value) * 100)".to_string()),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let result = transform_one(&mut tform, gauge(0.5)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("scaled"),
+            Some("50".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Gauge { value: 0.5 }
+        );
+
+        // Reads of special values, and of the fields for other types.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    .tags.json = encode_json(.gauge)
+                    .tags.is_counter = to_string(exists(.counter))
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let cases = [
+            (0.5, r#"{"value":0.5}"#),
+            // VRL floats can't hold NaN, so it reads as the string "NaN".
+            (f64::NAN, r#"{"value":"NaN"}"#),
+            // Infinity reads as a float, but `encode_json` writes non-finite floats as `null`.
+            (f64::INFINITY, r#"{"value":null}"#),
+        ];
+        for (value, json) in cases {
+            let result = transform_one(&mut tform, gauge(value)).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.tag_value("json"), Some(json.to_owned()), "{value}");
+            assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
+        }
+    }
+
+    #[test]
     fn check_remap_metric_type() {
         let conf = RemapConfig {
             source: Some(

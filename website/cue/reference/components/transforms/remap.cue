@@ -112,6 +112,27 @@ components: transforms: "remap": {
 				`interval_ms` | Read/write/delete | You can assign it a non zero 32 byte unsigned interval
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
+				`counter`, `gauge` | Read | `.counter.value` or `.gauge.value`.
+				`set` | Read | `.set.values`, an array of strings.
+				`distribution` | Read | `.distribution.samples`, an array of `{value, rate}` objects, and `.distribution.statistic`, either `histogram` or `summary`.
+				`aggregated_histogram` | Read | `.aggregated_histogram.buckets`, an array of `{upper_limit, count}` objects, plus `.aggregated_histogram.count` and `.aggregated_histogram.sum`. `sum` is `null` when it isn't set.
+				`aggregated_summary` | Read | `.aggregated_summary.quantiles`, an array of `{quantile, value}` objects, plus `.aggregated_summary.count` and `.aggregated_summary.sum`.
+				`sketch` | Read | Summary statistics only: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`.
+
+				A metric's value is available only under the field for its current type. For example, `.gauge.value`
+				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
+				includes the value field. These fields match the JSON encoding of metrics, which is what `vector tap`
+				shows. You can't change these fields yet. To convert between counters and gauges, set `type`.
+
+				Metric values are exposed as VRL numbers, with two exceptions:
+
+				* VRL floats can't represent NaN, so a NaN value reads as the string `"NaN"`. Infinities read as
+				  floats, but `encode_json` writes them as `null`.
+				* VRL integers are signed 64-bit, so a count larger than `9223372036854775807` reads as a string with
+				  the exact decimal value.
+
+				Because the type of a metric's value is only known at runtime, coerce it before using it in an
+				expression, for example `float!(.gauge.value) * 100`.
 
 				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
 				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores

@@ -16,7 +16,9 @@ use vrl::{
 
 use super::{
     Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, TraceEvent,
-    metric::{MetricTags, TagValue, TagValueSet},
+    metric::{
+        Bucket, MetricSketch, MetricTags, Quantile, Sample, StatisticKind, TagValue, TagValueSet,
+    },
 };
 use crate::{
     config::{LogNamespace, log_schema},
@@ -26,8 +28,22 @@ use crate::{
 const VALID_METRIC_PATHS_SET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
-const VALID_METRIC_PATHS_GET: &str =
-    ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
+const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
+    .counter, .gauge, .set, .distribution, .aggregated_histogram, .aggregated_summary, .sketch";
+
+/// The fields that hold a metric's value, one per metric type.
+///
+/// These match the native JSON encoding of metrics, which is what `vector tap` shows. Only the
+/// field for the metric's current type is present; the others read as `null`.
+const METRIC_VALUE_FIELDS: [&str; 7] = [
+    "counter",
+    "gauge",
+    "set",
+    "distribution",
+    "aggregated_histogram",
+    "aggregated_summary",
+    "sketch",
+];
 
 /// Metrics aren't interested in paths that have a length longer than 3.
 ///
@@ -416,7 +432,11 @@ impl Target for VrlTarget {
                             ["kind"] => {
                                 metric.data.kind = MetricKind::try_from(value.clone())?;
                             }
-                            ["type"] => set_metric_type(metric, &value)?,
+                            ["type"] => {
+                                let previous_field = metric_value_field(metric.value());
+                                set_metric_type(metric, &value)?;
+                                refresh_cached_metric_value(metric, metric_value, previous_field);
+                            }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &path.to_string(),
@@ -577,6 +597,10 @@ fn target_get_metric<'a>(
 
     let value = value.get(path);
 
+    if is_metric_value_path(path) {
+        return Ok(value);
+    }
+
     let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
         return Ok(None);
     };
@@ -704,6 +728,173 @@ fn metric_tags_to_vrl_value(tags: MetricTags, tag_mode: MetricTagMode) -> Value 
     }
 }
 
+/// Returns the field that holds the value of a metric of this type.
+const fn metric_value_field(value: &MetricValue) -> &'static str {
+    match value {
+        MetricValue::Counter { .. } => "counter",
+        MetricValue::Gauge { .. } => "gauge",
+        MetricValue::Set { .. } => "set",
+        MetricValue::Distribution { .. } => "distribution",
+        MetricValue::AggregatedHistogram { .. } => "aggregated_histogram",
+        MetricValue::AggregatedSummary { .. } => "aggregated_summary",
+        MetricValue::Sketch { .. } => "sketch",
+    }
+}
+
+/// Returns `true` if the path reads a metric's value, such as `.gauge.value`.
+fn is_metric_value_path(path: &OwnedValuePath) -> bool {
+    matches!(
+        path.segments.first(),
+        Some(OwnedSegment::Field(field)) if METRIC_VALUE_FIELDS.contains(&field.as_ref())
+    )
+}
+
+/// Converts a float for VRL.
+///
+/// VRL floats can't hold NaN, so NaN is exposed as the string `"NaN"`. This matches how NaN is
+/// written in the native JSON encoding of histogram buckets. Infinities are kept as floats.
+fn metric_float_to_vrl_value(value: f64) -> Value {
+    if value.is_nan() {
+        Value::from("NaN")
+    } else {
+        Value::from_f64_or_zero(value)
+    }
+}
+
+/// Converts an unsigned count for VRL.
+///
+/// VRL integers are signed 64-bit, so counts above `i64::MAX` are exposed as exact decimal
+/// strings rather than being truncated or rounded to a float.
+fn metric_count_to_vrl_value(count: u64) -> Value {
+    i64::try_from(count).map_or_else(|_| Value::from(count.to_string()), Value::from)
+}
+
+fn optional_metric_float_to_vrl_value(value: Option<f64>) -> Value {
+    value.map_or(Value::Null, metric_float_to_vrl_value)
+}
+
+fn sample_to_vrl_value(sample: &Sample) -> Value {
+    ObjectMap::from([
+        ("value".into(), metric_float_to_vrl_value(sample.value)),
+        ("rate".into(), Value::from(i64::from(sample.rate))),
+    ])
+    .into()
+}
+
+fn bucket_to_vrl_value(bucket: &Bucket) -> Value {
+    ObjectMap::from([
+        (
+            "upper_limit".into(),
+            metric_float_to_vrl_value(bucket.upper_limit),
+        ),
+        ("count".into(), metric_count_to_vrl_value(bucket.count)),
+    ])
+    .into()
+}
+
+fn quantile_to_vrl_value(quantile: &Quantile) -> Value {
+    ObjectMap::from([
+        (
+            "quantile".into(),
+            metric_float_to_vrl_value(quantile.quantile),
+        ),
+        ("value".into(), metric_float_to_vrl_value(quantile.value)),
+    ])
+    .into()
+}
+
+/// Only summary statistics are exposed. The bins are an internal representation and shouldn't
+/// become part of the VRL interface.
+fn sketch_to_vrl_value(sketch: &MetricSketch) -> ObjectMap {
+    let MetricSketch::AgentDDSketch(sketch) = sketch;
+    ObjectMap::from([
+        ("count".into(), Value::from(i64::from(sketch.count()))),
+        (
+            "min".into(),
+            optional_metric_float_to_vrl_value(sketch.min()),
+        ),
+        (
+            "max".into(),
+            optional_metric_float_to_vrl_value(sketch.max()),
+        ),
+        (
+            "sum".into(),
+            optional_metric_float_to_vrl_value(sketch.sum()),
+        ),
+        (
+            "avg".into(),
+            optional_metric_float_to_vrl_value(sketch.avg()),
+        ),
+    ])
+}
+
+/// Converts a metric's value to the object VRL reads under the field for its type.
+fn metric_value_to_vrl_value(value: &MetricValue) -> Value {
+    let map: ObjectMap = match value {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => {
+            ObjectMap::from([("value".into(), metric_float_to_vrl_value(*value))])
+        }
+        MetricValue::Set { values } => ObjectMap::from([(
+            "values".into(),
+            Value::Array(values.iter().map(|value| value.as_str().into()).collect()),
+        )]),
+        MetricValue::Distribution { samples, statistic } => ObjectMap::from([
+            (
+                "samples".into(),
+                Value::Array(samples.iter().map(sample_to_vrl_value).collect()),
+            ),
+            (
+                "statistic".into(),
+                match statistic {
+                    StatisticKind::Histogram => "histogram",
+                    StatisticKind::Summary => "summary",
+                }
+                .into(),
+            ),
+        ]),
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        } => ObjectMap::from([
+            (
+                "buckets".into(),
+                Value::Array(buckets.iter().map(bucket_to_vrl_value).collect()),
+            ),
+            ("count".into(), metric_count_to_vrl_value(*count)),
+            ("sum".into(), optional_metric_float_to_vrl_value(*sum)),
+        ]),
+        MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        } => ObjectMap::from([
+            (
+                "quantiles".into(),
+                Value::Array(quantiles.iter().map(quantile_to_vrl_value).collect()),
+            ),
+            ("count".into(), metric_count_to_vrl_value(*count)),
+            ("sum".into(), metric_float_to_vrl_value(*sum)),
+        ]),
+        MetricValue::Sketch { sketch } => sketch_to_vrl_value(sketch),
+    };
+    map.into()
+}
+
+/// Updates the cached value after a metric's type changed from `previous_field`.
+///
+/// The value is only cached when the program reads it, so nothing is added otherwise.
+fn refresh_cached_metric_value(metric: &Metric, cached: &mut Value, previous_field: &str) {
+    if let Value::Object(map) = cached
+        && map.remove(previous_field).is_some()
+    {
+        map.insert(
+            metric_value_field(metric.value()).into(),
+            metric_value_to_vrl_value(metric.value()),
+        );
+    }
+}
+
 /// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
@@ -729,6 +920,16 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     );
 
     let mut map = ObjectMap::default();
+    let mut value_inserted = false;
+    let mut insert_value = |map: &mut ObjectMap| {
+        if !value_inserted {
+            map.insert(
+                metric_value_field(metric.value()).into(),
+                metric_value_to_vrl_value(metric.value()),
+            );
+            value_inserted = true;
+        }
+    };
 
     for target_path in &info.target_queries {
         // Accessing a root path requires us to pre-populate all fields.
@@ -745,12 +946,19 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             for property in &mut properties {
                 property.insert(metric, &mut map);
             }
+            insert_value(&mut map);
             break;
         }
 
         // For non-root paths, we continuously populate the value with the
         // relevant data.
         if let Some(OwnedSegment::Field(field)) = target_path.path.segments.first() {
+            // Reading any value field prepares the value of the current type, so that reads still
+            // work after a program converts the type with `.type`.
+            if METRIC_VALUE_FIELDS.contains(&field.as_ref()) {
+                insert_value(&mut map);
+                continue;
+            }
             let property = match field.as_ref() {
                 "name" => Some(&mut name),
                 "kind" => Some(&mut kind),
@@ -1456,6 +1664,13 @@ mod test {
             ".kind",
             ".tags",
             ".type",
+            ".counter",
+            ".gauge",
+            ".set",
+            ".distribution",
+            ".aggregated_histogram",
+            ".aggregated_summary",
+            ".sketch",
         ];
 
         let validpaths_set = [
@@ -2163,5 +2378,329 @@ mod test {
             .expect("shard tag should be removed");
 
         assert_eq!(removed, Value::Array(vec!["a".into(), "b".into()]));
+    }
+    fn metric_target_with_queries(value: MetricValue, queries: &[OwnedTargetPath]) -> VrlTarget {
+        let metric = Metric::new("m", MetricKind::Absolute, value);
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: queries.to_vec(),
+            target_assignments: vec![],
+        };
+        VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single)
+    }
+
+    fn get(target: &VrlTarget, path: OwnedValuePath) -> Option<Value> {
+        target
+            .target_get(&OwnedTargetPath::event(path))
+            .unwrap()
+            .cloned()
+    }
+
+    #[test]
+    fn metric_value_read_by_type() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        sketch.insert_many(&[1.0, 3.0]);
+
+        let cases = [
+            (
+                MetricValue::Counter { value: 1.5 },
+                "counter",
+                Value::from(objectmap! { "value" => 1.5 }),
+            ),
+            (
+                MetricValue::Gauge { value: -2.0 },
+                "gauge",
+                Value::from(objectmap! { "value" => -2.0 }),
+            ),
+            (
+                MetricValue::Set {
+                    values: ["b".to_owned(), "a".to_owned()].into(),
+                },
+                "set",
+                Value::from(objectmap! { "values" => vec!["a", "b"] }),
+            ),
+            (
+                MetricValue::Distribution {
+                    samples: crate::samples![1.0 => 2, 4.0 => 1],
+                    statistic: StatisticKind::Summary,
+                },
+                "distribution",
+                Value::from(objectmap! {
+                    "samples" => vec![
+                        Value::from(objectmap! { "value" => 1.0, "rate" => 2 }),
+                        Value::from(objectmap! { "value" => 4.0, "rate" => 1 }),
+                    ],
+                    "statistic" => "summary",
+                }),
+            ),
+            (
+                MetricValue::AggregatedHistogram {
+                    buckets: crate::buckets![1.0 => 2, f64::INFINITY => 3],
+                    count: 5,
+                    sum: Some(7.5),
+                },
+                "aggregated_histogram",
+                Value::from(objectmap! {
+                    "buckets" => vec![
+                        Value::from(objectmap! { "upper_limit" => 1.0, "count" => 2 }),
+                        Value::from(objectmap! { "upper_limit" => f64::INFINITY, "count" => 3 }),
+                    ],
+                    "count" => 5,
+                    "sum" => 7.5,
+                }),
+            ),
+            (
+                MetricValue::AggregatedSummary {
+                    quantiles: crate::quantiles![0.5 => 2.0, 0.99 => 3.0],
+                    count: 4,
+                    sum: 9.0,
+                },
+                "aggregated_summary",
+                Value::from(objectmap! {
+                    "quantiles" => vec![
+                        Value::from(objectmap! { "quantile" => 0.5, "value" => 2.0 }),
+                        Value::from(objectmap! { "quantile" => 0.99, "value" => 3.0 }),
+                    ],
+                    "count" => 4,
+                    "sum" => 9.0,
+                }),
+            ),
+            (
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch.clone()),
+                },
+                "sketch",
+                Value::from(objectmap! {
+                    "count" => 2,
+                    "min" => sketch.min().unwrap(),
+                    "max" => sketch.max().unwrap(),
+                    "sum" => sketch.sum().unwrap(),
+                    "avg" => sketch.avg().unwrap(),
+                }),
+            ),
+        ];
+
+        for (value, field, expected) in cases {
+            let queries: Vec<_> = METRIC_VALUE_FIELDS
+                .iter()
+                .map(|field| OwnedTargetPath::event(owned_value_path!(*field)))
+                .collect();
+            let target = metric_target_with_queries(value, &queries);
+
+            assert_eq!(
+                get(&target, owned_value_path!(field)),
+                Some(expected),
+                "{field}"
+            );
+
+            // The fields for other types are missing, so they read as `null`.
+            for other in METRIC_VALUE_FIELDS.iter().filter(|other| **other != field) {
+                assert_eq!(get(&target, owned_value_path!(*other)), None, "{field}");
+            }
+        }
+    }
+
+    #[test]
+    fn metric_value_read_nested_paths() {
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 2],
+                count: 2,
+                sum: None,
+            },
+            &[OwnedTargetPath::event(owned_value_path!(
+                "aggregated_histogram",
+                "buckets"
+            ))],
+        );
+
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("aggregated_histogram", "buckets", 0, "count")
+            ),
+            Some(Value::from(2))
+        );
+        // A missing sum reads as `null`, which is different from a sum of zero.
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_histogram", "sum")),
+            Some(Value::Null)
+        );
+    }
+
+    #[test]
+    fn metric_value_read_special_numbers() {
+        let query = |field: &str| vec![OwnedTargetPath::event(owned_value_path!(field))];
+
+        // VRL floats can't hold NaN, so it reads as the string "NaN".
+        let target =
+            metric_target_with_queries(MetricValue::Gauge { value: f64::NAN }, &query("gauge"));
+        assert_eq!(
+            get(&target, owned_value_path!("gauge", "value")),
+            Some(Value::from("NaN"))
+        );
+
+        // Infinities stay floats.
+        let target = metric_target_with_queries(
+            MetricValue::Gauge {
+                value: f64::NEG_INFINITY,
+            },
+            &query("gauge"),
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("gauge", "value")),
+            Some(Value::from(f64::NEG_INFINITY))
+        );
+
+        // Counts that don't fit in a VRL integer read as exact decimal strings.
+        let big = u64::MAX;
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => big],
+                count: big,
+                sum: Some(1.0),
+            },
+            &query("aggregated_histogram"),
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_histogram", "count")),
+            Some(Value::from("18446744073709551615"))
+        );
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("aggregated_histogram", "buckets", 0, "count")
+            ),
+            Some(Value::from("18446744073709551615"))
+        );
+
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![0.5 => f64::NAN],
+                count: i64::MAX as u64 + 1,
+                sum: 1.0,
+            },
+            &query("aggregated_summary"),
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_summary", "count")),
+            Some(Value::from("9223372036854775808"))
+        );
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("aggregated_summary", "quantiles", 0, "value")
+            ),
+            Some(Value::from("NaN"))
+        );
+
+        // The largest count that fits stays an integer.
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedSummary {
+                quantiles: vec![],
+                count: i64::MAX as u64,
+                sum: 1.0,
+            },
+            &query("aggregated_summary"),
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_summary", "count")),
+            Some(Value::from(i64::MAX))
+        );
+    }
+
+    #[test]
+    fn metric_value_read_root_includes_value() {
+        let target = metric_target_with_queries(
+            MetricValue::Counter { value: 1.0 },
+            &[OwnedTargetPath::event_root()],
+        );
+        let root = target
+            .target_get(&OwnedTargetPath::event_root())
+            .unwrap()
+            .cloned()
+            .unwrap();
+        assert_eq!(
+            root.get(&owned_value_path!("counter")).cloned(),
+            Some(Value::from(objectmap! { "value" => 1.0 }))
+        );
+    }
+
+    #[test]
+    fn metric_value_not_computed_unless_read() {
+        let target = metric_target_with_queries(
+            MetricValue::Counter { value: 1.0 },
+            &[OwnedTargetPath::event(owned_value_path!("name"))],
+        );
+        let VrlTarget::Metric { value, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(value.get(&owned_value_path!("counter")), None);
+    }
+
+    #[test]
+    fn metric_value_follows_type_conversion() {
+        let queries = [
+            OwnedTargetPath::event(owned_value_path!("type")),
+            OwnedTargetPath::event(owned_value_path!("counter", "value")),
+            OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+            OwnedTargetPath::event_root(),
+        ];
+        let mut target = metric_target_with_queries(MetricValue::Gauge { value: 3.0 }, &queries);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("type")),
+                "counter".into(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(3.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        let root = target
+            .target_get(&OwnedTargetPath::event_root())
+            .unwrap()
+            .cloned()
+            .unwrap();
+        assert_eq!(root.get(&owned_value_path!("gauge")), None);
+        assert_eq!(
+            root.get(&owned_value_path!("counter")).cloned(),
+            Some(Value::from(objectmap! { "value" => 3.0 }))
+        );
+        assert_eq!(
+            root.get(&owned_value_path!("type")).cloned(),
+            Some(Value::from("counter"))
+        );
+    }
+
+    #[test]
+    fn metric_value_write_still_rejected() {
+        let mut target = metric_target_with_queries(
+            MetricValue::Gauge { value: 1.0 },
+            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+        );
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+                2.0.into(),
+            )
+            .unwrap_err();
+        target
+            .target_remove(&OwnedTargetPath::event(owned_value_path!("gauge")), false)
+            .unwrap_err();
+
+        assert_eq!(
+            get(&target, owned_value_path!("gauge", "value")),
+            Some(Value::from(1.0))
+        );
+        let VrlTarget::Metric { metric, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 1.0 });
     }
 }
