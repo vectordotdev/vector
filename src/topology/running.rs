@@ -1038,17 +1038,13 @@ impl RunningTopology {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
             if self.paused_inputs.remove(&(input.clone(), key.clone())) {
-                // We know that if this component is connected to a given input, and neither
-                // components were changed, then the output must still exist, which means we paused
-                // this component's connection to its output, so we have to replace that connection
-                // now:
+                // `remove_inputs` paused this connection during shutdown, so refill it.
                 debug!(component_id = %key, fanout_id = %input, "Replacing component input in fanout.");
 
                 _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             } else {
-                // If the input we're connecting to is changing, that means its outputs will have been
-                // recreated, so instead of replacing a paused sink, we have to add it to this new
-                // output for the first time, since there's nothing to actually replace at this point.
+                // Not paused by `remove_inputs`: the component is new, reuses a removed key, gained
+                // this input, or its upstream was rebuilt. Either way it isn't in this fanout yet.
                 debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
                 _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
