@@ -5,6 +5,8 @@ use http::{StatusCode, Uri, response::Parts, uri::Scheme};
 #[cfg(unix)]
 use hyperlocal::Uri as UnixUri;
 use serde_with::serde_as;
+#[cfg(unix)]
+use snafu::OptionExt;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
@@ -200,7 +202,20 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|t| match t {
                 PrometheusEndpoint::Url(s) => s.parse::<Uri>().context(sources::UriParseSnafu),
                 #[cfg(unix)]
-                PrometheusEndpoint::Unix(u) => Ok(UnixUri::new(&u.path, &u.endpoint).into()),
+                PrometheusEndpoint::Unix(u) => {
+                    let socket_uri: Uri = UnixUri::new(&u.path, "/").into();
+
+                    let scheme = socket_uri
+                        .scheme()
+                        .context(sources::InvalidSocketUriSnafu)?;
+                    let authority = socket_uri
+                        .authority()
+                        .context(sources::InvalidSocketUriSnafu)?;
+
+                    format!("{}://{}{}", scheme, authority, u.endpoint)
+                        .parse::<Uri>()
+                        .context(sources::UriParseSnafu)
+                }
             })
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;

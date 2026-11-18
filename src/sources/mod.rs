@@ -107,6 +107,9 @@ pub use vector_lib::source::{Source, SourceError, opaque_source, source_with_err
 pub enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[cfg(unix)]
+    #[snafu(display("Unix socket URI is missing a scheme or authority"))]
+    InvalidSocketUri,
     #[snafu(display("VRL compilation error: {}", message))]
     VrlCompilationError { message: String },
 }
