@@ -3,6 +3,9 @@
 use std::time::{Duration, Instant};
 use vector_lib::configurable::configurable_component;
 
+pub(super) const RECORD_LIMIT: usize = 1_048_576;
+pub(super) const GENERATED_PARTITION_KEY_LEN: usize = 32;
+
 /// Format used to combine original events into a Kinesis record.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -132,11 +135,14 @@ impl<M> Aggregator<M> {
     ) -> Vec<Aggregate<M>> {
         let mut ready = Vec::new();
         let size = self.settings.format.event_len(payload);
-        // Random keys contain 16 Unicode scalars, at most 64 UTF-8 bytes.
-        let overhead = self
+        let key_len = key
+            .as_ref()
+            .map_or(GENERATED_PARTITION_KEY_LEN, String::len);
+        let overhead = self.settings.format.overhead(key_len);
+        let data_limit = self
             .settings
-            .format
-            .overhead(key.as_ref().map_or(64, String::len));
+            .max_bytes
+            .min(RECORD_LIMIT.saturating_sub(key_len));
         let must_flush = self.deadline.is_some_and(|deadline| now >= deadline)
             || self.current.as_ref().is_some_and(|batch| {
                 batch.partition_key != key
@@ -145,7 +151,7 @@ impl<M> Aggregator<M> {
                         .len()
                         .saturating_add(size)
                         .saturating_add(overhead)
-                        > self.settings.max_bytes
+                        > data_limit
             });
         if must_flush && let Some(batch) = self.flush() {
             ready.push(batch);
@@ -163,7 +169,7 @@ impl<M> Aggregator<M> {
         batch.items.push(metadata);
         batch.ends.push(batch.payload.len());
         if batch.items.len() >= self.settings.max_events
-            || batch.payload.len().saturating_add(overhead) >= self.settings.max_bytes
+            || batch.payload.len().saturating_add(overhead) >= data_limit
         {
             ready.push(self.flush().expect("a batch was just populated"));
         }
@@ -183,6 +189,46 @@ mod tests {
             max_bytes: bytes,
             timeout: Duration::from_secs(1),
         }
+    }
+
+    #[test]
+    fn generated_key_budget_flushes_at_the_physical_record_limit() {
+        let cases = [
+            (Format::Newline, 1_048_543),
+            #[cfg(feature = "sinks-aws_kinesis_streams")]
+            (Format::Kpl, 1_048_480),
+        ];
+        for (format, size) in cases {
+            let mut aggregator = Aggregator::new(Settings {
+                format,
+                ..settings(500, 1_048_576)
+            });
+            let ready = aggregator.push(&vec![b'x'; size], None, (), Instant::now());
+            assert_eq!(
+                ready.len(),
+                1,
+                "{format:?} must reserve the generated outer key"
+            );
+            assert_eq!(ready[0].items.len(), 1);
+            assert!(aggregator.flush().is_none());
+        }
+    }
+
+    #[cfg(feature = "sinks-aws_kinesis_streams")]
+    #[test]
+    fn kpl_generated_key_table_uses_the_same_budget_as_the_wire_key() {
+        let mut aggregator = Aggregator::new(Settings {
+            format: Format::Kpl,
+            ..settings(500, 100)
+        });
+        let now = Instant::now();
+        for _ in 0..6 {
+            assert!(aggregator.push(b"a", None, (), now).is_empty());
+        }
+        let ready = aggregator.push(b"a", None, (), now);
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].items.len(), 6);
+        assert_eq!(aggregator.flush().unwrap().items.len(), 1);
     }
 
     #[test]

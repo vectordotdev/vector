@@ -177,13 +177,15 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
         {
             // Mandatory even when optional healthchecks are disabled. The newer
             // distribution field is only returned by DescribeStreamSummary.
-            client
+            let check = client
                 .describe_stream_summary()
                 .stream_name(&self.base.stream_name)
                 .customize()
                 .interceptor(super::kpl_compatibility::KplCompatibility)
-                .send()
+                .send();
+            tokio::time::timeout(cx.healthcheck.timeout, check)
                 .await
+                .map_err(|_| "KPL stream compatibility check timed out")?
                 .map_err(|error| format!("KPL stream compatibility check failed: {error:?}"))?;
         }
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
@@ -407,6 +409,54 @@ mod tests {
             result.is_err(),
             "KPL on AUTO must fail before starting the sink"
         );
+    }
+
+    #[tokio::test]
+    async fn kpl_build_times_out_a_stalled_summary_with_healthchecks_disabled() {
+        use http_body_util::BodyExt;
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        use std::time::Duration;
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = Arc::clone(&calls);
+        let uri = crate::test_util::http::spawn_blackhole_http_server(move |request| {
+            let observed = Arc::clone(&observed);
+            async move {
+                assert_eq!(
+                    request.headers()["x-amz-target"],
+                    "Kinesis_20131202.DescribeStreamSummary"
+                );
+                request.into_body().collect().await.unwrap();
+                observed.fetch_add(1, Ordering::SeqCst);
+                std::future::pending().await
+            }
+        })
+        .await;
+        let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
+            "stream_name = 'logs'\nregion = 'us-east-1'\nendpoint = '{uri}'\nencoding.codec = 'json'\nauth.access_key_id = 'test'\nauth.secret_access_key = 'test'\n[aggregation]\nenabled = true\n"
+        )).unwrap();
+        let mut cx = crate::config::SinkContext::default();
+        cx.healthcheck.enabled = false;
+        cx.healthcheck.timeout = Duration::from_millis(200);
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            crate::config::SinkConfig::build(&config, cx),
+        )
+        .await
+        .expect("mandatory KPL check must respect the configured timeout");
+        let error = result
+            .err()
+            .expect("stalled KPL check must fail sink construction");
+        assert!(
+            error
+                .to_string()
+                .contains("KPL stream compatibility check timed out"),
+            "{error}"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

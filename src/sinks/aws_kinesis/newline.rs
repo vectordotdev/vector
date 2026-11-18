@@ -12,10 +12,12 @@ use vector_lib::{
 };
 
 use super::{
-    aggregation::{Aggregate, Aggregator, Format, Settings},
+    aggregation::{
+        Aggregate, Aggregator, Format, GENERATED_PARTITION_KEY_LEN, RECORD_LIMIT, Settings,
+    },
     record::Record,
     request_builder::{KinesisRequest, KinesisRequestBuilder},
-    sink::{KinesisKey, KinesisProcessedEvent, gen_partition_key},
+    sink::{KinesisKey, KinesisProcessedEvent},
 };
 #[cfg(any(test, feature = "sinks-aws_kinesis_streams"))]
 use crate::codecs::encoding::SerializerConfig;
@@ -27,8 +29,6 @@ use crate::{
         util::{Compressor, RequestBuilder, encoding::Encoder as _, request_builder::EncodeResult},
     },
 };
-
-const RECORD_LIMIT: usize = 1_048_576;
 
 /// Combine serialized logs into newline-delimited or KPL Kinesis records.
 #[configurable_component]
@@ -132,7 +132,7 @@ fn build_records<R: Record>(
         let key = batch
             .partition_key
             .clone()
-            .unwrap_or_else(gen_partition_key);
+            .unwrap_or_else(|| format!("{:032x}", rand::random::<u128>()));
         let payload = match format {
             Format::Newline => compress(&batch.payload, builder.compression),
             #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -282,7 +282,7 @@ where
                 Ok(payload) => payload,
                 Err(error) => { reject(vec![item], error); continue; }
             };
-            let key_len = key.as_ref().map_or(0, String::len);
+            let key_len = key.as_ref().map_or(GENERATED_PARTITION_KEY_LEN, String::len);
             let size = settings.format.event_len(&payload) + settings.format.overhead(key_len);
             if size.saturating_add(key_len) > RECORD_LIMIT {
                 reject(vec![item], std::io::Error::new(
@@ -847,6 +847,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn generated_keys_accept_exact_record_limit_and_reject_only_oversized_events() {
+        let cases = [
+            (Format::Newline, 1_048_543),
+            #[cfg(feature = "sinks-aws_kinesis_streams")]
+            (Format::Kpl, 1_048_480),
+        ];
+        for (format, size) in cases {
+            let (batch, status) = BatchNotifier::new_with_receiver();
+            let events = vec![
+                event("x".repeat(size)),
+                event("x".repeat(size + 1)).with_batch_notifier(&batch),
+                event("tail"),
+            ];
+            drop(batch);
+            let output = requests(
+                futures::stream::iter(events).boxed(),
+                builder(false, Compression::None),
+                None,
+                Settings {
+                    format,
+                    max_bytes: RECORD_LIMIT,
+                    ..settings()
+                },
+            )
+            .collect::<Vec<_>>()
+            .await;
+            assert_eq!(output.len(), 2, "{format:?}");
+            assert_eq!(
+                output[0].record.data.len() + output[0].record.key.len(),
+                RECORD_LIMIT
+            );
+            for request in &output {
+                assert_eq!(request.record.key.len(), 32);
+                assert!(
+                    request
+                        .record
+                        .key
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit())
+                );
+                assert_eq!(request.metadata.event_count(), 1);
+            }
+            match format {
+                Format::Newline => {
+                    assert_eq!(output[0].record.data, format!("{}\n", "x".repeat(size)));
+                    assert_eq!(output[1].record.data, b"tail\n".as_slice());
+                }
+                #[cfg(feature = "sinks-aws_kinesis_streams")]
+                Format::Kpl => {
+                    for (request, expected) in
+                        output.iter().zip([vec![b'x'; size], b"tail".to_vec()])
+                    {
+                        assert_eq!(
+                            super::super::kpl::test_support::decode(
+                                &request.record.data,
+                                &request.record.key
+                            ),
+                            [expected]
+                        );
+                    }
+                }
+            }
+            assert_eq!(status.await, BatchStatus::Rejected);
+        }
+    }
+
+    #[tokio::test]
     async fn oversized_rejection_does_not_lose_later_events() {
         let (batch, status) = BatchNotifier::new_with_receiver();
         let events = vec![
@@ -873,14 +940,14 @@ mod tests {
             max_bytes: RECORD_LIMIT,
             ..settings()
         });
-        aggregator.push(
+        let mut ready = aggregator.push(
             &vec![b'x'; RECORD_LIMIT - 2],
             Some("k".into()),
             item(),
             std::time::Instant::now(),
         );
         let output = build_records(
-            aggregator.flush().unwrap(),
+            ready.pop().or_else(|| aggregator.flush()).unwrap(),
             &builder(false, Compression::None),
             Format::Newline,
         );
