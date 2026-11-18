@@ -746,23 +746,19 @@ fn flattened_reports_unmapped_fields_except_ingest_timestamp() {
 }
 
 #[test]
-fn envelope_reports_and_defaults_wrong_typed_fields() {
+fn envelope_defaults_and_reports_fields_whose_default_means_unknown() {
     let mut span = valid_envelope_span(1, 1);
-    span.insert("name".into(), Value::Integer(42));
+    span.insert("name".into(), vrl::value!({"not": "a string"}));
     span.insert("kind".into(), Value::from("SPAN_KIND_NOPE"));
-    span.insert("startTimeUnixNano".into(), Value::from("10"));
+    span.insert("traceState".into(), vrl::value!(["x"]));
     span.insert("status".into(), Value::from("bad"));
+    span.insert("droppedEventsCount".into(), Value::from("many"));
     let scope_spans = with_key(
         scope_spans_value(vec![Value::Object(span)]),
         "scope",
-        Value::Integer(5),
+        vrl::value!({"name": ["x"]}),
     );
-    let resource_spans = with_key(
-        resource_spans_value(vec![scope_spans]),
-        "resource",
-        Value::from("bad"),
-    );
-    let envelope = envelope(vec![resource_spans]);
+    let envelope = envelope(vec![resource_spans_value(vec![scope_spans])]);
 
     assert_eq!(
         convert_hinted(envelope.clone()),
@@ -777,16 +773,15 @@ fn envelope_reports_and_defaults_wrong_typed_fields() {
 }
 
 #[test]
-fn flattened_reports_and_defaults_wrong_typed_fields() {
+fn flattened_defaults_and_reports_fields_whose_default_means_unknown() {
     let mut span = flattened_legacy();
-    span.insert(vrl::event_path!("name"), Value::Integer(42));
+    span.insert(vrl::event_path!("name"), vrl::value!({"not": "a string"}));
     span.insert(vrl::event_path!("kind"), Value::from("server"));
+    span.insert(vrl::event_path!("trace_state"), vrl::value!(["x"]));
     span.insert(
         vrl::event_path!(spans::DROPPED_ATTRIBUTES_COUNT_KEY),
         Value::Integer(-1),
     );
-    // The source writes timestamps, so an integer is not coerced.
-    span.insert(vrl::event_path!("start_time_unix_nano"), Value::Integer(5));
 
     assert_eq!(
         convert_hinted(span.clone()),
@@ -794,6 +789,206 @@ fn flattened_reports_and_defaults_wrong_typed_fields() {
             legacy_span(&span, Span::new(sid(1), "")),
             TraceConversionCounts {
                 malformed_fields: 4,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+}
+
+#[test]
+fn envelope_coerces_lossless_scalar_values() {
+    let mut span = valid_envelope_span(1, 1);
+    span.insert("name".into(), Value::Integer(42));
+    span.insert("kind".into(), Value::Integer(2));
+    span.insert("startTimeUnixNano".into(), Value::from("10"));
+    span.insert("endTimeUnixNano".into(), Value::from("25"));
+    span.insert("droppedEventsCount".into(), Value::from("3"));
+    span.insert("status".into(), vrl::value!({"code": 2, "message": 500}));
+    let (events, counts) = convert_hinted(envelope_with_spans(vec![Value::Object(span)]));
+    let span = &events[0].spans()[0];
+
+    assert_eq!(
+        (
+            span.name.as_str(),
+            span.kind,
+            span.start_time,
+            span.duration,
+            span.status.clone(),
+            span.dropped_events_count,
+            counts,
+        ),
+        (
+            "42",
+            SpanKind::Server,
+            DateTime::from_timestamp_nanos(10),
+            Duration::from_nanos(15),
+            SpanStatus::Error("500".into()),
+            DroppedCount::new(3),
+            TraceConversionCounts::default(),
+        )
+    );
+}
+
+#[test]
+fn flattened_coerces_lossless_scalar_values() {
+    let mut span = flattened_legacy();
+    span.insert(vrl::event_path!("name"), Value::Integer(42));
+    span.insert(vrl::event_path!("dropped_events_count"), Value::from("3"));
+    span.insert(
+        vrl::event_path!("status"),
+        vrl::value!({"code": "2", "message": 500}),
+    );
+    let (events, counts) = convert_hinted(span);
+    let span = &events[0].spans()[0];
+
+    assert_eq!(
+        (
+            span.name.as_str(),
+            span.status.clone(),
+            span.dropped_events_count,
+            counts,
+        ),
+        (
+            "42",
+            SpanStatus::Error("500".into()),
+            DroppedCount::new(3),
+            TraceConversionCounts::default(),
+        )
+    );
+}
+
+#[test]
+fn envelope_drops_span_with_malformed_timestamp_and_keeps_siblings() {
+    let mut bad_start = valid_envelope_span(1, 1);
+    bad_start.insert("startTimeUnixNano".into(), Value::from("abc"));
+    let mut bad_end = valid_envelope_span(1, 2);
+    bad_end.insert("endTimeUnixNano".into(), vrl::value!([1]));
+    let envelope = envelope_with_spans(vec![
+        Value::Object(bad_start),
+        Value::Object(valid_envelope_span(1, 3)),
+        Value::Object(bad_end),
+    ]);
+
+    assert_eq!(
+        convert_hinted(envelope.clone()),
+        (
+            legacy_span(&envelope, Span::new(sid(3), "s")),
+            TraceConversionCounts {
+                malformed_fields: 2,
+                rejected_spans: 2,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+}
+
+#[test]
+fn flattened_drops_span_with_malformed_timestamp() {
+    let mut span = flattened_legacy();
+    // The source writes timestamps, so an integer is not coerced.
+    span.insert(vrl::event_path!("start_time_unix_nano"), Value::Integer(5));
+
+    let (events, mut expected) = rejected(1);
+    expected.malformed_fields = 1;
+    assert_eq!(convert_hinted(span), (events, expected));
+}
+
+#[test]
+fn envelope_drops_and_counts_events_with_malformed_required_fields() {
+    let mut span = valid_envelope_span(1, 1);
+    span.insert(
+        "events".into(),
+        vrl::value!([
+            {"name": {"not": "a string"}},
+            {"name": "late", "timeUnixNano": "x"},
+            {"name": 7},
+        ]),
+    );
+    let envelope = envelope_with_spans(vec![Value::Object(span)]);
+
+    assert_eq!(
+        convert_hinted(envelope.clone()),
+        (
+            legacy_span(
+                &envelope,
+                Span {
+                    events: vec![SpanEvent {
+                        name: "7".into(),
+                        time: DateTime::<Utc>::UNIX_EPOCH,
+                        attributes: Attributes::new(),
+                        dropped_attributes_count: DroppedCount::ZERO,
+                    }],
+                    dropped_events_count: DroppedCount::new(2),
+                    ..Span::new(sid(1), "s")
+                },
+            ),
+            TraceConversionCounts {
+                malformed_fields: 2,
+                malformed_events: 2,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+}
+
+#[test]
+fn flattened_drops_and_counts_events_with_malformed_required_fields() {
+    let mut span = flattened_legacy();
+    span.insert(
+        vrl::event_path!("events"),
+        vrl::value!([
+            {"name": {"not": "a string"}},
+            {"name": "late", "time_unix_nano": 5},
+            {"name": 7},
+        ]),
+    );
+
+    assert_eq!(
+        convert_hinted(span.clone()),
+        (
+            legacy_span(
+                &span,
+                Span {
+                    events: vec![SpanEvent {
+                        name: "7".into(),
+                        time: DateTime::<Utc>::UNIX_EPOCH,
+                        attributes: Attributes::new(),
+                        dropped_attributes_count: DroppedCount::ZERO,
+                    }],
+                    dropped_events_count: DroppedCount::new(2),
+                    ..Span::new(sid(1), "s")
+                },
+            ),
+            TraceConversionCounts {
+                malformed_fields: 2,
+                malformed_events: 2,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+}
+
+#[test]
+fn envelope_drops_groupings_with_malformed_resource_or_scope() {
+    let span = |id| Value::Object(valid_envelope_span(1, id));
+    let bad_resource = with_key(
+        resource_spans_value(vec![scope_spans_value(vec![span(1)])]),
+        "resource",
+        Value::from("bad"),
+    );
+    let bad_scope = with_key(scope_spans_value(vec![span(2)]), "scope", Value::Integer(5));
+    let envelope = envelope(vec![
+        bad_resource,
+        resource_spans_value(vec![bad_scope, scope_spans_value(vec![span(3)])]),
+    ]);
+
+    assert_eq!(
+        convert_hinted(envelope.clone()),
+        (
+            legacy_span(&envelope, Span::new(sid(3), "s")),
+            TraceConversionCounts {
+                malformed_fields: 2,
+                malformed_groupings: 2,
                 ..TraceConversionCounts::default()
             },
         )

@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.63.0-dev"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -13,6 +13,9 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
 rust-version = "1.95"
+
+[workspace.package]
+version = "0.63.0-dev"
 
 [[bin]]
 name = "vector"
@@ -193,6 +196,7 @@ dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 derive_more = { version = "2.1.1", default-features = false, features = ["display", "debug"] }
 exitcode = { version = "1.1.2", default-features = false }
+fixed_decimal = { version = "0.7.3", default-features = false, features = ["ryu"] }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
@@ -207,7 +211,7 @@ libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
 metrics-util = { version = "0.20.4", default-features = false, features = ["registry"] }
-mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
+mlua = { version = "0.12.2", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
@@ -262,7 +266,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] , git = "https://github.com/vectordotdev/vrl.git", branch = "main" }
-zstd = { version = "0.13.0", default-features = false }
+zstd = { version = "0.14.3", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
 similar-asserts = "2.0.0"
@@ -437,6 +441,7 @@ enum_dispatch = { version = "0.3.13", default-features = false }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 evmap-derive = { version = "0.2.0", default-features = false, optional = true }
 exitcode.workspace = true
+fixed_decimal = { workspace = true, optional = true }
 flate2.workspace = true
 futures-util.workspace = true
 glob.workspace = true
@@ -782,7 +787,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-encoding", "dep:datadog-proto", "dep:prost"]
+sources-datadog_agent = ["sources-utils-http-encoding", "dep:base64", "dep:datadog-proto", "dep:fixed_decimal", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
 sources-docker_logs = ["docker"]

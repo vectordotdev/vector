@@ -82,7 +82,7 @@ fn clean_generate() {
 fn validate_cleanup() {
     // Create component directories with some file.
     let dir = create_directory();
-    let mut path = dir.clone();
+    let mut path = dir.path().to_path_buf();
     path.push("tmp");
     path.set_extension("data");
     overwrite_file(path.clone(), "");
@@ -101,7 +101,7 @@ fn validate_cleanup() {
     cmd.arg("validate")
         .arg("--dangerously-allow-env-var-interpolation")
         .arg(config)
-        .env("VECTOR_DATA_DIR", dir.clone());
+        .env("VECTOR_DATA_DIR", dir.path());
 
     let output = cmd.output().expect("Failed to execute process");
     println!(
@@ -115,7 +115,7 @@ fn validate_cleanup() {
     // Assert that data folder didn't change
     assert_eq!(
         HashSet::from([path]),
-        read_dir(dir)
+        read_dir(dir.path())
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect::<HashSet<_>>()
@@ -368,7 +368,7 @@ fn validate_output_with_args(config: &str, args: &[&str]) -> std::process::Outpu
     for arg in args {
         cmd.arg(arg);
     }
-    cmd.arg(config).env("VECTOR_DATA_DIR", dir);
+    cmd.arg(config).env("VECTOR_DATA_DIR", dir.path());
 
     let output = cmd.output().unwrap();
     println!(

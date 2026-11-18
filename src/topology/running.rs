@@ -65,6 +65,7 @@ pub struct RunningTopology {
     inputs: HashMap<ComponentKey, BufferSender<EventArray>>,
     inputs_tap_metadata: HashMap<ComponentKey, Inputs<OutputId>>,
     outputs: HashMap<OutputId, ControlChannel>,
+    paused_inputs: HashSet<(OutputId, ComponentKey)>,
     outputs_tap_metadata: HashMap<ComponentKey, (&'static str, String)>,
     component_type_names: HashMap<ComponentKey, String>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
@@ -92,6 +93,7 @@ impl RunningTopology {
             inputs: HashMap::new(),
             inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
+            paused_inputs: HashSet::new(),
             outputs_tap_metadata: HashMap::new(),
             component_type_names: HashMap::new(),
             shutdown_coordinator: SourceShutdownCoordinator::default(),
@@ -924,13 +926,13 @@ impl RunningTopology {
         // with transforms.
         for key in diff.transforms.changed_and_added() {
             debug!(component_id = %key, "Connecting inputs for transform.");
-            self.setup_inputs(key, diff, new_pieces);
+            self.setup_inputs(key, new_pieces);
         }
 
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
             debug!(component_id = %key, "Connecting inputs for sink.");
-            self.setup_inputs(key, diff, new_pieces);
+            self.setup_inputs(key, new_pieces);
         }
         let added_changed_tables: Vec<ComponentKey> = diff
             .enrichment_tables
@@ -940,7 +942,7 @@ impl RunningTopology {
             .collect();
         for key in &added_changed_tables {
             debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
-            self.setup_inputs(key, diff, new_pieces);
+            self.setup_inputs(key, new_pieces);
         }
 
         // We do a final pass here to reconnect unchanged components.
@@ -954,6 +956,13 @@ impl RunningTopology {
         // connect components backwards i.e. transforms to sources/transforms, and sinks to
         // sources/transforms, to ensure we're connecting components in order.
         self.reattach_severed_inputs(diff);
+
+        debug_assert!(
+            self.paused_inputs.is_empty(),
+            "paused component inputs were not replaced: {:?}",
+            self.paused_inputs
+        );
+        self.paused_inputs.clear();
 
         // Broadcast any topology changes to subscribers.
         if !self.watch.0.is_closed() {
@@ -1023,43 +1032,23 @@ impl RunningTopology {
         }
     }
 
-    fn setup_inputs(
-        &mut self,
-        key: &ComponentKey,
-        diff: &ConfigDiff,
-        new_pieces: &mut builder::TopologyPieces,
-    ) {
+    fn setup_inputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
-
-        let old_inputs = self
-            .config
-            .inputs_for_node(key)
-            .into_iter()
-            .flatten()
-            .cloned()
-            .collect::<HashSet<_>>();
-
-        let new_inputs = inputs.iter().cloned().collect::<HashSet<_>>();
-        let inputs_to_add = &new_inputs - &old_inputs;
 
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
-            if diff.contains(&input.component) || inputs_to_add.contains(&input) {
-                // If the input we're connecting to is changing, that means its outputs will have been
-                // recreated, so instead of replacing a paused sink, we have to add it to this new
-                // output for the first time, since there's nothing to actually replace at this point.
-                debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
-
-                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
-            } else {
-                // We know that if this component is connected to a given input, and neither
-                // components were changed, then the output must still exist, which means we paused
-                // this component's connection to its output, so we have to replace that connection
-                // now:
+            if self.paused_inputs.remove(&(input.clone(), key.clone())) {
+                // `remove_inputs` paused this connection during shutdown, so refill it.
                 debug!(component_id = %key, fanout_id = %input, "Replacing component input in fanout.");
 
                 _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
+            } else {
+                // Not paused by `remove_inputs`: the component is new, reuses a removed key, gained
+                // this input, or its upstream was rebuilt. Either way it isn't in this fanout yet.
+                debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
+
+                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
             }
         }
 
@@ -1111,6 +1100,7 @@ impl RunningTopology {
                     debug!(component_id = %key, fanout_id = %input, "Pausing component input in fanout.");
 
                     _ = output.send(ControlMessage::Pause(key.clone()));
+                    self.paused_inputs.insert((input.clone(), key.clone()));
                 }
             }
         }
