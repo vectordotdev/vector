@@ -1,7 +1,7 @@
 //! Service implementation for the `opsimate` sink.
 
 use bytes::Bytes;
-use http::{Request, header::CONTENT_TYPE};
+use http::{HeaderValue, Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -23,8 +23,15 @@ pub(super) struct OpsiMateSvcRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for OpsiMateSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+        // `x-api-token` is not on the shared redaction list of the outgoing-request debug log,
+        // so the value is flagged sensitive here and the log prints it as `Sensitive`.
+        let mut api_token = HeaderValue::from_str(self.api_token.inner())
+            .map_err(http::Error::from)
+            .context(HTTPRequestBuilderSnafu)?;
+        api_token.set_sensitive(true);
+
         Request::post(self.alerts_endpoint.as_uri().clone())
-            .header(HTTP_HEADER_OPSIMATE_API_TOKEN, self.api_token.inner())
+            .header(HTTP_HEADER_OPSIMATE_API_TOKEN, api_token)
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
             .context(HTTPRequestBuilderSnafu)
@@ -64,17 +71,41 @@ mod tests {
             request.uri().to_string(),
             "http://opsimate.example.com:3001/api/v1/alerts/custom"
         );
-        assert_eq!(
-            request
-                .headers()
-                .get(HTTP_HEADER_OPSIMATE_API_TOKEN)
-                .unwrap(),
-            "secret-token"
+        let token = request
+            .headers()
+            .get(HTTP_HEADER_OPSIMATE_API_TOKEN)
+            .unwrap();
+        assert_eq!(token, "secret-token");
+        assert!(
+            token.is_sensitive(),
+            "the API token header must be flagged sensitive so debug logs redact it"
         );
         assert_eq!(
             request.headers().get(CONTENT_TYPE).unwrap(),
             "application/json"
         );
         assert_eq!(request.body(), &payload);
+    }
+
+    #[test]
+    fn rejects_a_token_that_is_not_a_valid_header_value() {
+        let builder = OpsiMateSvcRequestBuilder {
+            alerts_endpoint: HttpEndpoint::parse(
+                "http://opsimate.example.com:3001/api/v1/alerts/custom",
+            )
+            .unwrap(),
+            api_token: SensitiveString::from("secret\ntoken".to_owned()),
+        };
+        let request = HttpRequest::new(
+            Bytes::from_static(b"{}"),
+            EventFinalizers::default(),
+            RequestMetadata::default(),
+            (),
+        );
+
+        assert!(
+            builder.build(request).is_err(),
+            "a token with a line break cannot be sent as a header"
+        );
     }
 }
