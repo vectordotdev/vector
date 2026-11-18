@@ -2,7 +2,11 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
 use http::{StatusCode, Uri, response::Parts, uri::Scheme};
+#[cfg(unix)]
+use hyperlocal::Uri as UnixUri;
 use serde_with::serde_as;
+#[cfg(unix)]
+use snafu::OptionExt;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
@@ -46,7 +50,7 @@ pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
     #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
     #[serde(alias = "hosts")]
-    endpoints: Vec<String>,
+    endpoints: Vec<PrometheusEndpoint>,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
     /// than the interval a new scrape will be started. This can take extra resources, set the timeout
@@ -107,6 +111,54 @@ pub struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
+/// Unix socket configuration to scrape metrics from
+#[cfg(unix)]
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub(crate) struct UnixEndpoint {
+    /// The Path to the unix socket
+    #[configurable(metadata(docs::examples = "/var/run/forgejo/forgejo.sock"))]
+    path: String,
+    /// The absolute Path in the URI
+    #[serde(default = "default_prometheus_path")]
+    #[configurable(metadata(docs::examples = "/metrics"))]
+    #[configurable(metadata(docs::examples = "/api/v1/metrics"))]
+    endpoint: String,
+}
+
+/// URI Configuration to scrape metrics from
+#[serde_as]
+#[configurable_component]
+#[serde(untagged)]
+#[derive(Clone, Debug)]
+pub(crate) enum PrometheusEndpoint {
+    /// The URL to scrape metrics from
+    #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
+    Url(String),
+    #[cfg(unix)]
+    /// The URI to scrape metrics from a unix socket
+    Unix(UnixEndpoint),
+}
+
+impl From<std::string::String> for PrometheusEndpoint {
+    fn from(str: std::string::String) -> Self {
+        Self::Url(str)
+    }
+}
+
+impl From<&str> for PrometheusEndpoint {
+    fn from(value: &str) -> Self {
+        Self::Url(value.to_owned())
+    }
+}
+
+#[cfg(unix)]
+/// The default path in the URI for Unix Endpoint
+pub(crate) fn default_prometheus_path() -> String {
+    String::from("/metrics")
+}
+
 fn query_example() -> serde_json::Value {
     serde_json::json! ({
         "match[]": [
@@ -125,7 +177,7 @@ fn headers_example() -> serde_json::Value {
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            endpoints: vec!["http://localhost:9090/metrics".to_string().into()],
             interval: default_interval(),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -147,7 +199,24 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
+            .map(|t| match t {
+                PrometheusEndpoint::Url(s) => s.parse::<Uri>().context(sources::UriParseSnafu),
+                #[cfg(unix)]
+                PrometheusEndpoint::Unix(u) => {
+                    let socket_uri: Uri = UnixUri::new(&u.path, "/").into();
+
+                    let scheme = socket_uri
+                        .scheme()
+                        .context(sources::InvalidSocketUriSnafu)?;
+                    let authority = socket_uri
+                        .authority()
+                        .context(sources::InvalidSocketUriSnafu)?;
+
+                    format!("{}://{}{}", scheme, authority, u.endpoint)
+                        .parse::<Uri>()
+                        .context(sources::UriParseSnafu)
+                }
+            })
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
@@ -382,7 +451,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{in_addr}/metrics")],
+            endpoints: vec![format!("http://{in_addr}/metrics").into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -423,7 +492,58 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![stalled.to_string(), format!("http://{in_addr}/metrics")],
+            endpoints: vec![
+                stalled.to_string().into(),
+                format!("http://{in_addr}/metrics").into(),
+            ],
+            interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events =
+            run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS)
+                .await;
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_prometheus_unix_stalled_body_times_out_without_blocking_other_endpoints() {
+        use crate::test_util::wait_for_unix_socket;
+        use tempfile::tempdir;
+        use tokio::net::UnixListener;
+
+        let stalled = spawn_slow_body_http_server(SlowBody::Stall).await;
+
+        let healthy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
+                "#
+        });
+
+        // Clean up once dropped
+        let dir = tempdir().unwrap();
+        let addr = dir.path().join("stalled_body_blocks.sock");
+        let listener = UnixListener::bind(&addr).unwrap();
+
+        tokio::spawn(warp::serve(healthy_endpoint).incoming(listener).run());
+        wait_for_unix_socket(addr.clone()).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![
+                stalled.to_string().into(),
+                sources::prometheus::scrape::PrometheusEndpoint::Unix(UnixEndpoint {
+                    path: addr.clone().into_os_string().into_string().unwrap(),
+                    endpoint: "/metrics".to_string(),
+                }),
+            ],
             interval: Duration::from_secs(1),
             timeout: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
@@ -455,7 +575,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{in_addr}/metrics")],
+            endpoints: vec![format!("http://{in_addr}/metrics").into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -505,7 +625,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{in_addr}/metrics")],
+            endpoints: vec![format!("http://{in_addr}/metrics").into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -569,7 +689,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{in_addr}/metrics")],
+            endpoints: vec![format!("http://{in_addr}/metrics").into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -622,7 +742,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
+            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1").into()],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -733,7 +853,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{in_addr}")],
+                endpoints: vec![format!("http://{in_addr}").into()],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,

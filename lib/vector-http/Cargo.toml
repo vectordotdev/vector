@@ -27,5 +27,11 @@ tracing.workspace = true
 url = { version = "2.5.4", default-features = false }
 vector-core = { path = "../vector-core" }
 
+[target.'cfg(unix)'.dependencies]
+hyperlocal.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util", "macros", "test-util"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile.workspace = true

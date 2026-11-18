@@ -202,6 +202,7 @@ futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
+hyperlocal = "0.9.1"
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
@@ -532,6 +533,7 @@ nix = { version = "0.31", default-features = false, features = ["socket", "signa
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
+hyperlocal.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
