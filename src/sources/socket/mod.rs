@@ -20,6 +20,9 @@ use crate::{
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
+const HOST: &str = "host";
+const PORT: &str = "port";
+const TLS_CLIENT_METADATA: &str = "tls_client_metadata";
 
 /// Configuration for the `socket` source.
 #[configurable_component(source("socket", "Collect logs over a socket."))]
@@ -235,21 +238,21 @@ impl SourceConfig for SocketConfig {
                     .with_source_metadata(
                         Self::NAME,
                         legacy_host_key,
-                        &owned_value_path!("host"),
+                        &owned_value_path!(HOST),
                         Kind::bytes(),
                         Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
                         legacy_port_key,
-                        &owned_value_path!("port"),
+                        &owned_value_path!(PORT),
                         Kind::integer(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
                         tls_client_metadata_path,
-                        &owned_value_path!("tls_client_metadata"),
+                        &owned_value_path!(TLS_CLIENT_METADATA),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
                         None,
@@ -264,7 +267,7 @@ impl SourceConfig for SocketConfig {
                     .with_source_metadata(
                         Self::NAME,
                         legacy_host_key,
-                        &owned_value_path!("host"),
+                        &owned_value_path!(HOST),
                         Kind::bytes(),
                         None,
                     )
@@ -287,7 +290,7 @@ impl SourceConfig for SocketConfig {
                 schema_definition.with_source_metadata(
                     Self::NAME,
                     legacy_host_key,
-                    &owned_value_path!("host"),
+                    &owned_value_path!(HOST),
                     Kind::bytes(),
                     None,
                 )

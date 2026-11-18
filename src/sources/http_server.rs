@@ -28,6 +28,10 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
+const PATH: &str = "path";
+const HEADERS: &str = "headers";
+const QUERY_PARAMETERS: &str = "query_parameters";
+const HOST: &str = "host";
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -144,7 +148,7 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 self.path_key.path.clone().map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("path"),
+                &owned_value_path!(PATH),
                 Kind::bytes(),
                 None,
             )
@@ -152,7 +156,7 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 None,
-                &owned_value_path!("headers"),
+                &owned_value_path!(HEADERS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -160,14 +164,14 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 None,
-                &owned_value_path!("query_parameters"),
+                &owned_value_path!(QUERY_PARAMETERS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 self.host_key.path.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
                 None,
             )
@@ -237,7 +241,7 @@ fn default_path() -> String {
 }
 
 fn default_path_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("path"))
+    OptionalValuePath::from(owned_value_path!(PATH))
 }
 
 fn default_host_key() -> OptionalValuePath {
@@ -391,7 +395,7 @@ impl HttpSource for SimpleHttpSource {
                     SimpleHttpConfig::NAME,
                     log,
                     self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("path"),
+                    path!(PATH),
                     request_path.to_owned(),
                 );
 
@@ -406,7 +410,7 @@ impl HttpSource for SimpleHttpSource {
                         SimpleHttpConfig::NAME,
                         log,
                         self.host_key.path.as_ref().map(LegacyKey::Overwrite),
-                        path!("host"),
+                        path!(HOST),
                         socket_addr_to_ip_string(addr),
                     );
                 }
