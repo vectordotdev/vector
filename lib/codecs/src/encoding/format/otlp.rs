@@ -1,15 +1,26 @@
 use crate::encoding::ProtobufSerializer;
+#[cfg(feature = "typed-trace")]
+use crate::internal_events::OtlpTraceConversionError;
 use bytes::BytesMut;
 use opentelemetry_proto::metrics::metric_event_to_export_request;
-#[cfg(not(feature = "typed-trace"))]
-use opentelemetry_proto::proto::RESOURCE_SPANS_JSON_FIELD;
+#[cfg(feature = "typed-trace")]
+use opentelemetry_proto::proto::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::proto::{
     DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
-    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, TRACES_REQUEST_MESSAGE_TYPE,
+    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
+    TRACES_REQUEST_MESSAGE_TYPE,
 };
+#[cfg(feature = "typed-trace")]
+use opentelemetry_proto::typed_trace::legacy_to_typed;
 use prost::Message;
 use tokio_util::codec::Encoder;
+#[cfg(feature = "typed-trace")]
+use vector_common::internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit};
 use vector_config_macros::configurable_component;
+#[cfg(feature = "typed-trace")]
+use vector_core::event::TraceEvent;
+#[cfg(feature = "typed-trace")]
+use vector_core::event::typed_trace::{TraceConversionIssue, TraceConversionReporter};
 use vector_core::{config::DataType, event::Event, schema};
 use vrl::{event_path, protobuf::encode::Options};
 
@@ -58,6 +69,12 @@ impl OtlpSerializerConfig {
 /// - `resourceMetrics` → `ExportMetricsServiceRequest`
 /// - `resourceSpans` → `ExportTraceServiceRequest`
 ///
+/// When the `typed-trace` feature is enabled, a native trace event (one flattened span
+/// from the `opentelemetry` source without `use_otlp_decoding`) is converted through the
+/// typed trace model. A trace whose spans are all rejected encodes to nothing. The `http`
+/// sink omits that empty body. Other sinks that select this codec write the empty payload
+/// and still count the event as sent.
+///
 /// The implementation is the inverse of what the `opentelemetry` source does when decoding,
 /// ensuring round-trip compatibility.
 #[derive(Debug, Clone)]
@@ -65,7 +82,6 @@ impl OtlpSerializerConfig {
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
-    #[cfg_attr(feature = "typed-trace", expect(dead_code))]
     traces_descriptor: ProtobufSerializer,
     options: Options,
 }
@@ -128,8 +144,6 @@ impl Encoder<Event> for OtlpSerializer {
                         .into())
                 }
             }
-            #[cfg(feature = "typed-trace")]
-            Event::Trace(trace) => encode_typed_trace(trace, buffer),
             #[cfg(not(feature = "typed-trace"))]
             Event::Trace(trace) => {
                 if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
@@ -138,7 +152,19 @@ impl Encoder<Event> for OtlpSerializer {
                     Err(format!(
                         "Trace event does not contain OTLP top-level field ({RESOURCE_SPANS_JSON_FIELD})",
                     )
-                        .into())
+                    .into())
+                }
+            }
+            #[cfg(feature = "typed-trace")]
+            Event::Trace(trace) => {
+                if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
+                    self.traces_descriptor.encode(Event::Trace(trace), buffer)
+                } else if let Some(request) = native_trace_to_export_request(trace)? {
+                    request.encode(buffer).map_err(Into::into)
+                } else {
+                    // Every span was rejected. The conversion already reported that, and
+                    // RFC 25329 treats a conversion that yields no events as success.
+                    Ok(())
                 }
             }
             Event::Metric(metric) => {
@@ -149,33 +175,42 @@ impl Encoder<Event> for OtlpSerializer {
     }
 }
 
-/// Encodes a trace through the typed model (RFC 25329) so `typed-trace` builds exercise it end
-/// to end. Any conversion issue fails the event instead of relaying a lossy result.
+/// Convert a native trace event from the `opentelemetry` source (one flattened span per event)
+/// into an OTLP export request, through the typed trace model (RFC 25329).
+///
+/// Returns `Ok(None)` when every span was rejected. That is a successful conversion with
+/// nothing to send, so one bad span does not fail the rest of the batch. Fails for traces
+/// in other layouts, such as Datadog traces.
 #[cfg(feature = "typed-trace")]
-fn encode_typed_trace(
-    trace: vector_core::event::TraceEvent,
-    buffer: &mut BytesMut,
-) -> vector_common::Result<()> {
-    use opentelemetry_proto::{
-        proto::collector::trace::v1::ExportTraceServiceRequest, typed_trace::legacy_to_typed,
-    };
-    use vector_core::event::typed_trace::{TraceConversionIssue, TraceConversionReporter};
-
-    struct Issues(Vec<String>);
-    impl TraceConversionReporter for Issues {
-        fn report(&mut self, issue: TraceConversionIssue<'_>) {
-            self.0.push(format!("{issue:?}"));
-        }
+fn native_trace_to_export_request(
+    trace: TraceEvent,
+) -> vector_common::Result<Option<ExportTraceServiceRequest>> {
+    let mut reporter = EmitTraceConversionIssue;
+    let events = legacy_to_typed(trace, &mut reporter).map_err(|failed| failed.error())?;
+    if events.is_empty() {
+        // Links and attributes dropped inside a span that is still encoded are counted by
+        // `OtlpTraceConversionError`. This is the case where the Vector event itself
+        // contributed no spans.
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: "Trace event has no spans that can be encoded as OTLP.",
+        });
+        return Ok(None);
     }
+    // The finalizers belong to the input event. Sinks take them before encoding, so this
+    // set is empty and dropping it acknowledges nothing.
+    let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut reporter);
+    Ok(Some(request))
+}
 
-    let mut issues = Issues(Vec::new());
-    let events = legacy_to_typed(trace, &mut issues)?;
-    // Sinks take finalizers before encoding, so dropping these releases nothing early.
-    let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut issues);
-    if !issues.0.is_empty() {
-        return Err(format!("typed trace conversion reported issues: {:?}", issues.0).into());
+#[cfg(feature = "typed-trace")]
+struct EmitTraceConversionIssue;
+
+#[cfg(feature = "typed-trace")]
+impl TraceConversionReporter for EmitTraceConversionIssue {
+    fn report(&mut self, issue: TraceConversionIssue<'_>) {
+        emit(OtlpTraceConversionError { issue });
     }
-    request.encode(buffer).map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -361,5 +396,157 @@ mod tests {
                 .encode(Event::Metric(distribution_metric), &mut buffer)
                 .is_err()
         );
+    }
+
+    #[cfg(feature = "typed-trace")]
+    mod native_traces {
+        use opentelemetry_proto::proto::{
+            common::v1::{AnyValue, KeyValue, any_value::Value as PBValue},
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        };
+        use vector_core::event::TraceLayout;
+
+        use super::*;
+
+        const TRACE_ID: [u8; 16] = [1; 16];
+        const SPAN_ID: [u8; 8] = [2; 8];
+
+        /// Decode one span the way the `opentelemetry` source does without
+        /// `use_otlp_decoding`, giving a flattened native trace event.
+        fn flattened_trace(trace_id: &[u8], end_time_unix_nano: u64) -> Event {
+            let resource_spans = ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![KeyValue {
+                        key: "service.name".into(),
+                        value: Some(AnyValue {
+                            value: Some(PBValue::StringValue("checkout".into())),
+                        }),
+                    }],
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: trace_id.to_vec(),
+                        span_id: SPAN_ID.to_vec(),
+                        name: "GET /cart".into(),
+                        kind: 2,
+                        start_time_unix_nano: 1_000,
+                        end_time_unix_nano,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            };
+            let mut events: Vec<Event> = resource_spans.into_event_iter().collect();
+            assert_eq!(events.len(), 1);
+            events.remove(0)
+        }
+
+        fn capture_metrics(encode: impl FnOnce()) -> Vec<vector_core::event::Metric> {
+            vector_core::metrics::init_test();
+            let controller = vector_core::metrics::Controller::get().unwrap();
+            controller.reset();
+            encode();
+            controller.capture_metrics()
+        }
+
+        #[test]
+        fn flattened_trace_is_converted() {
+            let mut buffer = BytesMut::new();
+            OtlpSerializer::new()
+                .unwrap()
+                .encode(flattened_trace(&TRACE_ID, 2_000), &mut buffer)
+                .expect("native trace must be converted, not rejected");
+
+            let request = ExportTraceServiceRequest::decode(buffer.freeze()).unwrap();
+            assert_eq!(request.resource_spans.len(), 1);
+            let resource_spans = &request.resource_spans[0];
+            let resource = resource_spans.resource.as_ref().unwrap();
+            assert_eq!(resource.attributes[0].key, "service.name");
+            let spans = &resource_spans.scope_spans[0].spans;
+            assert_eq!(spans.len(), 1);
+            assert_eq!(spans[0].trace_id, TRACE_ID);
+            assert_eq!(spans[0].span_id, SPAN_ID);
+            assert_eq!(spans[0].name, "GET /cart");
+            assert_eq!(spans[0].kind, 2);
+            assert_eq!(spans[0].start_time_unix_nano, 1_000);
+            assert_eq!(spans[0].end_time_unix_nano, 2_000);
+        }
+
+        #[test]
+        fn trace_with_only_rejected_spans_encodes_nothing() {
+            let mut buffer = BytesMut::new();
+            let metrics = capture_metrics(|| {
+                OtlpSerializer::new()
+                    .unwrap()
+                    .encode(flattened_trace(&[0; 16], 2_000), &mut buffer)
+                    .expect("rejected spans are omitted, not a batch failure");
+            });
+            assert!(buffer.is_empty());
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_matches("error_code", "invalid_trace_id")
+                }),
+                "expected invalid_trace_id in {metrics:?}"
+            );
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_discarded_events_total"
+                        && metric.tag_matches("intentional", "false")
+                }),
+                "expected the empty trace to count as a discarded event in {metrics:?}"
+            );
+        }
+
+        #[test]
+        fn reversed_timestamps_are_reported_and_the_span_is_still_encoded() {
+            let mut buffer = BytesMut::new();
+            let metrics = capture_metrics(|| {
+                OtlpSerializer::new()
+                    .unwrap()
+                    .encode(flattened_trace(&TRACE_ID, 500), &mut buffer)
+                    .expect("a clamped span is still encoded");
+            });
+
+            let request = ExportTraceServiceRequest::decode(buffer.freeze()).unwrap();
+            let span = &request.resource_spans[0].scope_spans[0].spans[0];
+            assert_eq!(span.start_time_unix_nano, 1_000);
+            assert_eq!(span.end_time_unix_nano, 1_000);
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_matches("error_code", "reversed_span_timestamps")
+                }),
+                "expected reversed_span_timestamps in {metrics:?}"
+            );
+            assert!(
+                metrics
+                    .iter()
+                    .all(|metric| metric.name() != "component_discarded_events_total"),
+                "a delivered span is not a discarded event: {metrics:?}"
+            );
+        }
+
+        #[test]
+        fn datadog_trace_is_an_error() {
+            let mut trace = TraceEvent::default();
+            trace.insert(event_path!("spans"), vrl::value::Value::Array(Vec::new()));
+            trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+
+            let mut buffer = BytesMut::new();
+            let error = OtlpSerializer::new()
+                .unwrap()
+                .encode(Event::Trace(trace), &mut buffer)
+                .expect_err("a Datadog trace is not an OTLP layout");
+            assert!(
+                error.to_string().contains("not a recognized OTLP layout"),
+                "{error}"
+            );
+            assert!(buffer.is_empty());
+        }
     }
 }

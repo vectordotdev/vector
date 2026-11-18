@@ -89,6 +89,95 @@ pub enum TraceConversionIssue<'a> {
     ClampedTimestamp,
 }
 
+impl TraceConversionIssue<'_> {
+    /// Bounded error code for component-error metrics.
+    ///
+    /// The set is fixed so it can be a metric tag. Attribute keys and field names stay
+    /// out of it.
+    #[must_use]
+    pub const fn error_code(self) -> &'static str {
+        match self {
+            Self::RejectedSpan {
+                field: IdField::TraceId,
+                ..
+            }
+            | Self::DroppedLink {
+                field: IdField::TraceId,
+                ..
+            } => "invalid_trace_id",
+            Self::RejectedSpan {
+                field: IdField::SpanId | IdField::ParentSpanId,
+                ..
+            }
+            | Self::DroppedLink {
+                field: IdField::SpanId | IdField::ParentSpanId,
+                ..
+            } => "invalid_span_id",
+            Self::MalformedGrouping | Self::DiscardedGrouping => "discarded_span",
+            Self::EmptyEvent => "discarded_empty_chunk",
+            Self::UnrepresentableChunkContext => "unrepresentable_chunk_context",
+            Self::MalformedField { .. } | Self::MalformedAttribute => "invalid_attribute_value",
+            Self::UnmappedField { .. } => "legacy_conversion_error",
+            Self::MalformedEvent => "discarded_event",
+            Self::DuplicateAttribute { .. } => "duplicate_attribute",
+            Self::AttributeCollision { .. } => "attribute_collision",
+            Self::InvalidReservedAttribute { .. } => "invalid_reserved_attribute",
+            Self::ConflictingChunkContext { .. } => "conflicting_chunk_context",
+            Self::NonconformingStatus => "nonconforming_status",
+            Self::ReversedSpanTimestamps => "reversed_span_timestamps",
+            Self::ClampedTimestamp => "timestamp_clamped",
+        }
+    }
+
+    /// Operator-facing description of this issue.
+    #[must_use]
+    pub const fn message(self) -> &'static str {
+        match self {
+            Self::RejectedSpan { .. } => {
+                "Trace span was dropped because an identifier was invalid."
+            }
+            Self::DroppedLink { .. } => "Trace link was dropped because an identifier was invalid.",
+            Self::MalformedGrouping => "Trace grouping was dropped because it was malformed.",
+            Self::DiscardedGrouping => {
+                "Trace grouping was dropped because it had no accepted spans."
+            }
+            Self::EmptyEvent => "Empty trace event was encoded without its trace ID.",
+            Self::UnrepresentableChunkContext => {
+                "Datadog chunk context could not be distinguished from an absent one."
+            }
+            Self::MalformedField { .. } => {
+                "Trace field had the wrong type, so its default was used."
+            }
+            Self::UnmappedField { .. } => {
+                "Trace field was discarded because the typed model has no place for it."
+            }
+            Self::MalformedEvent => "Trace span event was dropped because it was malformed.",
+            Self::MalformedAttribute => "Trace attribute was dropped because it was malformed.",
+            Self::DuplicateAttribute { .. } => {
+                "Trace attribute was replaced by a later duplicate of its key."
+            }
+            Self::AttributeCollision { .. } => {
+                "Trace attribute was discarded because another field supplies its value."
+            }
+            Self::InvalidReservedAttribute { .. } => {
+                "Reserved Datadog bridge attribute was malformed."
+            }
+            Self::ConflictingChunkContext { .. } => {
+                "Datadog chunk context conflicted with an earlier span."
+            }
+            Self::NonconformingStatus => {
+                "Trace status message was discarded from an unset or ok status."
+            }
+            Self::ReversedSpanTimestamps => {
+                "Trace span ended before it started, so its duration was clamped to zero."
+            }
+            Self::ClampedTimestamp => {
+                "Trace timestamp was clamped to the destination field's domain."
+            }
+        }
+    }
+}
+
 /// Receives conversion issues so the caller can report them.
 pub trait TraceConversionReporter {
     /// Records one issue.

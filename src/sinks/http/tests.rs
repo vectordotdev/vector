@@ -1147,3 +1147,191 @@ async fn sends_through_authenticated_proxy() {
 
     drop(trigger);
 }
+
+#[cfg(all(feature = "codecs-opentelemetry", feature = "typed-trace"))]
+mod otlp_native_traces {
+    use std::io::Read as _;
+
+    use prost::Message as _;
+    use vector_lib::{
+        codecs::encoding::{
+            BytesEncoder, Encoder as CodecEncoder, Framer, Serializer, Transformer,
+            format::OtlpSerializerConfig,
+        },
+        event::MetricValue,
+        metrics::Controller,
+        opentelemetry::proto::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        },
+    };
+    use vrl::event_path;
+
+    use super::*;
+
+    const GOOD_SPAN_ID: [u8; 8] = [2; 8];
+    const REJECTED_SPAN_ID: [u8; 8] = [3; 8];
+
+    /// One native trace event, decoded the way the `opentelemetry` source does without
+    /// `use_otlp_decoding`. An all-zero trace ID is invalid, so that span is rejected.
+    fn native_trace(trace_id: [u8; 16], span_id: [u8; 8]) -> Event {
+        let resource_spans = ResourceSpans {
+            resource: None,
+            scope_spans: vec![ScopeSpans {
+                scope: None,
+                spans: vec![Span {
+                    trace_id: trace_id.to_vec(),
+                    span_id: span_id.to_vec(),
+                    name: "GET /cart".into(),
+                    start_time_unix_nano: 1_000,
+                    end_time_unix_nano: 2_000,
+                    ..Default::default()
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        };
+        let mut events: Vec<Event> = resource_spans.into_event_iter().collect();
+        assert_eq!(events.len(), 1);
+        events.remove(0)
+    }
+
+    fn good_trace() -> Event {
+        native_trace([1; 16], GOOD_SPAN_ID)
+    }
+
+    fn rejected_trace() -> Event {
+        native_trace([0; 16], REJECTED_SPAN_ID)
+    }
+
+    /// Runs the events through an OTLP `http` sink as one batch and returns the request
+    /// bodies the server received, decompressed, with the batch status.
+    async fn run_otlp_sink(
+        compression: &str,
+        mut events: Vec<Event>,
+    ) -> (Vec<ExportTraceServiceRequest>, BatchStatus) {
+        let (_guard, in_addr) = next_addr();
+        let config = indoc::formatdoc! {r#"
+            uri: "http://{in_addr}/v1/traces"
+            compression: {compression}
+            encoding:
+              codec: otlp
+        "#};
+        let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (rx, trigger, server) = build_test_server(in_addr);
+        let server = tokio::spawn(server);
+
+        let mut receiver = BatchNotifier::apply_to(&mut events);
+        sink.run_events(events).await.unwrap();
+        drop(trigger);
+        server.await.unwrap().unwrap();
+
+        let requests = rx
+            .map(|(_parts, body)| {
+                let body = match compression {
+                    "none" => body.to_vec(),
+                    "gzip" => {
+                        let mut decoded = Vec::new();
+                        CappedDecoder::gzip(body.reader())
+                            .into_reader()
+                            .read_to_end(&mut decoded)
+                            .unwrap();
+                        decoded
+                    }
+                    _ => panic!("undefined compression: {compression}"),
+                };
+                ExportTraceServiceRequest::decode(body.as_slice()).unwrap()
+            })
+            .collect()
+            .await;
+        (requests, receiver.try_recv().unwrap())
+    }
+
+    fn metric_total(name: &str) -> f64 {
+        Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .into_iter()
+            .filter(|metric| metric.name() == name)
+            .map(|metric| match metric.value() {
+                MetricValue::Counter { value } => *value,
+                value => panic!("unexpected metric value {value:?}"),
+            })
+            .sum()
+    }
+
+    fn otlp_http_encoder() -> HttpEncoder {
+        let serializer = OtlpSerializerConfig::default()
+            .build()
+            .expect("otlp serializer");
+        let encoder =
+            CodecEncoder::<Framer>::new(Framer::Bytes(BytesEncoder), Serializer::Otlp(serializer));
+        HttpEncoder::new(
+            encoder,
+            Transformer::default(),
+            String::new(),
+            String::new(),
+        )
+    }
+
+    #[test]
+    fn datadog_trace_error_keeps_codec_message() {
+        use vector_lib::event::{TraceEvent, TraceLayout};
+
+        let mut trace = TraceEvent::default();
+        trace.insert(event_path!("spans"), vrl::value::Value::Array(Vec::new()));
+        trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+
+        let error = otlp_http_encoder()
+            .encode_input(vec![Event::Trace(trace)], &mut Vec::new())
+            .expect_err("a Datadog trace is not an OTLP layout");
+        assert!(
+            error.to_string().contains("not a recognized OTLP layout"),
+            "{error}"
+        );
+    }
+
+    async fn assert_all_rejected_batch_is_not_posted(compression: &str) {
+        init_test();
+        vector_lib::metrics::init_test();
+        Controller::get().unwrap().reset();
+        let (requests, status) =
+            run_otlp_sink(compression, vec![rejected_trace(), rejected_trace()]).await;
+        assert!(requests.is_empty(), "unexpected requests: {requests:?}");
+        assert_eq!(status, BatchStatus::Delivered);
+        assert_eq!(metric_total("component_sent_events_total"), 0.0);
+        assert_eq!(metric_total("component_discarded_events_total"), 2.0);
+    }
+
+    #[tokio::test]
+    async fn all_rejected_batch_is_not_posted_uncompressed() {
+        assert_all_rejected_batch_is_not_posted("none").await;
+    }
+
+    #[tokio::test]
+    async fn all_rejected_batch_is_not_posted_gzip() {
+        assert_all_rejected_batch_is_not_posted("gzip").await;
+    }
+
+    #[tokio::test]
+    async fn mixed_batch_posts_only_the_good_span() {
+        init_test();
+        vector_lib::metrics::init_test();
+        Controller::get().unwrap().reset();
+
+        let (requests, status) = run_otlp_sink("gzip", vec![good_trace(), rejected_trace()]).await;
+
+        assert_eq!(status, BatchStatus::Delivered);
+        assert_eq!(requests.len(), 1);
+        let span_ids: Vec<_> = requests[0]
+            .resource_spans
+            .iter()
+            .flat_map(|resource_spans| &resource_spans.scope_spans)
+            .flat_map(|scope_spans| &scope_spans.spans)
+            .map(|span| span.span_id.as_slice())
+            .collect();
+        assert_eq!(span_ids, [GOOD_SPAN_ID.as_slice()]);
+        assert_eq!(metric_total("component_sent_events_total"), 1.0);
+    }
+}

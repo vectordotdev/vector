@@ -320,3 +320,36 @@ impl InternalEvent for JsonSerializationError<'_> {
         .increment(1);
     }
 }
+
+#[cfg(all(feature = "opentelemetry", feature = "typed-trace"))]
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when OTLP trace conversion drops or normalizes part of a trace.
+///
+/// The surrounding event may still be encoded. RFC 25329 reports every such issue
+/// through the instrumentation spec, with a bounded `error_code`.
+pub(crate) struct OtlpTraceConversionError<'a> {
+    pub issue: vector_core::event::typed_trace::TraceConversionIssue<'a>,
+}
+
+#[cfg(all(feature = "opentelemetry", feature = "typed-trace"))]
+impl InternalEvent for OtlpTraceConversionError<'_> {
+    fn emit(self) {
+        let error_code = self.issue.error_code();
+        let message = self.issue.message();
+        error!(
+            message = message,
+            error_code,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            issue = ?self.issue,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => error_code,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+    }
+}
