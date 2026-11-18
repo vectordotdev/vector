@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -56,6 +57,9 @@ pub enum ValidationMode {
     ///
     /// This mode does not treat specification violations as errors, allowing the decoder
     /// to accept messages from sources that don't strictly follow the GELF spec.
+    /// The spec'd numeric fields (`level` and `line`) may be sent as JSON strings holding
+    /// numeric values (e.g. `"level": "6"`) and are coerced to numbers, matching the
+    /// lenient decoding of the Graylog server.
     Relaxed,
 }
 
@@ -249,17 +253,61 @@ struct GelfMessage {
     additional_fields: Option<HashMap<String, serde_json::Value>>,
 }
 
+impl GelfMessage {
+    /// Deserializes a GELF message from a byte frame.
+    ///
+    /// In relaxed validation mode, the spec'd numeric fields (`level` and `line`) may be
+    /// sent as JSON strings holding numeric values (e.g. `"level": "6"`) and are coerced
+    /// to numbers, mirroring the lenient decoding of the Graylog server. Non-numeric
+    /// strings are still rejected. Strict validation mode leaves the payload untouched.
+    fn parse(
+        buffer: &[u8],
+        lossy: bool,
+        validation: ValidationMode,
+    ) -> Result<Self, serde_json::Error> {
+        match validation {
+            ValidationMode::Strict => {
+                if lossy {
+                    serde_json::from_str(&String::from_utf8_lossy(buffer))
+                } else {
+                    serde_json::from_slice(buffer)
+                }
+            }
+            ValidationMode::Relaxed => {
+                let mut value: serde_json::Value = if lossy {
+                    serde_json::from_str(&String::from_utf8_lossy(buffer))
+                } else {
+                    serde_json::from_slice(buffer)
+                }?;
+                if let serde_json::Value::Object(fields) = &mut value {
+                    coerce_numeric_string_fields(fields);
+                }
+                serde_json::from_value(value)
+            }
+        }
+    }
+}
+
+/// Coerces the spec'd numeric GELF fields (`level` and `line`) from JSON strings holding
+/// numeric values into numbers, as the Graylog server does when decoding GELF. Additional
+/// fields are left untouched, as the GELF spec allows them to have arbitrary string values.
+fn coerce_numeric_string_fields(fields: &mut serde_json::Map<String, serde_json::Value>) {
+    for field in [LEVEL, LINE] {
+        if let Some(serde_json::Value::String(value)) = fields.get(field) {
+            if let Ok(number) = serde_json::Number::from_str(value) {
+                fields.insert(field.to_owned(), serde_json::Value::Number(number));
+            }
+        }
+    }
+}
+
 impl Deserializer for GelfDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let parsed: GelfMessage = if self.lossy {
-            serde_json::from_str(&String::from_utf8_lossy(&bytes))
-        } else {
-            serde_json::from_slice(&bytes)
-        }?;
+        let parsed = GelfMessage::parse(&bytes, self.lossy, self.validation)?;
         let event = self.message_to_event(&parsed)?;
 
         Ok(smallvec![event])
@@ -440,6 +488,14 @@ mod tests {
             SHORT_MESSAGE: "foobar",
             LEVEL: "baz",
         }));
+
+        //  level is a numeric string, which only relaxed mode coerces
+        validate_err(&json!({
+            HOST: "example.org",
+            VERSION: "1.1",
+            SHORT_MESSAGE: "foobar",
+            LEVEL: "6",
+        }));
     }
 
     /// Validates the relaxed validation mode
@@ -490,6 +546,61 @@ mod tests {
         assert_eq!(
             log.get(event_path!(incorrect_extra_field)),
             Some(&Value::Null)
+        );
+    }
+
+    /// Validates the relaxed validation mode coerces numeric strings for numeric fields.
+    #[test]
+    fn gelf_deserialize_relaxed_numeric_strings() {
+        // level/line are sent as JSON strings holding numeric values
+        let input = json!({
+            VERSION: "1.1",
+            HOST: "example.org",
+            SHORT_MESSAGE: "A short message that helps you identify what is going on",
+            LEVEL: "6",
+            LINE: "42.5",
+            "_pid": "123",
+        });
+
+        let events = deserialize_gelf_input(
+            &input,
+            GelfDeserializerOptions {
+                validation: ValidationMode::Relaxed,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(events.len(), 1);
+
+        let log = events[0].as_log();
+
+        assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(6)));
+        assert_eq!(
+            log.get(event_path!(LINE)),
+            Some(&Value::Float(ordered_float::NotNan::new(42.5).unwrap()))
+        );
+
+        // additional fields are not coerced and keep their string values
+        assert_eq!(
+            log.get(event_path!("_pid")),
+            Some(&Value::from_static_str("123"))
+        );
+
+        // non-numeric strings are not coerced and still fail
+        assert!(
+            deserialize_gelf_input(
+                &json!({
+                    VERSION: "1.1",
+                    HOST: "example.org",
+                    SHORT_MESSAGE: "foobar",
+                    LEVEL: "baz",
+                }),
+                GelfDeserializerOptions {
+                    validation: ValidationMode::Relaxed,
+                    ..Default::default()
+                },
+            )
+            .is_err()
         );
     }
 }
