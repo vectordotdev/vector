@@ -1,10 +1,11 @@
-use std::{collections::btree_map, fmt::Write as _, iter, slice, sync::LazyLock};
+use std::{fmt::Write as _, iter, slice, sync::LazyLock};
 
 use regex::Regex;
 use serde::{Serialize, Serializer};
 use vrl::path::PathPrefix;
 
 use crate::event::{KeyString, ObjectMap, Value};
+use vrl::value::ObjectMapIter;
 
 static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
@@ -41,7 +42,7 @@ pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter<'_> {
 #[derive(Clone, Debug)]
 enum LeafIter<'a> {
     Root((&'a Value, bool)),
-    Map(btree_map::Iter<'a, KeyString, Value>),
+    Map(ObjectMapIter<'a>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 

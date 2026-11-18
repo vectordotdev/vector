@@ -61,7 +61,7 @@ an event with the following fields:
 
 The following VRL program demonstrates how to achieve the above:
 
-```coffee
+```vrl
 # Parse the raw string into a JSON object, this way we can manipulate fields.
 . = parse_json!(string!(.message))
 
@@ -75,7 +75,7 @@ The following VRL program demonstrates how to achieve the above:
 
 # Attempt to parse the timestamp that was in the original message.
 # Note that `.timestamp` can be `null` if it wasn't present.
-parsed_timestamp, err = parse_timestamp(.timestamp, format: "%Y-%m-%dT%H:%M:%S.%fZ")
+parsed_timestamp, err = parse_timestamp(.timestamp, format: "%+")
 
 # Check if the conversion was successful. Note here that all errors must be handled, more on that later.
 if err == null {
@@ -103,8 +103,8 @@ Finally, the resulting event:
 {
   "message": "success",
   "status": 200,
-  "timestamp": 1614644364,
-  "timestamp_str": "2021-03-02T00:19:24Z"
+  "timestamp": 1614626364,
+  "timestamp_str": "2021-03-01T19:19:24Z"
 }
 ```
 
@@ -128,7 +128,7 @@ Conditions can also be more multifaceted. This condition would filter out all
 events for which the `severity` field is `"info"`, the `status_code` field is
 greater than or equal to 400, and the `host` field isn't set:
 
-```coffee
+```toml
 condition = '.severity != "info" && .status_code < 400 && exists(.host)'
 ```
 
@@ -154,8 +154,7 @@ acquainted with Vector and VRL:
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
 where you can experiment with VRL.
 
-Some functions are currently unsupported on the playground. Functions that are currently not supported can be found with
-this [issue filter](https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3Aplayground%22+wasm+compatible)
+Some functions aren't supported in the playground.
 {{< /info >}}
 
 ## The goals of VRL {#goals}

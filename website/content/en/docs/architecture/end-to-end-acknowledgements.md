@@ -36,7 +36,7 @@ cases and complications in providing this capability.
 For example, events may end up being sent to multiple sinks. In this case, we have to track the
 delivery status across all the destinations. To do so, the status of an event lives in a piece of
 data that is shared across all the copies of the event. This ensures that Vector only notifies the
-source once all copies of an event have been processed of a sink, and that the "worst" status is the
+source once all copies of an event have been processed by a sink, and that the "worst" status is the
 status reported to the source. If an event is sent to three sinks, and is only processed
 successfully by two of them, we mark that event as having failed which ensures it can be sent again,
 giving all three sinks a chance to process it successfully.
@@ -66,7 +66,7 @@ durable processing, and that silent data loss may occur.
 [sources]: /docs/reference/configuration/sources
 [sinks]: /docs/reference/configuration/sinks
 [filter_transform]: /docs/reference/configuration/transforms/filter/
-[http_source]: /docs/reference/configuration/sources/http/
+[http_source]: /docs/reference/configuration/sources/http_server/
 [kafka_source]: /docs/reference/configuration/sources/kafka/
 [aws_sqs_source]: /docs/reference/configuration/sources/aws_sqs/
 [aggregate_transform]: /docs/reference/configuration/transforms/aggregate

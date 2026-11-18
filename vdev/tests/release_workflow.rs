@@ -32,7 +32,7 @@ fn version(repo: &Path, version: &str) {
         repo,
         "Cargo.toml",
         &format!(
-            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
+            "[package]\nname = \"vector\"\nversion.workspace = true\nedition = \"2021\"\n[workspace.package]\nversion = \"{version}\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
         ),
     );
     write(
@@ -625,7 +625,10 @@ printf '## [0.28.0 (2026-11-03)](https://github.com/vectordotdev/vrl/releases/ta
         assert!(!release_cue.contains("[View the full release notes]"));
         let manifest: toml::Value =
             toml::from_str(&fs::read_to_string(repo.join("Cargo.toml")).unwrap()).unwrap();
-        assert_eq!(manifest["package"]["version"].as_str(), Some(version));
+        assert_eq!(
+            manifest["workspace"]["package"]["version"].as_str(),
+            Some(version)
+        );
         assert_eq!(
             manifest["workspace"]["dependencies"]["vrl"]["version"].as_str(),
             Some("0.28.0")
@@ -1132,7 +1135,7 @@ mod housekeeping {
         write(repo, "docs/generated/vrl.json", "{}\n");
         commit(repo);
         fixture.validate(true);
-        assert!(git(repo, &["status", "--porcelain"]).is_empty());
+        assert_eq!(git(repo, &["status", "--porcelain"]), "");
     }
 
     #[test]
@@ -1146,7 +1149,7 @@ mod housekeeping {
             ("Cargo.lock", "version = 4\n", "lock file"),
             (
                 "Cargo.toml",
-                "[package]\nname = \"vector\"\nversion = \"0.60.0-dev\"\nedition = \"2024\"\n",
+                "[package]\nname = \"vector\"\nversion.workspace = true\nedition = \"2024\"\n[workspace.package]\nversion = \"0.60.0-dev\"\n",
                 "housekeeping may only bump",
             ),
         ] {
@@ -1244,7 +1247,7 @@ mod housekeeping {
         version(fixture.repo.path(), "0.58.0");
         commit(fixture.repo.path());
         fixture.run(&["housekeeping-prepare", "--version", "0.59.0"], false);
-        assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
+        assert_eq!(git(fixture.repo.path(), &["status", "--porcelain"]), "");
     }
 }
 

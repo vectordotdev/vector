@@ -1,7 +1,11 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use vector_vrl_category::Category;
-use vrl::prelude::{expression::Expr, *};
+use vrl::prelude::{
+    example, expression::Expr, indoc, kind, state, ArgumentList, Compiled, Context,
+    DiagnosticMessage, Example, Expression, ExpressionError, Function, FunctionCompileContext,
+    FunctionExpression, KeyString, ObjectMap, Parameter, Resolved, TypeDef, TypeState, Value,
+};
 
 use crate::common::{
     metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
@@ -29,7 +33,7 @@ fn get_metric(
     Ok(value)
 }
 
-static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(ObjectMap::new()));
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
@@ -51,7 +55,7 @@ impl Function for GetVectorMetric {
         "get_vector_metric"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         const_str::concat!(
             "Searches internal Vector metrics by name and optionally by tags. Returns the first matching metric.\n\n",
             crate::VECTOR_METRICS_EXPLAINER

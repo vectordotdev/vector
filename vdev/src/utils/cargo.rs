@@ -7,14 +7,19 @@ use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Deserialize)]
-pub struct CargoTomlPackage {
+pub struct CargoTomlWorkspacePackage {
     pub version: String,
+}
+
+#[derive(Deserialize)]
+pub struct CargoTomlWorkspace {
+    pub package: CargoTomlWorkspacePackage,
 }
 
 /// The bits of the top-level `Cargo.toml` configuration that `vdev` uses to drive its features.
 #[derive(Deserialize)]
 pub struct CargoToml {
-    pub package: CargoTomlPackage,
+    pub workspace: CargoTomlWorkspace,
     pub features: BTreeMap<String, Value>,
 }
 
@@ -32,7 +37,7 @@ impl CargoToml {
 
 /// Read the version string from `Cargo.toml`
 pub fn read_version() -> Result<String> {
-    CargoToml::load().map(|cargo| cargo.package.version)
+    CargoToml::load().map(|cargo| cargo.workspace.package.version)
 }
 
 /// Use the version provided by env vars or default to reading from `Cargo.toml`.

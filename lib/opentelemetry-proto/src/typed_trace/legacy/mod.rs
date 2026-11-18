@@ -13,21 +13,20 @@
 //!
 //! Every value the converter cannot carry into the typed model is reported: unmapped keys as
 //! [`TraceConversionIssue::UnmappedField`], wrong-typed known fields as
-//! [`TraceConversionIssue::MalformedField`] (with the field's default used instead), and
-//! malformed list entries through their item-level issue.
+//! [`TraceConversionIssue::MalformedField`], and malformed list entries through their
+//! item-level issue. The normalization of a wrong-typed field (coercion, default, or dropping
+//! its item) is documented in `parse`.
 
 mod parse;
 
 #[cfg(test)]
 mod tests;
 
-use std::collections::btree_map::Entry;
-
 use vector_core::event::{
     EventMetadata, TraceEvent as LegacyTraceEvent, TraceLayout,
     typed_trace::{TraceConversionIssue, TraceConversionReporter, TraceEvent},
 };
-use vrl::value::{ObjectMap, Value};
+use vrl::value::{ObjectMap, ObjectMapEntry, Value};
 
 use crate::{
     proto::{RESOURCE_SPANS_JSON_FIELD, trace::v1::ResourceSpans},
@@ -207,11 +206,13 @@ fn legacy_map(legacy: LegacyTraceEvent) -> Result<(ObjectMap, EventMetadata), Fa
 /// Removes `resourceSpans` when it is an array. Any other value stays in the map.
 fn take_resource_spans(map: &mut ObjectMap) -> Option<Vec<Value>> {
     match map.entry(RESOURCE_SPANS_JSON_FIELD.into()) {
-        Entry::Occupied(entry) if matches!(entry.get(), Value::Array(_)) => match entry.remove() {
-            Value::Array(array) => Some(array),
-            _ => unreachable!("the occupied value is an array"),
-        },
-        Entry::Occupied(_) | Entry::Vacant(_) => None,
+        ObjectMapEntry::Occupied(entry) if matches!(entry.get(), Value::Array(_)) => {
+            match entry.remove_entry().1 {
+                Value::Array(array) => Some(array),
+                _ => unreachable!("the occupied value is an array"),
+            }
+        }
+        ObjectMapEntry::Occupied(_) | ObjectMapEntry::Vacant(_) => None,
     }
 }
 
