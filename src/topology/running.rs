@@ -1031,13 +1031,19 @@ impl RunningTopology {
     ) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
-        let old_inputs = self
-            .config
-            .inputs_for_node(key)
-            .into_iter()
-            .flatten()
-            .cloned()
-            .collect::<HashSet<_>>();
+        // The inputs this component was already connected to, so only filled if it existed before
+        // the reload. `is_changed` is only true for a component kept with the same kind, so a new
+        // component reusing a removed component's key has no old inputs.
+        let old_inputs = if diff.is_changed(key) {
+            self.config
+                .inputs_for_node(key)
+                .into_iter()
+                .flatten()
+                .cloned()
+                .collect::<HashSet<_>>()
+        } else {
+            HashSet::new()
+        };
 
         let new_inputs = inputs.iter().cloned().collect::<HashSet<_>>();
         let inputs_to_add = &new_inputs - &old_inputs;
