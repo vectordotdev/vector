@@ -109,10 +109,10 @@ pub struct UdpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    /// Number of concurrent readers draining the receive buffer.
+    /// Number of concurrent socket readers.
     ///
-    /// A single reader processes datagrams sequentially, capping receive throughput at
-    /// one CPU core per socket. Increase this to decode and forward datagrams in parallel.
+    /// A single reader caps throughput at one CPU core per socket; multiple readers
+    /// parallelize datagram decoding.
     #[serde(default = "default_receive_concurrency")]
     #[configurable(validation(range(min = 1)))]
     receive_concurrency: usize,
@@ -252,10 +252,8 @@ pub(super) fn udp(
 
         info!(message = "Listening.", address = %config.address);
 
-        // Multiple tasks read the same socket concurrently: a single receive task caps
-        // throughput at one CPU core per socket, while the per-datagram decode work
-        // parallelizes across tasks. Each task owns its buffer; decoder clones share the
-        // framing state (e.g. chunked GELF reassembly) by design.
+        // Spawn concurrent readers: each owns its buffer; decoder clones share the
+        // chunked GELF reassembly state by design.
         let socket = Arc::new(socket);
         let host_key = config.host_key.clone().unwrap_or(default_host_key());
         let port_key = config.port_key.clone();
@@ -267,8 +265,7 @@ pub(super) fn udp(
             )));
         }
 
-        // Capture the current span so spawned tasks inherit the component labels
-        // (component_id, component_kind, component_type) used by metrics.
+        // Capture the span so spawned tasks inherit component labels for metrics.
         let span = tracing::Span::current();
 
         let mut join_set = tokio::task::JoinSet::new();
