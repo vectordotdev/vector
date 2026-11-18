@@ -1713,3 +1713,203 @@ fn azure_blob_build_request_append_blob_with_tags_and_metadata() {
     assert_eq!(request.blob_metadata, Some(metadata));
     assert_eq!(request.blob_type, AzureBlobType::Append);
 }
+
+mod retry {
+    use std::{collections::HashMap, convert::Infallible};
+
+    use azure_core::{
+        Error,
+        error::ErrorKind,
+        http::{StatusCode, Url},
+    };
+    use bytes::Bytes;
+    use http_body_util::Full;
+    use tower::ServiceExt;
+    use vector_lib::request_metadata::RequestMetadata;
+
+    use crate::{
+        config::ProxyConfig,
+        event::EventFinalizers,
+        sinks::{
+            azure_blob::{
+                config::{
+                    AzureBlobMetadata, AzureBlobRequest, AzureBlobRetryLogic, AzureBlobType,
+                    build_client,
+                },
+                service::{AzureBlobService, is_existing_blob_conflict},
+            },
+            azure_common::connection_string::ParsedConnectionString,
+            util::retries::RetryLogic,
+        },
+        test_util::http::spawn_blackhole_http_server,
+    };
+
+    fn status_error(status: StatusCode, error_code: Option<&str>) -> Error {
+        Error::with_message(
+            ErrorKind::HttpResponse {
+                status,
+                error_code: error_code.map(str::to_string),
+                raw_response: None,
+            },
+            "test error",
+        )
+    }
+
+    #[test]
+    fn retries_transport_and_credential_errors() {
+        for kind in [ErrorKind::Io, ErrorKind::Connection, ErrorKind::Credential] {
+            let error = Error::with_message(kind.clone(), "retry policy expired");
+            assert!(
+                AzureBlobRetryLogic.is_retriable_error(&error),
+                "{kind:?} should be retried"
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_retry_other_errors_without_status() {
+        for kind in [ErrorKind::DataConversion, ErrorKind::Other] {
+            let error = Error::with_message(kind.clone(), "test error");
+            assert!(
+                !AzureBlobRetryLogic.is_retriable_error(&error),
+                "{kind:?} should not be retried"
+            );
+        }
+    }
+
+    #[test]
+    fn retries_retriable_statuses() {
+        for status in [
+            StatusCode::RequestTimeout,
+            StatusCode::TooManyRequests,
+            StatusCode::InternalServerError,
+            StatusCode::BadGateway,
+            StatusCode::ServiceUnavailable,
+            StatusCode::GatewayTimeout,
+        ] {
+            assert!(
+                AzureBlobRetryLogic.is_retriable_error(&status_error(status, None)),
+                "{status} should be retried"
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_retry_client_errors_or_not_implemented() {
+        for status in [
+            StatusCode::BadRequest,
+            StatusCode::Unauthorized,
+            StatusCode::Forbidden,
+            StatusCode::NotFound,
+            StatusCode::Conflict,
+            StatusCode::PreconditionFailed,
+            StatusCode::NotImplemented,
+        ] {
+            assert!(
+                !AzureBlobRetryLogic.is_retriable_error(&status_error(status, None)),
+                "{status} should not be retried"
+            );
+        }
+    }
+
+    #[test]
+    fn existing_blob_conflict_matches_only_blob_exists_codes() {
+        assert!(is_existing_blob_conflict(&status_error(
+            StatusCode::Conflict,
+            Some("BlobAlreadyExists")
+        )));
+        assert!(is_existing_blob_conflict(&status_error(
+            StatusCode::PreconditionFailed,
+            Some("ConditionNotMet")
+        )));
+
+        assert!(!is_existing_blob_conflict(&status_error(
+            StatusCode::Conflict,
+            Some("LeaseIdMissing")
+        )));
+        assert!(!is_existing_blob_conflict(&status_error(
+            StatusCode::Conflict,
+            None
+        )));
+        assert!(!is_existing_blob_conflict(&status_error(
+            StatusCode::PreconditionFailed,
+            Some("BlobAlreadyExists")
+        )));
+        assert!(!is_existing_blob_conflict(&Error::with_message(
+            ErrorKind::Io,
+            "connection reset"
+        )));
+    }
+
+    /// Spawns a server that answers every request with `status` and `x-ms-error-code: code`, and
+    /// returns a service that uploads to it.
+    async fn service_answering(
+        status: u16,
+        code: &'static str,
+        unique_blob_names: bool,
+    ) -> AzureBlobService {
+        let uri = spawn_blackhole_http_server(move |_| async move {
+            Ok::<_, Infallible>(
+                http::Response::builder()
+                    .status(status)
+                    .header("x-ms-error-code", code)
+                    .body(Full::new(Bytes::new()))
+                    .unwrap(),
+            )
+        })
+        .await;
+        let parsed = ParsedConnectionString::parse(&format!("BlobEndpoint={uri}")).unwrap();
+        let url = Url::parse(&parsed.container_url("logs").unwrap()).unwrap();
+        let client = build_client(None, &parsed, url, &ProxyConfig::default(), None).unwrap();
+        AzureBlobService::new(client, unique_blob_names)
+    }
+
+    fn block_request() -> AzureBlobRequest {
+        AzureBlobRequest {
+            blob_data: Bytes::from_static(b"[]"),
+            content_encoding: None,
+            content_type: "application/json",
+            metadata: AzureBlobMetadata {
+                partition_key: "blob/1700000000-30f6652c-71da-4f9f-800d-a1189c47c547.log"
+                    .to_string(),
+                count: 0,
+                finalizers: EventFinalizers::default(),
+            },
+            request_metadata: RequestMetadata::default(),
+            tags: None,
+            blob_metadata: None::<HashMap<String, String>>,
+            blob_type: AzureBlobType::Block,
+        }
+    }
+
+    #[tokio::test]
+    async fn existing_blob_with_unique_name_is_delivered() {
+        for (status, code) in [(409, "BlobAlreadyExists"), (412, "ConditionNotMet")] {
+            let service = service_answering(status, code, true).await;
+            let result = service.oneshot(block_request()).await;
+            assert!(
+                result.is_ok(),
+                "{status} {code} should be treated as delivered: {result:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn existing_blob_without_unique_name_is_an_error() {
+        let service = service_answering(409, "BlobAlreadyExists", false).await;
+        let error = service
+            .oneshot(block_request())
+            .await
+            .expect_err("a name collision must not be treated as delivered");
+        let error = error
+            .downcast_ref::<Error>()
+            .expect("service errors should be Azure errors");
+        assert_eq!(error.http_status(), Some(StatusCode::Conflict));
+    }
+
+    #[tokio::test]
+    async fn other_conflicts_are_errors() {
+        let service = service_answering(409, "LeaseIdMissing", true).await;
+        assert!(service.oneshot(block_request()).await.is_err());
+    }
+}

@@ -565,7 +565,7 @@ impl AzureBlobSinkConfig {
     ) -> VectorSink {
         let service = ServiceBuilder::new()
             .settings(validated.request_settings.clone(), AzureBlobRetryLogic)
-            .service(AzureBlobService::new(client));
+            .service(AzureBlobService::new(client, validated.blob_append_uuid));
 
         let encoder = validated.encoder.clone();
 
@@ -994,8 +994,21 @@ impl RetryLogic for AzureBlobRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error.http_status() {
-            Some(code) => code.is_server_error() || code == StatusCode::TooManyRequests,
-            None => false,
+            Some(StatusCode::NotImplemented) => false,
+            Some(code) => {
+                code.is_server_error()
+                    || code == StatusCode::TooManyRequests
+                    || code == StatusCode::RequestTimeout
+            }
+            // Errors without a status never reached the service, or failed to obtain a token.
+            // The SDK retries transport errors (`Io`, `Connection`) itself, but returns them once
+            // its own retry budget is spent; retrying them here keeps the batch instead of
+            // dropping it. Credential errors are retried as well, since a failed token refresh
+            // (for example, a transient identity endpoint outage) would otherwise drop the batch.
+            None => matches!(
+                error.kind(),
+                ErrorKind::Io | ErrorKind::Connection | ErrorKind::Credential
+            ),
         }
     }
 }
