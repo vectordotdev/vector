@@ -805,10 +805,17 @@ fn is_reset(error: &Status) -> bool {
     false
 }
 
-#[pin_project::pin_project]
 struct Task {
     task: tokio::task::JoinHandle<()>,
     busy_flag: Arc<AtomicBool>,
+}
+
+impl Drop for Task {
+    // Dropping a `JoinHandle` detaches its task. Abort instead, so a forced shutdown that drops
+    // the source also stops streams still waiting on finalization or the RPC to finish.
+    fn drop(&mut self) {
+        self.task.abort();
+    }
 }
 
 impl Future for Task {
@@ -1331,6 +1338,57 @@ mod tests {
             .unwrap()
             .unwrap()
             .unwrap();
+        peer.abort();
+    }
+
+    #[tokio::test]
+    async fn forced_shutdown_cancels_streams_waiting_for_rpc() {
+        // The peer never finishes the RPC, so the stream task stays in `finish_stream` until
+        // the topology drops the source after the shutdown deadline.
+        let (endpoint, acknowledgements, _finish, peer) = acknowledgement_peer().await;
+        let component = crate::config::ComponentKey::from("pubsub");
+        let (out, mut events) = SourceSender::new_test();
+        let mut shutdown = SourceShutdownCoordinator::default();
+        let (signal, force_shutdown) = shutdown.register_source(&component, false);
+        let mut context = SourceContext::new_test(out, None);
+        context.key = component.clone();
+        context.shutdown = signal;
+        context.acknowledgements = true;
+        let source = tokio::spawn(test_config(endpoint).build(context).await.unwrap());
+
+        let mut event = timeout(Duration::from_secs(10), events.next())
+            .await
+            .unwrap()
+            .unwrap();
+        event
+            .metadata_mut()
+            .update_status(crate::event::EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(1);
+        assert!(!shutdown.shutdown_source(&component, deadline).await);
+        assert_eq!(
+            timeout(Duration::from_secs(10), acknowledgements)
+                .await
+                .unwrap()
+                .unwrap(),
+            ["ack-id"]
+        );
+        timeout(Duration::from_secs(10), force_shutdown)
+            .await
+            .expect("The shutdown deadline must trigger forced shutdown");
+
+        // Forced shutdown drops the source future, as the topology does.
+        source.abort();
+        assert!(source.await.unwrap_err().is_cancelled());
+
+        assert!(
+            timeout(Duration::from_secs(5), events.next())
+                .await
+                .expect("Stream tasks must release the output after forced shutdown")
+                .is_none()
+        );
         peer.abort();
     }
 
