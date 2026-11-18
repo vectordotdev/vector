@@ -32,3 +32,6 @@ hyperlocal.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util", "macros", "test-util"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile.workspace = true
