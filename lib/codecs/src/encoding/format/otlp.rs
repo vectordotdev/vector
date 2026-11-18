@@ -525,7 +525,7 @@ mod typed_trace_tests {
     fn returns_ok_when_every_span_is_rejected() {
         let request = encode(envelope(vec![span("dropped", 0, 1)]))
             .expect("rejecting every span consumes the event without failing it");
-        assert!(span_names(&request).is_empty());
+        assert_eq!(span_names(&request), Vec::<&str>::new());
     }
 
     #[test]
