@@ -8,13 +8,10 @@ follow the following deprecation policy.
 
 ## Policy
 
-Vector will retain deprecated configuration or features for at least one minor version (this will transition to one
-major version when Vector hits 1.0).
+Deprecated configuration or features become eligible for removal two minor versions after the release announcing the
+deprecation.
 
-This means that deprecations will be eligible for removal in the next minor release after they are announced; however,
-we will typically aim to support deprecations for a longer time period depending on their development maintenance
-burden. For example, a deprecation announced in `v0.16.0` would be eligible to be removed in `v0.17.0` but may be
-removed later in `v0.20.0`.
+For example, a deprecation announced in `v0.62.0` is eligible for removal in `v0.64.0` or a later minor release.
 
 ### Security changes and critical bugs
 
@@ -60,8 +57,8 @@ When this happens, we will notify by:
 
 ### Migration
 
-Users will have 1 or more minor releases to migrate away from using the deprecation using the instructions provided in
-the deprecation notice.
+Users should follow the migration instructions in the deprecation notice before upgrading to a release in which the
+feature has been removed.
 
 ### Removal
 

@@ -112,7 +112,7 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_logs: Option<bool>,
 
-    /// If this is set to `true`, metrics (beta) are not accepted by the component.
+    /// If this is set to `true`, metrics are not accepted by the component.
     #[configurable(
         deprecated = "This option has been deprecated, use `enabled_data_types` instead."
     )]
@@ -134,10 +134,10 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_llmobs: Option<bool>,
 
-    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
+    /// If this is set to `true`, logs, metrics, and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
+    /// For a source component named `agent`, the received logs, metrics, and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
     /// sent to `agent.apm_stats`.
@@ -186,6 +186,25 @@ pub struct DatadogAgentConfig {
     /// and increment the `component_timed_out_events_total` internal metric instead.
     #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
     send_timeout_secs: Option<f64>,
+
+    /// The maximum number of bytes that indexed trace payloads in a single request can expand to
+    /// while being converted into trace events.
+    ///
+    /// Indexed trace payloads are compact, so the converted events can be much larger than the
+    /// request body. A string is stored once and referenced from any number of spans, and each
+    /// reference becomes its own copy. Numbers, booleans, and ids that become tag strings or list
+    /// elements also take more bytes than they did on the wire: the double `5e-324` is an 8-byte
+    /// value in a payload but a 326-byte tag. This limit counts the bytes of all of these copies and
+    /// conversions. Requests that would exceed it are rejected with an HTTP 422 Unprocessable
+    /// Entity response as soon as the conversion reaches the limit.
+    #[serde(default = "default_max_trace_expansion_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::advanced))]
+    max_trace_expansion_bytes: usize,
+}
+
+const fn default_max_trace_expansion_bytes() -> usize {
+    100 * 1024 * 1024
 }
 
 /// Data types accepted by the `datadog_agent` source.
@@ -196,7 +215,7 @@ pub enum DatadogAgentDataType {
     /// Logs.
     Logs,
 
-    /// Metrics (beta).
+    /// Metrics.
     Metrics,
 
     /// Traces (alpha).
@@ -241,6 +260,7 @@ impl GenerateConfig for DatadogAgentConfig {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         })
         .unwrap()
     }
@@ -279,15 +299,18 @@ impl SourceConfig for DatadogAgentConfig {
                 .build()?;
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let source = DatadogAgentSource::new(
-            self.store_api_key,
-            decoder,
-            tls.http_protocol_name(),
-            logs_schema_definition,
-            log_namespace,
-            self.parse_ddtags,
-            self.split_metric_namespace,
-        );
+        let source = DatadogAgentSource {
+            max_trace_expansion_bytes: self.max_trace_expansion_bytes,
+            ..DatadogAgentSource::new(
+                self.store_api_key,
+                decoder,
+                tls.http_protocol_name(),
+                logs_schema_definition,
+                log_namespace,
+                self.parse_ddtags,
+                self.split_metric_namespace,
+            )
+        };
         let listener = tls
             .bind(&self.address)
             .await?
@@ -551,6 +574,7 @@ pub(crate) struct DatadogAgentSource {
     events_received: Registered<EventsReceived>,
     parse_ddtags: bool,
     split_metric_namespace: bool,
+    max_trace_expansion_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -612,6 +636,7 @@ impl DatadogAgentSource {
             events_received: register(EventsReceived),
             parse_ddtags,
             split_metric_namespace,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         }
     }
 

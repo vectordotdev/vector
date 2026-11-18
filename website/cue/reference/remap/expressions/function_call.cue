@@ -28,13 +28,13 @@ remap: expressions: function_call: {
 					`abort` represents a literal `!` that can optionally be used with fallible functions to abort
 					the program when the function fails:
 
-					```coffee
+					```vrl
 					result = f!()
 					```
 
 					Otherwise, errors must be handled:
 
-					```coffee
+					```vrl
 					result, err = f()
 					```
 
@@ -55,7 +55,7 @@ remap: expressions: function_call: {
 							_All_ function arguments in VRL are assigned names, including required leading arguments.
 							Named arguments are suffixed with a colon (`:`), with the value proceeding the name:
 
-							```coffee
+							```vrl
 							argument_name: "value"
 							argument_name: (1 + 2)
 							```
@@ -69,7 +69,7 @@ remap: expressions: function_call: {
 							Function calls support nameless positional arguments. Arguments must be supplied in the order
 							they are documented:
 
-							```coffee
+							```vrl
 							f(1, 2)
 							```
 							"""
@@ -79,13 +79,13 @@ remap: expressions: function_call: {
 						description: """
 							Function arguments enforce type safety when the type of the value supplied is known:
 
-							```coffee
+							```vrl
 							round("not a number") # fails at compile time
 							```
 
 							If the type of the value is not known, you need to handle the potential argument error:
 
-							```coffee
+							```vrl
 							number = int(.message) ?? 0
 							round(number)
 							```
@@ -99,7 +99,7 @@ remap: expressions: function_call: {
 				description: """
 					The `closure` is an optional piece of code resolved by the function call. It is primarily used in functions that iterate over collections. Its syntax is as follows:
 
-					```coffee
+					```vrl
 					for_each([]) -> |index, value| { ... }
 					```
 					"""

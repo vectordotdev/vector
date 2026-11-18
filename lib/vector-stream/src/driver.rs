@@ -96,6 +96,10 @@ where
     ///
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
+    #[expect(
+        clippy::result_unit_err,
+        reason = "The driver only reports whether service readiness failed"
+    )]
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnorderedCount::new();
         let mut next_batch: Option<VecDeque<St::Item>> = None;

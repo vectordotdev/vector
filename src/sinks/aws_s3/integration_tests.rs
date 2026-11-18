@@ -105,7 +105,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
     let key = keys[0].clone();
     let key_parts = key.split('/');
-    assert!(key_parts.count() == 1);
+    assert_eq!(key_parts.count(), 1);
     assert!(key.starts_with("test-prefix"));
     assert_log_suffix(&key);
 
@@ -142,8 +142,8 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
     let key = keys[0].clone();
     let key_parts = key.split('/').collect::<Vec<_>>();
-    assert!(key_parts.len() == 2);
-    assert!(*key_parts.first().unwrap() == "test-prefix");
+    assert_eq!(key_parts.len(), 2);
+    assert_eq!(*key_parts.first().unwrap(), "test-prefix");
     assert_log_suffix(&key);
 
     let obj = get_object(&bucket, key).await;
@@ -185,7 +185,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
 
     let key = keys[0].clone();
     let key_parts = key.split('/');
-    assert!(key_parts.count() == 1);
+    assert_eq!(key_parts.count(), 1);
     assert!(key.starts_with("test-prefix"));
     assert_log_suffix(&key);
 
@@ -232,7 +232,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let keys = get_keys(&bucket, prefix).await;
@@ -342,10 +342,9 @@ async fn s3_zstd() {
     assert_eq!(lines, response_lines);
 }
 
-// NOTE: this test doesn't actually validate anything because localstack
+// NOTE: this test doesn't actually validate anything because the emulator
 // doesn't enforce the required Content-MD5 header on the request for
 // buckets with object lock enabled
-// https://github.com/localstack/localstack/issues/4166
 #[tokio::test]
 async fn s3_insert_message_into_object_lock() {
     let cx = SinkContext::default();
@@ -410,7 +409,7 @@ async fn acknowledges_failures() {
     create_bucket(&bucket, false).await;
 
     let config = S3SinkConfig {
-        bucket: format!("BREAK{}IT", &bucket), // Break the bucket name
+        bucket: format!("BREAK{bucket}IT"), // Break the bucket name
         ..config(&bucket, 1, 5.0)
     };
     let prefix = config.key_prefix.clone();

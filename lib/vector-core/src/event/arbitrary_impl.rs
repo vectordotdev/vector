@@ -81,8 +81,11 @@ impl Arbitrary for Event {
 
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
+        use std::collections::BTreeMap;
+        use vrl::value::KeyString;
+
         let mut generator = Gen::new(MAX_MAP_SIZE);
-        let map: ObjectMap = ObjectMap::arbitrary(&mut generator);
+        let map: ObjectMap = BTreeMap::<KeyString, Value>::arbitrary(&mut generator).into();
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
         LogEvent::from_map(map, metadata)
     }
@@ -104,12 +107,15 @@ impl Arbitrary for TraceEvent {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        use std::collections::BTreeMap;
+        use vrl::value::KeyString;
         let (fields, metadata) = self.clone().into_parts();
+        let fields_btree: BTreeMap<KeyString, Value> = fields.into_iter().collect();
 
         Box::new(
-            fields
+            fields_btree
                 .shrink()
-                .map(move |x| TraceEvent::from_parts(x, metadata.clone())),
+                .map(move |x| TraceEvent::from_parts(x.into(), metadata.clone())),
         )
     }
 }

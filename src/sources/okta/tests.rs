@@ -28,7 +28,7 @@ pub(crate) async fn run_compliance(config: OktaConfig) -> Vec<Event> {
         run_and_assert_source_compliance(config, Duration::from_secs(5), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
     events
 }
