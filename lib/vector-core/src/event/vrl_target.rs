@@ -2361,7 +2361,10 @@ mod test {
                 false,
             )
             .unwrap();
-        assert!(target.take_ignored_metric_changes().is_empty());
+        assert_eq!(
+            target.take_ignored_metric_changes(),
+            Vec::<IgnoredMetricChange>::new()
+        );
 
         target
             .target_insert(
@@ -2407,7 +2410,10 @@ mod test {
         );
 
         // Taking the changes clears them.
-        assert!(target.take_ignored_metric_changes().is_empty());
+        assert_eq!(
+            target.take_ignored_metric_changes(),
+            Vec::<IgnoredMetricChange>::new()
+        );
     }
 
     #[test]
@@ -2499,6 +2505,9 @@ mod test {
         target
             .target_insert(&OwnedTargetPath::event(owned_value_path!("a")), 1.into())
             .unwrap();
-        assert!(target.take_ignored_metric_changes().is_empty());
+        assert_eq!(
+            target.take_ignored_metric_changes(),
+            Vec::<IgnoredMetricChange>::new()
+        );
     }
 }
