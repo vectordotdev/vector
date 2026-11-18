@@ -35,6 +35,16 @@ type BoxError = Box<dyn Error + Send + Sync>;
 
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
+/// Idle time before the kernel starts sending TCP keepalive probes on client connections, so
+/// that a connection whose peer silently went away is eventually closed instead of held
+/// forever.
+///
+/// Only the idle time is set; the probe interval and count keep the kernel defaults. With the
+/// Linux defaults (75 seconds, 9 probes) a dead peer is detected about 60 + 75 * 9 = 735 seconds
+/// after the connection went idle. Keepalive does not apply while sent data is unacknowledged;
+/// that case is governed by `tcp_retries2` instead.
+const TCP_KEEPALIVE_TIME: Duration = Duration::from_secs(60);
+
 #[derive(Clone)]
 struct ProxyEndpoint {
     uri: Uri,
@@ -372,6 +382,7 @@ fn https_connector(
 ) -> Result<BaseConnector, BoxError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
+    http.set_keepalive(Some(TCP_KEEPALIVE_TIME));
     let mut tls_builder = tls_connector_builder(tls)?;
     if http1_alpn {
         tls_builder.set_alpn_protos(HTTP1_ALPN)?;
@@ -687,18 +698,21 @@ mod tests {
 
     use http::{HeaderValue, Request, Uri};
     use http_body_util::BodyExt as _;
+    use hyper_openssl::client::legacy::MaybeHttpsStream;
     use hyper_util::rt::TokioIo;
+    use socket2::SockRef;
     use tokio::{
         io::{AsyncReadExt as _, AsyncWriteExt as _, duplex},
         net::TcpListener,
         time::Instant,
     };
+    use tower::Service as _;
     use vector_core::{
         config::proxy::ProxyConfig,
         tls::{MaybeTls, MaybeTlsSettings},
     };
 
-    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, tls_host};
+    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, https_connector, tls_host};
     use crate::{ConnectionOptions, HttpClient, empty_body};
 
     /// Returns the proxy URI and `Proxy-Authorization` value of the route to `destination`.
@@ -851,8 +865,41 @@ mod tests {
         .any(|error| error.kind() == ErrorKind::TimedOut);
         assert!(timed_out, "expected a timed out I/O error, got {error:?}");
 
-        // The TCP connection was established, so the timeout hit during the TLS handshake.
-        let _stream = accepted.await.unwrap();
+        // The TCP connection was established, so the timeout hit during the TLS handshake. The
+        // client must also have closed the stalled connection: after the ClientHello the server
+        // reads the end of the stream instead of waiting forever.
+        let mut stream = accepted.await.unwrap();
+        let mut client_hello = Vec::new();
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            stream.read_to_end(&mut client_hello),
+        )
+        .await
+        .expect("the client should close the stalled connection")
+        .unwrap();
+        assert!(
+            !client_hello.is_empty(),
+            "the client should have started the TLS handshake"
+        );
+    }
+
+    #[tokio::test]
+    async fn client_connections_enable_tcp_keepalive() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = tokio::spawn(async move { listener.accept().await.unwrap().0 });
+
+        let mut connector = https_connector(&MaybeTls::Raw(()), false, false).unwrap();
+        let stream = connector
+            .call(format!("http://127.0.0.1:{port}/").parse().unwrap())
+            .await
+            .unwrap();
+        let MaybeHttpsStream::Http(stream) = stream else {
+            panic!("an http destination should not use TLS");
+        };
+        assert!(SockRef::from(stream.inner()).keepalive().unwrap());
+
+        let _server_side = accepted.await.unwrap();
     }
 
     #[tokio::test]
