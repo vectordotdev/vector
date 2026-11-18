@@ -459,7 +459,7 @@ impl From<X509> for CertificateMetadata {
             let data_string = entry.data().to_string().unwrap_or_default();
             subject_metadata.insert(entry.object().to_string(), data_string);
         }
-        let subject_altnames = cert.subject_alt_names().map_or_default(|names| {
+        let subject_altnames = cert.subject_alt_names().map_or_else(Vec::new, |names| {
             names
                 .iter()
                 .filter_map(|name| {
