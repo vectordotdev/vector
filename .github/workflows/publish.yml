@@ -315,20 +315,21 @@ jobs:
             runner: ubuntu-24.04-arm
             platform: linux/arm64
             image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+          # Use the ARM64 pool that also executes the ARM32 build probes.
           - target: armv7-unknown-linux-musleabihf
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v7
             image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
           - target: arm-unknown-linux-musleabi
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v7
             image: alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
           - target: armv7-unknown-linux-gnueabihf
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v7
             image: debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
           - target: arm-unknown-linux-gnueabi
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v5
             image: arm32v5/debian:bookworm-slim@sha256:cf9397e3198b2c002eb360586d341ba89154634198a26c578eb096b533b212cd
     steps:
@@ -348,6 +349,8 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           IMAGE: ${{ matrix.image }}
         run: |
+          lscpu
+          docker info --format 'Runtime daemon architecture: {{.Architecture}}'
           if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
             echo '::error::Runtime verification must not use QEMU'
             exit 1
@@ -538,13 +541,14 @@ jobs:
             platform: linux/arm64/v8
             gnu: aarch64-unknown-linux-gnu
             musl: aarch64-unknown-linux-musl
+          # Keep ARM32 image execution on the build-probe runner pool too.
           - arch: armv7
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v7
             gnu: armv7-unknown-linux-gnueabihf
             musl: armv7-unknown-linux-musleabihf
           - arch: armv6
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04-8core-arm
             platform: linux/arm/v6
             gnu: arm-unknown-linux-gnueabi
             musl: arm-unknown-linux-musleabi
@@ -573,6 +577,8 @@ jobs:
           PUSH: "false"
           LOAD: "true"
         run: |
+          lscpu
+          docker info --format 'Runtime daemon architecture: {{.Architecture}}'
           if grep -l qemu /proc/sys/fs/binfmt_misc/* 2>/dev/null; then
             echo '::error::Docker runtime verification must not use QEMU'
             exit 1
