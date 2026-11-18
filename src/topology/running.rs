@@ -962,6 +962,7 @@ impl RunningTopology {
             "paused component inputs were not replaced: {:?}",
             self.paused_inputs
         );
+        self.paused_inputs.clear();
 
         // Broadcast any topology changes to subscribers.
         if !self.watch.0.is_closed() {
