@@ -114,7 +114,7 @@ components: sinks: opsimate: {
 				      . = {
 				        "id": .alert_id,
 				        "alertName": .name,
-				        "tags": ["vector", .service],
+				        "tags": {"source": "vector", "service": string(.service) ?? "unknown"},
 				        "summary": .message,
 				        "severity": .severity,
 				        "status": "firing",
