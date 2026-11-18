@@ -943,6 +943,54 @@ async fn topology_restores_removed_sink_after_failed_reload() {
 }
 
 #[tokio::test]
+async fn topology_restores_changed_sink_inputs_after_failed_reload() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (mut in2, source2) = basic_source();
+    let (out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_source("in2", source2);
+    config.add_sink("out1", &["in1", "in2"], sink1);
+
+    let (mut topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_source("in2", basic_source().1);
+    config.add_sink("out1", &["in1"], basic_sink(10).1);
+    config.add_sink("out2", &["in1"], basic_sink_failing_healthcheck(10).1);
+    let mut config = config.build().unwrap();
+    config.healthchecks.require_healthy = true;
+
+    let result = topology
+        .reload_config_and_respawn(config, ExtraContext::default())
+        .await;
+    assert!(matches!(result, Err(TopologyBuildFailed)));
+
+    let h_out1 = tokio::spawn(out1.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(Event::Log(LogEvent::from("this")))
+        .await
+        .unwrap();
+    in2.send_event(Event::Log(LogEvent::from("that")))
+        .await
+        .unwrap();
+    drop(in1);
+    drop(in2);
+    topology.stop().await;
+
+    assert!(
+        crash.try_recv().is_err(),
+        "topology crashed after restoring the old configuration"
+    );
+    let mut received = h_out1.await.unwrap();
+    received.sort();
+    assert_eq!(vec!["that", "this"], received);
+}
+
+#[tokio::test]
 async fn topology_disk_buffer_flushes_on_idle() {
     trace_init();
 
