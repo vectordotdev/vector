@@ -459,37 +459,34 @@ impl From<X509> for CertificateMetadata {
             let data_string = entry.data().to_string().unwrap_or_default();
             subject_metadata.insert(entry.object().to_string(), data_string);
         }
-        let subject_altnames = cert
-            .subject_alt_names()
-            .map(|names| {
-                names
-                    .iter()
-                    .filter_map(|name| {
-                        if let Some(dns) = name.dnsname() {
-                            Some(format!("DNS:{dns}"))
-                        } else if let Some(email) = name.email() {
-                            Some(format!("email:{email}"))
-                        } else if let Some(uri) = name.uri() {
-                            Some(format!("URI:{uri}"))
-                        } else {
-                            name.ipaddress().and_then(|ip| match ip.len() {
-                                4 => Some(format!(
-                                    "IP Address:{}",
-                                    IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3]))
-                                )),
-                                16 => Some(format!(
-                                    "IP Address:{}",
-                                    IpAddr::V6(Ipv6Addr::from(u128::from_be_bytes(
-                                        ip.try_into().expect("ip address length checked"),
-                                    )))
-                                )),
-                                _ => None,
-                            })
-                        }
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let subject_altnames = cert.subject_alt_names().map_or_default(|names| {
+            names
+                .iter()
+                .filter_map(|name| {
+                    if let Some(dns) = name.dnsname() {
+                        Some(format!("DNS:{dns}"))
+                    } else if let Some(email) = name.email() {
+                        Some(format!("email:{email}"))
+                    } else if let Some(uri) = name.uri() {
+                        Some(format!("URI:{uri}"))
+                    } else {
+                        name.ipaddress().and_then(|ip| match ip.len() {
+                            4 => Some(format!(
+                                "IP Address:{}",
+                                IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3]))
+                            )),
+                            16 => Some(format!(
+                                "IP Address:{}",
+                                IpAddr::V6(Ipv6Addr::from(u128::from_be_bytes(
+                                    ip.try_into().expect("ip address length checked"),
+                                )))
+                            )),
+                            _ => None,
+                        })
+                    }
+                })
+                .collect()
+        });
         Self {
             country_name: subject_metadata.get("countryName").cloned(),
             state_or_province_name: subject_metadata.get("stateOrProvinceName").cloned(),
