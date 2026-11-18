@@ -350,3 +350,41 @@ async fn conflicting_auth_headers_rejected() {
         Ok(_) => panic!("Expected an error for conflicting auth settings, but build succeeded"),
     }
 }
+
+#[tokio::test]
+async fn histogram_batch_aggregation_modes() {
+    let event = |value| {
+        Metric::new(
+            "batch_histogram",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vec![vector_lib::event::metric::Sample { value, rate: 1 }],
+                statistic: vector_lib::event::metric::StatisticKind::Histogram,
+            },
+        )
+        .into()
+    };
+    for (aggregate, expected) in [(true, vec![3.0]), (false, vec![1.0, 2.0, 3.0])] {
+        let config =
+            format!("batch:\n  max_events: 3\n  aggregate: {aggregate}\nbuckets: [0.5, 1.0]");
+        let requests = send_request(&config, vec![event(0.25), event(0.75), event(1.5)]).await;
+        assert_eq!(requests.len(), 1);
+        let series = requests[0]
+            .1
+            .timeseries
+            .iter()
+            .find(|series| {
+                series
+                    .labels
+                    .iter()
+                    .any(|label| label.name == "__name__" && label.value == "batch_histogram_count")
+            })
+            .expect("histogram count series");
+        let actual = series
+            .samples
+            .iter()
+            .map(|sample| sample.value)
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
+}
