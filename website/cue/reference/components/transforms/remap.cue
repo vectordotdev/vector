@@ -113,9 +113,18 @@ components: transforms: "remap": {
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
 
-				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
-				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
-				the disallowed action.
+				VRL can't read or change a metric's value yet (for example, `.gauge.value` reads as `null`). To
+				work with metric values, convert the metric to a log first with the
+				[Metric to Log](\(urls.vector_metric_to_log_transform)) transform.
+
+				If you try to perform a disallowed action, such as deleting the `type` field using `del(.type)` or
+				assigning to `.gauge.value`, Vector doesn't abort the VRL program. Instead, it ignores the action and
+				logs a rate-limited warning that lists the ignored changes. This also applies to tag values that aren't
+				strings or `null`, which are dropped from the assignment. The event is still emitted as usual.
+
+				If the same program handles both logs and metrics, you can avoid these warnings for log-only fields by
+				splitting the events with a [`route`](\(urls.vector_route_transform)) transform that uses the `is_log`
+				and `is_metric` conditions.
 				"""
 		}
 		lazy_event_mutation: {

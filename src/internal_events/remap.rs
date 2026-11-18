@@ -1,3 +1,4 @@
+use vector_lib::event::IgnoredMetricChange;
 use vector_lib::internal_event::{
     ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
     error_stage, error_type,
@@ -56,5 +57,27 @@ impl InternalEvent for RemapMappingAbort<'_> {
                 reason: "Event mapping aborted.",
             });
         }
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct RemapMetricChangesIgnored<'a> {
+    /// The changes to the metric event that were not fully applied.
+    pub changes: &'a [IgnoredMetricChange],
+}
+
+impl InternalEvent for RemapMetricChangesIgnored<'_> {
+    fn emit(self) {
+        let changes = self
+            .changes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
+        warn!(
+            message = "Ignored changes to a metric event.",
+            changes = %changes,
+            help = "VRL can only change the name, namespace, kind, type, timestamp, interval_ms, and tags of a metric. See https://vector.dev/docs/reference/configuration/transforms/remap/#event-data-model.",
+        );
     }
 }

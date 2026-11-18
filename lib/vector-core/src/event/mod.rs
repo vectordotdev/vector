@@ -22,7 +22,7 @@ use vector_common::{
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
 pub use vrl_target::MetricTagMode;
-pub use vrl_target::{TargetEvents, VrlTarget};
+pub use vrl_target::{IgnoredMetricChange, MetricChangeOperation, TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 

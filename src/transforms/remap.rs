@@ -40,7 +40,7 @@ use crate::{
     },
     event::{Event, LogEvent, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
-    internal_events::{RemapMappingAbort, RemapMappingError},
+    internal_events::{RemapMappingAbort, RemapMappingError, RemapMetricChangesIgnored},
     schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
 };
@@ -624,6 +624,15 @@ where
 
         let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
+
+        // VRL ignores the errors from changes that a metric event can't accept, so report them
+        // here. This covers programs that fail later too, since the change was still ignored.
+        let ignored_changes = target.take_ignored_metric_changes();
+        if !ignored_changes.is_empty() {
+            emit(RemapMetricChangesIgnored {
+                changes: &ignored_changes,
+            });
+        }
 
         match result {
             Ok(_) => match target.into_events(log_namespace) {
@@ -1277,6 +1286,46 @@ mod tests {
             assert_eq!(metric.value(), &expected, "{name}");
             assert_eq!(metric.kind(), MetricKind::Absolute, "{name}");
         }
+    }
+
+    #[test]
+    fn check_remap_metric_ignored_changes_warn() {
+        use vector_lib::event_test_util::{clear_recorded_events, contains_name_once};
+
+        let conf = RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    .gauge.value = 100
+                    .tags.code = 200
+                    .tags.region = "us-east-1"
+                "#}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        // Ignored changes don't change how the event is processed: valid changes still apply and
+        // the event is emitted rather than dropped.
+        clear_recorded_events();
+        let metric = Event::Metric(Metric::new(
+            "queue_depth",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 4.5 },
+        ));
+        let result = transform_one(&mut tform, metric).unwrap();
+        let metric = result.as_metric();
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 4.5 });
+        assert_eq!(metric.tag_value("code"), None);
+        assert_eq!(metric.tag_value("region"), Some("us-east-1".to_owned()));
+        contains_name_once("RemapMetricChangesIgnored").unwrap();
+
+        // The same program on a log event changes nothing it shouldn't and doesn't warn.
+        clear_recorded_events();
+        let log = Event::Log(LogEvent::from("hello"));
+        transform_one(&mut tform, log).unwrap();
+        assert!(contains_name_once("RemapMetricChangesIgnored").is_err());
     }
 
     #[test]

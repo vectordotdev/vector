@@ -68,8 +68,75 @@ pub enum VrlTarget {
         metric: Metric,
         value: Value,
         tag_mode: MetricTagMode,
+        ignored_changes: Vec<IgnoredMetricChange>,
     },
     Trace(Value, EventMetadata),
+}
+
+/// The maximum number of ignored metric changes recorded for a single event.
+///
+/// This bounds memory use for programs that repeatedly attempt invalid changes, such as inside a
+/// loop. Only the first changes are recorded.
+const MAX_IGNORED_METRIC_CHANGES: usize = 8;
+
+/// The kind of change a VRL program attempted on a metric event.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetricChangeOperation {
+    /// An assignment, such as `.name = "foo"`.
+    Assign,
+    /// A deletion, such as `del(.namespace)`.
+    Delete,
+}
+
+impl MetricChangeOperation {
+    /// Returns the name of the operation, for use in diagnostics.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Assign => "assign",
+            Self::Delete => "delete",
+        }
+    }
+}
+
+/// A change to a metric event that a VRL program attempted but that was not fully applied.
+///
+/// VRL discards the errors returned by [`Target`] methods, so without this record an invalid
+/// change to a metric event would be ignored silently.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IgnoredMetricChange {
+    /// The kind of change that was attempted.
+    pub operation: MetricChangeOperation,
+    /// The path that was changed, such as `.gauge.value`.
+    pub path: String,
+    /// Why the change was not applied.
+    pub reason: String,
+}
+
+impl std::fmt::Display for IgnoredMetricChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {}: {}",
+            self.operation.as_str(),
+            self.path,
+            self.reason
+        )
+    }
+}
+
+fn record_ignored_metric_change(
+    ignored_changes: &mut Vec<IgnoredMetricChange>,
+    operation: MetricChangeOperation,
+    path: &OwnedValuePath,
+    reason: String,
+) {
+    if ignored_changes.len() < MAX_IGNORED_METRIC_CHANGES {
+        ignored_changes.push(IgnoredMetricChange {
+            operation,
+            path: OwnedTargetPath::event(path.clone()).to_string(),
+            reason,
+        });
+    }
 }
 
 pub enum TargetEvents {
@@ -141,6 +208,7 @@ impl VrlTarget {
                     metric,
                     value,
                     tag_mode,
+                    ignored_changes: Vec::new(),
                 }
             }
             Event::Trace(event) => {
@@ -210,6 +278,39 @@ impl VrlTarget {
         }
     }
 
+    /// Takes the changes to a metric event that the VRL program attempted but that were not fully
+    /// applied.
+    ///
+    /// Returns an empty list for log and trace events.
+    pub fn take_ignored_metric_changes(&mut self) -> Vec<IgnoredMetricChange> {
+        match self {
+            VrlTarget::Metric {
+                ignored_changes, ..
+            } => std::mem::take(ignored_changes),
+            VrlTarget::LogEvent(..) | VrlTarget::Trace(..) => Vec::new(),
+        }
+    }
+
+    /// Records a failed change to a metric event. Changes to logs and traces don't fail.
+    fn record_failed_change(
+        &mut self,
+        operation: MetricChangeOperation,
+        target_path: &OwnedTargetPath,
+        reason: &str,
+    ) {
+        if let VrlTarget::Metric {
+            ignored_changes, ..
+        } = self
+        {
+            record_ignored_metric_change(
+                ignored_changes,
+                operation,
+                &target_path.path,
+                reason.to_owned(),
+            );
+        }
+    }
+
     fn metadata(&self) -> &EventMetadata {
         match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
@@ -274,12 +375,19 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
     definition
 }
 
+/// The reason recorded when some of the values assigned to a tag are not strings or null.
+const IGNORED_TAG_VALUES_REASON: &str =
+    "tag values must be strings or null, other values were ignored";
+
+/// Sets the values of a metric tag.
+///
+/// Values that are not strings or null are skipped. Returns `false` if any value was skipped.
 fn set_metric_tag_values(
     name: String,
     value: &Value,
     metric: &mut Metric,
     tag_mode: MetricTagMode,
-) {
+) -> bool {
     // `Auto` dispatches by the *shape* of the assigned value: arrays go through
     // the multi-value path, scalars go through the single-value path. `Full`
     // and `Single` are unchanged.
@@ -308,14 +416,48 @@ fn set_metric_tag_values(
             })
             .collect::<Vec<_>>();
 
+        let all_applied = tag_values.len() == values.len();
         metric.set_multi_value_tag(name, tag_values);
+        all_applied
     } else {
         // set a single tag value
         if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(Cow::into_owned) {
             metric.replace_tag(name, tag_value);
+            true
         } else if value.is_null() {
             metric.set_multi_value_tag(name, vec![TagValue::Bare]);
+            true
+        } else {
+            false
         }
+    }
+}
+
+/// Sets the tag `name` from an assignment to `path`, and records the change if some of the values
+/// were skipped.
+///
+/// When the whole `tags` object is assigned, `path` is `.tags` and `is_field_of_path` is true, so
+/// the recorded path is `.tags.<name>`.
+fn set_metric_tag_or_record(
+    metric: &mut Metric,
+    tag_mode: MetricTagMode,
+    ignored_changes: &mut Vec<IgnoredMetricChange>,
+    path: &OwnedValuePath,
+    name: &str,
+    is_field_of_path: bool,
+    value: &Value,
+) {
+    if !set_metric_tag_values(name.to_owned(), value, metric, tag_mode) {
+        let mut tag_path = path.clone();
+        if is_field_of_path {
+            tag_path.push_field(name);
+        }
+        record_ignored_metric_change(
+            ignored_changes,
+            MetricChangeOperation::Assign,
+            &tag_path,
+            IGNORED_TAG_VALUES_REASON.to_owned(),
+        );
     }
 }
 
@@ -347,8 +489,8 @@ fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
     Ok(())
 }
 
-impl Target for VrlTarget {
-    fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
+impl VrlTarget {
+    fn insert_field(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         let path = &target_path.path;
         match target_path.prefix {
             PathPrefix::Event => match self {
@@ -360,6 +502,7 @@ impl Target for VrlTarget {
                     metric,
                     value: metric_value,
                     tag_mode,
+                    ignored_changes,
                 } => {
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -373,22 +516,26 @@ impl Target for VrlTarget {
 
                                 metric.remove_tags();
                                 for (field, value) in &value {
-                                    set_metric_tag_values(
-                                        field.as_str().into(),
-                                        value,
+                                    set_metric_tag_or_record(
                                         metric,
                                         *tag_mode,
+                                        ignored_changes,
+                                        path,
+                                        field.as_str(),
+                                        true,
+                                        value,
                                     );
                                 }
                             }
-                            ["tags", field] => {
-                                set_metric_tag_values(
-                                    (*field).to_owned(),
-                                    &value,
-                                    metric,
-                                    *tag_mode,
-                                );
-                            }
+                            ["tags", field] => set_metric_tag_or_record(
+                                metric,
+                                *tag_mode,
+                                ignored_changes,
+                                path,
+                                field,
+                                false,
+                                &value,
+                            ),
                             ["name"] => {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                                 metric.series.name.name =
@@ -446,6 +593,28 @@ impl Target for VrlTarget {
             }
         }
     }
+}
+
+impl Target for VrlTarget {
+    fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
+        let result = self.insert_field(target_path, value);
+        if let Err(reason) = &result {
+            self.record_failed_change(MetricChangeOperation::Assign, target_path, reason);
+        }
+        result
+    }
+
+    fn target_remove(
+        &mut self,
+        target_path: &OwnedTargetPath,
+        compact: bool,
+    ) -> Result<Option<vrl::value::Value>, String> {
+        let result = self.remove_field(target_path, compact);
+        if let Err(reason) = &result {
+            self.record_failed_change(MetricChangeOperation::Delete, target_path, reason);
+        }
+        result
+    }
 
     fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         match target_path.prefix {
@@ -473,8 +642,10 @@ impl Target for VrlTarget {
             PathPrefix::Metadata => Ok(self.metadata_mut().value_mut().get_mut(&target_path.path)),
         }
     }
+}
 
-    fn target_remove(
+impl VrlTarget {
+    fn remove_field(
         &mut self,
         target_path: &OwnedTargetPath,
         compact: bool,
@@ -488,6 +659,7 @@ impl Target for VrlTarget {
                     metric,
                     value,
                     tag_mode,
+                    ..
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -1428,11 +1600,7 @@ mod test {
         );
 
         match target {
-            VrlTarget::Metric {
-                metric,
-                value: _,
-                tag_mode: _,
-            } => {
+            VrlTarget::Metric { metric, .. } => {
                 assert!(metric.tags().is_some());
                 assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
@@ -2163,5 +2331,174 @@ mod test {
             .expect("shard tag should be removed");
 
         assert_eq!(removed, Value::Array(vec!["a".into(), "b".into()]));
+    }
+
+    fn metric_target(tag_mode: MetricTagMode) -> VrlTarget {
+        let metric = Metric::new("m", MetricKind::Absolute, MetricValue::Gauge { value: 1.0 });
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        VrlTarget::new(Event::Metric(metric), &info, tag_mode)
+    }
+
+    #[test]
+    fn metric_records_rejected_changes() {
+        let mut target = metric_target(MetricTagMode::Single);
+
+        // Valid changes are not recorded.
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("name")),
+                "n".into(),
+            )
+            .unwrap();
+        target
+            .target_remove(
+                &OwnedTargetPath::event(owned_value_path!("namespace")),
+                false,
+            )
+            .unwrap();
+        assert!(target.take_ignored_metric_changes().is_empty());
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+                100.into(),
+            )
+            .unwrap_err();
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("timestamp")),
+                "not a timestamp".into(),
+            )
+            .unwrap_err();
+        target
+            .target_insert(
+                &OwnedTargetPath::event_root(),
+                Value::Object(ObjectMap::new()),
+            )
+            .unwrap_err();
+        target
+            .target_remove(&OwnedTargetPath::event(owned_value_path!("type")), false)
+            .unwrap_err();
+
+        let ignored = target.take_ignored_metric_changes();
+        let summary: Vec<_> = ignored
+            .iter()
+            .map(|change| (change.operation, change.path.as_str()))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                (MetricChangeOperation::Assign, ".gauge.value"),
+                (MetricChangeOperation::Assign, ".timestamp"),
+                (MetricChangeOperation::Assign, "."),
+                (MetricChangeOperation::Delete, ".type"),
+            ]
+        );
+        assert!(ignored[0].reason.contains("invalid path"));
+        assert_eq!(ignored[3].reason, "cannot delete metric type");
+        assert_eq!(
+            ignored[3].to_string(),
+            "delete .type: cannot delete metric type"
+        );
+
+        // Taking the changes clears them.
+        assert!(target.take_ignored_metric_changes().is_empty());
+    }
+
+    #[test]
+    fn metric_records_filtered_tag_values_without_changing_behavior() {
+        // A scalar that is not a string or null is skipped in `Single` mode.
+        let mut target = metric_target(MetricTagMode::Single);
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "a")),
+                1.into(),
+            )
+            .unwrap();
+        let ignored = target.take_ignored_metric_changes();
+        assert_eq!(ignored.len(), 1);
+        assert_eq!(ignored[0].path, ".tags.a");
+        assert_eq!(ignored[0].reason, IGNORED_TAG_VALUES_REASON);
+        let VrlTarget::Metric { metric, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert!(metric.tag_value("a").is_none());
+
+        // Invalid elements of an array are skipped, valid ones are kept.
+        let mut target = metric_target(MetricTagMode::Full);
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "a")),
+                Value::Array(vec!["x".into(), 1.into()]),
+            )
+            .unwrap();
+        let ignored = target.take_ignored_metric_changes();
+        assert_eq!(ignored.len(), 1);
+        assert_eq!(ignored[0].path, ".tags.a");
+        let VrlTarget::Metric { metric, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(metric.tag_value("a"), Some("x".to_owned()));
+
+        // Assigning the whole `tags` object records the field that was skipped.
+        let mut target = metric_target(MetricTagMode::Single);
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags")),
+                Value::Object(ObjectMap::from([
+                    ("good".into(), "x".into()),
+                    ("bad".into(), true.into()),
+                ])),
+            )
+            .unwrap();
+        let ignored = target.take_ignored_metric_changes();
+        assert_eq!(ignored.len(), 1);
+        assert_eq!(ignored[0].path, ".tags.bad");
+        let VrlTarget::Metric { metric, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(metric.tag_value("good"), Some("x".to_owned()));
+        assert!(metric.tag_value("bad").is_none());
+    }
+
+    #[test]
+    fn metric_ignored_changes_are_bounded() {
+        let mut target = metric_target(MetricTagMode::Single);
+        for _ in 0..(MAX_IGNORED_METRIC_CHANGES * 2) {
+            target
+                .target_insert(
+                    &OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+                    1.into(),
+                )
+                .unwrap_err();
+        }
+        assert_eq!(
+            target.take_ignored_metric_changes().len(),
+            MAX_IGNORED_METRIC_CHANGES
+        );
+    }
+
+    #[test]
+    fn log_has_no_ignored_metric_changes() {
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(
+            Event::Log(LogEvent::default()),
+            &info,
+            MetricTagMode::Single,
+        );
+        target
+            .target_insert(&OwnedTargetPath::event(owned_value_path!("a")), 1.into())
+            .unwrap();
+        assert!(target.take_ignored_metric_changes().is_empty());
     }
 }
