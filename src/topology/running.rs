@@ -1407,12 +1407,14 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
+        let shutdown_guard = new_pieces.source_shutdown_guards.remove(key);
         let source_task = {
             let key = key.clone();
             handle_errors(source_task, self.abort_tx.clone(), |error| {
                 ShutdownError::SourceAborted { key, error }
             })
         }
+        .inspect(move |_| drop(shutdown_guard))
         .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
