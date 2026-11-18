@@ -88,6 +88,8 @@ pub(crate) struct RoutePlanner {
     https: Option<ProxyEndpoint>,
 }
 
+const SCHEME_HELP: &str = "destination URI scheme must be http, https";
+
 impl RoutePlanner {
     pub(crate) fn new(config: &ProxyConfig) -> Result<Self, BoxError> {
         let (http, https) = if config.enabled {
@@ -114,14 +116,20 @@ impl RoutePlanner {
         })
     }
 
+    fn scheme_supported(scheme: &str) -> bool {
+        match scheme {
+            "http" | "https" => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn route(&self, destination: &Uri) -> Result<Route, BoxError> {
         let scheme = destination
             .scheme_str()
             .ok_or_else(|| invalid_input("destination URI must contain a scheme"))?;
-        if scheme != "http" && scheme != "https" {
-            return Err(invalid_input(
-                "destination URI scheme must be http or https",
-            ));
+
+        if !Self::scheme_supported(scheme) {
+            return Err(invalid_input(SCHEME_HELP));
         }
 
         if !self.config.enabled || self.bypasses_proxy(destination) {
