@@ -95,7 +95,7 @@ mod test {
         x509::{X509, X509NameBuilder},
     };
 
-    use crate::tls::{MaybeTls, MaybeTlsSettings, TlsConfig, TlsEnableableConfig};
+    use crate::tls::{MaybeTls, MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsError};
 
     #[test]
     fn no_reloadable_acceptor_without_tls() {
@@ -105,6 +105,25 @@ mod test {
                 .unwrap()
                 .is_none(),
             "plaintext settings have no acceptor to reload"
+        );
+    }
+
+    #[tokio::test]
+    async fn binding_a_reloader_without_tls_fails() {
+        let reloader =
+            MaybeTlsSettings::from_config(Some(&TlsEnableableConfig::test_config()), true)
+                .unwrap()
+                .reloadable_acceptor()
+                .unwrap();
+        assert!(reloader.is_some());
+
+        let addr = "127.0.0.1:0".parse().unwrap();
+        let result = MaybeTlsSettings::Raw(())
+            .bind_reloadable(&addr, reloader)
+            .await;
+        assert!(
+            matches!(result, Err(TlsError::ReloaderWithoutTls)),
+            "must not silently serve plaintext"
         );
     }
 
