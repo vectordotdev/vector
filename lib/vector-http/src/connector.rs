@@ -29,6 +29,9 @@ use vector_core::{
     tls::{MaybeTlsSettings, TlsSettings, tls_connector_builder},
 };
 
+#[cfg(unix)]
+use hyperlocal::UnixConnector as LocalUnixConnector;
+
 use crate::{ConnectionOptions, jittered_duration};
 
 type BoxError = Box<dyn Error + Send + Sync>;
@@ -88,6 +91,9 @@ pub(crate) struct RoutePlanner {
     https: Option<ProxyEndpoint>,
 }
 
+#[cfg(unix)]
+const SCHEME_HELP: &str = "destination URI scheme must be http, https or unix";
+#[cfg(not(unix))]
 const SCHEME_HELP: &str = "destination URI scheme must be http, https";
 
 impl RoutePlanner {
@@ -119,6 +125,8 @@ impl RoutePlanner {
     fn scheme_supported(scheme: &str) -> bool {
         match scheme {
             "http" | "https" => true,
+            #[cfg(unix)]
+            "unix" => true,
             _ => false,
         }
     }
@@ -130,6 +138,13 @@ impl RoutePlanner {
 
         if !Self::scheme_supported(scheme) {
             return Err(invalid_input(SCHEME_HELP));
+        }
+
+        #[cfg(unix)]
+        if scheme == "unix" {
+            return Ok(Route::Unix {
+                destination: destination.clone(),
+            });
         }
 
         if !self.config.enabled || self.bypasses_proxy(destination) {
@@ -174,6 +189,10 @@ impl RoutePlanner {
 }
 
 pub(crate) enum Route {
+    #[cfg(unix)]
+    Unix {
+        destination: Uri,
+    },
     Direct {
         destination: Uri,
     },
@@ -190,6 +209,9 @@ pub(crate) enum Route {
 
 type BaseConnector = HttpsConnector<HttpConnector>;
 
+#[cfg(unix)]
+type UnixConnector = HttpsConnector<LocalUnixConnector>;
+
 /// ALPN protocols offered to a TLS forward (non-`CONNECT`) proxy.
 #[derive(Clone, Copy)]
 pub(crate) enum ForwardProxyAlpn {
@@ -204,6 +226,8 @@ pub(crate) struct HttpProxyConnector {
     direct: BaseConnector,
     forward_proxy: BaseConnector,
     connect_proxy: BaseConnector,
+    #[cfg(unix)]
+    unix_connector: UnixConnector,
     destination_tls: SslConnector,
     tls_settings: Option<TlsSettings>,
     routes: Arc<RoutePlanner>,
@@ -233,10 +257,15 @@ impl HttpProxyConnector {
         };
         let destination_tls = tls_connector_builder(&tls)?.build();
 
+        #[cfg(unix)]
+        let unix_connector = unix_https_connector(&tls, true, true)?;
+
         Ok(Self {
             direct,
             forward_proxy,
             connect_proxy,
+            #[cfg(unix)]
+            unix_connector,
             destination_tls,
             tls_settings,
             routes,
@@ -327,9 +356,16 @@ impl Service<Uri> for HttpProxyConnector {
         let max_connection_age = self.max_connection_age;
         let connect_timeout = self.connect_timeout;
 
+        #[cfg(unix)]
+        let mut unix_connector = self.unix_connector.clone();
+
         Box::pin(async move {
             let connect = async move {
                 match route? {
+                    #[cfg(unix)]
+                    Route::Unix { destination } => {
+                        unix_connector.call(destination).await.map(BoxedIo::new)
+                    }
                     Route::Direct { destination } => {
                         direct.call(destination).await.map(BoxedIo::new)
                     }
@@ -371,6 +407,28 @@ impl Service<Uri> for HttpProxyConnector {
             })
         })
     }
+}
+
+#[cfg(unix)]
+fn unix_https_connector(
+    tls: &MaybeTlsSettings,
+    skip_server_name: bool,
+    http1_alpn: bool,
+) -> Result<UnixConnector, BoxError> {
+    let unix_http = LocalUnixConnector;
+    let mut tls_builder = tls_connector_builder(tls)?;
+    if http1_alpn {
+        tls_builder.set_alpn_protos(HTTP1_ALPN)?;
+    }
+    let mut https = HttpsConnector::with_connector(unix_http, tls_builder)?;
+    let settings = tls.tls().cloned();
+    https.set_callback(move |configuration, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(configuration, skip_server_name)?;
+        }
+        Ok(())
+    });
+    Ok(https)
 }
 
 fn https_connector(
