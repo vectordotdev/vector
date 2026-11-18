@@ -28,7 +28,7 @@ generated: components: sinks: aws_kinesis_streams: configuration: {
 				description: "Aggregation format. Newline preserves text/JSONL; KPL uses the standard protobuf envelope."
 				required:    false
 				type: string: {
-					default: "newline"
+					default: "kpl"
 					enum: {
 						kpl:     "Standard KPL protobuf envelope, preserving individual payload boundaries."
 						newline: "Serialized text or compact JSON separated by newline characters."

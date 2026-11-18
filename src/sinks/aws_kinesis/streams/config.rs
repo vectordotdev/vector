@@ -394,12 +394,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn kpl_build_rejects_auto_distribution_even_without_healthcheck_execution() {
+    async fn default_aggregation_rejects_auto_distribution_even_without_healthcheck_execution() {
         let uri = crate::test_util::http::spawn_blackhole_http_server(|_| async {
             Ok(http::Response::new(http_body_util::Full::new(bytes::Bytes::from_static(br#"{"StreamDescriptionSummary":{"StreamName":"logs","StreamARN":"arn:aws:kinesis:us-east-1:123456789012:stream/logs","StreamStatus":"ACTIVE","RetentionPeriodHours":24,"StreamCreationTimestamp":0,"EnhancedMonitoring":[],"OpenShardCount":1,"RecordDistributionStrategy":"AUTO"}}"#))))
         }).await;
         let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
-            "stream_name = 'logs'\nregion = 'us-east-1'\nendpoint = '{uri}'\nencoding.codec = 'json'\nauth.access_key_id = 'test'\nauth.secret_access_key = 'test'\n[aggregation]\nenabled = true\nformat = 'kpl'\n"
+            "stream_name = 'logs'\nregion = 'us-east-1'\nendpoint = '{uri}'\nencoding.codec = 'json'\nauth.access_key_id = 'test'\nauth.secret_access_key = 'test'\n[aggregation]\nenabled = true\n"
         )).unwrap();
         let result =
             crate::config::SinkConfig::build(&config, crate::config::SinkContext::default()).await;
@@ -535,7 +535,7 @@ mod tests {
         let config: KinesisStreamsSinkConfig = toml::from_str(base).unwrap();
         assert!(config.aggregation.is_none());
         let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
-            "{base}\n[aggregation]\nenabled = true\nmax_events = 2\n"
+            "{base}\n[aggregation]\nenabled = true\nformat = 'newline'\nmax_events = 2\n"
         ))
         .unwrap();
         assert_eq!(
@@ -549,7 +549,7 @@ mod tests {
             2
         );
         let config: KinesisStreamsSinkConfig = toml::from_str(&format!(
-            "{base}\n[aggregation]\nenabled = true\nmax_events = 0\n"
+            "{base}\n[aggregation]\nenabled = true\nformat = 'newline'\nmax_events = 0\n"
         ))
         .unwrap();
         assert!(

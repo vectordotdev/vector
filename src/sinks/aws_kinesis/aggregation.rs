@@ -9,10 +9,11 @@ use vector_lib::configurable::configurable_component;
 #[serde(rename_all = "snake_case")]
 pub enum Format {
     /// Serialized text or compact JSON separated by newline characters.
-    #[default]
+    #[cfg_attr(not(feature = "sinks-aws_kinesis_streams"), default)]
     Newline,
     /// Standard KPL protobuf envelope, preserving individual payload boundaries.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
+    #[default]
     Kpl,
 }
 

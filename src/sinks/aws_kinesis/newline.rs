@@ -55,7 +55,7 @@ impl Default for AggregationConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            format: Format::Newline,
+            format: Format::default(),
             max_events: 500,
             max_bytes: 943_718,
             timeout_secs: 1.0,
@@ -400,7 +400,7 @@ mod tests {
 
     #[cfg(feature = "sinks-aws_kinesis_streams")]
     #[tokio::test]
-    async fn kpl_emits_standard_envelope_and_preserves_payload_boundaries() {
+    async fn default_aggregation_emits_kpl_and_preserves_payload_boundaries() {
         let mut a = event("a");
         a.as_mut_log().insert(vrl::event_path!("key"), "key");
         let mut b = event("b\n");
@@ -409,7 +409,11 @@ mod tests {
             futures::stream::iter([a, b]).boxed(),
             builder(false, Compression::None),
             Some("key".into()),
-            kpl_settings(),
+            toml::from_str::<AggregationConfig>("enabled = true")
+                .unwrap()
+                .settings(&SerializerConfig::Text(TextSerializerConfig::default()))
+                .unwrap()
+                .unwrap(),
         )
         .collect::<Vec<_>>()
         .await;
@@ -695,6 +699,7 @@ mod tests {
         let text = SerializerConfig::Text(TextSerializerConfig::default());
         let mut config = AggregationConfig {
             enabled: true,
+            format: Format::Newline,
             ..Default::default()
         };
         assert!(config.settings(&text).unwrap().is_some());

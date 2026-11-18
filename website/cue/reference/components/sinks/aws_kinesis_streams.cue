@@ -85,8 +85,8 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			title: "Record aggregation"
 			body: """
 				Enable `aggregation.enabled` to combine original logs into fewer Kinesis records.
-				Aggregation is disabled by default. Select `aggregation.format: newline` (the
-				default) for text/JSONL or `aggregation.format: kpl` for standard KPL framing.
+				Aggregation is disabled by default. When enabled, it uses standard KPL framing.
+				Select `aggregation.format: newline` explicitly for text/JSONL.
 				Consumers must support the selected format. This option belongs to the
 				Kinesis Streams sink, including streams consumed by Firehose; it does not
 				change the direct Firehose sink.
@@ -94,7 +94,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				```yaml
 				aggregation:
 				  enabled: true
-				  format: newline
+				  format: kpl
 				  max_events: 500
 				  max_bytes: 943718
 				  timeout_secs: 1.0
@@ -111,7 +111,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				batch timeout. A shorter `batch.timeout_secs`, such as `0.05`, reduces that
 				additional API wait. It can also produce smaller API requests during sparse input.
 
-				Use text or compact JSON encoding. Each serialized log receives a trailing LF
+				For newline mode, use text or compact JSON encoding. Each serialized log receives a trailing LF
 				if it does not already have one. Text bytes, including embedded newlines, are
 				preserved. Compression applies once to each completed aggregate. Consumers must
 				decompress the record before splitting its lines.
