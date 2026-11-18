@@ -1,6 +1,10 @@
 [alias]
 vdev = "run --quiet --package vdev --"
 
+# Allow time for newly published dependency versions to be reviewed.
+[registry]
+global-min-publish-age = "7 days"
+
 [env]
 # Build jemalloc assuming 64K pages so binaries also run on aarch64 hosts whose
 # kernels ship with a 64K page size (notably EL8 aarch64). On 4K-page hosts this
