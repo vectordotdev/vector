@@ -21,7 +21,7 @@ fn version(repo: &Path, version: &str) {
         repo,
         "Cargo.toml",
         &format!(
-            "[package]\nname = \"changelog-fixture\"\nversion = \"{version}\"\n\n[features]\n"
+            "[package]\nname = \"changelog-fixture\"\nversion.workspace = true\n\n[workspace.package]\nversion = \"{version}\"\n\n[features]\n"
         ),
     );
 }

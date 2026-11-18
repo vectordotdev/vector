@@ -218,25 +218,28 @@ impl ProviderConfig for HttpConfig {
 
 impl_generate_config_from_default!(HttpConfig);
 
-#[cfg(all(test, feature = "sources-demo_logs"))]
+#[cfg(test)]
 mod parse_first_tests {
     use std::{convert::Infallible, future::ready};
 
     use http::Response;
 
     use super::{Format, IndexMap, ProxyConfig, Url, http_request_to_config_builder};
-    use crate::test_util::http::spawn_blackhole_http_server;
+    use crate::{
+        config::ComponentKey,
+        test_util::{http::spawn_blackhole_http_server, mock::TestComponentData},
+    };
 
     #[tokio::test]
     async fn remote_configuration_is_parsed_before_optional_interpolation() {
         let input = indoc::indoc! {"
             # ${VECTOR_TEST_HTTP_UNSET:?comments are not interpolated}
             sources:
-              demo:
-                type: demo_logs
-                format: shuffle
-                lines: ['${VECTOR_TEST_HTTP_LINE:-a: b}']
-                count: '42'
+              test_source:
+                type: test_basic
+                extra:
+                  strings: ['${VECTOR_TEST_HTTP_LINE:-a: b}']
+                  integer: '42'
         "};
         let uri = spawn_blackhole_http_server(move |_| {
             ready(Ok::<_, Infallible>(Response::new(input.into())))
@@ -254,12 +257,10 @@ mod parse_first_tests {
             )
             .await
             .unwrap();
-            let value = serde_json::to_value(config).unwrap();
-            assert_eq!(
-                value["sources"]["demo"]["lines"],
-                serde_json::json!([expected])
-            );
-            assert_eq!(value["sources"]["demo"]["count"], 42);
+            let extra =
+                TestComponentData::from_config(&config.sources[&ComponentKey::from("test_source")]);
+            assert_eq!(extra.strings, [expected]);
+            assert_eq!(extra.integer, Some(42));
         }
     }
 }

@@ -122,6 +122,20 @@ fn connector(
     )?))
 }
 
+/// Creates the HTTP client that AWS service clients use: [`connector`] behind the connector that
+/// emits the request telemetry and counts the bytes sent.
+pub(crate) fn service_http_client(
+    proxy: &ProxyConfig,
+    tls_options: Option<&TlsConfig>,
+    region: Region,
+) -> crate::Result<SharedHttpClient> {
+    Ok(SharedHttpClient::new(AwsHttpClient {
+        http: connector(proxy, tls_options)?,
+        region,
+        emit_bytes_sent: true,
+    }))
+}
+
 /// Implement for each AWS service to create the appropriate AWS sdk client.
 pub trait ClientBuilder {
     /// The type of the client in the SDK.
@@ -222,14 +236,7 @@ where
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
-    let connector = connector(proxy, tls_options)?;
-
-    // Create a custom http connector that will emit the required metrics for us.
-    let connector = AwsHttpClient {
-        http: connector,
-        region: region.clone(),
-        emit_bytes_sent: true,
-    };
+    let connector = service_http_client(proxy, tls_options, region.clone())?;
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()

@@ -38,8 +38,7 @@ use crate::{
         util::{
             BatchConfig, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{
-                MetricNormalize, MetricNormalizer, MetricSet, MetricSetSettings,
-                compress_distribution,
+                MetricNormalize, MetricNormalizer, MetricSet, compress_distribution,
             },
             builder::SinkBuilderExt,
             encode_namespace,
@@ -241,14 +240,10 @@ struct MetricBatch {
     json_size: JsonSize,
 }
 
-fn metric_set(max_events: usize) -> MetricSet {
-    MetricSet::new(MetricSetSettings {
-        max_events: Some(max_events),
-        ..Default::default()
-    })
-}
-
 /// Aggregates metrics by series until a batch holds `max_events` series.
+///
+/// The batch is taken as soon as it holds `max_events` series, so the set never needs to evict and
+/// uses the default `MetricSet` without LRU bookkeeping.
 struct MetricBatchConfig {
     metrics: MetricSet,
     finalizers: EventFinalizers,
@@ -261,7 +256,7 @@ struct MetricBatchConfig {
 impl MetricBatchConfig {
     fn new(settings: BatcherSettings) -> Self {
         Self {
-            metrics: metric_set(settings.item_limit),
+            metrics: MetricSet::default(),
             finalizers: EventFinalizers::default(),
             count: 0,
             byte_size: 0,
@@ -280,7 +275,7 @@ impl StreamBatchConfig<NormalizedMetric> for MetricBatchConfig {
     }
 
     fn take_batch(&mut self) -> MetricBatch {
-        let metrics = mem::replace(&mut self.metrics, metric_set(self.settings.item_limit));
+        let metrics = mem::take(&mut self.metrics);
         let mut metrics = metrics.into_metrics();
         for metric in &mut metrics {
             if let MetricValue::Distribution { samples, .. } = metric.data_mut().value_mut() {

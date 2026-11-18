@@ -4,10 +4,8 @@ use indoc::indoc;
 use serde_json::{Value, json};
 
 use super::with_absent_env_var;
-#[cfg(any(feature = "sources-demo_logs", feature = "sinks-console"))]
-use crate::config::Format;
 use crate::config::{
-    ConfigPath,
+    ConfigPath, Format,
     loading::{ConfigBuilderLoader, load_source_from_paths},
 };
 
@@ -86,7 +84,6 @@ fn no_proxy_preserves_string_and_list_matching() {
 }
 
 #[test]
-#[cfg(feature = "sinks-console")]
 fn healthchecks_accept_boolean_shorthand_and_objects() {
     struct Case {
         name: &'static str,
@@ -146,9 +143,10 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
             enabled: None,
         },
     ] {
-        let input = json!({"sinks": {"console": {
-            "type": "console", "inputs": [], "encoding": {"codec": "json"}, "healthcheck": case.input
-        }}}).to_string();
+        let input = json!({"sinks": {"out": {
+            "type": "test_basic", "inputs": [], "healthcheck": case.input
+        }}})
+        .to_string();
         let input = with_absent_env_var(&input);
         let result = ConfigBuilderLoader::default()
             .interpolate_env(true)
@@ -160,7 +158,7 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
         if let Some(enabled) = case.enabled {
             let builder = result.unwrap_or_else(|errors| panic!("{}: {errors:?}", case.name));
             assert_eq!(
-                serde_json::to_value(builder).unwrap()["sinks"]["console"]["healthcheck"]["enabled"],
+                serde_json::to_value(builder).unwrap()["sinks"]["out"]["healthcheck"]["enabled"],
                 enabled,
                 "{}",
                 case.name
@@ -172,7 +170,6 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
 }
 
 #[test]
-#[cfg(feature = "sinks-console")]
 fn custom_buffer_and_duration_defaults_match_serde() {
     const CONFIG: &str = indoc! {r"
         expire_metrics:
@@ -180,10 +177,8 @@ fn custom_buffer_and_duration_defaults_match_serde() {
           nanos: 42
         sinks:
           out:
-            type: console
+            type: test_basic
             inputs: []
-            encoding:
-              codec: json
             buffer: @BUFFER@
     "};
 
@@ -427,14 +422,12 @@ fn directory_fragments_preserve_merge_semantics() {
 }
 
 #[test]
-#[cfg(feature = "sources-demo_logs")]
 fn file_and_directory_inputs_preserve_append_boundaries() {
     const CONFIG: &str = indoc! {r"
         sources:
-          demo:
-            type: demo_logs
-            format: json
-            count: 43
+          source:
+            type: test_basic
+            data: retained
     "};
 
     struct Case {
@@ -496,15 +489,15 @@ fn file_and_directory_inputs_preserve_append_boundaries() {
             assert!(
                 errors
                     .iter()
-                    .any(|error| error.contains("duplicate source id found: demo")),
+                    .any(|error| error.contains("duplicate source id found: source")),
                 "{}: {errors:?}",
                 case.name
             );
         } else {
             let builder = result.unwrap_or_else(|errors| panic!("{}: {errors:?}", case.name));
             assert_eq!(
-                serde_json::to_value(builder).unwrap()["sources"]["demo"]["count"],
-                43,
+                serde_json::to_value(builder).unwrap()["sources"]["source"]["data"],
+                "retained",
                 "{}",
                 case.name
             );
