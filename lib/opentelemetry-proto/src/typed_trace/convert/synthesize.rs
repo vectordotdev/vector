@@ -148,8 +148,7 @@ impl PbSpan {
             trace_state: span.trace_state.into_raw(),
             parent_span_id: span
                 .parent_span_id
-                .map(|id| id.to_bytes().to_vec())
-                .unwrap_or_default(),
+                .map_or_else(Vec::new, |id| id.to_bytes().to_vec()),
             name: span.name,
             kind: span.kind.to_i32(),
             start_time_unix_nano,
