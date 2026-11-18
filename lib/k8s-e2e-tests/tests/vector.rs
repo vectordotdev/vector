@@ -99,7 +99,10 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
             "agent",
             &helm_chart_repo(),
             VectorConfig {
-                custom_helm_values: vec![&helm_values_stdout_sink(&agent_override_name)],
+                custom_helm_values: vec![
+                    &config_override_name(&agent_override_name, true),
+                    &helm_values_stdout_sink(&agent_override_name),
+                ],
                 ..Default::default()
             },
         )
@@ -226,7 +229,10 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
             "agent",
             &helm_chart_repo(),
             VectorConfig {
-                custom_helm_values: vec![&helm_values_haproxy(&agent_override_name)],
+                custom_helm_values: vec![
+                    &config_override_name(&agent_override_name, true),
+                    &helm_values_haproxy(&agent_override_name),
+                ],
                 ..Default::default()
             },
         )

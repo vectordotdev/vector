@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.62.0-dev"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -13,6 +13,9 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
 rust-version = "1.95"
+
+[workspace.package]
+version = "0.63.0-dev"
 
 [[bin]]
 name = "vector"
@@ -193,6 +196,7 @@ dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 derive_more = { version = "2.1.1", default-features = false, features = ["display", "debug"] }
 exitcode = { version = "1.1.2", default-features = false }
+fixed_decimal = { version = "0.7.3", default-features = false, features = ["ryu"] }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
@@ -207,7 +211,7 @@ libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
 metrics-util = { version = "0.20.4", default-features = false, features = ["registry"] }
-mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
+mlua = { version = "0.12.2", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
@@ -224,7 +228,8 @@ rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
-rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
+# The crypto provider is selected by the `tls-ring` and `tls-aws-lc` features.
+rustls = { version = "0.23", default-features = false, features = ["logging", "std", "tls12"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
@@ -243,7 +248,7 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "1.1.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.14.9", default-features = false, features = ["transport", "router", "codegen", "tls-ring", "tls-native-roots", "gzip", "zstd"] }
+tonic = { version = "0.14.9", default-features = false, features = ["transport", "router", "codegen", "tls-native-roots", "gzip", "zstd"] }
 tonic-prost = { version = "0.14.9", default-features = false }
 tonic-prost-build = { version = "0.14.9", default-features = false, features = ["transport"] }
 tonic-health = { version = "0.14.9", default-features = false }
@@ -260,7 +265,7 @@ vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
+vrl = { default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] , git = "https://github.com/vectordotdev/vrl.git", branch = "main" }
 zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
@@ -436,6 +441,7 @@ enum_dispatch = { version = "0.3.13", default-features = false }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 evmap-derive = { version = "0.2.0", default-features = false, optional = true }
 exitcode.workspace = true
+fixed_decimal = { workspace = true, optional = true }
 flate2.workspace = true
 futures-util.workspace = true
 glob.workspace = true
@@ -561,7 +567,8 @@ tokio = { workspace = true, features = ["test-util"] }
 tokio-test.workspace = true
 tower-test = "0.4.0"
 parking_lot = { version = "0.12.5", default-features = false }
-vector-lib = { workspace = true, features = ["test"] }
+# Tests built with `--no-default-features` still need a Rustls crypto provider.
+vector-lib = { workspace = true, features = ["test", "tls-ring"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
@@ -605,12 +612,18 @@ vendored = ["gssapi-vendored"]
 
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet", "tls-ring"]
 enable-api-client = ["base", "api-client"]
 default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# Rustls crypto provider installed at startup, preferring Ring when both are enabled. Builds with
+# neither must install a process-wide provider before starting Vector. Some components, such as
+# GreptimeDB, NATS, MQTT, and PostgreSQL, use Ring through their own dependencies.
+tls-aws-lc = ["vector-lib/tls-aws-lc"]
+tls-ring = ["vector-lib/tls-ring"]
 
 # VRL functions control features
 vrl-functions-env = ["vrl/enable_env_functions"]
@@ -774,7 +787,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-encoding", "dep:datadog-proto", "dep:prost"]
+sources-datadog_agent = ["sources-utils-http-encoding", "dep:base64", "dep:datadog-proto", "dep:fixed_decimal", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
 sources-docker_logs = ["docker"]

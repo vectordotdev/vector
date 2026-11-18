@@ -35,7 +35,7 @@ to upgrade to the secret functions immediately.
 
 Here are some examples using the new features
 
-```coffeescript
+```vrl
 # This is existing functionality that will continue to work. Setting the datadog API key
 set_metadata_field("datadog_api_key", "my secret key")
 

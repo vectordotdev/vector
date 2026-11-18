@@ -391,8 +391,7 @@ impl State {
             .filter_state
             .pattern
             .as_ref()
-            .map(|r| r.as_str().to_string())
-            .unwrap_or_default();
+            .map_or_else(String::new, |r| r.as_str().to_string());
     }
 }
 

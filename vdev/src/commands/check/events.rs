@@ -772,8 +772,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             .path
             .segments
             .last()
-            .map(|s| s.ident.to_string())
-            .unwrap_or_default();
+            .map_or_else(String::new, |s| s.ident.to_string());
 
         // Use-counting, emit/register ComponentEventsDropped detection, and
         // the log-message format check run via a separate raw-source pass
