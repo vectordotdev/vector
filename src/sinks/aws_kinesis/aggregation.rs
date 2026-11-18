@@ -118,14 +118,6 @@ impl<M> Aggregator<M> {
         self.current.take()
     }
 
-    pub fn flush_due(&mut self, now: Instant) -> Option<Aggregate<M>> {
-        if self.deadline.is_some_and(|deadline| now >= deadline) {
-            self.flush()
-        } else {
-            None
-        }
-    }
-
     /// Buffers an event and returns aggregates completed by it.
     ///
     /// # Panics
@@ -278,13 +270,10 @@ mod tests {
         let now = Instant::now();
         let mut a = Aggregator::new(settings(500, 1000));
         assert!(a.deadline().is_none());
-        assert!(a.flush_due(now).is_none());
+        assert!(a.flush().is_none());
         a.push(b"a", None, (), now);
-        assert!(a.flush_due(now + Duration::from_millis(999)).is_none());
-        assert_eq!(
-            a.flush_due(now + Duration::from_secs(1)).unwrap().payload,
-            b"a\n"
-        );
+        assert_eq!(a.deadline(), Some(now + Duration::from_secs(1)));
+        assert_eq!(a.flush().unwrap().payload, b"a\n");
         assert!(a.deadline().is_none());
     }
 

@@ -331,6 +331,7 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
         sinks::util::Compression,
     };
+    use rand::{RngExt, SeedableRng, rngs::SmallRng};
     use vector_lib::{
         codecs::{JsonSerializerConfig, TextSerializerConfig},
         request_metadata::MetaDescriptive,
@@ -888,14 +889,8 @@ mod tests {
             output[0].record.data.len() + output[0].record.key.len(),
             RECORD_LIMIT
         );
-        let mut random = Vec::with_capacity(RECORD_LIMIT - 2);
-        let mut state = 42u64;
-        for _ in 0..RECORD_LIMIT - 2 {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            random.push(state.to_le_bytes()[0]);
-        }
+        let mut random = vec![0u8; RECORD_LIMIT - 2];
+        SmallRng::seed_from_u64(42).fill(&mut random[..]);
         random[RECORD_LIMIT / 2 - 2] = b'\n';
         random[RECORD_LIMIT - 3] = b'\n';
         let mut aggregator = Aggregator::new(Settings {

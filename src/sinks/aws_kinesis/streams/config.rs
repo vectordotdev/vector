@@ -453,57 +453,35 @@ mod tests {
         body: Vec<u8>,
         calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     ) -> http::Uri {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use http_body_util::{BodyExt, StreamBody};
+        use std::convert::Infallible;
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        tokio::spawn(async move {
-            loop {
-                let (mut socket, _) = listener.accept().await.unwrap();
-                let body = body.clone();
-                let calls = std::sync::Arc::clone(&calls);
-                tokio::spawn(async move {
-                    let mut request = Vec::new();
-                    let mut buffer = [0; 1024];
-                    let header_end = loop {
-                        let size = socket.read(&mut buffer).await.unwrap();
-                        assert_ne!(size, 0);
-                        request.extend_from_slice(&buffer[..size]);
-                        if let Some(end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
-                            break end + 4;
-                        }
-                    };
-                    let headers = String::from_utf8_lossy(&request[..header_end]);
-                    assert!(headers.contains("DescribeStreamSummary"));
-                    let length = headers
-                        .lines()
-                        .find_map(|line| {
-                            let (name, value) = line.split_once(':')?;
-                            name.eq_ignore_ascii_case("content-length")
-                                .then(|| value.trim().parse::<usize>().unwrap())
-                        })
-                        .unwrap();
-                    while request.len() < header_end + length {
-                        let size = socket.read(&mut buffer).await.unwrap();
-                        assert_ne!(size, 0);
-                        request.extend_from_slice(&buffer[..size]);
-                    }
-                    calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/x-amz-json-1.1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n").await.unwrap();
-                    for chunk in [&body[..body.len() / 2], &body[body.len() / 2..]] {
-                        socket
-                            .write_all(format!("{:x}\r\n", chunk.len()).as_bytes())
-                            .await
-                            .unwrap();
-                        socket.write_all(chunk).await.unwrap();
-                        socket.write_all(b"\r\n").await.unwrap();
-                        tokio::task::yield_now().await;
-                    }
-                    socket.write_all(b"0\r\n\r\n").await.unwrap();
+        let body = bytes::Bytes::from(body);
+        crate::test_util::http::spawn_http_server(move |request| {
+            let body = body.clone();
+            let calls = std::sync::Arc::clone(&calls);
+            async move {
+                assert_eq!(
+                    request.headers()["x-amz-target"],
+                    "Kinesis_20131202.DescribeStreamSummary"
+                );
+                request.into_body().collect().await.unwrap();
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let middle = body.len() / 2;
+                let chunks = [body.slice(..middle), body.slice(middle..)];
+                let stream = futures::stream::iter(chunks).then(|chunk| async move {
+                    tokio::task::yield_now().await;
+                    Ok::<_, Infallible>(http_body::Frame::data(chunk))
                 });
+                Ok(http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, "application/x-amz-json-1.1")
+                    .header(http::header::TRANSFER_ENCODING, "chunked")
+                    .header(http::header::CONNECTION, "close")
+                    .body(StreamBody::new(stream))
+                    .unwrap())
             }
-        });
-        format!("http://{address}/").parse().unwrap()
+        })
+        .await
     }
 
     #[test]

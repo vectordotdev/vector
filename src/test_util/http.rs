@@ -36,6 +36,20 @@ where
     H: Fn(Request<Incoming>) -> F + Clone + Send + Sync + 'static,
     F: Future<Output = std::result::Result<Response<Full<Bytes>>, Infallible>> + Send + 'static,
 {
+    spawn_http_server(handler).await
+}
+
+/// Spawns an HTTP server with a streaming or full response body.
+///
+/// # Panics
+///
+/// Panics if the listener cannot be bound or its address cannot be used to construct a URI.
+pub async fn spawn_http_server<H, F, B>(handler: H) -> Uri
+where
+    H: Fn(Request<Incoming>) -> F + Clone + Send + Sync + 'static,
+    F: Future<Output = std::result::Result<Response<B>, Infallible>> + Send + 'static,
+    B: http_body::Body<Data = Bytes, Error = Infallible> + Send + 'static,
+{
     let (_guard, address) = next_addr();
 
     let uri = Uri::builder()
