@@ -255,9 +255,10 @@ impl SourceConfig for NatsSourceConfig {
         )]
     }
 
-    // Acknowledgment is only possible with Jetstream.
+    // JetStream messages are acked once they reach the topology, not when a sink confirms
+    // delivery, so end-to-end acknowledgements are not supported.
     fn can_acknowledge(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -323,6 +324,18 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn does_not_claim_end_to_end_acknowledgements() {
+        let core = NatsSourceConfig::default();
+        let jetstream = NatsSourceConfig {
+            jetstream: Some(JetStreamConfig::default()),
+            ..Default::default()
+        };
+
+        assert!(!core.can_acknowledge());
+        assert!(!jetstream.can_acknowledge());
     }
 
     #[test]
