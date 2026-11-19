@@ -701,7 +701,13 @@ impl VrlTarget {
 
                         Ok(removed_value)
                     } else {
-                        Ok(None)
+                        // The path contains an array index, such as `.tags.region[0]`, which
+                        // metric fields don't support. Assignments reject these paths the same way.
+                        Err(MetricPathError::InvalidPath {
+                            path: &target_path.path.to_string(),
+                            expected: VALID_METRIC_PATHS_SET,
+                        }
+                        .to_string())
                     }
                 }
             },
@@ -2470,6 +2476,51 @@ mod test {
         };
         assert_eq!(metric.tag_value("good"), Some("x".to_owned()));
         assert!(metric.tag_value("bad").is_none());
+    }
+
+    #[test]
+    fn metric_records_rejected_indexed_delete() {
+        use super::super::metric::{MetricTags, TagValue, TagValueSet};
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "region".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Full);
+
+        // Metric fields can't be addressed by array index, so the tag is left unchanged.
+        target
+            .target_remove(
+                &OwnedTargetPath::event(owned_value_path!("tags", "region", 0)),
+                false,
+            )
+            .unwrap_err();
+
+        let ignored = target.take_ignored_metric_changes();
+        assert_eq!(ignored.len(), 1);
+        assert_eq!(ignored[0].operation, MetricChangeOperation::Delete);
+        assert_eq!(ignored[0].path, ".tags.region[0]");
+        let VrlTarget::Metric { metric, .. } = &target else {
+            panic!("must be a metric");
+        };
+        let region = metric
+            .tags()
+            .and_then(|tags| tags.iter_sets().find(|(name, _)| *name == "region"))
+            .map(|(_, values)| values.len());
+        assert_eq!(region, Some(2));
     }
 
     #[test]
