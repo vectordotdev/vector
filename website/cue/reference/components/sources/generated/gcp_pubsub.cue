@@ -79,7 +79,7 @@ generated: components: sources: gcp_pubsub: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	endpoint: {
 		description: "The endpoint from which to pull data."

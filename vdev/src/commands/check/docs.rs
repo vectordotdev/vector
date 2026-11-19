@@ -177,7 +177,7 @@ mod tests {
         })
         .expect("check cue formatting");
 
-        assert!(modified.is_empty());
+        assert_eq!(modified, Vec::<String>::new());
     }
 
     #[test]
@@ -194,6 +194,6 @@ mod tests {
 
         let modified =
             Cli::find_unformatted_cue_files(temp.path(), || Ok(())).expect("check cue formatting");
-        assert!(modified.is_empty());
+        assert_eq!(modified, Vec::<String>::new());
     }
 }

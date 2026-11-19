@@ -93,10 +93,14 @@ enum BuildError {
     ))]
     DuplicatedMatches { field: String, value: String },
     #[snafu(display(
-        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
-        systemd_version
+        "`current_boot_only: false` is not supported for systemd versions 250 through 257 (got {} from `{}`). Use journalctl from systemd 258 or later in Vector's runtime environment (inside the container for container deployments), or set `current_boot_only: true` to collect only the current boot.",
+        systemd_version,
+        journalctl_path.display()
     ))]
-    AllBootsNotSupported { systemd_version: u32 },
+    AllBootsNotSupported {
+        systemd_version: u32,
+        journalctl_path: PathBuf,
+    },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -115,6 +119,10 @@ pub struct JournaldConfig {
     pub since_now: bool,
 
     /// Only include entries that occurred after the current boot of the system.
+    ///
+    /// Setting this to `false` requires systemd 258 or later, or a version older than 250.
+    /// Versions 250 through 257 are not supported. For container deployments, this
+    /// requirement applies to the `journalctl` inside the container image.
     #[serde(default = "crate::serde::default_true")]
     pub current_boot_only: bool,
 
@@ -385,7 +393,11 @@ impl SourceConfig for JournaldConfig {
 
         if !self.current_boot_only && (250..=257).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
-            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
+            return Err(BuildError::AllBootsNotSupported {
+                systemd_version,
+                journalctl_path,
+            }
+            .into());
         }
 
         let starter = StartJournalctl::new(

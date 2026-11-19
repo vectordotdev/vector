@@ -33,7 +33,7 @@ generated: components: sources: datadog_agent: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	disable_llmobs: {
 		deprecated:         true
@@ -101,6 +101,25 @@ generated: components: sources: datadog_agent: configuration: {
 		description: "Configuration of HTTP server keepalive parameters."
 		required:    false
 		type:        _schemaDefinitions["vector::http::KeepaliveConfig"]
+	}
+	max_trace_expansion_bytes: {
+		description: """
+			The maximum number of bytes that indexed trace payloads in a single request can expand to
+			while being converted into trace events.
+
+			Indexed trace payloads are compact, so the converted events can be much larger than the
+			request body. A string is stored once and referenced from any number of spans, and each
+			reference becomes its own copy. Numbers, booleans, and ids that become tag strings or list
+			elements also take more bytes than they did on the wire: the double `5e-324` is an 8-byte
+			value in a payload but a 326-byte tag. This limit counts the bytes of all of these copies and
+			conversions. Requests that would exceed it are rejected with an HTTP 422 Unprocessable
+			Entity response as soon as the conversion reaches the limit.
+			"""
+		required: false
+		type: uint: {
+			default: 104857600
+			unit:    "bytes"
+		}
 	}
 	multiple_outputs: {
 		description: """

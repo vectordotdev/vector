@@ -33,6 +33,9 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+const SERVICE: &str = "service";
+const HOST: &str = "host";
+
 /// Configuration for the `demo_logs` source.
 #[serde_as]
 #[configurable_component(source(
@@ -254,15 +257,15 @@ async fn demo_logs_source(
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
-                            path!("service"),
+                            Some(LegacyKey::InsertIfEmpty(path!(SERVICE))),
+                            path!(SERVICE),
                             "vector",
                         );
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("host"))),
-                            path!("host"),
+                            Some(LegacyKey::InsertIfEmpty(path!(HOST))),
+                            path!(HOST),
                             "localhost",
                         );
 
@@ -320,10 +323,10 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 DemoLogsConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
-                &owned_value_path!("service"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(SERVICE))),
+                &owned_value_path!(SERVICE),
                 Kind::bytes(),
-                Some("service"),
+                Some(SERVICE),
             );
 
         vec![SourceOutput::new_maybe_logs(

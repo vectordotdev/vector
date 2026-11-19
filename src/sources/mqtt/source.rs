@@ -17,7 +17,11 @@ use crate::{
     internal_events::{EndpointBytesReceived, MqttSubscribeError, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
-    sources::{SourceError, mqtt::MqttSourceConfig, util},
+    sources::{
+        SourceError,
+        mqtt::{MqttSourceConfig, config::TOPIC_KEY},
+        util,
+    },
 };
 
 pub(super) struct MqttSource {
@@ -141,7 +145,7 @@ impl MqttSource {
                     .path
                     .as_ref()
                     .map(LegacyKey::Overwrite),
-                path!("topic"),
+                path!(TOPIC_KEY),
                 publish.topic.clone(),
             );
         }

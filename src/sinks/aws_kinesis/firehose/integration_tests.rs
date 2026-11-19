@@ -1,174 +1,79 @@
-use aws_sdk_elasticsearch::{Client as EsClient, types::DomainEndpointOptions};
-use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
-use futures::{StreamExt, TryFutureExt};
-use serde_json::{Value, json};
-use tokio::time::{Duration, sleep};
+use aws_sdk_firehose::types::{
+    BufferingHints, DeliveryStreamStatus, ExtendedS3DestinationConfiguration,
+};
+use aws_sdk_s3::Client as S3Client;
+use futures::StreamExt;
+use serde_json::Value;
+use tokio::time::{Duration, Instant, sleep};
 use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext},
-    sinks::{
-        elasticsearch::{
-            BulkConfig, ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig,
-        },
-        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
-    },
-    template::Template,
+    event::Event,
+    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
-        random_events_with_stream, random_string, wait_for_duration,
+        random_events_with_stream, random_string, trace_init, wait_for_duration,
     },
 };
+
+/// The role that the emulator image creates for Firehose to write to S3.
+const DELIVERY_ROLE_ARN: &str = "arn:aws:iam::000000000000:role/firehose-delivery";
 
 fn kinesis_address() -> String {
     std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
 }
 
-fn elasticsearch_address() -> String {
-    format!(
-        "{}/es-endpoint",
-        std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into()),
-    )
+fn s3_address() -> String {
+    std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
 }
 
 #[tokio::test]
 async fn firehose_put_records_without_partition_key() {
+    trace_init();
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone()).await;
-
-    ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
+    ensure_s3_delivery_stream(&stream).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
-    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
-
-    let base = KinesisSinkBaseConfig {
-        stream_name: stream.clone(),
-        region: region.clone(),
-        encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
-        compression: Compression::None,
-        request: TowerRequestConfig {
-            timeout_secs: 10,
-            retry_attempts: 0,
-            ..Default::default()
-        },
-        tls: None,
-        auth: AwsAuthentication::default(),
-        acknowledgements: AcknowledgementsConfig::default(),
-        request_retry_partial: false,
-        partition_key_field: None,
+    let config = KinesisFirehoseSinkConfig {
+        base: base_config(&stream, None),
+        batch,
     };
 
-    let config = KinesisFirehoseSinkConfig { base, batch };
-
-    let cx = SinkContext::default();
-
-    let (sink, _) = config.build(cx).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
-    sleep(Duration::from_secs(5)).await;
-
-    let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuthConfig::Aws(AwsAuthentication::Default {
-            load_timeout_secs: Some(5),
-            imds: ImdsAuthentication::default(),
-            region: None,
-        })),
-        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
-        bulk: BulkConfig {
-            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
-            ..Default::default()
-        },
-        aws: Some(region),
-        ..Default::default()
-    };
-    let common = ElasticsearchCommon::parse_single(&config)
-        .await
-        .expect("Config error");
-
-    let client = reqwest::Client::builder()
-        .build()
-        .expect("Could not build HTTP client");
-
-    let response = client
-        .get(format!("{}/{stream}/_search", common.base_url))
-        .json(&json!({
-            "query": { "query_string": { "query": "*" } }
-        }))
-        .send()
-        .await
-        .unwrap()
-        .json::<Value>()
-        .await
-        .expect("could not issue Elasticsearch search request");
-
-    let total = response["hits"]["total"]["value"]
-        .as_u64()
-        .expect("Elasticsearch response does not include hits->total->value");
-    assert_eq!(input.len() as u64, total);
-
-    let hits = response["hits"]["hits"]
-        .as_array()
-        .expect("Elasticsearch response does not include hits->hits");
-    let input = input
-        .into_iter()
-        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
-        .collect::<Vec<_>>();
-    for hit in hits {
-        let hit = hit
-            .get("_source")
-            .expect("Elasticsearch hit missing _source");
-        assert!(input.contains(hit));
-    }
+    assert_delivered(&stream, input).await;
 }
 
 #[tokio::test]
 async fn firehose_put_records_with_partition_key() {
+    trace_init();
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone()).await;
-
-    ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
+    ensure_s3_delivery_stream(&stream).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(20);
 
-    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
-
     let partition_value = "a_value";
     let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
 
-    let base = KinesisSinkBaseConfig {
-        stream_name: stream.clone(),
-        region: region.clone(),
-        encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
-        compression: Compression::None,
-        request: TowerRequestConfig {
-            timeout_secs: 10,
-            retry_attempts: 0,
-            ..Default::default()
-        },
-        tls: None,
-        auth: AwsAuthentication::default(),
-        acknowledgements: AcknowledgementsConfig::default(),
-        request_retry_partial: false,
-        partition_key_field: Some(partition_key.clone()),
+    let config = KinesisFirehoseSinkConfig {
+        base: base_config(&stream, Some(partition_key)),
+        batch,
     };
 
-    let config = KinesisFirehoseSinkConfig { base, batch };
-
-    let cx = SinkContext::default();
-
-    let (sink, _) = config.build(cx).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input, events) = random_events_with_stream(100, 100, None);
 
@@ -186,99 +91,95 @@ async fn firehose_put_records_with_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
-    sleep(Duration::from_secs(5)).await;
+    assert_delivered(&stream, input).await;
+}
 
-    let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuthConfig::Aws(AwsAuthentication::Default {
-            load_timeout_secs: Some(5),
-            imds: ImdsAuthentication::default(),
-            region: None,
-        })),
-        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
-        bulk: BulkConfig {
-            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
+fn base_config(
+    stream: &str,
+    partition_key_field: Option<ConfigValuePath>,
+) -> KinesisSinkBaseConfig {
+    KinesisSinkBaseConfig {
+        stream_name: stream.to_string(),
+        region: test_region_endpoint(kinesis_address()),
+        encoding: JsonSerializerConfig::default().into(),
+        compression: Compression::None,
+        request: TowerRequestConfig {
+            timeout_secs: 10,
+            retry_attempts: 0,
             ..Default::default()
         },
-        aws: Some(region),
-        ..Default::default()
-    };
-    let common = ElasticsearchCommon::parse_single(&config)
-        .await
-        .expect("Config error");
-
-    let client = reqwest::Client::builder()
-        .build()
-        .expect("Could not build HTTP client");
-
-    let response = client
-        .get(format!("{}/{stream}/_search", common.base_url))
-        .json(&json!({
-            "query": { "query_string": { "query": "*" } }
-        }))
-        .send()
-        .await
-        .unwrap()
-        .json::<Value>()
-        .await
-        .expect("could not issue Elasticsearch search request");
-
-    let total = response["hits"]["total"]["value"]
-        .as_u64()
-        .expect("Elasticsearch response does not include hits->total->value");
-    assert_eq!(input.len() as u64, total);
-
-    let hits = response["hits"]["hits"]
-        .as_array()
-        .expect("Elasticsearch response does not include hits->hits");
-    let input = input
-        .into_iter()
-        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
-        .collect::<Vec<_>>();
-    for hit in hits {
-        let hit = hit
-            .get("_source")
-            .expect("Elasticsearch hit missing _source");
-        assert!(input.contains(hit));
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        request_retry_partial: false,
+        partition_key_field,
     }
 }
 
-fn test_region_endpoint() -> RegionOrEndpoint {
-    RegionOrEndpoint::with_both("us-east-1", kinesis_address())
+/// Waits until Firehose has written every input event to the stream's bucket, then checks that
+/// the delivered records are exactly the input events.
+async fn assert_delivered(bucket: &str, input: Vec<Event>) {
+    let mut expected = input
+        .into_iter()
+        .map(|event| serde_json::to_value(event.into_log()).unwrap().to_string())
+        .collect::<Vec<_>>();
+    expected.sort();
+
+    let client = s3_client().await;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let mut delivered = delivered_records(&client, bucket).await;
+        if delivered.len() >= expected.len() || Instant::now() >= deadline {
+            delivered.sort();
+            assert_eq!(expected, delivered);
+            return;
+        }
+        sleep(Duration::from_millis(500)).await;
+    }
+}
+
+/// Reads every record that Firehose delivered to `bucket`. Firehose concatenates the records of
+/// a delivery into one object, so each object holds a sequence of JSON values.
+async fn delivered_records(client: &S3Client, bucket: &str) -> Vec<String> {
+    let objects = client
+        .list_objects_v2()
+        .bucket(bucket)
+        .send()
+        .await
+        .expect("could not list delivered objects");
+
+    let mut records = Vec::new();
+    for object in objects.contents() {
+        let body = client
+            .get_object()
+            .bucket(bucket)
+            .key(object.key().expect("delivered object has no key"))
+            .send()
+            .await
+            .expect("could not get delivered object")
+            .body
+            .collect()
+            .await
+            .expect("could not read delivered object")
+            .into_bytes();
+        records.extend(
+            serde_json::Deserializer::from_slice(&body)
+                .into_iter::<Value>()
+                .map(|record| record.expect("delivered record is not JSON").to_string()),
+        );
+    }
+    records
+}
+
+fn test_region_endpoint(endpoint: String) -> RegionOrEndpoint {
+    RegionOrEndpoint::with_both("us-east-1", endpoint)
 }
 
 async fn firehose_client() -> aws_sdk_firehose::Client {
-    let region_endpoint = test_region_endpoint();
-    let auth = AwsAuthentication::test_auth();
-    let proxy = ProxyConfig::default();
+    let region_endpoint = test_region_endpoint(kinesis_address());
 
     create_client::<KinesisFirehoseClientBuilder>(
         &KinesisFirehoseClientBuilder {},
-        &auth,
-        region_endpoint.region(),
-        region_endpoint.endpoint(),
-        &proxy,
-        None,
-        None,
-    )
-    .await
-    .unwrap()
-}
-
-/// creates ES domain with the given name and returns the ARN
-async fn ensure_elasticsearch_domain(domain_name: String) -> String {
-    struct ElasticsearchClientBuilder;
-    impl crate::aws::ClientBuilder for ElasticsearchClientBuilder {
-        type Client = EsClient;
-
-        fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
-            EsClient::new(config)
-        }
-    }
-
-    let region_endpoint = test_region_endpoint();
-    let client = create_client::<ElasticsearchClientBuilder>(
-        &ElasticsearchClientBuilder,
         &AwsAuthentication::test_auth(),
         region_endpoint.region(),
         region_endpoint.endpoint(),
@@ -287,71 +188,93 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         None,
     )
     .await
-    .unwrap();
-
-    let arn = match client
-        .create_elasticsearch_domain()
-        .domain_name(domain_name)
-        .domain_endpoint_options(
-            DomainEndpointOptions::builder()
-                .custom_endpoint_enabled(true)
-                .custom_endpoint(elasticsearch_address())
-                .build(),
-        )
-        .send()
-        .await
-    {
-        Ok(res) => res.domain_status.expect("no domain status").arn,
-        Err(error) => panic!("Unable to create the Elasticsearch domain {error:?}"),
-    };
-
-    // wait for ES to be available; it starts up when the ES domain is created
-    // This takes a long time
-    wait_for_duration(
-        || async {
-            reqwest::get(format!("{}/_cluster/health", elasticsearch_address()))
-                .and_then(reqwest::Response::json::<Value>)
-                .await
-                .is_ok_and(|v| {
-                    v.get("status")
-                        .and_then(Value::as_str)
-                        .is_some_and(|status| status != "red")
-                })
-        },
-        Duration::from_mins(2),
-    )
-    .await;
-
-    arn
+    .unwrap()
 }
 
-/// creates Firehose delivery stream to ship to Elasticsearch
-async fn ensure_elasticsearch_delivery_stream(
-    delivery_stream_name: String,
-    elasticsearch_arn: String,
-) {
-    let client = firehose_client().await;
+async fn s3_client() -> S3Client {
+    struct S3ClientBuilder;
+    impl crate::aws::ClientBuilder for S3ClientBuilder {
+        type Client = S3Client;
 
-    match Box::pin(
-        client
-            .create_delivery_stream()
-            .delivery_stream_name(delivery_stream_name.clone())
-            .elasticsearch_destination_configuration(
-                ElasticsearchDestinationConfiguration::builder()
-                    .index_name(delivery_stream_name)
-                    .domain_arn(elasticsearch_arn)
-                    .role_arn("doesn't matter")
-                    .type_name("doesn't matter")
-                    .build()
-                    .expect("all builder fields populated"),
-            )
-            .send(),
+        fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
+            let config = aws_sdk_s3::config::Builder::from(config)
+                .force_path_style(true)
+                .build();
+            S3Client::from_conf(config)
+        }
+    }
+
+    let region_endpoint = test_region_endpoint(s3_address());
+    create_client::<S3ClientBuilder>(
+        &S3ClientBuilder,
+        &AwsAuthentication::test_auth(),
+        region_endpoint.region(),
+        region_endpoint.endpoint(),
+        &ProxyConfig::default(),
+        None,
+        None,
     )
     .await
-    {
-        Ok(_) => (),
-        Err(error) => panic!("Unable to create the delivery stream {error:?}"),
-    }
+    .unwrap()
+}
+
+/// Creates a bucket and a Firehose delivery stream, both named `name`, that writes each record to
+/// the bucket without buffering. Returns when the delivery stream accepts records.
+async fn ensure_s3_delivery_stream(name: &str) {
+    s3_client()
+        .await
+        .create_bucket()
+        .bucket(name)
+        .send()
+        .await
+        .expect("could not create the destination bucket");
+
+    let client = firehose_client().await;
+    let request = client
+        .create_delivery_stream()
+        .delivery_stream_name(name)
+        .extended_s3_destination_configuration(
+            ExtendedS3DestinationConfiguration::builder()
+                .role_arn(DELIVERY_ROLE_ARN)
+                .bucket_arn(format!("arn:aws:s3:::{name}"))
+                .buffering_hints(
+                    BufferingHints::builder()
+                        .interval_in_seconds(0)
+                        .size_in_mbs(1)
+                        .build(),
+                )
+                .build()
+                .expect("all required builder fields populated"),
+        )
+        .send();
+    Box::pin(request)
+        .await
+        .expect("could not create the delivery stream");
+
+    let name = name.to_string();
+    wait_for_duration(
+        move || {
+            let client = client.clone();
+            let name = name.clone();
+            async move {
+                client
+                    .describe_delivery_stream()
+                    .delivery_stream_name(name)
+                    .send()
+                    .await
+                    .is_ok_and(|output| {
+                        output
+                            .delivery_stream_description()
+                            .is_some_and(|description| {
+                                *description.delivery_stream_status()
+                                    == DeliveryStreamStatus::Active
+                            })
+                    })
+            }
+        },
+        Duration::from_secs(30),
+    )
+    .await;
 }
 
 fn gen_stream() -> String {
