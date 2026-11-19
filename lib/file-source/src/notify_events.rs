@@ -55,13 +55,13 @@ pub struct NotifyEventSource {
     tracked_path_refs: HashMap<PathBuf, usize>,
     /// Active per-watcher registrations keyed by `FileFingerprint`.
     watched_files: HashMap<FileFingerprint, WatchedFileRecord>,
-    /// Ref-count of watched files per parent directory.
+    /// Ref-count of watched files per canonical parent directory.
     dir_refs: HashMap<PathBuf, usize>,
-    /// Maps canonicalized parent directory -> original watched parent directory
-    /// when they differ (e.g. macOS `/var` -> `/private/var`).
-    canonical_to_watched: HashMap<PathBuf, Vec<PathBuf>>,
-    /// Maps canonicalized target file path -> watched symlink path(s).
-    file_aliases: HashMap<PathBuf, Vec<PathBuf>>,
+    /// Maps canonicalized parent directory -> ref-counted original watched parent
+    /// directory aliases when they differ (e.g. macOS `/var` -> `/private/var`).
+    canonical_to_watched: HashMap<PathBuf, HashMap<PathBuf, usize>>,
+    /// Maps canonicalized target file path -> ref-counted watched symlink path(s).
+    file_aliases: HashMap<PathBuf, HashMap<PathBuf, usize>>,
 }
 
 impl NotifyEventSource {
@@ -89,15 +89,12 @@ impl NotifyEventSource {
                         woke = true;
                     } else if let Some(kind) = map_event_kind(event.kind) {
                         for path in event.paths {
-                            // Filter out noisy sibling files for Modify/Remove events;
-                            // Created events are allowed through so newly appearing files
-                            // can still signal hints if desired.
-                            if !matches!(kind, MappedKind::Created) {
-                                let is_tracked =
-                                    cb_tracked.read().map_or(true, |set| set.contains(&path));
-                                if !is_tracked {
-                                    continue;
-                                }
+                            // Filter out noisy sibling files for all event kinds;
+                            // `AdaptiveEventScheduler` only wakes tracked paths.
+                            let is_tracked =
+                                cb_tracked.read().map_or(true, |set| set.contains(&path));
+                            if !is_tracked {
+                                continue;
                             }
                             let fs_event = match kind {
                                 MappedKind::Modified => FsEvent::Modified(path),
@@ -171,43 +168,54 @@ impl NotifyEventSource {
 
     fn watch_dir(&mut self, dir: &Path) {
         let dir_buf = dir.to_path_buf();
-        let count = self.dir_refs.entry(dir_buf.clone()).or_insert(0);
+        let canonical = std::fs::canonicalize(dir).unwrap_or_else(|_| dir_buf.clone());
+        let count = self.dir_refs.entry(canonical.clone()).or_insert(0);
         *count += 1;
-        if *count == 1 {
-            if let Err(error) = self.watcher.watch(dir, RecursiveMode::NonRecursive) {
-                debug!(
-                    message = "Failed to register OS directory watch; relying on fallback polling.",
-                    dir = ?dir,
-                    %error,
-                );
-            }
-            if let Ok(canonical) = std::fs::canonicalize(dir)
-                && canonical != dir_buf
-            {
-                self.canonical_to_watched
-                    .entry(canonical)
-                    .or_default()
-                    .push(dir_buf);
-            }
+        if *count == 1
+            && let Err(error) = self.watcher.watch(&canonical, RecursiveMode::NonRecursive)
+        {
+            debug!(
+                message = "Failed to register OS directory watch; relying on fallback polling.",
+                dir = ?canonical,
+                %error,
+            );
+        }
+        if canonical != dir_buf {
+            *self
+                .canonical_to_watched
+                .entry(canonical)
+                .or_default()
+                .entry(dir_buf)
+                .or_insert(0) += 1;
         }
     }
 
     fn unwatch_dir(&mut self, dir: &Path) {
-        if let Some(count) = self.dir_refs.get_mut(dir) {
+        let canonical = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+        if canonical != dir
+            && let Some(aliases) = self.canonical_to_watched.get_mut(&canonical)
+        {
+            if let Some(c) = aliases.get_mut(dir) {
+                *c = c.saturating_sub(1);
+                if *c == 0 {
+                    aliases.remove(dir);
+                }
+            }
+            if aliases.is_empty() {
+                self.canonical_to_watched.remove(&canonical);
+            }
+        }
+        if let Some(count) = self.dir_refs.get_mut(&canonical) {
             *count = count.saturating_sub(1);
             if *count == 0 {
-                self.dir_refs.remove(dir);
-                if let Err(error) = self.watcher.unwatch(dir) {
+                self.dir_refs.remove(&canonical);
+                if let Err(error) = self.watcher.unwatch(&canonical) {
                     debug!(
                         message = "Failed to unregister OS directory watch.",
-                        dir = ?dir,
+                        dir = ?canonical,
                         %error,
                     );
                 }
-                self.canonical_to_watched.retain(|_, aliases| {
-                    aliases.retain(|p| p != dir);
-                    !aliases.is_empty()
-                });
             }
         }
     }
@@ -233,7 +241,7 @@ impl NotifyEventSource {
         // 1. Direct canonical target -> symlink path aliases (e.g. Kubernetes pod logs).
         let mut emitted_alias = false;
         if let Some(symlink_paths) = self.file_aliases.get(path) {
-            for sym_path in symlink_paths {
+            for sym_path in symlink_paths.keys() {
                 out.push(Self::remap_event(&event, sym_path.clone()));
                 emitted_alias = true;
             }
@@ -243,7 +251,7 @@ impl NotifyEventSource {
         if let (Some(parent), Some(file_name)) = (path.parent(), path.file_name())
             && let Some(aliases) = self.canonical_to_watched.get(parent)
         {
-            for alias_parent in aliases {
+            for alias_parent in aliases.keys() {
                 out.push(Self::remap_event(&event, alias_parent.join(file_name)));
             }
             if self.dir_refs.contains_key(parent) {
@@ -277,8 +285,12 @@ const fn map_event_kind(kind: EventKind) -> Option<MappedKind> {
 impl FsEventSource for NotifyEventSource {
     fn drain_events(&mut self, out: &mut Vec<FsEvent>) {
         if self.overflowed.swap(false, Ordering::AcqRel) {
-            // Drain and discard buffered events; a single Overflow promotes all files.
-            while self.rx.try_recv().is_ok() {}
+            // Bounded drain of stale buffered events; a single Overflow promotes all files.
+            for _ in 0..EVENT_CHANNEL_CAPACITY {
+                if self.rx.try_recv().is_err() {
+                    break;
+                }
+            }
             debug!(
                 message =
                     "OS file event queue overflowed; scheduling full rescan of watched files."
@@ -287,16 +299,19 @@ impl FsEventSource for NotifyEventSource {
             return;
         }
 
-        loop {
+        for _ in 0..EVENT_CHANNEL_CAPACITY {
             match self.rx.try_recv() {
                 Ok(event) => self.normalize_event(event, out),
-                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Empty) => return,
                 Err(TryRecvError::Disconnected) => {
                     out.push(FsEvent::Overflow);
-                    break;
+                    return;
                 }
             }
         }
+        // Hit per-tick cap while events still pending -> coalesce into Overflow.
+        self.overflowed.store(true, Ordering::Release);
+        out.push(FsEvent::Overflow);
     }
 
     fn watch_path(&mut self, file_id: FileFingerprint, path: &Path) {
@@ -326,10 +341,12 @@ impl FsEventSource for NotifyEventSource {
                 self.watch_dir(dir);
             }
             self.track_path_ref(canonical_file.clone());
-            self.file_aliases
+            *self
+                .file_aliases
                 .entry(canonical_file.clone())
                 .or_default()
-                .push(watched_path.clone());
+                .entry(watched_path.clone())
+                .or_insert(0) += 1;
             (Some(canonical_file), tp)
         } else {
             (None, None)
@@ -358,7 +375,12 @@ impl FsEventSource for NotifyEventSource {
         if let Some(canonical_file) = &rec.canonical_target {
             self.untrack_path_ref(canonical_file);
             if let Some(aliases) = self.file_aliases.get_mut(canonical_file) {
-                aliases.retain(|p| p != &rec.watched_path);
+                if let Some(c) = aliases.get_mut(&rec.watched_path) {
+                    *c = c.saturating_sub(1);
+                    if *c == 0 {
+                        aliases.remove(&rec.watched_path);
+                    }
+                }
                 if aliases.is_empty() {
                     self.file_aliases.remove(canonical_file);
                 }

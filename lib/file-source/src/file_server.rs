@@ -262,10 +262,7 @@ where
 
         self.cleanup_small_files().await;
 
-        let lines_start = lines.len();
         let global_bytes_read = self.poll_files(lines).await;
-
-        self.cleanup_idle_files(&lines[lines_start..]).await;
 
         self.reap_dead_files().await;
 
@@ -278,8 +275,14 @@ where
         } else {
             1
         };
-        let backoff = self.backoff_cap.saturating_sub(global_bytes_read);
-        Duration::from_millis(backoff as u64)
+        let backoff =
+            Duration::from_millis(self.backoff_cap.saturating_sub(global_bytes_read) as u64);
+        let now = self.clock.now();
+        if let Some(next_due) = self.scheduler.next_wakeup(now) {
+            cmp::min(backoff, next_due.saturating_duration_since(now))
+        } else {
+            backoff
+        }
     }
 
     /// Search (glob) for files to detect new files, renames, and fingerprint collisions.
@@ -322,8 +325,12 @@ where
                         );
                         if let Ok(unwatch_opt) = watcher.update_path(path.clone()).await {
                             self.event_source.watch_path(file_id, &path);
-                            self.scheduler
-                                .on_file_renamed(file_id, &old_path, &path, self.clock.now());
+                            self.scheduler.on_file_renamed(
+                                file_id,
+                                &old_path,
+                                &path,
+                                self.clock.now(),
+                            );
                             if let Some(unwatch_info) = unwatch_opt {
                                 // Inode changed - emit metrics for the old file
                                 self.server.emitter.emit_file_unwatched(
@@ -334,38 +341,7 @@ where
                             }
                         }
                     } else {
-                        info!(
-                            message = "More than one file has the same fingerprint.",
-                            path = ?path,
-                            old_path = ?watcher.path
-                        );
-                        let (old_path, new_path) = (watcher.path.clone(), path.clone());
-                        if let (Ok(old_meta), Ok(new_meta)) = (
-                            self.fs.metadata(&old_path).await,
-                            self.fs.metadata(&new_path).await,
-                        ) && let (Some(old_modified_time), Some(new_modified_time)) =
-                            (old_meta.modified, new_meta.modified)
-                            && old_modified_time < new_modified_time
-                        {
-                            info!(
-                                message = "Switching to watch most recently modified file.",
-                                new_modified_time = ?new_modified_time,
-                                old_modified_time = ?old_modified_time,
-                            );
-                            if let Ok(unwatch_opt) = watcher.update_path(path).await {
-                                self.event_source.watch_path(file_id, &new_path);
-                                self.scheduler
-                                    .on_file_renamed(file_id, &old_path, &new_path, self.clock.now());
-                                if let Some(unwatch_info) = unwatch_opt {
-                                    // Inode changed - emit metrics for the old file
-                                    self.server.emitter.emit_file_unwatched(
-                                        &unwatch_info.path,
-                                        unwatch_info.reached_eof,
-                                        unwatch_info.bytes_unread,
-                                    );
-                                }
-                            }
-                        }
+                        self.handle_duplicate_fingerprint(file_id, path).await;
                     }
                 } else {
                     // untracked file fingerprint
@@ -374,10 +350,55 @@ where
                 }
             }
         }
+        // Promote any newly unfindable watchers so they get a final drain pass
+        // before `reap_dead_files` can expire them on `rotate_wait`.
+        for (&file_id, watcher) in &self.fp_map {
+            if !watcher.file_findable() {
+                self.scheduler.on_file_unfindable(file_id);
+            }
+        }
+
         self.stats.record(
             "discovery",
             self.clock.now().saturating_duration_since(start),
         );
+    }
+
+    async fn handle_duplicate_fingerprint(&mut self, file_id: FileFingerprint, path: PathBuf) {
+        let Some(watcher) = self.fp_map.get_mut(&file_id) else {
+            return;
+        };
+        info!(
+            message = "More than one file has the same fingerprint.",
+            path = ?path,
+            old_path = ?watcher.path
+        );
+        let (old_path, new_path) = (watcher.path.clone(), path.clone());
+        if let (Ok(old_meta), Ok(new_meta)) = (
+            self.fs.metadata(&old_path).await,
+            self.fs.metadata(&new_path).await,
+        ) && let (Some(old_modified_time), Some(new_modified_time)) =
+            (old_meta.modified, new_meta.modified)
+            && old_modified_time < new_modified_time
+        {
+            info!(
+                message = "Switching to watch most recently modified file.",
+                new_modified_time = ?new_modified_time,
+                old_modified_time = ?old_modified_time,
+            );
+            if let Ok(unwatch_opt) = watcher.update_path(path).await {
+                self.event_source.watch_path(file_id, &new_path);
+                self.scheduler
+                    .on_file_renamed(file_id, &old_path, &new_path, self.clock.now());
+                if let Some(unwatch_info) = unwatch_opt {
+                    self.server.emitter.emit_file_unwatched(
+                        &unwatch_info.path,
+                        unwatch_info.reached_eof,
+                        unwatch_info.bytes_unread,
+                    );
+                }
+            }
+        }
     }
 
     /// Cleanup `known_small_files` that have exceeded `remove_after`.
@@ -424,8 +445,10 @@ where
         let mut global_bytes_read: usize = 0;
         let mut maxed_out_reading_single_file = false;
 
-        self.read_candidates.clear();
         let select_now = self.clock.now();
+        self.promote_remove_after_candidates(select_now);
+
+        self.read_candidates.clear();
         self.scheduler
             .select_readable(select_now, &mut self.read_candidates);
         let candidates = std::mem::take(&mut self.read_candidates);
@@ -437,42 +460,53 @@ where
 
             let start = self.clock.now();
             let mut bytes_read: usize = 0;
+            let mut lines_read: usize = 0;
             let mut hit_max_read_bytes = false;
-            while let Ok(RawLineResult {
-                raw_line: Some(line),
-                discarded_for_size_and_truncated,
-            }) = watcher.read_line_with_clock(&self.clock).await
-            {
-                for buf in &discarded_for_size_and_truncated {
-                    self.server.emitter.emit_file_line_too_long(
-                        &buf.clone(),
-                        self.server.max_line_bytes,
-                        buf.len(),
-                    );
-                }
+            let mut had_read_error = false;
+            loop {
+                match watcher.read_line_with_clock(&self.clock).await {
+                    Ok(RawLineResult {
+                        raw_line: Some(line),
+                        discarded_for_size_and_truncated,
+                    }) => {
+                        for buf in &discarded_for_size_and_truncated {
+                            self.server.emitter.emit_file_line_too_long(
+                                &buf.clone(),
+                                self.server.max_line_bytes,
+                                buf.len(),
+                            );
+                        }
 
-                let sz = line.bytes.len();
-                trace!(
-                    message = "Read bytes.",
-                    path = ?watcher.path,
-                    bytes = ?sz
-                );
-                self.stats.record_bytes(sz);
+                        let sz = line.bytes.len();
+                        trace!(
+                            message = "Read bytes.",
+                            path = ?watcher.path,
+                            bytes = ?sz
+                        );
+                        self.stats.record_bytes(sz);
 
-                bytes_read += sz;
+                        bytes_read += sz;
+                        lines_read += 1;
 
-                lines.push(Line {
-                    text: line.bytes,
-                    filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                    file_id,
-                    start_offset: line.offset,
-                    end_offset: watcher.get_file_position(),
-                });
+                        lines.push(Line {
+                            text: line.bytes,
+                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                            file_id,
+                            start_offset: line.offset,
+                            end_offset: watcher.get_file_position(),
+                        });
 
-                if bytes_read > self.server.max_read_bytes {
-                    hit_max_read_bytes = true;
-                    maxed_out_reading_single_file = true;
-                    break;
+                        if bytes_read > self.server.max_read_bytes {
+                            hit_max_read_bytes = true;
+                            maxed_out_reading_single_file = true;
+                            break;
+                        }
+                    }
+                    Ok(RawLineResult { raw_line: None, .. }) => break,
+                    Err(_) => {
+                        had_read_error = true;
+                        break;
+                    }
                 }
             }
             let after_read = self.clock.now();
@@ -481,12 +515,25 @@ where
 
             if bytes_read > 0 {
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                self.scheduler.on_file_read(file_id, bytes_read, after_read);
-                if !hit_max_read_bytes {
-                    self.scheduler.on_file_eof(file_id, after_read);
-                }
+            }
+
+            if hit_max_read_bytes {
+                self.scheduler
+                    .on_file_read_more(file_id, lines_read, after_read);
+            } else if had_read_error {
+                self.scheduler.on_file_read_error(file_id, after_read);
             } else {
-                self.scheduler.on_file_eof(file_id, after_read);
+                self.scheduler.on_file_eof(file_id, lines_read, after_read);
+                if lines_read == 0 {
+                    Self::maybe_remove_idle_watcher(
+                        &self.fs,
+                        &self.server.emitter,
+                        self.server.remove_after,
+                        watcher,
+                        after_read,
+                    )
+                    .await;
+                }
             }
 
             // Do not move on to newer files if we are behind on an older file
@@ -501,32 +548,35 @@ where
         global_bytes_read
     }
 
-    /// Remove idle watched files that have exceeded `remove_after`, decoupled from
-    /// whether the [`ReadScheduler`] polled them on this tick.
-    async fn cleanup_idle_files(&mut self, lines_read_this_tick: &[Line]) {
-        let Some(grace_period) = self.server.remove_after else {
-            return;
-        };
-        let now = self.clock.now();
-        for (&file_id, watcher) in &mut self.fp_map {
-            if watcher.dead() {
-                continue;
+    fn promote_remove_after_candidates(&mut self, now: MonotonicInstant) {
+        if let Some(grace_period) = self.server.remove_after {
+            for (&file_id, watcher) in &self.fp_map {
+                if !watcher.dead()
+                    && now.saturating_duration_since(watcher.last_read_success()) >= grace_period
+                {
+                    self.scheduler.on_file_needs_verification(file_id);
+                }
             }
-            if lines_read_this_tick.iter().any(|l| l.file_id == file_id) {
-                continue;
-            }
-            if now.saturating_duration_since(watcher.last_read_success()) >= grace_period {
-                match self.fs.remove_file(&watcher.path).await {
-                    Ok(()) => {
-                        self.server.emitter.emit_file_deleted(&watcher.path);
-                        watcher.set_dead();
-                    }
-                    Err(error) => {
-                        // We will try again after some time.
-                        self.server
-                            .emitter
-                            .emit_file_delete_error(&watcher.path, error);
-                    }
+        }
+    }
+
+    async fn maybe_remove_idle_watcher(
+        fs: &FS,
+        emitter: &E,
+        remove_after: Option<Duration>,
+        watcher: &mut FileWatcher<FS>,
+        now: MonotonicInstant,
+    ) {
+        if let Some(grace_period) = remove_after
+            && now.saturating_duration_since(watcher.last_read_success()) >= grace_period
+        {
+            match fs.remove_file(&watcher.path).await {
+                Ok(()) => {
+                    emitter.emit_file_deleted(&watcher.path);
+                    watcher.set_dead();
+                }
+                Err(error) => {
+                    emitter.emit_file_delete_error(&watcher.path, error);
                 }
             }
         }

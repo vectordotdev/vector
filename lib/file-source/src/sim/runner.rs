@@ -695,82 +695,12 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
         }
 
         let min_lines = self.min_fingerprint_lines();
-        for (ino, model) in &self.models {
+        for (&ino, model) in &self.models {
             let got = self
                 .delivered_by_ino
-                .get(ino)
+                .get(&ino)
                 .map_or(&[][..], Vec::as_slice);
-
-            if model.total_newlines < min_lines || model.unfindable_before_discovery {
-                // File never accumulated enough lines to be fingerprinted under `lines: N`.
-                continue;
-            }
-
-            if model.lost_across_restart {
-                // Unlinked/moved outside glob before a restart: every line we DID deliver
-                // must be a valid line from this stream (never corrupted/invented).
-                for line in got {
-                    prop_assert!(
-                        model.expected_lines.contains(line),
-                        "ino={}: unexpected line {:?} not in expected {:?}",
-                        ino,
-                        line,
-                        model.expected_lines
-                    );
-                }
-                continue;
-            }
-
-            if model.allow_replay {
-                // At-least-once across unacked/crashed-checkpoint restarts or transient EACCES:
-                // 1. Every delivered line belongs to this stream.
-                // 2. Every expected non-empty line was delivered at least once in exact first-seen order.
-                // 3. At least as many empty lines were delivered as were written.
-                let mut first_seen_order = Vec::new();
-                let mut seen = HashSet::new();
-                let mut empty_delivered = 0usize;
-                for line in got {
-                    prop_assert!(
-                        model.expected_lines.contains(line),
-                        "ino={}: unexpected line {:?}",
-                        ino,
-                        line
-                    );
-                    if line.is_empty() {
-                        empty_delivered += 1;
-                    } else if seen.insert(line.clone()) {
-                        first_seen_order.push(line.clone());
-                    }
-                }
-                let expected_non_empty: Vec<String> = model
-                    .expected_lines
-                    .iter()
-                    .filter(|l| !l.is_empty())
-                    .cloned()
-                    .collect();
-                let expected_empty = model.expected_lines.len() - expected_non_empty.len();
-                prop_assert_eq!(
-                    first_seen_order,
-                    expected_non_empty,
-                    "ino={}: at-least-once order/completeness violated",
-                    ino
-                );
-                prop_assert!(
-                    empty_delivered >= expected_empty,
-                    "ino={}: missing empty lines ({} < {})",
-                    ino,
-                    empty_delivered,
-                    expected_empty
-                );
-            } else {
-                // No unpersisted restart or EACCES on this stream: strict exact delivery (no loss, no dupes).
-                prop_assert_eq!(
-                    got,
-                    model.expected_lines.as_slice(),
-                    "ino={}: delivered lines diverged from ground truth",
-                    ino
-                );
-            }
+            verify_stream_delivery(ino, model, got, min_lines)?;
         }
 
         self.state = None;
@@ -803,6 +733,75 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
             fs_stats: self.fs.stats(),
         })
     }
+}
+
+fn verify_stream_delivery(
+    ino: u64,
+    model: &StreamModel,
+    got: &[String],
+    min_lines: usize,
+) -> Result<(), TestCaseError> {
+    if model.total_newlines < min_lines || model.unfindable_before_discovery {
+        return Ok(());
+    }
+    if model.lost_across_restart {
+        for line in got {
+            prop_assert!(
+                model.expected_lines.contains(line),
+                "ino={}: unexpected line {:?} not in expected {:?}",
+                ino,
+                line,
+                model.expected_lines
+            );
+        }
+        return Ok(());
+    }
+    if model.allow_replay {
+        let mut first_seen_order = Vec::new();
+        let mut seen = HashSet::new();
+        let mut empty_delivered = 0usize;
+        for line in got {
+            prop_assert!(
+                model.expected_lines.contains(line),
+                "ino={}: unexpected line {:?}",
+                ino,
+                line
+            );
+            if line.is_empty() {
+                empty_delivered += 1;
+            } else if seen.insert(line.clone()) {
+                first_seen_order.push(line.clone());
+            }
+        }
+        let expected_non_empty: Vec<String> = model
+            .expected_lines
+            .iter()
+            .filter(|l| !l.is_empty())
+            .cloned()
+            .collect();
+        let expected_empty = model.expected_lines.len() - expected_non_empty.len();
+        prop_assert_eq!(
+            first_seen_order,
+            expected_non_empty,
+            "ino={}: at-least-once order/completeness violated",
+            ino
+        );
+        prop_assert!(
+            empty_delivered >= expected_empty,
+            "ino={}: missing empty lines ({} < {})",
+            ino,
+            empty_delivered,
+            expected_empty
+        );
+    } else {
+        prop_assert_eq!(
+            got,
+            model.expected_lines.as_slice(),
+            "ino={}: delivered lines diverged from ground truth",
+            ino
+        );
+    }
+    Ok(())
 }
 
 fn build_server(

@@ -85,21 +85,46 @@ pub trait ReadScheduler: Send + 'static {
     /// Called when a watched file is unwatched/reaped.
     fn on_file_removed(&mut self, file_id: FileFingerprint);
 
-    /// Called after a `read_line` attempt succeeds (`bytes_read > 0`) or completes a read cycle.
-    fn on_file_read(&mut self, file_id: FileFingerprint, bytes_read: usize, now: MonotonicInstant);
+    /// Called when a watched file yielded one or more lines and hit `max_read_bytes`
+    /// (still has unread data ready to read immediately on the next tick).
+    fn on_file_read_more(
+        &mut self,
+        file_id: FileFingerprint,
+        lines_read: usize,
+        now: MonotonicInstant,
+    );
 
-    /// Called when a watched file hits EOF (no complete line available).
-    fn on_file_eof(&mut self, file_id: FileFingerprint, now: MonotonicInstant);
+    /// Called when a watched file reached EOF. `lines_read` is the number of lines
+    /// successfully read before hitting EOF in this poll cycle.
+    fn on_file_eof(&mut self, file_id: FileFingerprint, lines_read: usize, now: MonotonicInstant);
 
-    /// Feed an external filesystem notification hint into the scheduler.
-    fn on_fs_event(&mut self, event: &FsEvent, now: MonotonicInstant);
+    /// Called when a watched file encountered a non-EOF read error.
+    fn on_file_read_error(&mut self, _file_id: FileFingerprint, _now: MonotonicInstant) {}
+
+    /// Called when discovery finds that a watched file is no longer findable
+    /// (unlinked or moved outside `include`), ensuring it gets a final drain pass
+    /// before `rotate_wait` can reap it.
+    fn on_file_unfindable(&mut self, _file_id: FileFingerprint) {}
+
+    /// Called when a watcher needs a fresh EOF verification (e.g. `remove_after`
+    /// grace period has elapsed).
+    fn on_file_needs_verification(&mut self, _file_id: FileFingerprint) {}
 
     /// Called when a file returned by `select_readable` was skipped (e.g., due
     /// to `oldest_first` stopping early) so event-driven schedulers can requeue it.
     fn on_file_skipped(&mut self, _file_id: FileFingerprint) {}
 
-    /// Populate `out` with the ordered list of files eligible to be polled at `now`.
+    /// Feed an external filesystem notification hint into the scheduler.
+    fn on_fs_event(&mut self, event: &FsEvent, now: MonotonicInstant);
+
+    /// Populate `out` with the ordered, deduplicated list of files eligible to be polled at `now`.
     fn select_readable(&mut self, now: MonotonicInstant, out: &mut Vec<FileFingerprint>);
+
+    /// Earliest monotonic instant at which any parked file will become due for
+    /// fallback polling (used to clamp outer backoff sleeps).
+    fn next_wakeup(&self, _now: MonotonicInstant) -> Option<MonotonicInstant> {
+        None
+    }
 
     /// Number of queued internal timer entries (used by DST to assert bounded memory).
     fn pending_timer_count(&self) -> usize {
@@ -176,10 +201,10 @@ impl ReadScheduler for LegacyPollingScheduler {
         self.entries.shift_remove(&file_id);
     }
 
-    fn on_file_read(
+    fn on_file_read_more(
         &mut self,
         file_id: FileFingerprint,
-        _bytes_read: usize,
+        _lines_read: usize,
         now: MonotonicInstant,
     ) {
         if let Some(entry) = self.entries.get_mut(&file_id) {
@@ -190,18 +215,29 @@ impl ReadScheduler for LegacyPollingScheduler {
         }
     }
 
-    fn on_file_eof(&mut self, file_id: FileFingerprint, now: MonotonicInstant) {
+    fn on_file_eof(&mut self, file_id: FileFingerprint, lines_read: usize, now: MonotonicInstant) {
         if let Some(entry) = self.entries.get_mut(&file_id) {
             entry.last_read_attempt = now;
-            entry.read_retry_delay = if entry.reached_eof {
-                std::cmp::min(
-                    entry.read_retry_delay.saturating_mul(2),
-                    LEGACY_EOF_BACKOFF_MAX,
-                )
+            if lines_read > 0 {
+                entry.last_read_success = now;
+                entry.read_retry_delay = LEGACY_EOF_BACKOFF_MIN;
             } else {
-                LEGACY_EOF_BACKOFF_MIN
-            };
+                entry.read_retry_delay = if entry.reached_eof {
+                    std::cmp::min(
+                        entry.read_retry_delay.saturating_mul(2),
+                        LEGACY_EOF_BACKOFF_MAX,
+                    )
+                } else {
+                    LEGACY_EOF_BACKOFF_MIN
+                };
+            }
             entry.reached_eof = true;
+        }
+    }
+
+    fn on_file_read_error(&mut self, file_id: FileFingerprint, now: MonotonicInstant) {
+        if let Some(entry) = self.entries.get_mut(&file_id) {
+            entry.last_read_attempt = now;
         }
     }
 
@@ -255,22 +291,22 @@ struct AdaptiveEntry {
 
 /// Event-driven + adaptive fallback [`ReadScheduler`].
 ///
-/// - Files signaled by [`FsEvent::Modified`] / [`FsEvent::Created`] (or newly
-///   added / actively producing bytes) are promoted immediately to the `dirty`
-///   set and read on the very next tick with zero idle cliff.
-/// - Idle files are parked in a min-heap (`O(k log N)` per tick) with exponential
-///   fallback backoff up to `fallback_max`, avoiding `O(N)` scans and wasted
-///   `read()` syscalls when watching thousands of quiet files.
-/// - [`FsEvent::Overflow`] promotes all watched files back to `dirty` so missed
-///   OS notifications never stall reads.
+/// - Files signaled by [`FsEvent::Modified`] / [`FsEvent::Created`] / [`FsEvent::Overflow`]
+///   (or newly added, renamed, unfindable, or hitting `max_read_bytes`) are promoted
+///   immediately to the `dirty` queue and read on the very next tick with zero idle cliff.
+/// - Idle files are parked in a min-heap (`O(k log N)` per tick, compacted to `O(N)` memory)
+///   with exponential fallback backoff up to `fallback_max`.
+/// - Both `dirty` and `fallback_heap` entries are validated against `(order, generation)`
+///   so stale entries from prior EOFs or removed-and-re-added fingerprints can never cause
+///   early polls or duplicate selection within a tick.
 #[derive(Debug)]
 pub struct AdaptiveEventScheduler {
     config: AdaptiveSchedulerConfig,
     next_order: u64,
     entries: HashMap<FileFingerprint, AdaptiveEntry>,
     path_to_fp: HashMap<PathBuf, FileFingerprint>,
-    /// Files known or suspected to have unread data ready immediately.
-    dirty: Vec<(u64, FileFingerprint)>,
+    /// Files known or suspected to have unread data ready immediately: `(order, generation, file_id)`.
+    dirty: Vec<(u64, u64, FileFingerprint)>,
     /// Min-heap of `(next_due_at, order, generation, file_id)` for fallback polling.
     fallback_heap: BinaryHeap<Reverse<(MonotonicInstant, u64, u64, FileFingerprint)>>,
 }
@@ -295,14 +331,22 @@ impl AdaptiveEventScheduler {
             entry.dirty = true;
             entry.generation = entry.generation.wrapping_add(1);
             entry.fallback_delay = self.config.fallback_min;
-            self.dirty.push((entry.order, file_id));
+            self.dirty.push((entry.order, entry.generation, file_id));
         }
     }
 
-    fn schedule_fallback(&mut self, file_id: FileFingerprint, now: MonotonicInstant) {
+    fn schedule_fallback(
+        &mut self,
+        file_id: FileFingerprint,
+        reset_delay: bool,
+        now: MonotonicInstant,
+    ) {
         if let Some(entry) = self.entries.get_mut(&file_id) {
             entry.dirty = false;
             entry.generation = entry.generation.wrapping_add(1);
+            if reset_delay {
+                entry.fallback_delay = self.config.fallback_min;
+            }
             let due = now.checked_add(entry.fallback_delay).unwrap_or(now);
             entry.fallback_delay = std::cmp::min(
                 entry.fallback_delay.saturating_mul(2),
@@ -318,11 +362,12 @@ impl AdaptiveEventScheduler {
     fn maybe_compact_heap(&mut self) {
         let limit = self.entries.len().saturating_mul(4).max(64);
         if self.fallback_heap.len() > limit {
-            self.fallback_heap.retain(|Reverse((_, _, gen_id, fp))| {
-                self.entries
-                    .get(fp)
-                    .is_some_and(|e| e.generation == *gen_id && !e.dirty)
-            });
+            self.fallback_heap
+                .retain(|Reverse((_, order, gen_id, fp))| {
+                    self.entries
+                        .get(fp)
+                        .is_some_and(|e| e.order == *order && e.generation == *gen_id && !e.dirty)
+                });
         }
     }
 }
@@ -349,7 +394,7 @@ impl ReadScheduler for AdaptiveEventScheduler {
                 fallback_delay: self.config.fallback_min,
             },
         );
-        self.dirty.push((order, file_id));
+        self.dirty.push((order, 1, file_id));
     }
 
     fn on_file_renamed(
@@ -379,18 +424,34 @@ impl ReadScheduler for AdaptiveEventScheduler {
         self.maybe_compact_heap();
     }
 
-    fn on_file_read(
+    fn on_file_read_more(
         &mut self,
         file_id: FileFingerprint,
-        _bytes_read: usize,
+        _lines_read: usize,
         _now: MonotonicInstant,
     ) {
-        // File actively yielded bytes; keep it hot for the next tick.
+        // File hit `max_read_bytes`; keep it hot for the very next tick.
         self.mark_dirty(file_id);
     }
 
-    fn on_file_eof(&mut self, file_id: FileFingerprint, now: MonotonicInstant) {
-        self.schedule_fallback(file_id, now);
+    fn on_file_eof(&mut self, file_id: FileFingerprint, lines_read: usize, now: MonotonicInstant) {
+        self.schedule_fallback(file_id, lines_read > 0, now);
+    }
+
+    fn on_file_read_error(&mut self, file_id: FileFingerprint, now: MonotonicInstant) {
+        self.schedule_fallback(file_id, false, now);
+    }
+
+    fn on_file_unfindable(&mut self, file_id: FileFingerprint) {
+        self.mark_dirty(file_id);
+    }
+
+    fn on_file_needs_verification(&mut self, file_id: FileFingerprint) {
+        self.mark_dirty(file_id);
+    }
+
+    fn on_file_skipped(&mut self, file_id: FileFingerprint) {
+        self.mark_dirty(file_id);
     }
 
     fn on_fs_event(&mut self, event: &FsEvent, _now: MonotonicInstant) {
@@ -409,10 +470,6 @@ impl ReadScheduler for AdaptiveEventScheduler {
         }
     }
 
-    fn on_file_skipped(&mut self, file_id: FileFingerprint) {
-        self.mark_dirty(file_id);
-    }
-
     fn select_readable(&mut self, now: MonotonicInstant, out: &mut Vec<FileFingerprint>) {
         // 1. Pop any fallback timers that have expired by `now`.
         while let Some(&Reverse((due, order, gen_id, file_id))) = self.fallback_heap.peek() {
@@ -421,31 +478,44 @@ impl ReadScheduler for AdaptiveEventScheduler {
             }
             self.fallback_heap.pop();
             if let Some(entry) = self.entries.get_mut(&file_id)
+                && entry.order == order
                 && entry.generation == gen_id
                 && !entry.dirty
             {
                 entry.dirty = true;
-                self.dirty.push((order, file_id));
+                entry.generation = entry.generation.wrapping_add(1);
+                self.dirty.push((entry.order, entry.generation, file_id));
             }
         }
 
-        // 2. Drain `dirty` (removing any stale entries for removed files).
-        let mut ready: Vec<(u64, FileFingerprint)> = self
-            .dirty
-            .drain(..)
-            .filter(|(_, fp)| self.entries.contains_key(fp))
-            .collect();
+        // 2. Drain `dirty`, validating each item against `(order, generation, dirty)` so
+        //    stale entries can never trigger early polls or duplicate selection.
+        let mut ready: Vec<(u64, FileFingerprint)> = Vec::new();
+        for (order, gen_id, fp) in self.dirty.drain(..) {
+            if let Some(entry) = self.entries.get_mut(&fp)
+                && entry.order == order
+                && entry.generation == gen_id
+                && entry.dirty
+            {
+                entry.dirty = false;
+                ready.push((order, fp));
+            }
+        }
 
         if self.config.oldest_first {
             ready.sort_by_key(|(order, _)| *order);
         }
 
         for (_, fp) in ready {
-            if let Some(entry) = self.entries.get_mut(&fp) {
-                entry.dirty = false;
-            }
             out.push(fp);
         }
+    }
+
+    fn next_wakeup(&self, now: MonotonicInstant) -> Option<MonotonicInstant> {
+        if self.entries.values().any(|e| e.dirty) {
+            return Some(now);
+        }
+        self.fallback_heap.peek().map(|Reverse((due, ..))| *due)
     }
 
     fn pending_timer_count(&self) -> usize {

@@ -544,16 +544,193 @@ async fn adaptive_scheduler_recovers_from_event_overflow() {
     let _ = state.step(&mut lines).await;
     assert_eq!(lines.len(), 50);
 
-    // Drop normal events, write to all 50 files, then inject `IN_Q_OVERFLOW`.
+    // Drop normal events and write to all 50 files.
     fs.set_event_delivery(EventDelivery::DropAll);
     for i in 0..50 {
         fs.append_bytes(format!("/logs/f_{i:02}.log"), b"after_overflow\n");
     }
-    fs.inject_event_overflow();
 
-    // A single step after `Overflow` immediately reads all 50 files without waiting for fallback!
+    // Negative control: before `Overflow` and before the 250ms fallback timer expires,
+    // stepping MUST read 0 lines (proving stale `dirty` entries did NOT survive EOF!).
+    clock.advance(Duration::from_millis(50));
+    let _ = state.step(&mut lines).await;
+    assert_eq!(
+        lines.len(),
+        50,
+        "negative control: parked files must not be polled before fallback or Overflow"
+    );
+
+    // Now inject `IN_Q_OVERFLOW`: a single step immediately reads all 50 files!
+    fs.inject_event_overflow();
     let _ = state.step(&mut lines).await;
     assert_eq!(lines.len(), 100);
+}
+
+/// Regression test for P0 #2: `oldest_first = true`, `max_read_bytes = 1`, and
+/// `remove_after_secs = 0` must NEVER unlink a newer skipped file before reading it.
+#[tokio::test]
+async fn p0_remove_after_zero_with_oldest_first_never_deletes_unread_file() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    let emitter = RecordingEmitter::new();
+
+    fs.append_bytes("/logs/a_old.log", b"old_line_1\nold_line_2\n");
+    fs.append_bytes("/logs/b_new.log", b"new_line_1\n");
+    fs.set_created(
+        "/logs/a_old.log",
+        clock.now_utc() - chrono::Duration::seconds(10),
+    );
+    fs.set_created("/logs/b_new.log", clock.now_utc());
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let mut server = make_bench_server(&fs, emitter);
+    server.oldest_first = true;
+    server.max_read_bytes = 1;
+    server.remove_after = Some(Duration::ZERO);
+
+    let mut state = FileServerState::init(server, &mut cp, fs.clone(), clock.clone()).await;
+
+    // Step 1: `a_old.log` exceeds `max_read_bytes=1` on line 1 and stops the loop.
+    // `b_new.log` was skipped and MUST still exist unread!
+    let mut lines = Vec::new();
+    let _ = state.step(&mut lines).await;
+    assert_eq!(lines.len(), 1);
+    assert!(
+        fs.exists("/logs/b_new.log"),
+        "skipped newer file must not be deleted before being read"
+    );
+
+    // Drain remaining lines: all 3 lines across both files must be delivered!
+    for _ in 0..5 {
+        clock.advance(Duration::from_secs(1));
+        let _ = state.step(&mut lines).await;
+    }
+    let texts: Vec<&[u8]> = lines.iter().map(|l| l.text.as_ref()).collect();
+    assert_eq!(
+        texts,
+        vec![&b"old_line_1"[..], &b"old_line_2"[..], &b"new_line_1"[..]]
+    );
+}
+
+/// Regression test for P0 #3: a read ending at EOF yields no candidate before its
+/// fallback deadline and exactly one candidate after a fresh `FsEvent::Modified`
+/// (never double-selecting the same `FileFingerprint` in one tick).
+#[test]
+fn p0_adaptive_read_ending_at_eof_no_duplicate_or_early_select() {
+    use file_source_common::FileFingerprint;
+
+    let clock = SimClock::new();
+    let mut sched = AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default());
+    let fp = FileFingerprint::DevInode(1, 1);
+    let path = PathBuf::from("/logs/a.log");
+
+    let t0 = clock.now();
+    sched.on_file_added(fp, &path, t0, t0);
+
+    let mut out = Vec::new();
+    sched.select_readable(t0, &mut out);
+    assert_eq!(out, vec![fp]);
+
+    // Simulate reading 1 line and then hitting EOF.
+    sched.on_file_eof(fp, 1, t0);
+
+    // 50ms later (< 250ms fallback): MUST yield 0 candidates.
+    clock.advance(Duration::from_millis(50));
+    out.clear();
+    sched.select_readable(clock.now(), &mut out);
+    assert!(out.is_empty(), "EOF file must not be re-selected early");
+
+    // Feed a fresh FsEvent::Modified AND advance past 250ms fallback: MUST yield `fp` ONCE.
+    sched.on_fs_event(&crate::scheduler::FsEvent::Modified(path), clock.now());
+    clock.advance(Duration::from_millis(300));
+    out.clear();
+    sched.select_readable(clock.now(), &mut out);
+    assert_eq!(
+        out,
+        vec![fp],
+        "file must never be selected twice in one tick"
+    );
+}
+
+/// Regression test for P0 #4: a live stream of empty lines (`\n`) must NOT be
+/// throttled to the 10-second idle cliff by `LegacyPollingScheduler`.
+#[tokio::test]
+async fn p0_legacy_blank_line_stream_not_throttled_at_10s() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    let emitter = RecordingEmitter::new();
+
+    fs.append_bytes("/logs/blank.log", b"\n");
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let server = make_bench_server(&fs, emitter);
+    let mut state = FileServerState::init(server, &mut cp, fs.clone(), clock.clone()).await;
+
+    let mut lines = Vec::new();
+    // Append a blank line every 2s for 14s (past the 10s cliff).
+    for expected in 1..=7 {
+        let _ = state.step(&mut lines).await;
+        assert_eq!(
+            lines.len(),
+            expected,
+            "blank-line stream was wrongly throttled at step {expected}"
+        );
+        clock.advance(Duration::from_secs(2));
+        fs.append_bytes("/logs/blank.log", b"\n");
+    }
+}
+
+/// Regression test for P0 #5: with `rotate_wait = 0` and dropped FS events (`DropAll`),
+/// moving a parked file outside the watched glob must still drain its unread tail
+/// before `reap_dead_files` closes it.
+#[tokio::test]
+async fn p0_adaptive_unfindable_file_drains_before_rotate_wait_zero_reap() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    fs.set_event_delivery(EventDelivery::DropAll);
+    let emitter = RecordingEmitter::new();
+
+    let writer = fs.open_writer("/logs/app.log");
+    writer.append(b"line1\n");
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let mut server = make_bench_server(&fs, emitter);
+    server.rotate_wait = Duration::ZERO;
+    let ev = fs.event_source();
+    let mut state = FileServerState::init_with_scheduler(
+        server,
+        &mut cp,
+        fs.clone(),
+        clock.clone(),
+        AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default()),
+        ev,
+    )
+    .await;
+
+    let mut lines = Vec::new();
+    let _ = state.step(&mut lines).await;
+    assert_eq!(lines.len(), 1);
+
+    // Park the watcher well into fallback backoff (e.g. 500ms), then append a final
+    // line and move the file outside `/logs/*` while events are dropped.
+    clock.advance(Duration::from_millis(500));
+    let _ = state.step(&mut lines).await; // hits EOF -> next fallback is +1s
+    writer.append(b"final_tail\n");
+    fs.rename_file("/logs/app.log", "/archive/app.log.1")
+        .unwrap();
+
+    // Advance 1s to trigger discovery (note: fallback timer is still in the future
+    // if we only advance 500ms; here glob cooldown is 1s, so advance 1s after setting
+    // a 2s fallback by doing one more idle step, or verify directly on glob tick).
+    clock.advance(Duration::from_millis(600));
+    // Trigger discovery directly + poll + reap (as `step()` does when glob is due):
+    state.discover_files().await;
+    let _ = state.poll_files(&mut lines).await;
+    state.reap_dead_files().await;
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1].text.as_ref(), b"final_tail");
+    drop(writer);
 }
 
 fn arb_event_delivery() -> impl Strategy<Value = EventDelivery> {
