@@ -85,7 +85,7 @@ pub struct KafkaSinkConfig {
 
     /// Local message timeout, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
-    #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
+    #[configurable(metadata(docs::examples = 150_000, docs::examples = 450_000))]
     #[serde(default = "default_message_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Message Timeout"))]
     pub message_timeout_ms: Duration,
@@ -133,11 +133,11 @@ pub struct KafkaSinkConfig {
 }
 
 const fn default_socket_timeout_ms() -> Duration {
-    Duration::from_millis(60000) // default in librdkafka
+    Duration::from_mins(1) // default in librdkafka
 }
 
 const fn default_message_timeout_ms() -> Duration {
-    Duration::from_millis(300000) // default in librdkafka
+    Duration::from_mins(5) // default in librdkafka
 }
 
 const fn default_rate_limit_duration_secs() -> u64 {
@@ -224,7 +224,7 @@ impl KafkaSinkConfig {
             client_config.set(key, value.to_string());
         }
 
-        for (key, value) in self.librdkafka_options.iter() {
+        for (key, value) in &self.librdkafka_options {
             debug!(option = %key, value = %value, "Setting librdkafka option.");
             client_config.set(key.as_str(), value.as_str());
         }
@@ -294,16 +294,16 @@ impl GenerateConfig for KafkaSinkConfig {
             healthcheck_topic: None,
             key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
             encoding: JsonSerializerConfig::default().into(),
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             compression: KafkaCompression::None,
-            auth: Default::default(),
+            auth: KafkaAuthConfig::default(),
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             rate_limit_duration_secs: default_rate_limit_duration_secs(),
             rate_limit_num: default_rate_limit_num(),
-            librdkafka_options: Default::default(),
+            librdkafka_options: HashMap::default(),
             headers_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -346,6 +346,8 @@ impl ValidatedSink for KafkaSinkConfig {
             .topic
             .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
+        self.encoding.validate()?;
+
         Ok(ValidatedKafkaSink { topic })
     }
 
@@ -356,7 +358,7 @@ impl ValidatedSink for KafkaSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
         let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck.clone()).boxed();
+        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }
@@ -385,6 +387,49 @@ mod tests {
         .unwrap();
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_assumes_protobuf_encoding_valid_without_disk_access() {
+        // The protobuf codec reads its descriptor set from `desc_file` on
+        // disk; pure validation must stay filesystem-free, so an unbuildable
+        // protobuf encoding is caught in the build phase instead.
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: protobuf
+                protobuf:
+                    desc_file: "/nonexistent/protobuf.desc"
+                    message_type: "package.Message"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: avro
+                avro:
+                    schema: "not a valid avro schema"
+            "#,
+        )
+        .unwrap();
+        let error = config.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

@@ -18,13 +18,16 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct DatabendRequestBuilder {
+pub(super) struct DatabendRequestBuilder {
     compression: Compression,
     encoder: (Transformer, Encoder<Framer>),
 }
 
 impl DatabendRequestBuilder {
-    pub const fn new(compression: Compression, encoder: (Transformer, Encoder<Framer>)) -> Self {
+    pub(super) const fn new(
+        compression: Compression,
+        encoder: (Transformer, Encoder<Framer>),
+    ) -> Self {
         Self {
             compression,
             encoder,

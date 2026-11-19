@@ -15,7 +15,7 @@ use vrl::{
 };
 
 use super::{
-    Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent,
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, TraceEvent,
     metric::{MetricTags, TagValue, TagValueSet},
 };
 use crate::{
@@ -23,9 +23,9 @@ use crate::{
     schema::Definition,
 };
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
+const VALID_METRIC_PATHS_SET: &str =
+    ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
-/// We can get the `type` of the metric in Remap, but can't set it.
 const VALID_METRIC_PATHS_GET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
@@ -188,7 +188,7 @@ impl VrlTarget {
                     LogNamespace::Legacy => TargetEvents::One(create_log_event(v, metadata).into()),
                 },
             },
-            VrlTarget::Trace(value, metadata) => match value {
+            VrlTarget::Trace(value, mut metadata) => match value {
                 value @ Value::Object(_) => {
                     let log = LogEvent::from_parts(value, metadata);
                     TargetEvents::One(TraceEvent::from(log).into())
@@ -201,7 +201,10 @@ impl VrlTarget {
                     log_namespace,
                 }),
 
-                v => TargetEvents::One(create_log_event(v, metadata).into()),
+                v => {
+                    metadata.clear_trace_layout();
+                    TargetEvents::One(create_log_event(v, metadata).into())
+                }
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
@@ -299,6 +302,7 @@ fn set_metric_tag_values(
                 Value::Bytes(bytes) => {
                     Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
                 }
+                Value::String(string) => Some(TagValue::Value(string.to_string())),
                 Value::Null => Some(TagValue::Bare),
                 _ => None,
             })
@@ -313,6 +317,34 @@ fn set_metric_tag_values(
             metric.set_multi_value_tag(name, vec![TagValue::Bare]);
         }
     }
+}
+
+/// Converts a counter to a gauge or a gauge to a counter, keeping its value and kind.
+///
+/// Other metric types carry values that have no meaningful scalar equivalent, so they are
+/// rejected both as the current type and as the target type.
+fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
+    let target_type = value.clone().try_bytes().map_err(|e| e.to_string())?;
+    let current = match metric.value() {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => *value,
+        other => {
+            return Err(format!(
+                "cannot change the type of a {} metric, only `counter` and `gauge` metrics can be converted",
+                other.as_name()
+            ));
+        }
+    };
+    *metric.value_mut() = match target_type.as_ref() {
+        b"counter" => MetricValue::Counter { value: current },
+        b"gauge" => MetricValue::Gauge { value: current },
+        other => {
+            return Err(format!(
+                "invalid metric type {}, metric type must be `counter` or `gauge`",
+                String::from_utf8_lossy(other)
+            ));
+        }
+    };
+    Ok(())
 }
 
 impl Target for VrlTarget {
@@ -384,6 +416,7 @@ impl Target for VrlTarget {
                             ["kind"] => {
                                 metric.data.kind = MetricKind::try_from(value.clone())?;
                             }
+                            ["type"] => set_metric_type(metric, &value)?,
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &path.to_string(),
@@ -482,6 +515,7 @@ impl Target for VrlTarget {
                             ["tags", field] => metric
                                 .remove_tag_set(field)
                                 .map(|tag_set| tag_value_set_to_vrl_value(&tag_set, *tag_mode)),
+                            ["type"] => return Err(MetricPathError::RemoveTypeError.to_string()),
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &target_path.path.to_string(),
@@ -548,14 +582,8 @@ fn target_get_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["type"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "type" | "namespace" | "timestamp" | "interval_ms" | "tags"]
+        | ["tags", _] => Ok(value),
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_GET,
@@ -579,13 +607,9 @@ fn target_get_mut_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "namespace" | "timestamp" | "interval_ms" | "tags"] | ["tags", _] => {
+            Ok(value)
+        }
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_SET,
@@ -751,6 +775,9 @@ enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
     SetPathError,
 
+    #[snafu(display("cannot delete metric type"))]
+    RemoveTypeError,
+
     #[snafu(display("invalid path {}: expected one of {}", path, expected))]
     InvalidPath { path: &'a str, expected: &'a str },
 }
@@ -760,10 +787,14 @@ mod test {
     use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::{btreemap, value::kind::Index};
+    use vrl::{btreemap, event_path, objectmap, value::kind::Index};
 
-    use super::{super::MetricValue, *};
-    use crate::metric_tags;
+    use super::*;
+    use crate::{
+        event::metric::{MetricSketch, StatisticKind},
+        metric_tags,
+        metrics::AgentDDSketch,
+    };
 
     #[test]
     fn test_field_definitions_in_message() {
@@ -864,39 +895,38 @@ mod test {
     fn log_get() {
         let cases = vec![
             (
-                BTreeMap::new(),
+                ObjectMap::new(),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::new().into())),
+                Ok(Some(ObjectMap::new().into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
+                Ok(Some(ObjectMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 Ok(Some("bar".into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("bar"),
                 Ok(None),
             ),
             (
-                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
+                objectmap! { "foo" => vec![objectmap! { "bar" => true }] },
                 owned_value_path!("foo", 0, "bar"),
                 Ok(Some(true.into())),
             ),
             (
-                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
+                objectmap! { "foo" => objectmap! { "bar baz" => objectmap! { "baz" => 2 } } },
                 owned_value_path!("foo", r"bar baz", "baz"),
                 Ok(Some(2.into())),
             ),
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -922,39 +952,39 @@ mod test {
     fn log_insert() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(0),
-                btreemap! { "baz" => "qux" }.into(),
-                btreemap! { "baz" => "qux" },
+                objectmap! { "baz" => "qux" }.into(),
+                objectmap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 "baz".into(),
-                btreemap! { "foo" => "baz" },
+                objectmap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         Value::Null,
                         Value::Null,
-                        btreemap! {
-                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        objectmap! {
+                            "bar baz" => objectmap! { "a" => objectmap! { "b" => true } },
                         }.into()
                     ]
                 },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => vec![0, 1, 2] },
+                objectmap! { "foo" => vec![0, 1, 2] },
                 owned_value_path!("foo", 5),
                 "baz".into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         0.into(),
                         1.into(),
@@ -967,44 +997,43 @@ mod test {
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![]) },
+                objectmap! { "foo" => Value::Array(vec![]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 1),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1046,64 +1075,64 @@ mod test {
     fn log_remove() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(btreemap! { "foo" => "bar"}.into()),
+                Some(objectmap! { "foo" => "bar"}.into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(objectmap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 false,
                 Some(
-                    btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                    objectmap! {
+                        "foo" => objectmap! { "bar baz" => Value::Array(vec![]) },
                         "bar" => "baz",
                     }
                     .into(),
                 ),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 true,
-                Some(btreemap! { "bar" => "baz" }.into()),
+                Some(objectmap! { "bar" => "baz" }.into()),
             ),
         ];
 
@@ -1136,28 +1165,26 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use vrl::btreemap;
-
         let cases = vec![
             (
-                Value::from(btreemap! {"foo" => "bar"}),
-                vec![btreemap! {"foo" => "bar"}],
+                Value::from(objectmap! {"foo" => "bar"}),
+                vec![objectmap! {"foo" => "bar"}],
             ),
-            (Value::from(1), vec![btreemap! {"message" => 1}]),
-            (Value::from("2"), vec![btreemap! {"message" => "2"}]),
-            (Value::from(true), vec![btreemap! {"message" => true}]),
+            (Value::from(1), vec![objectmap! {"message" => 1}]),
+            (Value::from("2"), vec![objectmap! {"message" => "2"}]),
+            (Value::from(true), vec![objectmap! {"message" => true}]),
             (
                 Value::from(vec![
                     Value::from(1),
                     Value::from("2"),
                     Value::from(true),
-                    Value::from(btreemap! {"foo" => "bar"}),
+                    Value::from(objectmap! {"foo" => "bar"}),
                 ]),
                 vec![
-                    btreemap! {"message" => 1},
-                    btreemap! {"message" => "2"},
-                    btreemap! {"message" => true},
-                    btreemap! {"foo" => "bar"},
+                    objectmap! {"message" => 1},
+                    objectmap! {"message" => "2"},
+                    objectmap! {"message" => true},
+                    objectmap! {"foo" => "bar"},
                 ],
             ),
         ];
@@ -1189,6 +1216,40 @@ mod test {
                     .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
+        }
+    }
+
+    #[test]
+    fn trace_scalar_root_into_log_drops_trace_layout() {
+        let mut trace = TraceEvent::from(objectmap! {"foo" => "bar"});
+        trace
+            .metadata_mut()
+            .set_trace_layout(super::super::TraceLayout::Datadog);
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Trace(trace), &info, MetricTagMode::Single);
+        Target::target_insert(
+            &mut target,
+            &OwnedTargetPath::event_root(),
+            Value::from("message"),
+        )
+        .unwrap();
+
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Log(log)) => {
+                assert_eq!(log.namespace(), LogNamespace::Legacy);
+                assert_eq!(log.metadata().trace_layout(), None);
+                assert_eq!(
+                    log.get(event_path!("message")),
+                    Some(&Value::from("message"))
+                );
+            }
+            _ => panic!("expected one log event"),
         }
     }
 
@@ -1363,7 +1424,7 @@ mod test {
         let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
-            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+            Value::Object(ObjectMap::from([("a".into(), "b".into())])),
         );
 
         match target {
@@ -1404,6 +1465,7 @@ mod test {
             ".timestamp",
             ".kind",
             ".tags",
+            ".type",
         ];
 
         let info = ProgramInfo {
@@ -1452,6 +1514,183 @@ mod test {
         );
     }
 
+    fn type_program_info() -> ProgramInfo {
+        ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!("type"))],
+            target_assignments: vec![],
+        }
+    }
+
+    fn set_type(metric: Metric, new_type: Value) -> (VrlTarget, Result<(), String>) {
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+        let result =
+            target.target_insert(&OwnedTargetPath::event(owned_value_path!("type")), new_type);
+        (target, result)
+    }
+
+    fn into_metric(target: VrlTarget) -> Metric {
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Metric(metric)) => metric,
+            _ => panic!("must be a metric"),
+        }
+    }
+
+    #[test]
+    fn metric_set_type_converts_between_counter_and_gauge() {
+        let cases = [
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+        ];
+
+        for kind in [MetricKind::Absolute, MetricKind::Incremental] {
+            for (value, new_type, expected) in cases.clone() {
+                let metric =
+                    Metric::new("name", kind, value).with_tags(Some(metric_tags!("host" => "a")));
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(result, Ok(()));
+
+                // Later reads in the same program see the new type.
+                assert_eq!(
+                    target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                    Ok(Some(&Value::from(new_type)))
+                );
+
+                let metric = into_metric(target);
+                assert_eq!(metric.value(), &expected);
+                assert_eq!(metric.kind(), kind);
+                assert_eq!(metric.name(), "name");
+                assert_eq!(metric.tag_value("host"), Some("a".into()));
+            }
+        }
+    }
+
+    #[test]
+    fn metric_set_type_rejects_invalid_values() {
+        for new_type in [
+            Value::from("distribution"),
+            Value::from("Counter"),
+            Value::from(""),
+            Value::from(1),
+            Value::Null,
+        ] {
+            let metric = Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            );
+            let (target, result) = set_type(metric, new_type.clone());
+            assert!(result.is_err(), "{new_type:?} should be rejected");
+            assert_eq!(
+                target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                Ok(Some(&Value::from("gauge"))),
+                "{new_type:?} should leave `.type` reading the original type"
+            );
+            assert_eq!(
+                into_metric(target).value(),
+                &MetricValue::Gauge { value: 1.0 },
+                "{new_type:?} should leave the metric unchanged"
+            );
+        }
+
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        assert_eq!(
+            set_type(metric, "set".into()).1,
+            Err("invalid metric type set, metric type must be `counter` or `gauge`".to_owned())
+        );
+    }
+
+    #[test]
+    fn metric_set_type_rejects_non_scalar_metrics() {
+        let values = [
+            MetricValue::Set {
+                values: ["a".to_owned()].into(),
+            },
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 1],
+                count: 1,
+                sum: Some(1.0),
+            },
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![0.5 => 1.0],
+                count: 1,
+                sum: 1.0,
+            },
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+            },
+        ];
+
+        for value in values {
+            let name = value.as_name();
+            for new_type in ["counter", "gauge", name] {
+                let metric = Metric::new("name", MetricKind::Absolute, value.clone());
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(
+                    result,
+                    Err(format!(
+                        "cannot change the type of a {name} metric, only `counter` and `gauge` metrics can be converted"
+                    ))
+                );
+                assert_eq!(into_metric(target).value(), &value);
+            }
+        }
+    }
+
+    #[test]
+    fn metric_remove_type_is_an_error() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+
+        assert_eq!(
+            target.target_remove(&OwnedTargetPath::event(owned_value_path!("type")), true),
+            Err("cannot delete metric type".to_owned())
+        );
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 1.0 }
+        );
+    }
+
     #[test]
     fn test_metric_insert_get_multi_value_tag() {
         let metric = Metric::new(
@@ -1483,7 +1722,7 @@ mod test {
 
         assert_eq!(
             vrl_tags_value,
-            &Value::Object(BTreeMap::from([(
+            &Value::Object(ObjectMap::from([(
                 "foo".into(),
                 Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
             )]))
@@ -1529,7 +1768,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([("env".into(), Value::from("prod"))])),
+            Value::Object(ObjectMap::from([("env".into(), Value::from("prod"))])),
         );
     }
 
@@ -1563,7 +1802,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([(
+            Value::Object(ObjectMap::from([(
                 "shard".into(),
                 Value::Array(vec!["a".into(), "b".into()])
             )])),
@@ -1602,7 +1841,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([
+            Value::Object(ObjectMap::from([
                 ("env".into(), Value::from("prod")),
                 ("shard".into(), Value::Array(vec!["a".into(), "b".into()])),
             ])),
@@ -1736,7 +1975,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([(
+            Value::Object(ObjectMap::from([(
                 "region".into(),
                 Value::from("us-east-1"),
             )])),
@@ -1772,7 +2011,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([("empty".into(), Value::Array(vec![]))])),
+            Value::Object(ObjectMap::from([("empty".into(), Value::Array(vec![]))])),
             "empty tag set must surface as an empty array, not as null",
         );
     }
@@ -1883,7 +2122,7 @@ mod test {
 
         assert_eq!(
             removed,
-            Value::Object(BTreeMap::from([
+            Value::Object(ObjectMap::from([
                 ("env".into(), Value::from("prod")),
                 ("shard".into(), Value::Array(vec!["a".into(), "b".into()]))
             ]))

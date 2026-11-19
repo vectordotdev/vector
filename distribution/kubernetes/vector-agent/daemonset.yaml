@@ -8,14 +8,14 @@ metadata:
   labels:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.58.0-distroless-libc"
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/version: "0.62.0-distroless-libc"
 spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
-      app.kubernetes.io/component: Agent
+      app.kubernetes.io/component: agent
   minReadySeconds: 0
   template:
     metadata:
@@ -23,14 +23,14 @@ spec:
       labels:
         app.kubernetes.io/name: vector
         app.kubernetes.io/instance: vector
-        app.kubernetes.io/component: Agent
+        app.kubernetes.io/component: agent
         vector.dev/exclude: "true"
     spec:
       serviceAccountName: vector
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "docker.io/timberio/vector:0.58.0-distroless-libc"
+          image: "docker.io/timberio/vector:0.62.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir

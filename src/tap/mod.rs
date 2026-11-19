@@ -17,7 +17,7 @@ pub struct Opts {
     #[arg(default_value = "500", short = 'i', long, value_parser = clap::value_parser!(u32).range(100..))]
     interval: u32,
 
-    /// gRPC API server endpoint (e.g. http://localhost:8686)
+    /// gRPC API server endpoint (e.g. <http://localhost:8686>)
     #[arg(short, long)]
     url: Option<Url>,
 
@@ -62,6 +62,7 @@ impl Opts {
     /// Component ID patterns to tap
     ///
     /// If no patterns are provided, tap all components' outputs
+    #[must_use]
     pub fn outputs_patterns(&self) -> Vec<String> {
         if self.component_id_patterns.is_empty()
             && self.outputs_of.is_empty()

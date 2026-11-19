@@ -1,7 +1,7 @@
 //! Shared helpers for checking generated JSON Schema against encoded values.
 //!
 //! Used by sibling modules of this `[[test]]` crate. rust-analyzer often type-checks this
-//! file in isolation, so the helpers look unused unless dead_code is allowed here.
+//! file in isolation, so the helpers look unused unless `dead_code` is allowed here.
 
 #![allow(dead_code)]
 
@@ -13,6 +13,11 @@ use vector_config::{Configurable, schema::generate_root_schema};
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 /// Asserts that `instance` is valid according to the generated schema for `T`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "allow test callers to pass temporary JSON fixtures by value"
+)]
 pub fn assert_schema_allows<T>(instance: serde_json::Value)
 where
     T: Configurable + 'static,
@@ -37,10 +42,21 @@ where
 
 /// Schema generation currently clamps numeric `minimum`/`maximum` to the JSON-safe
 /// integer range (`±2^53-1`), so values outside that range encode but do not validate.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the JSON-safe integer bounds are integral and representable in the destination type"
+)]
 pub fn json_schema_safe_u64() -> impl Strategy<Value = u64> {
     0..=(NUMERIC_ENFORCED_UPPER_BOUND as u64)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the JSON-safe integer bounds are integral and representable in the destination type"
+)]
 pub fn json_schema_safe_i64() -> impl Strategy<Value = i64> {
     (NUMERIC_ENFORCED_LOWER_BOUND as i64)..=(NUMERIC_ENFORCED_UPPER_BOUND as i64)
 }

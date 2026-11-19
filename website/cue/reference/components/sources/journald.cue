@@ -38,6 +38,15 @@ components: sources: journald: {
 				This source requires permissions to run `journalctl`. When installed from a package manager this should be
 				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
 				""",
+			"""
+				Setting `current_boot_only: false` requires systemd 258 or later, or a version older than 250.
+				Vector rejects this setting with systemd versions 250 through 257. Check the version of the
+				`journalctl` binary Vector runs; in a container, this is the container's version, not the host's.
+				The official Debian 13 image provides systemd 257 and supports only `current_boot_only: true`, which
+				excludes entries from previous boots. For previous-boot collection, use a native installation on a host
+				with systemd 258 or later, or a custom image with a compatible `journalctl` and its required libraries.
+				See [Docker installation](/docs/setup/installation/platforms/docker/#collecting-journals-from-previous-boots).
+				""",
 		]
 		warnings: []
 	}

@@ -207,27 +207,13 @@ mod tests {
         assert_eq!(fix_text(&[0xff, b' ']), None);
     }
 
-    #[cfg(unix)]
     #[test]
-    fn excludes_symlinks() {
-        use std::os::unix::fs::symlink;
-
+    fn filters_ignored_paths_and_non_regular_files() {
         let directory = tempfile::tempdir().unwrap();
-        let target = directory.path().join("target");
-        let link = directory.path().join("link");
-        fs::write(&target, "target").unwrap();
-        symlink(&target, &link).unwrap();
-
-        assert!(
-            eligible_files(vec![link.to_string_lossy().into_owned()]).is_empty(),
-            "symlinks must not be treated as writable files"
-        );
-        assert_eq!(fs::read_to_string(target).unwrap(), "target");
-    }
-
-    #[test]
-    fn ignores_configured_paths() {
-        for path in [
+        let ordinary = directory.path().join("source.rs");
+        fs::write(&ordinary, "source\n").unwrap();
+        let mut files = vec![ordinary.to_string_lossy().into_owned()];
+        for name in [
             "image.png",
             "image.svg",
             "image.gif",
@@ -235,15 +221,38 @@ mod tests {
             "artifact.sig",
             "page.html",
             "schema.desc",
-            "tests/data/example.txt",
             "schema.avsc",
             "events.avro",
             "message.pb",
         ] {
-            assert!(
-                IGNORED_PATHS.iter().any(|pattern| pattern.matches(path)),
-                "{path} should be ignored"
-            );
+            let path = directory.path().join(name);
+            fs::write(&path, "ignored\n").unwrap();
+            files.push(path.to_string_lossy().into_owned());
         }
+        files.push(directory.path().to_string_lossy().into_owned());
+        files.push(
+            directory
+                .path()
+                .join("missing")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        #[cfg(unix)]
+        {
+            let link = directory.path().join("link.rs");
+            std::os::unix::fs::symlink(&ordinary, &link).unwrap();
+            files.push(link.to_string_lossy().into_owned());
+        }
+        assert_eq!(
+            eligible_files(files),
+            [ordinary.to_string_lossy().into_owned()]
+        );
+        assert_eq!(fs::read_to_string(ordinary).unwrap(), "source\n");
+        // Git supplies repository-relative paths for the test-data exclusion.
+        assert!(
+            IGNORED_PATHS
+                .iter()
+                .any(|pattern| pattern.matches("tests/data/example.txt"))
+        );
     }
 }

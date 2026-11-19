@@ -18,6 +18,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 /// by the Azure SDK and signed without being changed. The signature is computed according to the
 /// "Authorize with Shared Key" rules for the Blob service:
 ///
+/// ```text
 /// StringToSign =
 ///   VERB + "\n" +
 ///   Content-Encoding + "\n" +
@@ -33,6 +34,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 ///   Range + "\n" +
 ///   CanonicalizedHeaders +
 ///   CanonicalizedResource
+/// ```
 ///
 /// Notes:
 /// - We set x-ms-date, leaving the standard Date field empty in the signature.
@@ -51,7 +53,10 @@ impl SharedKeyAuthorizationPolicy {
     ///
     /// - `account_name`: The storage account name.
     /// - `account_key_b64`: Base64-encoded storage account key.
-    pub fn new(account_name: String, account_key_b64: String) -> AzureResult<Self> {
+    ///
+    /// # Errors
+    /// Returns an error if the account key is not valid base64.
+    pub fn new(account_name: String, account_key_b64: &str) -> AzureResult<Self> {
         let account_key = base64::decode(account_key_b64.as_bytes()).map_err(|e| {
             AzureError::with_message(
                 azure_core::error::ErrorKind::Other,
@@ -64,7 +69,7 @@ impl SharedKeyAuthorizationPolicy {
         })
     }
 
-    fn ensure_signing_headers(&self, request: &mut Request) {
+    fn ensure_signing_headers(request: &mut Request) {
         let now = OffsetDateTime::now_utc();
         let ms_date = to_rfc7231(&now);
         request.insert_header("x-ms-date", ms_date);
@@ -190,11 +195,11 @@ impl SharedKeyAuthorizationPolicy {
             vals.sort();
             vals.dedup();
             let joined = vals.join(",");
-            writeln!(s, "{}:{}", k, joined).ok();
+            writeln!(s, "{k}:{joined}").ok();
         }
 
         // CanonicalizedResource
-        append_canonicalized_resource(&mut s, &self.account_name, url)?;
+        append_canonicalized_resource(&mut s, &self.account_name, url);
 
         Ok(s)
     }
@@ -239,7 +244,7 @@ impl Policy for SharedKeyAuthorizationPolicy {
     ) -> PolicyResult {
         // The Azure SDK sets x-ms-version before running policies. Add the remaining signing
         // headers, then sign the exact headers that will be sent.
-        self.ensure_signing_headers(request);
+        Self::ensure_signing_headers(request);
         // Build string to sign
         let sts = self.build_string_to_sign(request)?;
         let signature = self.sign(&sts)?;
@@ -247,7 +252,7 @@ impl Policy for SharedKeyAuthorizationPolicy {
         // Authorization: SharedKey {account}:{signature}
         request.insert_header(
             "authorization",
-            format!("SharedKey {}:{}", self.account_name, signature),
+            format!("SharedKey {}:{signature}", self.account_name),
         );
 
         // Continue pipeline
@@ -257,7 +262,7 @@ impl Policy for SharedKeyAuthorizationPolicy {
 
 // ---------- Helpers ----------
 
-fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
+fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) {
     // "/{account_name}{path}\n"
     s.push('/');
     s.push_str(account);
@@ -279,14 +284,12 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
         for (k, mut vals) in qp_map {
             vals.sort();
             let mut line = String::new();
-            write!(&mut line, "\n{}:", k).ok();
+            write!(&mut line, "\n{k}:").ok();
             let joined = vals.join(",");
             line.push_str(&joined);
             s.push_str(&line);
         }
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -296,7 +299,7 @@ mod tests {
     use super::*;
 
     fn policy() -> SharedKeyAuthorizationPolicy {
-        SharedKeyAuthorizationPolicy::new("account".into(), "a2V5".into()).unwrap()
+        SharedKeyAuthorizationPolicy::new("account".into(), "a2V5").unwrap()
     }
 
     #[test]
@@ -308,7 +311,7 @@ mod tests {
         );
         request.insert_header("x-ms-version", "2021-08-06");
 
-        policy.ensure_signing_headers(&mut request);
+        SharedKeyAuthorizationPolicy::ensure_signing_headers(&mut request);
         let string_to_sign = policy.build_string_to_sign(&request).unwrap();
 
         assert!(string_to_sign.contains("x-ms-version:2021-08-06\n"));
@@ -321,7 +324,7 @@ mod tests {
             Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
             Method::Put,
         );
-        policy.ensure_signing_headers(&mut request);
+        SharedKeyAuthorizationPolicy::ensure_signing_headers(&mut request);
 
         let error = policy.build_string_to_sign(&request).unwrap_err();
         assert!(
@@ -342,7 +345,7 @@ mod tests {
     fn content_length_field(request: &mut Request) -> String {
         let policy = policy();
         request.insert_header("x-ms-version", "2025-11-05");
-        policy.ensure_signing_headers(request);
+        SharedKeyAuthorizationPolicy::ensure_signing_headers(request);
         policy
             .build_string_to_sign(request)
             .expect("request should be signed")

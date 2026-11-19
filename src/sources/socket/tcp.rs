@@ -11,7 +11,7 @@ use vector_lib::{
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 
-use super::{SocketConfig, default_host_key};
+use super::{HOST, PORT, SocketConfig, default_host_key};
 use crate::{
     codecs::Decoder,
     event::Event,
@@ -99,10 +99,11 @@ const fn default_shutdown_timeout_secs() -> Duration {
 }
 
 fn default_port_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("port"))
+    OptionalValuePath::from(owned_value_path!(PORT))
 }
 
 impl TcpConfig {
+    #[must_use]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -126,38 +127,47 @@ impl TcpConfig {
         self.host_key.clone().unwrap_or(default_host_key())
     }
 
+    #[must_use]
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
+    #[must_use]
     pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }
 
+    #[must_use]
     pub const fn framing(&self) -> &Option<FramingConfig> {
         &self.framing
     }
 
+    #[must_use]
     pub const fn decoding(&self) -> &DeserializerConfig {
         &self.decoding
     }
 
+    #[must_use]
     pub const fn address(&self) -> SocketListenAddr {
         self.address
     }
 
+    #[must_use]
     pub const fn keepalive(&self) -> Option<TcpKeepaliveConfig> {
         self.keepalive
     }
 
+    #[must_use]
     pub const fn shutdown_timeout_secs(&self) -> Duration {
         self.shutdown_timeout_secs
     }
 
+    #[must_use]
     pub const fn receive_buffer_bytes(&self) -> Option<usize> {
         self.receive_buffer_bytes
     }
 
+    #[must_use]
     pub const fn max_connection_duration_secs(&self) -> Option<u64> {
         self.max_connection_duration_secs
     }
@@ -167,6 +177,7 @@ impl TcpConfig {
         self
     }
 
+    #[must_use]
     pub const fn tls_handshake_timeout_secs(&self) -> Option<NonZeroU64> {
         self.tls_handshake_timeout_secs
     }
@@ -251,7 +262,7 @@ impl TcpSource for RawTcpSource {
                     SocketConfig::NAME,
                     log,
                     legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("host"),
+                    path!(HOST),
                     host.ip().to_string(),
                 );
 
@@ -261,7 +272,7 @@ impl TcpSource for RawTcpSource {
                     SocketConfig::NAME,
                     log,
                     legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("port"),
+                    path!(PORT),
                     host.port(),
                 );
             }

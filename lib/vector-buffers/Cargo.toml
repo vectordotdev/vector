@@ -1,6 +1,6 @@
 [package]
 name = "vector-buffers"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
@@ -50,7 +50,7 @@ quickcheck.workspace = true
 rand.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-temp-dir = "0.2.0"
+tempfile.workspace = true
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }

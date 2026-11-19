@@ -5,6 +5,7 @@ use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
+#[must_use]
 pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
     if let Some(limit) = std::env::var("VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY")
         .map(|value| value.parse::<NonZeroUsize>().ok())
@@ -14,7 +15,7 @@ pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
         return limit;
     }
 
-    crate::app::worker_threads().unwrap_or_else(|| NonZeroUsize::new(8).expect("static"))
+    crate::app::worker_threads().unwrap_or(const { NonZeroUsize::new(8).expect("nonzero limit") })
 }
 
 pub struct EncodeResult<P> {
@@ -80,6 +81,11 @@ pub trait RequestBuilder<Input> {
     /// as-is, such as event finalizers, while the events are the actual events to process.
     fn split_input(&self, input: Input) -> (Self::Metadata, RequestMetadataBuilder, Self::Events);
 
+    /// Encodes and compresses the events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encoding or writing fails.
     fn encode_events(
         &self,
         events: Self::Events,
@@ -112,6 +118,10 @@ pub trait RequestBuilder<Input> {
     ) -> Self::Request;
 }
 
+/// The payloads returned by [`IncrementalRequestBuilder::encode_events_incremental`], each with
+/// its metadata.
+type IncrementalPayloads<Metadata, Payload, Error> = Vec<Result<(Metadata, Payload), Error>>;
+
 /// Generalized interface for defining how a batch of events will incrementally be turned into requests.
 ///
 /// As opposed to `RequestBuilder`, this trait provides the means to incrementally build requests
@@ -132,7 +142,7 @@ pub trait IncrementalRequestBuilder<Input> {
     fn encode_events_incremental(
         &mut self,
         input: Input,
-    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>>;
+    ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error>;
 
     /// Builds a request for the given metadata and payload.
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;

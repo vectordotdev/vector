@@ -21,6 +21,25 @@ generated: components: transforms: sample: configuration: {
 			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
 			syntax: "template"
 		}
+		warnings: ["Prefer grouping by fields with a small, stable set of values, such as `service` or `host`. When the template interpolates event content (for example `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new group: exceeding `max_state_bytes` then evicts the least recently used groups' sampling state."]
+	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for the Sample transform."
+		required:    false
+		type: object: options: include_group_tag: {
+			description: """
+				Whether or not to include the `group` tag on the `component_discarded_events_total`
+				internal metric.
+
+				When enabled, adds a `group` tag containing the rendered `group_by` value.
+				Missing or unrenderable values use `None`.
+
+				Note that this defaults to false because the `group` tag has potentially unbounded
+				cardinality. Only set this to true if you know that the number of unique groups is bounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 	key_field: {
 		description: """
@@ -40,6 +59,21 @@ generated: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: string: examples: ["message"]
+	}
+	max_state_bytes: {
+		description: """
+			The maximum number of bytes of per-group sampling state that is retained.
+
+			Each group is counted by the size of its rendered `group_by` value plus a fixed per-group
+			overhead for its sampling state and cache bookkeeping. When this limit is reached, the least
+			recently used groups' state is evicted. A group whose state alone exceeds this limit is
+			sampled but not retained.
+			"""
+		required: false
+		type: uint: {
+			default: 134217728
+			unit:    "bytes"
+		}
 	}
 	rate: {
 		description: """

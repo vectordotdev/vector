@@ -8,7 +8,7 @@ fn generate_config() {
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     #[test]
-    /// Should only run when docker daemon is up. DockerLogsSource::new will fail if docker socket
+    /// Should only run when docker daemon is up. `DockerLogsSource::new` will fail if docker socket
     /// is not present even though it is not used.
     fn exclude_self() {
         let (tx, _rx) = SourceSender::new_test();
@@ -149,7 +149,7 @@ mod integration_tests {
 
         let config = ContainerCreateBody {
             image: Some("busybox".to_string()),
-            cmd: Some(cmd.iter().map(|i| i.to_string()).collect::<Vec<_>>()),
+            cmd: Some(cmd.iter().map(ToString::to_string).collect::<Vec<_>>()),
             labels: label.map(|label| {
                 vec![(label.to_string(), String::new())]
                     .into_iter()
@@ -187,7 +187,7 @@ mod integration_tests {
                         panic!("{error:?}");
                     }
                 })
-                .await
+                .await;
         }
     }
 
@@ -421,7 +421,7 @@ mod integration_tests {
                 meta.get(path!("vector", "ingest_timestamp"))
                     .unwrap()
                     .is_timestamp()
-            )
+            );
         })
         .await;
     }
@@ -554,15 +554,15 @@ mod integration_tests {
             let included1_message = "included 1";
 
             let prefix = format!("vector_test_exclude_containers_{}", uuid::Uuid::new_v4());
-            let included0 = format!("{}_{}", prefix, "include0");
-            let included1 = format!("{}_{}", prefix, "include1");
-            let excluded0 = format!("{}_{}", prefix, "excluded0");
+            let included0 = format!("{prefix}_{}", "include0");
+            let included1 = format!("{prefix}_{}", "include1");
+            let excluded0 = format!("{prefix}_{}", "excluded0");
 
             let docker = docker(None, None).unwrap();
 
             let out = source_with_config(DockerLogsConfig {
                 include_containers: Some(vec![prefix]),
-                exclude_containers: Some(vec![excluded0.to_owned()]),
+                exclude_containers: Some(vec![excluded0.clone()]),
                 ..DockerLogsConfig::default()
             })
             .await;
@@ -571,7 +571,7 @@ mod integration_tests {
             let id1 = container_log_n(1, &included0, None, included0_message, &docker).await;
             let id2 = container_log_n(1, &included1, None, included1_message, &docker).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let events = collect_ready(out).await;
+            let events = collect_ready(out);
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
             container_remove(&id2, &docker).await;
@@ -584,7 +584,7 @@ mod integration_tests {
                 .iter()
                 .map(|event| {
                     definition.assert_valid_for_event(event);
-                    event.as_log()[&message_key].as_str().unwrap()
+                    event.as_log()[&message_key].to_str_lossy().unwrap()
                 })
                 .unique()
                 .sorted()

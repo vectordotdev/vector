@@ -2,7 +2,6 @@
 #
 # This workflow is used to run an integration test on demand.
 # An input for the test name needs to be provided.
-# TODO: check if the input is "all" , and run all, without a timeout?
 
 name: Integration Test
 
@@ -36,7 +35,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: inputs.if || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
@@ -45,27 +44,20 @@ jobs:
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/dd-token
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
-      - run: make test-integration-${{ inputs.test_name }}
+      # Preserve the retry policy used by integration test.
+      - run: cargo vdev --verbose integration run "$TEST_NAME" --retries 0
         env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-
-      - name: Upload test results
-        run: scripts/upload-test-results.sh
-        if: always()
-
-      - run: make test-integration-${{ inputs.test_name }}-cleanup
-        if: ${{ always() }}
-        env:
+          TEST_NAME: ${{ inputs.test_name }}
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}

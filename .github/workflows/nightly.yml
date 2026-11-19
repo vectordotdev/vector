@@ -10,6 +10,7 @@ on:
 
 jobs:
   Nightly:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: write # Required to create/update releases and tags
       packages: write # Required to push container images to GHCR

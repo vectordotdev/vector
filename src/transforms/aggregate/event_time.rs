@@ -1,4 +1,5 @@
 use std::collections::{HashMap, hash_map::Entry};
+use vector_lib::internal_event::emit;
 
 use chrono::{DateTime, Utc};
 use vector_lib::event::{
@@ -7,7 +8,7 @@ use vector_lib::event::{
 };
 
 use super::AggregationMode;
-use super::config::{EventTimeConfig, MissingTimestamp};
+use super::config::{EventTimeConfig, LateEventsStrategy, MetricType, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
 use crate::{
     event::{Event, EventMetadata},
@@ -39,11 +40,13 @@ impl Aggregate {
 
         // Mean/Stdev ignore absolute non-gauge values (no passthrough, no bucket).
         if Self::is_silently_ignored(self.config.mode, &data) {
-            emit!(AggregateEventRecorded);
+            emit(AggregateEventRecorded);
             return None;
         }
 
-        let event_time = *self.event_time();
+        let event_time = self.event_time();
+        let (missing_timestamp, max_future_ms) =
+            (event_time.missing_timestamp, event_time.max_future_ms);
 
         // Capture one wall-clock instant for fallback synthesis and all subsequent
         // skew/cutoff checks so a missing timestamp cannot be assigned to bucket B
@@ -53,11 +56,11 @@ impl Aggregate {
 
         let ts = match timestamp {
             Some(ts) => ts,
-            None => match event_time.missing_timestamp {
+            None => match missing_timestamp {
                 MissingTimestamp::UseSystemTime => now,
                 MissingTimestamp::Drop => {
-                    emit!(AggregateEventDropped {
-                        reason: "Event missing timestamp required for event-time aggregation."
+                    emit(AggregateEventDropped {
+                        reason: "Event missing timestamp required for event-time aggregation.",
                     });
                     return None;
                 }
@@ -67,13 +70,13 @@ impl Aggregate {
         // event-time "latest" selection can compare timestamps reliably.
         data.time.timestamp = Some(ts);
 
-        if event_time.max_future_ms > 0 {
-            let max_future_ms = i64::try_from(event_time.max_future_ms)
+        if max_future_ms > 0 {
+            let max_future_ms = i64::try_from(max_future_ms)
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
             let drift_ms = ts.timestamp_millis().saturating_sub(now_ms);
             if drift_ms > max_future_ms {
-                emit!(AggregateEventDropped {
-                    reason: "Event timestamp too far in the future."
+                emit(AggregateEventDropped {
+                    reason: "Event timestamp too far in the future.",
                 });
                 return None;
             }
@@ -81,17 +84,18 @@ impl Aggregate {
 
         let bucket_key = self.bucket_key(ts);
 
-        if self.was_bucket_flushed(bucket_key) {
-            emit!(AggregateEventDropped {
-                reason: "Event timestamp is too late; bucket already flushed."
-            });
-            return None;
-        }
-
-        if self.is_past_bucket_cutoff(bucket_key, now_ms) {
-            emit!(AggregateEventDropped {
-                reason: "Event timestamp is too late; bucket window has ended."
-            });
+        let late_reason = if self.was_bucket_flushed(bucket_key) {
+            Some("Event timestamp is too late; bucket already flushed.")
+        } else if self.is_past_bucket_cutoff(bucket_key, now_ms) {
+            Some("Event timestamp is too late; bucket window has ended.")
+        } else {
+            None
+        };
+        if let Some(reason) = late_reason {
+            if self.should_forward_late(&data) {
+                return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
+            }
+            emit(AggregateEventDropped { reason });
             return None;
         }
 
@@ -100,8 +104,23 @@ impl Aggregate {
             "only storable metrics reach event-time bucketing"
         );
         self.record_into_bucket(bucket_key, series, data, metadata);
-        emit!(AggregateEventRecorded);
+        emit(AggregateEventRecorded);
         None
+    }
+
+    /// Returns `true` when a late event should be forwarded downstream unchanged
+    /// rather than dropped. With `metric_types` set, only incremental events of a
+    /// listed type qualify: sinks that convert absolute metrics to deltas would
+    /// treat an older absolute sample as a reset and inflate the next delta.
+    fn should_forward_late(&self, data: &MetricData) -> bool {
+        let late_events = &self.event_time().late_events;
+        match late_events.strategy {
+            LateEventsStrategy::Drop => false,
+            LateEventsStrategy::Forward => late_events.metric_types.as_ref().is_none_or(|types| {
+                data.kind == MetricKind::Incremental
+                    && types.contains(&MetricType::of(data.value()))
+            }),
+        }
     }
 
     /// Start of the half-open window `[bucket_key, bucket_key + interval_ms)` containing
@@ -177,10 +196,7 @@ impl Aggregate {
                             entry.insert((data, metadata));
                         }
                         Entry::Occupied(mut entry) => {
-                            if entry.get().0.kind != data.kind {
-                                emit!(AggregateUpdateFailed);
-                                Self::replace_entry(entry.get_mut(), data, metadata);
-                            } else {
+                            if entry.get().0.kind == data.kind {
                                 // In event-time mode, "latest" means latest *event timestamp*
                                 // within the time bucket, not latest arrival order.
                                 Self::select_latest_by_event_timestamp(
@@ -188,6 +204,9 @@ impl Aggregate {
                                     data,
                                     metadata,
                                 );
+                            } else {
+                                emit(AggregateUpdateFailed);
+                                Self::replace_entry(entry.get_mut(), data, metadata);
                             }
                         }
                     },
@@ -251,8 +270,8 @@ impl Aggregate {
         data: MetricData,
         metadata: EventMetadata,
     ) {
-        let new_ts = data.timestamp().cloned();
-        let existing_ts = existing.0.timestamp().cloned();
+        let new_ts = data.timestamp().copied();
+        let existing_ts = existing.0.timestamp().copied();
         let should_replace = match (new_ts, existing_ts) {
             (Some(n), Some(e)) => n >= e,
             (Some(_), None) => true,
@@ -291,7 +310,7 @@ impl Aggregate {
                     if updated {
                         existing.1.merge(metadata);
                     } else {
-                        emit!(AggregateUpdateFailed);
+                        emit(AggregateUpdateFailed);
                         Self::replace_entry(existing, data, metadata);
                     }
                 }
@@ -320,7 +339,7 @@ impl Aggregate {
         // kind must not gate the update or mixed-kind series get undercounted.
         existing.1.merge(metadata);
         if !existing.0.update(&count_data) {
-            emit!(AggregateUpdateFailed);
+            emit(AggregateUpdateFailed);
         }
     }
 
@@ -365,7 +384,7 @@ impl Aggregate {
                             existing.1.merge(metadata);
                         }
                     } else {
-                        emit!(AggregateUpdateFailed);
+                        emit(AggregateUpdateFailed);
                         Self::replace_entry(existing, data, metadata);
                     }
                 }
@@ -375,6 +394,14 @@ impl Aggregate {
             },
         }
     }
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(crate) fn flush_event_time_buckets(&mut self, output: &mut Vec<Event>, force: bool) {
         let now = Utc::now();
         let now_ms = now.timestamp_millis();
@@ -432,7 +459,7 @@ impl Aggregate {
                             && metric.data().kind == prev_entry.kind
                             && !metric.subtract(prev_entry)
                         {
-                            emit!(AggregateUpdateFailed);
+                            emit(AggregateUpdateFailed);
                         }
                         output.push(Event::Metric(metric));
                         // Retain data only — drop metadata/finalizers so
@@ -453,7 +480,7 @@ impl Aggregate {
                 }
 
                 if let Some(multi_bucket) = self.event_time_multi_buckets.remove(&bucket_key) {
-                    'outer: for (series, entries) in multi_bucket.into_iter() {
+                    'outer: for (series, entries) in multi_bucket {
                         if entries.is_empty() {
                             continue;
                         }
@@ -461,7 +488,7 @@ impl Aggregate {
                         let (mut final_sum, mut final_metadata) = entries.first().unwrap().clone();
                         for (data, metadata) in entries.iter().skip(1) {
                             if !final_sum.update(data) {
-                                emit!(AggregateUpdateFailed);
+                                emit(AggregateUpdateFailed);
                                 continue 'outer;
                             }
                             final_metadata.merge(metadata.clone());
@@ -496,7 +523,7 @@ impl Aggregate {
                                     / entries.len() as f64;
                                 let mut final_stdev = final_mean;
                                 if let MetricValue::Gauge { value } = final_stdev.value_mut() {
-                                    *value = variance.sqrt()
+                                    *value = variance.sqrt();
                                 }
                                 let metric =
                                     Metric::from_parts(series, final_stdev, final_metadata);
@@ -518,7 +545,7 @@ impl Aggregate {
         }
 
         if !output.is_empty() {
-            emit!(AggregateFlushed);
+            emit(AggregateFlushed);
         }
     }
 }

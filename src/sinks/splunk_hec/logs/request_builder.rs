@@ -18,13 +18,13 @@ use crate::sinks::{
     },
 };
 
-pub struct HecLogsRequestBuilder {
+pub(super) struct HecLogsRequestBuilder {
     pub encoder: HecLogsEncoder,
     pub compression: Compression,
 }
 
 #[derive(Debug, Clone)]
-pub struct HecRequestMetadata {
+pub(super) struct HecRequestMetadata {
     finalizers: EventFinalizers,
     partition: Option<Arc<str>>,
     source: Option<String>,

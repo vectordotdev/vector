@@ -1,6 +1,7 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
+use crate::config::ProxyConfig;
 use std::{collections::HashSet, time::Duration};
 
 use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
@@ -56,7 +57,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
         &AwsAuthentication::test_auth(),
         Some(Region::new("us-east-1")),
         Some(sqs_address()),
-        &Default::default(),
+        &ProxyConfig::default(),
         None,
         None,
     )
@@ -66,7 +67,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 
 #[tokio::test]
 pub(crate) async fn test() {
-    assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
+    Box::pin(assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
         let sqs_client = get_sqs_client().await;
         let queue_name = gen_queue_name();
         let queue_url = ensure_queue(&queue_name, &sqs_client)
@@ -91,7 +92,7 @@ pub(crate) async fn test() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         let mut expected_messages = HashSet::new();
@@ -112,12 +113,13 @@ pub(crate) async fn test() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
-    })
+    }))
     .await;
 }
 

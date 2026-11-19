@@ -118,6 +118,11 @@ fn git_path(path: &str) -> std::io::Result<String> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
@@ -133,17 +138,12 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
         println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
-        //
-        // This allows us to use runtime reflection to manually build Protocol Buffers payloads
-        // in a type-safe way, which is necessary for incrementally building certain payloads, like
-        // the ones generated in the `datadog_metrics` sink.
+        // Used for gRPC reflection of Vector's own observability/API protos.
         let protobuf_fds_path =
             Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
                 .join("protobuf-fds.bin");
@@ -154,21 +154,20 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_with_config(
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
-                    "proto/vector/dd_metric.proto",
-                    "proto/vector/dd_trace.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
                     "proto/vector/observability.proto",
                 ],
                 &[
+                    "proto",
                     "proto/third-party",
                     "proto/vector",
                     "lib/vector-core/proto/",
@@ -183,9 +182,6 @@ fn main() {
     let mut tracker = TrackedEnv::new();
     let pkg_name = tracker
         .get_env_var("CARGO_PKG_NAME")
-        .expect("Cargo-provided environment variables should always exist!");
-    let pkg_version = tracker
-        .get_env_var("CARGO_PKG_VERSION")
         .expect("Cargo-provided environment variables should always exist!");
     let pkg_description = tracker
         .get_env_var("CARGO_PKG_DESCRIPTION")
@@ -233,11 +229,6 @@ fn main() {
         rust_version,
     );
     constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
-    constants.add_required_constant(
-        "PKG_VERSION",
-        "The full version of this package.",
-        pkg_version,
-    );
     constants.add_required_constant(
         "PKG_DESCRIPTION",
         "The description of this package.",

@@ -12,7 +12,6 @@ use crate::sinks::{
         http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
-
 #[derive(Clone, derive_more::Debug)]
 pub(super) struct HoneycombSvcRequestBuilder {
     pub(super) uri: HttpEndpoint,
@@ -25,8 +24,8 @@ pub(super) struct HoneycombSvcRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let mut builder =
-            Request::post(self.uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, self.api_key.clone());
+        let mut builder = Request::post(self.uri.as_uri().clone())
+            .header(HTTP_HEADER_HONEYCOMB, self.api_key.clone());
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding".to_string(), ce.to_string());
@@ -35,7 +34,7 @@ impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
         builder
             .body(request.take_payload())
             .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+            .map_err(crate::Error::from)
     }
 }
 
