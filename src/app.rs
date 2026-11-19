@@ -32,7 +32,7 @@ use crate::{
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
         TopologyController,
@@ -522,7 +522,7 @@ impl FinishedApplication {
 
         let status = match signal {
             SignalTo::Shutdown(triggering_error) => {
-                Self::stop(topology_controller, signal_rx, triggering_error.is_none()).await
+                Self::stop(topology_controller, signal_rx, triggering_error.as_ref()).await
             }
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
@@ -538,13 +538,15 @@ impl FinishedApplication {
     async fn stop(
         topology_controller: TopologyController,
         mut signal_rx: SignalRx,
-        clean_shutdown: bool,
+        triggering_error: Option<&ShutdownError>,
     ) -> ExitStatus {
         emit(VectorStopping);
         tokio::select! {
             drained = topology_controller.stop() => {
-                emit(VectorStopped);
-                if clean_shutdown && drained {
+                emit(VectorStopped {
+                    reason: triggering_error.map_or("none", ShutdownError::reason),
+                });
+                if triggering_error.is_none() && drained {
                     info!("All components shut down gracefully.");
                 }
                 ExitStatus::from_raw({
