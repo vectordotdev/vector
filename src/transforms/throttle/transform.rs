@@ -543,4 +543,60 @@ mod tests {
         );
         assert_eq!(single["b12"], vec![12, 29, 46, 97], "97 is excluded");
     }
+
+    #[test]
+    fn render_failures_share_the_shard_of_unkeyed_events() {
+        use std::hash::BuildHasher as _;
+        let hasher = std::hash::RandomState::new();
+        let failed = ThrottleKey::RenderFailed(RenderError::MissingKeys {
+            missing_keys: vec!["bucket".to_string()],
+        });
+
+        assert_eq!(
+            hasher.hash_one(&failed),
+            hasher.hash_one(&ThrottleKey::Unkeyed)
+        );
+        assert_ne!(
+            hasher.hash_one(ThrottleKey::Bucket("a".to_string())),
+            hasher.hash_one(&ThrottleKey::Unkeyed)
+        );
+    }
+
+    #[tokio::test]
+    async fn partitioned_emits_internal_events() {
+        Box::pin(assert_transform_compliance(async move {
+            let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {r#"
+                threshold: 1
+                window_secs: 60
+                key_field: "{{ bucket }}"
+                concurrency: 4
+            "#})
+            .unwrap();
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            for bucket in ["a", "b", "a"] {
+                let mut log = LogEvent::from("hello world");
+                log.insert(event_path!("bucket"), bucket);
+                tx.send(log.into()).await.unwrap();
+            }
+
+            // One event per bucket passes; the second `a` is discarded.
+            let mut buckets = vec![
+                out.recv().await.unwrap().as_log()["bucket"]
+                    .to_string_lossy()
+                    .into_owned(),
+                out.recv().await.unwrap().as_log()["bucket"]
+                    .to_string_lossy()
+                    .into_owned(),
+            ];
+            buckets.sort();
+            assert_eq!(buckets, ["a", "b"]);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
 }

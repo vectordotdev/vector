@@ -10,7 +10,10 @@ use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
     template::UnconfinedTemplate,
-    transforms::{Transform, partitioned::Partitioned},
+    transforms::{
+        Transform,
+        partitioned::{MAX_SHARDS, Partitioned},
+    },
 };
 
 /// Configuration of internal metrics for the Throttle transform.
@@ -80,10 +83,11 @@ pub struct ThrottleConfig {
     ///
     /// Has no effect when `key_field` is unset: all events then share a single bucket, which is
     /// rate limited by a single task. Use at most the number of CPUs, and fewer tasks than distinct
-    /// `key_field` values: extra tasks add CPU usage without adding throughput.
+    /// `key_field` values: extra tasks add CPU usage without adding throughput. At most `128`.
     #[serde(default = "default_concurrency")]
     #[derivative(Default(value = "default_concurrency()"))]
     #[configurable(metadata(docs::human_name = "Concurrency"))]
+    #[configurable(validation(range(min = 1, max = 128)))]
     pub concurrency: NonZeroUsize,
 }
 
@@ -133,12 +137,17 @@ impl TransformConfig for ThrottleConfig {
     }
 
     fn validate_structure(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
         if self.threshold == 0 || self.window_secs.as_secs_f64() == 0.0 {
-            Err(vec![
-                "`threshold` and `window_secs` must be non-zero".to_string(),
-            ])
-        } else {
+            errors.push("`threshold` and `window_secs` must be non-zero".to_string());
+        }
+        if self.concurrency.get() > MAX_SHARDS {
+            errors.push(format!("`concurrency` must be at most {MAX_SHARDS}"));
+        }
+        if errors.is_empty() {
             Ok(())
+        } else {
+            Err(errors)
         }
     }
 
@@ -160,6 +169,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use super::ThrottleConfig;
+    use crate::{config::TransformConfig as _, transforms::partitioned::MAX_SHARDS};
 
     #[test]
     fn generate_config() {
@@ -190,6 +200,22 @@ mod tests {
             serde_yaml::from_str::<ThrottleConfig>("threshold: 1\nwindow_secs: 1\n").unwrap();
         assert_eq!(config.concurrency.get(), 1);
         assert_eq!(config.shards(), None);
+    }
+
+    #[test]
+    fn concurrency_is_capped() {
+        let config = |concurrency: usize| {
+            serde_yaml::from_str::<ThrottleConfig>(&format!(
+                "threshold: 1\nwindow_secs: 1\nconcurrency: {concurrency}\n"
+            ))
+            .unwrap()
+        };
+
+        assert_eq!(config(MAX_SHARDS).validate_structure(), Ok(()));
+        assert_eq!(
+            config(MAX_SHARDS + 1).validate_structure(),
+            Err(vec![format!("`concurrency` must be at most {MAX_SHARDS}")])
+        );
     }
 
     #[test]

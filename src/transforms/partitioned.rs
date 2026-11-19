@@ -28,6 +28,14 @@ use vector_lib::{cpu_time::SpawnTimedExt as _, source_sender::chunk_size_events}
 
 use crate::{event::Event, transforms::TaskTransform};
 
+/// The most shards a [`Partitioned`] transform should run.
+///
+/// From the reduce concurrency benchmarks, the worst case for a cap: with very few keys per CPU,
+/// the best shard count is 8 x CPUs, and throughput still rose at 64 shards on 8 CPUs, the most
+/// run. 128 allows 8 x CPUs up to 16 CPUs, past the 12 measured. Beyond it, extra shards only
+/// add tasks, queues and CPU.
+pub const MAX_SHARDS: usize = 128;
+
 /// How many batches can wait in one shard's queue before the router waits.
 const SHARD_QUEUE_BATCHES: usize = 4;
 

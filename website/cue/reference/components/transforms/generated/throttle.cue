@@ -1,6 +1,21 @@
 package metadata
 
 generated: components: transforms: throttle: configuration: {
+	concurrency: {
+		description: """
+			The number of parallel tasks used to throttle events.
+
+			Buckets are distributed across tasks by hashing their rendered `key_field`, so all events of
+			a bucket are always rate limited by the same task, in arrival order. Only the order of
+			output events across different buckets may change.
+
+			Has no effect when `key_field` is unset: all events then share a single bucket, which is
+			rate limited by a single task. Use at most the number of CPUs, and fewer tasks than distinct
+			`key_field` values: extra tasks add CPU usage without adding throughput. At most `128`.
+			"""
+		required: false
+		type: uint: default: 1
+	}
 	exclude: {
 		description: "A logical condition used to exclude events from sampling."
 		required:    false
