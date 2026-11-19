@@ -498,18 +498,27 @@ mod test {
         // Polling at EOF does not report it again.
         let result = read(b"", &mut position, &mut buffer, max_size).await;
         assert_eq!(result.successfully_read, None);
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
 
         // More of the same line is neither reported nor buffered.
         let result = read(b"abcdef", &mut position, &mut buffer, max_size).await;
         assert_eq!(result.successfully_read, None);
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
         assert_eq!(buffer.len(), buffered);
 
         // The delimiter ends the discarded line, and the next line is read normally.
         let result = read(b"gh\nnext\n", &mut position, &mut buffer, max_size).await;
         assert_eq!(result.successfully_read, Some(8));
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
         assert_eq!(buffer.as_ref(), b"next");
         assert_eq!(position, 24);
     }
@@ -592,7 +601,10 @@ mod test {
                 .await
                 .unwrap();
         assert_eq!(result.successfully_read, Some(9));
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
         assert_eq!(buffer.as_ref(), b"next");
     }
 
