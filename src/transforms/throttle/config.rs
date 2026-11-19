@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroUsize, time::Duration};
 
 use governor::clock;
 use serde_with::serde_as;
@@ -10,7 +10,10 @@ use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
     template::UnconfinedTemplate,
-    transforms::Transform,
+    transforms::{
+        Transform,
+        partitioned::{MAX_SHARDS, Partitioned},
+    },
 };
 
 /// Configuration of internal metrics for the Throttle transform.
@@ -45,7 +48,8 @@ pub struct ThrottleInternalMetricsConfig {
 /// Configuration for the `throttle` transform.
 #[serde_as]
 #[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
     /// The number of events allowed for a given bucket per configured `window_secs`.
@@ -70,15 +74,50 @@ pub struct ThrottleConfig {
 
     #[serde(default)]
     pub internal_metrics: ThrottleInternalMetricsConfig,
+
+    /// The number of parallel tasks used to throttle events.
+    ///
+    /// Buckets are distributed across tasks by hashing their rendered `key_field`, so all events of
+    /// a bucket are always rate limited by the same task, in arrival order. Only the order of
+    /// output events across different buckets may change.
+    ///
+    /// Has no effect when `key_field` is unset: all events then share a single bucket, which is
+    /// rate limited by a single task. Use at most the number of CPUs, and fewer tasks than distinct
+    /// `key_field` values: extra tasks add CPU usage without adding throughput. At most `128`.
+    #[serde(default = "default_concurrency")]
+    #[derivative(Default(value = "default_concurrency()"))]
+    #[configurable(metadata(docs::human_name = "Concurrency"))]
+    #[configurable(validation(range(min = 1, max = 128)))]
+    pub concurrency: NonZeroUsize,
 }
 
 impl_generate_config_from_default!(ThrottleConfig);
+
+const fn default_concurrency() -> NonZeroUsize {
+    NonZeroUsize::MIN
+}
+
+impl ThrottleConfig {
+    /// The number of shards to throttle in, or `None` to throttle in a single task: without
+    /// `key_field`, all events share one bucket, which only one task can rate limit.
+    fn shards(&self) -> Option<NonZeroUsize> {
+        Some(self.concurrency).filter(|n| n.get() > 1 && self.key_field.is_some())
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
+        let throttle = Throttle::new(self, context, clock::MonotonicClock)?;
+        let Some(shards) = self.shards() else {
+            return Ok(Transform::event_task(throttle));
+        };
+
+        Ok(Transform::event_task(Partitioned::new(
+            move || throttle.clone(),
+            shards,
+        )))
     }
 
     fn input(&self) -> Input {
@@ -98,12 +137,17 @@ impl TransformConfig for ThrottleConfig {
     }
 
     fn validate_structure(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
         if self.threshold == 0 || self.window_secs.as_secs_f64() == 0.0 {
-            Err(vec![
-                "`threshold` and `window_secs` must be non-zero".to_string(),
-            ])
-        } else {
+            errors.push("`threshold` and `window_secs` must be non-zero".to_string());
+        }
+        if self.concurrency.get() > MAX_SHARDS {
+            errors.push(format!("`concurrency` must be at most {MAX_SHARDS}"));
+        }
+        if errors.is_empty() {
             Ok(())
+        } else {
+            Err(errors)
         }
     }
 
@@ -122,7 +166,10 @@ impl TransformConfig for ThrottleConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use super::ThrottleConfig;
+    use crate::{config::TransformConfig as _, transforms::partitioned::MAX_SHARDS};
 
     #[test]
     fn generate_config() {
@@ -145,5 +192,44 @@ mod tests {
         )
         .unwrap();
         assert!(config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
+    fn concurrency_defaults_to_one_task() {
+        let config =
+            serde_yaml::from_str::<ThrottleConfig>("threshold: 1\nwindow_secs: 1\n").unwrap();
+        assert_eq!(config.concurrency.get(), 1);
+        assert_eq!(config.shards(), None);
+    }
+
+    #[test]
+    fn concurrency_is_capped() {
+        let config = |concurrency: usize| {
+            serde_yaml::from_str::<ThrottleConfig>(&format!(
+                "threshold: 1\nwindow_secs: 1\nconcurrency: {concurrency}\n"
+            ))
+            .unwrap()
+        };
+
+        assert_eq!(config(MAX_SHARDS).validate_structure(), Ok(()));
+        assert_eq!(
+            config(MAX_SHARDS + 1).validate_structure(),
+            Err(vec![format!("`concurrency` must be at most {MAX_SHARDS}")])
+        );
+    }
+
+    #[test]
+    fn concurrency_needs_a_key_field_to_shard() {
+        let config = serde_yaml::from_str::<ThrottleConfig>(
+            "threshold: 1\nwindow_secs: 1\nconcurrency: 4\n",
+        )
+        .unwrap();
+        assert_eq!(config.shards(), None);
+
+        let config = serde_yaml::from_str::<ThrottleConfig>(
+            "threshold: 1\nwindow_secs: 1\nconcurrency: 4\nkey_field: \"{{ bucket }}\"\n",
+        )
+        .unwrap();
+        assert_eq!(config.shards().map(NonZeroUsize::get), Some(4));
     }
 }
