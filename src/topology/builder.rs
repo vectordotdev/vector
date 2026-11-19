@@ -65,7 +65,7 @@ use crate::{
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
-    shutdown::SourceShutdownCoordinator,
+    shutdown::{ShutdownSignal, SourceShutdownCoordinator},
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
 };
@@ -132,6 +132,7 @@ struct Builder<'a> {
     config: &'a super::Config,
     diff: &'a ConfigDiff,
     shutdown_coordinator: SourceShutdownCoordinator,
+    source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     errors: Vec<String>,
     outputs: HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: HashMap<ComponentKey, Task>,
@@ -165,6 +166,7 @@ impl<'a> Builder<'a> {
             diff,
             buffers,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
+            source_shutdown_guards: HashMap::new(),
             errors: vec![],
             outputs: HashMap::new(),
             tasks: HashMap::new(),
@@ -200,6 +202,7 @@ impl<'a> Builder<'a> {
                 source_tasks,
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
+                source_shutdown_guards: self.source_shutdown_guards,
                 detach_triggers: self.detach_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
@@ -418,6 +421,8 @@ impl<'a> Builder<'a> {
         let (shutdown_signal, force_shutdown_tripwire) = self
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
+        self.source_shutdown_guards
+            .insert(key.clone(), shutdown_signal.clone());
 
         let context = SourceContext {
             key: key.clone(),
@@ -1102,6 +1107,10 @@ pub struct TopologyPieces {
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    /// A copy of each source's shutdown signal, held by the topology until the source task's error
+    /// is reported. The source counts as finished only once every copy is dropped, so the error is
+    /// always observable by then.
+    pub(crate) source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
