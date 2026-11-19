@@ -60,7 +60,7 @@ impl FileWatcherFile {
     }
 
     pub fn reset(&mut self) {
-        self.contents.truncate(0);
+        self.contents.clear();
         self.read_idx = 0;
         self.previous_read_size = 0;
         self.reads_available = 0;
@@ -68,7 +68,7 @@ impl FileWatcherFile {
 
     pub fn truncate(&mut self) {
         self.reads_available = 0;
-        self.contents.truncate(0);
+        self.contents.clear();
     }
 
     pub fn write_line(&mut self, input: &str) {

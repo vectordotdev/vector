@@ -154,6 +154,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn capacity(&self) -> Option<usize> {
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
@@ -239,6 +240,7 @@ pub struct BufferSender<T: Bufferable> {
 
 impl<T: Bufferable> BufferSender<T> {
     /// Creates a new [`BufferSender`] wrapping the given channel sender.
+    #[must_use]
     pub fn new(base: SenderAdapter<T>, when_full: WhenFull) -> Self {
         Self {
             base,
@@ -251,6 +253,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Creates a new [`BufferSender`] wrapping the given channel sender and overflow sender.
+    #[must_use]
     pub fn with_overflow(base: SenderAdapter<T>, overflow: BufferSender<T>) -> Self {
         Self {
             base,
@@ -291,6 +294,7 @@ impl<T: Bufferable> BufferSender<T> {
     /// Returns the aggregate approximate usage of all disk stages in this buffer topology.
     ///
     /// Returns `None` rather than waiting if any disk writer is currently busy.
+    #[must_use]
     pub fn disk_usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
         let mut usage = self.base.usage_snapshot()?;
         if let Some(overflow) = self.overflow.as_ref() {

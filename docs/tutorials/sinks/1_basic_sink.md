@@ -24,7 +24,7 @@ Let's setup all the imports we will need for the tutorial:
 ```rust
 use crate::sinks::prelude::*;
 use vector_lib::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol,
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol, register,
 };
 ```
 
@@ -255,7 +255,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-+       let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
++       let bytes_sent = register(BytesSent::from(Protocol("console".into())));
 
         while let Some(mut event) = input.next().await {
 +           let bytes = format!("{:#?}", event);
@@ -280,8 +280,8 @@ Change the body of `run_inner` to look like the following:
 
 ```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
-+       let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("console".into())));
++       let events_sent = register(EventsSent::from(Output(None)));
 
         while let Some(mut event) = input.next().await {
             let bytes = format!("{:#?}", event);

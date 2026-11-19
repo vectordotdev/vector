@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
-use http_1::{Method, Version, header};
+use http::{Method, Version, header};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use rstest::rstest;
 use vector_http::{Http2Client, RequestBody};

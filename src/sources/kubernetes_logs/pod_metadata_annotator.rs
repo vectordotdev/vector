@@ -27,7 +27,7 @@ use crate::event::{Event, LogEvent};
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(super) struct FieldsSpec {
     /// Event field for the Pod's name.
     ///
     /// Set to `""` to suppress this key.
@@ -174,7 +174,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with pod metadata.
-pub struct PodMetadataAnnotator {
+pub(super) struct PodMetadataAnnotator {
     pods_state_reader: Store<Pod>,
     fields_spec: FieldsSpec,
     log_namespace: LogNamespace,
@@ -182,7 +182,7 @@ pub struct PodMetadataAnnotator {
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub const fn new(
+    pub(super) const fn new(
         pods_state_reader: Store<Pod>,
         fields_spec: FieldsSpec,
         log_namespace: LogNamespace,
@@ -203,7 +203,7 @@ impl PodMetadataAnnotator {
     /// from the log file path, which is always available. The path-derived ID is exposed as
     /// `pod_log_directory_id` rather than `pod_uid`, since for static pods it may be a config
     /// hash instead of the API Pod UID.
-    pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
+    pub(super) fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
         let obj = ObjectRef::<Pod>::new(file_info.pod_name).within(file_info.pod_namespace);

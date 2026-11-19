@@ -33,6 +33,10 @@ impl GenerateConfig for MmdbConfig {
 }
 
 impl EnrichmentTableConfig for MmdbConfig {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,

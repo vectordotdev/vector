@@ -15,7 +15,7 @@ use crate::sinks::{
     util::encoding::{Encoder, as_tracked_write},
 };
 
-pub struct NewRelicEncoder {
+pub(super) struct NewRelicEncoder {
     pub(super) transformer: Transformer,
     pub(super) credentials: Arc<NewRelicCredentials>,
 }
@@ -54,7 +54,7 @@ impl Encoder<Vec<Event>> for NewRelicEncoder {
     }
 }
 
-pub fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
+fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
     match serde_json::to_vec(model) {
         Ok(mut json) => {
             json.push(b'\n');

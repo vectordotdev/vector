@@ -283,6 +283,107 @@ async fn encode_datastream_mode() {
 }
 
 #[tokio::test]
+async fn encode_datastream_dynamic_namespace() {
+    for auto_routing in [false, true] {
+        for sync_fields in [false, true] {
+            let config = serde_yaml::from_str::<ElasticsearchConfig>(&format!(
+                r#"
+                endpoints: ["https://example.com"]
+                api_version: v8
+                mode: data_stream
+                data_stream:
+                  type: logs
+                  dataset: system
+                  namespace: "{{{{ service }}}}"
+                  auto_routing: {auto_routing}
+                  sync_fields: {sync_fields}
+                "#
+            ))
+            .unwrap();
+            let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+            for override_namespace in [false, true] {
+                let mut log = LogEvent::from("hello there");
+                log.insert(event_path!("service"), "checkout");
+                if override_namespace {
+                    log.insert(event_path!("data_stream", "namespace"), "production");
+                }
+                let namespace = if auto_routing && override_namespace {
+                    "production"
+                } else {
+                    "checkout"
+                };
+                let processed = process_log(log, &es.mode, None, &config.encoding).unwrap();
+                assert_eq!(processed.index, format!("logs-system-{namespace}"));
+                if sync_fields {
+                    assert_eq!(
+                        processed.log.get(event_path!("data_stream", "type")),
+                        Some(&Value::from("logs"))
+                    );
+                    assert_eq!(
+                        processed.log.get(event_path!("data_stream", "dataset")),
+                        Some(&Value::from("system"))
+                    );
+                }
+
+                let mut encoded = Vec::new();
+                es.request_builder
+                    .encoder
+                    .encode_input(vec![processed], &mut encoded)
+                    .unwrap();
+                let metadata = encoded.split(|&byte| byte == b'\n').next().unwrap();
+                let metadata: serde_json::Value = serde_json::from_slice(metadata).unwrap();
+                assert_eq!(
+                    metadata["create"]["_index"],
+                    format!("logs-system-{namespace}")
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn encode_datastream_preserves_namespace_confinement() {
+    for (dataset, rendered_dataset) in [
+        ("svc_{{ service }}", "svc_checkout"),
+        ("{{ service }}", "checkout"),
+    ] {
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(&format!(
+            r#"
+            endpoints: ["https://example.com"]
+            api_version: v8
+            mode: data_stream
+            data_stream:
+              type: logs
+              dataset: "{dataset}"
+              namespace: "tenanta_{{{{ environment }}}}"
+            "#
+        ))
+        .unwrap();
+        let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+        let mut log = LogEvent::from("hello there");
+        log.insert(event_path!("service"), "checkout");
+        log.insert(event_path!("environment"), "prod");
+        log.insert(event_path!("data_stream", "namespace"), "tenantb_prod");
+        assert!(process_log(log.clone(), &es.mode, None, &config.encoding).is_none());
+
+        log.insert(event_path!("data_stream", "namespace"), "tenanta_other");
+        let processed = process_log(log, &es.mode, None, &config.encoding).unwrap();
+        let mut encoded = Vec::new();
+        es.request_builder
+            .encoder
+            .encode_input(vec![processed], &mut encoded)
+            .unwrap();
+        let metadata = encoded.split(|&byte| byte == b'\n').next().unwrap();
+        let metadata: serde_json::Value = serde_json::from_slice(metadata).unwrap();
+        assert_eq!(
+            metadata["create"]["_index"],
+            format!("logs-{rendered_dataset}-tenanta_other")
+        );
+    }
+}
+
+#[tokio::test]
 async fn encode_datastream_mode_no_routing() {
     use chrono::{TimeZone, Utc};
 
@@ -810,7 +911,7 @@ async fn api_version_uses_selected_distribution() {
         atomic::{AtomicUsize, Ordering},
     };
 
-    use hyper::Body;
+    use http_body_util::Full;
 
     use crate::{sinks::util::test::build_test_server_generic, test_util::addr::next_addr};
 
@@ -870,7 +971,7 @@ async fn api_version_uses_selected_distribution() {
         let server_probes = Arc::clone(&probes);
         let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
             server_probes.fetch_add(1, Ordering::Relaxed);
-            http::Response::new(Body::from(body.clone()))
+            http::Response::new(Full::new(bytes::Bytes::from(body.clone())))
         });
         let server = tokio::spawn(server);
         let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
@@ -913,7 +1014,7 @@ async fn bulk_request_shape_and_compressed_error_response() {
 
     use flate2::write::GzEncoder;
     use futures::StreamExt;
-    use hyper::Body;
+    use http_body_util::Full;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 
     use crate::{
@@ -933,7 +1034,7 @@ async fn bulk_request_shape_and_compressed_error_response() {
     let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
         http::Response::builder()
             .header("Content-Encoding", "gzip")
-            .body(Body::from(response_body.clone()))
+            .body(Full::new(response_body.clone()))
             .unwrap()
     });
     tokio::spawn(server);

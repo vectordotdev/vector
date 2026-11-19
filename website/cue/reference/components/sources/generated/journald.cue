@@ -31,8 +31,14 @@ generated: components: sources: journald: configuration: {
 		}
 	}
 	current_boot_only: {
-		description: "Only include entries that occurred after the current boot of the system."
-		required:    false
+		description: """
+			Only include entries that occurred after the current boot of the system.
+
+			Setting this to `false` requires systemd 258 or later, or a version older than 250.
+			Versions 250 through 257 are not supported. For container deployments, this
+			requirement applies to the `journalctl` inside the container image.
+			"""
+		required: false
 		type: bool: default: true
 	}
 	data_dir: {

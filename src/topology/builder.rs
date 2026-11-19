@@ -9,7 +9,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt, future::Either, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
 use metrics::Counter;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -31,12 +31,21 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuScopedFuture, CpuTimedExt, CpuTimedFuture, spawn_timed},
     enrichment::Table,
-    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    extra_context::ExtraContext,
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, register,
+    },
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -54,18 +63,11 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
-    extra_context::ExtraContext,
     internal_events::EventsReceived,
-    shutdown::SourceShutdownCoordinator,
-    spawn_named,
+    shutdown::{ShutdownSignal, SourceShutdownCoordinator},
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -121,7 +123,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -130,6 +132,7 @@ struct Builder<'a> {
     config: &'a super::Config,
     diff: &'a ConfigDiff,
     shutdown_coordinator: SourceShutdownCoordinator,
+    source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     errors: Vec<String>,
     outputs: HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: HashMap<ComponentKey, Task>,
@@ -163,6 +166,7 @@ impl<'a> Builder<'a> {
             diff,
             buffers,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
+            source_shutdown_guards: HashMap::new(),
             errors: vec![],
             outputs: HashMap::new(),
             tasks: HashMap::new(),
@@ -198,6 +202,7 @@ impl<'a> Builder<'a> {
                 source_tasks,
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
+                source_shutdown_guards: self.source_shutdown_guards,
                 detach_triggers: self.detach_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
@@ -416,6 +421,8 @@ impl<'a> Builder<'a> {
         let (shutdown_signal, force_shutdown_tripwire) = self
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
+        self.source_shutdown_guards
+            .insert(key.clone(), shutdown_signal.clone());
 
         let context = SourceContext {
             key: key.clone(),
@@ -571,29 +578,24 @@ impl<'a> Builder<'a> {
             merged_schema_definition: merged_definition.clone(),
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
-            // Resolve the per-component CPU counter inside the transform span so it
-            // picks up component_id/component_kind/component_type tags. The same
-            // handle is shared between the main transform task and any helper
-            // tokio tasks the transform spawns at construction time. On platforms
-            // without per-thread CPU time, `register_counter` returns a noop
-            // handle and the metric is silently omitted.
-            //
-            // `None` when `measure_cpu_usage` is false (the default): no counter
-            // is registered and no per-poll `ThreadTime` measurement takes place.
-            cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
-            } else {
-                None
-            },
         };
 
-        let node = TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = transform.measure_cpu_usage.then(cpu_time::register_counter);
 
-        let transform = match transform
-            .inner
-            .build(&context)
-            .instrument(Span::current())
-            .await
+        let node = TransformNode::from_parts(
+            key.clone(),
+            &context,
+            transform,
+            &input_definitions,
+            cpu_ns.clone(),
+        );
+
+        let transform = match cpu_scoped_if(
+            transform.inner.build(&context).instrument(Span::current()),
+            cpu_ns,
+        )
+        .await
         {
             Err(error) => {
                 self.errors.push(format!("Transform \"{key}\": {error}"));
@@ -744,7 +746,7 @@ impl<'a> Builder<'a> {
 
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
-            let events_received = register!(EventsReceived);
+            let events_received = register(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
@@ -843,31 +845,14 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
-            node.cpu_ns.clone(),
         );
 
-        // Attribute the runner task's per-poll CPU time (driver loop +,
-        // for the inline variant, the transform body) to the component. The
-        // concurrent variant additionally spawns transform invocations onto
-        // their own tasks with `spawn_timed`, which feed the same counter.
-        // When `cpu_ns` is `None` the futures are returned as-is — no
-        // `ThreadTime` sampling takes place.
+        // The concurrent variant spawns transform invocations onto their own
+        // tasks with `spawn_timed`, which inherit the counter.
         let transform = if node.enable_concurrency {
-            let fut = runner.run_concurrently();
-
-            if let Some(cpu_ns) = node.cpu_ns {
-                fut.cpu_timed(cpu_ns).boxed()
-            } else {
-                fut.boxed()
-            }
+            cpu_timed_if(runner.run_concurrently(), node.cpu_ns).boxed()
         } else {
-            let fut = runner.run_inline();
-
-            if let Some(cpu_ns) = node.cpu_ns {
-                fut.cpu_timed(cpu_ns).boxed()
-            } else {
-                fut.boxed()
-            }
+            cpu_timed_if(runner.run_inline(), node.cpu_ns).boxed()
         };
 
         let transform = async move {
@@ -923,7 +908,7 @@ impl<'a> Builder<'a> {
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let filtered = input_rx
             .filter(move |events| ready(filter_events_type(events, input_type)))
             .inspect(move |events| {
@@ -932,7 +917,7 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ));
             });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+        let events_sent = register(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
             component: key.clone(),
             port: None,
@@ -950,24 +935,27 @@ impl<'a> Builder<'a> {
             .map(|(key, value)| (key, Arc::new(value)))
             .collect();
 
-        let stream = t
-            .transform(Box::pin(filtered))
-            .map(move |mut events| {
-                for event in events.iter_events_mut() {
-                    update_runtime_schema_definition(event, &output_id, &schema_definition_map);
-                }
-                let now = Instant::now();
-                latency_recorder.on_send(&mut events, now);
-                (events, now)
-            })
-            .inspect(move |(events, _): &(EventArray, Instant)| {
-                events_sent.emit(CountByteSize(
-                    events.len(),
-                    events.estimated_json_encoded_size_of(),
-                ));
-            });
-        let stream = OutputUtilization::new(output_sender, stream);
+        // The stream is built inside the task so that helper tasks spawned by
+        // `transform()` inherit the component's CPU counter.
         let transform = async move {
+            let stream = t
+                .transform(Box::pin(filtered))
+                .map(move |mut events| {
+                    for event in events.iter_events_mut() {
+                        update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+                    }
+                    let now = Instant::now();
+                    latency_recorder.on_send(&mut events, now);
+                    (events, now)
+                })
+                .inspect(move |(events, _): &(EventArray, Instant)| {
+                    events_sent.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
+                });
+            let stream = OutputUtilization::new(output_sender, stream);
+
             debug!("Task transform starting.");
 
             match fanout.send_stream(stream).await {
@@ -982,11 +970,7 @@ impl<'a> Builder<'a> {
             }
         };
 
-        let transform = if let Some(cpu_ns) = cpu_ns {
-            transform.cpu_timed(cpu_ns).boxed()
-        } else {
-            transform.boxed()
-        };
+        let transform = cpu_timed_if(transform, cpu_ns).boxed();
 
         let mut outputs = HashMap::new();
         outputs.insert(OutputId::from(&key), control);
@@ -994,6 +978,23 @@ impl<'a> Builder<'a> {
         let task = Task::new(key, typetag, transform);
 
         (task, outputs)
+    }
+}
+
+/// Times `future` with `cpu_ns` when CPU usage measurement is enabled for the component.
+fn cpu_timed_if<F: Future>(future: F, cpu_ns: Option<Counter>) -> Either<CpuTimedFuture<F>, F> {
+    match cpu_ns {
+        Some(counter) => Either::Left(future.cpu_timed(counter)),
+        None => Either::Right(future),
+    }
+}
+
+/// Makes `cpu_ns` inheritable by tasks spawned from `future` when CPU usage measurement is
+/// enabled for the component, without timing `future` itself.
+fn cpu_scoped_if<F: Future>(future: F, cpu_ns: Option<Counter>) -> Either<CpuScopedFuture<F>, F> {
+    match cpu_ns {
+        Some(counter) => Either::Left(future.cpu_scoped(counter)),
+        None => Either::Right(future),
     }
 }
 
@@ -1106,6 +1107,10 @@ pub struct TopologyPieces {
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    /// A copy of each source's shutdown signal, held by the topology until the source task's error
+    /// is reported. The source counts as finished only once every copy is dropped, so the error is
+    /// always observable by then.
+    pub(crate) source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
@@ -1257,11 +1262,12 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
+        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             key,
@@ -1270,7 +1276,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
-            cpu_ns: context.cpu_ns.clone(),
+            cpu_ns,
         }
     }
 }
@@ -1283,7 +1289,6 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
-    cpu_ns: Option<Counter>,
 }
 
 impl Runner {
@@ -1294,7 +1299,6 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
-        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             transform,
@@ -1303,8 +1307,7 @@ impl Runner {
             outputs,
             timer_tx,
             latency_recorder,
-            events_received: register!(EventsReceived),
-            cpu_ns,
+            events_received: register(EventsReceived),
         }
     }
 
@@ -1389,18 +1392,12 @@ impl Runner {
 
                         let mut t = self.transform.clone();
                         let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                        // Hook CPU-time accounting onto the spawned task at
-                        // the `Future::poll` boundary.
-                        // This is a separate task from the current one, so there is no double-counting.
-                        let task = spawn_timed(
-                            async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
-                                }
-                                outputs_buf
-                            },
-                            self.cpu_ns.clone(),
-                        );
+                        let task = spawn_timed(async move {
+                            for events in input_arrays {
+                                t.transform_all(events, &mut outputs_buf);
+                            }
+                            outputs_buf
+                        });
                         in_flight.push_back(task);
                     } else {
                         shutting_down = true;
