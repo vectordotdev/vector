@@ -39,7 +39,7 @@ remap: expressions: path: {
 						description: """
 							Array elements can be accessed by their index:
 
-							```coffee
+							```vrl
 							.array[0]
 							```
 							"""
@@ -55,7 +55,7 @@ remap: expressions: path: {
 						description: """
 							Nested object values are accessed by delimiting each ancestor path with `.`:
 
-							```coffee
+							```vrl
 							.parent.child
 							```
 							"""
@@ -72,7 +72,7 @@ remap: expressions: path: {
 							Path segments can be quoted to include special characters, such as spaces, periods, and
 							others:
 
-							```coffee
+							```vrl
 							."parent.key.with.special \"characters\"".child
 							```
 							"""#

@@ -80,7 +80,7 @@ impl TransformOutputs {
                             }),
                         },
                     );
-                    controls.insert(Some(name.clone()), control);
+                    controls.insert(Some(name), control);
                 }
             }
         }
@@ -159,7 +159,7 @@ impl TransformOutputsBuf {
                     primary_buffer = Some(OutputBuffer::with_capacity(capacity));
                 }
                 Some(name) => {
-                    named_buffers.insert(name.clone(), OutputBuffer::default());
+                    named_buffers.insert(name, OutputBuffer::default());
                 }
             }
         }

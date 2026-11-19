@@ -752,8 +752,7 @@ fn decode_event_metadata(
         full.try_into()
     } else if let Some(value) = metadata {
         Ok(decode_value(value)?
-            .map(EventMetadata::default_with_value)
-            .unwrap_or_default())
+            .map_or_else(EventMetadata::default, EventMetadata::default_with_value))
     } else {
         Ok(EventMetadata::default())
     }
