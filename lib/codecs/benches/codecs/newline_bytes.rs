@@ -48,12 +48,10 @@ fn decoding(c: &mut Criterion) {
             |b, param| {
                 b.iter_batched(
                     || {
-                        let framer = Framer::NewlineDelimited(
-                            param
-                                .max_length
-                                .map(NewlineDelimitedDecoder::new_with_max_length)
-                                .unwrap_or_default(),
-                        );
+                        let framer = Framer::NewlineDelimited(param.max_length.map_or_else(
+                            NewlineDelimitedDecoder::default,
+                            NewlineDelimitedDecoder::new_with_max_length,
+                        ));
                         let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = Decoder::new(framer, deserializer);
 
