@@ -20,7 +20,10 @@ use serde_json::Value;
 use tokio::time::{Duration, timeout};
 use vector_lib::{
     codecs::encoding::ArrowStreamSerializerConfig,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+    event::{
+        BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
+        MetricValue,
+    },
     lookup::PathPrefix,
 };
 use vrl::event_path;
@@ -88,6 +91,67 @@ async fn insert_events() {
     assert_eq!(1, output.rows);
 
     let expected = serde_json::to_value(input_event.into_log()).unwrap();
+    assert_eq!(expected, output.data[0]);
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+}
+
+#[tokio::test]
+async fn insert_metrics() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = ClickhouseClient::new(host);
+    client
+        .create_table_with_sql(&format!(
+            "CREATE TABLE {table}
+                (name String, tags Map(String, String), kind String, counter Map(String, Float64))
+                ENGINE = MergeTree()
+                ORDER BY name;"
+        ))
+        .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let metric = Metric::new(
+        "requests_total",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 3.5 },
+    )
+    .with_tags(Some(
+        [("host".to_string(), "example.com".to_string())]
+            .into_iter()
+            .collect(),
+    ))
+    .with_batch_notifier(&batch);
+    drop(batch);
+    let input_event = Event::Metric(metric);
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(1, output.rows);
+
+    let expected = serde_json::to_value(input_event.into_metric()).unwrap();
     assert_eq!(expected, output.data[0]);
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

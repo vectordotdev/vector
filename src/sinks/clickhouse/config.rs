@@ -216,7 +216,12 @@ impl SinkConfig for ClickhouseConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        // The Arrow batch encoder only encodes log events, so metrics would be silently dropped.
+        if self.batch_encoding.is_some() {
+            Input::log()
+        } else {
+            Input::new(DataType::Metric | DataType::Log)
+        }
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -484,6 +489,24 @@ mod tests {
     use super::*;
     use crate::config::ValidatedSink;
     use crate::template::ConfinementConfig;
+
+    #[test]
+    fn input_accepts_metrics_for_json_formats() {
+        let input = ClickhouseConfig::default().input();
+        assert_eq!(input.data_type(), DataType::Metric | DataType::Log);
+    }
+
+    #[test]
+    fn input_is_log_only_with_batch_encoding() {
+        let config = ClickhouseConfig {
+            format: Format::ArrowStream,
+            batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+                ArrowStreamSerializerConfig::default(),
+            )),
+            ..Default::default()
+        };
+        assert_eq!(config.input().data_type(), DataType::Log);
+    }
 
     #[test]
     fn generate_config() {
