@@ -18,7 +18,7 @@ use crate::{
         Transform,
         reduce::{
             merge_strategy::MergeStrategy,
-            transform::{Reduce, ShardedReduce},
+            transform::{MAX_SHARDS, Reduce, ShardedReduce},
         },
     },
 };
@@ -65,10 +65,11 @@ pub struct ReduceConfig {
     /// across different groups may change.
     ///
     /// Has no effect when `group_by` is empty: all events then belong to a single group, which is
-    /// reduced by a single task.
+    /// reduced by a single task. At most `128`.
     #[serde(default = "default_concurrency")]
     #[derivative(Default(value = "default_concurrency()"))]
     #[configurable(metadata(docs::human_name = "Concurrency"))]
+    #[configurable(validation(range(min = 1, max = 128)))]
     pub concurrency: NonZeroUsize,
 
     /// An ordered list of fields by which to group events.
@@ -260,6 +261,10 @@ impl TransformConfig for ReduceConfig {
             errors.push("only one of `ends_when` and `starts_when` can be provided".to_string());
         }
 
+        if self.concurrency.get() > MAX_SHARDS {
+            errors.push(format!("`concurrency` must be at most {MAX_SHARDS}"));
+        }
+
         for (path, _) in &self.merge_strategies {
             match parse_target_path(path) {
                 Err(_) => errors.push(format!("Could not parse path: `{path}`")),
@@ -310,5 +315,18 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ReduceConfig>();
+    }
+
+    #[test]
+    fn concurrency_is_capped() {
+        let config = |concurrency: usize| {
+            serde_yaml::from_str::<ReduceConfig>(&format!("concurrency: {concurrency}\n")).unwrap()
+        };
+
+        assert_eq!(config(MAX_SHARDS).validate_structure(), Ok(()));
+        assert_eq!(
+            config(MAX_SHARDS + 1).validate_structure(),
+            Err(vec![format!("`concurrency` must be at most {MAX_SHARDS}")])
+        );
     }
 }

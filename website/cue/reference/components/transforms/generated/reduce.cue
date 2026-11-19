@@ -10,7 +10,7 @@ generated: components: transforms: reduce: configuration: {
 			across different groups may change.
 
 			Has no effect when `group_by` is empty: all events then belong to a single group, which is
-			reduced by a single task.
+			reduced by a single task. At most `128`.
 			"""
 		required: false
 		type: uint: default: 1
