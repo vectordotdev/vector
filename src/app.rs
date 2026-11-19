@@ -363,6 +363,9 @@ impl StartedApplication {
         let signal = loop {
             let has_sources = !topology_controller.lock().await.topology.config.is_empty();
             tokio::select! {
+                // A crashed source also counts as finished, so the crash must be checked before
+                // `sources_finished` to keep its error.
+                biased;
                 signal = signal_rx.recv() => if let Some(signal) = handle_signal(
                     signal,
                     &topology_controller,
