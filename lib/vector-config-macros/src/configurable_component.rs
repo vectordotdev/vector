@@ -332,6 +332,10 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 
     // Final assembly.
     let expanded = quote! {
+        #[allow(
+            clippy::duplicated_attributes,
+            reason = "Configurable metadata such as docs::examples is repeatable."
+        )]
         #[derive(#derives)]
         #component_type
         #maybe_component_name

@@ -222,14 +222,14 @@ The `%vector` namespace, which holds `ingest_timestamp` and `source_type`, is re
 
 **Legacy mode:**
 
-```coffee
+```vrl
 .host = "new-host"
 .timestamp = now()
 ```
 
 **Vector namespace mode:**
 
-```coffee
+```vrl
 %demo_logs.host = "new-host"
 ```
 

@@ -205,6 +205,9 @@ If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
 
+Dependabot waits seven days before proposing routine version updates for newly published
+registry versions to reduce supply-chain risk. Security updates are exempt from this cooldown.
+
 ### Minimum Supported Rust Version
 
 Vector's Minimum Supported Rust Version (MSRV) is indicated by the `rust-version` specified in

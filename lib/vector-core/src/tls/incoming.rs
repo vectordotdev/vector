@@ -59,21 +59,24 @@ impl MaybeTlsSettings {
     }
 
     /// Bind a listener, optionally sharing a [`TlsAcceptorReloader`] so its acceptor can be swapped
-    /// at runtime. When `reloader` is `Some` and TLS is enabled, connections accepted by the
-    /// returned listener use the acceptor the reloader currently holds; otherwise the acceptor is
-    /// fixed for the lifetime of the listener.
+    /// at runtime. When `reloader` is `Some`, connections accepted by the returned listener use the
+    /// acceptor the reloader currently holds; otherwise the acceptor is fixed for the lifetime of
+    /// the listener.
+    ///
+    /// Returns [`TlsError::ReloaderWithoutTls`] when `reloader` is `Some` but TLS is disabled: the
+    /// caller expects TLS, so serving plaintext would silently drop it.
     pub async fn bind_reloadable(
         &self,
         addr: &SocketAddr,
         reloader: Option<TlsAcceptorReloader>,
     ) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
-
         let acceptor = match (self, reloader) {
-            (Self::Raw(()), _) => None,
+            (Self::Raw(()), Some(_)) => return Err(TlsError::ReloaderWithoutTls),
+            (Self::Raw(()), None) => None,
             (Self::Tls(_), Some(reloader)) => Some(reloader.shared()),
             (Self::Tls(tls), None) => Some(Arc::new(ArcSwap::from_pointee(tls.acceptor()?))),
         };
+        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
         Ok(MaybeTlsListener {
             listener,
