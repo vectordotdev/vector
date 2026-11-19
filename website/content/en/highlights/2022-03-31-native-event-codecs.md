@@ -112,5 +112,5 @@ Note that the new `native` encoding option is not yet documented on sinks as we
 are waiting until it is fully rolled out to document and announce the feature;
 however, is available on `kafka` and some other sinks.
 
-[cue schema]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+[cue schema]: https://github.com/vectordotdev/vector/blob/v0.22.0/lib/codecs/tests/data/native_encoding/schema.cue
 [proto schema]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto

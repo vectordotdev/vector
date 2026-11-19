@@ -202,6 +202,7 @@ futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
+http = { version = "1.0", default-features = false, features = ["std"] }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
@@ -451,7 +452,7 @@ hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.4.1", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
-http = { version = "1.0", default-features = false, features = ["std"] }
+http.workspace = true
 http-serde = "2"
 http-body = { version = "1", default-features = false }
 http-body-util = { version = "0.1", default-features = false }
