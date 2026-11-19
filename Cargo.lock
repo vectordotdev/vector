@@ -4620,6 +4620,7 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.14.2",
+ "proptest",
  "quickcheck",
  "tempfile",
  "tokio",
