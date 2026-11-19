@@ -18,6 +18,58 @@ fn partial_delim_len(data: &[u8], delim: &[u8]) -> usize {
         .unwrap_or(0)
 }
 
+/// Decides what to do with the bytes kept from an earlier read as the start of a possible
+/// delimiter, now that `available` (non-empty) follows them.
+///
+/// A delimiter that starts in the kept bytes ends within the first `delim.len() - 1` bytes of
+/// `available`. Searching the kept bytes together with those also finds a delimiter that overlaps
+/// itself and starts after the first kept byte, such as `AAB` after a kept `AA`.
+///
+/// Returns `Some((done, used))` when this settles how much of `available` to use, and `None` when
+/// the kept bytes turned out to be data and `available` still has to be searched. Bytes that are
+/// data are added to `buf` unless `discarding`. `partial_delim` holds what is still kept.
+fn resolve_partial_delim(
+    partial_delim: &mut BytesMut,
+    available: &[u8],
+    delim: &[u8],
+    delim_finder: &Finder,
+    buf: &mut BytesMut,
+    discarding: bool,
+) -> Option<(bool, usize)> {
+    let kept = partial_delim.len();
+    let window_len = min(available.len(), delim.len() - 1);
+    partial_delim.extend_from_slice(&available[..window_len]);
+    let window = partial_delim.split();
+
+    match delim_finder.find(&window) {
+        Some(start) if start < kept => {
+            // Complete delimiter found. Consuming the remainder of the delimiter and deciding what
+            // to do with the line it ends is the same as for a delimiter found whole.
+            if !discarding {
+                buf.extend_from_slice(&window[..start]);
+            }
+            Some((true, start + delim.len() - kept))
+        }
+        None if window_len == available.len() => {
+            // All of `available` is in the window and it still holds no delimiter. Keep the end
+            // that may begin one and wait for more data.
+            let tail = partial_delim_len(&window, delim);
+            if !discarding {
+                buf.extend_from_slice(&window[..window.len() - tail]);
+            }
+            partial_delim.extend_from_slice(&window[window.len() - tail..]);
+            Some((false, available.len()))
+        }
+        _ => {
+            // No delimiter starts in the kept bytes, so they are data.
+            if !discarding {
+                buf.extend_from_slice(&window[..kept]);
+            }
+            None
+        }
+    }
+}
+
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
 /// The function reads up to `max_size` bytes from `reader`, splitting the input
@@ -89,19 +141,11 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
             }
         };
 
-        // First, check if we have a partial delimiter from the previous iteration/buffer
-        let mut delim_suffix_len = None;
+        // First, check if we have a partial delimiter from the previous iteration/buffer. When
+        // this decides how much of `available` to use, `handled` holds that, as `(done, used)`.
+        let mut handled = None;
         if !partial_delim.is_empty() {
-            let expected_suffix = &delim[partial_delim.len()..];
-
-            // We already know that we have a partial delimiter match from the previous buffer.
-            // Here we check what part of the delimiter is missing and whether the new buffer
-            // contains the remaining part.
-            if available.starts_with(expected_suffix) {
-                // Complete delimiter found! Consuming the remainder of the delimiter and deciding
-                // what to do with the line it ends is the same as for a delimiter found whole.
-                delim_suffix_len = Some(expected_suffix.len());
-            } else if available.is_empty() {
+            if available.is_empty() {
                 // We've hit EOF, so we can't tell yet. Leave the partial delimiter at the end of
                 // `buf` for the next call to pick up.
                 buf.extend_from_slice(&partial_delim);
@@ -110,26 +154,21 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                     successfully_read: None,
                     discarded_for_size_and_truncated,
                 });
-            } else if expected_suffix.starts_with(available) {
-                // Still only part of the delimiter, so keep it and wait for the rest.
-                partial_delim.extend_from_slice(available);
-                let used = available.len();
-                reader.consume(used);
-                *position += used as u64;
-                total_read += used;
-                continue;
-            } else if !discarding {
-                // Not a complete delimiter after all.
-                // Add partial_delim to output buffer as it is actual data.
-                buf.extend_from_slice(&partial_delim);
             }
-            partial_delim.clear();
-            // Continue processing current available buffer
+
+            handled = resolve_partial_delim(
+                &mut partial_delim,
+                available,
+                delim,
+                &delim_finder,
+                buf,
+                discarding,
+            );
         }
 
         let (done, used) = {
-            if let Some(suffix_len) = delim_suffix_len {
-                (true, suffix_len)
+            if let Some(handled) = handled {
+                handled
             } else if let Some(i) = delim_finder.find(available) {
                 if !discarding {
                     buf.extend_from_slice(&available[..i]);
@@ -524,7 +563,10 @@ mod test {
             )
             .await;
             assert_eq!(result.successfully_read, None);
-            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(
+                result.discarded_for_size_and_truncated,
+                Vec::<BytesMut>::new()
+            );
 
             // Polling at EOF changes nothing.
             let result = read_chunk(
@@ -537,7 +579,10 @@ mod test {
             )
             .await;
             assert_eq!(result.successfully_read, None);
-            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(
+                result.discarded_for_size_and_truncated,
+                Vec::<BytesMut>::new()
+            );
             assert_eq!(buffer.as_ref(), b"123\r");
 
             let mut reader = BufReader::new(Cursor::new(b"\nnext\r\n".to_vec()));
@@ -552,7 +597,10 @@ mod test {
             .await
             .unwrap();
             assert_eq!(result.successfully_read, Some(1));
-            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(
+                result.discarded_for_size_and_truncated,
+                Vec::<BytesMut>::new()
+            );
             assert_eq!(buffer.as_ref(), b"123");
             assert_eq!(position, 5);
 
@@ -568,7 +616,10 @@ mod test {
             .await
             .unwrap();
             assert_eq!(result.successfully_read, Some(6));
-            assert!(result.discarded_for_size_and_truncated.is_empty());
+            assert_eq!(
+                result.discarded_for_size_and_truncated,
+                Vec::<BytesMut>::new()
+            );
             assert_eq!(buffer.as_ref(), b"next");
             assert_eq!(position, 11);
         }
@@ -622,6 +673,40 @@ mod test {
         )
         .await;
         check(b"ABC", b"xABCyAABCzABABCABC", &[b"x", b"yA", b"zAB", b""]).await;
+        // Delimiters that overlap themselves, where a kept partial match can turn out to start
+        // one byte later.
+        check(b"AAB", b"xAAAByAABzAAAAB", &[b"xA", b"y", b"zAA"]).await;
+        check(b"ABAB", b"xABABAByABAB", &[b"x", b"ABy"]).await;
+    }
+
+    #[tokio::test]
+    async fn test_overlapping_delimiter_split_by_reads_in_one_call() {
+        for (delimiter, data, expected) in [
+            (b"AAB".as_slice(), b"xAAAByAAB".as_slice(), b"xA".as_slice()),
+            (b"ABAB", b"xABABAByABAB", b"x"),
+        ] {
+            let mut position = 0;
+            let mut buffer = BytesMut::new();
+            let mut buffered_delim_len = 0;
+            let mut reader = BufReader::with_capacity(1, Cursor::new(data.to_vec()));
+
+            let result = read_until_with_max_size(
+                &mut reader,
+                &mut position,
+                delimiter,
+                &mut buffer,
+                &mut buffered_delim_len,
+                1024,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(
+                result.successfully_read,
+                Some(expected.len() + delimiter.len())
+            );
+            assert_eq!(buffer.as_ref(), expected);
+        }
     }
 
     #[tokio::test]
@@ -729,7 +814,10 @@ mod test {
         )
         .await;
         assert_eq!(result.successfully_read, None);
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
 
         let result = read_chunk(
             b"\n",
@@ -741,7 +829,10 @@ mod test {
         )
         .await;
         assert_eq!(result.successfully_read, Some(1));
-        assert!(result.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(
+            result.discarded_for_size_and_truncated,
+            Vec::<BytesMut>::new()
+        );
         assert_eq!(buffer.as_ref(), b"12345");
     }
 
