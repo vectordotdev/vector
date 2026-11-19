@@ -121,8 +121,10 @@ components: transforms: "remap": {
 
 				A metric's value is available only under the field for its current type. For example, `.gauge.value`
 				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
-				includes the value field. These fields match the JSON encoding of metrics, which is what `vector tap`
-				shows. You can't change these fields yet. To convert between counters and gauges, set `type`.
+				includes the value field. The top-level field matches the metric type, as in the JSON encoding of
+				metrics that `vector tap` shows. For sketches, VRL exposes summary statistics directly under `.sketch`.
+				Assigning to these fields or calling `del()` on them doesn't change the metric's value. To convert between
+				counters and gauges, set `type`.
 
 				Metric values are exposed as VRL numbers, with two exceptions:
 
