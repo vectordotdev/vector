@@ -237,10 +237,134 @@ async fn run_sporadic_cliff_workload<S: ReadScheduler, Ev: FsEventSource>(
     }
 }
 
+/// Workload C: 200 files where each file writes 1 line every 15s over 60s
+/// (4 waves of sporadic writes), measuring both wasted EOF reads and p50/p99/max latency.
+async fn run_continuous_sporadic_workload<S: ReadScheduler, Ev: FsEventSource>(
+    scheduler: S,
+    make_ev: impl FnOnce(&SimFileSystem) -> Ev,
+    delivery: EventDelivery,
+) -> WorkloadMetrics {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    fs.set_event_delivery(delivery);
+    let emitter = RecordingEmitter::new();
+
+    let file_count = 200;
+    for i in 0..file_count {
+        fs.append_bytes(format!("/logs/sporadic_{i:03}.log"), b"init\n");
+    }
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let server = make_bench_server(&fs, emitter);
+    let ev = make_ev(&fs);
+    let mut state = FileServerState::init_with_scheduler(
+        server,
+        &mut cp,
+        fs.clone(),
+        clock.clone(),
+        scheduler,
+        ev,
+    )
+    .await;
+
+    let mut lines = Vec::new();
+    let _ = state.step(&mut lines).await;
+    assert_eq!(lines.len(), file_count);
+    lines.clear();
+
+    fs.reset_stats();
+    let mut write_times: HashMap<String, MonotonicInstant> = HashMap::new();
+    let mut latencies_ms = Vec::new();
+
+    // 300 ticks × 200ms = 60s simulated time; write a wave to all 200 files at t=15s, 30s, 45s.
+    for tick in 1..=300u64 {
+        clock.advance(Duration::from_millis(200));
+        let now = clock.now();
+        if tick % 75 == 0 && tick < 300 {
+            let wave = tick / 75;
+            for i in 0..file_count {
+                let tag = format!("w{wave}_f{i}");
+                write_times.insert(tag.clone(), now);
+                fs.append_bytes(
+                    format!("/logs/sporadic_{i:03}.log"),
+                    format!("{tag}\n").as_bytes(),
+                );
+            }
+        }
+        let mut batch: Vec<Line> = Vec::new();
+        let _ = state.step(&mut batch).await;
+        let read_at = clock.now();
+        for line in batch {
+            let text = String::from_utf8(line.text.to_vec()).unwrap();
+            if let Some(written_at) = write_times.remove(&text) {
+                let lat = u64::try_from(read_at.saturating_duration_since(written_at).as_millis())
+                    .unwrap_or(u64::MAX);
+                latencies_ms.push(lat);
+            }
+            lines.push(line);
+        }
+    }
+
+    let fs_stats = fs.stats();
+    let (p50, p99, max) = summarize_latencies(latencies_ms);
+    WorkloadMetrics {
+        lines_delivered: lines.len(),
+        total_reads: fs_stats.reads,
+        eof_reads: fs_stats.eof_reads,
+        p50_latency_ms: p50,
+        p99_latency_ms: p99,
+        max_latency_ms: max,
+    }
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn pct_reduction(legacy: u64, adaptive: u64) -> f64 {
+    if legacy == 0 {
+        return 0.0;
+    }
+    ((legacy as f64 - adaptive as f64) / legacy as f64) * 100.0
+}
+
 #[allow(clippy::print_stderr)]
+fn print_scorecard_row(
+    workload: &str,
+    scheduler: &str,
+    m: WorkloadMetrics,
+    baseline_eof_reads: Option<u64>,
+) {
+    let reduction = baseline_eof_reads.map_or_else(
+        || "—".to_string(),
+        |base| format!("-{:.1}%", pct_reduction(base, m.eof_reads)),
+    );
+    eprintln!(
+        "| {workload} | {scheduler} | {} | {} | {} | {reduction} | {}ms | {}ms | {}ms |",
+        m.lines_delivered,
+        m.total_reads,
+        m.eof_reads,
+        m.p50_latency_ms,
+        m.p99_latency_ms,
+        m.max_latency_ms,
+    );
+}
+
+#[allow(clippy::print_stderr)]
+fn print_scorecard(rows: &[(&str, &str, WorkloadMetrics, Option<u64>)]) {
+    eprintln!("\n=== ReadScheduler Deterministic Simulation Scorecard ===");
+    eprintln!(
+        "| Workload | Scheduler | Lines | Total Reads | Wasted EOF Reads | EOF Read Reduction | p50 Latency | p99 Latency | Max Latency |"
+    );
+    eprintln!("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    for &(workload, scheduler, m, baseline_eof_reads) in rows {
+        print_scorecard_row(workload, scheduler, m, baseline_eof_reads);
+    }
+}
+
+fn adaptive_default() -> AdaptiveEventScheduler {
+    AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default())
+}
+
 #[tokio::test]
 async fn scheduler_scorecard_comparison() {
-    // Workload A: 1,000 idle files + 2 hot writers
     let legacy_idle = run_idle_heavy_workload(
         LegacyPollingScheduler::default(),
         |_| NoopFsEventSource,
@@ -248,13 +372,12 @@ async fn scheduler_scorecard_comparison() {
     )
     .await;
     let adaptive_idle = run_idle_heavy_workload(
-        AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default()),
+        adaptive_default(),
         SimFileSystem::event_source,
         EventDelivery::Normal,
     )
     .await;
 
-    // Workload B: 200 sporadic quiet files after 11s idle
     let legacy_sporadic = run_sporadic_cliff_workload(
         LegacyPollingScheduler::default(),
         |_| NoopFsEventSource,
@@ -262,62 +385,65 @@ async fn scheduler_scorecard_comparison() {
     )
     .await;
     let adaptive_sporadic = run_sporadic_cliff_workload(
-        AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default()),
+        adaptive_default(),
         SimFileSystem::event_source,
         EventDelivery::Normal,
     )
     .await;
-
-    // Workload B with 100% dropped events (NFS fallback)
     let adaptive_nfs = run_sporadic_cliff_workload(
-        AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default()),
+        adaptive_default(),
         SimFileSystem::event_source,
         EventDelivery::DropAll,
     )
     .await;
 
-    eprintln!("\n=== ReadScheduler Deterministic Simulation Scorecard ===");
-    eprintln!(
-        "Workload A (1000 idle + 2 hot, 30s):
-  Legacy:   lines={}, reads={}, eof_reads={}, p50={}ms, p99={}ms, max={}ms
-  Adaptive: lines={}, reads={}, eof_reads={}, p50={}ms, p99={}ms, max={}ms",
-        legacy_idle.lines_delivered,
-        legacy_idle.total_reads,
-        legacy_idle.eof_reads,
-        legacy_idle.p50_latency_ms,
-        legacy_idle.p99_latency_ms,
-        legacy_idle.max_latency_ms,
-        adaptive_idle.lines_delivered,
-        adaptive_idle.total_reads,
-        adaptive_idle.eof_reads,
-        adaptive_idle.p50_latency_ms,
-        adaptive_idle.p99_latency_ms,
-        adaptive_idle.max_latency_ms,
-    );
-    eprintln!(
-        "Workload B (200 sporadic files after 11s idle):
-  Legacy:       lines={}, reads={}, eof_reads={}, p50={}ms, p99={}ms, max={}ms
-  Adaptive:     lines={}, reads={}, eof_reads={}, p50={}ms, p99={}ms, max={}ms
-  Adaptive/NFS: lines={}, reads={}, eof_reads={}, p50={}ms, p99={}ms, max={}ms",
-        legacy_sporadic.lines_delivered,
-        legacy_sporadic.total_reads,
-        legacy_sporadic.eof_reads,
-        legacy_sporadic.p50_latency_ms,
-        legacy_sporadic.p99_latency_ms,
-        legacy_sporadic.max_latency_ms,
-        adaptive_sporadic.lines_delivered,
-        adaptive_sporadic.total_reads,
-        adaptive_sporadic.eof_reads,
-        adaptive_sporadic.p50_latency_ms,
-        adaptive_sporadic.p99_latency_ms,
-        adaptive_sporadic.max_latency_ms,
-        adaptive_nfs.lines_delivered,
-        adaptive_nfs.total_reads,
-        adaptive_nfs.eof_reads,
-        adaptive_nfs.p50_latency_ms,
-        adaptive_nfs.p99_latency_ms,
-        adaptive_nfs.max_latency_ms,
-    );
+    let legacy_waves = run_continuous_sporadic_workload(
+        LegacyPollingScheduler::default(),
+        |_| NoopFsEventSource,
+        EventDelivery::Normal,
+    )
+    .await;
+    let adaptive_waves = run_continuous_sporadic_workload(
+        adaptive_default(),
+        SimFileSystem::event_source,
+        EventDelivery::Normal,
+    )
+    .await;
+
+    print_scorecard(&[
+        ("A: 1000 idle + 2 hot (30s)", "Legacy", legacy_idle, None),
+        (
+            "A: 1000 idle + 2 hot (30s)",
+            "Adaptive+Notify",
+            adaptive_idle,
+            Some(legacy_idle.eof_reads),
+        ),
+        (
+            "B: 200 quiet after 11s idle",
+            "Legacy",
+            legacy_sporadic,
+            None,
+        ),
+        (
+            "B: 200 quiet after 11s idle",
+            "Adaptive+Notify",
+            adaptive_sporadic,
+            Some(legacy_sporadic.eof_reads),
+        ),
+        (
+            "B: 200 quiet after 11s idle",
+            "Adaptive/NFS (DropAll)",
+            adaptive_nfs,
+            Some(legacy_sporadic.eof_reads),
+        ),
+        ("C: 200 sporadic waves (60s)", "Legacy", legacy_waves, None),
+        (
+            "C: 200 sporadic waves (60s)",
+            "Adaptive+Notify",
+            adaptive_waves,
+            Some(legacy_waves.eof_reads),
+        ),
+    ]);
 
     // Correctness: all hot & burst lines delivered in every configuration.
     assert_eq!(legacy_idle.lines_delivered, 300);
@@ -325,20 +451,29 @@ async fn scheduler_scorecard_comparison() {
     assert_eq!(legacy_sporadic.lines_delivered, 200);
     assert_eq!(adaptive_sporadic.lines_delivered, 200);
     assert_eq!(adaptive_nfs.lines_delivered, 200);
+    assert_eq!(legacy_waves.lines_delivered, 600);
+    assert_eq!(adaptive_waves.lines_delivered, 600);
 
-    // Quantitative efficiency win on Workload A: Adaptive executes > 3x fewer wasted EOF reads!
+    // Quantitative efficiency wins:
     assert!(
         adaptive_idle.eof_reads * 3 < legacy_idle.eof_reads,
-        "expected >3x reduction in wasted EOF reads (legacy={}, adaptive={})",
+        "expected >3x reduction in wasted EOF reads on Workload A (legacy={}, adaptive={})",
         legacy_idle.eof_reads,
         adaptive_idle.eof_reads
     );
+    assert!(
+        adaptive_waves.eof_reads * 3 < legacy_waves.eof_reads,
+        "expected >3x reduction in wasted EOF reads on Workload C (legacy={}, adaptive={})",
+        legacy_waves.eof_reads,
+        adaptive_waves.eof_reads
+    );
 
-    // Quantitative latency win on Workload B: Legacy hits the ~9s idle cliff;
-    // Adaptive delivers immediately (0ms sim latency), and even NFS fallback beats legacy!
+    // Quantitative latency wins:
     assert!(legacy_sporadic.max_latency_ms >= 9_000);
     assert_eq!(adaptive_sporadic.max_latency_ms, 0);
     assert!(adaptive_nfs.max_latency_ms <= 10_000);
+    assert!(legacy_waves.max_latency_ms >= 5_000);
+    assert_eq!(adaptive_waves.max_latency_ms, 0);
 }
 
 #[tokio::test]
@@ -461,11 +596,20 @@ proptest! {
         let legacy = run_dst_scenario_outcome(config.clone(), &actions)?;
         let adaptive = run_dst_scenario_adaptive_outcome(config, &actions, delivery)?;
 
-        // 1. Final filesystem state (files & symlinks remaining) must match identically.
+        // 1. Final watched filesystem state (all non-checkpoint log files & symlinks)
+        // must match identically. (`/data/checkpoints.new.json` depends on whether a
+        // mid-trace crashed flush had dirty checkpoints at that exact tick.)
+        let log_paths = |paths: &[PathBuf]| -> Vec<PathBuf> {
+            paths
+                .iter()
+                .filter(|p| !p.starts_with("/data"))
+                .cloned()
+                .collect()
+        };
         prop_assert_eq!(
-            adaptive.final_paths,
-            legacy.final_paths,
-            "final filesystem paths diverged between Legacy and Adaptive"
+            log_paths(&adaptive.final_paths),
+            log_paths(&legacy.final_paths),
+            "final log filesystem paths diverged between Legacy and Adaptive"
         );
 
         // 2. Compare per-stream delivered lines for every stream not lost across a restart.

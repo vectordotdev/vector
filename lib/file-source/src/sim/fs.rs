@@ -8,7 +8,9 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use file_source_common::{AsyncFile, Clock, FileIdentity, FileMetadata, FileSystem};
+use file_source_common::{
+    AsyncFile, Clock, FileFingerprint, FileIdentity, FileMetadata, FileSystem,
+};
 use glob::Pattern;
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 
@@ -134,7 +136,10 @@ impl SimFileSystem {
     /// Returns a [`SimFsEventSource`] connected to this simulated filesystem.
     #[must_use]
     pub fn event_source(&self) -> SimFsEventSource {
-        SimFsEventSource { fs: self.clone() }
+        SimFsEventSource {
+            fs: self.clone(),
+            watched_files: HashMap::new(),
+        }
     }
 
     /// Configures how filesystem notifications are delivered (normal vs. dropped/NFS).
@@ -407,15 +412,29 @@ fn push_event(inner: &mut SimFsInner, event: FsEvent) {
     }
 }
 
-/// Simulated [`FsEventSource`] connected to a [`SimFileSystem`].
+/// Simulated [`FsEventSource`] connected to a [`SimFileSystem`], tracking active
+/// per-watcher registrations so DST can assert zero watch leaks across rotations.
 pub struct SimFsEventSource {
     fs: SimFileSystem,
+    watched_files: HashMap<FileFingerprint, PathBuf>,
 }
 
 impl FsEventSource for SimFsEventSource {
     fn drain_events(&mut self, out: &mut Vec<FsEvent>) {
         let mut inner = self.fs.inner.lock().unwrap();
         out.append(&mut inner.fs_events);
+    }
+
+    fn watch_path(&mut self, file_id: FileFingerprint, path: &Path) {
+        self.watched_files.insert(file_id, path.to_path_buf());
+    }
+
+    fn unwatch_path(&mut self, file_id: FileFingerprint) {
+        self.watched_files.remove(&file_id);
+    }
+
+    fn watched_file_count(&self) -> usize {
+        self.watched_files.len()
     }
 }
 

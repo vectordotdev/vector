@@ -34,16 +34,21 @@ pub trait FsEventSource: Send + 'static {
     /// Drain all pending filesystem events into `out` without blocking.
     fn drain_events(&mut self, out: &mut Vec<FsEvent>);
 
-    /// Notify the event source that `path` is now being watched.
-    fn watch_path(&mut self, _path: &Path) {}
+    /// Notify the event source that `file_id` at `path` is now being watched.
+    fn watch_path(&mut self, _file_id: FileFingerprint, _path: &Path) {}
 
-    /// Notify the event source that `path` is no longer being watched.
-    fn unwatch_path(&mut self, _path: &Path) {}
+    /// Notify the event source that `file_id` is no longer being watched.
+    fn unwatch_path(&mut self, _file_id: FileFingerprint) {}
 
     /// Optional async notifier signaled whenever new events arrive, allowing
     /// `FileServer` to interrupt its idle backoff sleep immediately.
     fn wakeup_notifier(&self) -> Option<Arc<Notify>> {
         None
+    }
+
+    /// Number of active per-watcher registrations (used for DST leak invariants).
+    fn watched_file_count(&self) -> usize {
+        0
     }
 }
 
@@ -95,6 +100,11 @@ pub trait ReadScheduler: Send + 'static {
 
     /// Populate `out` with the ordered list of files eligible to be polled at `now`.
     fn select_readable(&mut self, now: MonotonicInstant, out: &mut Vec<FileFingerprint>);
+
+    /// Number of queued internal timer entries (used by DST to assert bounded memory).
+    fn pending_timer_count(&self) -> usize {
+        0
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +310,19 @@ impl AdaptiveEventScheduler {
             );
             self.fallback_heap
                 .push(Reverse((due, entry.order, entry.generation, file_id)));
+            self.maybe_compact_heap();
+        }
+    }
+
+    /// Compacts stale/superseded heap entries so memory stays strictly `O(N)`.
+    fn maybe_compact_heap(&mut self) {
+        let limit = self.entries.len().saturating_mul(4).max(64);
+        if self.fallback_heap.len() > limit {
+            self.fallback_heap.retain(|Reverse((_, _, gen_id, fp))| {
+                self.entries
+                    .get(fp)
+                    .is_some_and(|e| e.generation == *gen_id && !e.dirty)
+            });
         }
     }
 }
@@ -353,6 +376,7 @@ impl ReadScheduler for AdaptiveEventScheduler {
         {
             self.path_to_fp.remove(&entry.path);
         }
+        self.maybe_compact_heap();
     }
 
     fn on_file_read(
@@ -422,5 +446,9 @@ impl ReadScheduler for AdaptiveEventScheduler {
             }
             out.push(fp);
         }
+    }
+
+    fn pending_timer_count(&self) -> usize {
+        self.fallback_heap.len()
     }
 }

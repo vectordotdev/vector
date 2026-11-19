@@ -618,12 +618,32 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
 
         // Open OS handles must never exceed active watchers (watchers using
         // `FileReader::Null` for already-checkpointed gzip files hold 0 handles).
-        let open_count = self.state.as_ref().unwrap().open_file_count();
+        let state_ref = self.state.as_ref().unwrap();
+        let open_count = state_ref.open_file_count();
         prop_assert!(
             self.fs.active_open_handles() <= open_count,
             "step={}: active_open_handles ({}) > open_file_count ({})",
             step_idx,
             self.fs.active_open_handles(),
+            open_count
+        );
+
+        // Scheduler internal timer heap must stay strictly O(N) bounded under churn.
+        let heap_limit = open_count.saturating_mul(4).max(64);
+        prop_assert!(
+            state_ref.scheduler_pending_timers() <= heap_limit,
+            "step={}: scheduler_pending_timers ({}) exceeded O(N) bound ({})",
+            step_idx,
+            state_ref.scheduler_pending_timers(),
+            heap_limit
+        );
+
+        // Event-source watch registrations must never leak past active watchers.
+        prop_assert!(
+            state_ref.watched_event_count() <= open_count,
+            "step={}: watched_event_count ({}) > open_file_count ({})",
+            step_idx,
+            state_ref.watched_event_count(),
             open_count
         );
         Ok(())

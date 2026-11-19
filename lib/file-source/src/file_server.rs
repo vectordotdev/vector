@@ -207,6 +207,18 @@ where
         self.fp_map.len()
     }
 
+    /// Returns the number of queued timer entries inside the active [`ReadScheduler`].
+    #[must_use]
+    pub fn scheduler_pending_timers(&self) -> usize {
+        self.scheduler.pending_timer_count()
+    }
+
+    /// Returns the number of active file watch registrations in the [`FsEventSource`].
+    #[must_use]
+    pub fn watched_event_count(&self) -> usize {
+        self.event_source.watched_file_count()
+    }
+
     /// Returns a handle to the shared checkpoints view.
     #[must_use]
     pub fn checkpoints(&self) -> &Arc<CheckpointsView<C>> {
@@ -307,8 +319,7 @@ where
                             old_path = ?old_path
                         );
                         if let Ok(unwatch_opt) = watcher.update_path(path.clone()).await {
-                            self.event_source.unwatch_path(&old_path);
-                            self.event_source.watch_path(&path);
+                            self.event_source.watch_path(file_id, &path);
                             self.scheduler
                                 .on_file_renamed(file_id, &old_path, &path, now);
                             if let Some(unwatch_info) = unwatch_opt {
@@ -340,8 +351,7 @@ where
                                 old_modified_time = ?old_modified_time,
                             );
                             if let Ok(unwatch_opt) = watcher.update_path(path).await {
-                                self.event_source.unwatch_path(&old_path);
-                                self.event_source.watch_path(&new_path);
+                                self.event_source.watch_path(file_id, &new_path);
                                 self.scheduler
                                     .on_file_renamed(file_id, &old_path, &new_path, now);
                                 if let Some(unwatch_info) = unwatch_opt {
@@ -544,7 +554,7 @@ where
         for file_id in dead_file_ids {
             if let Some(watcher) = self.fp_map.shift_remove(&file_id) {
                 self.scheduler.on_file_removed(file_id);
-                self.event_source.unwatch_path(&watcher.path);
+                self.event_source.unwatch_path(file_id);
                 let unwatch_info = watcher.get_unwatch_info().await;
                 self.server.emitter.emit_file_unwatched(
                     &unwatch_info.path,
@@ -606,7 +616,7 @@ where
                 watcher.set_file_findable_at(true, now);
                 let initial_ts = watcher.last_read_success();
                 self.fp_map.insert(file_id, watcher);
-                self.event_source.watch_path(&path);
+                self.event_source.watch_path(file_id, &path);
                 self.scheduler
                     .on_file_added(file_id, &path, initial_ts, now);
             }
@@ -647,6 +657,40 @@ where
     /// Creating a watcher can also panic as described by [`FileWatcher::new`].
     /// Requires a Tokio runtime with timers enabled.
     pub async fn run<C, S1, S2>(
+        self,
+        chans: C,
+        shutdown_data: S1,
+        shutdown_checkpointer: S2,
+        checkpointer: Checkpointer,
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
+    where
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
+    {
+        self.run_with(
+            chans,
+            shutdown_data,
+            shutdown_checkpointer,
+            checkpointer,
+            OsFileSystem,
+            SystemClock,
+        )
+        .await
+    }
+
+    /// Opt-in entrypoint running `FileServer` with [`AdaptiveEventScheduler`]
+    /// and [`NotifyEventSource`] (gracefully degrading to adaptive fallback
+    /// polling if OS watcher initialization fails).
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    pub async fn run_adaptive<C, S1, S2>(
         self,
         chans: C,
         shutdown_data: S1,

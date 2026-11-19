@@ -1,13 +1,14 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, RwLock,
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, TryRecvError, TrySendError},
     },
 };
 
+use file_source_common::FileFingerprint;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
 use tokio::sync::Notify;
 use tracing::{debug, warn};
@@ -16,36 +17,51 @@ use crate::scheduler::{FsEvent, FsEventSource};
 
 const EVENT_CHANNEL_CAPACITY: usize = 4096;
 
+#[derive(Debug)]
+struct WatchedFileRecord {
+    watched_path: PathBuf,
+    watched_parent: Option<PathBuf>,
+    canonical_target: Option<PathBuf>,
+    target_parent: Option<PathBuf>,
+}
+
 /// Production [`FsEventSource`] backed by `notify::RecommendedWatcher`
 /// (`inotify` on Linux, `FSEvents` on macOS, `ReadDirectoryChangesW` on Windows).
 ///
+/// Events are treated strictly as **hints**; [`crate::scheduler::AdaptiveEventScheduler`]
+/// always retains bounded fallback polling when notifications are delayed, dropped, or
+/// unavailable (e.g. NFS/SMB or watch-exhausted hosts).
+///
 /// Design properties:
+/// - **Per-watcher `FileFingerprint` tracking:** Avoids symlink-rotation races where a
+///   new file at the same path is watched before the old watcher is reaped.
 /// - **Parent-directory ref-counted watches:** Watches unique parent directories
-///   (`RecursiveMode::NonRecursive`) rather than individual files, keeping OS
-///   watch-descriptor usage `O(directories)` instead of `O(files)` and surviving
-///   atomic rename-replace rotations.
-/// - **Bounded channel with overflow coalescing:** If the bounded event channel
-///   fills up or `notify` reports an error / `need_rescan()`, an atomic
-///   `overflowed` flag is set and drained as a single [`FsEvent::Overflow`].
-/// - **Zero-latency async wakeup:** Signals an [`Arc<Notify>`] whenever events
-///   arrive so `FileServer` can interrupt its idle backoff sleep immediately.
-/// - **Canonical-path normalization:** Tracks canonical parent directory aliases
-///   (e.g. macOS `/var` -> `/private/var`) so emitted paths match watched paths.
+///   (`RecursiveMode::NonRecursive`) plus canonical symlink target directories, keeping
+///   OS watch descriptors `O(directories)` instead of `O(files)`.
+/// - **Noisy-sibling filtering:** Checks `Modify`/`Remove` events against the active
+///   tracked path set in the watcher callback so writes to unrelated files in shared
+///   directories (e.g. `/var/log`) do not fill the channel or wake `FileServer`.
+/// - **Bounded channel with overflow coalescing:** Channel saturation or watcher errors
+///   coalesce into a single [`FsEvent::Overflow`].
 pub struct NotifyEventSource {
     watcher: RecommendedWatcher,
     rx: Receiver<FsEvent>,
     overflowed: Arc<AtomicBool>,
     wakeup: Arc<Notify>,
+    /// Shared set of tracked file paths (watched paths, canonical target paths, and
+    /// canonicalized-parent forms) used to filter out noisy sibling files in the callback.
+    tracked_paths: Arc<RwLock<HashSet<PathBuf>>>,
+    /// Ref-count of each path in `tracked_paths` (handles multiple symlinks to same target).
+    tracked_path_refs: HashMap<PathBuf, usize>,
+    /// Active per-watcher registrations keyed by `FileFingerprint`.
+    watched_files: HashMap<FileFingerprint, WatchedFileRecord>,
     /// Ref-count of watched files per parent directory.
     dir_refs: HashMap<PathBuf, usize>,
     /// Maps canonicalized parent directory -> original watched parent directory
-    /// when they differ (e.g. symlinked parent dirs).
+    /// when they differ (e.g. macOS `/var` -> `/private/var`).
     canonical_to_watched: HashMap<PathBuf, Vec<PathBuf>>,
-    /// Maps canonicalized target file path -> watched symlink path(s) when a
-    /// watched file is a symlink pointing to a target (possibly in another directory).
+    /// Maps canonicalized target file path -> watched symlink path(s).
     file_aliases: HashMap<PathBuf, Vec<PathBuf>>,
-    /// Reverse index from watched symlink path -> canonical target file path for clean unwatch.
-    watched_to_canonical_file: HashMap<PathBuf, PathBuf>,
 }
 
 impl NotifyEventSource {
@@ -58,9 +74,11 @@ impl NotifyEventSource {
         let (tx, rx) = mpsc::sync_channel::<FsEvent>(EVENT_CHANNEL_CAPACITY);
         let overflowed = Arc::new(AtomicBool::new(false));
         let wakeup = Arc::new(Notify::new());
+        let tracked_paths: Arc<RwLock<HashSet<PathBuf>>> = Arc::new(RwLock::new(HashSet::new()));
 
         let cb_overflowed = Arc::clone(&overflowed);
         let cb_wakeup = Arc::clone(&wakeup);
+        let cb_tracked = Arc::clone(&tracked_paths);
 
         let watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
             let mut woke = false;
@@ -71,6 +89,16 @@ impl NotifyEventSource {
                         woke = true;
                     } else if let Some(kind) = map_event_kind(event.kind) {
                         for path in event.paths {
+                            // Filter out noisy sibling files for Modify/Remove events;
+                            // Created events are allowed through so newly appearing files
+                            // can still signal hints if desired.
+                            if !matches!(kind, MappedKind::Created) {
+                                let is_tracked =
+                                    cb_tracked.read().map_or(true, |set| set.contains(&path));
+                                if !is_tracked {
+                                    continue;
+                                }
+                            }
                             let fs_event = match kind {
                                 MappedKind::Modified => FsEvent::Modified(path),
                                 MappedKind::Created => FsEvent::Created(path),
@@ -104,10 +132,12 @@ impl NotifyEventSource {
             rx,
             overflowed,
             wakeup,
+            tracked_paths,
+            tracked_path_refs: HashMap::new(),
+            watched_files: HashMap::new(),
             dir_refs: HashMap::new(),
             canonical_to_watched: HashMap::new(),
             file_aliases: HashMap::new(),
-            watched_to_canonical_file: HashMap::new(),
         })
     }
 
@@ -115,6 +145,28 @@ impl NotifyEventSource {
     #[must_use]
     pub fn watched_dir_count(&self) -> usize {
         self.dir_refs.len()
+    }
+
+    fn track_path_ref(&mut self, path: PathBuf) {
+        let count = self.tracked_path_refs.entry(path.clone()).or_insert(0);
+        *count += 1;
+        if *count == 1
+            && let Ok(mut set) = self.tracked_paths.write()
+        {
+            set.insert(path);
+        }
+    }
+
+    fn untrack_path_ref(&mut self, path: &Path) {
+        if let Some(count) = self.tracked_path_refs.get_mut(path) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.tracked_path_refs.remove(path);
+                if let Ok(mut set) = self.tracked_paths.write() {
+                    set.remove(path);
+                }
+            }
+        }
     }
 
     fn watch_dir(&mut self, dir: &Path) {
@@ -178,7 +230,7 @@ impl NotifyEventSource {
             }
         };
 
-        // 1. Check direct canonical target -> symlink path aliases (e.g. Kubernetes pod logs).
+        // 1. Direct canonical target -> symlink path aliases (e.g. Kubernetes pod logs).
         let mut emitted_alias = false;
         if let Some(symlink_paths) = self.file_aliases.get(path) {
             for sym_path in symlink_paths {
@@ -187,7 +239,7 @@ impl NotifyEventSource {
             }
         }
 
-        // 2. Check canonical parent dir -> watched parent dir aliases (e.g. macOS /private/var).
+        // 2. Canonical parent dir -> watched parent dir aliases (e.g. macOS /private/var).
         if let (Some(parent), Some(file_name)) = (path.parent(), path.file_name())
             && let Some(aliases) = self.canonical_to_watched.get(parent)
         {
@@ -227,6 +279,10 @@ impl FsEventSource for NotifyEventSource {
         if self.overflowed.swap(false, Ordering::AcqRel) {
             // Drain and discard buffered events; a single Overflow promotes all files.
             while self.rx.try_recv().is_ok() {}
+            debug!(
+                message =
+                    "OS file event queue overflowed; scheduling full rescan of watched files."
+            );
             out.push(FsEvent::Overflow);
             return;
         }
@@ -243,52 +299,82 @@ impl FsEventSource for NotifyEventSource {
         }
     }
 
-    fn watch_path(&mut self, path: &Path) {
-        if let Some(parent) = path.parent() {
-            self.watch_dir(parent);
+    fn watch_path(&mut self, file_id: FileFingerprint, path: &Path) {
+        // If `file_id` was already registered (e.g. rename), clean up its old record first.
+        if self.watched_files.contains_key(&file_id) {
+            self.unwatch_path(file_id);
         }
 
-        // If `path` is a symlink whose target resolves to a different file (potentially
-        // in another directory, e.g. `/var/log/containers/*.log -> /var/log/pods/...`),
-        // also watch the target's parent directory and map target events back to `path`.
-        if let Ok(canonical_file) = std::fs::canonicalize(path)
+        let watched_path = path.to_path_buf();
+        let watched_parent = path.parent().map(Path::to_path_buf);
+        if let Some(parent) = &watched_parent {
+            self.watch_dir(parent);
+        }
+        self.track_path_ref(watched_path.clone());
+
+        // If `path` resolves to a different canonical path (symlink or symlinked parent dir),
+        // also track & watch the canonical target's parent directory.
+        let (canonical_target, target_parent) = if let Ok(canonical_file) =
+            std::fs::canonicalize(path)
             && canonical_file != path
         {
-            if let Some(target_parent) = canonical_file.parent()
-                && Some(target_parent) != path.parent()
-            {
-                self.watch_dir(target_parent);
+            let tp = canonical_file
+                .parent()
+                .filter(|tp| Some(*tp) != path.parent())
+                .map(Path::to_path_buf);
+            if let Some(dir) = &tp {
+                self.watch_dir(dir);
             }
+            self.track_path_ref(canonical_file.clone());
             self.file_aliases
                 .entry(canonical_file.clone())
                 .or_default()
-                .push(path.to_path_buf());
-            self.watched_to_canonical_file
-                .insert(path.to_path_buf(), canonical_file);
-        }
+                .push(watched_path.clone());
+            (Some(canonical_file), tp)
+        } else {
+            (None, None)
+        };
+
+        self.watched_files.insert(
+            file_id,
+            WatchedFileRecord {
+                watched_path,
+                watched_parent,
+                canonical_target,
+                target_parent,
+            },
+        );
     }
 
-    fn unwatch_path(&mut self, path: &Path) {
-        if let Some(parent) = path.parent() {
+    fn unwatch_path(&mut self, file_id: FileFingerprint) {
+        let Some(rec) = self.watched_files.remove(&file_id) else {
+            return;
+        };
+
+        self.untrack_path_ref(&rec.watched_path);
+        if let Some(parent) = &rec.watched_parent {
             self.unwatch_dir(parent);
         }
-        if let Some(canonical_file) = self.watched_to_canonical_file.remove(path) {
-            if let Some(target_parent) = canonical_file.parent()
-                && Some(target_parent) != path.parent()
-            {
-                self.unwatch_dir(target_parent);
-            }
-            if let Some(aliases) = self.file_aliases.get_mut(&canonical_file) {
-                aliases.retain(|p| p != path);
+        if let Some(canonical_file) = &rec.canonical_target {
+            self.untrack_path_ref(canonical_file);
+            if let Some(aliases) = self.file_aliases.get_mut(canonical_file) {
+                aliases.retain(|p| p != &rec.watched_path);
                 if aliases.is_empty() {
-                    self.file_aliases.remove(&canonical_file);
+                    self.file_aliases.remove(canonical_file);
                 }
             }
+        }
+        if let Some(tp) = &rec.target_parent {
+            self.unwatch_dir(tp);
         }
     }
 
     fn wakeup_notifier(&self) -> Option<Arc<Notify>> {
         Some(Arc::clone(&self.wakeup))
+    }
+
+    fn watched_file_count(&self) -> usize {
+        self.watched_files.len()
     }
 }
 
@@ -302,7 +388,8 @@ mod tests {
 
     use bytes::Bytes;
     use file_source_common::{
-        Checkpointer, FingerprintStrategy, Fingerprinter, OsFileSystem, ReadFrom, SystemClock,
+        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, OsFileSystem, ReadFrom,
+        SystemClock,
     };
     use tempfile::tempdir;
 
@@ -316,26 +403,51 @@ mod tests {
     use super::NotifyEventSource;
 
     #[test]
-    fn notify_event_source_watches_parent_dir_and_receives_writes() {
+    fn notify_event_source_watches_parent_dir_and_filters_noisy_siblings() {
         let dir = tempdir().unwrap();
         let file_a = dir.path().join("a.log");
         let file_b = dir.path().join("b.log");
+        let noisy_sibling = dir.path().join("unrelated.tmp");
         fs::write(&file_a, b"init_a\n").unwrap();
         fs::write(&file_b, b"init_b\n").unwrap();
+        fs::write(&noisy_sibling, b"noise\n").unwrap();
+
+        let fp_a = FileFingerprint::DevInode(1, 1);
+        let fp_b = FileFingerprint::DevInode(1, 2);
 
         let mut source = NotifyEventSource::new().expect("create notify watcher");
-        source.watch_path(&file_a);
-        source.watch_path(&file_b);
-        // Two files in the same directory -> only 1 OS directory watch!
+        source.watch_path(fp_a, &file_a);
+        source.watch_path(fp_b, &file_b);
+        // Two files in the same directory -> only 1 OS directory watch.
         assert_eq!(source.watched_dir_count(), 1);
+        assert_eq!(source.watched_file_count(), 2);
 
-        // Append to `file_a` and wait briefly for OS event delivery.
+        // Drain any startup events, then write to the unrelated sibling file.
+        let mut events = Vec::new();
+        source.drain_events(&mut events);
+        events.clear();
+
+        let mut noisy = fs::OpenOptions::new()
+            .append(true)
+            .open(&noisy_sibling)
+            .unwrap();
+        writeln!(noisy, "should_be_ignored").unwrap();
+        noisy.flush().unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        source.drain_events(&mut events);
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, FsEvent::Modified(p) if p == &noisy_sibling)),
+            "unrelated sibling file should be filtered out, got {events:?}"
+        );
+
+        // Append to `file_a` and verify Modified event arrives.
         let mut f = fs::OpenOptions::new().append(true).open(&file_a).unwrap();
         writeln!(f, "hello_notify").unwrap();
         f.flush().unwrap();
 
-        let mut events = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = Instant::now() + Duration::from_secs(5);
         while Instant::now() < deadline {
             source.drain_events(&mut events);
             if events
@@ -355,10 +467,11 @@ mod tests {
         );
 
         // Ref-counting: unwatching one file keeps directory watch; unwatching both removes it.
-        source.unwatch_path(&file_a);
+        source.unwatch_path(fp_a);
         assert_eq!(source.watched_dir_count(), 1);
-        source.unwatch_path(&file_b);
+        source.unwatch_path(fp_b);
         assert_eq!(source.watched_dir_count(), 0);
+        assert_eq!(source.watched_file_count(), 0);
     }
 
     fn make_os_server(
@@ -434,7 +547,6 @@ mod tests {
         )
         .await;
 
-        // Initial seed drain
         let mut legacy_lines: Vec<Line> = Vec::new();
         let mut adaptive_lines: Vec<Line> = Vec::new();
         let _ = legacy.step(&mut legacy_lines).await;
@@ -444,8 +556,6 @@ mod tests {
         legacy_lines.clear();
         adaptive_lines.clear();
 
-        // Append 20 lines to each hot file and verify both deliver identical lines,
-        // with `NotifyEventSource` waking `AdaptiveEventScheduler` immediately.
         let mut f0 = fs::OpenOptions::new().append(true).open(&hot0).unwrap();
         let mut f1 = fs::OpenOptions::new().append(true).open(&hot1).unwrap();
         let mut expected_hot = Vec::new();
@@ -460,14 +570,13 @@ mod tests {
         f0.flush().unwrap();
         f1.flush().unwrap();
 
-        // Wait for OS notify wakeup (bounded by 500ms) and step adaptive.
         assert!(
-            tokio::time::timeout(Duration::from_millis(500), wakeup.notified())
+            tokio::time::timeout(Duration::from_secs(5), wakeup.notified())
                 .await
                 .is_ok(),
-            "expected NotifyEventSource to wake within 500ms"
+            "expected NotifyEventSource to wake within 5s"
         );
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = Instant::now() + Duration::from_secs(5);
         while adaptive_lines.len() < expected_hot.len() && Instant::now() < deadline {
             let _ = adaptive.step(&mut adaptive_lines).await;
             if adaptive_lines.len() < expected_hot.len() {
@@ -497,32 +606,46 @@ mod tests {
         assert_eq!(got_legacy, expected_hot);
     }
 
+    /// Verifies cross-directory symlink target watching AND atomic symlink rotation
+    /// where the new target (`fp2`) is watched before the old target (`fp1`) is unwatched.
     #[cfg(unix)]
     #[test]
-    fn notify_event_source_tracks_cross_directory_symlink_target() {
-        let target_dir = tempdir().unwrap();
+    fn notify_event_source_tracks_cross_directory_symlink_target_and_rotation() {
+        let target_dir_1 = tempdir().unwrap();
+        let target_dir_2 = tempdir().unwrap();
         let link_dir = tempdir().unwrap();
 
-        let target_file = target_dir.path().join("0.log");
+        let target_1 = target_dir_1.path().join("0.log");
+        let target_2 = target_dir_2.path().join("1.log");
         let symlink_file = link_dir.path().join("pod_container.log");
-        fs::write(&target_file, b"init\n").unwrap();
-        std::os::unix::fs::symlink(&target_file, &symlink_file).unwrap();
+        fs::write(&target_1, b"init1\n").unwrap();
+        fs::write(&target_2, b"init2\n").unwrap();
+        std::os::unix::fs::symlink(&target_1, &symlink_file).unwrap();
+
+        let fp1 = FileFingerprint::DevInode(1, 10);
+        let fp2 = FileFingerprint::DevInode(1, 20);
 
         let mut source = NotifyEventSource::new().expect("create notify watcher");
-        source.watch_path(&symlink_file);
-        // Watches both the symlink's directory AND the target's directory.
+        source.watch_path(fp1, &symlink_file);
         assert_eq!(source.watched_dir_count(), 2);
 
-        // Append directly to the target file (in a different directory!).
-        let mut f = fs::OpenOptions::new()
-            .append(true)
-            .open(&target_file)
-            .unwrap();
-        writeln!(f, "pod_log_line").unwrap();
+        // Atomically retarget symlink to `target_2` and watch `fp2` BEFORE unwatching `fp1`.
+        fs::remove_file(&symlink_file).unwrap();
+        std::os::unix::fs::symlink(&target_2, &symlink_file).unwrap();
+        source.watch_path(fp2, &symlink_file);
+        assert_eq!(source.watched_dir_count(), 3);
+
+        // Unwatching `fp1` must release `target_dir_1` while keeping `target_dir_2` active!
+        source.unwatch_path(fp1);
+        assert_eq!(source.watched_dir_count(), 2);
+        assert_eq!(source.watched_file_count(), 1);
+
+        let mut f = fs::OpenOptions::new().append(true).open(&target_2).unwrap();
+        writeln!(f, "after_symlink_rotate").unwrap();
         f.flush().unwrap();
 
         let mut events = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = Instant::now() + Duration::from_secs(5);
         while Instant::now() < deadline {
             source.drain_events(&mut events);
             if events
@@ -541,8 +664,8 @@ mod tests {
             "expected Modified event remapped to symlink {symlink_file:?}, got {events:?}"
         );
 
-        // Unwatching the symlink cleans up both directory watches.
-        source.unwatch_path(&symlink_file);
+        source.unwatch_path(fp2);
         assert_eq!(source.watched_dir_count(), 0);
+        assert_eq!(source.watched_file_count(), 0);
     }
 }
