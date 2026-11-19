@@ -1,4 +1,6 @@
-use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vector_lib::{
+    TimeZone, compile_vrl, configurable::configurable_component, internal_event::emit,
+};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
@@ -112,8 +114,8 @@ impl Conditional for Vrl {
 
         let result = result.map_or_else(
             |err| {
-                emit!(VrlConditionExecutionError {
-                    error: err.to_string().as_ref()
+                emit(VrlConditionExecutionError {
+                    error: err.to_string().as_ref(),
                 });
                 false
             },
@@ -265,7 +267,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default(), &MetricsStorage::default()) {
                 assert_eq!(
-                    cond.check_with_context(event.clone()).0,
+                    cond.check_with_context(event).0,
                     check.map_err(std::string::ToString::to_string)
                 );
             }

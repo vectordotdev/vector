@@ -21,10 +21,9 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     ComponentKey, DynValidatedSink, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
 };
-use crate::{
-    extra_context::ExtraContext,
-    sinks::{Healthcheck, util::UriSerde},
-};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::sinks::{Healthcheck, util::UriSerde};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 

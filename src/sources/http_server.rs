@@ -26,8 +26,12 @@ use crate::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
     },
-    tls::TlsEnableableConfig,
+    tls::{TlsAcceptorReloader, TlsEnableableConfig},
 };
+const PATH: &str = "path";
+const HEADERS: &str = "headers";
+const QUERY_PARAMETERS: &str = "query_parameters";
+const HOST: &str = "host";
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -144,7 +148,7 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 self.path_key.path.clone().map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("path"),
+                &owned_value_path!(PATH),
                 Kind::bytes(),
                 None,
             )
@@ -152,7 +156,7 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 None,
-                &owned_value_path!("headers"),
+                &owned_value_path!(HEADERS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -160,14 +164,14 @@ impl SimpleHttpConfig {
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 None,
-                &owned_value_path!("query_parameters"),
+                &owned_value_path!(QUERY_PARAMETERS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 SimpleHttpConfig::NAME,
                 self.host_key.path.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
                 None,
             )
@@ -237,7 +241,7 @@ fn default_path() -> String {
 }
 
 fn default_path_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("path"))
+    OptionalValuePath::from(owned_value_path!(PATH))
 }
 
 fn default_host_key() -> OptionalValuePath {
@@ -295,10 +299,25 @@ pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParam
         .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "http_server")]
-impl SourceConfig for SimpleHttpConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SimpleHttpConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    #[must_use]
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder, TLS, or authentication cannot be built, or if `tls_reloader`
+    /// is set but TLS is disabled.
+    pub fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self
             .get_decoding_config()
@@ -323,11 +342,20 @@ impl SourceConfig for SimpleHttpConfig {
             self.response_code,
             self.strict_path,
             self.tls.as_ref(),
+            tls_reloader,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
         )
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "http_server")]
+impl SourceConfig for SimpleHttpConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None)
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -391,7 +419,7 @@ impl HttpSource for SimpleHttpSource {
                     SimpleHttpConfig::NAME,
                     log,
                     self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("path"),
+                    path!(PATH),
                     request_path.to_owned(),
                 );
 
@@ -406,7 +434,7 @@ impl HttpSource for SimpleHttpSource {
                         SimpleHttpConfig::NAME,
                         log,
                         self.host_key.path.as_ref().map(LegacyKey::Overwrite),
-                        path!("host"),
+                        path!(HOST),
                         socket_addr_to_ip_string(addr),
                     );
                 }
@@ -478,7 +506,7 @@ mod tests {
     };
     use futures::Stream;
     use headers::{Authorization, authorization::Credentials};
-    use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
+    use http::{HeaderMap, Method, StatusCode, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{
@@ -492,6 +520,7 @@ mod tests {
             owned_value_path, path,
         },
         schema::Definition,
+        tls::{MaybeTlsSettings, TlsEnableableConfig, TlsError},
     };
     use vrl::{
         path::ValuePath as _,
@@ -1679,6 +1708,25 @@ mod tests {
         assert_eq!(200, send_with_headers(addr, "", headers).await);
     }
 
+    #[tokio::test]
+    async fn tls_reloader_requires_tls() {
+        let reloader =
+            MaybeTlsSettings::from_config(Some(&TlsEnableableConfig::test_config()), true)
+                .unwrap()
+                .reloadable_acceptor()
+                .unwrap();
+        assert!(reloader.is_some());
+
+        let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let result = SimpleHttpConfig::default()
+            .build_with_tls_reloader(SourceContext::new_test(sender, None), reloader);
+        let error = result.err().expect("must not silently serve plaintext");
+        assert!(
+            matches!(error.downcast_ref(), Some(TlsError::ReloaderWithoutTls)),
+            "unexpected error: {error}"
+        );
+    }
+
     #[test]
     fn output_schema_definition_vector_namespace() {
         let config = SimpleHttpConfig {
@@ -1970,7 +2018,7 @@ mod tests {
             let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
 
             let listen_addr_http = format!("http://{}/", config.address);
-            let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+            let uri = http::Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,

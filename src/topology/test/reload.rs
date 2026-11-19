@@ -12,6 +12,7 @@ use vector_lib::{
     buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull},
     config::ComponentKey,
     event::{Event, EventContainer, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use crate::{
@@ -20,7 +21,6 @@ use crate::{
         EnrichmentTables,
         memory::{MemoryConfig, MemorySourceConfig, ReloadBehavior},
     },
-    extra_context::ExtraContext,
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
@@ -30,7 +30,7 @@ use crate::{
         self,
         addr::next_addr,
         mock::{basic_sink, oneshot_sink},
-        start_topology, temp_dir, wait_for_tcp,
+        start_topology, wait_for_tcp,
     },
     topology::ReloadError::*,
 };
@@ -193,11 +193,10 @@ async fn topology_disk_buffer_conflict() {
     let (_guard_0, address_0) = next_addr();
     let (_guard_1, address_1) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address_0, 1));
 
@@ -293,11 +292,11 @@ async fn topology_readd_input() {
     topology.stop().await;
 
     // sink should not crash
-    assert!(
+    assert_eq!(
         UnboundedReceiverStream::new(crash)
             .collect::<Vec<_>>()
-            .await
-            .is_empty()
+            .await,
+        [] as [crate::signal::ShutdownError; 0]
     );
 }
 
@@ -341,11 +340,10 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     let (_guard, address) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
 
@@ -391,6 +389,7 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
         () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
+    topology.stop().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -401,8 +400,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
 
     let (_guard, address) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let memory_stage = BufferType::Memory {
         size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
@@ -410,7 +408,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     };
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
 
@@ -460,6 +458,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
         () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
+    topology.stop().await;
 }
 
 #[tokio::test]
@@ -621,7 +620,7 @@ async fn topology_reload_reuses_removed_enrichment_table_source_key() {
                 .expect("old table source must send output before reload")
                 .into_events()
                 .collect::<Vec<_>>();
-            assert!(!events.is_empty());
+            assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         },
         () = tokio::time::sleep(Duration::from_secs(5)) => {
             panic!("old table source never produced output")

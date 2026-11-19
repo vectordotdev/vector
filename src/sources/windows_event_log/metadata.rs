@@ -12,7 +12,7 @@ use windows::core::HSTRING;
 use super::subscription::{FORMAT_CACHE_CAPACITY, PublisherHandle};
 
 /// Resolves task, opcode, and keyword names from provider metadata via `EvtFormatMessage`.
-pub fn resolve_event_metadata(
+pub(super) fn resolve_event_metadata(
     publisher_cache: &mut LruCache<String, PublisherHandle>,
     format_cache: &mut HashMap<String, LruCache<(u32, u64), Option<String>>>,
     cache_hits_counter: &Counter,
@@ -175,7 +175,7 @@ fn format_metadata_field(
 }
 
 /// Renders a human-readable event message using the Windows `EvtFormatMessage` API.
-pub fn format_event_message(
+pub(super) fn format_event_message(
     publisher_cache: &mut LruCache<String, PublisherHandle>,
     event_handle: EVT_HANDLE,
     provider_name: &str,

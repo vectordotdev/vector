@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use vector_lib::internal_event::emit;
 
 use snafu::ResultExt;
 
@@ -30,7 +31,7 @@ impl NatsSink {
             .subject
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("subject"),
                     drop_event: true,

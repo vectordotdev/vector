@@ -4,7 +4,8 @@ use derivative::Derivative;
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_lib::{
-    configurable::configurable_component, json_size::JsonSize, stream::BatcherSettings,
+    configurable::configurable_component, internal_event::emit, json_size::JsonSize,
+    stream::BatcherSettings,
 };
 
 use super::EncodedEvent;
@@ -375,7 +376,7 @@ impl<B> Default for BatchSettings<B> {
 }
 
 pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
-    emit!(LargeEventDroppedError { length, max_length });
+    emit(LargeEventDroppedError { length, max_length });
     PushResult::Ok(false)
 }
 

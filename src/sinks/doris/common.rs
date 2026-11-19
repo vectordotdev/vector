@@ -9,11 +9,11 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use http_1::Uri;
+use http::Uri;
 use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]
-pub struct DorisCommon {
+pub(super) struct DorisCommon {
     pub base_url: Uri,
     pub auth: Option<Auth>,
     pub request_builder: DorisRequestBuilder,
@@ -21,7 +21,7 @@ pub struct DorisCommon {
 }
 
 impl DorisCommon {
-    pub fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
+    pub(super) fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
         if endpoint.uri.host().is_none() {
             return Err(
                 format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
@@ -30,8 +30,7 @@ impl DorisCommon {
 
         // basic auth must be some for now
         let auth = config.auth.choose_one(&endpoint.auth)?;
-        // Convert the validated endpoint to the native URI once, at the client boundary.
-        let base_url = endpoint.uri_v1()?;
+        let base_url = endpoint.uri.clone();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
 
         // Build encoder from the encoding configuration
@@ -51,7 +50,7 @@ impl DorisCommon {
             tls_settings,
         })
     }
-    pub fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
+    pub(super) fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
         for endpoint in &config.endpoints {
             commons.push(Self::parse_config(config, endpoint)?);
@@ -59,7 +58,7 @@ impl DorisCommon {
         Ok(commons)
     }
 
-    pub async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
+    pub(super) async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
         client.healthcheck_fenode(&self.base_url).await
     }
 }

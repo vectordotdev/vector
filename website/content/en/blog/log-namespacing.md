@@ -147,7 +147,7 @@ Source vector fields (`%vector`)
 
 Here is a sample VRL script accessing different parts of an event when log namespacing is enabled.
 
-```coffee
+```vrl
 event = .
 field_from_event = .foo
 

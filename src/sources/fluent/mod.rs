@@ -11,6 +11,7 @@ use vector_lib::{
     codecs::{BytesDeserializerConfig, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
     schema::Definition,
@@ -32,6 +33,12 @@ use crate::{
 
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
+
+const HOST: &str = "host";
+const TAG: &str = "tag";
+const TIMESTAMP: &str = "timestamp";
+const RECORD: &str = "record";
+const TLS_CLIENT_METADATA: &str = "tls_client_metadata";
 
 /// Configuration for the `fluent` source.
 #[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
@@ -442,21 +449,21 @@ impl FluentConfig {
             .with_source_metadata(
                 FluentConfig::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 FluentConfig::NAME,
                 tag_key,
-                &owned_value_path!("tag"),
+                &owned_value_path!(TAG),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 FluentConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
@@ -464,14 +471,14 @@ impl FluentConfig {
             .with_source_metadata(
                 FluentConfig::NAME,
                 None,
-                &owned_value_path!("record"),
+                &owned_value_path!(RECORD),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 tls_client_metadata_path,
-                &owned_value_path!("tls_client_metadata"),
+                &owned_value_path!(TLS_CLIENT_METADATA),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
@@ -512,7 +519,7 @@ impl FluentSource {
                 FluentConfig::NAME,
                 log,
                 legacy_host_key,
-                path!("host"),
+                path!(HOST),
                 host.clone(),
             );
         }
@@ -794,9 +801,9 @@ impl Decoder for FluentDecoder {
 
             let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
                 let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
-                emit!(FluentMessageDecodeError {
+                emit(FluentMessageDecodeError {
                     error,
-                    base64_encoded_message
+                    base64_encoded_message,
                 });
             })?;
             if let Some(item) = maybe_item {
@@ -836,7 +843,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(FluentMessageReceived { byte_size });
+            emit(FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };
@@ -926,7 +933,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         match log_namespace {
             LogNamespace::Vector => {
-                log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
+                log.insert(metadata_path!(FluentConfig::NAME, TIMESTAMP), timestamp);
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
@@ -937,8 +944,8 @@ impl From<FluentEvent<'_>> for LogEvent {
         log_namespace.insert_source_metadata(
             FluentConfig::NAME,
             &mut log,
-            Some(LegacyKey::Overwrite(path!("tag"))),
-            path!("tag"),
+            Some(LegacyKey::Overwrite(path!(TAG))),
+            path!(TAG),
             tag,
         );
 
@@ -948,7 +955,7 @@ impl From<FluentEvent<'_>> for LogEvent {
                 FluentConfig::NAME,
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(key.as_str()))),
-                path!("record", key.as_str()),
+                path!(RECORD, key.as_str()),
                 value,
             );
         }

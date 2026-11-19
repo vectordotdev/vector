@@ -16,7 +16,7 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{SinkConfig, SinkContext},
-    http::{ParameterValue, QueryParameterValue, client_v1::HttpClient},
+    http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         HealthcheckError,
         util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
@@ -84,7 +84,7 @@ fn https_server() -> HttpEndpoint {
 
 impl ElasticsearchCommon {
     async fn flush_request(&self, client: &HttpClient) -> crate::Result<()> {
-        let mut builder = http_1::Request::post(format!("{}/_flush", self.base_url));
+        let mut builder = http::Request::post(format!("{}/_flush", self.base_url));
 
         if let Some(ce) = self.request_builder.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -97,7 +97,7 @@ impl ElasticsearchCommon {
         let mut request = builder.body(Bytes::new())?;
         if let Some(auth) = &self.auth {
             match auth {
-                Auth::Basic(http_auth) => http_auth.apply_v1(&mut request),
+                Auth::Basic(http_auth) => http_auth.apply(&mut request),
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,
@@ -117,7 +117,7 @@ impl ElasticsearchCommon {
         let response = client.send(request.map(full_body)).await?;
 
         match response.status() {
-            http_1::StatusCode::OK => Ok(()),
+            http::StatusCode::OK => Ok(()),
             status => Err(HealthcheckError::unexpected_status(status).into()),
         }
     }

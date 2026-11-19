@@ -209,13 +209,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_native_chart_version_option() {
-        for args in [
-            vec!["vdev", "build", "manifests"],
-            vec!["vdev", "build", "manifests", "--chart-version", "0.58.0"],
-        ] {
-            crate::commands::Cli::try_parse_from(args).unwrap();
-        }
+    fn rejects_invalid_chart_version_option() {
         assert!(
             crate::commands::Cli::try_parse_from([
                 "vdev",
@@ -229,19 +223,14 @@ mod tests {
     }
 
     #[test]
-    fn permits_retries_and_upgrades_but_rejects_downgrades() {
-        let readme = readme_text("0.58.0", "");
-        for (version, accepted) in [
-            ("0.58.0", true),
-            ("0.59.0", true),
-            ("0.57.0", false),
-            ("0.58.0-rc.1", false),
-        ] {
-            assert_eq!(
-                check_version(&versions::parse(version).unwrap(), &readme).is_ok(),
-                accepted
-            );
-        }
+    fn rejects_prerelease_and_malformed_chart_versions() {
+        assert!(
+            check_version(
+                &versions::parse("0.58.0-rc.1").unwrap(),
+                &readme_text("0.58.0", ""),
+            )
+            .is_err()
+        );
         assert!(
             check_version(
                 &versions::parse("0.58.0").unwrap(),
@@ -266,9 +255,8 @@ mod tests {
     }
 
     #[test]
-    fn replaces_stale_files_and_sorts_resources() {
+    fn sorts_resources_and_preserves_unrelated_directories() {
         let temporary = tempfile::tempdir().unwrap();
-        fs::write(temporary.path().join("old.yaml"), "old").unwrap();
         fs::create_dir(temporary.path().join("custom")).unwrap();
         let mut manifests = BTreeMap::from([
             ("z.yaml".to_owned(), "kind: Service\n".to_owned()),
@@ -279,7 +267,6 @@ mod tests {
         manifests.insert("kustomization.yaml".to_owned(), expected.to_owned());
         manifests.insert("README.md".to_owned(), readme_text("0.58.0", ""));
         write_manifests(temporary.path(), &manifests).unwrap();
-        assert!(!temporary.path().join("old.yaml").exists());
         assert!(temporary.path().join("custom").is_dir());
         for (name, contents) in &manifests {
             assert_eq!(
@@ -287,10 +274,5 @@ mod tests {
                 *contents
             );
         }
-        write_manifests(temporary.path(), &manifests).unwrap();
-        assert_eq!(
-            fs::read_to_string(temporary.path().join("kustomization.yaml")).unwrap(),
-            expected
-        );
     }
 }

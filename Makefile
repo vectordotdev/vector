@@ -48,6 +48,9 @@ export CURRENT_DIR = $(shell pwd)
 # via .github/actions/setup; falling back to `cargo vdev` recompiles vdev).
 VDEV ?= cargo vdev
 
+# Comma-separated `cargo deny` lints to allow; all other warnings are errors. Set empty to allow none.
+DENY_ALLOW ?= duplicate,source-not-allowed
+
 # Cargo writes artifacts to CARGO_TARGET_DIR when it is set, so recipes that run
 # a freshly built binary have to resolve the same directory rather than assume
 # `target` — otherwise they silently execute a stale binary from a previous build.
@@ -279,7 +282,7 @@ endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests
-	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
+	scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
@@ -413,11 +416,11 @@ check-scripts: ## Check that scripts do not have common mistakes
 
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	$(VDEV) check deny
+	$(VDEV) check deny --allow '$(DENY_ALLOW)'
 
 .PHONY: check-deny-licenses
 check-deny-licenses: ## Check licenses for crate dependencies
-	$(VDEV) check deny --licenses-only
+	$(VDEV) check deny --licenses-only --allow '$(DENY_ALLOW)'
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md

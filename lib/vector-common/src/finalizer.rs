@@ -66,7 +66,6 @@ where
     /// shutdown signal is received. This is not recommended, and can cause some acknowledgements
     /// to go unprocessed. Sources may process the message(s) that correspond to those
     /// acknowledgements again.
-    #[must_use]
     pub fn new(shutdown: Option<ShutdownSignal>) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         let flush1 = Arc::new(Notify::new());
@@ -85,7 +84,6 @@ where
     /// stream of acknowledged identifiers. In the case the finalizer
     /// is not to be used, a special empty stream is returned that is
     /// always pending and so never wakes.
-    #[must_use]
     pub fn maybe_new(
         maybe: bool,
         shutdown: Option<ShutdownSignal>,

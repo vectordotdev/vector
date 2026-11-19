@@ -1,6 +1,8 @@
 The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `{{version}}`! 🚀
+{{#if github}}
 
 [Vector](https://vector.dev) is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
+{{/if}}
 {{#if changes}}
 
 {{#if contributors}}
@@ -21,4 +23,6 @@ This release includes {{changes}} {{#if one_change}}change{{else}}changes{{/if}}
 Upgrading to {{major}}.{{minor}}? Read the [upgrade guide]({{upgrade_guide_url}}).
 {{/if}}
 
+{{#if github}}
 [View the full release notes]({{release_url}}) · See upcoming releases on the [release calendar](https://calendar.vector.dev).
+{{/if}}
