@@ -35,15 +35,20 @@ type BoxError = Box<dyn Error + Send + Sync>;
 
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
-/// Idle time before the kernel starts sending TCP keepalive probes on client connections, so
-/// that a connection whose peer silently went away is eventually closed instead of held
-/// forever.
-///
-/// Only the idle time is set; the probe interval and count keep the kernel defaults. With the
-/// Linux defaults (75 seconds, 9 probes) a dead peer is detected about 60 + 75 * 9 = 735 seconds
-/// after the connection went idle. Keepalive does not apply while sent data is unacknowledged;
-/// that case is governed by `tcp_retries2` instead.
+// TCP keepalive settings for client connections, so that a connection whose peer silently
+// went away is eventually closed instead of held forever. These match the curl CLI defaults:
+// probes start after 60 seconds idle and repeat every 60 seconds, and after 9 unanswered
+// probes the connection is closed, about 60 + 60 * 9 = 600 seconds after it went idle.
+// Keepalive does not apply while sent data is unacknowledged; that case is governed by
+// `tcp_retries2` instead. Platforms that cannot set the interval or the probe count keep their
+// own defaults for them.
+
+/// Idle time before the first TCP keepalive probe.
 const TCP_KEEPALIVE_TIME: Duration = Duration::from_secs(60);
+/// Time between TCP keepalive probes.
+const TCP_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(60);
+/// Unanswered TCP keepalive probes before the connection is closed.
+const TCP_KEEPALIVE_RETRIES: u32 = 9;
 
 #[derive(Clone)]
 struct ProxyEndpoint {
@@ -383,6 +388,8 @@ fn https_connector(
     let mut http = HttpConnector::new();
     http.enforce_http(false);
     http.set_keepalive(Some(TCP_KEEPALIVE_TIME));
+    http.set_keepalive_interval(Some(TCP_KEEPALIVE_INTERVAL));
+    http.set_keepalive_retries(Some(TCP_KEEPALIVE_RETRIES));
     let mut tls_builder = tls_connector_builder(tls)?;
     if http1_alpn {
         tls_builder.set_alpn_protos(HTTP1_ALPN)?;
@@ -712,7 +719,10 @@ mod tests {
         tls::{MaybeTls, MaybeTlsSettings},
     };
 
-    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, https_connector, tls_host};
+    use super::{
+        MaxAgeIo, Route, RoutePlanner, TCP_KEEPALIVE_INTERVAL, TCP_KEEPALIVE_RETRIES,
+        TCP_KEEPALIVE_TIME, connect_authority, https_connector, tls_host,
+    };
     use crate::{ConnectionOptions, HttpClient, empty_body};
 
     /// Returns the proxy URI and `Proxy-Authorization` value of the route to `destination`.
@@ -897,7 +907,20 @@ mod tests {
         let MaybeHttpsStream::Http(stream) = stream else {
             panic!("an http destination should not use TLS");
         };
-        assert!(SockRef::from(stream.inner()).keepalive().unwrap());
+        let socket = SockRef::from(stream.inner());
+        assert!(socket.keepalive().unwrap());
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(socket.tcp_keepalive_time().unwrap(), TCP_KEEPALIVE_TIME);
+            assert_eq!(
+                socket.tcp_keepalive_interval().unwrap(),
+                TCP_KEEPALIVE_INTERVAL
+            );
+            assert_eq!(
+                socket.tcp_keepalive_retries().unwrap(),
+                TCP_KEEPALIVE_RETRIES
+            );
+        }
 
         let _server_side = accepted.await.unwrap();
     }

@@ -28,5 +28,5 @@ url = { version = "2.5.4", default-features = false }
 vector-core = { path = "../vector-core" }
 
 [dev-dependencies]
-socket2.workspace = true
+socket2 = { workspace = true, features = ["all"] }
 tokio = { workspace = true, features = ["io-util", "macros", "test-util"] }

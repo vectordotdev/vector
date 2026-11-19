@@ -25,10 +25,10 @@ use crate::{
 /// path, the socket stays open until the process exits, and enough of them exhaust the file
 /// descriptors. See <https://github.com/vectordotdev/vector/issues/27245>.
 ///
-/// This is a little above the default sink request timeout of 60 seconds, so that with default
-/// settings a connect made for a request is still ended by the request timeout first, rather
-/// than both timers expiring on the same tick.
-pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(65);
+/// This matches the curl CLI default. It is well above the default sink request timeout of 60
+/// seconds, so with default settings a connect made for a request is still ended by the
+/// request timeout first.
+pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// A [`vector_http::HttpClient`] that adds Vector's default request headers and emits the HTTP
 /// client events.
