@@ -1239,17 +1239,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn check_remap_metric_value_read() {
-        let gauge = |value| {
-            Event::Metric(Metric::new(
-                "queue_depth",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value },
-            ))
-        };
+    fn gauge(value: f64) -> Event {
+        Event::Metric(Metric::new(
+            "queue_depth",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        ))
+    }
 
-        // Values can be used in expressions.
+    #[test]
+    fn check_remap_metric_value_in_expression() {
         let mut tform = remap(RemapConfig {
             source: Some(".tags.scaled = to_string(float!(.gauge.value) * 100)".to_string()),
             drop_on_error: true,
@@ -1265,7 +1264,10 @@ mod tests {
             result.as_metric().value(),
             &MetricValue::Gauge { value: 0.5 }
         );
+    }
 
+    #[test]
+    fn check_remap_metric_value_special_values() {
         // Reads of special values, and of the fields for other types.
         let mut tform = remap(RemapConfig {
             source: Some(
@@ -1292,7 +1294,10 @@ mod tests {
             assert_eq!(metric.tag_value("json"), Some(json.to_owned()), "{value}");
             assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
         }
+    }
 
+    #[test]
+    fn check_remap_metric_value_get() {
         // `get` with a dynamic path reads values from `.`, and `get` on another field still works.
         let mut tform = remap(RemapConfig {
             source: Some(
@@ -1320,7 +1325,10 @@ mod tests {
             result.as_metric().tag_value("copy"),
             Some("us-east-1".to_owned())
         );
+    }
 
+    #[test]
+    fn check_remap_metric_value_unnest() {
         // `unnest` keeps the other fields of the metric around each element.
         let mut tform = remap(RemapConfig {
             source: Some(
