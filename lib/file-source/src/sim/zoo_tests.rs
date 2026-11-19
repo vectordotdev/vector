@@ -604,6 +604,47 @@ async fn zoo_transient_eacces_tears_partial_line() {
     assert_eq!(state.open_file_count(), 0);
 }
 
+/// Discovered by `proptest` DST! Restarting `FileServer` midway through reading
+/// a gzip file (when a non-zero checkpoint has been persisted) opens the file as
+/// `FileReader::Null`, permanently dropping all remaining unread lines in the archive.
+#[tokio::test]
+async fn zoo_gzip_partial_checkpoint_restart_drops_remainder() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    let emitter = RecordingEmitter::new();
+
+    let mut multi = gzip_bytes(b"line1_aaaaaaaaaaaaaaaa\nline2_bbbbbbbbbbbbbbbb\n").await;
+    multi.extend(gzip_bytes(b"line3_cccccccccccccccc\nline4_dddddddddddddddd\n").await);
+    fs.append_bytes("/logs/archive.gz", &multi);
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let mut server = base_server(&fs, emitter.clone(), FingerprintStrategy::DevInode);
+    // Force stopping after the first 2 lines.
+    server.max_read_bytes = 32;
+    let mut state = FileServerState::init(server, &mut cp, fs.clone(), clock.clone()).await;
+
+    let mut lines = Vec::new();
+    step_and_ack(&mut state, &mut lines).await;
+    assert_eq!(lines.len(), 2);
+
+    cp.write_checkpoints().await.unwrap();
+    drop(state);
+
+    // Restart from persisted checkpoint -> remaining 2 lines in the gzip archive are skipped!
+    let mut cp2 = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let server2 = base_server(&fs, emitter, FingerprintStrategy::DevInode);
+    let mut state2 = FileServerState::init(server2, &mut cp2, fs.clone(), clock.clone()).await;
+
+    let mut after_restart = Vec::new();
+    for _ in 0..3 {
+        clock.advance(Duration::from_secs(2));
+        step_and_ack(&mut state2, &mut after_restart).await;
+    }
+
+    // CURRENT BEHAVIOR (bug): `FileWatcher::new` opens checkpointed gzip as `FileReader::Null`.
+    assert!(after_restart.is_empty());
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: 30,

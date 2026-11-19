@@ -368,9 +368,19 @@ impl DstRunner {
         );
 
         // Any file that is unlinked or moved outside `/logs/*` cannot be re-opened by
-        // a brand-new FileServer process.
+        // a brand-new FileServer process. Also, gzip files with an existing persisted
+        // checkpoint are opened as `FileReader::Null` on restart (pinned by
+        // `zoo_gzip_partial_checkpoint_restart_drops_remainder`).
         for &ino in &self.unfindable_inos {
             if let Some(model) = self.models.get_mut(&ino) {
+                model.lost_across_restart = true;
+            }
+        }
+        for entry in self.active_slots.iter().flatten() {
+            if entry.is_gzip
+                && self.delivered_by_ino.contains_key(&entry.ino)
+                && let Some(model) = self.models.get_mut(&entry.ino)
+            {
                 model.lost_across_restart = true;
             }
         }
