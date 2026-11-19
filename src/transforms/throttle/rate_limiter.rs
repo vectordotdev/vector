@@ -4,7 +4,11 @@ use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::Das
 use tokio;
 
 use super::transform::Throttle;
-use crate::cpu_time::spawn_timed;
+use vector_lib::cpu_time::spawn_timed;
+
+/// A keyed rate limiter with a `DashMap` state store and no middleware.
+type KeyedRateLimiter<K, C> =
+    RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<<C as clock::Clock>::Instant>>;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.
@@ -13,7 +17,7 @@ where
     K: Hash + Eq + Clone,
     C: clock::Clock,
 {
-    pub rate_limiter: Arc<RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<C::Instant>>>,
+    pub rate_limiter: Arc<KeyedRateLimiter<K, C>>,
     flush_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -29,21 +33,15 @@ where
         ));
 
         let flush_keys_interval = throttle.flush_keys_interval;
-        let cpu_ns = throttle.cpu_ns.clone();
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        // Hook the periodic key-flush task onto the component's CPU counter so
-        // its housekeeping work is attributed to this throttle transform.
-        let flush_handle = spawn_timed(
-            async move {
-                let mut interval = tokio::time::interval(flush_keys_interval);
-                loop {
-                    interval.tick().await;
-                    rate_limiter_clone.retain_recent();
-                }
-            },
-            cpu_ns,
-        );
+        let flush_handle = spawn_timed(async move {
+            let mut interval = tokio::time::interval(flush_keys_interval);
+            loop {
+                interval.tick().await;
+                rate_limiter_clone.retain_recent();
+            }
+        });
 
         Self {
             rate_limiter,

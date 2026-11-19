@@ -8,8 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Stateless-Aggregator
-    app.kubernetes.io/version: "0.60.0-distroless-libc"
+    app.kubernetes.io/component: stateless-aggregator
+    app.kubernetes.io/version: "0.62.0-distroless-libc"
   annotations:
 spec:
   ports:
@@ -40,5 +40,5 @@ spec:
   selector:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Stateless-Aggregator
+    app.kubernetes.io/component: stateless-aggregator
   type: ClusterIP

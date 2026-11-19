@@ -17,7 +17,7 @@ use tokio::{
 use tokio_util::codec::Encoder;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    json_size::JsonSize,
+    internal_event::emit, json_size::JsonSize,
 };
 
 use crate::{
@@ -238,13 +238,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpSocketConnectionEstablished {
+                    emit(TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpSocketOutgoingConnectionError { error });
+                    emit(TcpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -346,7 +346,7 @@ where
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
 
             let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
@@ -360,11 +360,11 @@ where
             // responded with Ok(0).
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                    emit(TcpSocketConnectionShutdown {});
                 }
-                emit!(SocketSendError {
+                emit(SocketSendError {
                     mode: SocketMode::Tcp,
-                    error
+                    error,
                 });
             }
         }

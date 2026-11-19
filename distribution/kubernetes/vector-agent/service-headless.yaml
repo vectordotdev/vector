@@ -8,8 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.60.0-distroless-libc"
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/version: "0.62.0-distroless-libc"
   annotations:
 spec:
   clusterIP: None
@@ -41,5 +41,5 @@ spec:
   selector:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
+    app.kubernetes.io/component: agent
   type: ClusterIP

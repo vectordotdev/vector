@@ -49,7 +49,7 @@ pub(super) struct DatadogMetricsV3Encoder {
 }
 
 impl DatadogMetricsV3Encoder {
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let limits = endpoint.payload_limits();
         Self {
             default_namespace: default_namespace.map(Arc::from),
@@ -68,7 +68,7 @@ impl DatadogMetricsV3Encoder {
     /// Only available in tests; production code always uses the API-defined limits via `new`.
     /// Mirrors `DatadogMetricsEncoder::with_payload_limits`.
     #[cfg(test)]
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         default_namespace: Option<String>,
         uncompressed_limit: usize,
         compressed_limit: usize,
@@ -87,7 +87,7 @@ impl DatadogMetricsV3Encoder {
     ///
     /// Always returns `Ok(None)` — the V3 encoder cannot detect payload overflow
     /// until `finish()` time.  Caller must respect the batch event-count cap.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    pub(super) fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
         self.byte_size
             .add_event(&metric, metric.estimated_json_encoded_size_of());
         encode_metric_to_v3(
@@ -110,7 +110,7 @@ impl DatadogMetricsV3Encoder {
         clippy::cast_possible_truncation,
         reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
     )]
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let writer = mem::replace(&mut self.writer, V3Writer::new());
         let metrics = mem::take(&mut self.pending);
         let byte_size = mem::replace(
@@ -380,7 +380,7 @@ mod tests {
         );
         let (result, metrics) = enc.finish().unwrap();
         assert!(result.into_payload().is_empty());
-        assert!(metrics.is_empty());
+        assert_eq!(metrics, [] as [vector_lib::event::Metric; 0]);
     }
 
     /// Encodes one gauge and reports `(uncompressed_size, compressed_size)` for it.
@@ -595,7 +595,7 @@ mod tests {
                     count: 1,
                 }],
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
             },
         );
         assert!(enc.try_encode(histogram).is_err());
@@ -637,7 +637,7 @@ mod tests {
         )
         .unwrap();
         let encoded = writer.finalize().unwrap();
-        assert!(!encoded.payload.is_empty());
+        assert_ne!(encoded.payload, [] as [u8; 0]);
 
         // `host_metrics` maps to OriginService 211 in V2's `source_type_to_service` table;
         // V3 reuses that same mapping via the shared `generate_origin_metadata` function.

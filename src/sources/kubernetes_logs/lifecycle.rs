@@ -21,7 +21,7 @@ use crate::shutdown::ShutdownSignal;
 /// managed futures are requested to shutdown. They can do so gracefully after
 /// completing their work.
 #[derive(Debug)]
-pub struct Lifecycle<'bound> {
+pub(super) struct Lifecycle<'bound> {
     futs: FuturesOrdered<BoxFuture<'bound, ()>>,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
 }
@@ -30,7 +30,7 @@ pub struct Lifecycle<'bound> {
 /// Effectively used to hold the token or signal such that it can be dropped
 /// after the shutdown is complete.
 #[derive(Debug)]
-pub enum GlobalShutdownToken {
+pub(super) enum GlobalShutdownToken {
     /// The global shutdown signal was consumed.
     Token,
     /// The [`ShutdownSignal`] wasn't consumed, and still holds on to the
@@ -40,7 +40,7 @@ pub enum GlobalShutdownToken {
 
 impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             futs: FuturesOrdered::new(),
             fut_shutdowns: Vec::new(),
@@ -52,7 +52,7 @@ impl<'bound> Lifecycle<'bound> {
     /// Returns a [`Slot`] to be bound with the `Future`, and
     /// a [`ShutdownHandle`] that is to be used by the bound future to wait for
     /// shutdown.
-    pub fn add(&mut self) -> (Slot<'bound, '_>, ShutdownHandle) {
+    pub(super) fn add(&mut self) -> (Slot<'bound, '_>, ShutdownHandle) {
         let (tx, rx) = oneshot::channel();
         let slot = Slot {
             lifecycle: self,
@@ -63,7 +63,7 @@ impl<'bound> Lifecycle<'bound> {
     }
 
     /// Run the managed futures and keep track of the shutdown process.
-    pub async fn run(mut self, mut global_shutdown: ShutdownSignal) -> GlobalShutdownToken {
+    pub(super) async fn run(mut self, mut global_shutdown: ShutdownSignal) -> GlobalShutdownToken {
         let first_task_fut = self.futs.next();
         pin_mut!(first_task_fut);
 
@@ -106,7 +106,7 @@ impl<'bound> Lifecycle<'bound> {
 
 /// Represents an unbounded slot at the lifecycle.
 #[derive(Debug)]
-pub struct Slot<'bound, 'lc> {
+pub(super) struct Slot<'bound, 'lc> {
     lifecycle: &'lc mut Lifecycle<'bound>,
     shutdown_trigger: oneshot::Sender<()>,
 }
@@ -116,7 +116,7 @@ impl<'bound> Slot<'bound, '_> {
     /// The passed future MUST start it's shutdown process when requested to
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
-    pub fn bind(self, future: BoxFuture<'bound, ()>) {
+    pub(super) fn bind(self, future: BoxFuture<'bound, ()>) {
         self.lifecycle.futs.push_back(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
@@ -124,7 +124,7 @@ impl<'bound> Slot<'bound, '_> {
 
 /// A handle that allows waiting for the lifecycle-issued shutdown.
 #[derive(Debug)]
-pub struct ShutdownHandle(oneshot::Receiver<()>);
+pub(super) struct ShutdownHandle(oneshot::Receiver<()>);
 
 impl Future for ShutdownHandle {
     type Output = ();

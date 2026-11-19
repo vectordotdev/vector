@@ -11,7 +11,7 @@ use vector_lib::configurable::configurable_component;
 #[configurable(metadata(
     docs::enum_tag_description = "The compression algorithm to use for sending."
 ))]
-pub enum VectorCompression {
+pub(super) enum VectorCompression {
     /// No compression.
     #[default]
     None,
@@ -29,7 +29,7 @@ pub enum VectorCompression {
 
 impl VectorCompression {
     /// Returns the corresponding `tonic::codec::CompressionEncoding`, if any.
-    pub const fn as_tonic_encoding(self) -> Option<tonic::codec::CompressionEncoding> {
+    pub(super) const fn as_tonic_encoding(self) -> Option<tonic::codec::CompressionEncoding> {
         match self {
             VectorCompression::None => Option::None,
             VectorCompression::Gzip => Some(tonic::codec::CompressionEncoding::Gzip),

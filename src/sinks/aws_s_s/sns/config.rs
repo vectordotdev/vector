@@ -79,7 +79,7 @@ impl SinkConfig for SnsSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct ValidatedSnsSink {
+pub(super) struct ValidatedSnsSink {
     message_group_id: Option<UnconfinedTemplate>,
     message_deduplication_id: Option<UnconfinedTemplate>,
 }

@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use bytes::{Bytes, BytesMut};
 use encoding_rs::{CoderResult, Encoding};
+use vector_lib::internal_event::emit;
 
 use crate::internal_events::{
     DecoderBomRemoval, DecoderMalformedReplacement, EncoderUnmappableReplacement,
@@ -68,8 +69,8 @@ impl Decoder {
         }
 
         if total_had_errors {
-            emit!(DecoderMalformedReplacement {
-                from_encoding: self.inner.encoding().name()
+            emit(DecoderMalformedReplacement {
+                from_encoding: self.inner.encoding().name(),
             });
         }
 
@@ -86,8 +87,8 @@ impl Decoder {
         // any more use for us, since the source encoding is already pre-identified
         // as part of decoder initialization.
         if output.get(..BOM_UTF8_LEN) == Some(BOM_UTF8) {
-            emit!(DecoderBomRemoval {
-                from_encoding: self.inner.encoding().name()
+            emit(DecoderBomRemoval {
+                from_encoding: self.inner.encoding().name(),
             });
             output.slice(BOM_UTF8_LEN..)
         } else {
@@ -178,8 +179,8 @@ impl Encoder {
         }
 
         if total_had_errors {
-            emit!(EncoderUnmappableReplacement {
-                to_encoding: self.inner.encoding().name()
+            emit(EncoderUnmappableReplacement {
+                to_encoding: self.inner.encoding().name(),
             });
         }
 

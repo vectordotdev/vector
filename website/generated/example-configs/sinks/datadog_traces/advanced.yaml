@@ -5,5 +5,6 @@ sinks:
       - my-source-or-transform-id
     compression: gzip
     default_api_key: ${DATADOG_API_KEY_ENV_VAR}
+    disable_apm_stats: false
     endpoint: http://127.0.0.1:8080
     site: us3.datadoghq.com

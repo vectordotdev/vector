@@ -52,15 +52,19 @@ impl InternalEvent for VectorStopping {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct VectorStopped;
+pub struct VectorStopped {
+    /// `"none"` when no error triggered the shutdown, otherwise `ShutdownError::reason`.
+    pub reason: &'static str,
+}
 
 impl InternalEvent for VectorStopped {
     fn emit(self) {
         info!(
             target: "vector",
             message = "Vector has stopped.",
+            reason = self.reason,
         );
-        counter!(CounterName::StoppedTotal).increment(1);
+        counter!(CounterName::StoppedTotal, "reason" => self.reason).increment(1);
     }
 }
 

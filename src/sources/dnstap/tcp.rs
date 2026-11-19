@@ -7,6 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     ipallowlist::IpAllowlistConfig,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     tcp::TcpKeepaliveConfig,
@@ -19,7 +20,7 @@ use crate::{
     internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{
         framestream::{FrameHandler, TcpFrameHandler},
-        net::SocketListenAddr,
+        net::{SocketListenAddr, build_tls_client_metadata},
     },
 };
 
@@ -203,10 +204,10 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
                         );
                     }
 
-                    emit!(SocketEventsReceived {
+                    emit(SocketEventsReceived {
                         mode: SocketMode::Tcp,
                         byte_size: log_event.estimated_json_encoded_size_of(),
-                        count: 1
+                        count: 1,
                     });
 
                     event = Event::from(log_event);
@@ -270,11 +271,7 @@ impl<T: FrameHandler + Clone> TcpFrameHandler for DnstapFrameHandler<T> {
     }
 
     fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>) {
-        self.tls_client_metadata = metadata.map(|c| {
-            let mut metadata = ObjectMap::new();
-            metadata.insert("subject".into(), c.subject().into());
-            metadata
-        });
+        self.tls_client_metadata = metadata.map(|c| build_tls_client_metadata(&c));
     }
 
     fn allowed_origins(&self) -> Option<&[IpNet]> {

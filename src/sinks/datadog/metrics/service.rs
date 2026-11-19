@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
+use http::{
     Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
@@ -19,13 +19,13 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::HttpClient,
-    sinks::{HTTPV1RequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
+    http::HttpClient,
+    sinks::{HTTPRequestBuilderSnafu, datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
 #[derive(Debug, Default, Clone)]
-pub struct DatadogMetricsRetryLogic;
+pub(super) struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
     type Error = DatadogApiError;
@@ -39,7 +39,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
 #[derive(Debug, Clone)]
-pub struct DatadogMetricsRequest {
+pub(super) struct DatadogMetricsRequest {
     pub api_key: Option<Arc<str>>,
     pub payload: Bytes,
     pub uri: Uri,
@@ -56,7 +56,7 @@ impl DatadogMetricsRequest {
     ///
     /// If any of the header names or values are invalid, or if the URI is invalid, an error variant
     /// will be returned.
-    pub fn into_http_request(self, api_key: HeaderValue) -> http_1::Result<Request<Bytes>> {
+    pub(super) fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Bytes>> {
         // use the API key from the incoming event if it is provided
         let api_key = self.api_key.map_or_else(
             || api_key,
@@ -102,7 +102,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 
 // Generalized wrapper around the raw response from the client.
 #[derive(Debug)]
-pub struct DatadogMetricsResponse {
+pub(super) struct DatadogMetricsResponse {
     status_code: StatusCode,
     request_metadata: RequestMetadata,
 }
@@ -129,14 +129,14 @@ impl DriverResponse for DatadogMetricsResponse {
 }
 
 #[derive(Clone)]
-pub struct DatadogMetricsService {
+pub(super) struct DatadogMetricsService {
     client: HttpClient,
     api_key: HeaderValue,
 }
 
 impl DatadogMetricsService {
     /// Creates a new `DatadogMetricsService`.
-    pub fn new(client: HttpClient, api_key: &str) -> Self {
+    pub(super) fn new(client: HttpClient, api_key: &str) -> Self {
         DatadogMetricsService {
             client,
             api_key: HeaderValue::from_str(api_key)
@@ -165,7 +165,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
             let request = request
                 .into_http_request(api_key)
-                .context(HTTPV1RequestBuilderSnafu)
+                .context(HTTPRequestBuilderSnafu)
                 .map_err(|error| DatadogApiError::HttpError {
                     error: HttpError::from(crate::Error::from(error)),
                 })?;

@@ -76,7 +76,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
             .secret_string
             .ok_or::<String>(format!(
                 "secret for secret-id '{}' could not be retrieved",
-                &self.secret_id
+                self.secret_id
             ))?;
 
         let output = serde_json::from_str::<HashMap<String, String>>(secret_string.as_str())?;
@@ -87,7 +87,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
                 if secret.is_empty() {
                     return Err(format!(
                         "value for key '{k}' in secret with id '{}' was empty",
-                        &self.secret_id
+                        self.secret_id
                     )
                     .into());
                 }
@@ -95,7 +95,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
             } else {
                 return Err(format!(
                     "key '{k}' in secret with id '{}' does not exist",
-                    &self.secret_id
+                    self.secret_id
                 )
                 .into());
             }

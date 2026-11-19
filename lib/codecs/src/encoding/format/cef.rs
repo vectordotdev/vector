@@ -99,11 +99,12 @@ impl CefSerializerConfig {
     }
 
     /// Build the `CefSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `device_vendor`, `device_product`, `device_version`, or
+    /// `device_event_class_id` exceeds its maximum length after escaping, or if an extension key
+    /// contains characters other than ASCII letters.
     pub fn build(&self) -> Result<CefSerializer, BuildError> {
         let device_vendor = validate_length(
             &self.cef.device_vendor,
@@ -341,11 +342,11 @@ impl Encoder<Event> for CefSerializer {
 
         buffer.write_fmt(format_args!(
             "CEF:{}|{}|{}|{}|{}|{name}|{severity}",
-            &self.version,
-            &self.device.vendor,
-            &self.device.product,
-            &self.device.version,
-            &self.device.event_class_id,
+            self.version,
+            self.device.vendor,
+            self.device.product,
+            self.device.version,
+            self.device.event_class_id,
         ))?;
         if !formatted_extensions.is_empty() {
             formatted_extensions.sort();
@@ -404,6 +405,7 @@ mod tests {
     use ordered_float::NotNan;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
+    use vrl::objectmap;
 
     use super::*;
 
@@ -482,7 +484,7 @@ mod tests {
 
     #[test]
     fn serialize_extensions() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "cef" => Value::from(btreemap! {
                 "severity" => Value::from(1),
                 "name" => Value::from("Event name"),

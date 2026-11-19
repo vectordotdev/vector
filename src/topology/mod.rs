@@ -12,6 +12,7 @@ pub mod schema;
 
 pub mod builder;
 mod controller;
+mod orphaned_disk_buffers;
 mod ready_arrays;
 mod running;
 mod task;

@@ -196,6 +196,7 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout helm-charts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

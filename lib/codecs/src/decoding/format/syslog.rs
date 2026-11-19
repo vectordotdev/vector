@@ -63,12 +63,12 @@ impl SyslogDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `log_namespace` is `Legacy` and the global log schema has no message key.
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "The codec API panic documentation needs a separate audit."
-    )]
     #[allow(
         clippy::too_many_lines,
         reason = "Keep this codec mapping together during the lint rollout."

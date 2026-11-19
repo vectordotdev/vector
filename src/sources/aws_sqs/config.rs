@@ -18,6 +18,8 @@ use crate::{
     tls::TlsConfig,
 };
 
+const TIMESTAMP_KEY: &str = "timestamp";
+
 /// Configuration for the `aws_sqs` source.
 #[configurable_component(source("aws_sqs", "Collect logs from AWS SQS."))]
 #[derive(Clone, Debug, Derivative)]
@@ -119,7 +121,7 @@ impl SourceConfig for AwsSqsConfig {
                 poll_secs: self.poll_secs,
                 concurrency: self
                     .client_concurrency
-                    .map_or_else(crate::num_threads, NonZeroUsize::get),
+                    .map_or_else(vector_lib::num_threads, NonZeroUsize::get),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,
@@ -136,10 +138,10 @@ impl SourceConfig for AwsSqsConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             );
 
         vec![SourceOutput::new_maybe_logs(

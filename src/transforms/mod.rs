@@ -73,7 +73,7 @@ mod test {
     // this function -- but flagging this function off for bench flags will
     // issue a unused warnings about the import above.
     #[allow(dead_code)]
-    pub fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
+    pub(super) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
         let mut buf = OutputBuffer::with_capacity(1);
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
@@ -81,7 +81,7 @@ mod test {
     }
 
     #[allow(dead_code)]
-    pub async fn create_topology<T: TransformConfig + 'static>(
+    pub(super) async fn create_topology<T: TransformConfig + 'static>(
         events: impl Stream<Item = Event> + Send + 'static,
         transform_config: T,
     ) -> (RunningTopology, mpsc::Receiver<Event>) {

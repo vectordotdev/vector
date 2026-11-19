@@ -31,7 +31,7 @@ An example with input:
 { "plaintext": "super secret message" }
 ```
 
-```coffeescript
+```vrl
 # The `key` is typically a raw set of bytes matching the expected length for the algorithm so it is common to base64
 # encode it for injection and decode in VRL
 key = decode_base64!(get_env_var!("KEY")) # with $KEY set to "c2VjcmV0X19faHVudGVyMg==" in this example

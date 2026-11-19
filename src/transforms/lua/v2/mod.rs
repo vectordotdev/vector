@@ -5,6 +5,7 @@ use snafu::{ResultExt, Snafu};
 pub use vector_lib::event::lua;
 use vector_lib::{
     configurable::configurable_component,
+    internal_event::emit,
     transform::runtime_transform::{RuntimeTransform, Timer},
 };
 
@@ -381,8 +382,8 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
-            emit!(LuaGcTriggered {
-                used_memory: self.runtime.used_memory()
+            emit(LuaGcTriggered {
+                used_memory: self.runtime.used_memory(),
             });
             _ = self
                 .runtime
@@ -426,7 +427,7 @@ impl RuntimeTransform for Lua {
                     ))
             })
             .context(RuntimeErrorHooksProcessSnafu)
-            .map_err(|e| emit!(LuaBuildError { error: e }));
+            .map_err(|e| emit(LuaBuildError { error: e }));
 
         self.attempt_gc();
     }

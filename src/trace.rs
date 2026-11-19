@@ -28,7 +28,7 @@ use tracing_subscriber::{
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 use vector_lib::{
     SpanField,
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     lookup::event_path,
 };
 use vrl::value::Value;
@@ -324,7 +324,7 @@ impl TraceSubscription {
                     Ok(log) => {
                         let count = std::mem::take(dropped);
                         if count > 0 {
-                            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                                 count: usize::try_from(count).unwrap_or(usize::MAX),
                                 reason: "Internal logs broadcast receiver lagged.",
                             });
@@ -451,8 +451,6 @@ mod tests {
     use serial_test::serial;
     use tracing::info;
     use tracing_subscriber::layer::SubscriberExt;
-
-    use futures::StreamExt as _;
 
     use super::*;
 
