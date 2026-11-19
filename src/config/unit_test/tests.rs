@@ -1409,3 +1409,40 @@ async fn ambiguous_output_names_are_reported_as_build_errors() {
         errs[0]
     );
 }
+
+// https://github.com/vectordotdev/vector/issues/14853
+#[cfg(feature = "transforms-log_to_metric")]
+#[tokio::test]
+async fn metric_value_assertions() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = serde_yaml::from_str(indoc! {r#"
+        transforms:
+          to_metric:
+            inputs: []
+            type: log_to_metric
+            metrics:
+              - type: gauge
+                field: pm25
+                name: api.pm25
+        tests:
+          - name: "metric values are readable"
+            input:
+              insert_at: to_metric
+              type: log
+              log_fields:
+                pm25: 123
+            outputs:
+              - extract_from: to_metric
+                conditions:
+                  - type: vrl
+                    source: |
+                      assert_eq!(.name, "api.pm25")
+                      assert_eq!(.gauge.value, 123.0)
+                      assert_eq!(.counter, null)
+    "#})
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert_eq!(tests.remove(0).run().await.errors, [] as [String; 0]);
+}
