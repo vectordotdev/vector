@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    cell::OnceCell,
     collections::BTreeMap,
     convert::TryFrom,
     marker::PhantomData,
@@ -85,9 +84,6 @@ pub enum VrlTarget {
         metric: Metric,
         value: Value,
         tag_mode: MetricTagMode,
-        /// The whole event, built when the program reads `.` and cleared when it changes the
-        /// metric. See [`metric_root_value`].
-        root_value: OnceCell<Value>,
     },
     Trace(Value, EventMetadata),
 }
@@ -161,7 +157,6 @@ impl VrlTarget {
                     metric,
                     value,
                     tag_mode,
-                    root_value: OnceCell::new(),
                 }
             }
             Event::Trace(event) => {
@@ -381,9 +376,7 @@ impl Target for VrlTarget {
                     metric,
                     value: metric_value,
                     tag_mode,
-                    root_value,
                 } => {
-                    root_value.take();
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
                     }
@@ -480,19 +473,7 @@ impl Target for VrlTarget {
                 VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     Ok(log.get(&target_path.path))
                 }
-                VrlTarget::Metric {
-                    metric,
-                    value,
-                    root_value,
-                    ..
-                } => {
-                    if target_path.path.is_root() {
-                        return Ok(Some(
-                            root_value.get_or_init(|| metric_root_value(metric, value)),
-                        ));
-                    }
-                    target_get_metric(&target_path.path, value)
-                }
+                VrlTarget::Metric { value, .. } => target_get_metric(&target_path.path, value),
             },
             PathPrefix::Metadata => Ok(self.metadata().value().get(&target_path.path)),
         }
@@ -507,12 +488,7 @@ impl Target for VrlTarget {
                 VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     Ok(log.get_mut(&target_path.path))
                 }
-                VrlTarget::Metric {
-                    value, root_value, ..
-                } => {
-                    root_value.take();
-                    target_get_mut_metric(&target_path.path, value)
-                }
+                VrlTarget::Metric { value, .. } => target_get_mut_metric(&target_path.path, value),
             },
             PathPrefix::Metadata => Ok(self.metadata_mut().value_mut().get_mut(&target_path.path)),
         }
@@ -532,9 +508,7 @@ impl Target for VrlTarget {
                     metric,
                     value,
                     tag_mode,
-                    root_value,
                 } => {
-                    root_value.take();
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
                     }
@@ -988,25 +962,6 @@ fn metric_value_scalars_to_vrl_value(value: &MetricValue, keys: &[&str]) -> Valu
     map.into()
 }
 
-/// Builds the whole event for a read of `.`.
-///
-/// The value is converted here rather than in `precompute_metric_value`, because VRL registers a
-/// query for `.` for every `get` call, whatever its argument. Building it on the first actual read
-/// keeps programs such as `get!(.tags, [key])` from converting every sample of a distribution.
-fn metric_root_value(metric: &Metric, cached: &Value) -> Value {
-    let mut root = cached.clone();
-    if let Value::Object(map) = &mut root {
-        for field in METRIC_VALUE_FIELDS {
-            map.remove(field);
-        }
-        map.insert(
-            metric_value_field(metric.value()).into(),
-            metric_value_to_vrl_value(metric.value()),
-        );
-    }
-    root
-}
-
 /// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
@@ -1049,13 +1004,14 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             continue;
         }
 
-        // Accessing a root path requires us to pre-populate all fields. So does reading one of
-        // the value's arrays, because `unnest` copies the whole event around each element without
-        // registering a query for the root.
+        // Accessing a root path requires us to pre-populate all fields, including the value. So
+        // does reading one of the value's arrays, because `unnest` copies the whole event around
+        // each element without registering a query for the root.
         //
-        // The value itself isn't converted for a root query. VRL registers a root query for every
-        // `get` call, even `get(.tags, ...)`, so the value is only added when the program actually
-        // reads `.` at runtime. See `metric_root_value`.
+        // VRL also registers a root query for every `get` call, even `get(.tags, ...)`. It can't
+        // be told apart from a read of `.`, so those programs convert the value too. The root
+        // can't be built lazily on the first read instead, because the VRL runtime reads the root
+        // before running every program to check that the target exists.
         let is_root = target_path.path.is_root();
         let is_value_array = is_metric_value_array_path(target_path, value_field);
         if is_root || is_value_array {
@@ -1071,7 +1027,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             for property in &mut properties {
                 property.insert(metric, &mut map);
             }
-            value_full |= is_value_array;
+            value_full = true;
             continue;
         }
 
@@ -1647,8 +1603,6 @@ mod test {
                     "tags" => btreemap! { "tig" => "tog" },
                     "kind" => "absolute",
                     "type" => "counter",
-                    // Reading `.` always includes the value.
-                    "counter" => btreemap! { "value" => 1.23 },
                 }
                 .into()
             )),
@@ -2811,34 +2765,64 @@ mod test {
         }
     }
 
+    /// Runs a program through the VRL runtime, which also reads the root before running it.
+    fn run_metric_program(value: MetricValue, source: &str) -> (VrlTarget, Value) {
+        // Only the functions these tests use, since `vector_vrl_functions` depends on this crate.
+        let fns: Vec<Box<dyn vrl::compiler::Function>> = vec![
+            Box::new(vrl::stdlib::Contains),
+            Box::new(vrl::stdlib::EncodeJson),
+            Box::new(vrl::stdlib::Exists),
+            Box::new(vrl::stdlib::Get),
+        ];
+        let program = vrl::compiler::compile(source, &fns).unwrap().program;
+        let metric = Metric::new("m", MetricKind::Absolute, value)
+            .with_tags(Some(metric_tags!("region" => "eu")));
+        let mut target =
+            VrlTarget::new(Event::Metric(metric), program.info(), MetricTagMode::Single);
+        let result = vrl::compiler::runtime::Runtime::default()
+            .resolve(&mut target, &program, &vrl::compiler::TimeZone::default())
+            .unwrap();
+        (target, result)
+    }
+
     #[test]
-    fn metric_value_root_query_is_lazy() {
-        // VRL registers a root query for every `get` call, so `get!(.tags, [key])` has these
-        // queries. Reading only the tags shouldn't convert the samples.
-        let target = metric_target_with_queries(
-            big_distribution(),
-            &[
-                OwnedTargetPath::event_root(),
-                OwnedTargetPath::event(owned_value_path!("tags")),
-            ],
-        );
+    fn metric_value_runtime_reads_only_what_the_program_reads() {
+        // Only a metadata field: the samples aren't converted.
+        let (target, result) = run_metric_program(big_distribution(), r#".name == "m""#);
+        assert_eq!(result, Value::from(true));
         assert_eq!(cached_field(&target, "distribution"), None);
 
-        // An actual read of `.` still includes the value.
-        let root = target
-            .target_get(&OwnedTargetPath::event_root())
-            .unwrap()
-            .cloned()
-            .unwrap();
-        assert_eq!(
-            root.get(&owned_value_path!("distribution", "samples", 2, "value"))
-                .cloned(),
-            Some(Value::from(3.0))
+        // A metadata path with the same name as a value field.
+        let (target, result) = run_metric_program(big_distribution(), "exists(%distribution)");
+        assert_eq!(result, Value::from(false));
+        assert_eq!(cached_field(&target, "distribution"), None);
+
+        // A scalar field next to an array: the buckets aren't converted.
+        let (target, result) = run_metric_program(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 1, 2.0 => 2],
+                count: 3,
+                sum: Some(4.0),
+            },
+            ".aggregated_histogram.count == 3",
         );
+        assert_eq!(result, Value::from(true));
         assert_eq!(
-            root.get(&owned_value_path!("name")).cloned(),
-            Some(Value::from("m"))
+            cached_field(&target, "aggregated_histogram"),
+            Some(Value::from(objectmap! { "count" => 3 }))
         );
+
+        // Reading `.` includes the value.
+        let (_, result) = run_metric_program(
+            big_distribution(),
+            r#"contains(encode_json(.), "\"samples\"")"#,
+        );
+        assert_eq!(result, Value::from(true));
+        let (_, result) = run_metric_program(
+            MetricValue::Gauge { value: 2.0 },
+            r#"get!(., ["gauge", "value"])"#,
+        );
+        assert_eq!(result, Value::from(2.0));
     }
 
     #[test]
