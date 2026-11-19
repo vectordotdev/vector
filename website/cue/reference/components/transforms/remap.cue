@@ -115,7 +115,7 @@ components: transforms: "remap": {
 				`counter`, `gauge` | Read | `.counter.value` or `.gauge.value`.
 				`set` | Read | `.set.values`, an array of strings.
 				`distribution` | Read | `.distribution.samples`, an array of `{value, rate}` objects, and `.distribution.statistic`, either `histogram` or `summary`.
-				`aggregated_histogram` | Read | `.aggregated_histogram.buckets`, an array of `{upper_limit, count}` objects, plus `.aggregated_histogram.count` and `.aggregated_histogram.sum`. `sum` is `null` when it isn't set.
+				`aggregated_histogram` | Read | `.aggregated_histogram.buckets`, an array of `{upper_limit, count}` objects, plus `.aggregated_histogram.count` and `.aggregated_histogram.sum`. `sum` is left out when it isn't set, so it reads as `null` and `exists(.aggregated_histogram.sum)` is `false`.
 				`aggregated_summary` | Read | `.aggregated_summary.quantiles`, an array of `{quantile, value}` objects, plus `.aggregated_summary.count` and `.aggregated_summary.sum`.
 				`sketch` | Read | Summary statistics only: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`.
 

@@ -856,14 +856,21 @@ fn metric_value_to_vrl_value(value: &MetricValue) -> Value {
             buckets,
             count,
             sum,
-        } => ObjectMap::from([
-            (
-                "buckets".into(),
-                Value::Array(buckets.iter().map(bucket_to_vrl_value).collect()),
-            ),
-            ("count".into(), metric_count_to_vrl_value(*count)),
-            ("sum".into(), optional_metric_float_to_vrl_value(*sum)),
-        ]),
+        } => {
+            let mut map = ObjectMap::from([
+                (
+                    "buckets".into(),
+                    Value::Array(buckets.iter().map(bucket_to_vrl_value).collect()),
+                ),
+                ("count".into(), metric_count_to_vrl_value(*count)),
+            ]);
+            // Like the native JSON encoding, a missing sum is left out, so `exists` can tell it
+            // apart from a sum of zero.
+            if let Some(sum) = sum {
+                map.insert("sum".into(), metric_float_to_vrl_value(*sum));
+            }
+            map
+        }
         MetricValue::AggregatedSummary {
             quantiles,
             count,
@@ -913,39 +920,57 @@ fn is_metric_value_array_path(target_path: &OwnedTargetPath, value_field: &str) 
         )
 }
 
-/// Converts the scalar field that the path reads from the value, such as `count` for
-/// `.aggregated_histogram.count`, without converting the arrays next to it.
-///
-/// Returns `None` if the path doesn't read one of these scalar fields. Only the types with arrays
-/// next to their scalar fields are considered. For other types the whole value is cheap to convert.
-fn metric_value_scalar(
-    value: &MetricValue,
-    path: &OwnedValuePath,
-) -> Option<(&'static str, Value)> {
-    let Some(OwnedSegment::Field(key)) = path.segments.get(1) else {
-        return None;
+/// What a path reads from the value of the metric's current type.
+enum MetricValueRead {
+    /// The whole value, or a field that is cheap to get only by converting the whole value, such
+    /// as an array.
+    Full,
+    /// A scalar field next to an array, converted on its own. `None` if the field is missing,
+    /// like the sum of a histogram that doesn't have one.
+    Scalar(&'static str, Option<Value>),
+    /// A field that this type of value doesn't have, which reads as `null`.
+    Nothing,
+}
+
+/// Classifies what the path, such as `.aggregated_histogram.count`, reads from the value.
+fn metric_value_read(value: &MetricValue, path: &OwnedValuePath) -> MetricValueRead {
+    let Some(segment) = path.segments.get(1) else {
+        return MetricValueRead::Full;
+    };
+    let OwnedSegment::Field(key) = segment else {
+        return MetricValueRead::Nothing;
     };
     match (value, key.as_ref()) {
-        (MetricValue::Distribution { statistic, .. }, "statistic") => Some((
+        (MetricValue::Distribution { statistic, .. }, "statistic") => MetricValueRead::Scalar(
             "statistic",
-            match statistic {
-                StatisticKind::Histogram => "histogram",
-                StatisticKind::Summary => "summary",
-            }
-            .into(),
-        )),
+            Some(
+                match statistic {
+                    StatisticKind::Histogram => "histogram",
+                    StatisticKind::Summary => "summary",
+                }
+                .into(),
+            ),
+        ),
         (
             MetricValue::AggregatedHistogram { count, .. }
             | MetricValue::AggregatedSummary { count, .. },
             "count",
-        ) => Some(("count", metric_count_to_vrl_value(*count))),
+        ) => MetricValueRead::Scalar("count", Some(metric_count_to_vrl_value(*count))),
         (MetricValue::AggregatedHistogram { sum, .. }, "sum") => {
-            Some(("sum", optional_metric_float_to_vrl_value(*sum)))
+            MetricValueRead::Scalar("sum", sum.map(metric_float_to_vrl_value))
         }
         (MetricValue::AggregatedSummary { sum, .. }, "sum") => {
-            Some(("sum", metric_float_to_vrl_value(*sum)))
+            MetricValueRead::Scalar("sum", Some(metric_float_to_vrl_value(*sum)))
         }
-        _ => None,
+        (MetricValue::Counter { .. } | MetricValue::Gauge { .. }, "value")
+        | (MetricValue::Set { .. }, "values")
+        | (MetricValue::Distribution { .. }, "samples")
+        | (MetricValue::AggregatedHistogram { .. }, "buckets")
+        | (MetricValue::AggregatedSummary { .. }, "quantiles")
+        | (MetricValue::Sketch { .. }, "count" | "min" | "max" | "sum" | "avg") => {
+            MetricValueRead::Full
+        }
+        _ => MetricValueRead::Nothing,
     }
 }
 
@@ -983,6 +1008,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     ) && info.target_assignments.iter().any(is_metric_type_path);
     // Whether the program reads the whole value, or only some of its scalar fields.
     let mut value_full = false;
+    let mut value_partial = false;
     let mut value_scalars = ObjectMap::new();
 
     for target_path in &info.target_queries {
@@ -1025,11 +1051,15 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             // read as `null`, so they don't, unless the type can be converted to them.
             if METRIC_VALUE_FIELDS.contains(&field.as_ref()) {
                 if field.as_ref() == value_field {
-                    match metric_value_scalar(metric.value(), &target_path.path) {
-                        Some((key, scalar)) => {
-                            value_scalars.insert(key.into(), scalar);
+                    match metric_value_read(metric.value(), &target_path.path) {
+                        MetricValueRead::Full => value_full = true,
+                        MetricValueRead::Scalar(key, scalar) => {
+                            value_partial = true;
+                            if let Some(scalar) = scalar {
+                                value_scalars.insert(key.into(), scalar);
+                            }
                         }
-                        None => value_full = true,
+                        MetricValueRead::Nothing => {}
                     }
                 } else if convertible && matches!(field.as_ref(), "counter" | "gauge") {
                     value_full = true;
@@ -1057,7 +1087,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             value_field.into(),
             metric_value_to_vrl_value(metric.value()),
         );
-    } else if !value_scalars.is_empty() {
+    } else if value_partial {
         map.insert(value_field.into(), value_scalars.into());
     }
 
@@ -2604,10 +2634,11 @@ mod test {
             ),
             Some(Value::from(2))
         );
-        // A missing sum reads as `null`, which is different from a sum of zero.
+        // A missing sum is left out, as in the native JSON encoding, so it reads as `null` and
+        // `exists` is `false`.
         assert_eq!(
             get(&target, owned_value_path!("aggregated_histogram", "sum")),
-            Some(Value::Null)
+            None
         );
     }
 
@@ -2658,7 +2689,7 @@ mod test {
         );
         assert_eq!(
             get(&target, owned_value_path!("aggregated_histogram", "sum")),
-            Some(Value::Null)
+            None
         );
     }
 
@@ -2798,6 +2829,24 @@ mod test {
             Some(Value::from(objectmap! { "count" => 3 }))
         );
 
+        // A field that the type doesn't have: nothing is converted.
+        let (target, result) =
+            run_metric_program(big_distribution(), "exists(.distribution.count)");
+        assert_eq!(result, Value::from(false));
+        assert_eq!(cached_field(&target, "distribution"), None);
+
+        // A missing sum doesn't exist, unlike a sum of zero.
+        let histogram = |sum| MetricValue::AggregatedHistogram {
+            buckets: crate::buckets![1.0 => 1],
+            count: 1,
+            sum,
+        };
+        let (_, result) = run_metric_program(histogram(None), "exists(.aggregated_histogram.sum)");
+        assert_eq!(result, Value::from(false));
+        let (_, result) =
+            run_metric_program(histogram(Some(0.0)), "exists(.aggregated_histogram.sum)");
+        assert_eq!(result, Value::from(true));
+
         // Reading `.` includes the value.
         let (_, result) = run_metric_program(
             big_distribution(),
@@ -2838,9 +2887,7 @@ mod test {
         );
         assert_eq!(
             cached_field(&target, "aggregated_histogram"),
-            Some(Value::from(
-                objectmap! { "count" => 5, "sum" => Value::Null }
-            ))
+            Some(Value::from(objectmap! { "count" => 5 }))
         );
         assert_eq!(
             get(&target, owned_value_path!("aggregated_histogram", "count")),
