@@ -9,10 +9,37 @@
 
 use std::sync::{Arc, Weak};
 
-use arc_swap::ArcSwap;
+use arc_swap::{ArcSwap, Guard};
 use openssl::ssl::SslAcceptor;
 
-use super::{MaybeTlsSettings, TlsSettings};
+use super::{ClientCertVerifier, MaybeTlsSettings, TlsSettings};
+
+/// An acceptor and the client certificate verifier it was built with.
+pub(super) struct TlsAcceptor {
+    pub(super) acceptor: SslAcceptor,
+    verifier: Option<Arc<dyn ClientCertVerifier>>,
+}
+
+impl TlsAcceptor {
+    /// Build from `settings`, falling back to `verifier` when `settings` has none.
+    pub(super) fn build(
+        settings: &TlsSettings,
+        verifier: Option<&Arc<dyn ClientCertVerifier>>,
+    ) -> crate::tls::Result<Self> {
+        match (&settings.client_cert_verifier, verifier) {
+            (None, Some(verifier)) => Self::build(
+                &settings
+                    .clone()
+                    .with_client_cert_verifier(Arc::clone(verifier)),
+                None,
+            ),
+            (verifier, _) => Ok(Self {
+                acceptor: settings.acceptor()?,
+                verifier: verifier.clone(),
+            }),
+        }
+    }
+}
 
 /// A cloneable handle to a server TLS acceptor that can be swapped at runtime.
 ///
@@ -20,27 +47,38 @@ use super::{MaybeTlsSettings, TlsSettings};
 /// established keep whatever they negotiated at handshake time.
 #[derive(Clone)]
 pub struct TlsAcceptorReloader {
-    acceptor: Arc<ArcSwap<SslAcceptor>>,
+    acceptor: Arc<ArcSwap<TlsAcceptor>>,
 }
 
 impl TlsAcceptorReloader {
-    /// Wrap an initial acceptor in a swappable cell.
-    pub(super) fn new(acceptor: SslAcceptor) -> Self {
-        Self {
-            acceptor: Arc::new(ArcSwap::from_pointee(acceptor)),
-        }
+    /// Wrap the acceptor built from `settings` in a swappable cell.
+    pub(super) fn new(settings: &TlsSettings) -> crate::tls::Result<Self> {
+        Ok(Self {
+            acceptor: Arc::new(ArcSwap::from_pointee(TlsAcceptor::build(settings, None)?)),
+        })
     }
 
     /// The shared cell the bound listener reads from on each accept.
-    pub(super) fn shared(&self) -> Arc<ArcSwap<SslAcceptor>> {
+    pub(super) fn shared(&self) -> Arc<ArcSwap<TlsAcceptor>> {
         Arc::clone(&self.acceptor)
     }
 
     /// Swap in a freshly built acceptor from `settings`. New connections pick it up
     /// immediately; the previous acceptor is dropped once its last in-flight handshake completes.
+    ///
+    /// A verifier on `settings` replaces the current one. If `settings` has none, the current
+    /// verifier, if any, is kept.
     pub fn reload(&self, settings: &TlsSettings) -> crate::tls::Result<()> {
-        self.acceptor.store(Arc::new(settings.acceptor()?));
-        Ok(())
+        let mut current = self.acceptor.load_full();
+        loop {
+            let acceptor = Arc::new(TlsAcceptor::build(settings, current.verifier.as_ref())?);
+            // Retry if a concurrent reload swapped in a different verifier meanwhile.
+            let previous = self.acceptor.compare_and_swap(&current, acceptor);
+            if Arc::ptr_eq(&previous, &current) {
+                return Ok(());
+            }
+            current = Guard::into_inner(previous);
+        }
     }
 
     /// Downgrade to a [`WeakTlsAcceptorReloader`] that does not keep the served acceptor alive.
@@ -54,7 +92,7 @@ impl TlsAcceptorReloader {
 /// A non-owning handle to a served TLS acceptor, obtained from [`TlsAcceptorReloader::downgrade`].
 #[derive(Clone)]
 pub struct WeakTlsAcceptorReloader {
-    acceptor: Weak<ArcSwap<SslAcceptor>>,
+    acceptor: Weak<ArcSwap<TlsAcceptor>>,
 }
 
 impl WeakTlsAcceptorReloader {
@@ -74,7 +112,7 @@ impl MaybeTlsSettings {
     /// certificate material rotates.
     pub fn reloadable_acceptor(&self) -> crate::tls::Result<Option<TlsAcceptorReloader>> {
         match self {
-            Self::Tls(tls) => Ok(Some(TlsAcceptorReloader::new(tls.acceptor()?))),
+            Self::Tls(tls) => TlsAcceptorReloader::new(tls).map(Some),
             Self::Raw(()) => Ok(None),
         }
     }
@@ -85,17 +123,15 @@ mod test {
     use std::{net::SocketAddr, pin::Pin};
 
     use openssl::{
-        asn1::Asn1Time,
-        bn::{BigNum, MsbOption},
-        hash::MessageDigest,
-        nid::Nid,
-        pkey::PKey,
-        rsa::Rsa,
+        pkey::{PKeyRef, Private},
         ssl::{SslConnector, SslMethod, SslVerifyMode},
-        x509::{X509, X509NameBuilder},
+        x509::X509Ref,
     };
 
-    use crate::tls::{MaybeTls, MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsError};
+    use crate::tls::{
+        MaybeTls, MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsError,
+        test_util::{extract_common_name, self_signed_ca},
+    };
 
     #[test]
     fn no_reloadable_acceptor_without_tls() {
@@ -167,8 +203,8 @@ mod test {
     /// served the new one.
     #[tokio::test]
     async fn served_certificate_changes_after_reload() {
-        let (crt_a, key_a) = self_signed("old.example");
-        let (crt_b, key_b) = self_signed("new.example");
+        let (crt_a, key_a) = self_signed_ca("old.example");
+        let (crt_b, key_b) = self_signed_ca("new.example");
 
         let settings = server_settings(&crt_a, &key_a);
         let reloader = settings
@@ -225,18 +261,14 @@ mod test {
             .ssl()
             .peer_certificate()
             .expect("server presents a certificate");
-        cert.subject_name()
-            .entries_by_nid(Nid::COMMONNAME)
-            .next()
-            .unwrap()
-            .data()
-            .to_string()
-            .unwrap()
+        extract_common_name(&cert)
     }
 
-    fn server_settings(crt_pem: &str, key_pem: &str) -> MaybeTlsSettings {
+    fn server_settings(crt: &X509Ref, key: &PKeyRef<Private>) -> MaybeTlsSettings {
         // `crt_file`/`key_file` accept inline PEM (detected by the `-----BEGIN ` marker), so no
         // temp files are needed.
+        let crt_pem = String::from_utf8(crt.to_pem().unwrap()).unwrap();
+        let key_pem = String::from_utf8(key.private_key_to_pem_pkcs8().unwrap()).unwrap();
         let config = TlsEnableableConfig {
             enabled: Some(true),
             options: TlsConfig {
@@ -246,39 +278,5 @@ mod test {
             },
         };
         MaybeTlsSettings::from_config(Some(&config), true).unwrap()
-    }
-
-    /// Generate a self-signed certificate/key pair (PEM) with the given common name.
-    fn self_signed(common_name: &str) -> (String, String) {
-        let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
-
-        let mut name = X509NameBuilder::new().unwrap();
-        name.append_entry_by_text("CN", common_name).unwrap();
-        let name = name.build();
-
-        let mut serial = BigNum::new().unwrap();
-        serial.rand(128, MsbOption::MAYBE_ZERO, false).unwrap();
-
-        let mut builder = X509::builder().unwrap();
-        builder.set_version(2).unwrap();
-        builder
-            .set_serial_number(&serial.to_asn1_integer().unwrap())
-            .unwrap();
-        builder.set_subject_name(&name).unwrap();
-        builder.set_issuer_name(&name).unwrap();
-        builder.set_pubkey(&key).unwrap();
-        builder
-            .set_not_before(&Asn1Time::days_from_now(0).unwrap())
-            .unwrap();
-        builder
-            .set_not_after(&Asn1Time::days_from_now(1).unwrap())
-            .unwrap();
-        builder.sign(&key, MessageDigest::sha256()).unwrap();
-        let cert = builder.build();
-
-        (
-            String::from_utf8(cert.to_pem().unwrap()).unwrap(),
-            String::from_utf8(key.private_key_to_pem_pkcs8().unwrap()).unwrap(),
-        )
     }
 }
