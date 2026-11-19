@@ -57,9 +57,8 @@ pub enum ValidationMode {
     ///
     /// This mode does not treat specification violations as errors, allowing the decoder
     /// to accept messages from sources that don't strictly follow the GELF spec.
-    /// The spec'd numeric fields (`level` and `line`) may be sent as JSON strings holding
-    /// numeric values (e.g. `"level": "6"`) and are coerced to numbers, matching the
-    /// lenient decoding of the Graylog server.
+    /// Spec'd numeric fields (`level`, `line`, `timestamp`) sent as JSON strings with
+    /// numeric values (e.g. `"level": "6"`) are coerced to numbers, like the Graylog server.
     Relaxed,
 }
 
@@ -254,12 +253,6 @@ struct GelfMessage {
 }
 
 impl GelfMessage {
-    /// Deserializes a GELF message from a byte frame.
-    ///
-    /// In relaxed validation mode, the spec'd numeric fields (`level` and `line`) may be
-    /// sent as JSON strings holding numeric values (e.g. `"level": "6"`) and are coerced
-    /// to numbers, mirroring the lenient decoding of the Graylog server. Non-numeric
-    /// strings are still rejected. Strict validation mode leaves the payload untouched.
     fn parse(
         buffer: &[u8],
         lossy: bool,
@@ -288,15 +281,14 @@ impl GelfMessage {
     }
 }
 
-/// Coerces the spec'd numeric GELF fields (`level` and `line`) from JSON strings holding
-/// numeric values into numbers, as the Graylog server does when decoding GELF. Additional
-/// fields are left untouched, as the GELF spec allows them to have arbitrary string values.
+/// Only the spec'd numeric fields, as the Graylog server does; additional fields are
+/// left untouched.
 fn coerce_numeric_string_fields(fields: &mut serde_json::Map<String, serde_json::Value>) {
-    for field in [LEVEL, LINE] {
-        if let Some(serde_json::Value::String(value)) = fields.get(field) {
-            if let Ok(number) = serde_json::Number::from_str(value) {
-                fields.insert(field.to_owned(), serde_json::Value::Number(number));
-            }
+    for field in [LEVEL, LINE, TIMESTAMP] {
+        if let Some(serde_json::Value::String(value)) = fields.get(field)
+            && let Ok(number) = serde_json::Number::from_str(value)
+        {
+            fields.insert(field.to_owned(), serde_json::Value::Number(number));
         }
     }
 }
@@ -552,11 +544,12 @@ mod tests {
     /// Validates the relaxed validation mode coerces numeric strings for numeric fields.
     #[test]
     fn gelf_deserialize_relaxed_numeric_strings() {
-        // level/line are sent as JSON strings holding numeric values
+        // level/line/timestamp are sent as JSON strings holding numeric values
         let input = json!({
             VERSION: "1.1",
             HOST: "example.org",
             SHORT_MESSAGE: "A short message that helps you identify what is going on",
+            TIMESTAMP: "1385053862.3072",
             LEVEL: "6",
             LINE: "42.5",
             "_pid": "123",
@@ -574,6 +567,8 @@ mod tests {
 
         let log = events[0].as_log();
 
+        let dt = DateTime::from_timestamp(1_385_053_862, 307_200_000).expect("invalid timestamp");
+        assert_eq!(log.get(event_path!(TIMESTAMP)), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(6)));
         assert_eq!(
             log.get(event_path!(LINE)),
