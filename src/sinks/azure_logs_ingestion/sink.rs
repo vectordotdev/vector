@@ -12,6 +12,7 @@ use super::service::AzureLogsIngestionRequest;
 pub(super) struct AzureLogsIngestionSink<S> {
     batch_settings: BatcherSettings,
     encoding: JsonEncoding,
+    compression: Compression,
     service: S,
     protocol: String,
 }
@@ -26,6 +27,7 @@ where
     pub(super) fn new(
         batch_settings: BatcherSettings,
         transformer: Transformer,
+        compression: Compression,
         service: S,
         timestamp_field: String,
         protocol: String,
@@ -33,6 +35,7 @@ where
         Self {
             batch_settings,
             encoding: JsonEncoding::new(transformer, timestamp_field),
+            compression,
             service,
             protocol,
         }
@@ -45,6 +48,7 @@ where
                 default_request_builder_concurrency_limit(),
                 AzureLogsIngestionRequestBuilder {
                     encoding: self.encoding,
+                    compression: self.compression,
                 },
             )
             .filter_map(|request| async {
@@ -140,6 +144,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
 
 struct AzureLogsIngestionRequestBuilder {
     encoding: JsonEncoding,
+    compression: Compression,
 }
 
 impl RequestBuilder<Vec<Event>> for AzureLogsIngestionRequestBuilder {
@@ -151,7 +156,7 @@ impl RequestBuilder<Vec<Event>> for AzureLogsIngestionRequestBuilder {
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -175,8 +180,37 @@ impl RequestBuilder<Vec<Event>> for AzureLogsIngestionRequestBuilder {
     ) -> Self::Request {
         AzureLogsIngestionRequest {
             body: payload.into_payload(),
+            compression: self.compression,
             finalizers,
             metadata: request_metadata,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gzip_request_metadata_uses_wire_size() {
+        let builder = AzureLogsIngestionRequestBuilder {
+            encoding: JsonEncoding::new(Transformer::default(), "TimeGenerated".into()),
+            compression: Compression::gzip_default(),
+        };
+        let events = vec![Event::Log(crate::event::LogEvent::from(
+            "repeated log ".repeat(100),
+        ))];
+        let (finalizers, metadata_builder, events) = builder.split_input(events);
+        let encoded = builder.encode_events(events).unwrap();
+        let metadata = metadata_builder.build(&encoded);
+        let request = builder.build_request(finalizers, metadata, encoded);
+        assert_eq!(request.metadata.request_encoded_size(), request.body.len());
+        let decoded = vector_common::decompression::CappedDecoder::gzip(request.body.as_ref())
+            .decompress()
+            .unwrap();
+        assert!(decoded.len() > request.body.len());
+        let json: serde_json::Value = serde_json::from_slice(&decoded).unwrap();
+        assert_eq!(json.as_array().unwrap().len(), 1);
+        assert_eq!(json[0]["message"], "repeated log ".repeat(100));
     }
 }

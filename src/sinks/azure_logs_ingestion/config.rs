@@ -20,6 +20,7 @@ use crate::{
 };
 
 use super::{
+    compression::AzureLogsIngestionCompression,
     service::{AzureLogsIngestionResponse, AzureLogsIngestionService, request_path},
     sink::AzureLogsIngestionSink,
 };
@@ -87,6 +88,12 @@ pub struct AzureLogsIngestionConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
+    /// Compression to apply to log batches before sending them to Azure.
+    ///
+    /// Only `none` and `gzip` are supported.
+    #[serde(default)]
+    pub compression: AzureLogsIngestionCompression,
+
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
@@ -116,6 +123,7 @@ impl Default for AzureLogsIngestionConfig {
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
             encoding: Transformer::default(),
+            compression: AzureLogsIngestionCompression::None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
@@ -162,6 +170,7 @@ impl AzureLogsIngestionConfig {
         let sink = AzureLogsIngestionSink::new(
             validated.batch_settings,
             self.encoding.clone(),
+            self.compression.into(),
             service,
             timestamp_field,
             protocol,

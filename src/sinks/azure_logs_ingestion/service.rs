@@ -27,6 +27,7 @@ const CONTENT_TYPE: &str = "application/json";
 #[derive(Debug, Clone)]
 pub(super) struct AzureLogsIngestionRequest {
     pub body: Bytes,
+    pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }
@@ -123,7 +124,11 @@ impl AzureLogsIngestionService {
         })
     }
 
-    async fn build_request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
+    async fn build_request(
+        &self,
+        body: Bytes,
+        compression: Compression,
+    ) -> crate::Result<Request<Bytes>> {
         let mut request = Request::post(&self.endpoint)
             .body(body)
             .context(HTTPRequestBuilderSnafu)?;
@@ -137,6 +142,12 @@ impl AzureLogsIngestionService {
         let bearer = format!("Bearer {}", access_token.token.secret());
 
         *request.headers_mut() = self.default_headers.clone();
+        if let Some(content_encoding) = compression.content_encoding() {
+            request.headers_mut().insert(
+                header::CONTENT_ENCODING,
+                HeaderValue::from_static(content_encoding),
+            );
+        }
         request.headers_mut().insert(
             header::AUTHORIZATION,
             HeaderValue::from_str(&bearer).unwrap(),
@@ -148,7 +159,9 @@ impl AzureLogsIngestionService {
     pub(super) fn healthcheck(&self) -> Healthcheck {
         let service = self.clone();
         Box::pin(async move {
-            let request = service.build_request(Bytes::from("[]")).await?;
+            let request = service
+                .build_request(Bytes::from("[]"), Compression::None)
+                .await?;
             let res = service
                 .client
                 .send(request.map(full_body))
@@ -186,7 +199,9 @@ impl Service<AzureLogsIngestionRequest> for AzureLogsIngestionService {
     fn call(&mut self, request: AzureLogsIngestionRequest) -> Self::Future {
         let service = self.clone();
         Box::pin(async move {
-            let http_request = service.build_request(request.body).await?;
+            let http_request = service
+                .build_request(request.body, request.compression)
+                .await?;
             let response = service
                 .client
                 .send(http_request.map(full_body))
