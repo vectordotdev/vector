@@ -28,12 +28,12 @@ fn setup(total_events: usize, condition: Condition) -> Payload {
 }
 
 fn measurement(payload: Payload) {
-    let mut filter = payload.filter;
+    let filter = payload.filter;
     let mut output = payload.output;
     let events = payload.events;
 
     for event in events {
-        filter.transform(&mut output, event);
+        filter.transform(&mut (), &mut output, event);
     }
 }
 

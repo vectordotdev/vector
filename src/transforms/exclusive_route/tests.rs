@@ -47,14 +47,14 @@ fn exclusive_routes() {
         "#})
     .unwrap();
 
-    let mut transform = ExclusiveRoute::new(&config, &TransformContext::default()).unwrap();
+    let transform = ExclusiveRoute::new(&config, &TransformContext::default()).unwrap();
 
     let (output_names, mut outputs) = get_outputs_buf();
     for service in ["a", "b", "c"] {
         let event = Event::Log(LogEvent::from(objectmap! {
             "service" => service
         }));
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(&mut (), event.clone(), &mut outputs);
         for name in output_names.clone() {
             let mut events: Vec<_> = outputs.drain_named(name).collect();
             if name == service || (name == UNMATCHED_ROUTE && service == "c") {

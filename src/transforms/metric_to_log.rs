@@ -346,7 +346,11 @@ impl MetricToLog {
 }
 
 impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
             .map(std::convert::Into::into);
@@ -736,7 +740,7 @@ mod tests {
             ..Default::default()
         }
         .build_transform(&TransformContext::default())
-        .transform(&mut output, counter.into());
+        .transform(&mut (), &mut output, counter.into());
 
         assert_eq!(output.len(), 1);
         output.into_events().next().unwrap().into_log()["tags"].clone()

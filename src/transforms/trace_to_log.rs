@@ -64,7 +64,11 @@ impl TransformConfig for TraceToLogConfig {
 pub struct TraceToLog;
 
 impl FunctionTransform for TraceToLog {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, _state: &mut (), output: &mut OutputBuffer, event: Event) {
         if let Event::Trace(trace) = event {
             output.push(Event::Log(LogEvent::from(trace)));
         }

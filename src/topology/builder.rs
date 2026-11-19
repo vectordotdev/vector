@@ -67,7 +67,9 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::{ShutdownSignal, SourceShutdownCoordinator},
     topology::task::TaskError,
-    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    transforms::{
+        ErasedSyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf,
+    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -820,8 +822,6 @@ impl<'a> Builder<'a> {
         input_rx: BufferReceiver<EventArray>,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
         match transform {
-            // TODO: avoid the double boxing for function transforms here
-            Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
             Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
@@ -829,7 +829,7 @@ impl<'a> Builder<'a> {
 
     fn build_sync_transform(
         &self,
-        t: Box<dyn SyncTransform>,
+        t: Arc<dyn ErasedSyncTransform>,
         node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
@@ -1282,7 +1282,7 @@ impl TransformNode {
 }
 
 struct Runner {
-    transform: Box<dyn SyncTransform>,
+    transform: Arc<dyn ErasedSyncTransform>,
     input_rx: Option<BufferReceiver<EventArray>>,
     input_type: DataType,
     outputs: TransformOutputs,
@@ -1293,7 +1293,7 @@ struct Runner {
 
 impl Runner {
     fn new(
-        transform: Box<dyn SyncTransform>,
+        transform: Arc<dyn ErasedSyncTransform>,
         input_rx: BufferReceiver<EventArray>,
         timer_tx: UtilizationComponentSender,
         input_type: DataType,
@@ -1332,6 +1332,7 @@ impl Runner {
         const INLINE_BATCH_SIZE: usize = 128;
 
         let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
+        let mut executor = Arc::clone(&self.transform).create_executor();
 
         let mut input_rx = self
             .input_rx
@@ -1343,7 +1344,7 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
-            self.transform.transform_all(events, &mut outputs_buf);
+            executor.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf)
                 .await
                 .map_err(TaskError::wrapped)?;
@@ -1390,12 +1391,10 @@ impl Runner {
                             len += events.len();
                         }
 
-                        let mut t = self.transform.clone();
+                        let transform_template = Arc::clone(&self.transform);
                         let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                         let task = spawn_timed(async move {
-                            for events in input_arrays {
-                                t.transform_all(events, &mut outputs_buf);
-                            }
+                            transform_template.transform_batch(input_arrays, &mut outputs_buf);
                             outputs_buf
                         });
                         in_flight.push_back(task);

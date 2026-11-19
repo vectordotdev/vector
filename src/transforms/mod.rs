@@ -39,8 +39,8 @@ pub mod trace_to_log;
 pub mod window;
 
 pub use vector_lib::transform::{
-    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
-    TransformOutputsBuf,
+    ErasedSyncTransform, FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform,
+    TransformOutputs, TransformOutputsBuf,
 };
 
 #[cfg(test)]
@@ -73,9 +73,13 @@ mod test {
     // this function -- but flagging this function off for bench flags will
     // issue a unused warnings about the import above.
     #[allow(dead_code)]
-    pub(super) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
+    pub(super) fn transform_one<T: FunctionTransform>(
+        ft: &T,
+        state: &mut T::State,
+        event: Event,
+    ) -> Option<Event> {
         let mut buf = OutputBuffer::with_capacity(1);
-        ft.transform(&mut buf, event);
+        ft.transform(state, &mut buf, event);
         assert!(buf.len() <= 1);
         buf.into_events().next()
     }

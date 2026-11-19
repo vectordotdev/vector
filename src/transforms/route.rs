@@ -42,7 +42,16 @@ impl Route {
 }
 
 impl SyncTransform for Route {
-    fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(
+        &self,
+        _state: &mut (),
+        event: Event,
+        output: &mut vector_lib::transform::TransformOutputsBuf,
+    ) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
@@ -256,7 +265,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -268,7 +277,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(&mut (), event.clone(), &mut outputs);
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == UNMATCHED_ROUTE {
@@ -302,7 +311,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -314,7 +323,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(&mut (), event.clone(), &mut outputs);
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
@@ -345,7 +354,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -357,7 +366,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(&mut (), event.clone(), &mut outputs);
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == UNMATCHED_ROUTE {
@@ -389,7 +398,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -401,7 +410,7 @@ mod test {
             1,
         );
 
-        transform.transform(event, &mut outputs);
+        transform.transform(&mut (), event, &mut outputs);
         for output_name in output_names {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 0);
