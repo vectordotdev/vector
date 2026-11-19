@@ -20,12 +20,16 @@ use futures::{
 use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio_util::task::JoinMap;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
+    notify_events::NotifyEventSource,
     paths_provider::PathsProvider,
-    scheduler::{FsEvent, FsEventSource, LegacyPollingScheduler, NoopFsEventSource, ReadScheduler},
+    scheduler::{
+        AdaptiveEventScheduler, AdaptiveSchedulerConfig, FsEvent, FsEventSource,
+        LegacyPollingScheduler, NoopFsEventSource, ReadScheduler,
+    },
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -655,15 +659,42 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
-        self.run_with(
-            chans,
-            shutdown_data,
-            shutdown_checkpointer,
-            checkpointer,
-            OsFileSystem,
-            SystemClock,
-        )
-        .await
+        let scheduler = AdaptiveEventScheduler::new(AdaptiveSchedulerConfig {
+            oldest_first: self.oldest_first,
+            ..AdaptiveSchedulerConfig::default()
+        });
+        match NotifyEventSource::new() {
+            Ok(event_source) => {
+                self.run_with_scheduler(
+                    chans,
+                    shutdown_data,
+                    shutdown_checkpointer,
+                    checkpointer,
+                    OsFileSystem,
+                    SystemClock,
+                    scheduler,
+                    event_source,
+                )
+                .await
+            }
+            Err(error) => {
+                warn!(
+                    message = "Failed to initialize OS file event watcher; falling back to adaptive polling.",
+                    %error,
+                );
+                self.run_with_scheduler(
+                    chans,
+                    shutdown_data,
+                    shutdown_checkpointer,
+                    checkpointer,
+                    OsFileSystem,
+                    SystemClock,
+                    scheduler,
+                    NoopFsEventSource,
+                )
+                .await
+            }
+        }
     }
 
     /// Run the `FileServer` with an explicit [`FileSystem`] and [`Clock`].
