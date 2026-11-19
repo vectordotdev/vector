@@ -2,11 +2,13 @@ use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap},
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
 use file_source_common::{FileFingerprint, MonotonicInstant};
 use indexmap::IndexMap;
+use tokio::sync::Notify;
 
 const LEGACY_EOF_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const LEGACY_EOF_BACKOFF_MAX: Duration = Duration::from_millis(250);
@@ -37,6 +39,12 @@ pub trait FsEventSource: Send + 'static {
 
     /// Notify the event source that `path` is no longer being watched.
     fn unwatch_path(&mut self, _path: &Path) {}
+
+    /// Optional async notifier signaled whenever new events arrive, allowing
+    /// `FileServer` to interrupt its idle backoff sleep immediately.
+    fn wakeup_notifier(&self) -> Option<Arc<Notify>> {
+        None
+    }
 }
 
 /// Default no-op [`FsEventSource`] used when OS event notifications are disabled.

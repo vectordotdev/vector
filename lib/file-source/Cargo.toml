@@ -21,6 +21,7 @@ futures-util.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 file-source-common = { path = "../file-source-common" }
 async-compression.workspace = true
+notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

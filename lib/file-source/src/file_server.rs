@@ -661,10 +661,10 @@ where
     /// closing the output sink fails, or the checkpoint writer task fails.
     pub async fn run_with<Ch, S1, S2, FS, Clk>(
         self,
-        mut chans: Ch,
-        mut shutdown_data: S1,
+        chans: Ch,
+        shutdown_data: S1,
         shutdown_checkpointer: S2,
-        mut checkpointer: Checkpointer<FS, Clk>,
+        checkpointer: Checkpointer<FS, Clk>,
         fs: FS,
         clock: Clk,
     ) -> Result<Shutdown, <Ch as Sink<Vec<Line>>>::Error>
@@ -676,8 +676,62 @@ where
         FS: FileSystem,
         Clk: Clock,
     {
+        self.run_with_scheduler(
+            chans,
+            shutdown_data,
+            shutdown_checkpointer,
+            checkpointer,
+            fs,
+            clock,
+            LegacyPollingScheduler::default(),
+            NoopFsEventSource,
+        )
+        .await
+    }
+
+    /// Run the `FileServer` with explicit [`FileSystem`], [`Clock`], [`ReadScheduler`],
+    /// and [`FsEventSource`]. If the event source provides a wakeup notifier, idle
+    /// backoff sleeps are interrupted immediately when OS filesystem events arrive.
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_with_scheduler<Ch, S1, S2, FS, Clk, S, Ev>(
+        self,
+        mut chans: Ch,
+        mut shutdown_data: S1,
+        shutdown_checkpointer: S2,
+        mut checkpointer: Checkpointer<FS, Clk>,
+        fs: FS,
+        clock: Clk,
+        scheduler: S,
+        event_source: Ev,
+    ) -> Result<Shutdown, <Ch as Sink<Vec<Line>>>::Error>
+    where
+        Ch: Sink<Vec<Line>> + Unpin,
+        <Ch as Sink<Vec<Line>>>::Error: std::error::Error,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
+        FS: FileSystem,
+        Clk: Clock,
+        S: ReadScheduler,
+        Ev: FsEventSource,
+    {
         let mut lines = Vec::new();
-        let mut state = FileServerState::init(self, &mut checkpointer, fs, clock.clone()).await;
+        let wakeup = event_source.wakeup_notifier();
+        let mut state = FileServerState::init_with_scheduler(
+            self,
+            &mut checkpointer,
+            fs,
+            clock.clone(),
+            scheduler,
+            event_source,
+        )
+        .await;
 
         // Spawn the checkpoint writer task
         let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
@@ -708,9 +762,17 @@ where
 
             let start = clock.now();
             let sleep_clock = clock.clone();
+            let sleep_wakeup = wakeup.clone();
             let sleep = async move {
                 if !backoff.is_zero() {
-                    sleep_clock.sleep(backoff).await;
+                    if let Some(notify) = sleep_wakeup {
+                        tokio::select! {
+                            () = sleep_clock.sleep(backoff) => {},
+                            () = notify.notified() => {},
+                        }
+                    } else {
+                        sleep_clock.sleep(backoff).await;
+                    }
                 }
             };
             futures::pin_mut!(sleep);
