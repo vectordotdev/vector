@@ -1293,6 +1293,34 @@ mod tests {
             assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
         }
 
+        // `get` with a dynamic path reads values from `.`, and `get` on another field still works.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    .tags.value = to_string(float!(get!(., ["gauge", "value"])))
+                    .tags.copy = string!(get!(.tags, ["region"]))
+                "#}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let metric = gauge(0.5)
+            .into_metric()
+            .with_tags(Some(vector_lib::metric_tags!(
+                "region" => "us-east-1"
+            )));
+        let result = transform_one(&mut tform, Event::Metric(metric)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("value"),
+            Some("0.5".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().tag_value("copy"),
+            Some("us-east-1".to_owned())
+        );
+
         // `unnest` keeps the other fields of the metric around each element.
         let mut tform = remap(RemapConfig {
             source: Some(
