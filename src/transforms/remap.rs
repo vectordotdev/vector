@@ -1328,6 +1328,7 @@ mod tests {
                     rows = unnest!(.distribution.samples)
                     .tags.first_name = string!(rows[0].name)
                     .tags.first_value = to_string(float!(rows[0].distribution.samples.value))
+                    .tags.first_type = string!(rows[0].type)
                 "}
                 .to_string(),
             ),
@@ -1350,6 +1351,10 @@ mod tests {
             Some("observations".to_owned())
         );
         assert_eq!(metric.tag_value("first_value"), Some("2.5".to_owned()));
+        assert_eq!(
+            metric.tag_value("first_type"),
+            Some("distribution".to_owned())
+        );
     }
 
     #[test]

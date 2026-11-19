@@ -2672,83 +2672,53 @@ mod test {
     }
 
     #[test]
-    fn metric_value_read_special_numbers() {
-        let query = |field: &str| vec![OwnedTargetPath::event(owned_value_path!(field))];
-
-        // VRL floats can't hold NaN, so it reads as the string "NaN".
-        let target =
-            metric_target_with_queries(MetricValue::Gauge { value: f64::NAN }, &query("gauge"));
-        assert_eq!(
-            get(&target, owned_value_path!("gauge", "value")),
-            Some(Value::from("NaN"))
-        );
-
-        // Infinities stay floats.
-        let target = metric_target_with_queries(
-            MetricValue::Gauge {
-                value: f64::NEG_INFINITY,
-            },
-            &query("gauge"),
-        );
-        assert_eq!(
-            get(&target, owned_value_path!("gauge", "value")),
-            Some(Value::from(f64::NEG_INFINITY))
-        );
+    fn metric_value_special_numbers() {
+        // VRL floats can't hold NaN, so it reads as the string "NaN". Infinities stay floats.
+        let floats = [
+            (1.5, Value::from(1.5)),
+            (f64::NAN, Value::from("NaN")),
+            (f64::INFINITY, Value::from(f64::INFINITY)),
+            (f64::NEG_INFINITY, Value::from(f64::NEG_INFINITY)),
+        ];
+        for (input, expected) in floats {
+            assert_eq!(metric_float_to_vrl_value(input), expected, "{input}");
+        }
 
         // Counts that don't fit in a VRL integer read as exact decimal strings.
-        let big = u64::MAX;
+        let counts = [
+            (5, Value::from(5)),
+            (i64::MAX as u64, Value::from(i64::MAX)),
+            (i64::MAX as u64 + 1, Value::from("9223372036854775808")),
+            (u64::MAX, Value::from("18446744073709551615")),
+        ];
+        for (input, expected) in counts {
+            assert_eq!(metric_count_to_vrl_value(input), expected, "{input}");
+        }
+
+        // Nested fields use these conversions, and a missing sum reads as `null`, not `0`.
         let target = metric_target_with_queries(
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => big],
-                count: big,
-                sum: Some(1.0),
+                buckets: crate::buckets![f64::NAN => u64::MAX],
+                count: 1,
+                sum: None,
             },
-            &query("aggregated_histogram"),
-        );
-        assert_eq!(
-            get(&target, owned_value_path!("aggregated_histogram", "count")),
-            Some(Value::from("18446744073709551615"))
+            &[OwnedTargetPath::event(owned_value_path!(
+                "aggregated_histogram"
+            ))],
         );
         assert_eq!(
             get(
                 &target,
-                owned_value_path!("aggregated_histogram", "buckets", 0, "count")
+                owned_value_path!("aggregated_histogram", "buckets", 0)
             ),
-            Some(Value::from("18446744073709551615"))
-        );
-
-        let target = metric_target_with_queries(
-            MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.5 => f64::NAN],
-                count: i64::MAX as u64 + 1,
-                sum: 1.0,
-            },
-            &query("aggregated_summary"),
+            Some(Value::from(objectmap! {
+                "upper_limit" => "NaN",
+                "count" => "18446744073709551615",
+            }))
         );
         assert_eq!(
-            get(&target, owned_value_path!("aggregated_summary", "count")),
-            Some(Value::from("9223372036854775808"))
-        );
-        assert_eq!(
-            get(
-                &target,
-                owned_value_path!("aggregated_summary", "quantiles", 0, "value")
-            ),
-            Some(Value::from("NaN"))
-        );
-
-        // The largest count that fits stays an integer.
-        let target = metric_target_with_queries(
-            MetricValue::AggregatedSummary {
-                quantiles: vec![],
-                count: i64::MAX as u64,
-                sum: 1.0,
-            },
-            &query("aggregated_summary"),
-        );
-        assert_eq!(
-            get(&target, owned_value_path!("aggregated_summary", "count")),
-            Some(Value::from(i64::MAX))
+            get(&target, owned_value_path!("aggregated_histogram", "sum")),
+            Some(Value::Null)
         );
     }
 
@@ -2796,30 +2766,6 @@ mod test {
             panic!("must be a metric");
         };
         assert_eq!(value.get(&owned_value_path!("distribution")), None);
-    }
-
-    #[test]
-    fn metric_value_array_read_prepares_whole_event() {
-        // `unnest` reads the root without registering a query for it, so reading an array in the
-        // value prepares every field.
-        let target = metric_target_with_queries(
-            MetricValue::Distribution {
-                samples: crate::samples![1.0 => 1],
-                statistic: StatisticKind::Histogram,
-            },
-            &[OwnedTargetPath::event(owned_value_path!(
-                "distribution",
-                "samples"
-            ))],
-        );
-        assert_eq!(
-            get(&target, owned_value_path!("name")),
-            Some(Value::from("m"))
-        );
-        assert_eq!(
-            get(&target, owned_value_path!("type")),
-            Some(Value::from("distribution"))
-        );
     }
 
     #[test]
