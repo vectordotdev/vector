@@ -51,6 +51,11 @@ impl<S, L> AdaptiveConcurrencyLimit<S, L> {
     pub(crate) fn logical_limit_layer(&self) -> LogicalConcurrencyLimitLayer {
         LogicalConcurrencyLimitLayer::new(self.controller.logical_semaphore())
     }
+
+    #[cfg(test)]
+    pub(crate) fn current_limit(&self) -> usize {
+        self.controller.current_limit()
+    }
 }
 
 impl<S, L, Request> Service<Request> for AdaptiveConcurrencyLimit<S, L>

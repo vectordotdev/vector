@@ -51,6 +51,11 @@ impl<S> LogicalConcurrencyLimit<S> {
     pub(crate) const fn get_ref(&self) -> &S {
         &self.inner
     }
+
+    #[cfg(test)]
+    pub(crate) fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
 }
 
 impl<S, Request> Service<Request> for LogicalConcurrencyLimit<S>

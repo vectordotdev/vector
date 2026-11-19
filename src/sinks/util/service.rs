@@ -669,31 +669,116 @@ mod tests {
         assert_eq!(fifth_calls.load(Ordering::Acquire), 0);
     }
 
+    /// Keeps `tasks` requests in flight until `duration` has passed, then waits for them to finish.
+    async fn keep_busy<S>(svc: &S, next_id: &Arc<AtomicUsize>, tasks: usize, duration: Duration)
+    where
+        S: Service<usize, Response = usize, Error = tower::BoxError, Future: Send>
+            + Clone
+            + Send
+            + 'static,
+    {
+        let deadline = tokio::time::Instant::now() + duration;
+        let tasks: Vec<_> = (0..tasks)
+            .map(|_| {
+                let svc = svc.clone();
+                let next_id = Arc::clone(next_id);
+                tokio::spawn(async move {
+                    while tokio::time::Instant::now() < deadline {
+                        let id = next_id.fetch_add(1, Ordering::AcqRel);
+                        svc.clone().oneshot(id).await.unwrap();
+                    }
+                })
+            })
+            .collect();
+        for task in tasks {
+            task.await.unwrap();
+        }
+    }
+
     #[tokio::test(start_paused = true)]
-    async fn retrying_requests_follow_the_adaptive_limit() {
-        let third_calls = Arc::new(AtomicUsize::new(0));
+    async fn retry_bound_follows_the_adaptive_limit() {
+        // Attempts take 100ms. While `failing` is set, the first attempt of each request fails and
+        // the request sleeps 60s in backoff, keeping its logical slot.
+        let failing = Arc::new(AtomicBool::new(false));
+        let attempts = Arc::new(AtomicUsize::new(0));
         let inner = {
-            let third_calls = Arc::clone(&third_calls);
+            let failing = Arc::clone(&failing);
+            let attempts = Arc::clone(&attempts);
+            let failed = Arc::new(Mutex::new(HashSet::new()));
             tower::service_fn(move |req: usize| {
-                if req == 2 {
-                    third_calls.fetch_add(1, Ordering::AcqRel);
+                attempts.fetch_add(1, Ordering::AcqRel);
+                let fail = failing.load(Ordering::Acquire) && failed.lock().unwrap().insert(req);
+                async move {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    if fail {
+                        Err(std::io::Error::other(""))
+                    } else {
+                        Ok(req)
+                    }
                 }
-                future::err::<usize, _>(std::io::Error::other("")).boxed()
+                .boxed()
             })
         };
-        let svc = buffered(retry_test_settings(Concurrency::Adaptive), inner);
+        let svc = ServiceBuilder::new()
+            .settings(retry_test_settings(Concurrency::Adaptive), RetryUsize)
+            .service(inner);
+        let logical = svc.get_ref().clone();
+        let adaptive = svc.get_ref().get_ref().get_ref().clone();
+        let svc = tower::buffer::Buffer::new(svc, 100);
+        let next_id = Arc::new(AtomicUsize::new(0));
 
-        // The adaptive limit starts at 1, so two logical requests may be in flight, not two per
-        // unit of `max_concurrency_limit`.
-        for req in 0..2 {
-            tokio::spawn(svc.clone().oneshot(req));
-        }
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(adaptive.current_limit(), 1);
+        assert_eq!(logical.available_permits(), 2);
 
-        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
+        // With a steady RTT under load the limit grows, and the bound with it.
+        keep_busy(&svc, &next_id, 50, Duration::from_secs(2)).await;
+        let warm_limit = adaptive.current_limit();
+        assert!(warm_limit > 4, "the limit did not grow: {warm_limit}");
+        assert_eq!(logical.available_permits(), 2 * warm_limit);
+
+        // Sent 150ms apart, each failure is back pressure in a new adjustment interval, so the limit
+        // drops while the failed requests sleep in backoff. Send them until one is held back.
+        failing.store(true, Ordering::Release);
+        let mut sleeping = Vec::new();
+        let held_back = loop {
+            let before = attempts.load(Ordering::Acquire);
+            let id = next_id.fetch_add(1, Ordering::AcqRel);
+            let request = tokio::spawn(svc.clone().oneshot(id));
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            if attempts.load(Ordering::Acquire) == before {
+                break request;
+            }
+            sleeping.push(request);
+        };
+        let low_limit = adaptive.current_limit();
+        assert!(
+            low_limit < warm_limit,
+            "the limit did not drop: {low_limit}"
+        );
+        // The sleeping retries fill the decreased bound, though they would fit in the earlier one.
+        assert_eq!(logical.available_permits(), 0);
+        assert!(sleeping.len() >= 2 * low_limit && sleeping.len() < 2 * warm_limit);
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        assert!(!held_back.is_finished());
+
+        // Once the retries succeed after their backoff, new requests get through again and the
+        // limit and the bound recover.
+        failing.store(false, Ordering::Release);
+        tokio::time::timeout(Duration::from_secs(60), held_back)
             .await
-            .expect_err("request should be held back by the retry bound");
-        assert_eq!(third_calls.load(Ordering::Acquire), 0);
+            .expect("the held back request did not get through")
+            .unwrap()
+            .unwrap();
+        for request in sleeping {
+            request.await.unwrap().unwrap();
+        }
+        keep_busy(&svc, &next_id, 50, Duration::from_secs(2)).await;
+        let recovered_limit = adaptive.current_limit();
+        assert!(
+            recovered_limit > low_limit,
+            "the limit did not recover: {recovered_limit}"
+        );
+        assert_eq!(logical.available_permits(), 2 * recovered_limit);
     }
 
     #[tokio::test(start_paused = true)]

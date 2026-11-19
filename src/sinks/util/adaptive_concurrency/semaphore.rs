@@ -68,6 +68,11 @@ impl ShrinkableSemaphore {
             *to_forget = 0;
         }
     }
+
+    #[cfg(test)]
+    pub(super) fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
 }
 
 /// A future that accounts for the possibility of needing to forget some

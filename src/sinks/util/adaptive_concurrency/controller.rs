@@ -135,6 +135,14 @@ impl<L> Controller<L> {
         Arc::clone(&self.logical)
     }
 
+    #[cfg(test)]
+    pub(super) fn current_limit(&self) -> usize {
+        self.inner
+            .lock()
+            .expect("Controller mutex is poisoned")
+            .current_limit
+    }
+
     pub(super) fn start_request(&self) {
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
 
