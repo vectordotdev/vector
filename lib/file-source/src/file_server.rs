@@ -25,6 +25,7 @@ use tracing::{debug, error, info, trace};
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
     paths_provider::PathsProvider,
+    scheduler::{FsEvent, FsEventSource, LegacyPollingScheduler, NoopFsEventSource, ReadScheduler},
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -56,39 +57,76 @@ where
     pub rotate_wait: Duration,
 }
 
-/// Steppable runtime state of a [`FileServer`], parameterized over [`FileSystem`]
-/// and [`Clock`] to enable deterministic simulation testing without modifying
-/// production behavior.
+/// Steppable runtime state of a [`FileServer`], parameterized over [`FileSystem`],
+/// [`Clock`], [`ReadScheduler`], and [`FsEventSource`] to enable deterministic
+/// simulation testing and pluggable scheduling without modifying production behavior.
 pub struct FileServerState<
     PP: PathsProvider,
     E: FileSourceInternalEvents,
     FS: FileSystem = OsFileSystem,
     C: Clock = SystemClock,
+    S: ReadScheduler = LegacyPollingScheduler,
+    Ev: FsEventSource = NoopFsEventSource,
 > {
     server: FileServer<PP, E>,
     fs: FS,
     clock: C,
+    scheduler: S,
+    event_source: Ev,
     fp_map: IndexMap<FileFingerprint, FileWatcher<FS>>,
     known_small_files: HashMap<PathBuf, MonotonicInstant>,
     checkpoints: Arc<CheckpointsView<C>>,
     backoff_cap: usize,
     next_glob_time: MonotonicInstant,
     stats: TimingStats,
+    pending_events: Vec<FsEvent>,
+    read_candidates: Vec<FileFingerprint>,
 }
 
-impl<PP, E, FS, C> FileServerState<PP, E, FS, C>
+impl<PP, E, FS, C> FileServerState<PP, E, FS, C, LegacyPollingScheduler, NoopFsEventSource>
 where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
     FS: FileSystem,
     C: Clock,
 {
-    /// Initialize `FileServerState` by loading checkpoints and discovering initial files.
+    /// Initialize `FileServerState` with the default [`LegacyPollingScheduler`]
+    /// and [`NoopFsEventSource`].
     pub async fn init(
+        server: FileServer<PP, E>,
+        checkpointer: &mut Checkpointer<FS, C>,
+        fs: FS,
+        clock: C,
+    ) -> Self {
+        Self::init_with_scheduler(
+            server,
+            checkpointer,
+            fs,
+            clock,
+            LegacyPollingScheduler::default(),
+            NoopFsEventSource,
+        )
+        .await
+    }
+}
+
+impl<PP, E, FS, C, S, Ev> FileServerState<PP, E, FS, C, S, Ev>
+where
+    PP: PathsProvider,
+    E: FileSourceInternalEvents,
+    FS: FileSystem,
+    C: Clock,
+    S: ReadScheduler,
+    Ev: FsEventSource,
+{
+    /// Initialize `FileServerState` with an explicit [`ReadScheduler`] and [`FsEventSource`].
+    pub async fn init_with_scheduler(
         mut server: FileServer<PP, E>,
         checkpointer: &mut Checkpointer<FS, C>,
         fs: FS,
         clock: C,
+        scheduler: S,
+        event_source: Ev,
     ) -> Self {
         let fp_map: IndexMap<FileFingerprint, FileWatcher<FS>> = IndexMap::default();
         let mut known_small_files = HashMap::new();
@@ -139,12 +177,16 @@ where
             server,
             fs,
             clock,
+            scheduler,
+            event_source,
             fp_map,
             known_small_files,
             checkpoints,
             backoff_cap: 1,
             next_glob_time: now,
             stats: TimingStats::new(now),
+            pending_events: Vec::new(),
+            read_candidates: Vec::new(),
         };
 
         for (_key, path, file_id) in existing_files {
@@ -175,6 +217,14 @@ where
     /// Panics if the polling deadline overflows or a file path is not UTF-8.
     pub async fn step(&mut self, lines: &mut Vec<Line>) -> Duration {
         let now_time = self.clock.now();
+
+        // Drain any pending OS/simulated filesystem notifications and feed them to the scheduler.
+        self.pending_events.clear();
+        self.event_source.drain_events(&mut self.pending_events);
+        for event in &self.pending_events {
+            self.scheduler.on_fs_event(event, now_time);
+        }
+
         if self.next_glob_time <= now_time {
             self.next_glob_time = now_time
                 .checked_add(self.server.glob_minimum_cooldown)
@@ -243,18 +293,25 @@ where
                         );
                     } else if !was_found_this_cycle {
                         // matches a file with a different path
+                        let old_path = watcher.path.clone();
                         info!(
                             message = "Watched file has been renamed.",
                             path = ?path,
-                            old_path = ?watcher.path
+                            old_path = ?old_path
                         );
-                        if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
-                            // Inode changed - emit metrics for the old file
-                            self.server.emitter.emit_file_unwatched(
-                                &unwatch_info.path,
-                                unwatch_info.reached_eof,
-                                unwatch_info.bytes_unread,
-                            );
+                        if let Ok(unwatch_opt) = watcher.update_path(path.clone()).await {
+                            self.event_source.unwatch_path(&old_path);
+                            self.event_source.watch_path(&path);
+                            self.scheduler
+                                .on_file_renamed(file_id, &old_path, &path, now);
+                            if let Some(unwatch_info) = unwatch_opt {
+                                // Inode changed - emit metrics for the old file
+                                self.server.emitter.emit_file_unwatched(
+                                    &unwatch_info.path,
+                                    unwatch_info.reached_eof,
+                                    unwatch_info.bytes_unread,
+                                );
+                            }
                         }
                     } else {
                         info!(
@@ -262,10 +319,10 @@ where
                             path = ?path,
                             old_path = ?watcher.path
                         );
-                        let (old_path, new_path) = (&watcher.path, &path);
+                        let (old_path, new_path) = (watcher.path.clone(), path.clone());
                         if let (Ok(old_meta), Ok(new_meta)) = (
-                            self.fs.metadata(old_path).await,
-                            self.fs.metadata(new_path).await,
+                            self.fs.metadata(&old_path).await,
+                            self.fs.metadata(&new_path).await,
                         ) && let (Some(old_modified_time), Some(new_modified_time)) =
                             (old_meta.modified, new_meta.modified)
                             && old_modified_time < new_modified_time
@@ -275,13 +332,19 @@ where
                                 new_modified_time = ?new_modified_time,
                                 old_modified_time = ?old_modified_time,
                             );
-                            if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
-                                // Inode changed - emit metrics for the old file
-                                self.server.emitter.emit_file_unwatched(
-                                    &unwatch_info.path,
-                                    unwatch_info.reached_eof,
-                                    unwatch_info.bytes_unread,
-                                );
+                            if let Ok(unwatch_opt) = watcher.update_path(path).await {
+                                self.event_source.unwatch_path(&old_path);
+                                self.event_source.watch_path(&new_path);
+                                self.scheduler
+                                    .on_file_renamed(file_id, &old_path, &new_path, now);
+                                if let Some(unwatch_info) = unwatch_opt {
+                                    // Inode changed - emit metrics for the old file
+                                    self.server.emitter.emit_file_unwatched(
+                                        &unwatch_info.path,
+                                        unwatch_info.reached_eof,
+                                        unwatch_info.bytes_unread,
+                                    );
+                                }
                             }
                         }
                     }
@@ -333,21 +396,29 @@ where
         }
     }
 
-    /// Collect lines by polling watched files. Returns total bytes read across all files.
+    /// Collect lines by polling watched files selected by the [`ReadScheduler`].
+    /// Returns total bytes read across all files.
     ///
     /// # Panics
     /// Panics if a watched file path is not valid UTF-8.
     pub async fn poll_files(&mut self, lines: &mut Vec<Line>) -> usize {
         let mut global_bytes_read: usize = 0;
         let mut maxed_out_reading_single_file = false;
-        for (&file_id, watcher) in &mut self.fp_map {
-            let now = self.clock.now();
-            if !watcher.should_read_at(now) {
+
+        self.read_candidates.clear();
+        let select_now = self.clock.now();
+        self.scheduler
+            .select_readable(select_now, &mut self.read_candidates);
+        let candidates = std::mem::take(&mut self.read_candidates);
+
+        for (idx, &file_id) in candidates.iter().enumerate() {
+            let Some(watcher) = self.fp_map.get_mut(&file_id) else {
                 continue;
-            }
+            };
 
             let start = self.clock.now();
             let mut bytes_read: usize = 0;
+            let mut hit_max_read_bytes = false;
             while let Ok(RawLineResult {
                 raw_line: Some(line),
                 discarded_for_size_and_truncated,
@@ -380,22 +451,26 @@ where
                 });
 
                 if bytes_read > self.server.max_read_bytes {
+                    hit_max_read_bytes = true;
                     maxed_out_reading_single_file = true;
                     break;
                 }
             }
+            let after_read = self.clock.now();
             self.stats
-                .record("reading", self.clock.now().saturating_duration_since(start));
+                .record("reading", after_read.saturating_duration_since(start));
 
             if bytes_read > 0 {
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
+                self.scheduler.on_file_read(file_id, bytes_read, after_read);
+                if !hit_max_read_bytes {
+                    self.scheduler.on_file_eof(file_id, after_read);
+                }
             } else {
+                self.scheduler.on_file_eof(file_id, after_read);
                 // Should the file be removed
                 if let Some(grace_period) = self.server.remove_after
-                    && self
-                        .clock
-                        .now()
-                        .saturating_duration_since(watcher.last_read_success())
+                    && after_read.saturating_duration_since(watcher.last_read_success())
                         >= grace_period
                 {
                     // Try to remove
@@ -416,9 +491,13 @@ where
 
             // Do not move on to newer files if we are behind on an older file
             if self.server.oldest_first && maxed_out_reading_single_file {
+                for &skipped_id in &candidates[idx + 1..] {
+                    self.scheduler.on_file_skipped(skipped_id);
+                }
                 break;
             }
         }
+        self.read_candidates = candidates;
         global_bytes_read
     }
 
@@ -445,6 +524,8 @@ where
 
         for file_id in dead_file_ids {
             if let Some(watcher) = self.fp_map.shift_remove(&file_id) {
+                self.scheduler.on_file_removed(file_id);
+                self.event_source.unwatch_path(&watcher.path);
                 let unwatch_info = watcher.get_unwatch_info().await;
                 self.server.emitter.emit_file_unwatched(
                     &unwatch_info.path,
@@ -504,7 +585,11 @@ where
                     self.server.emitter.emit_file_added(&path);
                 }
                 watcher.set_file_findable_at(true, now);
+                let initial_ts = watcher.last_read_success();
                 self.fp_map.insert(file_id, watcher);
+                self.event_source.watch_path(&path);
+                self.scheduler
+                    .on_file_added(file_id, &path, initial_ts, now);
             }
             Err(error) => self.server.emitter.emit_file_watch_error(&path, error),
         }

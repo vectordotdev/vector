@@ -12,13 +12,19 @@ use file_source_common::{
 use proptest::prelude::*;
 use tokio::io::AsyncReadExt as _;
 
-use crate::file_server::{FileServer, FileServerState, Line};
+use crate::{
+    file_server::{FileServer, FileServerState, Line},
+    scheduler::{
+        AdaptiveEventScheduler, AdaptiveSchedulerConfig, FsEventSource, LegacyPollingScheduler,
+        NoopFsEventSource, ReadScheduler,
+    },
+};
 
 use super::{
     action::{DstConfig, NUM_SLOTS, SimAction},
     clock::SimClock,
     emitter::RecordingEmitter,
-    fs::{SimFileSystem, SimPathsProvider},
+    fs::{EventDelivery, SimFileSystem, SimPathsProvider},
 };
 
 #[derive(Default)]
@@ -48,13 +54,19 @@ struct SlotEntry {
 
 /// Deterministic simulation runner executing a `proptest`-generated [`SimAction`]
 /// trace against [`FileServerState`] + [`SimFileSystem`] + [`SimClock`].
-pub struct DstRunner {
+pub struct DstRunner<
+    S: ReadScheduler = LegacyPollingScheduler,
+    Ev: FsEventSource = NoopFsEventSource,
+> {
     config: DstConfig,
     clock: SimClock,
     fs: SimFileSystem,
     emitter: RecordingEmitter,
     checkpointer: Checkpointer<SimFileSystem, SimClock>,
-    state: Option<FileServerState<SimPathsProvider, RecordingEmitter, SimFileSystem, SimClock>>,
+    state:
+        Option<FileServerState<SimPathsProvider, RecordingEmitter, SimFileSystem, SimClock, S, Ev>>,
+    make_scheduler: Box<dyn Fn(&DstConfig) -> S + Send>,
+    make_event_source: Box<dyn Fn(&SimFileSystem) -> Ev + Send>,
     active_slots: Vec<Option<SlotEntry>>,
     /// Rotated files that remain inside `/logs/*` and can still receive appends.
     rotated_in_glob: Vec<(PathBuf, u64)>,
@@ -81,17 +93,32 @@ pub struct DstRunner {
     rot_counter: u64,
 }
 
-impl DstRunner {
-    pub async fn new(config: DstConfig) -> Self {
+impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
+    pub async fn new_with(
+        config: DstConfig,
+        delivery: EventDelivery,
+        make_scheduler: impl Fn(&DstConfig) -> S + Send + 'static,
+        make_event_source: impl Fn(&SimFileSystem) -> Ev + Send + 'static,
+    ) -> Self {
         let clock = SimClock::new();
         let fs = SimFileSystem::new(clock.clone());
         fs.set_max_bytes_per_read(config.max_bytes_per_read);
+        fs.set_event_delivery(delivery);
         let emitter = RecordingEmitter::new();
         let mut checkpointer =
             Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
         let server = build_server(&fs, emitter.clone(), &config);
-        let state =
-            FileServerState::init(server, &mut checkpointer, fs.clone(), clock.clone()).await;
+        let scheduler = make_scheduler(&config);
+        let event_source = make_event_source(&fs);
+        let state = FileServerState::init_with_scheduler(
+            server,
+            &mut checkpointer,
+            fs.clone(),
+            clock.clone(),
+            scheduler,
+            event_source,
+        )
+        .await;
 
         Self {
             config,
@@ -100,6 +127,8 @@ impl DstRunner {
             emitter,
             checkpointer,
             state: Some(state),
+            make_scheduler: Box::new(make_scheduler),
+            make_event_source: Box::new(make_event_source),
             active_slots: vec![None; NUM_SLOTS],
             rotated_in_glob: Vec::new(),
             unfindable_inos: HashSet::new(),
@@ -389,9 +418,18 @@ impl DstRunner {
         let mut new_cp =
             Checkpointer::new_with(&PathBuf::from("/data"), self.fs.clone(), self.clock.clone());
         let new_server = build_server(&self.fs, self.emitter.clone(), &self.config);
+        let scheduler = (self.make_scheduler)(&self.config);
+        let event_source = (self.make_event_source)(&self.fs);
         self.state = Some(
-            FileServerState::init(new_server, &mut new_cp, self.fs.clone(), self.clock.clone())
-                .await,
+            FileServerState::init_with_scheduler(
+                new_server,
+                &mut new_cp,
+                self.fs.clone(),
+                self.clock.clone(),
+                scheduler,
+                event_source,
+            )
+            .await,
         );
         self.checkpointer = new_cp;
         Ok(())
@@ -699,14 +737,52 @@ fn build_server(
 }
 
 /// Runs a `proptest`-generated `(DstConfig, Vec<SimAction>)` scenario against
-/// `FileServerState` + `SimFileSystem` + `SimClock`.
+/// `FileServerState` with [`LegacyPollingScheduler`].
 pub fn run_dst_scenario(config: DstConfig, actions: &[SimAction]) -> Result<(), TestCaseError> {
+    run_dst_with(
+        config,
+        actions,
+        EventDelivery::Normal,
+        |_| LegacyPollingScheduler::default(),
+        |_| NoopFsEventSource,
+    )
+}
+
+/// Runs a `proptest`-generated `(DstConfig, Vec<SimAction>)` scenario against
+/// `FileServerState` with [`AdaptiveEventScheduler`] + [`SimFsEventSource`].
+pub fn run_dst_scenario_adaptive(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+) -> Result<(), TestCaseError> {
+    run_dst_with(
+        config,
+        actions,
+        delivery,
+        |cfg| {
+            AdaptiveEventScheduler::new(AdaptiveSchedulerConfig {
+                oldest_first: cfg.oldest_first,
+                ..AdaptiveSchedulerConfig::default()
+            })
+        },
+        SimFileSystem::event_source,
+    )
+}
+
+fn run_dst_with<S: ReadScheduler, Ev: FsEventSource>(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+    make_scheduler: impl Fn(&DstConfig) -> S + Send + 'static,
+    make_event_source: impl Fn(&SimFileSystem) -> Ev + Send + 'static,
+) -> Result<(), TestCaseError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .expect("build current-thread tokio runtime");
     rt.block_on(async move {
-        let mut runner = DstRunner::new(config).await;
+        let mut runner =
+            DstRunner::new_with(config, delivery, make_scheduler, make_event_source).await;
         for (step_idx, action) in actions.iter().enumerate() {
             runner.execute_action(step_idx, action).await?;
         }
