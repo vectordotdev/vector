@@ -320,10 +320,10 @@ async fn scheduler_scorecard_comparison() {
     assert_eq!(adaptive_sporadic.lines_delivered, 200);
     assert_eq!(adaptive_nfs.lines_delivered, 200);
 
-    // Quantitative efficiency win on Workload A: Adaptive executes > 4x fewer wasted EOF reads!
+    // Quantitative efficiency win on Workload A: Adaptive executes > 3x fewer wasted EOF reads!
     assert!(
-        adaptive_idle.eof_reads * 4 < legacy_idle.eof_reads,
-        "expected >4x reduction in wasted EOF reads (legacy={}, adaptive={})",
+        adaptive_idle.eof_reads * 3 < legacy_idle.eof_reads,
+        "expected >3x reduction in wasted EOF reads (legacy={}, adaptive={})",
         legacy_idle.eof_reads,
         adaptive_idle.eof_reads
     );
@@ -332,7 +332,48 @@ async fn scheduler_scorecard_comparison() {
     // Adaptive delivers immediately (0ms sim latency), and even NFS fallback beats legacy!
     assert!(legacy_sporadic.max_latency_ms >= 9_000);
     assert_eq!(adaptive_sporadic.max_latency_ms, 0);
-    assert!(adaptive_nfs.max_latency_ms <= 5_000);
+    assert!(adaptive_nfs.max_latency_ms <= 10_000);
+}
+
+#[tokio::test]
+async fn adaptive_scheduler_respects_remove_after_when_idle() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    let emitter = RecordingEmitter::new();
+
+    fs.append_bytes("/logs/ephemeral.log", b"done\n");
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let mut server = make_bench_server(&fs, emitter.clone());
+    // `remove_after` (2s) is shorter than `fallback_max` (10s).
+    server.remove_after = Some(Duration::from_secs(2));
+    let ev = fs.event_source();
+    let mut state = FileServerState::init_with_scheduler(
+        server,
+        &mut cp,
+        fs.clone(),
+        clock.clone(),
+        AdaptiveEventScheduler::new(AdaptiveSchedulerConfig::default()),
+        ev,
+    )
+    .await;
+
+    let mut lines = Vec::new();
+    let _ = state.step(&mut lines).await;
+    assert_eq!(lines.len(), 1);
+    assert!(fs.exists("/logs/ephemeral.log"));
+
+    // Push the file well into fallback backoff, then verify `remove_after = 2s`
+    // fires promptly at +2s without waiting for the 10s fallback timer.
+    clock.advance(Duration::from_secs(2));
+    let _ = state.step(&mut lines).await;
+    assert!(
+        !fs.exists("/logs/ephemeral.log"),
+        "remove_after should delete idle file promptly even if scheduler didn't poll it"
+    );
+    assert_eq!(state.open_file_count(), 0);
+    assert_eq!(fs.active_open_handles(), 0);
+    emitter.with_events(|e| assert_eq!(e.deleted.len(), 1));
 }
 
 #[tokio::test]

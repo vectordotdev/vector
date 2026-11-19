@@ -41,6 +41,11 @@ pub struct NotifyEventSource {
     /// Maps canonicalized parent directory -> original watched parent directory
     /// when they differ (e.g. symlinked parent dirs).
     canonical_to_watched: HashMap<PathBuf, Vec<PathBuf>>,
+    /// Maps canonicalized target file path -> watched symlink path(s) when a
+    /// watched file is a symlink pointing to a target (possibly in another directory).
+    file_aliases: HashMap<PathBuf, Vec<PathBuf>>,
+    /// Reverse index from watched symlink path -> canonical target file path for clean unwatch.
+    watched_to_canonical_file: HashMap<PathBuf, PathBuf>,
 }
 
 impl NotifyEventSource {
@@ -101,6 +106,8 @@ impl NotifyEventSource {
             wakeup,
             dir_refs: HashMap::new(),
             canonical_to_watched: HashMap::new(),
+            file_aliases: HashMap::new(),
+            watched_to_canonical_file: HashMap::new(),
         })
     }
 
@@ -108,6 +115,58 @@ impl NotifyEventSource {
     #[must_use]
     pub fn watched_dir_count(&self) -> usize {
         self.dir_refs.len()
+    }
+
+    fn watch_dir(&mut self, dir: &Path) {
+        let dir_buf = dir.to_path_buf();
+        let count = self.dir_refs.entry(dir_buf.clone()).or_insert(0);
+        *count += 1;
+        if *count == 1 {
+            if let Err(error) = self.watcher.watch(dir, RecursiveMode::NonRecursive) {
+                debug!(
+                    message = "Failed to register OS directory watch; relying on fallback polling.",
+                    dir = ?dir,
+                    %error,
+                );
+            }
+            if let Ok(canonical) = std::fs::canonicalize(dir)
+                && canonical != dir_buf
+            {
+                self.canonical_to_watched
+                    .entry(canonical)
+                    .or_default()
+                    .push(dir_buf);
+            }
+        }
+    }
+
+    fn unwatch_dir(&mut self, dir: &Path) {
+        if let Some(count) = self.dir_refs.get_mut(dir) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.dir_refs.remove(dir);
+                if let Err(error) = self.watcher.unwatch(dir) {
+                    debug!(
+                        message = "Failed to unregister OS directory watch.",
+                        dir = ?dir,
+                        %error,
+                    );
+                }
+                self.canonical_to_watched.retain(|_, aliases| {
+                    aliases.retain(|p| p != dir);
+                    !aliases.is_empty()
+                });
+            }
+        }
+    }
+
+    fn remap_event(event: &FsEvent, new_path: PathBuf) -> FsEvent {
+        match event {
+            FsEvent::Modified(_) => FsEvent::Modified(new_path),
+            FsEvent::Created(_) => FsEvent::Created(new_path),
+            FsEvent::Removed(_) => FsEvent::Removed(new_path),
+            FsEvent::Overflow => FsEvent::Overflow,
+        }
     }
 
     fn normalize_event(&self, event: FsEvent, out: &mut Vec<FsEvent>) {
@@ -119,18 +178,21 @@ impl NotifyEventSource {
             }
         };
 
+        // 1. Check direct canonical target -> symlink path aliases (e.g. Kubernetes pod logs).
+        let mut emitted_alias = false;
+        if let Some(symlink_paths) = self.file_aliases.get(path) {
+            for sym_path in symlink_paths {
+                out.push(Self::remap_event(&event, sym_path.clone()));
+                emitted_alias = true;
+            }
+        }
+
+        // 2. Check canonical parent dir -> watched parent dir aliases (e.g. macOS /private/var).
         if let (Some(parent), Some(file_name)) = (path.parent(), path.file_name())
             && let Some(aliases) = self.canonical_to_watched.get(parent)
         {
             for alias_parent in aliases {
-                let remapped = alias_parent.join(file_name);
-                let remapped_event = match &event {
-                    FsEvent::Modified(_) => FsEvent::Modified(remapped),
-                    FsEvent::Created(_) => FsEvent::Created(remapped),
-                    FsEvent::Removed(_) => FsEvent::Removed(remapped),
-                    FsEvent::Overflow => FsEvent::Overflow,
-                };
-                out.push(remapped_event);
+                out.push(Self::remap_event(&event, alias_parent.join(file_name)));
             }
             if self.dir_refs.contains_key(parent) {
                 out.push(event);
@@ -138,7 +200,9 @@ impl NotifyEventSource {
             return;
         }
 
-        out.push(event);
+        if !emitted_alias || path.parent().is_some_and(|p| self.dir_refs.contains_key(p)) {
+            out.push(event);
+        }
     }
 }
 
@@ -180,50 +244,45 @@ impl FsEventSource for NotifyEventSource {
     }
 
     fn watch_path(&mut self, path: &Path) {
-        let Some(parent) = path.parent() else {
-            return;
-        };
-        let parent_buf = parent.to_path_buf();
-        let count = self.dir_refs.entry(parent_buf.clone()).or_insert(0);
-        *count += 1;
-        if *count == 1 {
-            if let Err(error) = self.watcher.watch(parent, RecursiveMode::NonRecursive) {
-                debug!(
-                    message = "Failed to register OS directory watch; relying on fallback polling.",
-                    dir = ?parent,
-                    %error,
-                );
-            }
-            if let Ok(canonical) = std::fs::canonicalize(parent)
-                && canonical != parent_buf
+        if let Some(parent) = path.parent() {
+            self.watch_dir(parent);
+        }
+
+        // If `path` is a symlink whose target resolves to a different file (potentially
+        // in another directory, e.g. `/var/log/containers/*.log -> /var/log/pods/...`),
+        // also watch the target's parent directory and map target events back to `path`.
+        if let Ok(canonical_file) = std::fs::canonicalize(path)
+            && canonical_file != path
+        {
+            if let Some(target_parent) = canonical_file.parent()
+                && Some(target_parent) != path.parent()
             {
-                self.canonical_to_watched
-                    .entry(canonical)
-                    .or_default()
-                    .push(parent_buf);
+                self.watch_dir(target_parent);
             }
+            self.file_aliases
+                .entry(canonical_file.clone())
+                .or_default()
+                .push(path.to_path_buf());
+            self.watched_to_canonical_file
+                .insert(path.to_path_buf(), canonical_file);
         }
     }
 
     fn unwatch_path(&mut self, path: &Path) {
-        let Some(parent) = path.parent() else {
-            return;
-        };
-        if let Some(count) = self.dir_refs.get_mut(parent) {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                self.dir_refs.remove(parent);
-                if let Err(error) = self.watcher.unwatch(parent) {
-                    debug!(
-                        message = "Failed to unregister OS directory watch.",
-                        dir = ?parent,
-                        %error,
-                    );
+        if let Some(parent) = path.parent() {
+            self.unwatch_dir(parent);
+        }
+        if let Some(canonical_file) = self.watched_to_canonical_file.remove(path) {
+            if let Some(target_parent) = canonical_file.parent()
+                && Some(target_parent) != path.parent()
+            {
+                self.unwatch_dir(target_parent);
+            }
+            if let Some(aliases) = self.file_aliases.get_mut(&canonical_file) {
+                aliases.retain(|p| p != path);
+                if aliases.is_empty() {
+                    self.file_aliases.remove(&canonical_file);
                 }
-                self.canonical_to_watched.retain(|_, aliases| {
-                    aliases.retain(|p| p != parent);
-                    !aliases.is_empty()
-                });
             }
         }
     }
@@ -436,5 +495,54 @@ mod tests {
 
         assert_eq!(got_adaptive, expected_hot);
         assert_eq!(got_legacy, expected_hot);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn notify_event_source_tracks_cross_directory_symlink_target() {
+        let target_dir = tempdir().unwrap();
+        let link_dir = tempdir().unwrap();
+
+        let target_file = target_dir.path().join("0.log");
+        let symlink_file = link_dir.path().join("pod_container.log");
+        fs::write(&target_file, b"init\n").unwrap();
+        std::os::unix::fs::symlink(&target_file, &symlink_file).unwrap();
+
+        let mut source = NotifyEventSource::new().expect("create notify watcher");
+        source.watch_path(&symlink_file);
+        // Watches both the symlink's directory AND the target's directory.
+        assert_eq!(source.watched_dir_count(), 2);
+
+        // Append directly to the target file (in a different directory!).
+        let mut f = fs::OpenOptions::new()
+            .append(true)
+            .open(&target_file)
+            .unwrap();
+        writeln!(f, "pod_log_line").unwrap();
+        f.flush().unwrap();
+
+        let mut events = Vec::new();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            source.drain_events(&mut events);
+            if events
+                .iter()
+                .any(|e| matches!(e, FsEvent::Modified(p) if p == &symlink_file))
+            {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, FsEvent::Modified(p) if p == &symlink_file)),
+            "expected Modified event remapped to symlink {symlink_file:?}, got {events:?}"
+        );
+
+        // Unwatching the symlink cleans up both directory watches.
+        source.unwatch_path(&symlink_file);
+        assert_eq!(source.watched_dir_count(), 0);
     }
 }

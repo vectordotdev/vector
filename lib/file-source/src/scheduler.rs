@@ -228,7 +228,7 @@ impl Default for AdaptiveSchedulerConfig {
     fn default() -> Self {
         Self {
             fallback_min: Duration::from_millis(250),
-            fallback_max: Duration::from_secs(30),
+            fallback_max: Duration::from_secs(10),
             oldest_first: false,
         }
     }

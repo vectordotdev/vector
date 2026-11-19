@@ -243,7 +243,10 @@ where
 
         self.cleanup_small_files().await;
 
+        let lines_start = lines.len();
         let global_bytes_read = self.poll_files(lines).await;
+
+        self.cleanup_idle_files(&lines[lines_start..]).await;
 
         self.reap_dead_files().await;
 
@@ -468,25 +471,6 @@ where
                 }
             } else {
                 self.scheduler.on_file_eof(file_id, after_read);
-                // Should the file be removed
-                if let Some(grace_period) = self.server.remove_after
-                    && after_read.saturating_duration_since(watcher.last_read_success())
-                        >= grace_period
-                {
-                    // Try to remove
-                    match self.fs.remove_file(&watcher.path).await {
-                        Ok(()) => {
-                            self.server.emitter.emit_file_deleted(&watcher.path);
-                            watcher.set_dead();
-                        }
-                        Err(error) => {
-                            // We will try again after some time.
-                            self.server
-                                .emitter
-                                .emit_file_delete_error(&watcher.path, error);
-                        }
-                    }
-                }
             }
 
             // Do not move on to newer files if we are behind on an older file
@@ -499,6 +483,37 @@ where
         }
         self.read_candidates = candidates;
         global_bytes_read
+    }
+
+    /// Remove idle watched files that have exceeded `remove_after`, decoupled from
+    /// whether the [`ReadScheduler`] polled them on this tick.
+    async fn cleanup_idle_files(&mut self, lines_read_this_tick: &[Line]) {
+        let Some(grace_period) = self.server.remove_after else {
+            return;
+        };
+        let now = self.clock.now();
+        for (&file_id, watcher) in &mut self.fp_map {
+            if watcher.dead() {
+                continue;
+            }
+            if lines_read_this_tick.iter().any(|l| l.file_id == file_id) {
+                continue;
+            }
+            if now.saturating_duration_since(watcher.last_read_success()) >= grace_period {
+                match self.fs.remove_file(&watcher.path).await {
+                    Ok(()) => {
+                        self.server.emitter.emit_file_deleted(&watcher.path);
+                        watcher.set_dead();
+                    }
+                    Err(error) => {
+                        // We will try again after some time.
+                        self.server
+                            .emitter
+                            .emit_file_delete_error(&watcher.path, error);
+                    }
+                }
+            }
+        }
     }
 
     /// Expire unfindable watchers past `rotate_wait` and remove all dead watchers.
