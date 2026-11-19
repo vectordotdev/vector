@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use super::{
     ComponentKey, ComponentKind, ConfigBuilder, SinkOuter, SourceOuter, TransformContext,
     TransformOuter,
-    graph::{InputSpec, NodeSpec},
+    graph::{InputSpec, NodeSpec, OutputSpec},
     schema,
 };
 
@@ -102,18 +102,24 @@ fn transform_node(
             data_type: transform.inner.input().data_type(),
             upstream: transform.inputs.iter().cloned().collect(),
         }),
-        outputs: transform
-            .inner
-            .outputs(
-                &TransformContext {
-                    schema,
-                    ..Default::default()
-                },
-                &[(id.into(), schema::Definition::any())],
-            )
-            .into_iter()
-            .map(Into::into)
-            .collect(),
+        outputs: match transform.inner.output_ports() {
+            Some(ports) => ports
+                .into_iter()
+                .map(|(port, data_type)| OutputSpec { port, data_type })
+                .collect(),
+            None => transform
+                .inner
+                .outputs(
+                    &TransformContext {
+                        schema,
+                        ..Default::default()
+                    },
+                    &[(id.into(), schema::Definition::any())],
+                )
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        },
     }
 }
 

@@ -1276,8 +1276,7 @@ fn span_strategy() -> impl Strategy<Value = PbSpan> {
                 (attributes, events, links, (dropped_attributes, dropped_events, dropped_links)),
             )| PbSpan {
                 parent_span_id: parent
-                    .map(|parent| sid(parent).to_bytes().to_vec())
-                    .unwrap_or_default(),
+                    .map_or_else(Vec::new, |parent| sid(parent).to_bytes().to_vec()),
                 trace_state,
                 flags,
                 kind,
