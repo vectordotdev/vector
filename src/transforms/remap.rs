@@ -1292,6 +1292,36 @@ mod tests {
             assert_eq!(metric.tag_value("json"), Some(json.to_owned()), "{value}");
             assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
         }
+
+        // `unnest` keeps the other fields of the metric around each element.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    rows = unnest!(.distribution.samples)
+                    .tags.first_name = string!(rows[0].name)
+                    .tags.first_value = to_string(float!(rows[0].distribution.samples.value))
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let distribution = Event::Metric(Metric::new(
+            "observations",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![2.5 => 1, 4.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        ));
+        let result = transform_one(&mut tform, distribution).unwrap();
+        let metric = result.as_metric();
+        assert_eq!(
+            metric.tag_value("first_name"),
+            Some("observations".to_owned())
+        );
+        assert_eq!(metric.tag_value("first_value"), Some("2.5".to_owned()));
     }
 
     #[test]

@@ -895,6 +895,24 @@ fn refresh_cached_metric_value(metric: &Metric, cached: &mut Value, previous_fie
     }
 }
 
+/// Returns `true` if the path is `.type`.
+fn is_metric_type_path(target_path: &OwnedTargetPath) -> bool {
+    target_path.prefix == PathPrefix::Event
+        && matches!(target_path.path.segments.as_slice(), [OwnedSegment::Field(field)] if field.as_ref() == "type")
+}
+
+/// Returns `true` if the path reads one of the arrays in the value of the current type, such as
+/// `.distribution.samples`.
+fn is_metric_value_array_path(target_path: &OwnedTargetPath, value_field: &str) -> bool {
+    target_path.prefix == PathPrefix::Event
+        && matches!(
+            target_path.path.segments.as_slice(),
+            [OwnedSegment::Field(field), OwnedSegment::Field(array), ..]
+                if field.as_ref() == value_field
+                    && matches!(array.as_ref(), "values" | "samples" | "buckets" | "quantiles")
+        )
+}
+
 /// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
@@ -920,11 +938,18 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     );
 
     let mut map = ObjectMap::default();
+    let value_field = metric_value_field(metric.value());
+    // A counter or gauge can be converted to the other type with `.type`. In that case, reading
+    // the field of either type needs the value, so that it can be moved on conversion.
+    let convertible = matches!(
+        metric.value(),
+        MetricValue::Counter { .. } | MetricValue::Gauge { .. }
+    ) && info.target_assignments.iter().any(is_metric_type_path);
     let mut value_inserted = false;
     let mut insert_value = |map: &mut ObjectMap| {
         if !value_inserted {
             map.insert(
-                metric_value_field(metric.value()).into(),
+                value_field.into(),
                 metric_value_to_vrl_value(metric.value()),
             );
             value_inserted = true;
@@ -932,8 +957,12 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     };
 
     for target_path in &info.target_queries {
-        // Accessing a root path requires us to pre-populate all fields.
-        if target_path == &OwnedTargetPath::event_root() {
+        // Accessing a root path requires us to pre-populate all fields. So does reading one of
+        // the value's arrays, because `unnest` copies the whole event around each element without
+        // registering a query for the root.
+        if target_path == &OwnedTargetPath::event_root()
+            || is_metric_value_array_path(target_path, value_field)
+        {
             let mut properties = [
                 &mut name,
                 &mut kind,
@@ -953,10 +982,14 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
         // For non-root paths, we continuously populate the value with the
         // relevant data.
         if let Some(OwnedSegment::Field(field)) = target_path.path.segments.first() {
-            // Reading any value field prepares the value of the current type, so that reads still
-            // work after a program converts the type with `.type`.
+            // Reading the field for the current type prepares the value. Fields for other types
+            // read as `null`, so they don't, unless the type can be converted to them.
             if METRIC_VALUE_FIELDS.contains(&field.as_ref()) {
-                insert_value(&mut map);
+                if field.as_ref() == value_field
+                    || (convertible && matches!(field.as_ref(), "counter" | "gauge"))
+                {
+                    insert_value(&mut map);
+                }
                 continue;
             }
             let property = match field.as_ref() {
@@ -2637,6 +2670,74 @@ mod test {
             panic!("must be a metric");
         };
         assert_eq!(value.get(&owned_value_path!("counter")), None);
+    }
+
+    #[test]
+    fn metric_value_not_computed_for_other_types() {
+        // `exists(.gauge)` on a large distribution shouldn't convert every sample.
+        let target = metric_target_with_queries(
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1, 2.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        let VrlTarget::Metric { value, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(value.get(&owned_value_path!("distribution")), None);
+    }
+
+    #[test]
+    fn metric_value_array_read_prepares_whole_event() {
+        // `unnest` reads the root without registering a query for it, so reading an array in the
+        // value prepares every field.
+        let target = metric_target_with_queries(
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            &[OwnedTargetPath::event(owned_value_path!(
+                "distribution",
+                "samples"
+            ))],
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("name")),
+            Some(Value::from("m"))
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("type")),
+            Some(Value::from("distribution"))
+        );
+    }
+
+    #[test]
+    fn metric_value_conversion_reading_only_new_type() {
+        let metric = Metric::new("m", MetricKind::Absolute, MetricValue::Gauge { value: 3.0 });
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!(
+                "counter", "value"
+            ))],
+            target_assignments: vec![OwnedTargetPath::event(owned_value_path!("type"))],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
+        assert_eq!(get(&target, owned_value_path!("counter")), None);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("type")),
+                "counter".into(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(3.0))
+        );
     }
 
     #[test]
