@@ -24,8 +24,25 @@ use super::{
     action::{DstConfig, NUM_SLOTS, SimAction},
     clock::SimClock,
     emitter::RecordingEmitter,
-    fs::{EventDelivery, SimFileSystem, SimPathsProvider},
+    fs::{EventDelivery, FsStats, SimFileSystem, SimPathsProvider},
 };
+
+/// Quiescent summary returned by a completed DST run for lockstep differential comparison.
+#[derive(Debug)]
+pub struct DstOutcome {
+    /// Delivered lines per stream `ino`.
+    pub delivered_by_ino: BTreeMap<u64, Vec<String>>,
+    /// Streams that were unlinked/moved outside glob (or partially-checkpointed gzip)
+    /// across a `Restart`, where earlier draining can legitimately deliver more lines.
+    pub lost_across_restart_inos: HashSet<u64>,
+    /// True if any unacked/crashed-checkpoint restart or transient `EACCES` occurred.
+    pub had_unpersisted_restart: bool,
+    /// Final sorted list of paths remaining in `SimFileSystem`.
+    pub final_paths: Vec<PathBuf>,
+    /// Cumulative filesystem operation counters.
+    #[allow(dead_code)]
+    pub fs_stats: FsStats,
+}
 
 #[derive(Default)]
 struct StreamModel {
@@ -596,6 +613,7 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                 }
             }
             SimAction::Restart => self.restart_server(step_idx).await?,
+            SimAction::InjectFsOverflow => self.fs.inject_event_overflow(),
         }
 
         // Open OS handles must never exceed active watchers (watchers using
@@ -611,7 +629,7 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
         Ok(())
     }
 
-    pub async fn finish_and_verify(mut self) -> Result<(), TestCaseError> {
+    pub async fn finish_and_verify(mut self) -> Result<DstOutcome, TestCaseError> {
         // Restore readability on all files so transient EACCES recovers cleanly.
         for path in self.unreadable_paths.drain() {
             self.fs.set_readable(&path, true);
@@ -709,7 +727,23 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
             0,
             "fd leak at end of simulation"
         );
-        Ok(())
+
+        let lost_across_restart_inos: HashSet<u64> = self
+            .models
+            .iter()
+            .filter(|(_, m)| m.lost_across_restart)
+            .map(|(&ino, _)| ino)
+            .collect();
+        let delivered_by_ino: BTreeMap<u64, Vec<String>> =
+            self.delivered_by_ino.into_iter().collect();
+
+        Ok(DstOutcome {
+            delivered_by_ino,
+            lost_across_restart_inos,
+            had_unpersisted_restart: self.had_unpersisted_restart,
+            final_paths: self.fs.all_paths(),
+            fs_stats: self.fs.stats(),
+        })
     }
 }
 
@@ -739,6 +773,14 @@ fn build_server(
 /// Runs a `proptest`-generated `(DstConfig, Vec<SimAction>)` scenario against
 /// `FileServerState` with [`LegacyPollingScheduler`].
 pub fn run_dst_scenario(config: DstConfig, actions: &[SimAction]) -> Result<(), TestCaseError> {
+    run_dst_scenario_outcome(config, actions).map(|_| ())
+}
+
+/// Same as [`run_dst_scenario`], returning the quiescent [`DstOutcome`] for differential assertions.
+pub fn run_dst_scenario_outcome(
+    config: DstConfig,
+    actions: &[SimAction],
+) -> Result<DstOutcome, TestCaseError> {
     run_dst_with(
         config,
         actions,
@@ -755,6 +797,15 @@ pub fn run_dst_scenario_adaptive(
     actions: &[SimAction],
     delivery: EventDelivery,
 ) -> Result<(), TestCaseError> {
+    run_dst_scenario_adaptive_outcome(config, actions, delivery).map(|_| ())
+}
+
+/// Same as [`run_dst_scenario_adaptive`], returning the quiescent [`DstOutcome`] for differential assertions.
+pub fn run_dst_scenario_adaptive_outcome(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+) -> Result<DstOutcome, TestCaseError> {
     run_dst_with(
         config,
         actions,
@@ -775,7 +826,7 @@ fn run_dst_with<S: ReadScheduler, Ev: FsEventSource>(
     delivery: EventDelivery,
     make_scheduler: impl Fn(&DstConfig) -> S + Send + 'static,
     make_event_source: impl Fn(&SimFileSystem) -> Ev + Send + 'static,
-) -> Result<(), TestCaseError> {
+) -> Result<DstOutcome, TestCaseError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()

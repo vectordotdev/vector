@@ -102,6 +102,8 @@ pub enum SimAction {
     CheckpointFlush { crash_bytes: Option<usize> },
     /// Drop `FileServerState` and restart from persisted checkpoints on disk.
     Restart,
+    /// Inject an `FsEvent::Overflow` (`IN_Q_OVERFLOW`) into the simulated event source.
+    InjectFsOverflow,
 }
 
 /// Strategy producing weighted [`SimAction`] values that shrink cleanly.
@@ -128,6 +130,7 @@ pub fn arb_action() -> impl Strategy<Value = SimAction> {
             1 => (0usize..32).prop_map(|n| SimAction::CheckpointFlush { crash_bytes: Some(n) }),
         ],
         5  => Just(SimAction::Restart),
+        3  => Just(SimAction::InjectFsOverflow),
     ]
 }
 

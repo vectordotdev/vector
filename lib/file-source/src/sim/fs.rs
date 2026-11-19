@@ -27,6 +27,8 @@ pub enum EventDelivery {
     Normal,
     /// Silently drop all events (models NFS/SMB mounts where OS notifications do not fire).
     DropAll,
+    /// Deterministically drop every `drop_every_n`-th event (models flaky/coalesced OS notifications).
+    Flaky { drop_every_n: u64 },
 }
 
 /// Operation counters collected by [`SimFileSystem`].
@@ -81,6 +83,7 @@ struct SimFsInner {
     /// Queued filesystem change notifications for [`SimFsEventSource`].
     fs_events: Vec<FsEvent>,
     event_delivery: EventDelivery,
+    event_counter: u64,
 }
 
 /// Deterministic in-memory [`FileSystem`] modeling inodes, directory entries,
@@ -109,8 +112,23 @@ impl SimFileSystem {
                 max_bytes_per_read: None,
                 fs_events: Vec::new(),
                 event_delivery: EventDelivery::Normal,
+                event_counter: 0,
             })),
         }
+    }
+
+    /// Returns all currently linked file and symlink paths in deterministic sorted order.
+    #[must_use]
+    pub fn all_paths(&self) -> Vec<PathBuf> {
+        let inner = self.inner.lock().unwrap();
+        let mut paths: Vec<PathBuf> = inner
+            .entries
+            .keys()
+            .chain(inner.symlinks.keys())
+            .cloned()
+            .collect();
+        paths.sort();
+        paths
     }
 
     /// Returns a [`SimFsEventSource`] connected to this simulated filesystem.
@@ -377,8 +395,15 @@ impl SimFileSystem {
 }
 
 fn push_event(inner: &mut SimFsInner, event: FsEvent) {
-    if inner.event_delivery == EventDelivery::Normal {
-        inner.fs_events.push(event);
+    inner.event_counter = inner.event_counter.wrapping_add(1);
+    match inner.event_delivery {
+        EventDelivery::Normal => inner.fs_events.push(event),
+        EventDelivery::DropAll => {}
+        EventDelivery::Flaky { drop_every_n } => {
+            if drop_every_n == 0 || !inner.event_counter.is_multiple_of(drop_every_n) {
+                inner.fs_events.push(event);
+            }
+        }
     }
 }
 

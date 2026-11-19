@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    time::Duration,
+};
 
 use bytes::Bytes;
 use file_source_common::{
@@ -19,7 +23,9 @@ use super::{
     clock::SimClock,
     emitter::RecordingEmitter,
     fs::{EventDelivery, SimFileSystem, SimPathsProvider},
-    runner::run_dst_scenario_adaptive,
+    runner::{
+        run_dst_scenario_adaptive, run_dst_scenario_adaptive_outcome, run_dst_scenario_outcome,
+    },
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -415,12 +421,87 @@ async fn adaptive_scheduler_recovers_from_event_overflow() {
     assert_eq!(lines.len(), 100);
 }
 
+fn arb_event_delivery() -> impl Strategy<Value = EventDelivery> {
+    prop_oneof![
+        Just(EventDelivery::Normal),
+        Just(EventDelivery::DropAll),
+        Just(EventDelivery::Flaky { drop_every_n: 2 }),
+        Just(EventDelivery::Flaky { drop_every_n: 3 }),
+    ]
+}
+
+fn dedup_non_empty(lines: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for line in lines {
+        if !line.is_empty() && seen.insert(line.clone()) {
+            out.push(line.clone());
+        }
+    }
+    out
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         cases: 100,
         failure_persistence: None,
         .. ProptestConfig::default()
     })]
+
+    /// True lockstep differential DST: executes the *exact same* `(DstConfig, Vec<SimAction>)`
+    /// trace on BOTH `LegacyPollingScheduler` and `AdaptiveEventScheduler` (under normal,
+    /// flaky, and 100% dropped FS events + mid-stream `InjectFsOverflow`) and asserts
+    /// quiescent behavioral equivalence across all live streams and final filesystem state.
+    #[test]
+    fn dst_lockstep_differential_legacy_vs_adaptive(
+        config in arb_dst_config(),
+        delivery in arb_event_delivery(),
+        actions in arb_actions(120),
+    ) {
+        let legacy = run_dst_scenario_outcome(config.clone(), &actions)?;
+        let adaptive = run_dst_scenario_adaptive_outcome(config, &actions, delivery)?;
+
+        // 1. Final filesystem state (files & symlinks remaining) must match identically.
+        prop_assert_eq!(
+            adaptive.final_paths,
+            legacy.final_paths,
+            "final filesystem paths diverged between Legacy and Adaptive"
+        );
+
+        // 2. Compare per-stream delivered lines for every stream not lost across a restart.
+        let all_inos: HashSet<u64> = legacy
+            .delivered_by_ino
+            .keys()
+            .chain(adaptive.delivered_by_ino.keys())
+            .copied()
+            .collect();
+
+        for ino in all_inos {
+            if legacy.lost_across_restart_inos.contains(&ino)
+                || adaptive.lost_across_restart_inos.contains(&ino)
+            {
+                continue;
+            }
+            let legacy_lines = legacy.delivered_by_ino.get(&ino).map_or(&[][..], Vec::as_slice);
+            let adaptive_lines = adaptive.delivered_by_ino.get(&ino).map_or(&[][..], Vec::as_slice);
+
+            if !legacy.had_unpersisted_restart && !adaptive.had_unpersisted_restart {
+                prop_assert_eq!(
+                    adaptive_lines,
+                    legacy_lines,
+                    "ino={}: exact delivered lines diverged between Legacy and Adaptive",
+                    ino
+                );
+            } else {
+                prop_assert_eq!(
+                    dedup_non_empty(adaptive_lines),
+                    dedup_non_empty(legacy_lines),
+                    "ino={}: deduplicated first-seen lines diverged after unpersisted restart",
+                    ino
+                );
+            }
+        }
+    }
 
     /// Differential DST: `AdaptiveEventScheduler` with healthy FS events satisfies
     /// the exact same multi-file invariants across randomized configs & actions.
