@@ -14,7 +14,7 @@ use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
-    clock::MonotonicInstant,
+    clock::{Clock, MonotonicInstant},
     fs::{AsyncFile as _, FileSystem, OsFileSystem},
     internal_events::FileSourceInternalEvents,
 };
@@ -209,17 +209,42 @@ impl Fingerprinter {
     }
 
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
+    #[cfg(test)]
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
         self.fingerprint_with_fs(path, &OsFileSystem).await
     }
 
-    pub async fn fingerprint_or_emit_with_fs<FS: FileSystem>(
+    pub async fn fingerprint_or_emit_with_fs<FS: FileSystem, C: Clock>(
         &mut self,
         path: &Path,
         known_small_files: &mut HashMap<PathBuf, MonotonicInstant>,
         emitter: &impl FileSourceInternalEvents,
         fs: &FS,
-        now: MonotonicInstant,
+        clock: &C,
+    ) -> Option<FileFingerprint> {
+        self.fingerprint_or_emit_inner(path, known_small_files, emitter, fs, || clock.now())
+            .await
+    }
+
+    pub async fn fingerprint_or_emit(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut HashMap<PathBuf, time::Instant>,
+        emitter: &impl FileSourceInternalEvents,
+    ) -> Option<FileFingerprint> {
+        self.fingerprint_or_emit_inner(path, known_small_files, emitter, &OsFileSystem, || {
+            time::Instant::now()
+        })
+        .await
+    }
+
+    async fn fingerprint_or_emit_inner<FS: FileSystem, T>(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut HashMap<PathBuf, T>,
+        emitter: &impl FileSourceInternalEvents,
+        fs: &FS,
+        now_fn: impl FnOnce() -> T,
     ) -> Option<FileFingerprint> {
         let metadata = match fs.metadata(path).await {
             Ok(metadata) => {
@@ -242,54 +267,7 @@ impl Fingerprinter {
                     ErrorKind::UnexpectedEof => {
                         if !known_small_files.contains_key(path) {
                             emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), now);
-                        }
-                        return;
-                    }
-                    ErrorKind::NotFound => {
-                        if !self.ignore_not_found {
-                            emitter.emit_file_fingerprint_read_error(path, error);
-                        }
-                    }
-                    _ => {
-                        emitter.emit_file_fingerprint_read_error(path, error);
-                    }
-                }
-                // For scenarios other than UnexpectedEOF, remove the path from the small files map.
-                known_small_files.remove(&path.to_path_buf());
-            })
-            .ok()
-            .flatten()
-    }
-
-    pub async fn fingerprint_or_emit(
-        &mut self,
-        path: &Path,
-        known_small_files: &mut HashMap<PathBuf, time::Instant>,
-        emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
-        let metadata = match tokio::fs::metadata(path).await {
-            Ok(metadata) => {
-                if metadata.is_dir() {
-                    Ok(None)
-                } else {
-                    self.fingerprint(path).await.map(Some)
-                }
-            }
-            Err(e) => Err(e),
-        };
-
-        metadata
-            .inspect(|_| {
-                // Drop the path from the small files map if we've got enough data to fingerprint it.
-                known_small_files.remove(&path.to_path_buf());
-            })
-            .map_err(|error| {
-                match error.kind() {
-                    ErrorKind::UnexpectedEof => {
-                        if !known_small_files.contains_key(path) {
-                            emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
+                            known_small_files.insert(path.to_path_buf(), now_fn());
                         }
                         return;
                     }

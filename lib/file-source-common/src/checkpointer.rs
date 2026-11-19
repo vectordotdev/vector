@@ -238,9 +238,11 @@ impl<FS: FileSystem, C: Clock> Checkpointer<FS, C> {
             // disk. If vector dies anywhere during this section, the existing
             // stable file will still be in its current valid state and we'll be
             // able to recover.
-            let encoded = serde_json::to_vec(&current)?;
+            let current_to_write = current.clone();
             self.fs
-                .write_file_sync(&self.tmp_file_path, encoded)
+                .write_file_sync_with(&self.tmp_file_path, move |w| {
+                    serde_json::to_writer(w, &current_to_write).map_err(io::Error::other)
+                })
                 .await?;
 
             // Once the temp file is fully flushed, rename the tmp file to replace

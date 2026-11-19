@@ -301,6 +301,57 @@ async fn characterize_many_idle_files_read_overhead() {
     );
 }
 
+/// Regression test for P0 clock-sampling review finding: slow filesystem I/O
+/// during startup or discovery must NOT backdate `remove_after` grace periods
+/// for small files discovered later in the scan.
+#[tokio::test]
+async fn slow_io_does_not_backdate_grace_periods() {
+    let clock = SimClock::new();
+    let fs = SimFileSystem::new(clock.clone());
+    let emitter = RecordingEmitter::new();
+
+    // 4 normal files + 1 small file at the end (lexicographically last: `z_small.log`).
+    for i in 0..4 {
+        fs.append_bytes(format!("/logs/a_{i}.log"), b"enough data for checksum\n");
+    }
+    fs.create_file("/logs/z_small.log");
+
+    // Simulate slow filesystem I/O: 500ms per open/read/stat.
+    // Fingerprinting `a_0..a_3` takes ~6s before `z_small.log` fails checksum (~t=7s),
+    // and watching `a_0..a_3` takes ~6s more (~t=13s).
+    // With `remove_after = 8s`:
+    //   - Backdated to t=0s -> elapsed 13s >= 8s -> wrongly deleted immediately!
+    //   - Stamped at checksum failure (~t=7s) -> elapsed ~6s < 8s -> preserved!
+    fs.set_io_latency(Duration::from_millis(500));
+
+    let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
+    let mut server = make_server(
+        &fs,
+        emitter,
+        FingerprintStrategy::FirstLinesChecksum {
+            ignored_header_bytes: 0,
+            lines: 1,
+        },
+        1024,
+        b"\n",
+    );
+    server.remove_after = Some(Duration::from_secs(8));
+    let mut state = FileServerState::init(server, &mut cp, fs.clone(), clock.clone()).await;
+
+    fs.set_io_latency(Duration::ZERO);
+    let mut lines = Vec::new();
+    step_and_ack(&mut state, &mut lines).await;
+    assert!(
+        fs.exists("/logs/z_small.log"),
+        "small file discovered late in slow startup scan must not be backdated to t=0"
+    );
+
+    // After the remaining grace period truly elapses, it IS cleaned up.
+    clock.advance(Duration::from_secs(8));
+    step_and_ack(&mut state, &mut lines).await;
+    assert!(!fs.exists("/logs/z_small.log"));
+}
+
 // ---------------------------------------------------------------------------
 // Randomized Deterministic Simulation Testing (DST) across multiple files
 // ---------------------------------------------------------------------------

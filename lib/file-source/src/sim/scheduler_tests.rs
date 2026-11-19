@@ -629,7 +629,9 @@ proptest! {
             let legacy_lines = legacy.delivered_by_ino.get(&ino).map_or(&[][..], Vec::as_slice);
             let adaptive_lines = adaptive.delivered_by_ino.get(&ino).map_or(&[][..], Vec::as_slice);
 
-            if !legacy.had_unpersisted_restart && !adaptive.had_unpersisted_restart {
+            if !legacy.allow_replay_inos.contains(&ino)
+                && !adaptive.allow_replay_inos.contains(&ino)
+            {
                 prop_assert_eq!(
                     adaptive_lines,
                     legacy_lines,

@@ -35,8 +35,8 @@ pub struct DstOutcome {
     /// Streams that were unlinked/moved outside glob (or partially-checkpointed gzip)
     /// across a `Restart`, where earlier draining can legitimately deliver more lines.
     pub lost_across_restart_inos: HashSet<u64>,
-    /// True if any unacked/crashed-checkpoint restart or transient `EACCES` occurred.
-    pub had_unpersisted_restart: bool,
+    /// Streams that experienced an unpersisted restart or transient `EACCES` reopen.
+    pub allow_replay_inos: HashSet<u64>,
     /// Final sorted list of paths remaining in `SimFileSystem`.
     pub final_paths: Vec<PathBuf>,
     /// Cumulative filesystem operation counters.
@@ -59,6 +59,10 @@ struct StreamModel {
     /// True if the file was unlinked or moved outside the watched glob before
     /// `FileServer` ever discovered it.
     unfindable_before_discovery: bool,
+    /// True if THIS specific stream experienced an unpersisted restart or
+    /// transient `EACCES` reopen, allowing at-least-once redelivery for this
+    /// stream without relaxing verification on unrelated streams.
+    allow_replay: bool,
 }
 
 #[derive(Clone)]
@@ -102,10 +106,8 @@ pub struct DstRunner<
     fp_to_ino: HashMap<FileFingerprint, u64>,
     /// Lines emitted by `FileServer` that have not yet been acknowledged into `CheckpointsView`.
     pending_acks: Vec<(FileFingerprint, u64)>,
-    /// In-memory count of restarts that occurred with unacked or unpersisted progress.
-    had_unpersisted_restart: bool,
-    /// True if any checkpoint updates have occurred since the last clean `CheckpointFlush`.
-    dirty_checkpoints: bool,
+    /// Stream `ino`s that have delivered/acked lines since the last clean `CheckpointFlush`.
+    dirty_streams: HashSet<u64>,
     line_counter: u64,
     rot_counter: u64,
 }
@@ -155,8 +157,7 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
             epoch_offset_by_ino: HashMap::new(),
             fp_to_ino: HashMap::new(),
             pending_acks: Vec::new(),
-            had_unpersisted_restart: false,
-            dirty_checkpoints: false,
+            dirty_streams: HashSet::new(),
             line_counter: 0,
             rot_counter: 0,
         }
@@ -173,13 +174,28 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
         let mut batch = Vec::new();
         let state = self.state.as_mut().expect("server running");
         let _ = state.step(&mut batch).await;
+        let mut bytes_per_file: HashMap<u64, usize> = HashMap::new();
+        let max_per_tick = self
+            .config
+            .max_read_bytes
+            .saturating_add(self.config.max_line_bytes);
         for line in batch {
             self.pending_acks.push((line.file_id, line.end_offset));
-            self.dirty_checkpoints = true;
 
             let text = String::from_utf8(line.text.to_vec())
                 .map_err(|e| TestCaseError::fail(format!("invalid utf8: {e}")))?;
             let ino = self.resolve_line_ino(&line, &text)?;
+            self.dirty_streams.insert(ino);
+
+            let entry = bytes_per_file.entry(ino).or_insert(0);
+            *entry = entry.saturating_add(text.len());
+            prop_assert!(
+                *entry <= max_per_tick,
+                "ino={}: per-tick read budget exceeded ({} > {})",
+                ino,
+                *entry,
+                max_per_tick
+            );
 
             // Within a single server epoch (no restart), offsets for a stream must never go backward.
             if let Some(&prev_end) = self.epoch_offset_by_ino.get(&ino) {
@@ -312,6 +328,7 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                 pending_partial: String::new(),
                 lost_across_restart: false,
                 unfindable_before_discovery: false,
+                allow_replay: false,
             },
         );
         self.active_slots[slot] = Some(SlotEntry {
@@ -401,8 +418,11 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
     }
 
     async fn restart_server(&mut self, step_idx: usize) -> Result<(), TestCaseError> {
-        if !self.pending_acks.is_empty() || self.dirty_checkpoints {
-            self.had_unpersisted_restart = true;
+        // Only streams with unpersisted/unacked lines may replay after restart.
+        for &ino in &self.dirty_streams {
+            if let Some(model) = self.models.get_mut(&ino) {
+                model.allow_replay = true;
+            }
         }
         self.pending_acks.clear();
         self.state = None;
@@ -539,7 +559,9 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                 if !self.models[&ino].pending_partial.is_empty() {
                     return;
                 }
-                self.had_unpersisted_restart = true;
+                if let Some(model) = self.models.get_mut(&ino) {
+                    model.allow_replay = true;
+                }
                 self.unreadable_paths.insert(path.clone());
                 self.fs.set_readable(&path, false);
             }
@@ -608,7 +630,7 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                         .await
                         .map_err(|e| TestCaseError::fail(format!("write_checkpoints: {e}")))?;
                     if self.pending_acks.is_empty() {
-                        self.dirty_checkpoints = false;
+                        self.dirty_streams.clear();
                     }
                 }
             }
@@ -699,13 +721,14 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                 continue;
             }
 
-            if self.had_unpersisted_restart {
-                // At-least-once across unacked/crashed-checkpoint restarts:
+            if model.allow_replay {
+                // At-least-once across unacked/crashed-checkpoint restarts or transient EACCES:
                 // 1. Every delivered line belongs to this stream.
-                // 2. Every expected line was delivered at least once, and the deduplicated
-                //    first-appearance order matches `expected_lines` exactly!
+                // 2. Every expected non-empty line was delivered at least once in exact first-seen order.
+                // 3. At least as many empty lines were delivered as were written.
                 let mut first_seen_order = Vec::new();
                 let mut seen = HashSet::new();
+                let mut empty_delivered = 0usize;
                 for line in got {
                     prop_assert!(
                         model.expected_lines.contains(line),
@@ -713,8 +736,9 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                         ino,
                         line
                     );
-                    // Only track non-empty lines for first-seen order (empty lines can repeat).
-                    if !line.is_empty() && seen.insert(line.clone()) {
+                    if line.is_empty() {
+                        empty_delivered += 1;
+                    } else if seen.insert(line.clone()) {
                         first_seen_order.push(line.clone());
                     }
                 }
@@ -724,14 +748,22 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
                     .filter(|l| !l.is_empty())
                     .cloned()
                     .collect();
+                let expected_empty = model.expected_lines.len() - expected_non_empty.len();
                 prop_assert_eq!(
                     first_seen_order,
                     expected_non_empty,
-                    "ino={}: at-least-once order/completeness violated after unpersisted restart",
+                    "ino={}: at-least-once order/completeness violated",
                     ino
                 );
+                prop_assert!(
+                    empty_delivered >= expected_empty,
+                    "ino={}: missing empty lines ({} < {})",
+                    ino,
+                    empty_delivered,
+                    expected_empty
+                );
             } else {
-                // No unpersisted restart occurred: strict exact delivery (no loss, no dupes).
+                // No unpersisted restart or EACCES on this stream: strict exact delivery (no loss, no dupes).
                 prop_assert_eq!(
                     got,
                     model.expected_lines.as_slice(),
@@ -754,13 +786,19 @@ impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
             .filter(|(_, m)| m.lost_across_restart)
             .map(|(&ino, _)| ino)
             .collect();
+        let allow_replay_inos: HashSet<u64> = self
+            .models
+            .iter()
+            .filter(|(_, m)| m.allow_replay)
+            .map(|(&ino, _)| ino)
+            .collect();
         let delivered_by_ino: BTreeMap<u64, Vec<String>> =
             self.delivered_by_ino.into_iter().collect();
 
         Ok(DstOutcome {
             delivered_by_ino,
             lost_across_restart_inos,
-            had_unpersisted_restart: self.had_unpersisted_restart,
+            allow_replay_inos,
             final_paths: self.fs.all_paths(),
             fs_stats: self.fs.stats(),
         })
