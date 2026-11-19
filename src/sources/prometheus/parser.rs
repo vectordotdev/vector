@@ -240,7 +240,6 @@ fn combine_tags(
 
 #[cfg(test)]
 mod test {
-    use core::f64;
     use std::sync::LazyLock;
 
     use chrono::{TimeZone, Timelike, Utc};

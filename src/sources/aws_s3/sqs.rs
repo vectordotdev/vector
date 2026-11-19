@@ -637,6 +637,10 @@ impl IngestorProcess {
         Ok(())
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let batches: ProcessingBatches = match &self.state.notification_parser {
             Some(parser) => {
@@ -665,6 +669,10 @@ impl IngestorProcess {
         Ok(())
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn handle_notification_batch(
         &mut self,
         batch: NotificationBatch,
@@ -691,6 +699,10 @@ impl IngestorProcess {
     #[allow(
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
     )]
     async fn handle_s3_object(
         &mut self,
@@ -893,6 +905,10 @@ impl IngestorProcess {
         }
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn receive_messages(
         &mut self,
     ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
@@ -908,6 +924,10 @@ impl IngestorProcess {
             .await
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
@@ -921,6 +941,10 @@ impl IngestorProcess {
             .await
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "Preserve the existing AWS SDK and processing error types"
+    )]
     async fn send_messages(
         &mut self,
         entries: Vec<SendMessageBatchRequestEntry>,

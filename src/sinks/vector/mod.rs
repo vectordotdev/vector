@@ -399,7 +399,7 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
-        assert!(output_lines2.is_empty());
+        assert_eq!(output_lines2, [] as [std::string::String; 0]);
     }
 
     #[tokio::test]

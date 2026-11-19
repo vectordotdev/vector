@@ -104,7 +104,6 @@ pub fn build_http_service(
             auto_extract_timestamp,
         },
     )
-    .with_response_decompression()
 }
 
 /// Checks the HEC endpoint.

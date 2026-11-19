@@ -260,7 +260,10 @@ mod tests {
         graph.check_inputs().unwrap();
         graph.check_for_cycles().unwrap();
         assert!(graph.output_map().unwrap().is_empty());
-        assert!(graph.inputs_for_component(&"lookup".into()).is_empty());
+        assert_eq!(
+            graph.inputs_for_component(&"lookup".into()),
+            [] as [vector_lib::config::OutputId; 0]
+        );
     }
 
     #[test]

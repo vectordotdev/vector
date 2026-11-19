@@ -115,6 +115,12 @@ sinks:
 The table below provides a list of internal metrics provided by Vector. See the docs for the [`internal_metrics`
 source][output] for more detailed information about the available metrics and the [debugging guide][debugging_guide] on how to use them.
 
+## Inspect a running Vector instance
+
+Use [`vector top`](/guides/developer/debugging/#vector-top) to compare component activity and
+[`vector tap`](/guides/developer/debugging/#vector-tap) to sample events at component boundaries.
+Both commands require the [Observability API](/docs/reference/api/#enable-local-inspection), which is disabled by default.
+
 ## Troubleshooting
 
 More information in our troubleshooting guide:

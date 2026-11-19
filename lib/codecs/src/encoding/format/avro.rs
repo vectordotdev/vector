@@ -257,13 +257,13 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_core::event::{LogEvent, Value};
-    use vrl::btreemap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_avro() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
         }));
         let schema = indoc! {r#"
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn serialize_avro_preserves_resolvable_union_branch() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "x" => Value::Array(vec![Value::from(65), Value::from(66)]),
             "y" => Value::from(123)
         }));

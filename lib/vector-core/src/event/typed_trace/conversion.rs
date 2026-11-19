@@ -42,8 +42,9 @@ pub enum TraceConversionIssue<'a> {
     /// A present Datadog chunk context held only default values, so the destination cannot
     /// distinguish it from an absent one.
     UnrepresentableChunkContext,
-    /// A legacy-layout field held the wrong type or an unparseable value, so its default was
-    /// used.
+    /// A legacy-layout field held the wrong type or an unparseable value that cannot be
+    /// coerced. A field whose default means "unknown" takes it. For any other field, the
+    /// enclosing span, event, or grouping is dropped and also reported on its own.
     MalformedField {
         /// Field name.
         field: &'a str,
