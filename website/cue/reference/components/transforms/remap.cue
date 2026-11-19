@@ -134,6 +134,9 @@ components: transforms: "remap": {
 				Because the type of a metric's value is only known at runtime, coerce it before using it in an
 				expression, for example `float!(.gauge.value) * 100`.
 
+				Counter, gauge, and sample values are floats. The `==` operator treats `123` and `123.0` as equal, but
+				`assert_eq!` doesn't, so use float literals in assertions, for example `assert_eq!(.gauge.value, 123.0)`.
+
 				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
 				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
 				the disallowed action.
