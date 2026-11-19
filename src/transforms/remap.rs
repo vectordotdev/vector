@@ -1298,6 +1298,7 @@ mod tests {
                     .gauge.value = 100
                     .tags.code = 200
                     .tags.region = "us-east-1"
+                    del(.tags.region[0])
                 "#}
                 .to_string(),
             ),
