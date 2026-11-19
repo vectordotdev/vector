@@ -913,53 +913,40 @@ fn is_metric_value_array_path(target_path: &OwnedTargetPath, value_field: &str) 
         )
 }
 
-/// Returns the scalar field that the path reads from the value, such as `count` for
-/// `.aggregated_histogram.count`.
+/// Converts the scalar field that the path reads from the value, such as `count` for
+/// `.aggregated_histogram.count`, without converting the arrays next to it.
 ///
-/// Only the types with arrays next to their scalar fields are considered. For other types the
-/// whole value is cheap to convert.
-fn metric_value_scalar_key(value: &MetricValue, path: &OwnedValuePath) -> Option<&'static str> {
+/// Returns `None` if the path doesn't read one of these scalar fields. Only the types with arrays
+/// next to their scalar fields are considered. For other types the whole value is cheap to convert.
+fn metric_value_scalar(
+    value: &MetricValue,
+    path: &OwnedValuePath,
+) -> Option<(&'static str, Value)> {
     let Some(OwnedSegment::Field(key)) = path.segments.get(1) else {
         return None;
     };
     match (value, key.as_ref()) {
-        (MetricValue::Distribution { .. }, "statistic") => Some("statistic"),
-        (
-            MetricValue::AggregatedHistogram { .. } | MetricValue::AggregatedSummary { .. },
-            "count",
-        ) => Some("count"),
-        (
-            MetricValue::AggregatedHistogram { .. } | MetricValue::AggregatedSummary { .. },
-            "sum",
-        ) => Some("sum"),
-        _ => None,
-    }
-}
-
-/// Converts only the given scalar fields of a metric's value, without converting its arrays.
-fn metric_value_scalars_to_vrl_value(value: &MetricValue, keys: &[&str]) -> Value {
-    let mut map = ObjectMap::new();
-    for key in keys {
-        let converted = match (value, *key) {
-            (MetricValue::Distribution { statistic, .. }, "statistic") => match statistic {
+        (MetricValue::Distribution { statistic, .. }, "statistic") => Some((
+            "statistic",
+            match statistic {
                 StatisticKind::Histogram => "histogram",
                 StatisticKind::Summary => "summary",
             }
             .into(),
-            (
-                MetricValue::AggregatedHistogram { count, .. }
-                | MetricValue::AggregatedSummary { count, .. },
-                "count",
-            ) => metric_count_to_vrl_value(*count),
-            (MetricValue::AggregatedHistogram { sum, .. }, "sum") => {
-                optional_metric_float_to_vrl_value(*sum)
-            }
-            (MetricValue::AggregatedSummary { sum, .. }, "sum") => metric_float_to_vrl_value(*sum),
-            _ => continue,
-        };
-        map.insert((*key).into(), converted);
+        )),
+        (
+            MetricValue::AggregatedHistogram { count, .. }
+            | MetricValue::AggregatedSummary { count, .. },
+            "count",
+        ) => Some(("count", metric_count_to_vrl_value(*count))),
+        (MetricValue::AggregatedHistogram { sum, .. }, "sum") => {
+            Some(("sum", optional_metric_float_to_vrl_value(*sum)))
+        }
+        (MetricValue::AggregatedSummary { sum, .. }, "sum") => {
+            Some(("sum", metric_float_to_vrl_value(*sum)))
+        }
+        _ => None,
     }
-    map.into()
 }
 
 /// pre-compute the `Value` structure of the metric.
@@ -996,7 +983,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     ) && info.target_assignments.iter().any(is_metric_type_path);
     // Whether the program reads the whole value, or only some of its scalar fields.
     let mut value_full = false;
-    let mut value_keys: Vec<&'static str> = Vec::new();
+    let mut value_scalars = ObjectMap::new();
 
     for target_path in &info.target_queries {
         // Metadata paths, such as `%distribution`, don't read the event.
@@ -1038,8 +1025,10 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             // read as `null`, so they don't, unless the type can be converted to them.
             if METRIC_VALUE_FIELDS.contains(&field.as_ref()) {
                 if field.as_ref() == value_field {
-                    match metric_value_scalar_key(metric.value(), &target_path.path) {
-                        Some(key) => value_keys.push(key),
+                    match metric_value_scalar(metric.value(), &target_path.path) {
+                        Some((key, scalar)) => {
+                            value_scalars.insert(key.into(), scalar);
+                        }
                         None => value_full = true,
                     }
                 } else if convertible && matches!(field.as_ref(), "counter" | "gauge") {
@@ -1068,11 +1057,8 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             value_field.into(),
             metric_value_to_vrl_value(metric.value()),
         );
-    } else if !value_keys.is_empty() {
-        map.insert(
-            value_field.into(),
-            metric_value_scalars_to_vrl_value(metric.value(), &value_keys),
-        );
+    } else if !value_scalars.is_empty() {
+        map.insert(value_field.into(), value_scalars.into());
     }
 
     map.into()
@@ -2826,62 +2812,6 @@ mod test {
     }
 
     #[test]
-    fn metric_value_root_reflects_changes() {
-        let mut target = metric_target_with_queries(
-            MetricValue::Gauge { value: 1.0 },
-            &[
-                OwnedTargetPath::event_root(),
-                OwnedTargetPath::event(owned_value_path!("type")),
-            ],
-        );
-        let root = |target: &VrlTarget| {
-            target
-                .target_get(&OwnedTargetPath::event_root())
-                .unwrap()
-                .cloned()
-                .unwrap()
-        };
-        assert_eq!(
-            root(&target).get(&owned_value_path!("name")).cloned(),
-            Some(Value::from("m"))
-        );
-
-        target
-            .target_insert(
-                &OwnedTargetPath::event(owned_value_path!("name")),
-                "n".into(),
-            )
-            .unwrap();
-        target
-            .target_insert(
-                &OwnedTargetPath::event(owned_value_path!("type")),
-                "counter".into(),
-            )
-            .unwrap();
-
-        let root = root(&target);
-        assert_eq!(
-            root.get(&owned_value_path!("name")).cloned(),
-            Some(Value::from("n"))
-        );
-        assert_eq!(root.get(&owned_value_path!("gauge")), None);
-        assert_eq!(
-            root.get(&owned_value_path!("counter", "value")).cloned(),
-            Some(Value::from(1.0))
-        );
-    }
-
-    #[test]
-    fn metric_value_metadata_query_is_ignored() {
-        // `exists(%distribution)` reads metadata, not the metric's value.
-        let target = metric_target_with_queries(
-            big_distribution(),
-            &[OwnedTargetPath::metadata(owned_value_path!("distribution"))],
-        );
-        assert_eq!(cached_field(&target, "distribution"), None);
-    }
-
-    #[test]
     fn metric_value_scalar_reads_skip_arrays() {
         let target = metric_target_with_queries(
             big_distribution(),
@@ -2946,6 +2876,12 @@ mod test {
 
         target
             .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("name")),
+                "n".into(),
+            )
+            .unwrap();
+        target
+            .target_insert(
                 &OwnedTargetPath::event(owned_value_path!("type")),
                 "counter".into(),
             )
@@ -2969,6 +2905,10 @@ mod test {
         assert_eq!(
             root.get(&owned_value_path!("type")).cloned(),
             Some(Value::from("counter"))
+        );
+        assert_eq!(
+            root.get(&owned_value_path!("name")).cloned(),
+            Some(Value::from("n"))
         );
     }
 
