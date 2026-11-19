@@ -719,10 +719,7 @@ mod tests {
         tls::{MaybeTls, MaybeTlsSettings},
     };
 
-    use super::{
-        MaxAgeIo, Route, RoutePlanner, TCP_KEEPALIVE_INTERVAL, TCP_KEEPALIVE_RETRIES,
-        TCP_KEEPALIVE_TIME, connect_authority, https_connector, tls_host,
-    };
+    use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, https_connector, tls_host};
     use crate::{ConnectionOptions, HttpClient, empty_body};
 
     /// Returns the proxy URI and `Proxy-Authorization` value of the route to `destination`.
@@ -911,6 +908,8 @@ mod tests {
         assert!(socket.keepalive().unwrap());
         #[cfg(target_os = "linux")]
         {
+            use super::{TCP_KEEPALIVE_INTERVAL, TCP_KEEPALIVE_RETRIES, TCP_KEEPALIVE_TIME};
+
             assert_eq!(socket.tcp_keepalive_time().unwrap(), TCP_KEEPALIVE_TIME);
             assert_eq!(
                 socket.tcp_keepalive_interval().unwrap(),
