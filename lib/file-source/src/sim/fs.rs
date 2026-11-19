@@ -64,6 +64,11 @@ struct SimFsInner {
     /// If set, caps the number of bytes returned per `AsyncRead::poll_read` call
     /// (modeling short reads / torn kernel buffer visibility).
     max_bytes_per_read: Option<usize>,
+    /// If non-zero, advances `SimClock` by this duration on each `open`, `read`,
+    /// and `metadata` syscall (modeling slow filesystem I/O).
+    io_latency: std::time::Duration,
+    /// Optional one-shot read error injected on the next `poll_read` for an inode.
+    next_read_errors: HashMap<u64, ErrorKind>,
 }
 
 /// Deterministic in-memory [`FileSystem`] modeling inodes, directory entries,
@@ -90,7 +95,40 @@ impl SimFileSystem {
                 inode_reuse: false,
                 freed_inos: Vec::new(),
                 max_bytes_per_read: None,
+                io_latency: std::time::Duration::ZERO,
+                next_read_errors: HashMap::new(),
             })),
+        }
+    }
+
+    /// Configures simulated I/O latency applied to `open`, `read`, and `metadata` calls.
+    pub fn set_io_latency(&self, latency: std::time::Duration) {
+        self.inner.lock().unwrap().io_latency = latency;
+    }
+
+    /// Injects a one-shot I/O error on the next `AsyncRead::poll_read` for `path`.
+    #[allow(dead_code)]
+    pub fn inject_next_read_error(&self, path: impl AsRef<Path>, err: ErrorKind) {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(ino) = resolve_ino(&inner, path.as_ref()) {
+            inner.next_read_errors.insert(ino, err);
+        }
+    }
+
+    /// Opens a writer handle to `path` (creating the file if absent), holding an
+    /// open file descriptor on the inode so it stays alive across `unlink_file`
+    /// until the [`SimWriter`] is dropped.
+    pub fn open_writer(&self, path: impl AsRef<Path>) -> SimWriter {
+        let ino = self.append_bytes(path, &[]);
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .inodes
+            .get_mut(&ino)
+            .expect("inode exists")
+            .open_handles += 1;
+        SimWriter {
+            fs: self.clone(),
+            ino,
         }
     }
 
@@ -400,6 +438,45 @@ impl PathsProvider for SimPathsProvider {
     }
 }
 
+/// Writer handle into a [`SimFileSystem`] inode that keeps the inode alive across
+/// unlinks/renames (modeling a real log-producing process holding an open fd).
+pub struct SimWriter {
+    fs: SimFileSystem,
+    ino: u64,
+}
+
+impl SimWriter {
+    /// Appends `bytes` directly to this writer's open inode.
+    pub fn append(&self, bytes: &[u8]) {
+        self.fs.append_to_ino(self.ino, bytes);
+    }
+
+    /// Returns the underlying inode number.
+    #[allow(dead_code)]
+    #[must_use]
+    pub const fn ino(&self) -> u64 {
+        self.ino
+    }
+}
+
+impl Drop for SimWriter {
+    fn drop(&mut self) {
+        let mut inner = self.fs.inner.lock().unwrap();
+        let should_remove = if let Some(node) = inner.inodes.get_mut(&self.ino) {
+            node.open_handles = node.open_handles.saturating_sub(1);
+            node.link_count == 0 && node.open_handles == 0
+        } else {
+            false
+        };
+        if should_remove {
+            inner.inodes.remove(&self.ino);
+            if inner.inode_reuse {
+                inner.freed_inos.push(self.ino);
+            }
+        }
+    }
+}
+
 /// Open handle into a [`SimFileSystem`] inode.
 pub struct SimFile {
     fs: SimFileSystem,
@@ -433,6 +510,13 @@ impl AsyncRead for SimFile {
     ) -> Poll<io::Result<()>> {
         let mut inner = self.fs.inner.lock().unwrap();
         inner.stats.reads += 1;
+        let latency = inner.io_latency;
+        if !latency.is_zero() {
+            inner.clock.advance(latency);
+        }
+        if let Some(kind) = inner.next_read_errors.remove(&self.ino) {
+            return Poll::Ready(Err(io::Error::new(kind, "injected read error")));
+        }
         let max_per_read = inner.max_bytes_per_read.unwrap_or(usize::MAX);
         let Some(node) = inner.inodes.get(&self.ino) else {
             return Poll::Ready(Err(io::Error::new(ErrorKind::NotFound, "inode gone")));
@@ -513,6 +597,38 @@ impl AsyncFile for SimFile {
         };
         std::future::ready(result)
     }
+
+    fn open_info(
+        &self,
+    ) -> impl std::future::Future<Output = io::Result<(FileMetadata, FileIdentity)>> + Send {
+        let result = {
+            let mut inner = self.fs.inner.lock().unwrap();
+            inner.stats.stats += 1;
+            let latency = inner.io_latency;
+            if !latency.is_zero() {
+                inner.clock.advance(latency);
+            }
+            inner
+                .inodes
+                .get(&self.ino)
+                .map(|node| {
+                    (
+                        FileMetadata {
+                            len: node.data.len() as u64,
+                            is_dir: node.is_dir,
+                            created: Some(node.created),
+                            modified: Some(node.modified),
+                        },
+                        FileIdentity {
+                            dev: node.dev,
+                            ino: node.ino,
+                        },
+                    )
+                })
+                .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "inode gone"))
+        };
+        std::future::ready(result)
+    }
 }
 
 impl FileSystem for SimFileSystem {
@@ -525,6 +641,10 @@ impl FileSystem for SimFileSystem {
         let result = (|| {
             let mut inner = self.inner.lock().unwrap();
             inner.stats.opens += 1;
+            let latency = inner.io_latency;
+            if !latency.is_zero() {
+                inner.clock.advance(latency);
+            }
             let ino = resolve_ino(&inner, path)
                 .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "file not found"))?;
             let node = inner
@@ -620,12 +740,17 @@ impl FileSystem for SimFileSystem {
         std::future::ready(result)
     }
 
-    fn write_file_sync(
+    fn write_file_sync_with<F>(
         &self,
         path: &Path,
-        data: Vec<u8>,
-    ) -> impl std::future::Future<Output = io::Result<()>> + Send {
+        write_fn: F,
+    ) -> impl std::future::Future<Output = io::Result<()>> + Send
+    where
+        F: FnOnce(&mut dyn io::Write) -> io::Result<()> + Send + 'static,
+    {
         let result = (|| {
+            let mut data = Vec::new();
+            write_fn(&mut data)?;
             let mut inner = self.inner.lock().unwrap();
             inner.stats.writes += 1;
             if let Some(kind) = inner.next_write_error.take() {

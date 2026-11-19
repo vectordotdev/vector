@@ -168,7 +168,6 @@ impl FileWatcher<OsFileSystem> {
         max_line_bytes: usize,
         line_delimiter: Bytes,
     ) -> Result<Self, std::io::Error> {
-        let clock = SystemClock;
         Self::new_with_fs(
             path,
             read_from,
@@ -176,15 +175,14 @@ impl FileWatcher<OsFileSystem> {
             max_line_bytes,
             line_delimiter,
             OsFileSystem,
-            clock.now(),
-            clock.now_utc(),
+            &SystemClock,
         )
         .await
     }
 
     #[cfg(test)]
     pub(super) async fn read_line(&mut self) -> io::Result<RawLineResult> {
-        self.read_line_at(SystemClock.now()).await
+        self.read_line_with_clock(&SystemClock).await
     }
 
     #[cfg(test)]
@@ -194,7 +192,7 @@ impl FileWatcher<OsFileSystem> {
 }
 
 impl<FS: FileSystem> FileWatcher<FS> {
-    /// Create a new `FileWatcher` using the provided [`FileSystem`] and clock instants.
+    /// Create a new `FileWatcher` using the provided [`FileSystem`] and [`Clock`].
     ///
     /// # Errors
     /// Returns an error if opening the file, reading its metadata, or checking
@@ -203,20 +201,18 @@ impl<FS: FileSystem> FileWatcher<FS> {
     /// # Panics
     /// Panics if seeking to the initial position in an uncompressed file fails.
     #[allow(clippy::too_many_arguments)]
-    pub async fn new_with_fs(
+    pub async fn new_with_fs<C: Clock>(
         path: PathBuf,
         read_from: ReadFrom,
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
         fs: FS,
-        now: MonotonicInstant,
-        now_utc: DateTime<Utc>,
+        clock: &C,
     ) -> Result<Self, std::io::Error> {
         let f = fs.open(&path).await?;
-        let identity = f.identity().await?;
+        let (metadata, identity) = f.open_info().await?;
         let (devno, ino) = (identity.dev, identity.ino);
-        let metadata = f.metadata().await?;
 
         let mut reader = BufReader::new(f);
 
@@ -279,6 +275,8 @@ impl<FS: FileSystem> FileWatcher<FS> {
                 }
             };
 
+        let now = clock.now();
+        let now_utc = clock.now_utc();
         let ts = metadata
             .modified
             .and_then(|mtime| now_utc.signed_duration_since(mtime).to_std().ok())
@@ -397,12 +395,13 @@ impl<FS: FileSystem> FileWatcher<FS> {
         }
     }
 
-    /// Read a single line from the underlying file at the given monotonic timestamp.
-    pub(super) async fn read_line_at(
+    /// Read a single line from the underlying file, sampling `clock` at attempt
+    /// start and on read completion so slow I/O does not backdate `last_read_success`.
+    pub(super) async fn read_line_with_clock<C: Clock>(
         &mut self,
-        now: MonotonicInstant,
+        clock: &C,
     ) -> io::Result<RawLineResult> {
-        self.track_read_attempt(now);
+        self.track_read_attempt(clock.now());
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
@@ -420,7 +419,7 @@ impl<FS: FileSystem> FileWatcher<FS> {
                 successfully_read: Some(_),
                 discarded_for_size_and_truncated,
             }) => {
-                self.track_read_success(now);
+                self.track_read_success(clock.now());
                 Ok(RawLineResult {
                     raw_line: Some(RawLine {
                         offset: initial_position,

@@ -95,7 +95,6 @@ where
 
         checkpointer.read_checkpoints(server.ignore_before).await;
 
-        let now = clock.now();
         let mut existing_files = Vec::new();
         for path in server.paths_provider.paths() {
             if let Some(file_id) = server
@@ -105,7 +104,7 @@ where
                     &mut known_small_files,
                     &server.emitter,
                     &fs,
-                    now,
+                    &clock,
                 )
                 .await
             {
@@ -120,10 +119,11 @@ where
         )
         .await;
 
-        let now_utc = clock.now_utc();
-        let created = metadata
-            .into_iter()
-            .map(|m| m.ok().and_then(|m| m.created).unwrap_or(now_utc));
+        let created = metadata.into_iter().map(|m| {
+            m.ok()
+                .and_then(|m| m.created)
+                .unwrap_or_else(|| clock.now_utc())
+        });
 
         let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
             .into_iter()
@@ -134,6 +134,7 @@ where
         existing_files.sort_by_key(|(key, _, _)| *key);
 
         let checkpoints = checkpointer.view();
+        let startup_done = clock.now();
 
         let mut state = Self {
             server,
@@ -143,14 +144,16 @@ where
             known_small_files,
             checkpoints,
             backoff_cap: 1,
-            next_glob_time: now,
-            stats: TimingStats::new(now),
+            next_glob_time: startup_done,
+            stats: TimingStats::new(startup_done),
         };
 
         for (_key, path, file_id) in existing_files {
             state.watch_new_file(path, file_id, true).await;
         }
         state.server.emitter.emit_files_open(state.fp_map.len());
+        state.next_glob_time = state.clock.now();
+        state.stats = TimingStats::new(state.next_glob_time);
 
         state
     }
@@ -219,7 +222,6 @@ where
 
         let paths: Vec<PathBuf> = self.server.paths_provider.paths().into_iter().collect();
         for path in paths {
-            let now = self.clock.now();
             if let Some(file_id) = self
                 .server
                 .fingerprinter
@@ -228,14 +230,14 @@ where
                     &mut self.known_small_files,
                     &self.server.emitter,
                     &self.fs,
-                    now,
+                    &self.clock,
                 )
                 .await
             {
                 if let Some(watcher) = self.fp_map.get_mut(&file_id) {
                     // file fingerprint matches a watched file
                     let was_found_this_cycle = watcher.file_findable();
-                    watcher.set_file_findable_at(true, now);
+                    watcher.set_file_findable_at(true, self.clock.now());
                     if watcher.path == path {
                         trace!(
                             message = "Continue watching file.",
@@ -351,7 +353,7 @@ where
             while let Ok(RawLineResult {
                 raw_line: Some(line),
                 discarded_for_size_and_truncated,
-            }) = watcher.read_line_at(self.clock.now()).await
+            }) = watcher.read_line_with_clock(&self.clock).await
             {
                 for buf in &discarded_for_size_and_truncated {
                     self.server.emitter.emit_file_line_too_long(
@@ -483,8 +485,6 @@ where
                 .map_or(fallback, ReadFrom::Checkpoint)
         };
 
-        let now = self.clock.now();
-        let now_utc = self.clock.now_utc();
         match FileWatcher::new_with_fs(
             path.clone(),
             read_from,
@@ -492,8 +492,7 @@ where
             self.server.max_line_bytes,
             self.server.line_delimiter.clone(),
             self.fs.clone(),
-            now,
-            now_utc,
+            &self.clock,
         )
         .await
         {
@@ -503,7 +502,7 @@ where
                 } else {
                     self.server.emitter.emit_file_added(&path);
                 }
-                watcher.set_file_findable_at(true, now);
+                watcher.set_file_findable_at(true, self.clock.now());
                 self.fp_map.insert(file_id, watcher);
             }
             Err(error) => self.server.emitter.emit_file_watch_error(&path, error),

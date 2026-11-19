@@ -42,6 +42,9 @@ pub trait AsyncFile: AsyncRead + AsyncSeek + Unpin + Send + 'static {
 
     /// Returns the portable `(dev, ino)` identity of the open file handle.
     fn identity(&self) -> impl Future<Output = io::Result<FileIdentity>> + Send;
+
+    /// Returns both metadata and `(dev, ino)` identity in a single syscall on Unix.
+    fn open_info(&self) -> impl Future<Output = io::Result<(FileMetadata, FileIdentity)>> + Send;
 }
 
 impl AsyncFile for File {
@@ -56,6 +59,28 @@ impl AsyncFile for File {
             dev: info.portable_dev(),
             ino: info.portable_ino(),
         })
+    }
+
+    async fn open_info(&self) -> io::Result<(FileMetadata, FileIdentity)> {
+        #[cfg(unix)]
+        {
+            let m = self.metadata().await?;
+            let identity = FileIdentity {
+                dev: m.portable_dev(),
+                ino: m.portable_ino(),
+            };
+            Ok((FileMetadata::from(&m), identity))
+        }
+        #[cfg(windows)]
+        {
+            let info = self.file_info().await?;
+            let identity = FileIdentity {
+                dev: info.portable_dev(),
+                ino: info.portable_ino(),
+            };
+            let m = self.metadata().await?;
+            Ok((FileMetadata::from(&m), identity))
+        }
     }
 }
 
@@ -75,12 +100,14 @@ pub trait FileSystem: Clone + Send + Sync + 'static {
     /// Renames a file from `from` to `to`, replacing `to` if it exists.
     fn rename(&self, from: &Path, to: &Path) -> impl Future<Output = io::Result<()>> + Send;
 
-    /// Creates/truncates `path`, writes all `data`, and syncs it to durable storage.
-    fn write_file_sync(
+    /// Creates/truncates `path`, streams bytes via `write_fn`, and syncs to durable storage.
+    fn write_file_sync_with<F>(
         &self,
         path: &Path,
-        data: Vec<u8>,
-    ) -> impl Future<Output = io::Result<()>> + Send;
+        write_fn: F,
+    ) -> impl Future<Output = io::Result<()>> + Send
+    where
+        F: FnOnce(&mut dyn io::Write) -> io::Result<()> + Send + 'static;
 }
 
 /// Production [`FileSystem`] backed by `tokio::fs` and `std::fs`.
@@ -107,14 +134,15 @@ impl FileSystem for OsFileSystem {
         fs::rename(from, to).await
     }
 
-    async fn write_file_sync(&self, path: &Path, data: Vec<u8>) -> io::Result<()> {
-        use std::io::Write as _;
-
+    async fn write_file_sync_with<F>(&self, path: &Path, write_fn: F) -> io::Result<()>
+    where
+        F: FnOnce(&mut dyn io::Write) -> io::Result<()> + Send + 'static,
+    {
         let path = path.to_path_buf();
         // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
         tokio::task::spawn_blocking(move || -> io::Result<()> {
             let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
-            f.write_all(&data)?;
+            write_fn(&mut f)?;
             f.into_inner()?.sync_all()?;
             Ok(())
         })

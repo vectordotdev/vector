@@ -65,7 +65,8 @@ async fn zoo_torn_read_premature_flush_on_unlinked_inode() {
     let fs = SimFileSystem::new(clock.clone());
     let emitter = RecordingEmitter::new();
 
-    let ino = fs.append_bytes("/logs/app.log", b"first_line\npartial_start");
+    let writer = fs.open_writer("/logs/app.log");
+    writer.append(b"first_line\npartial_start");
 
     let mut cp = Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
     let server = base_server(&fs, emitter, FingerprintStrategy::DevInode);
@@ -76,7 +77,7 @@ async fn zoo_torn_read_premature_flush_on_unlinked_inode() {
     assert_eq!(lines.len(), 1);
     assert_eq!(lines[0].text.as_ref(), b"first_line");
 
-    // File is unlinked while writer still holds its open fd and has not yet written `\n`.
+    // File is unlinked while writer still holds its open fd (`SimWriter`) and has not yet written `\n`.
     fs.unlink_file("/logs/app.log").unwrap();
     clock.advance(Duration::from_secs(1));
     step_and_ack(&mut state, &mut lines).await;
@@ -86,12 +87,17 @@ async fn zoo_torn_read_premature_flush_on_unlinked_inode() {
     assert_eq!(lines.len(), 2);
     assert_eq!(lines[1].text.as_ref(), b"partial_start");
     assert_eq!(state.open_file_count(), 0);
+    // Writer handle still holds 1 open fd on the unlinked inode.
+    assert_eq!(fs.active_open_handles(), 1);
 
-    // Writer now finishes the line on its open fd — silently dropped because watcher died.
-    fs.append_to_ino(ino, b"_and_the_rest\n");
+    // Writer now finishes the line on its live open fd — silently dropped because watcher died.
+    writer.append(b"_and_the_rest\n");
     clock.advance(Duration::from_secs(1));
     step_and_ack(&mut state, &mut lines).await;
     assert_eq!(lines.len(), 2);
+
+    drop(writer);
+    assert_eq!(fs.active_open_handles(), 0);
 }
 
 /// Zoo 1.3 (`#21084`): Wrong `start_offset` reported when a line arrives in
