@@ -4,20 +4,19 @@
 //! Used by both `vector top` and `vector tap` integration tests.
 
 use std::fs::{OpenOptions, create_dir};
-use std::io::Write;
+use std::io::Write as _;
 use std::net::TcpListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
 use assert_cmd::prelude::*;
-use indoc::formatdoc;
 use nix::{
     sys::signal::{Signal, kill},
     unistd::Pid,
 };
+use tempfile::TempDir;
 use tokio::time::sleep;
-use vector::test_util::{temp_dir, temp_file};
 use vector_lib::api_client::Client;
 
 // Constants
@@ -34,6 +33,7 @@ pub struct TestHarness {
     api_port: u16,
     config_path: PathBuf,
     watch_mode: bool,
+    directory: TempDir,
 }
 
 impl TestHarness {
@@ -82,16 +82,12 @@ impl TestHarness {
         api_port: u16,
         watch_mode: bool,
     ) -> Result<Self, String> {
-        let config = formatdoc! {"
-            api:
-              enabled: true
-              address: \"127.0.0.1:{api_port}\"
-
-            {pipeline_config}
-        "};
-
-        let config_path = create_config_file(&config);
-        let data_dir = create_data_directory();
+        let directory = tempfile::tempdir().expect("Failed to create test directory");
+        let data_dir = directory.path().join("data");
+        create_dir(&data_dir).expect("Failed to create data directory");
+        let config_path = directory.path().join("vector.yaml");
+        let config = harness_config(pipeline_config, api_port, &data_dir);
+        overwrite_config_file(&config_path, &config);
 
         let mut cmd =
             Command::cargo_bin("vector").map_err(|e| format!("Failed to get cargo bin: {e}"))?;
@@ -105,9 +101,7 @@ impl TestHarness {
             cmd.arg("-w");
         }
 
-        cmd.env("VECTOR_DATA_DIR", &data_dir);
-
-        let mut vector = cmd
+        let vector = cmd
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -115,19 +109,29 @@ impl TestHarness {
             .map_err(|e| format!("Failed to spawn vector: {e}"))?;
 
         let url = format!("http://127.0.0.1:{api_port}");
-        let mut api_client = Client::new(url.parse().expect("valid URL"));
+        let api_client = Client::new(url.parse().expect("valid URL"));
 
-        // Wait for Vector startup with crash detection
-        // This will repeatedly try to connect until Vector is ready
-        wait_for_startup(&mut vector, &mut api_client, STARTUP_TIMEOUT).await?;
-
-        Ok(Self {
+        // Own the child before waiting for startup so failures also stop it before
+        // the temporary directory is removed.
+        let mut harness = Self {
             vector,
             api_client,
             api_port,
             config_path,
             watch_mode,
-        })
+            directory,
+        };
+
+        // Wait for Vector startup with crash detection
+        // This will repeatedly try to connect until Vector is ready
+        wait_for_startup(
+            &mut harness.vector,
+            &mut harness.api_client,
+            STARTUP_TIMEOUT,
+        )
+        .await?;
+
+        Ok(harness)
     }
 
     /// Returns mutable reference to the API client
@@ -153,13 +157,11 @@ impl TestHarness {
         new_pipeline_config: &str,
         expected_component_ids: &[&str],
     ) -> Result<(), String> {
-        let new_config = formatdoc! {"
-            api:
-              enabled: true
-              address: \"127.0.0.1:{port}\"
-
-            {new_pipeline_config}
-        ", port = self.api_port};
+        let new_config = harness_config(
+            new_pipeline_config,
+            self.api_port,
+            &self.directory.path().join("data"),
+        );
 
         overwrite_config_file(&self.config_path, &new_config);
 
@@ -193,11 +195,13 @@ impl TestHarness {
 impl Drop for TestHarness {
     fn drop(&mut self) {
         // Send SIGTERM for graceful shutdown
-        kill(
-            Pid::from_raw(self.vector.id().cast_signed()),
-            Signal::SIGTERM,
-        )
-        .ok();
+        if self.vector.try_wait().ok().flatten().is_none() {
+            kill(
+                Pid::from_raw(self.vector.id().cast_signed()),
+                Signal::SIGTERM,
+            )
+            .ok();
+        }
 
         // Wait for process to exit
         self.vector.wait().ok();
@@ -217,28 +221,21 @@ fn find_available_port() -> u16 {
         .port()
 }
 
-/// Creates a temporary file with the given content
-pub fn create_config_file(config: &str) -> PathBuf {
-    let mut path = temp_file();
-    // Add .yaml extension so Vector recognizes it as YAML
-    path.set_extension("yaml");
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&path)
-        .unwrap();
-
-    file.write_all(config.as_bytes()).unwrap();
-    file.sync_all().unwrap();
-
-    path
+fn harness_config(pipeline_config: &str, api_port: u16, data_dir: &Path) -> String {
+    let mut config: serde_json::Value =
+        serde_yaml::from_str(pipeline_config).expect("Invalid pipeline configuration");
+    config["data_dir"] = serde_json::json!(data_dir);
+    config["api"] = serde_json::json!({
+        "enabled": true,
+        "address": format!("127.0.0.1:{api_port}"),
+    });
+    serde_yaml::to_string(&config).expect("Failed to serialize configuration")
 }
 
 /// Overwrites an existing config file with new content
-pub fn overwrite_config_file(path: &PathBuf, config: &str) {
+pub fn overwrite_config_file(path: &Path, config: &str) {
     let mut file = OpenOptions::new()
+        .create(true)
         .write(true)
         .truncate(true)
         .open(path)
@@ -246,13 +243,6 @@ pub fn overwrite_config_file(path: &PathBuf, config: &str) {
 
     file.write_all(config.as_bytes()).unwrap();
     file.sync_all().unwrap();
-}
-
-/// Creates a temporary directory for Vector's `data_dir`
-pub fn create_data_directory() -> PathBuf {
-    let path = temp_dir();
-    create_dir(&path).unwrap();
-    path
 }
 
 /// Waits for Vector startup: polls for process health and API readiness
@@ -397,5 +387,59 @@ pub async fn wait_for_component_events(
         }
 
         sleep(Duration::from_millis(200)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::TestHarness;
+
+    #[tokio::test]
+    async fn disk_buffers_are_isolated_and_keep_their_directory_across_reload() {
+        let pipeline = indoc! {"
+            sources:
+              demo_source:
+                type: demo_logs
+                format: json
+                interval: 0.01
+            sinks:
+              out:
+                type: blackhole
+                inputs: [demo_source]
+                buffer:
+                  type: disk
+                  max_size: 268435488
+        "};
+
+        for watch_mode in [false, true] {
+            let mut first = TestHarness::new_internal(pipeline, watch_mode)
+                .await
+                .unwrap();
+            let second = TestHarness::new(pipeline).await.unwrap();
+            let first_directory = first.directory.path().to_path_buf();
+            let second_directory = second.directory.path().to_path_buf();
+            let ledger = "data/buffer/v2/out/buffer.db";
+
+            assert_ne!(first_directory, second_directory);
+            assert!(first_directory.join(ledger).is_file());
+            assert!(second_directory.join(ledger).is_file());
+
+            first
+                .reload_with_config(
+                    &pipeline.replace("demo_source", "replacement_source"),
+                    &["replacement_source", "out"],
+                )
+                .await
+                .unwrap();
+            assert!(first_directory.join(ledger).is_file());
+
+            drop(first);
+            assert!(!first_directory.exists());
+            assert!(second_directory.join(ledger).is_file());
+            drop(second);
+            assert!(!second_directory.exists());
+        }
     }
 }

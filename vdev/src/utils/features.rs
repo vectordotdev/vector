@@ -52,6 +52,10 @@ const NESTED_FEATURE_RULES: &[NestedFeatureRule] = &[
         feature: "aws-core",
     },
 ];
+const PROMETHEUS_SCRAPE_TYPE: &str = "prometheus_scrape";
+const PROMETHEUS_SCRAPE_TARGETS_KEY: &str = "targets";
+const PROMETHEUS_SCRAPE_KUBERNETES_KEY: &str = "kubernetes";
+const KUBERNETES_FEATURE: &str = "kubernetes";
 const VRL_FEATURES: &[&str] = &[
     "vector-vrl-functions/dnstap",
     "vrl-functions-crypto",
@@ -189,6 +193,9 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
         declared_features,
     );
     get_features(&mut features, "sinks", &config.sinks, declared_features);
+    if config.sources.values().any(scrapes_kubernetes_targets) {
+        features.insert(KUBERNETES_FEATURE.into());
+    }
 
     let mut uses_vrl = !config.transforms.is_empty();
 
@@ -214,6 +221,19 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     }
 
     Ok(features.into_iter().collect())
+}
+
+/// `prometheus_scrape` only compiles Kubernetes discovery with the `kubernetes` feature, so a
+/// source that lists a `kubernetes` entry under `targets` needs it.
+fn scrapes_kubernetes_targets(source: &Component) -> bool {
+    let is_kubernetes = |target: &Value| target.get(PROMETHEUS_SCRAPE_KUBERNETES_KEY).is_some();
+    source.r#type == PROMETHEUS_SCRAPE_TYPE
+        && match source.options.get(PROMETHEUS_SCRAPE_TARGETS_KEY) {
+            Some(Value::Array(targets)) => targets.iter().any(is_kubernetes),
+            // The config loader also accepts a single entry that isn't in a list.
+            Some(target) => is_kubernetes(target),
+            None => false,
+        }
 }
 
 fn add_option<T>(features: &mut FeatureSet, name: &str, field: Option<&T>) {
@@ -369,6 +389,66 @@ mod tests {
             &DECLARED_FEATURES,
         )
         .expect("feature extraction must succeed")
+    }
+
+    #[test]
+    fn prometheus_scrape_kubernetes_targets_enable_kubernetes() {
+        let with_kubernetes = features(indoc! {"
+            sources:
+              pods:
+                type: prometheus_scrape
+                targets:
+                  - static:
+                      urls: [http://localhost:9090/metrics]
+                  - kubernetes:
+                      role: pod
+        "});
+        assert!(with_kubernetes.contains(&"kubernetes".to_owned()));
+
+        let single_entry = features(indoc! {"
+            sources:
+              pods:
+                type: prometheus_scrape
+                targets:
+                  kubernetes:
+                    role: pod
+        "});
+        assert!(single_entry.contains(&"kubernetes".to_owned()));
+
+        let single_static = features(indoc! {"
+            sources:
+              static:
+                type: prometheus_scrape
+                targets:
+                  static:
+                    urls: [http://localhost:9090/metrics]
+        "});
+        assert!(!single_static.contains(&"kubernetes".to_owned()));
+
+        let static_only = features(indoc! {"
+            sources:
+              static:
+                type: prometheus_scrape
+                targets:
+                  - static:
+                      urls: [http://localhost:9090/metrics]
+        "});
+        assert!(!static_only.contains(&"kubernetes".to_owned()));
+
+        // A `kubernetes` key anywhere else doesn't count.
+        let elsewhere = features(indoc! {"
+            sources:
+              http:
+                type: http_client
+                endpoint: http://localhost:9090/metrics
+                targets:
+                  - kubernetes: {}
+              logs:
+                type: demo_logs
+                format: json
+                kubernetes: true
+        "});
+        assert!(!elsewhere.contains(&"kubernetes".to_owned()));
     }
 
     #[test]

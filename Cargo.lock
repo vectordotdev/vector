@@ -2918,6 +2918,7 @@ dependencies = [
  "dyn-clone",
  "flate2",
  "futures",
+ "http 1.5.0",
  "indoc",
  "influxdb-line-protocol",
  "memchr",
@@ -2957,7 +2958,7 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
- "zstd 0.13.2",
+ "zstd 0.14.3",
 ]
 
 [[package]]
@@ -6900,9 +6901,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.31"
+version = "1.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff20308ecabd635a2dc1dd5834a86c462cca20efba1d5d3ddab1f8aea3455cb2"
+checksum = "fee3f59f4321dab0c78d828942e7aa09d0bd8ad6e78a501977e6bf3d02938045"
 dependencies = [
  "cc",
  "libc",
@@ -13468,7 +13469,7 @@ dependencies = [
  "windows 0.58.0",
  "windows-service",
  "wiremock",
- "zstd 0.13.2",
+ "zstd 0.14.3",
 ]
 
 [[package]]
@@ -13564,7 +13565,7 @@ dependencies = [
  "vector-config",
  "vrl",
  "windows-sys 0.61.2",
- "zstd 0.13.2",
+ "zstd 0.14.3",
 ]
 
 [[package]]

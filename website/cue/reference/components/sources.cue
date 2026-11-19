@@ -199,11 +199,14 @@ components: sources: [Name=string]: {
 											[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 											"""
 										native_json: """
-											Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+											Decodes the [ProtoJSON mapping][protojson] of Vector’s
+											[native event schema][vector_native_protobuf]. The legacy native JSON
+											representation is also accepted for compatibility.
 
 											This codec is **[experimental][experimental]**.
 
-											[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+											[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+											[protojson]: https://protobuf.dev/programming-guides/json/
 											[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 											"""
 									}
@@ -330,6 +333,14 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: null
 									examples: ["CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+								}
+							}
+							subject_altnames: {
+								description: "The Subject Alternative Names (SANs) from the client TLS certificate, as a comma-separated list. Each SAN is prefixed with its type (for example `DNS:example.com`, `email:admin@example.com`, `URI:https://example.com`, or `IP Address:127.0.0.1`) to match the output of `openssl x509 -text`. Only added if `tls.client_metadata_key` is set and the client certificate contains SANs. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: ["DNS:localhost,IP Address:127.0.0.1"]
 								}
 							}
 						}
