@@ -152,10 +152,11 @@ pub struct AzureBlobSinkConfig {
 
     /// The Azure Blob Storage service API version to use for requests.
     ///
-    /// This sets the `x-ms-version` request header. If unset, the version selected by the Azure
-    /// SDK is used. Setting an older version can be useful with Azure Stack or other storage
-    /// services that do not support the SDK's default version. The configured version must support
-    /// every operation and option used by this sink.
+    /// This sets the `x-ms-version` request header. If unset, Shared Key authentication uses
+    /// `2025-11-05`, and other authentication methods use the version selected by the Azure SDK.
+    /// Setting an older version can be useful with Azure Stack or other storage services that do
+    /// not support the default version. The configured version must support every operation and
+    /// option used by this sink.
     #[configurable(metadata(docs::examples = "2021-08-06"))]
     pub(super) api_version: Option<String>,
 
@@ -733,22 +734,31 @@ mod tests {
     }
 
     #[test]
-    fn api_version_overrides_sdk_default() {
-        let mut options = BlobContainerClientOptions::default();
+    fn api_version_defaults_and_overrides() {
+        let sdk_default = BlobContainerClientOptions::default().version;
+        for (auth, default_version) in [
+            (Auth::None, sdk_default.as_str()),
+            (
+                Auth::Sas {
+                    query: "sv=2021-08-06".into(),
+                },
+                sdk_default.as_str(),
+            ),
+            (
+                Auth::SharedKey {
+                    account_name: "account".into(),
+                    account_key: "a2V5".into(),
+                },
+                "2025-11-05",
+            ),
+        ] {
+            let mut options = BlobContainerClientOptions::default();
+            set_api_version(&mut options, None, &auth);
+            assert_eq!(options.version, default_version);
 
-        set_api_version(&mut options, Some("2021-08-06")).unwrap();
-
-        assert_eq!(options.version, "2021-08-06");
-    }
-
-    #[test]
-    fn api_version_uses_sdk_default_when_unset() {
-        let mut options = BlobContainerClientOptions::default();
-        let sdk_default = options.version.clone();
-
-        set_api_version(&mut options, None).unwrap();
-
-        assert_eq!(options.version, sdk_default);
+            set_api_version(&mut options, Some("2021-08-06"), &auth);
+            assert_eq!(options.version, "2021-08-06");
+        }
     }
 
     #[test]
@@ -766,30 +776,6 @@ mod tests {
                 )
             );
         }
-    }
-
-    #[test]
-    fn api_version_rejects_invalid_date() {
-        let mut options = BlobContainerClientOptions::default();
-
-        let error = set_api_version(&mut options, Some("2021-13-40")).unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "Invalid Azure Blob Storage API version `2021-13-40`; expected YYYY-MM-DD"
-        );
-    }
-
-    #[test]
-    fn api_version_rejects_noncanonical_date() {
-        let mut options = BlobContainerClientOptions::default();
-
-        let error = set_api_version(&mut options, Some("2021-8-6")).unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "Invalid Azure Blob Storage API version `2021-8-6`; expected YYYY-MM-DD"
-        );
     }
 
     #[test]
@@ -1168,12 +1154,13 @@ pub fn build_client(
     // and an explicit `auth` was already rejected during `validate`; re-check
     // here so `build_client` stays safe when called directly (e.g. integration
     // tests).
-    validate_auth_conflict(&parsed.auth(), auth)?;
+    let connection_auth = parsed.auth();
+    validate_auth_conflict(&connection_auth, auth)?;
 
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
-    set_api_version(&mut options, api_version)?;
-    match (parsed.auth(), auth) {
+    set_api_version(&mut options, api_version, &connection_auth);
+    match (connection_auth, auth) {
         (Auth::None, None) => {
             warn!("No authentication method provided, requests will be anonymous.");
         }
@@ -1263,12 +1250,15 @@ pub fn build_client(
 fn set_api_version(
     options: &mut BlobContainerClientOptions,
     api_version: Option<&str>,
-) -> crate::Result<()> {
-    validate_api_version(api_version)?;
-    if let Some(api_version) = api_version {
-        api_version.clone_into(&mut options.version);
-    }
-    Ok(())
+    auth: &Auth,
+) {
+    let version = match (api_version, auth) {
+        (Some(version), _) => version,
+        // Preserve the version previously selected by the Shared Key signing policy.
+        (None, Auth::SharedKey { .. }) => "2025-11-05",
+        (None, _) => return,
+    };
+    version.clone_into(&mut options.version);
 }
 
 fn validate_api_version(api_version: Option<&str>) -> crate::Result<()> {

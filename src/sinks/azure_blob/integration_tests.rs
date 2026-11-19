@@ -46,16 +46,19 @@ fn assert_log_suffix(blob: &str) {
 
 #[tokio::test]
 async fn azure_blob_uploads_one_shot_with_shared_key() {
-    let config = AzureBlobSinkConfig::new_emulator().await;
-    let client = config.build_test_client();
-    let blob_name = format!("one-shot/{}.blob", random_string(10));
-    let payload = vec![b'x'; 3 * 1024 * 1024];
+    let mut config = AzureBlobSinkConfig::new_emulator().await;
+    for api_version in [None, Some("2021-08-06".into())] {
+        config.api_version = api_version;
+        let client = config.build_test_client();
+        let blob_name = format!("one-shot/{}.blob", random_string(10));
+        let payload = vec![b'x'; 3 * 1024 * 1024];
 
-    client
-        .blob_client(&blob_name)
-        .upload(RequestContent::from(payload), None)
-        .await
-        .expect("one-shot upload should succeed");
+        client
+            .blob_client(&blob_name)
+            .upload(RequestContent::from(payload), None)
+            .await
+            .expect("one-shot upload should succeed");
+    }
 }
 
 #[tokio::test]
