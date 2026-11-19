@@ -61,7 +61,7 @@ pub async fn custom_reflector<K, W>(
                                 store.apply_watcher_event(&event);
                                 let meta_descr = MetaDescribe::from_meta(obj.meta());
                                 meta_cache.store(meta_descr.clone());
-                                init_buffer_meta.push(meta_descr.clone());
+                                init_buffer_meta.push(meta_descr);
                             }
                             // Reconcile `InitApply` events and implied deletions
                             watcher::Event::InitDone => {

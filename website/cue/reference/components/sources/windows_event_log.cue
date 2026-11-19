@@ -172,7 +172,7 @@ components: sources: windows_event_log: {
 				Such events fail to serialize at the sink and are dropped. A `remap` transform in
 				front of the sink can make them valid:
 
-				```coffee
+				```vrl
 				. = flatten!(., "_")
 				. = map_values(.) -> |v| { if is_array(v) { encode_json(v) } else { v } }
 				.win_level = del(.level)
