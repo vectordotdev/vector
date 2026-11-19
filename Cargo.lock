@@ -2916,7 +2916,7 @@ dependencies = [
  "dyn-clone",
  "flate2",
  "futures",
- "http 1.5.0",
+ "http",
  "indoc",
  "influxdb-line-protocol",
  "memchr",
