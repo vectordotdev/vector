@@ -1,3 +1,13 @@
-VRL can now read the value of a metric event, for example in the `remap` transform, in `filter` and `route` conditions, and in unit tests. The value is under a top-level field named after the metric's type, as in the JSON encoding shown by `vector tap`: `.counter.value`, `.gauge.value`, `.set.values`, `.distribution.samples`, `.aggregated_histogram.buckets`, `.aggregated_summary.quantiles`, and so on. Sketches expose summary statistics directly under `.sketch`: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`. Assigning to these fields or calling `del()` on them doesn't change the metric's value.
+VRL can now read metric values in the `remap` transform, `filter` and `route`
+conditions, and unit tests. Example paths include:
+
+- `.counter.value` and `.gauge.value`
+- `.set.values`
+- `.distribution.samples`
+- `.aggregated_histogram.buckets`
+- `.aggregated_summary.quantiles`
+- `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`
+
+These fields are read-only: assignments and `del()` leave the metric's value unchanged.
 
 authors: JinchengCao
