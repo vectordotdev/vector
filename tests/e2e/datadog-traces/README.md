@@ -1,7 +1,8 @@
 # Datadog Agent trace validation
 
 This E2E test checks that Vector relays native Datadog tracer traffic from a real
-Datadog Agent without losing or changing spans. It provides evidence for the
+Datadog Agent, comparing each span and its Agent envelope, tracer metadata and chunk
+context against an explicit mapping of today's relay. It provides evidence for the
 [trace model RFC](../../../rfcs/2026-04-29-25329-trace-data-model.md) migration PRs on the
 Datadog side, as the
 [multiservice OpenTelemetry test](../opentelemetry-traces-multiservice/README.md) does for
@@ -22,7 +23,7 @@ flowchart TB
         input["fakeintake-agent<br/>input payloads"]
         output["fakeintake-vector<br/>output payloads"]
         coverage["Input must be rich enough<br/><br/>Every tracer, service and trace shape<br/>the test requires must appear"]
-        preservation["Every span must come out<br/>unchanged, exactly once<br/><br/>Only Agent payload, tracer payload<br/>and chunk grouping may differ"]
+        preservation["Every span record must come out<br/>with expected fields and multiplicity<br/><br/>Agent envelope, tracer metadata,<br/>chunk context and unchanged span"]
     end
     input --> coverage
     input --> preservation
@@ -72,14 +73,38 @@ The [Rust test](../datadog/traces/mod.rs) verifies:
   priorities 1 and 2, roots, cross-service parents, a trace spread across tracer
   payloads, multi-service chunks, several chunks in one tracer payload, error spans with
   `error.message`, `_dd.p.tid` (128-bit trace IDs), native span links and span events.
-- Preservation: every span reaches the output exactly once and byte-for-byte unchanged.
-  Missing, extra, duplicate and changed spans fail. Only the grouping into Agent, tracer
-  payloads and chunks may differ.
+- Preservation: flatten each span and its enclosing Agent, tracer and chunk fields into
+  a record, keyed by wire trace ID and span ID. Compare records as a multiset, retaining
+  duplicate counts while ignoring grouping and order. Spans remain byte-for-byte
+  unchanged; enclosing fields must match the input-only `expected_mapping` below.
+  Missing, extra, duplicate and changed records fail.
 
 Results are written to the `datadog_traces_evidence` volume: `summary.md`,
 `coverage.json`, `differences.txt` and the decoded `input.txt` and `output.txt`. CI does
 not upload that volume, so a failure also prints the first three differences in the test
-log.
+log as contextual expected/actual diffs, so changed fields remain visible without
+printing an entire record first.
+
+## Expected legacy mapping
+
+`expected_mapping` in the [Rust test](../datadog/traces/mod.rs) explicitly describes
+current losses. It applies only to input records, never output. When a typed-model PR
+fixes a loss, it must remove that rule; silently fixing the output also fails comparison.
+Each rule cites the relevant section of the [Datadog mapping RFC](../../../rfcs/2026-04-29-25329-trace-data-model/datadog-mapping.md).
+
+- Tracer `env` becomes Agent `env`.
+- Tracer `hostname` becomes empty: the source drops it, and the sink reads `hostname`
+  rather than this configuration's default `host` field.
+- Tags merge with precedence Agent > tracer > chunk, then appear on both tracer and
+  chunk; Agent tags become empty.
+- Agent `targetTPS` and `errorTPS` become zero: the source stores floats, but the sink
+  partitioner reads integers.
+- Agent `rareSamplerEnabled` becomes false.
+- Tracer `containerDebug` is dropped. Unlike the legacy losses above, this diagnostic
+  is explicitly out of scope for the RFC and remains an expected exclusion.
+
+Unit fixtures exercise non-default values and tag collisions even when native captures
+contain defaults. All other decoded fields are compared without normalization.
 
 ## Why this workload
 
@@ -95,6 +120,7 @@ by the Agent. The workload stays small and deterministic because:
 ## Running
 
 ```shell
+unset DOCKER_HOST
 cargo vdev e2e run datadog-traces
 ```
 
@@ -107,8 +133,11 @@ The merge queue runs it automatically when the paths in
 
 ## Known gaps
 
-- Span-level only: Agent envelope, tracer payload and chunk fields are not compared yet.
-  The current relay rewrites some of them, such as tracer payload `env` and merged tags.
+- The expected legacy mapping above tracks current losses, not the typed model's full
+  preservation guarantee. Native traffic does not guarantee non-default values for
+  every envelope field; synthetic fixtures cover those rules.
+- Empty envelopes, tracer payloads and chunks have no span record and are not compared.
+  Unknown protobuf fields are not retained by the decoder.
 - Indexed payloads: Agent 7.84+ sends them by default and Vector drops them, so the
   Agent sets `disable-convert-traces`.
 - Native span events come only from Python: Agent 7.84.6 rejects native span events from
