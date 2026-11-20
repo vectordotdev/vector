@@ -2822,6 +2822,26 @@ mod test {
     }
 
     #[test]
+    fn metric_value_runtime_unnest_local_object_skips_value() {
+        // Unnesting a local copy of the tags reads only the tags, so the rows don't carry the
+        // samples.
+        let (target, result) = run_metric_program_with_tags(
+            big_distribution(),
+            metric_tags!("region" => "eu", "region" => "us"),
+            MetricTagMode::Full,
+            r#"tag_view = {"tags": .tags}; unnest!(tag_view.tags.region)"#,
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![
+                Value::from(objectmap! { "tags" => objectmap! { "region" => "eu" } }),
+                Value::from(objectmap! { "tags" => objectmap! { "region" => "us" } }),
+            ])
+        );
+        assert_eq!(cached_field(&target, "distribution"), None);
+    }
+
+    #[test]
     fn metric_value_runtime_unnest_keeps_metric_fields() {
         // `unnest` records the root, so each row keeps the rest of the metric.
         let (_, result) = run_metric_program_with_tags(
