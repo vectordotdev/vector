@@ -137,9 +137,9 @@ components: transforms: "remap": {
 				* VRL integers are signed 64-bit, so a count larger than `9223372036854775807` reads as a string with
 				  the exact decimal value.
 
-				The type of a metric's value is only known at runtime, so use `float!` to assert that it's a float before
-				using it in arithmetic, for example `float!(.gauge.value) * 100`. `float!` fails on a NaN value, because it
-				reads as the string `"NaN"`.
+				The type of a metric's value is known only at runtime, so use `float!` to assert that it's a float before
+				using it in arithmetic, for example, `float!(.gauge.value) * 100`. `float!` fails on a NaN value because
+				NaN reads as the string `"NaN"`.
 
 				`unnest` copies the rest of the event into each row, and on a metric that includes the value. With
 				`metric_tag_values: full`, `.tags.region` is an array, so on a distribution `unnest!(.tags.region)`
