@@ -218,7 +218,7 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         validated: &ValidatedAzureLogsIngestion,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let credential: Arc<dyn TokenCredential> = self.auth.credential()?;
+        let credential: Arc<dyn TokenCredential> = self.auth.credential(&cx.proxy)?;
 
         self.build_inner(
             &cx,
