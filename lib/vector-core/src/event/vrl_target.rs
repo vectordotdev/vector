@@ -33,7 +33,7 @@ const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .interval_ms, .timestam
 
 /// The fields that hold a metric's value, one per metric type.
 ///
-/// These match the native JSON encoding of metrics, which is what `vector tap` shows. Only the
+/// These match the JSON encoding of metrics, which is what `vector tap` shows. Only the
 /// field for the metric's current type is present; the others read as `null`.
 const METRIC_VALUE_FIELDS: [&str; 7] = [
     "counter",
@@ -752,7 +752,7 @@ fn is_metric_value_path(path: &OwnedValuePath) -> bool {
 /// Converts a float for VRL.
 ///
 /// VRL floats can't hold NaN, so NaN is exposed as the string `"NaN"`. This matches how NaN is
-/// written in the native JSON encoding of histogram buckets. Infinities are kept as floats.
+/// written in the JSON encoding of histogram buckets. Infinities are kept as floats.
 fn metric_float_to_vrl_value(value: f64) -> Value {
     if value.is_nan() {
         Value::from("NaN")
@@ -864,7 +864,7 @@ fn metric_value_to_vrl_value(value: &MetricValue) -> Value {
                 ),
                 ("count".into(), metric_count_to_vrl_value(*count)),
             ]);
-            // Like the native JSON encoding, a missing sum is left out, so `exists` can tell it
+            // Like the JSON encoding, a missing sum is left out, so `exists` can tell it
             // apart from a sum of zero.
             if let Some(sum) = sum {
                 map.insert("sum".into(), metric_float_to_vrl_value(*sum));
@@ -2618,7 +2618,7 @@ mod test {
             ),
             Some(Value::from(2))
         );
-        // A missing sum is left out, as in the native JSON encoding, so it reads as `null` and
+        // A missing sum is left out, as in the JSON encoding, so it reads as `null` and
         // `exists` is `false`.
         assert_eq!(
             get(&target, owned_value_path!("aggregated_histogram", "sum")),
