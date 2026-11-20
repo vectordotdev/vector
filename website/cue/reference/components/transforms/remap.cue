@@ -121,12 +121,14 @@ components: transforms: "remap": {
 
 				A metric's value is available only under the field for its current type. For example, `.gauge.value`
 				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
-				includes the value field. Use the field names in the table, which are the ones in the JSON encoding of
-				metrics that `vector tap` shows. They differ from the value of `type` for some metrics. For example, an
-				aggregated histogram reports `aggregated histogram` in `.type` and exposes its count at
-				`.aggregated_histogram.count`. For sketches, VRL exposes summary statistics directly under `.sketch`.
-				Assigning to these fields or calling `del()` on them doesn't change the metric's value. To convert between
-				counters and gauges, set `type`.
+				includes the value field.
+
+				The field names in the table match the JSON encoding of metrics that `vector tap` shows. For some metric
+				types, these names differ from the value of `type`. For example, an aggregated histogram reports
+				`aggregated histogram` in `.type` but exposes its count at `.aggregated_histogram.count`.
+
+				These fields are read-only. Assigning to them or calling `del()` on them doesn't change the metric's value.
+				To convert between counters and gauges, set `type`.
 
 				Two kinds of numbers need special handling in VRL:
 
