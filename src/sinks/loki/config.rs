@@ -92,6 +92,9 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_false")]
     pub remove_structured_metadata_fields: bool,
 
+    #[serde(default)]
+    pub expanded_key_case: ExpandedKeyCase,
+
     /// Whether or not to remove the timestamp from the event payload.
     ///
     /// The timestamp is still sent as event metadata for Loki to use for indexing.
@@ -191,6 +194,32 @@ pub enum OutOfOrderAction {
 
     /// Drop the event.
     Drop,
+}
+
+/// Case of label and structured metadata keys that are expanded from `*` or from a prefix ending
+/// with `*`.
+///
+/// Loki label names and structured metadata keys are case-sensitive. Characters other than ASCII
+/// letters, digits, and `_` are replaced with `_` in both modes. Keys that are not expanded are
+/// never changed.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpandedKeyCase {
+    /// Lowercase expanded keys, for example `userId` becomes `userid`.
+    ///
+    /// Keys that differ only by case collide, and only one of their values is kept.
+    #[default]
+    Lowercase,
+
+    /// Keep expanded keys in the case they have in the event, for example `userId` stays `userId`.
+    Preserve,
+}
+
+impl ExpandedKeyCase {
+    pub(super) const fn lowercases(self) -> bool {
+        matches!(self, Self::Lowercase)
+    }
 }
 
 impl GenerateConfig for LokiConfig {
