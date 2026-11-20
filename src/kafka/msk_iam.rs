@@ -37,7 +37,8 @@ const USER_AGENT: &str = concat!("vector-msk-iam-signer/", env!("CARGO_PKG_VERSI
 
 /// Refresh cached credentials this long before they expire.
 const CRED_REFRESH_SKEW: Duration = Duration::from_mins(5);
-/// Floor for the refresh sleep, so a near-expired/expired credential doesn't spin.
+/// Back-off after a failed or no-progress refresh, so a provider that keeps failing (or keeps
+/// returning credentials that are already inside the refresh window) doesn't spin.
 const CRED_REFRESH_MIN: Duration = Duration::from_mins(1);
 /// Cadence used when credentials advertise no expiry (e.g. static keys).
 const CRED_REFRESH_NO_EXPIRY: Duration = Duration::from_mins(15);
@@ -102,31 +103,45 @@ async fn refresh_loop(
     load_timeout: Duration,
     weak: Weak<Mutex<Credentials>>,
 ) {
+    // Credentials inside the refresh window are reloaded right away; only a failed or no-progress
+    // attempt backs off, so cached credentials don't expire while waiting out the floor.
+    let mut backoff = false;
     loop {
         let sleep_for = match weak.upgrade() {
             None => break,
-            Some(cache) => next_refresh(cache.lock().ok().and_then(|c| c.expiry())),
+            Some(cache) => next_refresh(cache.lock().ok().and_then(|c| c.expiry()), backoff),
         };
         tokio::time::sleep(sleep_for).await;
 
         let Some(cache) = weak.upgrade() else { break };
-        // On failure/timeout keep the previous credentials and retry on the next iteration.
-        if let Ok(fresh) = load_credentials(&provider, load_timeout).await
-            && let Ok(mut guard) = cache.lock()
-        {
-            *guard = fresh;
-        }
+        // On failure/timeout keep the previous credentials and retry after the back-off.
+        backoff = match load_credentials(&provider, load_timeout).await {
+            Ok(fresh) => {
+                // Still inside the refresh window (e.g. a provider that keeps handing out the same
+                // near-expiry credentials until it rotates them): no progress, so back off.
+                let no_progress = next_refresh(fresh.expiry(), false).is_zero();
+                if let Ok(mut guard) = cache.lock() {
+                    *guard = fresh;
+                }
+                no_progress
+            }
+            Err(_) => true,
+        };
     }
 }
 
-fn next_refresh(expiry: Option<SystemTime>) -> Duration {
-    match expiry {
+fn next_refresh(expiry: Option<SystemTime>, backoff: bool) -> Duration {
+    let until_refresh = match expiry {
         Some(exp) => exp
             .duration_since(SystemTime::now())
             .unwrap_or(Duration::ZERO)
-            .saturating_sub(CRED_REFRESH_SKEW)
-            .max(CRED_REFRESH_MIN),
+            .saturating_sub(CRED_REFRESH_SKEW),
         None => CRED_REFRESH_NO_EXPIRY,
+    };
+    if backoff {
+        until_refresh.max(CRED_REFRESH_MIN)
+    } else {
+        until_refresh
     }
 }
 
@@ -478,14 +493,62 @@ mod tests {
     }
 
     #[test]
-    fn refresh_uses_skew_and_floor() {
+    fn refresh_uses_skew_and_backoff() {
         // Expiry far out -> refresh ~skew before it.
         let far = SystemTime::now() + Duration::from_secs(3600);
-        assert!(next_refresh(Some(far)) >= Duration::from_secs(3600 - 5 * 60 - 5));
-        // Already expired -> clamped to the floor, never zero.
+        assert!(next_refresh(Some(far), false) >= Duration::from_secs(3600 - 5 * 60 - 5));
+        // Inside the refresh window -> refresh right away instead of waiting out the floor.
+        let near = SystemTime::now() + Duration::from_secs(30);
+        assert_eq!(next_refresh(Some(near), false), Duration::ZERO);
+        // After a failed or no-progress attempt -> back off, never zero.
+        assert_eq!(next_refresh(Some(near), true), CRED_REFRESH_MIN);
         let past = SystemTime::now() - Duration::from_secs(10);
-        assert_eq!(next_refresh(Some(past)), CRED_REFRESH_MIN);
+        assert_eq!(next_refresh(Some(past), true), CRED_REFRESH_MIN);
         // No expiry -> loose cadence.
-        assert_eq!(next_refresh(None), CRED_REFRESH_NO_EXPIRY);
+        assert_eq!(next_refresh(None, false), CRED_REFRESH_NO_EXPIRY);
+        assert_eq!(next_refresh(None, true), CRED_REFRESH_NO_EXPIRY);
+    }
+
+    /// Credentials that are already close to expiry must be replaced before they lapse, not after
+    /// the one-minute back-off.
+    #[tokio::test(start_paused = true)]
+    async fn near_expiry_credentials_are_refreshed_immediately() {
+        use aws_credential_types::provider::{ProvideCredentials, future};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Debug)]
+        struct RotatingProvider(AtomicUsize);
+        impl ProvideCredentials for RotatingProvider {
+            fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+            where
+                Self: 'a,
+            {
+                // First load: 30s left (inside the refresh window). Afterwards: a fresh hour.
+                let ttl = if self.0.fetch_add(1, Ordering::SeqCst) == 0 {
+                    30
+                } else {
+                    3600
+                };
+                future::ProvideCredentials::ready(Ok(Credentials::new(
+                    ACCESS_KEY,
+                    SECRET_KEY,
+                    None,
+                    Some(SystemTime::now() + Duration::from_secs(ttl)),
+                    "test",
+                )))
+            }
+        }
+
+        let provider = SharedCredentialsProvider::new(RotatingProvider(AtomicUsize::new(0)));
+        let cache = spawn_credentials_cache(provider, Duration::from_secs(5))
+            .await
+            .expect("initial load");
+        // Well under the back-off: the refresher must already have swapped in fresh credentials.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let expiry = cache.lock().unwrap().expiry().expect("expiry");
+        assert!(
+            expiry > SystemTime::now() + Duration::from_secs(600),
+            "near-expiry credentials were not refreshed immediately"
+        );
     }
 }
