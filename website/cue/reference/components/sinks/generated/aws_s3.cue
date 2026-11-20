@@ -235,7 +235,7 @@ generated: components: sinks: aws_s3: configuration: {
 
 			Directly comparable to the `Content-Type` HTTP header.
 
-			If not specified, the value `text/x-log` is used.
+			Defaults to `text/x-log`, or `application/vnd.apache.parquet` when Parquet batch encoding is enabled.
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]
