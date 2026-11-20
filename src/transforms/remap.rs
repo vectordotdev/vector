@@ -404,6 +404,16 @@ impl TransformConfig for RemapConfig {
         true
     }
 
+    fn output_ports(&self) -> Option<Vec<(Option<String>, DataType)>> {
+        // The ports only depend on `reroute_dropped`, not on the program, so listing them does not
+        // require compiling VRL. Keep this in sync with `outputs`.
+        let mut ports = vec![(None, DataType::all_bits())];
+        if self.reroute_dropped {
+            ports.push((Some(DROPPED.to_owned()), DataType::all_bits()));
+        }
+        Some(ports)
+    }
+
     fn files_to_watch(&self) -> Vec<&PathBuf> {
         self.file
             .iter()
@@ -760,6 +770,38 @@ mod tests {
         ]);
 
         Remap::new(&config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
+    }
+
+    #[test]
+    fn output_ports_match_outputs() {
+        let sources = [
+            ".foo = \"bar\"",
+            // The ports must not depend on whether the program compiles.
+            "this is not valid VRL",
+        ];
+        for reroute_dropped in [false, true] {
+            for source in sources {
+                let conf = RemapConfig {
+                    source: Some(source.to_string()),
+                    reroute_dropped,
+                    ..Default::default()
+                };
+                let expected = conf
+                    .outputs(
+                        &TransformContext::default(),
+                        &[(OutputId::dummy(), test_default_schema_definition())],
+                    )
+                    .into_iter()
+                    .map(|output| (output.port, output.ty))
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    conf.output_ports(),
+                    Some(expected),
+                    "reroute_dropped: {reroute_dropped}, source: {source}"
+                );
+            }
+        }
     }
 
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
