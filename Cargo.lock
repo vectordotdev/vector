@@ -13444,6 +13444,7 @@ dependencies = [
  "warp",
  "windows 0.58.0",
  "windows-service",
+ "winresource",
  "wiremock",
  "zstd 0.14.3",
 ]
@@ -14810,6 +14811,15 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "winresource"
+version = "0.1.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2bc6d36480b829272a5bdabf08e6dca8004761c1da7e35efef800540c66221b"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]

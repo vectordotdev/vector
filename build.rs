@@ -206,6 +206,16 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
+    if target_os == "windows" {
+        // Use Cargo's version, including prerelease suffixes, in Explorer's Details tab.
+        winresource::WindowsResource::new()
+            .set("ProductName", "Vector")
+            .set("FileDescription", &pkg_description)
+            .set("OriginalFilename", "vector.exe")
+            .compile_for("vector")
+            .expect("Failed to compile Windows version information");
+    }
+
     // Get the git short hash of the HEAD.
     // Note that if Vector is compiled within a container, proper git permissions must be set for
     // the repo directory.
