@@ -25,7 +25,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-type"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(capped_body())
+        .and(capped_body(source.protocol))
         .and_then({
             move |path: FullPath,
                   content_encoding: Option<String>,

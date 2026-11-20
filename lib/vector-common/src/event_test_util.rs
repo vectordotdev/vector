@@ -59,7 +59,14 @@ fn ignore_prefixed_match(segment: &str, pattern: &str) -> bool {
     // topology. Component compliance only cares about the component-scoped
     // `Events{{Received|Sent}}` signals, so we explicitly filter out the buffer-prefixed
     // forms when matching these shared names. Other prefixes remain eligible.
-    matches!(pattern, "EventsReceived" | "EventsSent") && segment.starts_with("Buffer")
+    (matches!(pattern, "EventsReceived" | "EventsSent") && segment.starts_with("Buffer"))
+        // Network-byte and serialized-byte events coexist during the migration. A network
+        // event must neither satisfy nor duplicate the legacy serialized-byte requirement.
+        || matches!(
+            (segment, pattern),
+            ("SourceNetworkBytesReceived", "BytesReceived")
+                | ("SinkNetworkBytesSent", "BytesSent")
+        )
 }
 
 /// Record an emitted internal event. This is somewhat dumb at this
@@ -145,5 +152,22 @@ mod tests {
         record_internal_event("BufferEventsReceived");
 
         assert!(contains_name_once("EventsReceived").is_err());
+    }
+
+    #[test]
+    fn contains_name_once_distinguishes_network_and_serialized_bytes() {
+        for (serialized, network) in [
+            ("BytesReceived", "SourceNetworkBytesReceived"),
+            ("BytesSent", "SinkNetworkBytesSent"),
+        ] {
+            reset_events();
+            record_internal_event(network);
+            assert!(contains_name_once(serialized).is_err());
+            assert!(contains_name_once(network).is_ok());
+
+            record_internal_event(serialized);
+            assert!(contains_name_once(serialized).is_ok());
+            assert!(contains_name_once(network).is_ok());
+        }
     }
 }

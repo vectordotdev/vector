@@ -477,6 +477,7 @@ impl OpentelemetryConfig {
             build_param_matcher(&remove_duplicates(self.http.headers.clone(), "headers"))?;
 
         let filters = build_warp_filter(
+            protocol,
             acknowledgements,
             log_namespace,
             cx.out,

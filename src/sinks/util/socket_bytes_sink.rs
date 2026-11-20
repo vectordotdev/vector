@@ -1,5 +1,5 @@
 use std::{
-    io::Error as IoError,
+    io::{Error as IoError, IoSlice},
     marker::Unpin,
     pin::Pin,
     task::{Context, Poll, ready},
@@ -12,7 +12,9 @@ use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector_lib::{
     finalization::{EventFinalizers, EventStatus},
-    internal_event::emit,
+    internal_event::{
+        ByteSize, InternalEventHandle, Registered, SinkNetworkBytesSent, emit, register,
+    },
     json_size::JsonSize,
 };
 
@@ -40,7 +42,7 @@ where
     T: AsyncWrite + Unpin,
 {
     #[pin]
-    inner: FramedWrite<T, BytesCodec>,
+    inner: FramedWrite<NetworkWriter<T>, BytesCodec>,
     shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
     state: State,
 }
@@ -55,7 +57,15 @@ where
         socket_mode: SocketMode,
     ) -> Self {
         Self {
-            inner: FramedWrite::new(inner, BytesCodec::new()),
+            inner: FramedWrite::new(
+                NetworkWriter {
+                    inner,
+                    bytes_sent: register(SinkNetworkBytesSent {
+                        protocol: socket_mode.as_str().into(),
+                    }),
+                },
+                BytesCodec::new(),
+            ),
             shutdown_check: Box::new(shutdown_check),
             state: State {
                 events_total: 0,
@@ -65,6 +75,54 @@ where
                 finalizers: Vec::new(),
             },
         }
+    }
+}
+
+/// Counts completed writes rather than buffered events or acknowledgements. A partial write is
+/// still network traffic when a later write/flush fails. TLS streams expose plaintext payload
+/// sizes here; record that approximation without claiming to include TLS or TCP overhead.
+struct NetworkWriter<T> {
+    inner: T,
+    bytes_sent: Registered<SinkNetworkBytesSent>,
+}
+
+impl<T: AsyncWrite + Unpin> AsyncWrite for NetworkWriter<T> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, IoError>> {
+        let this = self.get_mut();
+        let result = Pin::new(&mut this.inner).poll_write(cx, buf);
+        if let Poll::Ready(Ok(written)) = result {
+            this.bytes_sent.emit(ByteSize(written));
+        }
+        result
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<Result<usize, IoError>> {
+        let this = self.get_mut();
+        let result = Pin::new(&mut this.inner).poll_write_vectored(cx, bufs);
+        if let Poll::Ready(Ok(written)) = result {
+            this.bytes_sent.emit(ByteSize(written));
+        }
+        result
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), IoError>> {
+        Pin::new(&mut self.get_mut().inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), IoError>> {
+        Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
     }
 }
 
@@ -116,7 +174,7 @@ impl<T> Sink<EncodedEvent<Bytes>> for BytesSink<T>
 where
     T: AsyncWrite + Unpin,
 {
-    type Error = <FramedWrite<T, BytesCodec> as Sink<Bytes>>::Error;
+    type Error = IoError;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.as_mut().project().state.events_total >= MAX_PENDING_ITEMS
@@ -126,7 +184,7 @@ where
         }
 
         let inner = self.project().inner;
-        <FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
+        <FramedWrite<NetworkWriter<T>, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<Bytes>) -> Result<(), Self::Error> {
@@ -145,7 +203,7 @@ where
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let pinned = self.as_mut().project();
-        match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
+        match (pinned.shutdown_check)(&mut pinned.inner.get_mut().get_mut().inner) {
             ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
             ShutdownCheck::Close(reason) => {
                 if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
@@ -158,9 +216,9 @@ where
         }
 
         let inner = self.as_mut().project().inner;
-        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_flush(
-            inner, cx
-        ));
+        let result = ready!(
+            <FramedWrite<NetworkWriter<T>, BytesCodec> as Sink<Bytes>>::poll_flush(inner, cx)
+        );
         self.as_mut().get_mut().state.ack(match result {
             Ok(()) => EventStatus::Delivered,
             Err(_) => EventStatus::Errored,
@@ -170,10 +228,131 @@ where
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let inner = self.as_mut().project().inner;
-        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
-            inner, cx
-        ));
+        let result = ready!(
+            <FramedWrite<NetworkWriter<T>, BytesCodec> as Sink<Bytes>>::poll_close(inner, cx)
+        );
         self.as_mut().get_mut().state.ack(EventStatus::Dropped);
         Poll::Ready(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::io::AsyncWriteExt;
+
+    use super::*;
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+
+    struct FailingWriter {
+        wrote: bool,
+        used_vectored: bool,
+    }
+
+    impl AsyncWrite for FailingWriter {
+        fn poll_write_vectored(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            _bufs: &[IoSlice<'_>],
+        ) -> Poll<Result<usize, IoError>> {
+            let this = self.get_mut();
+            this.used_vectored = true;
+            Pin::new(this).poll_write(cx, &[])
+        }
+
+        fn is_write_vectored(&self) -> bool {
+            true
+        }
+
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &[u8],
+        ) -> Poll<Result<usize, IoError>> {
+            let this = self.get_mut();
+            if this.wrote {
+                Poll::Ready(Err(IoError::other("connection reset")))
+            } else {
+                this.wrote = true;
+                Poll::Ready(Ok(3))
+            }
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), IoError>> {
+            Poll::Ready(Err(IoError::other("flush failed")))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), IoError>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn network_writer_counts_partial_vectored_write_even_when_delivery_fails() {
+        trace_init();
+        let protocol = "network_vectored_writer_failure";
+        let mut writer = NetworkWriter {
+            inner: FailingWriter {
+                wrote: false,
+                used_vectored: false,
+            },
+            bytes_sent: register(SinkNetworkBytesSent {
+                protocol: protocol.into(),
+            }),
+        };
+        assert!(writer.is_write_vectored());
+        // Three accepted bytes span both buffers, not just the first IoSlice.
+        let buffers = [IoSlice::new(b"ab"), IoSlice::new(b"cdef")];
+        assert_eq!(writer.write_vectored(&buffers).await.unwrap(), 3);
+        assert!(writer.inner.used_vectored, "must forward vectored writes");
+        assert!(
+            writer
+                .write_vectored(&[IoSlice::new(b"def")])
+                .await
+                .is_err()
+        );
+        assert!(writer.flush().await.is_err());
+        assert_eq!(
+            counter_value_with_tags(
+                "component_sent_network_bytes_total",
+                &[("protocol", protocol)],
+            )
+            .to_bits(),
+            3.0_f64.to_bits(),
+        );
+        assert_eq!(
+            counter_value_with_tags("component_sent_bytes_total", &[("protocol", protocol)])
+                .to_bits(),
+            0.0_f64.to_bits(),
+        );
+    }
+
+    #[tokio::test]
+    async fn network_writer_counts_partial_write_even_when_delivery_fails() {
+        trace_init();
+        let protocol = "network_writer_failure";
+        let counter = || {
+            counter_value_with_tags(
+                "component_sent_network_bytes_total",
+                &[("protocol", protocol)],
+            )
+        };
+        let before = counter();
+        let mut writer = NetworkWriter {
+            inner: FailingWriter {
+                wrote: false,
+                used_vectored: false,
+            },
+            bytes_sent: register(SinkNetworkBytesSent {
+                protocol: protocol.into(),
+            }),
+        };
+        assert!(writer.write_all(b"some data").await.is_err());
+        assert!(writer.flush().await.is_err());
+        assert_eq!((counter() - before).to_bits(), 3.0_f64.to_bits());
+        assert_eq!(
+            counter_value_with_tags("component_sent_bytes_total", &[("protocol", protocol)])
+                .to_bits(),
+            0.0_f64.to_bits(),
+        );
     }
 }

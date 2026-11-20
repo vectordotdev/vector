@@ -1,10 +1,11 @@
 use std::fmt;
-use vector_lib::internal_event::emit;
+use vector_lib::internal_event::{SinkNetworkBytesSent, emit, register};
 
 use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
+use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use tracing::Instrument;
 use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
@@ -83,6 +84,13 @@ impl HttpClient {
 
             emit(AboutToSendHttpRequest { request: &request });
 
+            let protocol = request.uri().scheme_str().unwrap_or("http").to_owned();
+            let bytes_sent = register(SinkNetworkBytesSent {
+                protocol: protocol.into(),
+            });
+            let request = request
+                .map(|body| super::network::NetworkBody::new(body, bytes_sent).boxed_unsync());
+
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
             let roundtrip = before.elapsed();
@@ -136,12 +144,68 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use flate2::{Compression, write::GzEncoder};
     use http::{
         HeaderValue, Request,
         header::{ACCEPT_ENCODING, USER_AGENT},
     };
+    use tracing::Instrument;
+    use vector_http::full_body;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
 
-    use super::default_request_headers;
+    use super::{HttpClient, default_request_headers};
+    use crate::{config::ProxyConfig, test_util::metrics::counter_value_with_tags};
+
+    #[tokio::test]
+    async fn network_bytes_count_compressed_http_attempts_despite_error_status() {
+        crate::test_util::trace_init();
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/logs"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&vec![b'a'; 4096]).unwrap();
+        let compressed = bytes::Bytes::from(encoder.finish().unwrap());
+        let expected = f64::from(u32::try_from(compressed.len() * 2).unwrap());
+        let client = HttpClient::new(None.into(), &ProxyConfig::default()).unwrap();
+        let component = "network_http_error_status";
+        async {
+            for _ in 0..2 {
+                let request = Request::post(format!("{}/logs", server.uri()))
+                    .header("content-encoding", "gzip")
+                    .body(full_body(compressed.clone()))
+                    .unwrap();
+                let response = client.send(request).await.unwrap();
+                assert_eq!(response.status(), 500);
+            }
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_sent_network_bytes_total",
+                    &[("component_id", component), ("protocol", "http")],
+                )
+                .to_bits(),
+                expected.to_bits(),
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_sent_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
 
     #[test]
     fn default_request_headers_are_added() {
