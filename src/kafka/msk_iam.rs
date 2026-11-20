@@ -85,7 +85,8 @@ pub(crate) async fn spawn_credentials_cache(
 ) -> Result<CredentialsCache, MskIamError> {
     let initial = load_credentials(&provider, load_timeout).await?;
     let cache: CredentialsCache = Arc::new(Mutex::new(initial));
-    tokio::spawn(refresh_loop(provider, load_timeout, Arc::downgrade(&cache)));
+    // Keep the component's span so credential-refresh HTTP telemetry stays attributed to it.
+    crate::spawn_in_current_span(refresh_loop(provider, load_timeout, Arc::downgrade(&cache)));
     Ok(cache)
 }
 
@@ -528,6 +529,71 @@ mod tests {
         // No expiry -> loose cadence.
         assert_eq!(next_refresh(None, false), CRED_REFRESH_NO_EXPIRY);
         assert_eq!(next_refresh(None, true), CRED_REFRESH_NO_EXPIRY);
+    }
+
+    /// The refresher must run in the component's span, so the HTTP telemetry of credential
+    /// refreshes (STS/IMDS/profile) keeps its component labels like the initial load does.
+    #[test]
+    fn refresher_runs_in_the_component_span() {
+        use aws_credential_types::provider::{ProvideCredentials, future};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tracing::Instrument;
+
+        #[derive(Debug)]
+        struct SpanRecordingProvider {
+            calls: AtomicUsize,
+            spans: Arc<Mutex<Vec<Option<&'static str>>>>,
+        }
+        impl ProvideCredentials for SpanRecordingProvider {
+            fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+            where
+                Self: 'a,
+            {
+                self.spans.lock().unwrap().push(
+                    tracing::Span::current()
+                        .metadata()
+                        .map(tracing::Metadata::name),
+                );
+                // First load: 30s left, so the refresher reloads right away.
+                let ttl = if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    30
+                } else {
+                    3600
+                };
+                future::ProvideCredentials::ready(Ok(Credentials::new(
+                    ACCESS_KEY,
+                    SECRET_KEY,
+                    None,
+                    Some(SystemTime::now() + Duration::from_secs(ttl)),
+                    "test",
+                )))
+            }
+        }
+
+        let spans = Arc::new(Mutex::new(Vec::new()));
+        let provider = SharedCredentialsProvider::new(SpanRecordingProvider {
+            calls: AtomicUsize::new(0),
+            spans: Arc::clone(&spans),
+        });
+        tracing::subscriber::with_default(tracing_subscriber::registry(), || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .start_paused(true)
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let _cache = spawn_credentials_cache(provider, Duration::from_secs(5))
+                    .instrument(tracing::info_span!("kafka_component"))
+                    .await
+                    .expect("initial load");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            });
+        });
+        assert_eq!(
+            *spans.lock().unwrap(),
+            [Some("kafka_component"), Some("kafka_component")],
+            "initial load and refresh must both run in the component span"
+        );
     }
 
     /// Credentials that are already close to expiry must be replaced before they lapse, not after
