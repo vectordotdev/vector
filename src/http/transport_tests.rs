@@ -928,3 +928,40 @@ async fn https_via_tls_connect_proxy(#[case] client_kind: ClientKind) {
     assert_eq!(observations.len(), 1);
     assert_eq!(observations[0].method, Method::CONNECT);
 }
+
+/// A connect that stalls in the TLS handshake ends even without a request timeout, because
+/// [`HttpClient::new`] limits connection setup by default.
+/// <https://github.com/vectordotdev/vector/issues/27245>
+#[tokio::test]
+async fn new_client_limits_a_stalled_connect_by_default() {
+    // Accept the TCP connection and hold it open without ever answering the TLS handshake.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let accepted = tokio::spawn(async move { listener.accept().await.unwrap().0 });
+
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    let request = Request::get(format!("https://127.0.0.1:{port}/"))
+        .body(empty_body())
+        .unwrap();
+    let response = tokio::spawn(async move { client.send(request).await });
+
+    // The connect timer starts before the TCP connect, so once the connection is accepted,
+    // skipping past the default limit must end the stalled handshake.
+    let _server_side = accepted.await.unwrap();
+    tokio::time::pause();
+    tokio::time::advance(super::client::DEFAULT_CONNECT_TIMEOUT + Duration::from_secs(1)).await;
+    tokio::time::resume();
+
+    let error = timeout(Duration::from_secs(5), response)
+        .await
+        .expect("the default connect timeout should fail the request")
+        .unwrap()
+        .unwrap_err();
+    let timed_out = std::iter::successors(
+        Some(&error as &(dyn std::error::Error + 'static)),
+        |error| (*error).source(),
+    )
+    .filter_map(|error| error.downcast_ref::<std::io::Error>())
+    .any(|error| error.kind() == std::io::ErrorKind::TimedOut);
+    assert!(timed_out, "expected a timed out I/O error, got {error:?}");
+}

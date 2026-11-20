@@ -13712,6 +13712,7 @@ dependencies = [
  "openssl",
  "percent-encoding",
  "rand 0.10.3",
+ "socket2 0.6.5",
  "tokio",
  "tower 0.5.3",
  "tracing 0.1.44",
