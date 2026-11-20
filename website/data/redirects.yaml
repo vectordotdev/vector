@@ -1,7 +1,3 @@
-platforms:
-  - docker
-  - kubernetes
-
 sinks:
   - aws_sqs
   - aws_cloudwatch_logs
