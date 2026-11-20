@@ -24,6 +24,7 @@
     - [Generating sample logs](#generating-sample-logs)
 - [Benchmarking](#benchmarking)
 - [Profiling](#profiling)
+  - [hotpath](#hotpath)
 - [Domains](#domains)
   - [Kubernetes](#kubernetes)
     - [Architecture](#architecture)
@@ -490,6 +491,57 @@ cat stacks.folded | inferno-flamegraph > flamegraph.svg
 
 And that's it! You now have a flamegraph SVG file that can be opened and
 navigated in your favorite web browser.
+
+### hotpath
+
+Vector is instrumented with [hotpath](https://hotpath.rs), which prints a
+per-function report of timings and allocations when Vector exits. `hotpath` is
+an optional dependency: it is only compiled when you enable the `hotpath`
+(timing) or `hotpath-alloc` (timing and allocations) feature. Never add these
+features to `default`.
+
+Use a config whose sources finish (for example `demo_logs` with `count` set),
+so that Vector exits and writes the report:
+
+```sh
+cargo run --release --no-default-features \
+  --features "sources-demo_logs,transforms-remap,sinks-blackhole,tikv-jemallocator,hotpath-alloc" \
+  -- --config my_test_config.yaml
+```
+
+For long-running configs, set `HOTPATH_SHUTDOWN_MS` to exit after a fixed
+duration, or watch the live dashboard: install it with
+`cargo install hotpath --features=tui`, run `hotpath console`, and then start
+Vector with a `hotpath` feature in a second terminal.
+
+The `hotpath` features also sample the Tokio runtime metrics (workers, alive
+tasks, queue depths, busy time) and show them in the TUI **Tokio** tab. Set
+`HOTPATH_TOKIO_RUNTIME_INTERVAL_MS` to change the sampling interval (default
+1000). For the additional poll, steal, and blocking-pool metrics, build with
+`RUSTFLAGS="--cfg tokio_unstable"`.
+
+To instrument a function, gate the attribute on the feature, because the
+dependency is absent from normal builds:
+
+```rust
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+fn my_function() {}
+```
+
+The instrumented functions include `Remap::transform`, the transform `Runner`,
+the codec `Decoder` (source decoding) and `Encoder` (sink encoding), and the
+shared sink `encode_input` implementations. Crates other than `vector` (such as
+`codecs`) have their own `hotpath` features, which the root features enable.
+
+With a `hotpath` feature, the `remap` benchmark uses the hotpath Criterion
+adapter. Without one, it is a plain Criterion benchmark. To profile one
+benchmark for a fixed number of iterations:
+
+```sh
+cargo bench --bench remap --features remap-benches -- --list
+HOTPATH_CRITERION_ITERATIONS=10000 \
+  cargo bench --bench remap --features remap-benches,hotpath-alloc -- --test --exact remap/add_fields/remap
+```
 
 ## Domains
 

@@ -31,6 +31,7 @@ derive_more.workspace = true
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
+hotpath = { workspace = true, optional = true }
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
@@ -81,6 +82,8 @@ zstd = { workspace = true, features = ["zdict_builder"] }
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
+hotpath = ["dep:hotpath", "hotpath/hotpath"]
+hotpath-alloc = ["hotpath", "hotpath/hotpath-alloc"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []

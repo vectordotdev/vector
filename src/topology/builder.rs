@@ -1305,6 +1305,7 @@ impl Runner {
         }
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Runner"))]
     fn on_events_received(&mut self, events: &EventArray) {
         self.timer_tx.try_send_stop_wait();
 
@@ -1314,6 +1315,7 @@ impl Runner {
         ));
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Runner"))]
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
         self.timer_tx.try_send_start_wait();
         let now = Instant::now();

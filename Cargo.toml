@@ -193,6 +193,7 @@ futures = { version = "0.3.32", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.26.1", default-features = false, features = ["dnssec-ring"] }
+hotpath = { version = "0.30", features = ["hotpath-cpu"] }
 humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
@@ -516,6 +517,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps
 # make sure to update the external docs when the Lua version changes
 mlua = { workspace = true, features = ["macros"], optional = true }
 sysinfo = "0.37.2"
+hotpath = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading"] }
@@ -615,6 +617,10 @@ default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "ven
 default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# Opt-in hotpath profiling (https://hotpath.rs). Keep these out of `default`.
+hotpath = ["dep:hotpath", "hotpath/hotpath", "hotpath/tokio", "vector-lib/hotpath"]
+hotpath-alloc = ["hotpath", "hotpath/hotpath-alloc", "vector-lib/hotpath-alloc"]
 
 # VRL functions control features
 vrl-functions-env = ["vrl/enable_env_functions"]
@@ -1225,7 +1231,8 @@ dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
-remap-benches = ["transforms-remap"]
+# `hotpath?/criterion-0-8` only takes effect when a `hotpath` feature is also enabled.
+remap-benches = ["transforms-remap", "hotpath?/criterion-0-8"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]

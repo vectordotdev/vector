@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use criterion::BatchSize;
+#[cfg(not(feature = "hotpath"))]
+use criterion::{Criterion, criterion_group, criterion_main};
+#[cfg(feature = "hotpath")]
+use hotpath::criterion::{Criterion, criterion_group, criterion_main};
 use vector::{
     config::{DataType, TransformOutput},
     event::{Event, LogEvent, Value},
@@ -16,10 +20,14 @@ criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
     // https://github.com/vectordotdev/vector/issues/5394
-    config = Criterion::default().noise_threshold(0.02);
+    config = criterion::Criterion::default().noise_threshold(0.02);
     targets = benchmark_remap
 );
+#[cfg(not(feature = "hotpath"))]
 criterion_main!(benches);
+// The vector library declares the global allocator, so hotpath must not install its own.
+#[cfg(feature = "hotpath")]
+criterion_main!(allocator = none; benches);
 
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(

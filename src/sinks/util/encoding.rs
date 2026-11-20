@@ -26,6 +26,10 @@ pub trait Encoder<T> {
 }
 
 impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) {
+    #[cfg_attr(
+        feature = "hotpath",
+        hotpath::measure(label = "vector::sinks::util::encoding::encode_input<Framer>")
+    )]
     fn encode_input(
         &self,
         events: Vec<Event>,
@@ -78,6 +82,10 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
 }
 
 impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
+    #[cfg_attr(
+        feature = "hotpath",
+        hotpath::measure(label = "vector::sinks::util::encoding::encode_input<()>")
+    )]
     fn encode_input(
         &self,
         mut event: Event,
@@ -100,6 +108,10 @@ impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
 
 #[cfg(feature = "codecs-arrow")]
 impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
+    #[cfg_attr(
+        feature = "hotpath",
+        hotpath::measure(label = "vector::sinks::util::encoding::encode_input<BatchEncoder>")
+    )]
     fn encode_input(
         &self,
         events: Vec<Event>,

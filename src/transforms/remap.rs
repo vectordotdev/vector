@@ -587,6 +587,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Remap"))]
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
@@ -596,6 +597,7 @@ impl<Runner> SyncTransform for Remap<Runner>
 where
     Runner: VrlRunner + Clone + Send + Sync,
 {
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Remap"))]
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the

@@ -88,6 +88,7 @@ impl Decoder {
     /// # Errors
     ///
     /// Returns a parsing error if the deserializer cannot parse the frame into events.
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Decoder"))]
     pub fn deserializer_parse(&self, frame: Bytes) -> Result<DecodedFrame, Error> {
         let byte_size = frame.len();
 
@@ -106,11 +107,13 @@ impl tokio_util::codec::Decoder for Decoder {
     type Item = DecodedFrame;
     type Error = Error;
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Decoder"))]
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let frame = self.framer.decode(buf);
         self.handle_framing_result(frame)
     }
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Decoder"))]
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let frame = self.framer.decode_eof(buf);
         self.handle_framing_result(frame)

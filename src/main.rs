@@ -13,6 +13,10 @@ use vector::{app::Application, extra_context::ExtraContext};
     reason = "Preserve low-byte exit status"
 )]
 fn main() -> ExitCode {
+    // Writes the hotpath report on drop.
+    #[cfg(feature = "hotpath")]
+    let _hotpath = hotpath::HotpathGuardBuilder::new("vector::main").build();
+
     #[cfg(all(unix, feature = "tikv-jemallocator"))]
     {
         use std::sync::atomic::Ordering;
@@ -58,6 +62,10 @@ fn main() -> ExitCode {
     reason = "Preserve low-byte exit status"
 )]
 fn main() -> ExitCode {
+    // Writes the hotpath report on drop.
+    #[cfg(feature = "hotpath")]
+    let _hotpath = hotpath::HotpathGuardBuilder::new("vector::main").build();
+
     // We need to be able to run vector in User Interactive mode. We first try
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See

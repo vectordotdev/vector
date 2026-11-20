@@ -38,12 +38,30 @@ pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
 
-#[cfg(all(unix, feature = "tikv-jemallocator"))]
+#[cfg(all(unix, feature = "tikv-jemallocator", not(feature = "hotpath-alloc")))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
         tikv_jemallocator::Jemalloc,
     );
+
+// hotpath allocation tracking wraps the regular allocator, so `--allocation-tracing` keeps working.
+#[cfg(all(unix, feature = "tikv-jemallocator", feature = "hotpath-alloc"))]
+#[global_allocator]
+static ALLOC: hotpath::CountingAllocator<
+    self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc>,
+> = hotpath::CountingAllocator::with(
+    self::internal_telemetry::allocations::get_grouped_tracing_allocator(
+        tikv_jemallocator::Jemalloc,
+    ),
+);
+
+#[cfg(all(
+    feature = "hotpath-alloc",
+    not(all(unix, feature = "tikv-jemallocator"))
+))]
+#[global_allocator]
+static ALLOC: hotpath::CountingAllocator = hotpath::CountingAllocator::new();
 
 #[allow(unreachable_pub)]
 pub mod internal_telemetry;

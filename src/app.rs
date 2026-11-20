@@ -187,6 +187,10 @@ impl Application {
         let (runtime, app) =
             Self::prepare_start(extra_context).unwrap_or_else(|code| std::process::exit(code));
 
+        // Samples the Tokio runtime metrics (workers, queues, scheduling) for the hotpath report.
+        #[cfg(feature = "hotpath")]
+        hotpath::tokio_runtime!(runtime.handle());
+
         runtime.block_on(app.run())
     }
 

@@ -103,6 +103,7 @@ impl BatchEncoder {
 impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     type Error = Error;
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "BatchEncoder"))]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match &mut self.serializer {
             BatchSerializer::Arrow(serializer) => {
@@ -187,6 +188,7 @@ where
     }
 
     /// Serialize the event without applying framing, at the start of the provided buffer.
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Encoder"))]
     fn serialize_at_start(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         self.serializer.encode(event, buffer).map_err(|error| {
             emit(EncoderSerializeError { error: &error });
@@ -301,6 +303,7 @@ impl Encoder<()> {
 impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
     type Error = Error;
 
+    #[cfg_attr(feature = "hotpath", hotpath::measure(impl_type = "Encoder"))]
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let len = buffer.len();
         let mut payload = buffer.split_off(len);
