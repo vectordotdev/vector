@@ -18,6 +18,7 @@ pub struct ReadyFrames<T, U, E> {
     enqueued_size: usize,
     error_slot: Option<E>,
     enqueued_limit: usize,
+    inner_pending: bool,
 }
 
 impl<T, U, E> ReadyFrames<T, U, E>
@@ -43,6 +44,7 @@ where
             enqueued_size: 0,
             error_slot: None,
             enqueued_limit: cap,
+            inner_pending: false,
         }
     }
 
@@ -54,6 +56,16 @@ where
     /// Returns a mutable reference to the underlying stream.
     pub const fn get_mut(&mut self) -> &mut T {
         &mut self.inner
+    }
+
+    /// Returns `true` if the last poll ended because the underlying stream returned
+    /// `Poll::Pending`.
+    ///
+    /// In that case the underlying stream had no more items ready, and it will only produce more
+    /// after it wakes the task again. Otherwise (for example, when the last chunk was cut at the
+    /// capacity), the underlying stream may still have items ready.
+    pub const fn is_inner_pending(&self) -> bool {
+        self.inner_pending
     }
 
     fn flush(&mut self) -> (Vec<U>, usize) {
@@ -73,6 +85,8 @@ where
     type Item = Result<(Vec<U>, usize), E>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.inner_pending = false;
+
         if let Some(error) = self.error_slot.take() {
             return Poll::Ready(Some(Err(error)));
         }
@@ -100,6 +114,7 @@ where
                     return Poll::Ready(Some(Ok(self.flush())));
                 }
                 Poll::Pending => {
+                    self.inner_pending = true;
                     if self.enqueued.is_empty() {
                         return Poll::Pending;
                     }
@@ -171,6 +186,38 @@ mod test {
         assert_eq!(Poll::Ready(Some(Ok((vec!["foo"], 7)))), poll!(rf.next()));
         assert_eq!(Poll::Ready(Some(Err("oops"))), poll!(rf.next()));
         assert_eq!(Poll::Pending, poll!(rf.next()));
+    }
+
+    #[tokio::test]
+    async fn reports_when_inner_is_pending() {
+        let (mut tx, rx) = mpsc::channel::<Result<(&str, usize), &str>>(5);
+        let mut rf = ReadyFrames::with_capacity(rx, 2);
+        assert!(!rf.is_inner_pending());
+
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+        assert!(rf.is_inner_pending());
+
+        // A chunk cut at the capacity leaves items in the inner stream.
+        tx.send(Ok(("foo", 1))).await.unwrap();
+        tx.send(Ok(("bar", 2))).await.unwrap();
+        tx.send(Ok(("baz", 3))).await.unwrap();
+        assert_eq!(
+            Poll::Ready(Some(Ok((vec!["foo", "bar"], 3)))),
+            poll!(rf.next())
+        );
+        assert!(!rf.is_inner_pending());
+
+        // A chunk that ends because the inner stream has nothing more ready.
+        assert_eq!(Poll::Ready(Some(Ok((vec!["baz"], 3)))), poll!(rf.next()));
+        assert!(rf.is_inner_pending());
+
+        // A chunk that ends at an error leaves the error to be returned next.
+        tx.send(Ok(("foo", 4))).await.unwrap();
+        tx.send(Err("oops")).await.unwrap();
+        assert_eq!(Poll::Ready(Some(Ok((vec!["foo"], 4)))), poll!(rf.next()));
+        assert!(!rf.is_inner_pending());
+        assert_eq!(Poll::Ready(Some(Err("oops"))), poll!(rf.next()));
+        assert!(!rf.is_inner_pending());
     }
 
     #[tokio::test]

@@ -267,6 +267,18 @@ impl<S> MaybeTlsIncomingStream<S> {
         }
     }
 
+    pub const fn ssl_stream_mut(&mut self) -> Option<&mut SslStream<S>> {
+        use super::MaybeTls;
+
+        match &mut self.state {
+            StreamState::Accepted(stream) => match stream {
+                MaybeTls::Raw(_) => None,
+                MaybeTls::Tls(s) => Some(s),
+            },
+            StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,
+        }
+    }
+
     pub fn get_mut(&mut self) -> Option<&mut S> {
         use super::MaybeTls;
 
