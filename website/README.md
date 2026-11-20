@@ -89,9 +89,9 @@ vector.dev uses two different icon sets for different purposes:
 
 ### Redirects
 
-Redirects for vector.dev are defined in three difference places (depending on the use):
+Redirects for vector.dev are defined in two places (depending on the use):
 
-1. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
+1. Splat-style redirects (which can't be defined as Hugo aliases) are generated into `_redirects` by [`layouts/index.redirects`](./layouts/index.redirects), using the integration guide lists in [`data/redirects.yaml`](./data/redirects.yaml).
 2. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
 
 ### Link checking
