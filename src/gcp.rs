@@ -11,7 +11,10 @@ use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
 };
-use google_cloud_auth::credentials::{AccessTokenCredentials, external_account};
+use google_cloud_auth::{
+    credentials::{AccessTokenCredentials, external_account},
+    errors::CredentialsError,
+};
 use http::{Uri, header::AUTHORIZATION, uri::PathAndQuery};
 use http_body_util::{BodyExt as _, Collected};
 use smpl_jwt::Jwt;
@@ -69,10 +72,8 @@ pub enum GcpError {
     BuildExternalAccount {
         source: google_cloud_auth::build_errors::Error,
     },
-    #[snafu(display("Failed to get GCP external account token: {}", error_chain(source)))]
-    GetExternalAccountToken {
-        source: google_cloud_auth::errors::CredentialsError,
-    },
+    #[snafu(display("Failed to get GCP external account token: {reason}"))]
+    GetExternalAccountToken { reason: String },
 }
 
 /// Configuration for GCP credentials and authentication.
@@ -400,7 +401,10 @@ impl ExternalAccount {
                 if !error.is_transient() {
                     *self.creds.write().unwrap() = Self::build(&self.json, &self.scope)?;
                 }
-                return Err(GcpError::GetExternalAccountToken { source: error }.into());
+                return Err(GcpError::GetExternalAccountToken {
+                    reason: token_error_reason(&error),
+                }
+                .into());
             }
         };
         Ok(FetchedToken {
@@ -425,37 +429,22 @@ impl From<Token> for FetchedToken {
     }
 }
 
-/// `google-cloud-auth` errors leave the underlying reason (e.g. the STS response) out of their
-/// `Display`, so include the whole source chain, with embedded payloads redacted.
-fn error_chain(error: &dyn std::error::Error) -> String {
-    std::iter::successors(Some(error), |error| error.source())
-        .map(|error| redact_body(&error.to_string()))
-        .collect::<Vec<_>>()
-        .join(": ")
-}
-
-/// SDK messages embed raw payloads as `body=<...>`, which can be a subject token file. Keep only
-/// the fields of an OAuth error response (e.g. from STS) and redact anything else.
-fn redact_body(message: &str) -> String {
-    let Some((head, rest)) = message.split_once("body=<") else {
-        return message.to_owned();
+/// Describes a token error without the SDK's messages, which can contain credential payloads,
+/// signed URLs or credential helper output.
+fn token_error_reason(error: &CredentialsError) -> String {
+    let status = std::iter::successors(Some(error as &dyn std::error::Error), |error| {
+        error.source()
+    })
+    .find_map(|error| error.downcast_ref::<reqwest::Error>()?.status());
+    let hint = if error.is_transient() {
+        "will retry"
+    } else {
+        "check the credentials configuration"
     };
-    // Run to the last `>` so nothing from the payload survives past the redaction.
-    let (body, tail) = rest.rsplit_once('>').unwrap_or((rest, ""));
-    let body = serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .filter(|json| json.get("error").is_some())
-        .map_or_else(
-            || "redacted".to_owned(),
-            |json| {
-                serde_json::json!({
-                    "error": json["error"],
-                    "error_description": json["error_description"],
-                })
-                .to_string()
-            },
-        );
-    format!("{head}body=<{body}>{tail}")
+    match status {
+        Some(status) => format!("HTTP {status}; {hint}"),
+        None => hint.to_owned(),
+    }
 }
 
 /// Returns the parsed credentials file if it holds Workload Identity Federation
@@ -646,8 +635,8 @@ mod tests {
             .await
             .expect_err("build should fail when STS rejects the subject token");
         assert!(
-            error.to_string().contains("invalid_target"),
-            "error should include the STS reason: {error}"
+            error.to_string().contains("HTTP 400 Bad Request"),
+            "error should include the STS status: {error}"
         );
         let requests = sts.received_requests().await.unwrap();
         assert_eq!(requests.len(), 1, "build should fail on the STS exchange");
@@ -733,8 +722,36 @@ mod tests {
             .expect_err("build should fail to read the subject token");
 
         let message = error.to_string();
-        assert!(message.contains("id_token_typo"), "{message}");
         assert!(!message.contains(SUBJECT_TOKEN), "{message}");
+    }
+
+    #[tokio::test]
+    async fn external_account_errors_do_not_leak_credential_url() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&server)
+            .await;
+        // A URL-sourced subject token, e.g. from a signed URL.
+        let creds = serde_json::json!({
+            "type": "external_account",
+            "audience": "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/pool/providers/provider",
+            "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+            "token_url": format!("{}/v1/token", server.uri()),
+            "credential_source": {
+                "url": format!("{}/subject-token?signature=SECRET_SIGNATURE", server.uri()),
+            },
+        });
+        let mut creds_file = NamedTempFile::new().unwrap();
+        write!(creds_file, "{creds}").unwrap();
+
+        let error = build_auth_from_file(&creds_file)
+            .await
+            .expect_err("build should fail to fetch the subject token");
+
+        let message = error.to_string();
+        assert!(message.contains("HTTP 403 Forbidden"), "{message}");
+        assert!(!message.contains("SECRET_SIGNATURE"), "{message}");
     }
 
     const SUBJECT_TOKEN: &str = "oidc-subject-token";
