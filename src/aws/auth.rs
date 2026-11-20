@@ -222,9 +222,7 @@ impl AwsAuthentication {
             }
             | AwsAuthentication::Default {
                 load_timeout_secs, ..
-            } => load_timeout_secs
-                .map(Duration::from_secs)
-                .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+            } => load_timeout_secs.map_or(DEFAULT_LOAD_TIMEOUT, Duration::from_secs),
             _ => DEFAULT_LOAD_TIMEOUT,
         }
     }

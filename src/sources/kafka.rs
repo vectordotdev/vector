@@ -1520,10 +1520,12 @@ mod test {
     fn source_context_enables_and_forwards_oauth_refresh() {
         use rdkafka::ClientContext;
 
-        assert!(
-            <KafkaSourceContext as ClientContext>::ENABLE_REFRESH_OAUTH_TOKEN,
-            "source context must enable the OAUTHBEARER refresh callback"
-        );
+        const {
+            assert!(
+                <KafkaSourceContext as ClientContext>::ENABLE_REFRESH_OAUTH_TOKEN,
+                "source context must enable the OAUTHBEARER refresh callback"
+            );
+        }
 
         // With no MSK creds, the call must surface OUR error (proving it delegates to the inner
         // KafkaStatisticsContext) rather than rdkafka's default "must be overridden" error.

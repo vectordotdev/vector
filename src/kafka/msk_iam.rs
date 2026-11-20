@@ -4,7 +4,7 @@
 //! portable path is SASL/OAUTHBEARER, where the OAuth token is a SigV4-presigned URL for the
 //! `kafka-cluster:Connect` action, base64url-encoded. This is a port of the official
 //! `aws-msk-iam-sasl-signer-go` `constructAuthToken`; correctness is proven offline in the tests
-//! below against an independent SigV4 oracle (fixed inputs -> known-answer signature).
+//! below against an independent `SigV4` oracle (fixed inputs -> known-answer signature).
 //!
 //! Token minting is fully synchronous: `build_token` only signs (no I/O, no async). AWS credential
 //! resolution — the one async step — is done ahead of time and cached in an `Arc<Mutex<Credentials>>`
@@ -12,6 +12,7 @@
 //! `block_on`, which is essential because for the source it is invoked while the `StreamConsumer` is
 //! polled *inside* the tokio runtime, where nested blocking would panic.
 
+use std::fmt::Write as _;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -35,11 +36,11 @@ const ACTION: &str = "kafka-cluster:Connect";
 const USER_AGENT: &str = concat!("vector-msk-iam-signer/", env!("CARGO_PKG_VERSION"));
 
 /// Refresh cached credentials this long before they expire.
-const CRED_REFRESH_SKEW: Duration = Duration::from_secs(5 * 60);
+const CRED_REFRESH_SKEW: Duration = Duration::from_mins(5);
 /// Floor for the refresh sleep, so a near-expired/expired credential doesn't spin.
-const CRED_REFRESH_MIN: Duration = Duration::from_secs(60);
+const CRED_REFRESH_MIN: Duration = Duration::from_mins(1);
 /// Cadence used when credentials advertise no expiry (e.g. static keys).
-const CRED_REFRESH_NO_EXPIRY: Duration = Duration::from_secs(15 * 60);
+const CRED_REFRESH_NO_EXPIRY: Duration = Duration::from_mins(15);
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -110,10 +111,10 @@ async fn refresh_loop(
 
         let Some(cache) = weak.upgrade() else { break };
         // On failure/timeout keep the previous credentials and retry on the next iteration.
-        if let Ok(fresh) = load_credentials(&provider, load_timeout).await {
-            if let Ok(mut guard) = cache.lock() {
-                *guard = fresh;
-            }
+        if let Ok(fresh) = load_credentials(&provider, load_timeout).await
+            && let Ok(mut guard) = cache.lock()
+        {
+            *guard = fresh;
         }
     }
 }
@@ -170,10 +171,13 @@ pub(crate) fn build_token(
         Some(cred_expiry) if cred_expiry < token_expiry => cred_expiry,
         _ => token_expiry,
     };
-    let lifetime_ms = effective_expiry
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64;
+    let lifetime_ms = i64::try_from(
+        effective_expiry
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis(),
+    )
+    .unwrap_or(i64::MAX);
     Ok(MskAuthToken { token, lifetime_ms })
 }
 
@@ -197,15 +201,20 @@ fn presign(
         .time(time)
         .settings(settings)
         .build()
-        .map_err(|e| MskIamError::SigningParams { source: Box::new(e) })?;
+        .map_err(|e| MskIamError::SigningParams {
+            source: Box::new(e),
+        })?;
 
     let url = format!("https://{host}/?Action={}", rfc3986(ACTION));
     let headers = [("host", host)];
     let signable = SignableRequest::new("GET", &url, headers.into_iter(), SignableBody::Bytes(&[]))
-        .map_err(|e| MskIamError::Signing { source: Box::new(e) })?;
+        .map_err(|e| MskIamError::Signing {
+            source: Box::new(e),
+        })?;
 
-    let output = sign(signable, &signing_params.into())
-        .map_err(|e| MskIamError::Signing { source: Box::new(e) })?;
+    let output = sign(signable, &signing_params.into()).map_err(|e| MskIamError::Signing {
+        source: Box::new(e),
+    })?;
     let (instructions, _signature) = output.into_parts();
 
     // `params()` yields DECODED (name, value) pairs. They must be re-encoded with the exact RFC3986
@@ -221,15 +230,15 @@ fn presign(
     Ok(final_url)
 }
 
-/// RFC3986 percent-encoding matching AWS SigV4 canonicalization (unreserved = A-Za-z0-9-_.~).
+/// RFC3986 percent-encoding matching AWS `SigV4` canonicalization (unreserved = A-Za-z0-9-_.~).
 fn rfc3986(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
+                out.push(b as char);
             }
-            _ => out.push_str(&format!("%{b:02X}")),
+            _ => write!(out, "%{b:02X}").expect("writing to a String cannot fail"),
         }
     }
     out
@@ -301,14 +310,21 @@ mod tests {
     #[test]
     fn full_presigned_url_matches_oracle() {
         let url = presign(&region(), HOST, &creds(true), fixed_time()).expect("presign");
-        assert_eq!(normalize(&url), normalize(ORACLE_URL_WITH_TOKEN), "url={url}");
+        assert_eq!(
+            normalize(&url),
+            normalize(ORACLE_URL_WITH_TOKEN),
+            "url={url}"
+        );
     }
 
     /// KNOWN-ANSWER: aws-sigv4 signature must equal the oracle's, with a session token present.
     #[test]
     fn signature_matches_oracle_with_session_token() {
         let url = presign(&region(), HOST, &creds(true), fixed_time()).expect("presign");
-        assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_WITH_TOKEN));
+        assert_eq!(
+            query_param(&url, "X-Amz-Signature"),
+            Some(GOLDEN_SIG_WITH_TOKEN)
+        );
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), Some("IQoJb3Jp"));
     }
 
@@ -316,7 +332,10 @@ mod tests {
     #[test]
     fn signature_matches_oracle_without_session_token() {
         let url = presign(&region(), HOST, &creds(false), fixed_time()).expect("presign");
-        assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_NO_TOKEN));
+        assert_eq!(
+            query_param(&url, "X-Amz-Signature"),
+            Some(GOLDEN_SIG_NO_TOKEN)
+        );
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), None);
     }
 
@@ -326,7 +345,10 @@ mod tests {
         let url = presign(&region(), HOST, &creds(false), fixed_time()).expect("presign");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert_eq!(query_param(&url, "Action"), Some("kafka-cluster%3AConnect"));
-        assert_eq!(query_param(&url, "X-Amz-Algorithm"), Some("AWS4-HMAC-SHA256"));
+        assert_eq!(
+            query_param(&url, "X-Amz-Algorithm"),
+            Some("AWS4-HMAC-SHA256")
+        );
         assert_eq!(query_param(&url, "X-Amz-Expires"), Some("900"));
         assert_eq!(query_param(&url, "X-Amz-SignedHeaders"), Some("host"));
         assert_eq!(
@@ -341,12 +363,17 @@ mod tests {
     fn build_token_encodes_and_sets_lifetime() {
         let out = build_token(&region(), HOST, &creds(false), fixed_time()).expect("token");
         assert!(!out.token.contains('='), "token must be unpadded base64url");
-        let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).expect("decode");
+        let decoded = URL_SAFE_NO_PAD
+            .decode(out.token.as_bytes())
+            .expect("decode");
         let url = String::from_utf8(decoded).expect("utf8");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert!(url.ends_with(&format!("&User-Agent={USER_AGENT}")));
         assert!(url.contains(GOLDEN_SIG_NO_TOKEN));
-        assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 900_000);
+        assert_eq!(
+            out.lifetime_ms,
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 900_000
+        );
     }
 
     #[test]
@@ -386,7 +413,10 @@ mod tests {
             "test",
         );
         let out = build_token(&region(), HOST, &creds, fixed_time()).expect("token");
-        assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 300_000);
+        assert_eq!(
+            out.lifetime_ms,
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 300_000
+        );
 
         // Credentials outliving the window -> full 900s.
         let long = Credentials::new(
@@ -397,7 +427,10 @@ mod tests {
             "test",
         );
         let out = build_token(&region(), HOST, &long, fixed_time()).expect("token");
-        assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 900_000);
+        assert_eq!(
+            out.lifetime_ms,
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 900_000
+        );
     }
 
     /// The cache path: resolve via a static provider, then mint a token from the cached credentials.
@@ -438,7 +471,10 @@ mod tests {
         let err = spawn_credentials_cache(provider, Duration::from_secs(5))
             .await
             .expect_err("must time out");
-        assert!(matches!(err, MskIamError::CredentialsTimeout { .. }), "got: {err}");
+        assert!(
+            matches!(err, MskIamError::CredentialsTimeout { .. }),
+            "got: {err}"
+        );
     }
 
     #[test]
