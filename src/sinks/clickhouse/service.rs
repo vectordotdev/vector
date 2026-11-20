@@ -19,8 +19,7 @@ use crate::{
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpResponse, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpResponse, HttpServiceRequestBuilder, RetryStrategy},
             retries::RetryAction,
         },
     },
@@ -121,7 +120,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
         let mut request = builder.body(payload).map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)

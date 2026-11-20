@@ -11,7 +11,7 @@ use http::{
     uri::Scheme,
 };
 use http_body_util::BodyExt as _;
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use tokio::sync::Mutex;
@@ -27,6 +27,7 @@ use vector_lib::{
     config::{LogNamespace, SourceOutput, proxy::ProxyConfig},
     configurable::configurable_component,
     event::Event,
+    internal_event::emit,
     json_size::JsonSize,
     shutdown::ShutdownSignal,
     tls::TlsConfig,
@@ -222,7 +223,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
 
             let body = body.collect().await?.to_bytes();
 
-            emit!(EndpointBytesReceived {
+            emit(EndpointBytesReceived {
                 byte_size: body.len(),
                 protocol: "http",
                 endpoint: &url,
@@ -251,7 +252,7 @@ fn handle_response(
                 events.estimated_json_encoded_size_of()
             };
 
-            emit!(HttpClientEventsReceived {
+            emit(HttpClientEventsReceived {
                 byte_size,
                 count: events.len(),
                 url,
@@ -266,14 +267,14 @@ fn handle_response(
             Some(stream::iter(events))
         }
         Ok((header, _, _)) => {
-            emit!(HttpClientHttpResponseError {
+            emit(HttpClientHttpResponseError {
                 code: header.status,
                 url,
             });
             None
         }
         Err(error) => {
-            emit!(HttpClientHttpError { error, url });
+            emit(HttpClientHttpError { error, url });
             None
         }
     }
@@ -306,14 +307,14 @@ async fn run(
     )
     .build()
     .inspect_err(|e| {
-        emit!(DecoderDeserializeError { error: e });
+        emit(DecoderDeserializeError { error: e });
     })?;
 
     let client = HttpClient::new(tls.into(), &proxy).map_err(|e| {
         let error: Arc<dyn std::error::Error + Send + Sync> = Arc::from(e);
-        emit!(HttpClientHttpError {
+        emit(HttpClientHttpError {
             error: Box::new(Arc::clone(&error)),
-            url: url.to_string()
+            url: url.to_string(),
         });
         crate::Error::from(error)
     })?;
@@ -343,7 +344,7 @@ async fn run(
                             let mut request = match Request::get(&url).body(empty_body()) {
                                 Ok(request) => request,
                                 Err(e) => {
-                                    emit!(HttpClientHttpError {
+                                    emit(HttpClientHttpError {
                                         error: e.into(),
                                         url: url.clone(),
                                     });
@@ -390,7 +391,7 @@ async fn run(
         }
         Err(error) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
             Err(error.into())
         }
     }

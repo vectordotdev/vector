@@ -16,6 +16,11 @@ pub struct Cli {
     /// Defaults to the next minor after the latest git tag.
     #[arg(long)]
     version: Option<Version>,
+
+    /// Allow removal before the default two-minor-version migration window.
+    /// Use only for a policy exception.
+    #[arg(long)]
+    allow_early_removal: bool,
 }
 
 impl Cli {
@@ -40,7 +45,7 @@ impl Cli {
             Version::new(latest.major, latest.minor + 1, 0)
         };
 
-        let dest = deprecation::enact(&repo_root, &filename, &version)?;
+        let dest = deprecation::enact(&repo_root, &filename, &version, self.allow_early_removal)?;
         println!(
             "Moved {}/{filename} to {} (removed in {version})",
             deprecation::DEPRECATION_DIR,

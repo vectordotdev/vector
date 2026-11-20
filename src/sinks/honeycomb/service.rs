@@ -5,10 +5,11 @@ use snafu::ResultExt;
 
 use super::config::HTTP_HEADER_HONEYCOMB;
 use crate::sinks::{
-    HTTPV1RequestBuilderSnafu,
+    HTTPRequestBuilderSnafu,
     util::{
-        HttpEndpoint, buffer::compression::Compression, http::HttpRequest,
-        http_v1::HttpServiceRequestBuilder,
+        HttpEndpoint,
+        buffer::compression::Compression,
+        http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
 #[derive(Clone, derive_more::Debug)]
@@ -32,7 +33,7 @@ impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
 
         builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)
     }
 }

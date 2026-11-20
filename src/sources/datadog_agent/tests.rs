@@ -14,7 +14,7 @@ use vector_lib::codecs::decoding::framing::OversizedAction;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
-use http_0::HeaderMap;
+use http::HeaderMap;
 use indoc::indoc;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -30,7 +30,7 @@ use vector_lib::{
     },
     config::{DataType, LogNamespace},
     event::{MetricTags, metric::TagValue},
-    lookup::{OwnedTargetPath, owned_value_path},
+    lookup::{OwnedTargetPath, owned_value_path, path},
     metric_tags,
 };
 use vrl::{compiler::value::Collection, value, value::Kind};
@@ -49,8 +49,9 @@ use crate::{
     schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        APM_STATS, DatadogAgentConfig, DatadogAgentSource, LLMOBS, LOGS, LogMsg, METRICS, TRACES,
+        ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, default_max_trace_expansion_bytes,
+        logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -70,7 +71,7 @@ use crate::{
     test_util::{mock::basic_sink, start_topology},
 };
 
-use crate::sources::datadog_agent::llmobs::decode_llmobs_body;
+use crate::sources::datadog_agent::{apm_stats::build_apm_stats_event, llmobs::decode_llmobs_body};
 
 const DD_API_KEY: &str = "12345678abcdefgh12345678abcdefgh";
 const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
@@ -1449,9 +1450,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
         serde_yaml::from_str::<DatadogAgentConfig>(&format!(
             r#"
                 address: "{dd_addr}"
-                disable_logs: true
-                disable_metrics: true
-                disable_llmobs: true
+                enabled_data_types: ["traces"]
                 multiple_outputs: true
             "#
         ))
@@ -1642,7 +1641,7 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
         );
 
         let events = crate::test_util::collect_ready(rx);
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = Controller::get().unwrap().capture_metrics();
         let errors = metrics
@@ -1659,8 +1658,218 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
     .await;
 }
 
+fn idx_strings(values: &[&str]) -> Vec<String> {
+    std::iter::once(String::new())
+        .chain(values.iter().map(|value| (*value).to_owned()))
+        .collect()
+}
+
+fn idx_ref(values: &[&str], value: &str) -> u32 {
+    u32::try_from(
+        values
+            .iter()
+            .position(|candidate| *candidate == value)
+            .unwrap()
+            + 1,
+    )
+    .unwrap()
+}
+
+fn idx_only_agent_payload() -> ddtrace_proto::AgentPayload {
+    let names = [
+        "an_id",
+        "plop",
+        "a_service",
+        "a_name",
+        "a_resource",
+        "a_type",
+    ];
+    ddtrace_proto::AgentPayload {
+        host_name: "a_hostname".to_owned(),
+        env: "env".to_owned(),
+        agent_version: "v1.23456".to_owned(),
+        target_tps: 10.0,
+        error_tps: 10.0,
+        idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+            strings: idx_strings(&names),
+            container_id_ref: idx_ref(&names, "an_id"),
+            language_name_ref: idx_ref(&names, "plop"),
+            chunks: vec![ddtrace_proto::idx::TraceChunk {
+                priority: 42,
+                trace_id: ddtrace_proto::idx::join_trace_id(0, 123).to_vec(),
+                spans: vec![ddtrace_proto::idx::Span {
+                    service_ref: idx_ref(&names, "a_service"),
+                    name_ref: idx_ref(&names, "a_name"),
+                    resource_ref: idx_ref(&names, "a_resource"),
+                    type_ref: idx_ref(&names, "a_type"),
+                    span_id: 456,
+                    parent_id: 789,
+                    start: 1_431_648_000_000_001,
+                    duration: 1_000_000_000,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+}
+
 #[tokio::test]
-async fn decode_traces_idx_only_payload_emits_error() {
+async fn decode_traces_idx_only_payload() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let mut buf = Vec::new();
+        idx_only_agent_payload().encode(&mut buf).unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH)
+                        .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        let start = Value::from(Utc.timestamp_nanos(1_431_648_000_000_001));
+        assert_eq!(
+            events[0].metadata().trace_layout(),
+            Some(TraceLayout::Datadog)
+        );
+        assert_eq!(
+            events[0].metadata().datadog_api_key().as_deref().unwrap(),
+            DD_API_KEY
+        );
+        assert_eq!(
+            Value::Object(events[0].as_trace().as_map().clone()),
+            value!({
+                "host": "a_hostname",
+                "env": "env",
+                "source_type": "datadog_agent",
+                "payload_version": "v2",
+                "agent_version": "v1.23456",
+                "target_tps": 10.0,
+                "error_tps": 10.0,
+                "priority": 42,
+                "origin": "",
+                "dropped": false,
+                "tags": {},
+                "container_id": "an_id",
+                "language_name": "plop",
+                "language_version": "",
+                "tracer_version": "",
+                "runtime_id": "",
+                "app_version": "",
+                "spans": [{
+                    "service": "a_service",
+                    "name": "a_name",
+                    "resource": "a_resource",
+                    "trace_id": 123,
+                    "span_id": 456,
+                    "parent_id": 789,
+                    "start": start,
+                    "duration": 1_000_000_000,
+                    "error": 0,
+                    "meta": {},
+                    "metrics": {},
+                    "type": "a_type",
+                    "meta_struct": {},
+                    "span_links": [],
+                    "span_events": []
+                }]
+            })
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_legacy_and_idx_payloads() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let names = ["idx-service"];
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload {
+            tracer_payloads: vec![ddtrace_proto::TracerPayload {
+                chunks: vec![ddtrace_proto::TraceChunk {
+                    spans: vec![ddtrace_proto::Span {
+                        service: "legacy-service".to_owned(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+                strings: idx_strings(&names),
+                chunks: vec![ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: idx_ref(&names, "idx-service"),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH)
+                        .await
+                );
+            },
+            rx,
+            2,
+        )
+        .await;
+
+        let service = |event: &crate::event::Event| {
+            event.as_trace().as_map()["spans"].as_array().unwrap()[0]
+                .as_object()
+                .unwrap()
+                .get("service")
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(service(&events[0]), Value::from("legacy-service"));
+        assert_eq!(service(&events[1]), Value::from("idx-service"));
+        assert_eq!(
+            events[0]
+                .as_trace()
+                .as_map()
+                .get("payload_version")
+                .unwrap(),
+            &Value::from("v2")
+        );
+        assert_eq!(
+            events[1]
+                .as_trace()
+                .as_map()
+                .get("payload_version")
+                .unwrap(),
+            &Value::from("v2")
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_idx_bad_string_ref_is_rejected() {
     crate::test_util::components::init_test();
     assert_source_error(&COMPONENT_ERROR_TAGS, async {
         let (rx, _, _, addr, _guard) =
@@ -1668,28 +1877,271 @@ async fn decode_traces_idx_only_payload_emits_error() {
 
         let mut buf = Vec::new();
         ddtrace_proto::AgentPayload {
-            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload::default()],
+            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+                strings: vec![String::new()],
+                chunks: vec![ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: 1,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
             ..Default::default()
         }
         .encode(&mut buf)
         .unwrap();
 
         assert_eq!(
-            200,
+            422,
             send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH).await
         );
 
         let events = crate::test_util::collect_ready(rx);
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics = Controller::get().unwrap().capture_metrics();
         assert!(
-            metrics.iter().any(|m| {
-                m.name() == "component_errors_total"
-                    && m.tag_matches("error_code", "idx_tracer_payloads")
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_invalid_string_ref")
             }),
-            "expected component_errors_total with error_code=idx_tracer_payloads"
+            "expected component_errors_total with error_code=idx_invalid_string_ref"
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_idx_expansion_over_limit_is_rejected() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 65536
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let resource = "r".repeat(1024);
+        let names = [resource.as_str()];
+        let span = ddtrace_proto::idx::Span {
+            resource_ref: idx_ref(&names, &resource),
+            ..Default::default()
+        };
+        let chunk = ddtrace_proto::idx::TraceChunk {
+            spans: vec![span; 32],
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload {
+            idx_tracer_payloads: vec![
+                ddtrace_proto::idx::TracerPayload {
+                    strings: idx_strings(&names),
+                    chunks: vec![chunk],
+                    ..Default::default()
+                };
+                2
+            ],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+        assert!(buf.len() < 65536 / 4);
+
+        assert_eq!(
+            422,
+            send_with_path(address, buf, dd_api_key_headers(), DD_API_TRACES_PATH).await
+        );
+
+        let events = crate::test_util::collect_ready(rx);
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        assert!(
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_expansion_limit_exceeded")
+            }),
+            "expected component_errors_total with error_code=idx_expansion_limit_exceeded"
+        );
+    })
+    .await;
+}
+
+fn repeated_chunk_payload(env: String, legacy_chunks: u64, idx_chunks: u64) -> Vec<u8> {
+    let mut payload = ddtrace_proto::AgentPayload {
+        env,
+        ..Default::default()
+    };
+    if idx_chunks > 0 {
+        let names = ["svc"];
+        payload.idx_tracer_payloads = vec![ddtrace_proto::idx::TracerPayload {
+            strings: idx_strings(&names),
+            chunks: (0..idx_chunks)
+                .map(|_| ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: idx_ref(&names, "svc"),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }];
+    }
+    if legacy_chunks > 0 {
+        payload.tracer_payloads = vec![ddtrace_proto::TracerPayload {
+            chunks: (0..legacy_chunks)
+                .map(|_| ddtrace_proto::TraceChunk {
+                    spans: vec![ddtrace_proto::Span {
+                        service: "svc".to_owned(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }];
+    }
+    let mut buf = Vec::new();
+    payload.encode(&mut buf).unwrap();
+    buf
+}
+
+#[tokio::test]
+async fn decode_traces_idx_agent_metadata_copies_count_against_the_budget() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 262144
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let env = "e".repeat(64 * 1024);
+        let idx_body = repeated_chunk_payload(env.clone(), 0, 8);
+        assert!(idx_body.len() < 262_144);
+
+        assert_eq!(
+            422,
+            send_with_path(address, idx_body, dd_api_key_headers(), DD_API_TRACES_PATH).await
+        );
+        assert_eq!(
+            crate::test_util::collect_ready(rx),
+            [] as [vector_lib::event::Event; 0]
+        );
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        assert!(
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_expansion_limit_exceeded")
+            }),
+            "expected component_errors_total with error_code=idx_expansion_limit_exceeded"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_legacy_agent_metadata_copies_are_not_budgeted() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 262144
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        address,
+                        repeated_chunk_payload("e".repeat(64 * 1024), 8, 0),
+                        dd_api_key_headers(),
+                        DD_API_TRACES_PATH,
+                    )
+                    .await
+                );
+            },
+            rx,
+            8,
+        )
+        .await;
+        assert_eq!(events.len(), 8);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_mixed_request_budgets_only_idx_agent_metadata_copies() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (sender, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                max_trace_expansion_bytes: 262144
+            "#},
+            address
+        ))
+        .unwrap();
+        let context = SourceContext::new_test(sender, None);
+        tokio::spawn(async move {
+            config.build(context).await.unwrap().await.unwrap();
+        });
+        wait_for_tcp(address).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        address,
+                        repeated_chunk_payload("e".repeat(64 * 1024), 8, 1),
+                        dd_api_key_headers(),
+                        DD_API_TRACES_PATH,
+                    )
+                    .await
+                );
+            },
+            rx,
+            9,
+        )
+        .await;
+        assert_eq!(events.len(), 9);
     })
     .await;
 }
@@ -1898,15 +2350,17 @@ fn test_config_outputs_with_disabled_data_types() {
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
-            disable_logs,
-            disable_metrics,
-            disable_traces,
-            disable_llmobs,
+            enabled_data_types: None,
+            disable_logs: Some(disable_logs),
+            disable_metrics: Some(disable_metrics),
+            disable_traces: Some(disable_traces),
+            disable_llmobs: Some(disable_llmobs),
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let outputs: Vec<DataType> = config
@@ -1923,9 +2377,100 @@ fn test_config_outputs_with_disabled_data_types() {
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
             assert!(outputs.contains(&DataType::all_bits()));
-            assert!(outputs.len() == 1);
+            assert_eq!(outputs.len(), 1);
         }
     }
+}
+
+#[test]
+fn test_config_outputs_with_enabled_data_types() {
+    for (multiple_outputs, enabled_data_types, want) in [
+        (true, "[logs]", vec![Some(LOGS)]),
+        (true, "[metrics, traces]", vec![Some(METRICS), Some(TRACES)]),
+        (true, "[llmobs]", vec![Some(LLMOBS)]),
+        (
+            true,
+            "[traces, apm_stats]",
+            vec![Some(TRACES), Some(APM_STATS)],
+        ),
+        (true, "[apm_stats]", vec![Some(APM_STATS)]),
+        (
+            true,
+            "null",
+            vec![Some(LOGS), Some(METRICS), Some(TRACES), Some(LLMOBS)],
+        ),
+        (false, "[traces]", vec![None]),
+        (false, "[apm_stats]", vec![None]),
+    ] {
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "0.0.0.0:8080"
+                multiple_outputs: {}
+                enabled_data_types: {}
+            "#},
+            multiple_outputs, enabled_data_types,
+        ))
+        .unwrap();
+
+        let outputs = config.outputs(LogNamespace::Legacy);
+        let ports: Vec<_> = outputs
+            .iter()
+            .map(|output| output.port.as_deref())
+            .collect();
+        assert_eq!(ports, want, "{enabled_data_types}");
+    }
+}
+
+#[test]
+fn test_config_outputs_with_enabled_and_disabled_data_types() {
+    for (disable_option, want) in [
+        ("disable_traces: true", vec![Some(LOGS)]),
+        ("disable_traces: false", vec![Some(LOGS), Some(TRACES)]),
+        ("disable_metrics: true", vec![Some(LOGS), Some(TRACES)]),
+    ] {
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "0.0.0.0:8080"
+                multiple_outputs: true
+                enabled_data_types: [logs, traces]
+                {}
+            "#},
+            disable_option,
+        ))
+        .unwrap();
+
+        let outputs = config.outputs(LogNamespace::Legacy);
+        let ports: Vec<_> = outputs
+            .iter()
+            .map(|output| output.port.as_deref())
+            .collect();
+        assert_eq!(ports, want, "{disable_option}");
+    }
+}
+
+#[tokio::test]
+async fn enabled_data_types_rejects_requests_for_other_data_types() {
+    let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let (_guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address: "{}"
+            enabled_data_types: ["traces"]
+        "#},
+        address,
+    ))
+    .unwrap();
+    let source = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(source);
+    wait_for_tcp(address).await;
+
+    assert_eq!(
+        404,
+        send_with_path(address, "[]", HeaderMap::new(), DD_API_LOGS_V2_PATH).await
+    );
 }
 
 #[test]
@@ -2346,15 +2891,17 @@ fn test_config_outputs() {
             decoding,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
-            disable_logs: false,
-            disable_metrics: false,
-            disable_traces: false,
-            disable_llmobs: false,
+            enabled_data_types: None,
+            disable_logs: None,
+            disable_metrics: None,
+            disable_traces: None,
+            disable_llmobs: None,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let mut outputs = config
@@ -2683,7 +3230,10 @@ async fn decode_series_v1_rejects_excessive_unit_event_expansion() {
         )
         .await
     );
-    assert!(crate::test_util::collect_ready(rx).is_empty());
+    assert_eq!(
+        crate::test_util::collect_ready(rx),
+        [] as [vector_lib::event::Event; 0]
+    );
 }
 
 #[tokio::test]
@@ -2714,7 +3264,10 @@ async fn decode_series_v1_skips_unit_materialization_for_zero_point_series() {
         )
         .await
     );
-    assert!(crate::test_util::collect_ready(rx).is_empty());
+    assert_eq!(
+        crate::test_util::collect_ready(rx),
+        [] as [vector_lib::event::Event; 0]
+    );
 }
 
 fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
@@ -3047,7 +3600,7 @@ fn decode_v3_skips_tag_expansion_for_zero_point_series() {
 
     let events = super::metrics::decode_ddseries_v3(Bytes::from(body), &None, false).unwrap();
 
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 #[test]
@@ -3702,15 +4255,17 @@ impl ValidatableComponent for DatadogAgentConfig {
             decoding: BytesDeserializerConfig::new().into(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs: false,
-            disable_logs: false,
-            disable_metrics: false,
-            disable_traces: false,
-            disable_llmobs: false,
+            enabled_data_types: None,
+            disable_logs: None,
+            disable_metrics: None,
+            disable_traces: None,
+            disable_llmobs: None,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         };
 
         let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
@@ -3854,5 +4409,239 @@ fn test_decode_llmobs_body_api_key() {
             .datadog_api_key()
             .map(|k| k.as_ref().to_owned()),
         Some("test1234test1234test1234test1234".to_owned())
+    );
+}
+
+const DD_API_STATS_PATH: &str = "/api/v0.2/stats";
+
+/// Arbitrary bytes that are neither valid UTF-8 nor a valid gzip stream.
+fn apm_stats_body() -> Bytes {
+    Bytes::from_static(&[0x1f, 0x8b, 0xff, 0x00, 0xfe, 0x80, 0x81, 0x42])
+}
+
+fn apm_stats_event(api_key: Option<Arc<str>>, source: &DatadogAgentSource) -> Vec<Event> {
+    build_apm_stats_event(
+        apm_stats_body(),
+        api_key,
+        Some("gzip".to_owned()),
+        Some("application/msgpack".to_owned()),
+        DD_API_STATS_PATH,
+        source,
+    )
+}
+
+#[test]
+fn test_build_apm_stats_event() {
+    let events = apm_stats_event(Some(Arc::from(DD_API_KEY)), &make_llmobs_source());
+    assert_eq!(events.len(), 1);
+
+    let log = events[0].as_log();
+    assert_eq!(log.get_message().unwrap(), &Value::Bytes(apm_stats_body()));
+    assert_eq!(
+        log.get_source_type().unwrap(),
+        &Value::from("datadog_agent")
+    );
+    assert_eq!(log["content_encoding"], "gzip".into());
+    assert_eq!(log["content_type"], "application/msgpack".into());
+    assert_eq!(
+        log.metadata().datadog_api_key().as_deref(),
+        Some(DD_API_KEY)
+    );
+}
+
+#[test]
+fn test_build_apm_stats_event_vector_namespace() {
+    let mut source = make_llmobs_source();
+    source.log_namespace = LogNamespace::Vector;
+    let events = apm_stats_event(None, &source);
+
+    let log = events[0].as_log();
+    assert_eq!(log.value(), &Value::Bytes(apm_stats_body()));
+    let metadata = log.metadata().value();
+    assert_eq!(
+        metadata.get(path!("datadog_agent", "content_encoding")),
+        Some(&Value::from("gzip"))
+    );
+    assert_eq!(
+        metadata.get(path!("datadog_agent", "content_type")),
+        Some(&Value::from("application/msgpack"))
+    );
+}
+
+#[test]
+fn test_build_apm_stats_event_without_api_key() {
+    let events = apm_stats_event(None, &make_llmobs_source());
+    assert!(events[0].metadata().datadog_api_key().is_none());
+}
+
+#[test]
+fn test_build_apm_stats_event_empty_body() {
+    let events = build_apm_stats_event(
+        Bytes::new(),
+        None,
+        None,
+        None,
+        DD_API_STATS_PATH,
+        &make_llmobs_source(),
+    );
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+}
+
+#[test]
+fn test_config_outputs_apm_stats_ignores_disable_traces() {
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+        address: "0.0.0.0:8080"
+        multiple_outputs: true
+        enabled_data_types: [traces, apm_stats]
+        disable_traces: true
+    "#})
+    .unwrap();
+
+    let outputs = config.outputs(LogNamespace::Legacy);
+    let ports: Vec<_> = outputs
+        .iter()
+        .map(|output| output.port.as_deref())
+        .collect();
+    assert_eq!(ports, vec![Some(APM_STATS)]);
+}
+
+#[tokio::test]
+async fn apm_stats_routing() {
+    let mut agent_payload = Vec::new();
+    ddtrace_proto::AgentPayload::default()
+        .encode(&mut agent_payload)
+        .unwrap();
+
+    for (enabled_data_types, path, want) in [
+        ("null", DD_API_STATS_PATH, 200),
+        ("[traces]", DD_API_STATS_PATH, 200),
+        ("[logs]", DD_API_STATS_PATH, 404),
+        ("[traces, apm_stats]", DD_API_TRACES_PATH, 200),
+        ("[apm_stats]", DD_API_TRACES_PATH, 404),
+    ] {
+        let status = EventStatus::Delivered;
+        let (mut sender, _recv) = SourceSender::new_test_finalize(status);
+        let _traces = sender.add_outputs(status, TRACES.to_string());
+        let _apm_stats = sender.add_outputs(status, APM_STATS.to_string());
+        let (_guard, address) = next_addr();
+        let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            indoc! { r#"
+                address: "{}"
+                multiple_outputs: true
+                enabled_data_types: {}
+            "#},
+            address, enabled_data_types,
+        ))
+        .unwrap();
+        let source = config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let body = if path == DD_API_STATS_PATH {
+            apm_stats_body().to_vec()
+        } else {
+            agent_payload.clone()
+        };
+        assert_eq!(
+            want,
+            send_with_path(address, body, dd_api_key_headers(), path).await,
+            "{enabled_data_types} {path}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn apm_stats_are_emitted_byte_for_byte_when_enabled() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (apm_stats, addr, _guard) = apm_stats_source("[traces, apm_stats]").await;
+        let mut headers = dd_api_key_headers();
+        headers.insert("content-type", "application/msgpack".parse().unwrap());
+        headers.insert("content-encoding", "gzip".parse().unwrap());
+
+        let events = send_and_collect(
+            addr,
+            apm_stats_body().to_vec(),
+            headers,
+            DD_API_STATS_PATH,
+            apm_stats,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log.get_message().unwrap(), &Value::Bytes(apm_stats_body()));
+        assert_eq!(log["content_encoding"], "gzip".into());
+        assert_eq!(
+            log.metadata().datadog_api_key().as_deref(),
+            Some(DD_API_KEY)
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn apm_stats_are_accepted_without_traces() {
+    let (apm_stats, addr, _guard) = apm_stats_source("[apm_stats]").await;
+
+    let events = send_and_collect(
+        addr,
+        apm_stats_body().to_vec(),
+        dd_api_key_headers(),
+        DD_API_STATS_PATH,
+        apm_stats,
+        1,
+    )
+    .await;
+    assert_eq!(events.len(), 1);
+}
+
+/// Starts a source with the given `enabled_data_types` and returns its `apm_stats` output.
+async fn apm_stats_source(
+    enabled_data_types: &str,
+) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
+    let status = EventStatus::Delivered;
+    let (mut sender, _recv) = SourceSender::new_test_finalize(status);
+    let output = sender
+        .add_outputs(status, APM_STATS.to_string())
+        .flat_map(into_event_stream);
+    let (guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address: "{}"
+            multiple_outputs: true
+            enabled_data_types: {}
+        "#},
+        address, enabled_data_types
+    ))
+    .unwrap();
+    let context = SourceContext::new_test(sender, None);
+    tokio::spawn(async move {
+        config.build(context).await.unwrap().await.unwrap();
+    });
+    wait_for_tcp(address).await;
+    (Box::pin(output), address, guard)
+}
+
+#[tokio::test]
+async fn apm_stats_require_multiple_outputs() {
+    let (sender, _recv) = SourceSender::new_test();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+        address: "0.0.0.0:8080"
+        enabled_data_types: [apm_stats]
+        multiple_outputs: false
+    "#})
+    .unwrap();
+    let error = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .err()
+        .expect("build should fail");
+    assert_eq!(
+        error.to_string(),
+        "`apm_stats` requires `multiple_outputs` to be enabled."
     );
 }

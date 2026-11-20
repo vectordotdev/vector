@@ -204,6 +204,9 @@ the label 'no-changelog' to your PR. When in doubt, consult the vector team
 for guidance. The details on how to add a changelog entry for your PR are
 outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
+For a new deprecation announcement, follow the [deprecation policy](docs/DEPRECATION_POLICY.md)
+and add a notice to `deprecation.d/` instead.
+
 ### CI
 
 Currently, Vector uses GitHub Actions to run tests. The workflows are defined in

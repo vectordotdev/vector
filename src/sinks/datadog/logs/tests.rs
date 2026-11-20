@@ -460,7 +460,7 @@ async fn retries_transport_errors() {
 
     use http::{Response, StatusCode};
     use http_body_util::{BodyExt as _, Full};
-    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,
@@ -596,7 +596,7 @@ async fn does_not_send_too_big_payloads() {
         }
     }
 
-    assert!(!sizes.is_empty());
+    assert_ne!(sizes, [] as [usize; 0]);
     for size in sizes {
         assert!(size < 5_000_000, "{size} not less than max");
     }

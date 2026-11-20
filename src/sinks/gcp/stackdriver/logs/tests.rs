@@ -27,8 +27,9 @@ use crate::{
         },
         prelude::*,
         util::{
-            HttpEndpoint, encoding::Encoder as _, http::HttpRequest,
-            http_v1::HttpServiceRequestBuilder,
+            HttpEndpoint,
+            encoding::Encoder as _,
+            http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},

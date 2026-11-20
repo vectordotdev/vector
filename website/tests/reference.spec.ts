@@ -8,10 +8,7 @@ function consoleExample(level: "minimal" | "advanced") {
   return readFileSync(file, "utf8").trimEnd();
 }
 
-test("generated VRL function and component references render", async ({ page }) => {
-  await page.goto(functions);
-  await expect(page.getByRole("heading", { name: "parse_json", exact: true })).toBeVisible();
-
+test("generated component examples switch formats and levels and persist the format", async ({ page }) => {
   await page.goto("/docs/reference/configuration/sinks/console/");
   const content = page.getByRole("main", { name: "Main documentation content" });
   await expect(content.getByRole("heading", { name: "inputs", exact: true })).toBeVisible();
@@ -20,8 +17,21 @@ test("generated VRL function and component references render", async ({ page }) 
   });
   const code = async () => (await examples.locator("pre:visible").innerText()).trimEnd();
   await expect.poll(code).toBe(consoleExample("minimal"));
+  await examples.getByRole("button", { name: "JSON", exact: true }).click();
+  await expect.poll(code).toContain('"type": "console"');
+  await expect.poll(code).not.toContain('"target"');
   await examples.getByRole("button", { name: "Advanced", exact: true }).click();
+  await expect.poll(code).toContain('"target": "stdout"');
+  await examples.getByRole("button", { name: "YAML", exact: true }).click();
   await expect.poll(code).toBe(consoleExample("advanced"));
+
+  await examples.getByRole("button", { name: "JSON", exact: true }).click();
+  await page.reload();
+  await expect.poll(code).toContain('"type": "console"');
+  await examples.getByRole("button", { name: "TOML", exact: true }).click();
+  await expect.poll(code).toContain('type = "console"');
+  await examples.getByRole("button", { name: "YAML", exact: true }).click();
+  await expect.poll(code).toBe(consoleExample("minimal"));
 });
 
 test("map-typed config fields render their examples", async ({ page }) => {

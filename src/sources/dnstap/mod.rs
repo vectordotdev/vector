@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use vector_lib::internal_event::{emit, register};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
@@ -239,7 +240,7 @@ struct CommonFrameHandler {
 }
 
 impl CommonFrameHandler {
-    pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
+    fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
         let source_type_key = log_schema().source_type_key();
         let timestamp_key = log_schema().timestamp_key();
 
@@ -257,7 +258,7 @@ impl CommonFrameHandler {
             host_key,
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
-            bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            bytes_received: register(BytesReceived::from(Protocol::from("protobuf"))),
             lowercase_hostnames: config.lowercase_hostnames,
             log_namespace,
         }
@@ -304,8 +305,8 @@ impl FrameHandler for CommonFrameHandler {
                 lowercase_hostnames: self.lowercase_hostnames,
             },
         ) {
-            emit!(DnstapParseError {
-                error: format!("Dnstap protobuf decode error {err:?}.")
+            emit(DnstapParseError {
+                error: format!("Dnstap protobuf decode error {err:?}."),
             });
             return None;
         }

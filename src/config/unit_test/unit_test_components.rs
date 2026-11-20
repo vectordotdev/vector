@@ -197,7 +197,7 @@ impl ValidatedSink for UnitTestSinkConfig {
     }
 }
 
-pub struct UnitTestSink {
+pub(super) struct UnitTestSink {
     pub test_name: String,
     pub transform_ids: Vec<String>,
     // None for NoOp test sinks

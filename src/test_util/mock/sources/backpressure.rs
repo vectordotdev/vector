@@ -36,6 +36,10 @@ impl GenerateConfig for BackpressureSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "test_backpressure")]
 impl SourceConfig for BackpressureSourceConfig {
+    #[expect(
+        clippy::for_unbounded_range,
+        reason = "The mock produces events until its task is cancelled"
+    )]
     async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
         let counter = Arc::clone(&self.counter);
         Ok(async move {

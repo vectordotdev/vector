@@ -1,0 +1,15 @@
+# Vendored from https://github.com/DataDog/saluki/tree/1.7.2/lib/datadog-agent/metrics-v3
+# (commit 24fa65a2b42c7bfd69abebdeb771d656512e0586). See README.md before you change this crate.
+[package]
+name = "datadog-agent-metrics-v3"
+version = "0.1.0"
+authors = ["Datadog, Inc."]
+description = "V3 columnar protobuf codec for Datadog metrics"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/DataDog/saluki"
+publish = false
+
+[dependencies]
+foldhash = { version = "0.2", default-features = false, features = ["std"] }
+protobuf.workspace = true

@@ -66,7 +66,7 @@ mod tests {
     use futures::{StreamExt, channel::mpsc};
     use http::{Method, Response, request::Parts};
     use http_body_util::Full;
-    use hyper_1::service::service_fn;
+    use hyper::service::service_fn;
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,
@@ -399,7 +399,7 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
-        assert!(output_lines2.is_empty());
+        assert_eq!(output_lines2, [] as [std::string::String; 0]);
     }
 
     #[tokio::test]

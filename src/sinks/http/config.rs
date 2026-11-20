@@ -32,8 +32,7 @@ use crate::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
-            http::{RequestConfig, RetryStrategy},
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RequestConfig, RetryStrategy, http_response_retry_logic},
         },
     },
     template::{ConfinementConfig, UriTemplate},
@@ -186,7 +185,7 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
     let mut request = Request::head(uri.uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;
@@ -529,8 +528,7 @@ impl HttpSinkConfig {
                 )
             }
             _ => HttpService::new(client, http_sink_request_builder),
-        }
-        .with_response_decompression();
+        };
 
         let service = ServiceBuilder::new()
             .settings(
@@ -827,6 +825,9 @@ mod tests {
         assert_eq!(validated.payload_prefix, "");
         assert_eq!(validated.payload_suffix, "");
         assert!(validated.template_headers.is_empty());
-        assert!(validated.converted_static_headers.is_empty());
+        assert_eq!(
+            validated.converted_static_headers,
+            [] as [(http::HeaderName, http::HeaderValue); 0]
+        );
     }
 }

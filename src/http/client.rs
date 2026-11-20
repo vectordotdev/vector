@@ -1,19 +1,17 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use tracing::Instrument;
 use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{
-        AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestV1Telemetry,
-        HttpResponseV1Telemetry,
-    },
+    internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
     tls::MaybeTlsSettings,
 };
 
@@ -83,12 +81,7 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
-            {
-                let telemetry = HttpRequestV1Telemetry::new(&request);
-                emit!(AboutToSendHttpRequest {
-                    request: &telemetry
-                });
-            }
+            emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
             let response = self.client.send(request).await;
@@ -96,17 +89,16 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    let telemetry = HttpResponseV1Telemetry::new(&response);
-                    emit!(GotHttpResponse {
-                        response: &telemetry,
-                        roundtrip
+                    emit(GotHttpResponse {
+                        response: &response,
+                        roundtrip,
                     });
                     Ok(response)
                 }
                 Err(error) => {
-                    emit!(GotHttpWarning {
+                    emit(GotHttpWarning {
                         error: &error,
-                        roundtrip
+                        roundtrip,
                     });
                     Err(error)
                 }
@@ -126,6 +118,11 @@ fn default_user_agent() -> HeaderValue {
     .expect("the application name and version must form a valid user agent")
 }
 
+/// Sets `User-Agent` and `Accept-Encoding` unless the caller already set them.
+///
+/// `Accept-Encoding` defaults to `identity` because callers of [`HttpClient::send`] read the
+/// raw body. Sink services that decode compressed responses, such as
+/// `sinks::util::http::HttpService`, advertise their supported encodings before they send.
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
     if !request.headers().contains_key(USER_AGENT) {
         request.headers_mut().insert(USER_AGENT, user_agent.clone());

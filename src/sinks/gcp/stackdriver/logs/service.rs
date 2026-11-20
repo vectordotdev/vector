@@ -7,8 +7,11 @@ use snafu::ResultExt;
 use crate::{
     gcp::GcpAuthenticator,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
-        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
+        HTTPRequestBuilderSnafu,
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 
@@ -25,7 +28,7 @@ impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
 
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)
+            .context(HTTPRequestBuilderSnafu)
             .map_err(crate::Error::from)?;
 
         self.auth.apply(&mut request);

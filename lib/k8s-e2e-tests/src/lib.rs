@@ -52,34 +52,20 @@ pub fn get_override_name(namespace: &str, suffix: &str) -> String {
     format!("{namespace}-{suffix}")
 }
 
-/// Is the MULTINODE environment variable set?
-#[must_use]
-pub fn is_multinode() -> bool {
-    env::var("MULTINODE").is_ok()
-}
-
 /// Create config adding fullnameOverride entry. This allows multiple tests
-/// to be run against the same cluster without the role names clashing.
+/// to be run against the same cluster without role names or data directories clashing.
 #[must_use]
 pub fn config_override_name(name: &str, cleanup: bool) -> String {
-    let vectordir = if is_multinode() {
-        format!("{name}-vector")
-    } else {
-        "vector".to_string()
-    };
-
-    let volumeconfig = if is_multinode() {
-        formatdoc!(
-            r"
-            dataVolume:
-              hostPath:
-                path: /var/lib/{}/
-            ",
-            vectordir,
-        )
-    } else {
-        String::new()
-    };
+    let vectordir = format!("{name}-vector");
+    let volumeconfig = formatdoc!(
+        r"
+        persistence:
+          hostPath:
+            enabled: true
+            path: /var/lib/{}/
+        ",
+        vectordir,
+    );
 
     let cleanupconfig = if cleanup {
         formatdoc!(

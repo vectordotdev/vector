@@ -1,26 +1,25 @@
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, GaugeName, InternalEvent},
+    internal_event::{CounterName, GaugeName, InternalEvent, LossyF64},
 };
 
 #[cfg(feature = "sinks-kafka")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(feature = "sources-kafka")]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KafkaStatisticsReceived<'a> {
+pub(crate) struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
-        gauge!(GaugeName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
-        gauge!(GaugeName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
+        gauge!(GaugeName::KafkaQueueMessages).set(LossyF64(self.statistics.msg_cnt));
+        gauge!(GaugeName::KafkaQueueMessagesBytes).set(LossyF64(self.statistics.msg_size));
         counter!(CounterName::KafkaRequestsTotal).absolute(self.statistics.tx as u64);
         counter!(CounterName::KafkaRequestsBytesTotal).absolute(self.statistics.tx_bytes as u64);
         counter!(CounterName::KafkaResponsesTotal).absolute(self.statistics.rx as u64);
@@ -40,7 +39,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
                         "topic_id" => topic_id.clone(),
                         "partition_id" => partition_id.to_string(),
                     )
-                    .set(partition.consumer_lag as f64);
+                    .set(LossyF64(partition.consumer_lag));
                 }
             }
         }
@@ -56,7 +55,7 @@ mod sink {
     use vrl::path::OwnedTargetPath;
 
     #[derive(NamedInternalEvent)]
-    pub struct KafkaHeaderExtractionError<'a> {
+    pub(crate) struct KafkaHeaderExtractionError<'a> {
         pub header_field: &'a OwnedTargetPath,
     }
 
@@ -89,7 +88,7 @@ mod source {
     };
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaBytesReceived<'a> {
+    pub(crate) struct KafkaBytesReceived<'a> {
         pub byte_size: usize,
         pub protocol: &'static str,
         pub topic: &'a str,
@@ -116,7 +115,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaEventsReceived<'a> {
+    pub(crate) struct KafkaEventsReceived<'a> {
         pub byte_size: JsonSize,
         pub count: usize,
         pub topic: &'a str,
@@ -148,7 +147,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaOffsetUpdateError {
+    pub(crate) struct KafkaOffsetUpdateError {
         pub error: rdkafka::error::KafkaError,
     }
 
@@ -172,7 +171,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaReadError {
+    pub(crate) struct KafkaReadError {
         pub error: rdkafka::error::KafkaError,
     }
 
@@ -196,7 +195,7 @@ mod source {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct KafkaPayloadDecompressionError<'a> {
+    pub(crate) struct KafkaPayloadDecompressionError<'a> {
         pub error: &'a std::io::Error,
         pub topic: &'a str,
         pub partition: i32,

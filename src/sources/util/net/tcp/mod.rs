@@ -1,4 +1,4 @@
-pub mod request_limiter;
+pub(super) mod request_limiter;
 
 use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
@@ -22,6 +22,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
+    internal_event::emit,
     lookup::{OwnedValuePath, path},
     shutdown::ShutdownSignal,
     source_sender::SourceSender,
@@ -153,7 +154,7 @@ where
             let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
-                    emit!(SocketBindError {
+                    emit(SocketBindError {
                         mode: SocketMode::Tcp,
                         error: &error,
                     });
@@ -196,9 +197,9 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                emit!(SocketReceiveError {
+                                emit(SocketReceiveError {
                                     mode: SocketMode::Tcp,
-                                    error: &error
+                                    error: &error,
                                 });
                                 return;
                             }
@@ -220,7 +221,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit(ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -248,7 +249,7 @@ where
                                     // including paths that return early from
                                     // handle_stream (TLS handshake failure,
                                     // shutdown during handshake).
-                                    emit!(TcpSourceConnectionClosed);
+                                    emit(TcpSourceConnectionClosed);
                                     drop(tcp_connection_permit);
                                 })
                                 .instrument(span.or_current()),
@@ -295,12 +296,12 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error, peer_addr });
+                emit(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
         Some(()) = &mut handshake_timeout => {
-            emit!(TcpSocketTlsHandshakeTimeout {
+            emit(TcpSocketTlsHandshakeTimeout {
                 peer_addr,
                 timeout: Duration::from_secs(
                     tls_handshake_timeout_secs.map_or(0, NonZeroU64::get),
@@ -326,9 +327,9 @@ async fn handle_stream<T>(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(TcpBytesReceived {
+        emit(TcpBytesReceived {
             byte_size,
-            peer_addr
+            peer_addr,
         });
     });
 
@@ -395,7 +396,7 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
-                        emit!(SocketEventsReceived {
+                        emit(SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
@@ -416,8 +417,7 @@ async fn handle_stream<T>(
 
 
                         if let Some(certificate_metadata) = &certificate_metadata {
-                            let mut metadata = ObjectMap::new();
-                            metadata.insert("subject".into(), certificate_metadata.subject().into());
+                            let metadata = build_tls_client_metadata(certificate_metadata);
                             for event in &mut events {
                                 let log = event.as_mut_log();
 
@@ -459,7 +459,7 @@ async fn handle_stream<T>(
                                             error = %error,
                                         );
                                     } else {
-                                        emit!(TcpSendAckError { error, peer_addr });
+                                        emit(TcpSendAckError { error, peer_addr });
                                     }
                                     break;
                                 }
@@ -468,13 +468,13 @@ async fn handle_stream<T>(
                                 break;
                             }
                         } else {
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             break;
                         }
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            emit!(DecoderFramingError { error });
+                            emit(DecoderFramingError { error });
                             break;
                         }
                     }
@@ -505,5 +505,65 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
         // Connection hasn't yet been established so we are done here.
         debug!("Closing connection that hasn't yet been fully established.");
         true
+    }
+}
+
+const TLS_CLIENT_METADATA_SUBJECT_KEY: &str = "subject";
+const TLS_CLIENT_METADATA_SUBJECT_ALTNAMES_KEY: &str = "subject_altnames";
+
+#[must_use]
+pub fn build_tls_client_metadata(certificate_metadata: &CertificateMetadata) -> ObjectMap {
+    let mut metadata = ObjectMap::new();
+    metadata.insert(
+        TLS_CLIENT_METADATA_SUBJECT_KEY.into(),
+        certificate_metadata.subject().into(),
+    );
+    let subject_altnames = certificate_metadata.subject_altnames();
+    if !subject_altnames.is_empty() {
+        metadata.insert(
+            TLS_CLIENT_METADATA_SUBJECT_ALTNAMES_KEY.into(),
+            subject_altnames.into(),
+        );
+    }
+    metadata
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use vrl::value::Value;
+
+    fn metadata_with_subject_altnames(subject_altnames: Vec<String>) -> CertificateMetadata {
+        CertificateMetadata {
+            country_name: None,
+            state_or_province_name: None,
+            locality_name: None,
+            organization_name: None,
+            organizational_unit_name: None,
+            common_name: Some("common".to_owned()),
+            subject_altnames,
+        }
+    }
+
+    #[test]
+    fn tls_client_metadata_with_subject_altnames() {
+        let metadata = build_tls_client_metadata(&metadata_with_subject_altnames(vec![
+            "DNS:example.com".to_owned(),
+            "IP Address:1.2.3.4".to_owned(),
+        ]));
+
+        assert_eq!(metadata.get("subject"), Some(&Value::from("CN=common")));
+        assert_eq!(
+            metadata.get("subject_altnames"),
+            Some(&Value::from("DNS:example.com,IP Address:1.2.3.4"))
+        );
+    }
+
+    #[test]
+    fn tls_client_metadata_without_subject_altnames() {
+        let metadata = build_tls_client_metadata(&metadata_with_subject_altnames(vec![]));
+
+        assert_eq!(metadata.get("subject"), Some(&Value::from("CN=common")));
+        assert!(!metadata.contains_key("subject_altnames"));
     }
 }

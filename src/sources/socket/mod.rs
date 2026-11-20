@@ -7,7 +7,7 @@ mod unix_config;
 use unix_config::UnixConfig;
 
 use vector_lib::{
-    codecs::decoding::DeserializerConfig,
+    codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
@@ -20,6 +20,9 @@ use crate::{
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
+const HOST: &str = "host";
+const PORT: &str = "port";
+const TLS_CLIENT_METADATA: &str = "tls_client_metadata";
 
 /// Configuration for the `socket` source.
 #[configurable_component(source("socket", "Collect logs over a socket."))]
@@ -108,6 +111,23 @@ impl GenerateConfig for SocketConfig {
     }
 }
 
+/// Resolve the framing for a stream socket. `message_pack` has no default stream framing, since
+/// the default `bytes` framing would only emit an event once the connection closes.
+fn stream_framing(
+    framing: Option<FramingConfig>,
+    decoding: &DeserializerConfig,
+) -> crate::Result<FramingConfig> {
+    match framing {
+        Some(framing) => Ok(framing),
+        None if matches!(decoding, DeserializerConfig::MessagePack) => Err(
+            "`message_pack` decoding on a stream socket requires an explicit `framing` method, \
+             such as `length_delimited`."
+                .into(),
+        ),
+        None => Ok(decoding.default_stream_framing()),
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
@@ -117,15 +137,8 @@ impl SourceConfig for SocketConfig {
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
                 let decoding = config.decoding().clone();
-                let decoder = DecodingConfig::new(
-                    config
-                        .framing
-                        .clone()
-                        .unwrap_or_else(|| decoding.default_stream_framing()),
-                    decoding,
-                    log_namespace,
-                )
-                .build()?;
+                let framing = stream_framing(config.framing.clone(), &decoding)?;
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -191,15 +204,8 @@ impl SourceConfig for SocketConfig {
                     let log_namespace = cx.log_namespace(config.log_namespace);
 
                     let decoding = config.decoding.clone();
-                    let decoder = DecodingConfig::new(
-                        config
-                            .framing
-                            .clone()
-                            .unwrap_or_else(|| decoding.default_stream_framing()),
-                        decoding,
-                        log_namespace,
-                    )
-                    .build()?;
+                    let framing = stream_framing(config.framing.clone(), &decoding)?;
+                    let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                     unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
                 },
@@ -232,21 +238,21 @@ impl SourceConfig for SocketConfig {
                     .with_source_metadata(
                         Self::NAME,
                         legacy_host_key,
-                        &owned_value_path!("host"),
+                        &owned_value_path!(HOST),
                         Kind::bytes(),
                         Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
                         legacy_port_key,
-                        &owned_value_path!("port"),
+                        &owned_value_path!(PORT),
                         Kind::integer(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
                         tls_client_metadata_path,
-                        &owned_value_path!("tls_client_metadata"),
+                        &owned_value_path!(TLS_CLIENT_METADATA),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
                         None,
@@ -261,7 +267,7 @@ impl SourceConfig for SocketConfig {
                     .with_source_metadata(
                         Self::NAME,
                         legacy_host_key,
-                        &owned_value_path!("host"),
+                        &owned_value_path!(HOST),
                         Kind::bytes(),
                         None,
                     )
@@ -284,7 +290,7 @@ impl SourceConfig for SocketConfig {
                 schema_definition.with_source_metadata(
                     Self::NAME,
                     legacy_host_key,
-                    &owned_value_path!("host"),
+                    &owned_value_path!(HOST),
                     Kind::bytes(),
                     None,
                 )
@@ -348,11 +354,14 @@ mod test {
         CharacterDelimitedDecoderConfig, decoding::CharacterDelimitedDecoderOptions,
     };
     use vector_lib::{
-        codecs::{GelfDeserializerConfig, NewlineDelimitedDecoderConfig},
+        codecs::{
+            GelfDeserializerConfig, LengthDelimitedDecoderConfig, NewlineDelimitedDecoderConfig,
+            decoding::DeserializerConfig,
+        },
         event::EventContainer,
         lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     };
-    use vrl::{btreemap, value, value::ObjectMap};
+    use vrl::{objectmap, value};
     #[cfg(unix)]
     use {
         super::UnixConfig,
@@ -395,7 +404,7 @@ mod test {
         drop(guard); // Now we're sure the socket was bound by the server and we can release the guard
     }
 
-    pub fn bind_unused_udp() -> UdpSocket {
+    fn bind_unused_udp() -> UdpSocket {
         // Bind to port 0 to let the OS assign an available port
         UdpSocket::bind((IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
             .expect("Failed to bind UDP socket to OS-assigned port")
@@ -404,7 +413,7 @@ mod test {
     /// Bind a UDP socket suitable for sending multicast packets through the loopback interface.
     /// Sets `IP_MULTICAST_IF` to loopback so packets route through `lo` regardless of the
     /// system's default multicast route, necessary for reliable local testing on macOS.
-    pub fn bind_unused_udp_multicast() -> UdpSocket {
+    fn bind_unused_udp_multicast() -> UdpSocket {
         let socket = UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
             .expect("Failed to bind UDP socket to OS-assigned port");
         socket2::SockRef::from(&socket)
@@ -592,6 +601,62 @@ mod test {
     }
 
     #[tokio::test]
+    async fn tcp_message_pack_requires_framing() {
+        let (tx, _rx) = SourceSender::new_test();
+        let (_guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_decoding(DeserializerConfig::MessagePack);
+
+        assert!(
+            SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn tcp_message_pack_length_delimited() {
+        use tokio::io::AsyncWriteExt;
+
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let (guard, addr) = next_addr();
+
+            let mut config = TcpConfig::from_address(addr.into());
+            config
+                .set_framing(Some(LengthDelimitedDecoderConfig::default().into()))
+                .set_decoding(DeserializerConfig::MessagePack);
+
+            let server = SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            wait_for_tcp_and_release(guard, addr).await;
+
+            // {"foo": 123} with a 4-byte big-endian length prefix.
+            let mut stream = TcpStream::connect(addr).await.unwrap();
+            stream
+                .write_all(b"\x00\x00\x00\x06\x81\xA3foo\x7B")
+                .await
+                .unwrap();
+
+            // The event arrives while the connection is still open.
+            let event = timeout(Duration::from_secs(5), rx.next())
+                .await
+                .expect("event not received while connection open")
+                .unwrap();
+            assert_eq!(event.as_log()["foo"], 123.into());
+
+            drop(stream);
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn tcp_it_includes_source_type() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
@@ -705,7 +770,7 @@ mod test {
                 "one line".into()
             );
 
-            let tls_meta: ObjectMap = btreemap!(
+            let tls_meta = objectmap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
@@ -770,7 +835,7 @@ mod test {
 
             assert_eq!(log.value(), &"one line".into());
 
-            let tls_meta: ObjectMap = btreemap!(
+            let tls_meta = objectmap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 

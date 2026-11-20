@@ -9,7 +9,7 @@ use std::{
 };
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_http::full_body;
-use vector_lib::{configurable::configurable_component, event::EventStatus};
+use vector_lib::{configurable::configurable_component, event::EventStatus, internal_event::emit};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -109,7 +109,7 @@ impl HecAckClient {
     fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
-        emit!(SplunkIndexerAcknowledgementAckAdded);
+        emit(SplunkIndexerAcknowledgementAckAdded);
     }
 
     /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
@@ -138,7 +138,7 @@ impl HecAckClient {
                             // request/response format changes in future
                             // versions), log an error and fall back to default
                             // behavior.
-                            emit!(SplunkIndexerAcknowledgementAPIError {
+                            emit(SplunkIndexerAcknowledgementAPIError {
                                 message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
                                 error,
                             });
@@ -147,7 +147,7 @@ impl HecAckClient {
                             );
                         }
                         _ => {
-                            emit!(SplunkIndexerAcknowledgementAPIError {
+                            emit(SplunkIndexerAcknowledgementAPIError {
                                 message: "Unable to send acknowledgement query request. Will retry.",
                                 error,
                             });
@@ -169,8 +169,8 @@ impl HecAckClient {
                 debug!(message = "Finalized ack id.", ?ack_id);
             }
         }
-        emit!(SplunkIndexerAcknowledgementAcksRemoved {
-            count: removed_count
+        emit(SplunkIndexerAcknowledgementAcksRemoved {
+            count: removed_count,
         });
     }
 
@@ -203,8 +203,8 @@ impl HecAckClient {
                 removed_count += 1.0;
             }
         }
-        emit!(SplunkIndexerAcknowledgementAcksRemoved {
-            count: removed_count
+        emit(SplunkIndexerAcknowledgementAcksRemoved {
+            count: removed_count,
         });
     }
 
@@ -384,7 +384,7 @@ mod tests {
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
         let ack_request_body = ack_client.get_ack_query_body();
-        assert!(ack_request_body.acks.is_empty());
+        assert_eq!(ack_request_body.acks, [] as [u64; 0]);
     }
 
     #[tokio::test]

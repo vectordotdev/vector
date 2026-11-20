@@ -20,6 +20,7 @@ use vector_http::empty_body;
 use vector_lib::{
     configurable::configurable_component,
     cpu_time::spawn_timed,
+    internal_event::emit,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -235,20 +236,15 @@ impl TransformConfig for Ec2Metadata {
             if required {
                 return Err(error);
             }
-            emit!(AwsEc2MetadataRefreshError { error });
+            emit(AwsEc2MetadataRefreshError { error });
         }
 
-        // The metadata-refresh loop runs as its own tokio task, so the main
-        // transform task's CPU-time wrapper does not see it. Spawn the
-        // background task with the same component-tagged counter so its CPU
-        // is attributed to this transform.
         spawn_timed(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
-            context.cpu_ns.clone(),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -370,7 +366,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         client: HttpClient,
         host: Uri,
         keys: Keys,
@@ -397,10 +393,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(()) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshError { error });
+                    emit(AwsEc2MetadataRefreshError { error });
                 }
             }
 
@@ -408,7 +404,7 @@ impl MetadataClient {
         }
     }
 
-    pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
+    pub(crate) async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
         if let Some((token, next_refresh)) = self.token.clone() {
             // If the next refresh is greater (in the future) than
             // the current time we can return the token since its still valid
@@ -445,7 +441,7 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+    pub(crate) async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         self.get_metadata(&DYNAMIC_DOCUMENT)
             .await?
             .map(|body| {
@@ -460,7 +456,7 @@ impl MetadataClient {
         clippy::too_many_lines,
         reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+    pub(crate) async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
@@ -581,7 +577,7 @@ impl MetadataClient {
                     new_state.push((
                         MetadataKey {
                             log_path: self.keys.tags.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, tag),
                         },
                         tag_content,
                     ));
@@ -669,7 +665,7 @@ fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
 }
 
 impl Keys {
-    pub fn new(namespace: Option<OptionalTargetPath>) -> Self {
+    pub(crate) fn new(namespace: Option<OptionalTargetPath>) -> Self {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {
@@ -917,8 +913,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),
@@ -948,8 +944,8 @@ mod integration_tests {
         let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
-        let server = warp::serve(slow).bind(addr);
-        let _server = tokio::spawn(server);
+        let server = warp::serve(slow).bind(addr).await;
+        let _server = tokio::spawn(server.run());
 
         let config = Ec2Metadata {
             endpoint: format!("http://{addr}"),

@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use http_0::StatusCode;
+use http::StatusCode;
 use tokio_util::codec::Decoder;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::StreamDecodingError,
     config::LegacyKey,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
     json_size::JsonSize,
     lookup::path,
 };
@@ -81,7 +81,7 @@ pub(crate) fn decode_log_body(
     }
 
     let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
-        emit!(DatadogAgentJsonParseError { error: &error });
+        emit(DatadogAgentJsonParseError { error: &error });
 
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,

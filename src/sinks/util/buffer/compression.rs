@@ -589,7 +589,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33",
+                r"integer could not be converted to u32: number too small to fit in target type at line 1 column 33",
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,

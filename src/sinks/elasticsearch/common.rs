@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use http::{Request, Response, StatusCode, Uri};
 use http_body_util::BodyExt;
-use hyper_1::body::Incoming;
+use hyper::body::Incoming;
 use serde::Deserialize;
 use vector_http::full_body;
 use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
@@ -436,7 +436,7 @@ pub async fn sign_request(
     // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
     // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
-    crate::aws::sign_request_v1(
+    crate::aws::sign_request(
         service_type.as_str(),
         request,
         credentials_provider,
@@ -507,7 +507,7 @@ async fn get(
     if let Some(auth) = auth {
         match auth {
             Auth::Basic(http_auth) => {
-                http_auth.apply_v1(&mut request);
+                http_auth.apply(&mut request);
             }
             #[cfg(feature = "aws-core")]
             Auth::Aws {

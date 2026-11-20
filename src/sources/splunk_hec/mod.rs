@@ -1,23 +1,20 @@
 use std::{
     collections::HashMap,
-    convert::Infallible,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::FutureExt;
-use http_0::StatusCode;
-use hyper::{Server, service::make_service_fn};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
     Deserializer, Value as JsonValue,
     de::{Read as JsonRead, StrRead},
 };
 use snafu::Snafu;
-use tokio::net::TcpStream;
 use tokio_util::codec::Decoder as _;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -40,7 +37,6 @@ use vector_lib::{
     schema::meaning,
     sensitive_string::SensitiveString,
     source_sender::SendError,
-    tls::MaybeTlsIncomingStream,
 };
 use vrl::{
     path::{OwnedTargetPath, PathPrefix, ValuePath as _},
@@ -49,7 +45,10 @@ use vrl::{
 use warp::{
     Filter, Reply,
     filters::BoxedFilter,
-    http::header::{CONTENT_TYPE, HeaderValue},
+    http::{
+        StatusCode,
+        header::{CONTENT_TYPE, HeaderValue},
+    },
     path,
     reject::Rejection,
     reply::Response,
@@ -68,7 +67,7 @@ use crate::{
     common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
@@ -279,25 +278,24 @@ impl SplunkConfig {
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            conn.peer_addr(),
-                        )
-                    }))
-                    .service(warp::service(services.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
-
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(shutdown.map(|_| ()))
-                .await
-                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
+            serve(
+                listener.accept_stream(),
+                shutdown.map(|_| ()),
+                move |conn| {
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                conn.peer_addr(),
+                            )
+                        }))
+                        .service(warp::service(services.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -505,7 +503,7 @@ impl SplunkSource {
             idx_ack,
             store_hec_token: config.store_hec_token,
             log_namespace,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             event_decoder,
             raw_decoder,
         }
@@ -573,7 +571,7 @@ impl SplunkSource {
                         } else {
                             (body.len(), String::from_utf8_lossy(body.as_ref()))
                         };
-                        emit!(HttpBytesReceived {
+                        emit(HttpBytesReceived {
                             byte_size,
                             http_path: path.as_str(),
                             protocol,
@@ -694,7 +692,7 @@ impl SplunkSource {
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
                     let decoder = decoder.clone();
-                    emit!(HttpBytesReceived {
+                    emit(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -795,10 +793,11 @@ impl SplunkSource {
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
             .map(move |_| {
-                http_0::Response::builder()
-                    .header(http_0::header::CONTENT_TYPE, "application/json")
-                    .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
-                    .expect("static response")
+                let mut response = Response::new(r#"{"text":"HEC is healthy","code":17}"#.into());
+                response
+                    .headers_mut()
+                    .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                response
             })
             .boxed()
     }
@@ -1235,12 +1234,12 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     let error: vector_lib::Error = Box::new(error);
-                    emit!(
+                    emit(
                         vector_lib::codecs::internal_events::DecoderDeserializeError {
-                            error: &error
-                        }
+                            error: &error,
+                        },
                     );
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
                         reason: "Failed to serialize event field to bytes.",
                     });
@@ -1477,8 +1476,8 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(SplunkHecRequestBodyInvalidError {
-                    error: error.into()
+                emit(SplunkHecRequestBodyInvalidError {
+                    error: error.into(),
                 });
                 // The deserializer failed to parse the next envelope, so the failing
                 // envelope's index is the count of envelopes already processed (not
@@ -1762,7 +1761,7 @@ fn raw_event(
             Ok(data) if data.is_empty() => return Err(ApiError::NoData.into()),
             Ok(data) => Bytes::from(data),
             Err(error) => {
-                emit!(SplunkHecRequestBodyInvalidError { error });
+                emit(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -1911,7 +1910,7 @@ mod splunk_response {
     use serde::Serialize;
 
     // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/TroubleshootHTTPEventCollector#Possible_error_codes
-    pub enum HecStatusCode {
+    pub(super) enum HecStatusCode {
         Success = 0,
         TokenIsRequired = 2,
         InvalidAuthorization = 3,
@@ -1925,7 +1924,7 @@ mod splunk_response {
     }
 
     #[derive(Serialize)]
-    pub enum HecResponseMetadata {
+    pub(super) enum HecResponseMetadata {
         #[serde(rename = "ackId")]
         AckId(u64),
         #[serde(rename = "invalid-event-number")]
@@ -1933,7 +1932,7 @@ mod splunk_response {
     }
 
     #[derive(Serialize)]
-    pub struct HecResponse {
+    pub(super) struct HecResponse {
         text: &'static str,
         code: u8,
         #[serde(skip_serializing_if = "Option::is_none", flatten)]
@@ -1941,7 +1940,7 @@ mod splunk_response {
     }
 
     impl HecResponse {
-        pub const fn new(code: HecStatusCode) -> Self {
+        pub(super) const fn new(code: HecStatusCode) -> Self {
             let text = match code {
                 HecStatusCode::Success => "Success",
                 HecStatusCode::TokenIsRequired => "Token is required",
@@ -1962,20 +1961,22 @@ mod splunk_response {
             }
         }
 
-        pub const fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
+        pub(super) const fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
             self.metadata = Some(metadata);
             self
         }
     }
 
-    pub const INVALID_AUTHORIZATION: HecResponse =
+    pub(super) const INVALID_AUTHORIZATION: HecResponse =
         HecResponse::new(HecStatusCode::InvalidAuthorization);
-    pub const TOKEN_IS_REQUIRED: HecResponse = HecResponse::new(HecStatusCode::TokenIsRequired);
-    pub const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
-    pub const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
-    pub const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
-    pub const NO_CHANNEL: HecResponse = HecResponse::new(HecStatusCode::DataChannelIsMissing);
-    pub const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
+    pub(super) const TOKEN_IS_REQUIRED: HecResponse =
+        HecResponse::new(HecStatusCode::TokenIsRequired);
+    pub(super) const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
+    pub(super) const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
+    pub(super) const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
+    pub(super) const NO_CHANNEL: HecResponse =
+        HecResponse::new(HecStatusCode::DataChannelIsMissing);
+    pub(super) const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
 }
 
 async fn register_ack(
@@ -2000,11 +2001,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 fn response_plain(code: StatusCode, msg: &'static str) -> Response {
     warp::reply::with_status(
-        warp::reply::with_header(
-            msg,
-            http_0::header::CONTENT_TYPE,
-            "text/plain; charset=utf-8",
-        ),
+        warp::reply::with_header(msg, CONTENT_TYPE, "text/plain; charset=utf-8"),
         code,
     )
     .into_response()
@@ -2012,7 +2009,7 @@ fn response_plain(code: StatusCode, msg: &'static str) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHecRequestError { error });
+        emit(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
                 response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)

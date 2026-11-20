@@ -16,7 +16,7 @@ async fn fetch_status(
     let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;
@@ -24,7 +24,7 @@ async fn fetch_status(
     Ok(response.status())
 }
 
-pub async fn healthcheck(
+pub(super) async fn healthcheck(
     base_endpoint: HttpEndpoint,
     auth: Option<Auth>,
     healthcheck_uri: Option<UriSerde>,

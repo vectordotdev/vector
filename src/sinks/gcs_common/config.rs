@@ -172,7 +172,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
 
 // Mirrors `RetryStrategy::Default` for `GcsResponse`, but also retries 401 Unauthorized
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
-    type Error = hyper_1::Error;
+    type Error = hyper::Error;
     type Request = Request;
     type Response = GcsResponse;
 

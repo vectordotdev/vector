@@ -10,6 +10,6 @@
   {{ with site.GetPage (printf "/releases/%s" $v.version) -}}
   <a href="{{ .RelPermalink }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary">v{{ $v.version }}</a>
   {{- else -}}
-  v{{ $v.version }}
+  v{{ $v.version }} (unreleased)
   {{- end }}
 {{- end -}}

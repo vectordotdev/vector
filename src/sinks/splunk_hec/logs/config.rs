@@ -18,7 +18,10 @@ use crate::{
             build_healthcheck, build_http_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::{HttpEndpoint, http::RetryStrategy, http_v1::http_response_retry_logic},
+        util::{
+            HttpEndpoint,
+            http::{RetryStrategy, http_response_retry_logic},
+        },
     },
     template::ConfinementConfig,
 };

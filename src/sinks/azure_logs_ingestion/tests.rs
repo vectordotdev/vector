@@ -301,7 +301,7 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn retries_transport_error() {
-    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper::{body::Incoming, service::service_fn};
     use hyper_util::{
         rt::{TokioExecutor, TokioIo},
         server::conn::auto,
