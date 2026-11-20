@@ -388,19 +388,9 @@ impl DstRunner {
         );
 
         // Any file that is unlinked or moved outside `/logs/*` cannot be re-opened by
-        // a brand-new FileServer process. Also, gzip files with an existing persisted
-        // checkpoint are opened as `FileReader::Null` on restart (pinned by
-        // `zoo_gzip_partial_checkpoint_restart_drops_remainder`).
+        // a brand-new FileServer process.
         for &ino in &self.unfindable_inos {
             if let Some(model) = self.models.get_mut(&ino) {
-                model.lost_across_restart = true;
-            }
-        }
-        for entry in self.active_slots.iter().flatten() {
-            if entry.is_gzip
-                && self.delivered_by_ino.contains_key(&entry.ino)
-                && let Some(model) = self.models.get_mut(&entry.ino)
-            {
                 model.lost_across_restart = true;
             }
         }
@@ -413,6 +403,24 @@ impl DstRunner {
             FileServerState::init(new_server, &mut new_cp, self.fs.clone(), self.clock.clone())
                 .await,
         );
+
+        // Gzip files with an existing recovered checkpoint are opened as `FileReader::Null`
+        // on restart (pinned by `zoo_gzip_partial_checkpoint_restart_drops_remainder`).
+        let cp_view = new_cp.view();
+        let recovered_inos: HashSet<u64> = self
+            .fp_to_ino
+            .iter()
+            .filter_map(|(&fp, &ino)| cp_view.get(fp).map(|_| ino))
+            .collect();
+        for entry in self.active_slots.iter().flatten() {
+            if entry.is_gzip
+                && recovered_inos.contains(&entry.ino)
+                && let Some(model) = self.models.get_mut(&entry.ino)
+            {
+                model.lost_across_restart = true;
+            }
+        }
+
         self.checkpointer = new_cp;
         Ok(())
     }
@@ -434,18 +442,29 @@ impl DstRunner {
     }
 
     fn append_partial_in_slot(&mut self, slot: usize) {
+        const CONTINUATION_HEADROOM: usize = 24;
         if let Some(entry) = &self.active_slots[slot]
             && !entry.is_gzip
             && !self.unreadable_paths.contains(&entry.path)
         {
             let (path, ino) = (entry.path.clone(), entry.ino);
             let model = self.models.get_mut(&ino).unwrap();
-            let chunk = if model.pending_partial.is_empty() {
-                self.line_counter += 1;
-                format!("ino={ino}:part={}", self.line_counter)
+            let is_first = model.pending_partial.is_empty();
+            let chunk = if is_first {
+                format!("ino={ino}:part={}", self.line_counter + 1)
             } else {
                 "_mid".to_string()
             };
+            // Keep partial lines below `max_line_bytes` (with headroom for `_cont_<n>`)
+            // so completed partials are not discarded as oversized lines or split across EOF.
+            if model.pending_partial.len() + chunk.len() + CONTINUATION_HEADROOM
+                >= self.config.max_line_bytes
+            {
+                return;
+            }
+            if is_first {
+                self.line_counter += 1;
+            }
             self.fs.append_bytes(&path, chunk.as_bytes());
             model.pending_partial.push_str(&chunk);
         }
@@ -490,13 +509,21 @@ impl DstRunner {
         Ok(())
     }
 
-    fn toggle_readable_slot(&mut self, slot: usize) {
+    async fn toggle_readable_slot(&mut self, slot: usize) {
         if let Some(entry) = &self.active_slots[slot] {
             let path = entry.path.clone();
             let ino = entry.ino;
             if self.unreadable_paths.remove(&path) {
                 self.fs.set_readable(&path, true);
                 self.epoch_offset_by_ino.remove(&ino);
+                // Rediscover the recovered watcher immediately so a subsequent
+                // `AppendPartial` + `Step` before the next glob cooldown does not
+                // flush a torn line while the watcher is still marked unfindable.
+                self.state
+                    .as_mut()
+                    .expect("server running")
+                    .discover_files()
+                    .await;
             } else {
                 // Known bug (pinned by `zoo_transient_eacces_tears_partial_line`):
                 // EACCES while a partial line is buffered causes `!file_findable()`
@@ -554,7 +581,7 @@ impl DstRunner {
             SimAction::RotateOutsideGlob { slot } => self.rotate_slot(slot, true).await?,
             SimAction::SymlinkRotate { slot } => self.symlink_rotate_slot(slot).await?,
             SimAction::Unlink { slot } => self.unlink_slot(slot).await?,
-            SimAction::ToggleReadable { slot } => self.toggle_readable_slot(slot),
+            SimAction::ToggleReadable { slot } => self.toggle_readable_slot(slot).await,
             SimAction::Step { advance_ms } => {
                 self.clock.advance(Duration::from_millis(advance_ms));
                 self.drain_step().await?;
