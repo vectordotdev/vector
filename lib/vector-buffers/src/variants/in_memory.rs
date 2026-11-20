@@ -38,14 +38,53 @@ where
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
-        let (max_bytes, max_size) = match self.capacity {
+        let (max_bytes, max_events) = match self.capacity {
             MemoryBufferSize::MaxEvents(max_events) => (None, Some(max_events.get())),
-            MemoryBufferSize::MaxSize(max_size) => (None, Some(max_size.get())),
+            MemoryBufferSize::MaxSize(max_size) => (u64::try_from(max_size.get()).ok(), None),
         };
 
-        usage_handle.set_buffer_limits(max_bytes, max_size);
+        usage_handle.set_buffer_limits(max_bytes, max_events);
 
         let (tx, rx) = limited(self.capacity, None, None);
         Ok((tx.into(), rx.into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use super::*;
+    use crate::test::SizedRecord;
+
+    #[tokio::test]
+    async fn reports_buffer_limit_in_its_configured_unit() {
+        let cases = [
+            (
+                MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
+                100,
+                0,
+            ),
+            (
+                MemoryBufferSize::MaxSize(NonZeroUsize::new(4096).unwrap()),
+                0,
+                4096,
+            ),
+        ];
+
+        for (capacity, expected_max_events, expected_max_bytes) in cases {
+            let usage_handle = BufferUsageHandle::noop();
+            let buffer = Box::new(MemoryBuffer::new(capacity));
+            let _parts = IntoBuffer::<SizedRecord>::into_buffer_parts(buffer, usage_handle.clone())
+                .await
+                .expect("memory buffer should build");
+
+            let snapshot = usage_handle.snapshot();
+            assert_eq!(
+                snapshot.max_size_events, expected_max_events,
+                "{capacity:?}"
+            );
+            assert_eq!(snapshot.max_size_bytes, expected_max_bytes, "{capacity:?}");
+        }
     }
 }
