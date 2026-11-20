@@ -2,7 +2,7 @@
 
 ## Summary
 
-Reading the whole metric event with `.` in VRL now includes the field that holds the metric's value, such as `gauge` or `distribution`. Programs that encode or iterate over `.` on metrics, such as `encode_json(.)` or `keys(.)`, see the new field. `unnest` on a metric also copies the value into each row, so with `metric_tag_values: full`, `unnest!(.tags.region)` on a distribution copies every sample into every row.
+On a gauge metric, `.gauge` previously returned `null`. It now returns an object containing `.gauge.value`, so `exists(.gauge)` changes from `false` to `true`. Reading the whole metric event with `.` in VRL now includes the field that holds the metric's value, such as `gauge` or `distribution`. Programs that encode or iterate over `.` on metrics, such as `encode_json(.)` or `keys(.)`, see the new field. `unnest` on a metric also copies the value into each row, so with `metric_tag_values: full`, `unnest!(.tags.region)` on a distribution copies every sample into every row.
 
 ## Migration
 
