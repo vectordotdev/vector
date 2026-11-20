@@ -8,19 +8,37 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use file_source_common::{AsyncFile, Clock, FileIdentity, FileMetadata, FileSystem};
+use file_source_common::{
+    AsyncFile, Clock, FileFingerprint, FileIdentity, FileMetadata, FileSystem,
+};
 use glob::Pattern;
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 
-use crate::paths_provider::PathsProvider;
+use crate::{
+    paths_provider::PathsProvider,
+    scheduler::{FsEvent, FsEventSource},
+};
 
 use super::clock::SimClock;
+
+/// Controls how [`SimFileSystem`] delivers [`FsEvent`] hints to [`SimFsEventSource`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EventDelivery {
+    /// Deliver all `Created`/`Modified`/`Removed` events normally (like healthy `inotify`/`kqueue`).
+    #[default]
+    Normal,
+    /// Silently drop all events (models NFS/SMB mounts where OS notifications do not fire).
+    DropAll,
+    /// Deterministically drop every `drop_every_n`-th event (models flaky/coalesced OS notifications).
+    Flaky { drop_every_n: u64 },
+}
 
 /// Operation counters collected by [`SimFileSystem`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct FsStats {
     pub opens: u64,
     pub reads: u64,
+    pub eof_reads: u64,
     pub read_bytes: u64,
     pub seeks: u64,
     pub stats: u64,
@@ -64,6 +82,10 @@ struct SimFsInner {
     /// If set, caps the number of bytes returned per `AsyncRead::poll_read` call
     /// (modeling short reads / torn kernel buffer visibility).
     max_bytes_per_read: Option<usize>,
+    /// Queued filesystem change notifications for [`SimFsEventSource`].
+    fs_events: Vec<FsEvent>,
+    event_delivery: EventDelivery,
+    event_counter: u64,
     /// If non-zero, advances `SimClock` by this duration on each `open`, `read`,
     /// and `metadata` syscall (modeling slow filesystem I/O).
     io_latency: std::time::Duration,
@@ -95,10 +117,48 @@ impl SimFileSystem {
                 inode_reuse: false,
                 freed_inos: Vec::new(),
                 max_bytes_per_read: None,
+                fs_events: Vec::new(),
+                event_delivery: EventDelivery::Normal,
+                event_counter: 0,
                 io_latency: std::time::Duration::ZERO,
                 next_read_errors: HashMap::new(),
             })),
         }
+    }
+
+    /// Returns all currently linked file and symlink paths in deterministic sorted order.
+    #[must_use]
+    pub fn all_paths(&self) -> Vec<PathBuf> {
+        let inner = self.inner.lock().unwrap();
+        let mut paths: Vec<PathBuf> = inner
+            .entries
+            .keys()
+            .chain(inner.symlinks.keys())
+            .cloned()
+            .collect();
+        paths.sort();
+        paths
+    }
+
+    /// Returns a [`SimFsEventSource`] connected to this simulated filesystem.
+    #[must_use]
+    pub fn event_source(&self) -> SimFsEventSource {
+        SimFsEventSource {
+            fs: self.clone(),
+            watched_files: HashMap::new(),
+        }
+    }
+
+    /// Configures how filesystem notifications are delivered (normal vs. dropped/NFS).
+    pub fn set_event_delivery(&self, mode: EventDelivery) {
+        self.inner.lock().unwrap().event_delivery = mode;
+    }
+
+    /// Injects an `FsEvent::Overflow` (modeling `IN_Q_OVERFLOW`).
+    pub fn inject_event_overflow(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.fs_events.clear();
+        inner.fs_events.push(FsEvent::Overflow);
     }
 
     /// Configures simulated I/O latency applied to `open`, `read`, and `metadata` calls.
@@ -185,7 +245,7 @@ impl SimFileSystem {
         let ino = allocate_ino(&mut inner);
 
         inner.symlinks.remove(&path);
-        if let Some(old_ino) = inner.entries.insert(path, ino) {
+        if let Some(old_ino) = inner.entries.insert(path.clone(), ino) {
             unlink_inode(&mut inner, old_ino);
         }
 
@@ -203,6 +263,7 @@ impl SimFileSystem {
                 link_count: 1,
             },
         );
+        push_event(&mut inner, FsEvent::Created(path));
         ino
     }
 
@@ -213,7 +274,8 @@ impl SimFileSystem {
         if let Some(old_ino) = inner.entries.remove(&link) {
             unlink_inode(&mut inner, old_ino);
         }
-        inner.symlinks.insert(link, target.into());
+        inner.symlinks.insert(link.clone(), target.into());
+        push_event(&mut inner, FsEvent::Modified(link));
     }
 
     /// Overwrites bytes at `offset` in-place (extending with zero bytes if needed),
@@ -230,6 +292,7 @@ impl SimFileSystem {
             }
             node.data[offset..end].copy_from_slice(bytes);
             node.modified = now;
+            push_event(&mut inner, FsEvent::Modified(path.as_ref().to_path_buf()));
         }
     }
 
@@ -263,6 +326,7 @@ impl SimFileSystem {
         let node = inner.inodes.get_mut(&ino).expect("inode exists");
         node.data.extend_from_slice(bytes);
         node.modified = now;
+        push_event(&mut inner, FsEvent::Modified(path.to_path_buf()));
         ino
     }
 
@@ -370,6 +434,45 @@ impl SimFileSystem {
                 .map(|p| Pattern::new(p).expect("valid exclude pattern"))
                 .collect(),
         }
+    }
+}
+
+fn push_event(inner: &mut SimFsInner, event: FsEvent) {
+    inner.event_counter = inner.event_counter.wrapping_add(1);
+    match inner.event_delivery {
+        EventDelivery::Normal => inner.fs_events.push(event),
+        EventDelivery::DropAll => {}
+        EventDelivery::Flaky { drop_every_n } => {
+            if drop_every_n == 0 || !inner.event_counter.is_multiple_of(drop_every_n) {
+                inner.fs_events.push(event);
+            }
+        }
+    }
+}
+
+/// Simulated [`FsEventSource`] connected to a [`SimFileSystem`], tracking active
+/// per-watcher registrations so DST can assert zero watch leaks across rotations.
+pub struct SimFsEventSource {
+    fs: SimFileSystem,
+    watched_files: HashMap<FileFingerprint, PathBuf>,
+}
+
+impl FsEventSource for SimFsEventSource {
+    fn drain_events(&mut self, out: &mut Vec<FsEvent>) {
+        let mut inner = self.fs.inner.lock().unwrap();
+        out.append(&mut inner.fs_events);
+    }
+
+    fn watch_path(&mut self, file_id: FileFingerprint, path: &Path) {
+        self.watched_files.insert(file_id, path.to_path_buf());
+    }
+
+    fn unwatch_path(&mut self, file_id: FileFingerprint) {
+        self.watched_files.remove(&file_id);
+    }
+
+    fn watched_file_count(&self) -> usize {
+        self.watched_files.len()
     }
 }
 
@@ -523,6 +626,7 @@ impl AsyncRead for SimFile {
         };
         let pos = usize::try_from(self.cursor).unwrap_or(usize::MAX);
         if pos >= node.data.len() {
+            inner.stats.eof_reads += 1;
             return Poll::Ready(Ok(()));
         }
         let available = &node.data[pos..];

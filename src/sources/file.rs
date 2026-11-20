@@ -237,6 +237,14 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
+
+    /// Opt-in to using OS filesystem notifications (`inotify`, `FSEvents`, `ReadDirectoryChangesW`)
+    /// paired with an adaptive read scheduler to reduce idle file polling and read latency.
+    ///
+    /// Notifications are treated as hints alongside bounded fallback polling (up to 10 seconds),
+    /// and Vector gracefully falls back to adaptive polling if OS watcher initialization fails.
+    #[serde(default)]
+    pub use_fs_notifications: bool,
 }
 
 #[allow(
@@ -381,6 +389,7 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: FileInternalMetricsConfig::default(),
             rotate_wait: default_rotate_wait(),
+            use_fs_notifications: false,
         }
     }
 }
@@ -597,6 +606,7 @@ pub fn file_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
+    let use_fs_notifications = config.use_fs_notifications;
     crate::sources::opaque_source(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
@@ -683,8 +693,16 @@ pub fn file_source(
         tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
             let rt = tokio::runtime::Handle::current();
-            let result =
-                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
+            let result = if use_fs_notifications {
+                rt.block_on(file_server.run_adaptive(
+                    tx,
+                    shutdown,
+                    shutdown_checkpointer,
+                    checkpointer,
+                ))
+            } else {
+                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer))
+            };
             emit(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
@@ -1207,6 +1225,54 @@ mod tests {
                     event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
                 );
+                goodbye_i += 1;
+            }
+        }
+        assert_eq!(hello_i, n);
+        assert_eq!(goodbye_i, n);
+    }
+
+    #[tokio::test]
+    async fn file_happy_path_with_fs_notifications() {
+        let n = 5;
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            use_fs_notifications: true,
+            ..test_default_file_config(&dir)
+        };
+
+        let path1 = dir.path().join("file1");
+        let path2 = dir.path().join("file2");
+
+        let received = run_file_source(&config, NoAcks, LogNamespace::Legacy, None, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+
+            for i in 0..n {
+                writeln!(&mut file1, "hello {i}").unwrap();
+                writeln!(&mut file2, "goodbye {i}").unwrap();
+            }
+
+            file1.flush().unwrap();
+            file2.flush().unwrap();
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let mut hello_i = 0;
+        let mut goodbye_i = 0;
+
+        for event in received {
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
+            if line.starts_with("hello") {
+                assert_eq!(line, format!("hello {hello_i}"));
+                hello_i += 1;
+            } else {
+                assert_eq!(line, format!("goodbye {goodbye_i}"));
                 goodbye_i += 1;
             }
         }

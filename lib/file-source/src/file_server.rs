@@ -20,11 +20,16 @@ use futures::{
 use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio_util::task::JoinMap;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
+    notify_events::NotifyEventSource,
     paths_provider::PathsProvider,
+    scheduler::{
+        AdaptiveEventScheduler, AdaptiveSchedulerConfig, FsEvent, FsEventSource,
+        LegacyPollingScheduler, NoopFsEventSource, ReadScheduler,
+    },
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -56,39 +61,76 @@ where
     pub rotate_wait: Duration,
 }
 
-/// Steppable runtime state of a [`FileServer`], parameterized over [`FileSystem`]
-/// and [`Clock`] to enable deterministic simulation testing without modifying
-/// production behavior.
+/// Steppable runtime state of a [`FileServer`], parameterized over [`FileSystem`],
+/// [`Clock`], [`ReadScheduler`], and [`FsEventSource`] to enable deterministic
+/// simulation testing and pluggable scheduling without modifying production behavior.
 pub struct FileServerState<
     PP: PathsProvider,
     E: FileSourceInternalEvents,
     FS: FileSystem = OsFileSystem,
     C: Clock = SystemClock,
+    S: ReadScheduler = LegacyPollingScheduler,
+    Ev: FsEventSource = NoopFsEventSource,
 > {
     server: FileServer<PP, E>,
     fs: FS,
     clock: C,
+    scheduler: S,
+    event_source: Ev,
     fp_map: IndexMap<FileFingerprint, FileWatcher<FS>>,
     known_small_files: HashMap<PathBuf, MonotonicInstant>,
     checkpoints: Arc<CheckpointsView<C>>,
     backoff_cap: usize,
     next_glob_time: MonotonicInstant,
     stats: TimingStats,
+    pending_events: Vec<FsEvent>,
+    read_candidates: Vec<FileFingerprint>,
 }
 
-impl<PP, E, FS, C> FileServerState<PP, E, FS, C>
+impl<PP, E, FS, C> FileServerState<PP, E, FS, C, LegacyPollingScheduler, NoopFsEventSource>
 where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
     FS: FileSystem,
     C: Clock,
 {
-    /// Initialize `FileServerState` by loading checkpoints and discovering initial files.
+    /// Initialize `FileServerState` with the default [`LegacyPollingScheduler`]
+    /// and [`NoopFsEventSource`].
     pub async fn init(
+        server: FileServer<PP, E>,
+        checkpointer: &mut Checkpointer<FS, C>,
+        fs: FS,
+        clock: C,
+    ) -> Self {
+        Self::init_with_scheduler(
+            server,
+            checkpointer,
+            fs,
+            clock,
+            LegacyPollingScheduler::default(),
+            NoopFsEventSource,
+        )
+        .await
+    }
+}
+
+impl<PP, E, FS, C, S, Ev> FileServerState<PP, E, FS, C, S, Ev>
+where
+    PP: PathsProvider,
+    E: FileSourceInternalEvents,
+    FS: FileSystem,
+    C: Clock,
+    S: ReadScheduler,
+    Ev: FsEventSource,
+{
+    /// Initialize `FileServerState` with an explicit [`ReadScheduler`] and [`FsEventSource`].
+    pub async fn init_with_scheduler(
         mut server: FileServer<PP, E>,
         checkpointer: &mut Checkpointer<FS, C>,
         fs: FS,
         clock: C,
+        scheduler: S,
+        event_source: Ev,
     ) -> Self {
         let fp_map: IndexMap<FileFingerprint, FileWatcher<FS>> = IndexMap::default();
         let mut known_small_files = HashMap::new();
@@ -140,12 +182,16 @@ where
             server,
             fs,
             clock,
+            scheduler,
+            event_source,
             fp_map,
             known_small_files,
             checkpoints,
             backoff_cap: 1,
             next_glob_time: startup_done,
             stats: TimingStats::new(startup_done),
+            pending_events: Vec::new(),
+            read_candidates: Vec::new(),
         };
 
         for (_key, path, file_id) in existing_files {
@@ -164,6 +210,18 @@ where
         self.fp_map.len()
     }
 
+    /// Returns the number of queued timer entries inside the active [`ReadScheduler`].
+    #[must_use]
+    pub fn scheduler_pending_timers(&self) -> usize {
+        self.scheduler.pending_timer_count()
+    }
+
+    /// Returns the number of active file watch registrations in the [`FsEventSource`].
+    #[must_use]
+    pub fn watched_event_count(&self) -> usize {
+        self.event_source.watched_file_count()
+    }
+
     /// Returns a handle to the shared checkpoints view.
     #[must_use]
     pub fn checkpoints(&self) -> &Arc<CheckpointsView<C>> {
@@ -178,6 +236,14 @@ where
     /// Panics if the polling deadline overflows or a file path is not UTF-8.
     pub async fn step(&mut self, lines: &mut Vec<Line>) -> Duration {
         let now_time = self.clock.now();
+
+        // Drain any pending OS/simulated filesystem notifications and feed them to the scheduler.
+        self.pending_events.clear();
+        self.event_source.drain_events(&mut self.pending_events);
+        for event in &self.pending_events {
+            self.scheduler.on_fs_event(event, now_time);
+        }
+
         if self.next_glob_time <= now_time {
             self.next_glob_time = now_time
                 .checked_add(self.server.glob_minimum_cooldown)
@@ -209,8 +275,14 @@ where
         } else {
             1
         };
-        let backoff = self.backoff_cap.saturating_sub(global_bytes_read);
-        Duration::from_millis(backoff as u64)
+        let backoff =
+            Duration::from_millis(self.backoff_cap.saturating_sub(global_bytes_read) as u64);
+        let now = self.clock.now();
+        if let Some(next_due) = self.scheduler.next_wakeup(now) {
+            cmp::min(backoff, next_due.saturating_duration_since(now))
+        } else {
+            backoff
+        }
     }
 
     /// Search (glob) for files to detect new files, renames, and fingerprint collisions.
@@ -245,39 +317,21 @@ where
                         );
                     } else if !was_found_this_cycle {
                         // matches a file with a different path
+                        let old_path = watcher.path.clone();
                         info!(
                             message = "Watched file has been renamed.",
                             path = ?path,
-                            old_path = ?watcher.path
+                            old_path = ?old_path
                         );
-                        if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
-                            // Inode changed - emit metrics for the old file
-                            self.server.emitter.emit_file_unwatched(
-                                &unwatch_info.path,
-                                unwatch_info.reached_eof,
-                                unwatch_info.bytes_unread,
+                        if let Ok(unwatch_opt) = watcher.update_path(path.clone()).await {
+                            self.event_source.watch_path(file_id, &path);
+                            self.scheduler.on_file_renamed(
+                                file_id,
+                                &old_path,
+                                &path,
+                                self.clock.now(),
                             );
-                        }
-                    } else {
-                        info!(
-                            message = "More than one file has the same fingerprint.",
-                            path = ?path,
-                            old_path = ?watcher.path
-                        );
-                        let (old_path, new_path) = (&watcher.path, &path);
-                        if let (Ok(old_meta), Ok(new_meta)) = (
-                            self.fs.metadata(old_path).await,
-                            self.fs.metadata(new_path).await,
-                        ) && let (Some(old_modified_time), Some(new_modified_time)) =
-                            (old_meta.modified, new_meta.modified)
-                            && old_modified_time < new_modified_time
-                        {
-                            info!(
-                                message = "Switching to watch most recently modified file.",
-                                new_modified_time = ?new_modified_time,
-                                old_modified_time = ?old_modified_time,
-                            );
-                            if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                            if let Some(unwatch_info) = unwatch_opt {
                                 // Inode changed - emit metrics for the old file
                                 self.server.emitter.emit_file_unwatched(
                                     &unwatch_info.path,
@@ -286,6 +340,8 @@ where
                                 );
                             }
                         }
+                    } else {
+                        self.handle_duplicate_fingerprint(file_id, path).await;
                     }
                 } else {
                     // untracked file fingerprint
@@ -294,10 +350,55 @@ where
                 }
             }
         }
+        // Promote any newly unfindable watchers so they get a final drain pass
+        // before `reap_dead_files` can expire them on `rotate_wait`.
+        for (&file_id, watcher) in &self.fp_map {
+            if !watcher.file_findable() {
+                self.scheduler.on_file_unfindable(file_id);
+            }
+        }
+
         self.stats.record(
             "discovery",
             self.clock.now().saturating_duration_since(start),
         );
+    }
+
+    async fn handle_duplicate_fingerprint(&mut self, file_id: FileFingerprint, path: PathBuf) {
+        let Some(watcher) = self.fp_map.get_mut(&file_id) else {
+            return;
+        };
+        info!(
+            message = "More than one file has the same fingerprint.",
+            path = ?path,
+            old_path = ?watcher.path
+        );
+        let (old_path, new_path) = (watcher.path.clone(), path.clone());
+        if let (Ok(old_meta), Ok(new_meta)) = (
+            self.fs.metadata(&old_path).await,
+            self.fs.metadata(&new_path).await,
+        ) && let (Some(old_modified_time), Some(new_modified_time)) =
+            (old_meta.modified, new_meta.modified)
+            && old_modified_time < new_modified_time
+        {
+            info!(
+                message = "Switching to watch most recently modified file.",
+                new_modified_time = ?new_modified_time,
+                old_modified_time = ?old_modified_time,
+            );
+            if let Ok(unwatch_opt) = watcher.update_path(path).await {
+                self.event_source.watch_path(file_id, &new_path);
+                self.scheduler
+                    .on_file_renamed(file_id, &old_path, &new_path, self.clock.now());
+                if let Some(unwatch_info) = unwatch_opt {
+                    self.server.emitter.emit_file_unwatched(
+                        &unwatch_info.path,
+                        unwatch_info.reached_eof,
+                        unwatch_info.bytes_unread,
+                    );
+                }
+            }
+        }
     }
 
     /// Cleanup `known_small_files` that have exceeded `remove_after`.
@@ -335,93 +436,150 @@ where
         }
     }
 
-    /// Collect lines by polling watched files. Returns total bytes read across all files.
+    /// Collect lines by polling watched files selected by the [`ReadScheduler`].
+    /// Returns total bytes read across all files.
     ///
     /// # Panics
     /// Panics if a watched file path is not valid UTF-8.
     pub async fn poll_files(&mut self, lines: &mut Vec<Line>) -> usize {
         let mut global_bytes_read: usize = 0;
         let mut maxed_out_reading_single_file = false;
-        for (&file_id, watcher) in &mut self.fp_map {
-            let now = self.clock.now();
-            if !watcher.should_read_at(now) {
+
+        let select_now = self.clock.now();
+        self.promote_remove_after_candidates(select_now);
+
+        self.read_candidates.clear();
+        self.scheduler
+            .select_readable(select_now, &mut self.read_candidates);
+        let candidates = std::mem::take(&mut self.read_candidates);
+
+        for (idx, &file_id) in candidates.iter().enumerate() {
+            let Some(watcher) = self.fp_map.get_mut(&file_id) else {
                 continue;
-            }
+            };
 
             let start = self.clock.now();
             let mut bytes_read: usize = 0;
-            while let Ok(RawLineResult {
-                raw_line: Some(line),
-                discarded_for_size_and_truncated,
-            }) = watcher.read_line_with_clock(&self.clock).await
-            {
-                for buf in &discarded_for_size_and_truncated {
-                    self.server.emitter.emit_file_line_too_long(
-                        &buf.clone(),
-                        self.server.max_line_bytes,
-                        buf.len(),
-                    );
-                }
+            let mut lines_read: usize = 0;
+            let mut hit_max_read_bytes = false;
+            let mut had_read_error = false;
+            loop {
+                match watcher.read_line_with_clock(&self.clock).await {
+                    Ok(RawLineResult {
+                        raw_line: Some(line),
+                        discarded_for_size_and_truncated,
+                    }) => {
+                        for buf in &discarded_for_size_and_truncated {
+                            self.server.emitter.emit_file_line_too_long(
+                                &buf.clone(),
+                                self.server.max_line_bytes,
+                                buf.len(),
+                            );
+                        }
 
-                let sz = line.bytes.len();
-                trace!(
-                    message = "Read bytes.",
-                    path = ?watcher.path,
-                    bytes = ?sz
-                );
-                self.stats.record_bytes(sz);
+                        let sz = line.bytes.len();
+                        trace!(
+                            message = "Read bytes.",
+                            path = ?watcher.path,
+                            bytes = ?sz
+                        );
+                        self.stats.record_bytes(sz);
 
-                bytes_read += sz;
+                        bytes_read += sz;
+                        lines_read += 1;
 
-                lines.push(Line {
-                    text: line.bytes,
-                    filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                    file_id,
-                    start_offset: line.offset,
-                    end_offset: watcher.get_file_position(),
-                });
+                        lines.push(Line {
+                            text: line.bytes,
+                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                            file_id,
+                            start_offset: line.offset,
+                            end_offset: watcher.get_file_position(),
+                        });
 
-                if bytes_read > self.server.max_read_bytes {
-                    maxed_out_reading_single_file = true;
-                    break;
+                        if bytes_read > self.server.max_read_bytes {
+                            hit_max_read_bytes = true;
+                            maxed_out_reading_single_file = true;
+                            break;
+                        }
+                    }
+                    Ok(RawLineResult { raw_line: None, .. }) => break,
+                    Err(_) => {
+                        had_read_error = true;
+                        break;
+                    }
                 }
             }
+            let after_read = self.clock.now();
             self.stats
-                .record("reading", self.clock.now().saturating_duration_since(start));
+                .record("reading", after_read.saturating_duration_since(start));
 
             if bytes_read > 0 {
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
+            }
+
+            if hit_max_read_bytes {
+                self.scheduler
+                    .on_file_read_more(file_id, lines_read, after_read);
+            } else if had_read_error {
+                self.scheduler.on_file_read_error(file_id, after_read);
             } else {
-                // Should the file be removed
-                if let Some(grace_period) = self.server.remove_after
-                    && self
-                        .clock
-                        .now()
-                        .saturating_duration_since(watcher.last_read_success())
-                        >= grace_period
-                {
-                    // Try to remove
-                    match self.fs.remove_file(&watcher.path).await {
-                        Ok(()) => {
-                            self.server.emitter.emit_file_deleted(&watcher.path);
-                            watcher.set_dead();
-                        }
-                        Err(error) => {
-                            // We will try again after some time.
-                            self.server
-                                .emitter
-                                .emit_file_delete_error(&watcher.path, error);
-                        }
-                    }
+                self.scheduler.on_file_eof(file_id, lines_read, after_read);
+                if lines_read == 0 {
+                    Self::maybe_remove_idle_watcher(
+                        &self.fs,
+                        &self.server.emitter,
+                        self.server.remove_after,
+                        watcher,
+                        after_read,
+                    )
+                    .await;
                 }
             }
 
             // Do not move on to newer files if we are behind on an older file
             if self.server.oldest_first && maxed_out_reading_single_file {
+                for &skipped_id in &candidates[idx + 1..] {
+                    self.scheduler.on_file_skipped(skipped_id);
+                }
                 break;
             }
         }
+        self.read_candidates = candidates;
         global_bytes_read
+    }
+
+    fn promote_remove_after_candidates(&mut self, now: MonotonicInstant) {
+        if let Some(grace_period) = self.server.remove_after {
+            for (&file_id, watcher) in &self.fp_map {
+                if !watcher.dead()
+                    && now.saturating_duration_since(watcher.last_read_success()) >= grace_period
+                {
+                    self.scheduler.on_file_needs_verification(file_id);
+                }
+            }
+        }
+    }
+
+    async fn maybe_remove_idle_watcher(
+        fs: &FS,
+        emitter: &E,
+        remove_after: Option<Duration>,
+        watcher: &mut FileWatcher<FS>,
+        now: MonotonicInstant,
+    ) {
+        if let Some(grace_period) = remove_after
+            && now.saturating_duration_since(watcher.last_read_success()) >= grace_period
+        {
+            match fs.remove_file(&watcher.path).await {
+                Ok(()) => {
+                    emitter.emit_file_deleted(&watcher.path);
+                    watcher.set_dead();
+                }
+                Err(error) => {
+                    emitter.emit_file_delete_error(&watcher.path, error);
+                }
+            }
+        }
     }
 
     /// Expire unfindable watchers past `rotate_wait` and remove all dead watchers.
@@ -447,6 +605,8 @@ where
 
         for file_id in dead_file_ids {
             if let Some(watcher) = self.fp_map.shift_remove(&file_id) {
+                self.scheduler.on_file_removed(file_id);
+                self.event_source.unwatch_path(file_id);
                 let unwatch_info = watcher.get_unwatch_info().await;
                 self.server.emitter.emit_file_unwatched(
                     &unwatch_info.path,
@@ -502,8 +662,13 @@ where
                 } else {
                     self.server.emitter.emit_file_added(&path);
                 }
-                watcher.set_file_findable_at(true, self.clock.now());
+                let now = self.clock.now();
+                watcher.set_file_findable_at(true, now);
+                let initial_ts = watcher.last_read_success();
                 self.fp_map.insert(file_id, watcher);
+                self.event_source.watch_path(file_id, &path);
+                self.scheduler
+                    .on_file_added(file_id, &path, initial_ts, now);
             }
             Err(error) => self.server.emitter.emit_file_watch_error(&path, error),
         }
@@ -565,6 +730,67 @@ where
         .await
     }
 
+    /// Opt-in entrypoint running `FileServer` with [`AdaptiveEventScheduler`]
+    /// and [`NotifyEventSource`] (gracefully degrading to adaptive fallback
+    /// polling if OS watcher initialization fails).
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    pub async fn run_adaptive<C, S1, S2>(
+        self,
+        chans: C,
+        shutdown_data: S1,
+        shutdown_checkpointer: S2,
+        checkpointer: Checkpointer,
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
+    where
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
+    {
+        let scheduler = AdaptiveEventScheduler::new(AdaptiveSchedulerConfig {
+            oldest_first: self.oldest_first,
+            ..AdaptiveSchedulerConfig::default()
+        });
+        match NotifyEventSource::new() {
+            Ok(event_source) => {
+                self.run_with_scheduler(
+                    chans,
+                    shutdown_data,
+                    shutdown_checkpointer,
+                    checkpointer,
+                    OsFileSystem,
+                    SystemClock,
+                    scheduler,
+                    event_source,
+                )
+                .await
+            }
+            Err(error) => {
+                warn!(
+                    message = "Failed to initialize OS file event watcher; falling back to adaptive polling.",
+                    %error,
+                );
+                self.run_with_scheduler(
+                    chans,
+                    shutdown_data,
+                    shutdown_checkpointer,
+                    checkpointer,
+                    OsFileSystem,
+                    SystemClock,
+                    scheduler,
+                    NoopFsEventSource,
+                )
+                .await
+            }
+        }
+    }
+
     /// Run the `FileServer` with an explicit [`FileSystem`] and [`Clock`].
     ///
     /// # Errors
@@ -575,10 +801,10 @@ where
     /// closing the output sink fails, or the checkpoint writer task fails.
     pub async fn run_with<Ch, S1, S2, FS, Clk>(
         self,
-        mut chans: Ch,
-        mut shutdown_data: S1,
+        chans: Ch,
+        shutdown_data: S1,
         shutdown_checkpointer: S2,
-        mut checkpointer: Checkpointer<FS, Clk>,
+        checkpointer: Checkpointer<FS, Clk>,
         fs: FS,
         clock: Clk,
     ) -> Result<Shutdown, <Ch as Sink<Vec<Line>>>::Error>
@@ -590,8 +816,62 @@ where
         FS: FileSystem,
         Clk: Clock,
     {
+        self.run_with_scheduler(
+            chans,
+            shutdown_data,
+            shutdown_checkpointer,
+            checkpointer,
+            fs,
+            clock,
+            LegacyPollingScheduler::default(),
+            NoopFsEventSource,
+        )
+        .await
+    }
+
+    /// Run the `FileServer` with explicit [`FileSystem`], [`Clock`], [`ReadScheduler`],
+    /// and [`FsEventSource`]. If the event source provides a wakeup notifier, idle
+    /// backoff sleeps are interrupted immediately when OS filesystem events arrive.
+    ///
+    /// # Errors
+    /// Returns the output sink's error if sending a batch of lines fails.
+    ///
+    /// # Panics
+    /// Panics if the polling deadline overflows, a file path is not UTF-8,
+    /// closing the output sink fails, or the checkpoint writer task fails.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_with_scheduler<Ch, S1, S2, FS, Clk, S, Ev>(
+        self,
+        mut chans: Ch,
+        mut shutdown_data: S1,
+        shutdown_checkpointer: S2,
+        mut checkpointer: Checkpointer<FS, Clk>,
+        fs: FS,
+        clock: Clk,
+        scheduler: S,
+        event_source: Ev,
+    ) -> Result<Shutdown, <Ch as Sink<Vec<Line>>>::Error>
+    where
+        Ch: Sink<Vec<Line>> + Unpin,
+        <Ch as Sink<Vec<Line>>>::Error: std::error::Error,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
+        FS: FileSystem,
+        Clk: Clock,
+        S: ReadScheduler,
+        Ev: FsEventSource,
+    {
         let mut lines = Vec::new();
-        let mut state = FileServerState::init(self, &mut checkpointer, fs, clock.clone()).await;
+        let wakeup = event_source.wakeup_notifier();
+        let mut state = FileServerState::init_with_scheduler(
+            self,
+            &mut checkpointer,
+            fs,
+            clock.clone(),
+            scheduler,
+            event_source,
+        )
+        .await;
 
         // Spawn the checkpoint writer task
         let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
@@ -622,9 +902,17 @@ where
 
             let start = clock.now();
             let sleep_clock = clock.clone();
+            let sleep_wakeup = wakeup.clone();
             let sleep = async move {
                 if !backoff.is_zero() {
-                    sleep_clock.sleep(backoff).await;
+                    if let Some(notify) = sleep_wakeup {
+                        tokio::select! {
+                            () = sleep_clock.sleep(backoff) => {},
+                            () = notify.notified() => {},
+                        }
+                    } else {
+                        sleep_clock.sleep(backoff).await;
+                    }
                 }
             };
             futures::pin_mut!(sleep);

@@ -12,14 +12,37 @@ use file_source_common::{
 use proptest::prelude::*;
 use tokio::io::AsyncReadExt as _;
 
-use crate::file_server::{FileServer, FileServerState, Line};
+use crate::{
+    file_server::{FileServer, FileServerState, Line},
+    scheduler::{
+        AdaptiveEventScheduler, AdaptiveSchedulerConfig, FsEventSource, LegacyPollingScheduler,
+        NoopFsEventSource, ReadScheduler,
+    },
+};
 
 use super::{
     action::{DstConfig, NUM_SLOTS, SimAction},
     clock::SimClock,
     emitter::RecordingEmitter,
-    fs::{SimFileSystem, SimPathsProvider},
+    fs::{EventDelivery, FsStats, SimFileSystem, SimPathsProvider},
 };
+
+/// Quiescent summary returned by a completed DST run for lockstep differential comparison.
+#[derive(Debug)]
+pub struct DstOutcome {
+    /// Delivered lines per stream `ino`.
+    pub delivered_by_ino: BTreeMap<u64, Vec<String>>,
+    /// Streams that were unlinked/moved outside glob (or partially-checkpointed gzip)
+    /// across a `Restart`, where earlier draining can legitimately deliver more lines.
+    pub lost_across_restart_inos: HashSet<u64>,
+    /// Streams that experienced an unpersisted restart or transient `EACCES` reopen.
+    pub allow_replay_inos: HashSet<u64>,
+    /// Final sorted list of paths remaining in `SimFileSystem`.
+    pub final_paths: Vec<PathBuf>,
+    /// Cumulative filesystem operation counters.
+    #[allow(dead_code)]
+    pub fs_stats: FsStats,
+}
 
 #[derive(Default)]
 struct StreamModel {
@@ -52,13 +75,19 @@ struct SlotEntry {
 
 /// Deterministic simulation runner executing a `proptest`-generated [`SimAction`]
 /// trace against [`FileServerState`] + [`SimFileSystem`] + [`SimClock`].
-pub struct DstRunner {
+pub struct DstRunner<
+    S: ReadScheduler = LegacyPollingScheduler,
+    Ev: FsEventSource = NoopFsEventSource,
+> {
     config: DstConfig,
     clock: SimClock,
     fs: SimFileSystem,
     emitter: RecordingEmitter,
     checkpointer: Checkpointer<SimFileSystem, SimClock>,
-    state: Option<FileServerState<SimPathsProvider, RecordingEmitter, SimFileSystem, SimClock>>,
+    state:
+        Option<FileServerState<SimPathsProvider, RecordingEmitter, SimFileSystem, SimClock, S, Ev>>,
+    make_scheduler: Box<dyn Fn(&DstConfig) -> S + Send>,
+    make_event_source: Box<dyn Fn(&SimFileSystem) -> Ev + Send>,
     active_slots: Vec<Option<SlotEntry>>,
     /// Rotated files that remain inside `/logs/*` and can still receive appends.
     rotated_in_glob: Vec<(PathBuf, u64)>,
@@ -83,17 +112,32 @@ pub struct DstRunner {
     rot_counter: u64,
 }
 
-impl DstRunner {
-    pub async fn new(config: DstConfig) -> Self {
+impl<S: ReadScheduler, Ev: FsEventSource> DstRunner<S, Ev> {
+    pub async fn new_with(
+        config: DstConfig,
+        delivery: EventDelivery,
+        make_scheduler: impl Fn(&DstConfig) -> S + Send + 'static,
+        make_event_source: impl Fn(&SimFileSystem) -> Ev + Send + 'static,
+    ) -> Self {
         let clock = SimClock::new();
         let fs = SimFileSystem::new(clock.clone());
         fs.set_max_bytes_per_read(config.max_bytes_per_read);
+        fs.set_event_delivery(delivery);
         let emitter = RecordingEmitter::new();
         let mut checkpointer =
             Checkpointer::new_with(&PathBuf::from("/data"), fs.clone(), clock.clone());
         let server = build_server(&fs, emitter.clone(), &config);
-        let state =
-            FileServerState::init(server, &mut checkpointer, fs.clone(), clock.clone()).await;
+        let scheduler = make_scheduler(&config);
+        let event_source = make_event_source(&fs);
+        let state = FileServerState::init_with_scheduler(
+            server,
+            &mut checkpointer,
+            fs.clone(),
+            clock.clone(),
+            scheduler,
+            event_source,
+        )
+        .await;
 
         Self {
             config,
@@ -102,6 +146,8 @@ impl DstRunner {
             emitter,
             checkpointer,
             state: Some(state),
+            make_scheduler: Box::new(make_scheduler),
+            make_event_source: Box::new(make_event_source),
             active_slots: vec![None; NUM_SLOTS],
             rotated_in_glob: Vec::new(),
             unfindable_inos: HashSet::new(),
@@ -399,9 +445,18 @@ impl DstRunner {
         let mut new_cp =
             Checkpointer::new_with(&PathBuf::from("/data"), self.fs.clone(), self.clock.clone());
         let new_server = build_server(&self.fs, self.emitter.clone(), &self.config);
+        let scheduler = (self.make_scheduler)(&self.config);
+        let event_source = (self.make_event_source)(&self.fs);
         self.state = Some(
-            FileServerState::init(new_server, &mut new_cp, self.fs.clone(), self.clock.clone())
-                .await,
+            FileServerState::init_with_scheduler(
+                new_server,
+                &mut new_cp,
+                self.fs.clone(),
+                self.clock.clone(),
+                scheduler,
+                event_source,
+            )
+            .await,
         );
 
         // Gzip files with an existing recovered checkpoint are opened as `FileReader::Null`
@@ -607,11 +662,13 @@ impl DstRunner {
                 }
             }
             SimAction::Restart => self.restart_server(step_idx).await?,
+            SimAction::InjectFsOverflow => self.fs.inject_event_overflow(),
         }
 
         // Open OS handles must never exceed active watchers (watchers using
         // `FileReader::Null` for already-checkpointed gzip files hold 0 handles).
-        let open_count = self.state.as_ref().unwrap().open_file_count();
+        let state_ref = self.state.as_ref().unwrap();
+        let open_count = state_ref.open_file_count();
         prop_assert!(
             self.fs.active_open_handles() <= open_count,
             "step={}: active_open_handles ({}) > open_file_count ({})",
@@ -619,10 +676,29 @@ impl DstRunner {
             self.fs.active_open_handles(),
             open_count
         );
+
+        // Scheduler internal timer heap must stay strictly O(N) bounded under churn.
+        let heap_limit = open_count.saturating_mul(4).max(64);
+        prop_assert!(
+            state_ref.scheduler_pending_timers() <= heap_limit,
+            "step={}: scheduler_pending_timers ({}) exceeded O(N) bound ({})",
+            step_idx,
+            state_ref.scheduler_pending_timers(),
+            heap_limit
+        );
+
+        // Event-source watch registrations must never leak past active watchers.
+        prop_assert!(
+            state_ref.watched_event_count() <= open_count,
+            "step={}: watched_event_count ({}) > open_file_count ({})",
+            step_idx,
+            state_ref.watched_event_count(),
+            open_count
+        );
         Ok(())
     }
 
-    pub async fn finish_and_verify(mut self) -> Result<(), TestCaseError> {
+    pub async fn finish_and_verify(mut self) -> Result<DstOutcome, TestCaseError> {
         // Restore readability on all files so transient EACCES recovers cleanly.
         for path in self.unreadable_paths.drain() {
             self.fs.set_readable(&path, true);
@@ -646,82 +722,12 @@ impl DstRunner {
         }
 
         let min_lines = self.min_fingerprint_lines();
-        for (ino, model) in &self.models {
+        for (&ino, model) in &self.models {
             let got = self
                 .delivered_by_ino
-                .get(ino)
+                .get(&ino)
                 .map_or(&[][..], Vec::as_slice);
-
-            if model.total_newlines < min_lines || model.unfindable_before_discovery {
-                // File never accumulated enough lines to be fingerprinted under `lines: N`.
-                continue;
-            }
-
-            if model.lost_across_restart {
-                // Unlinked/moved outside glob before a restart: every line we DID deliver
-                // must be a valid line from this stream (never corrupted/invented).
-                for line in got {
-                    prop_assert!(
-                        model.expected_lines.contains(line),
-                        "ino={}: unexpected line {:?} not in expected {:?}",
-                        ino,
-                        line,
-                        model.expected_lines
-                    );
-                }
-                continue;
-            }
-
-            if model.allow_replay {
-                // At-least-once across unacked/crashed-checkpoint restarts or transient EACCES:
-                // 1. Every delivered line belongs to this stream.
-                // 2. Every expected non-empty line was delivered at least once in exact first-seen order.
-                // 3. At least as many empty lines were delivered as were written.
-                let mut first_seen_order = Vec::new();
-                let mut seen = HashSet::new();
-                let mut empty_delivered = 0usize;
-                for line in got {
-                    prop_assert!(
-                        model.expected_lines.contains(line),
-                        "ino={}: unexpected line {:?}",
-                        ino,
-                        line
-                    );
-                    if line.is_empty() {
-                        empty_delivered += 1;
-                    } else if seen.insert(line.clone()) {
-                        first_seen_order.push(line.clone());
-                    }
-                }
-                let expected_non_empty: Vec<String> = model
-                    .expected_lines
-                    .iter()
-                    .filter(|l| !l.is_empty())
-                    .cloned()
-                    .collect();
-                let expected_empty = model.expected_lines.len() - expected_non_empty.len();
-                prop_assert_eq!(
-                    first_seen_order,
-                    expected_non_empty,
-                    "ino={}: at-least-once order/completeness violated",
-                    ino
-                );
-                prop_assert!(
-                    empty_delivered >= expected_empty,
-                    "ino={}: missing empty lines ({} < {})",
-                    ino,
-                    empty_delivered,
-                    expected_empty
-                );
-            } else {
-                // No unpersisted restart or EACCES on this stream: strict exact delivery (no loss, no dupes).
-                prop_assert_eq!(
-                    got,
-                    model.expected_lines.as_slice(),
-                    "ino={}: delivered lines diverged from ground truth",
-                    ino
-                );
-            }
+            verify_stream_delivery(ino, model, got, min_lines)?;
         }
 
         self.state = None;
@@ -730,8 +736,99 @@ impl DstRunner {
             0,
             "fd leak at end of simulation"
         );
-        Ok(())
+
+        let lost_across_restart_inos: HashSet<u64> = self
+            .models
+            .iter()
+            .filter(|(_, m)| m.lost_across_restart)
+            .map(|(&ino, _)| ino)
+            .collect();
+        let allow_replay_inos: HashSet<u64> = self
+            .models
+            .iter()
+            .filter(|(_, m)| m.allow_replay)
+            .map(|(&ino, _)| ino)
+            .collect();
+        let delivered_by_ino: BTreeMap<u64, Vec<String>> =
+            self.delivered_by_ino.into_iter().collect();
+
+        Ok(DstOutcome {
+            delivered_by_ino,
+            lost_across_restart_inos,
+            allow_replay_inos,
+            final_paths: self.fs.all_paths(),
+            fs_stats: self.fs.stats(),
+        })
     }
+}
+
+fn verify_stream_delivery(
+    ino: u64,
+    model: &StreamModel,
+    got: &[String],
+    min_lines: usize,
+) -> Result<(), TestCaseError> {
+    if model.total_newlines < min_lines || model.unfindable_before_discovery {
+        return Ok(());
+    }
+    if model.lost_across_restart {
+        for line in got {
+            prop_assert!(
+                model.expected_lines.contains(line),
+                "ino={}: unexpected line {:?} not in expected {:?}",
+                ino,
+                line,
+                model.expected_lines
+            );
+        }
+        return Ok(());
+    }
+    if model.allow_replay {
+        let mut first_seen_order = Vec::new();
+        let mut seen = HashSet::new();
+        let mut empty_delivered = 0usize;
+        for line in got {
+            prop_assert!(
+                model.expected_lines.contains(line),
+                "ino={}: unexpected line {:?}",
+                ino,
+                line
+            );
+            if line.is_empty() {
+                empty_delivered += 1;
+            } else if seen.insert(line.clone()) {
+                first_seen_order.push(line.clone());
+            }
+        }
+        let expected_non_empty: Vec<String> = model
+            .expected_lines
+            .iter()
+            .filter(|l| !l.is_empty())
+            .cloned()
+            .collect();
+        let expected_empty = model.expected_lines.len() - expected_non_empty.len();
+        prop_assert_eq!(
+            first_seen_order,
+            expected_non_empty,
+            "ino={}: at-least-once order/completeness violated",
+            ino
+        );
+        prop_assert!(
+            empty_delivered >= expected_empty,
+            "ino={}: missing empty lines ({} < {})",
+            ino,
+            empty_delivered,
+            expected_empty
+        );
+    } else {
+        prop_assert_eq!(
+            got,
+            model.expected_lines.as_slice(),
+            "ino={}: delivered lines diverged from ground truth",
+            ino
+        );
+    }
+    Ok(())
 }
 
 fn build_server(
@@ -758,14 +855,69 @@ fn build_server(
 }
 
 /// Runs a `proptest`-generated `(DstConfig, Vec<SimAction>)` scenario against
-/// `FileServerState` + `SimFileSystem` + `SimClock`.
+/// `FileServerState` with [`LegacyPollingScheduler`].
 pub fn run_dst_scenario(config: DstConfig, actions: &[SimAction]) -> Result<(), TestCaseError> {
+    run_dst_scenario_outcome(config, actions).map(|_| ())
+}
+
+/// Same as [`run_dst_scenario`], returning the quiescent [`DstOutcome`] for differential assertions.
+pub fn run_dst_scenario_outcome(
+    config: DstConfig,
+    actions: &[SimAction],
+) -> Result<DstOutcome, TestCaseError> {
+    run_dst_with(
+        config,
+        actions,
+        EventDelivery::Normal,
+        |_| LegacyPollingScheduler::default(),
+        |_| NoopFsEventSource,
+    )
+}
+
+/// Runs a `proptest`-generated `(DstConfig, Vec<SimAction>)` scenario against
+/// `FileServerState` with [`AdaptiveEventScheduler`] + [`SimFsEventSource`].
+pub fn run_dst_scenario_adaptive(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+) -> Result<(), TestCaseError> {
+    run_dst_scenario_adaptive_outcome(config, actions, delivery).map(|_| ())
+}
+
+/// Same as [`run_dst_scenario_adaptive`], returning the quiescent [`DstOutcome`] for differential assertions.
+pub fn run_dst_scenario_adaptive_outcome(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+) -> Result<DstOutcome, TestCaseError> {
+    run_dst_with(
+        config,
+        actions,
+        delivery,
+        |cfg| {
+            AdaptiveEventScheduler::new(AdaptiveSchedulerConfig {
+                oldest_first: cfg.oldest_first,
+                ..AdaptiveSchedulerConfig::default()
+            })
+        },
+        SimFileSystem::event_source,
+    )
+}
+
+fn run_dst_with<S: ReadScheduler, Ev: FsEventSource>(
+    config: DstConfig,
+    actions: &[SimAction],
+    delivery: EventDelivery,
+    make_scheduler: impl Fn(&DstConfig) -> S + Send + 'static,
+    make_event_source: impl Fn(&SimFileSystem) -> Ev + Send + 'static,
+) -> Result<DstOutcome, TestCaseError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .expect("build current-thread tokio runtime");
     rt.block_on(async move {
-        let mut runner = DstRunner::new(config).await;
+        let mut runner =
+            DstRunner::new_with(config, delivery, make_scheduler, make_event_source).await;
         for (step_idx, action) in actions.iter().enumerate() {
             runner.execute_action(step_idx, action).await?;
         }
