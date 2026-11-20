@@ -4,19 +4,22 @@ use std::sync::Arc;
 #[cfg(test)]
 use base64::prelude::*;
 
-use azure_core::http::ClientMethodOptions;
+use azure_core::http::{ClientMethodOptions, ClientOptions, Transport};
 
 use azure_core::credentials::{TokenCredential, TokenRequestOptions};
 use azure_core::{Error, error::ErrorKind};
 
 use azure_identity::{
-    AzureCliCredential, ClientAssertion, ClientAssertionCredential, ClientCertificateCredential,
-    ClientCertificateCredentialOptions, ClientSecretCredential, ManagedIdentityCredential,
-    ManagedIdentityCredentialOptions, UserAssignedId, WorkloadIdentityCredential,
-    WorkloadIdentityCredentialOptions,
+    AzureCliCredential, ClientAssertion, ClientAssertionCredential,
+    ClientAssertionCredentialOptions, ClientCertificateCredential,
+    ClientCertificateCredentialOptions, ClientSecretCredential, ClientSecretCredentialOptions,
+    ManagedIdentityCredential, ManagedIdentityCredentialOptions, UserAssignedId,
+    WorkloadIdentityCredential, WorkloadIdentityCredentialOptions,
 };
 
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+
+use crate::config::ProxyConfig;
 
 /// TLS configuration.
 #[configurable_component]
@@ -225,9 +228,9 @@ impl AzureAuthentication {
     ///
     /// # Errors
     /// Returns an error if credential settings or certificate files are invalid.
-    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+    pub fn credential(&self, proxy: &ProxyConfig) -> azure_core::Result<Arc<dyn TokenCredential>> {
         match self {
-            Self::Specific(specific) => specific.credential(),
+            Self::Specific(specific) => specific.credential(proxy),
 
             #[cfg(test)]
             Self::MockCredential => Ok(Arc::new(MockTokenCredential) as Arc<dyn TokenCredential>),
@@ -240,7 +243,8 @@ impl SpecificAzureCredential {
     ///
     /// # Errors
     /// Returns an error if credential settings or certificate files are invalid.
-    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+    #[allow(clippy::too_many_lines, reason = "one arm per credential kind")]
+    pub fn credential(&self, proxy: &ProxyConfig) -> azure_core::Result<Arc<dyn TokenCredential>> {
         Ok(match self {
             #[cfg(not(target_arch = "wasm32"))]
             Self::AzureCli {} => AzureCliCredential::new(None)?,
@@ -267,6 +271,7 @@ impl SpecificAzureCredential {
                 if let Some(password) = certificate_password {
                     options.password = Some(password.inner().to_string().into());
                 }
+                options.client_options = identity_client_options(proxy)?;
 
                 ClientCertificateCredential::new(
                     azure_tenant_id.clone(),
@@ -302,7 +307,9 @@ impl SpecificAzureCredential {
                     &azure_tenant_id.clone(),
                     azure_client_id.clone(),
                     secret.into(),
-                    None,
+                    Some(ClientSecretCredentialOptions {
+                        client_options: identity_client_options(proxy)?,
+                    }),
                 )?
             }
 
@@ -334,7 +341,9 @@ impl SpecificAzureCredential {
                     client_assertion_tenant_id.clone(),
                     client_assertion_client_id.clone(),
                     assertion,
-                    None,
+                    Some(ClientAssertionCredentialOptions {
+                        client_options: identity_client_options(proxy)?,
+                    }),
                 )?
             }
 
@@ -347,13 +356,62 @@ impl SpecificAzureCredential {
                     tenant_id: tenant_id.clone(),
                     client_id: client_id.clone(),
                     token_file_path: token_file_path.clone(),
-                    ..Default::default()
+                    credential_options: ClientAssertionCredentialOptions {
+                        client_options: identity_client_options(proxy)?,
+                    },
                 };
 
                 WorkloadIdentityCredential::new(Some(options))?
             }
         })
     }
+}
+
+// Managed identity is left out: its token endpoint is the link-local IMDS address or a local
+// sidecar, which a proxy cannot reach.
+fn identity_client_options(proxy: &ProxyConfig) -> azure_core::Result<ClientOptions> {
+    // Same timeouts and redirect policy as the Azure SDK's default reqwest client.
+    let builder = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .redirect(reqwest::redirect::Policy::none());
+    let builder = if proxy.enabled {
+        // `Proxy::custom` skips a proxy URL it cannot parse, so reject it here instead.
+        for url in [&proxy.http, &proxy.https].into_iter().flatten() {
+            reqwest::Proxy::all(url).map_err(|e| {
+                Error::with_message(ErrorKind::Credential, format!("Invalid proxy URL: {e}"))
+            })?;
+        }
+        let proxy = proxy.clone();
+        builder.proxy(reqwest::Proxy::custom(move |url| {
+            let host = url.host_str()?;
+            if proxy.no_proxy.matches(host)
+                || url
+                    .port()
+                    .is_some_and(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
+            {
+                return None;
+            }
+            match url.scheme() {
+                "http" => proxy.http.clone(),
+                "https" => proxy.https.clone(),
+                _ => None,
+            }
+        }))
+    } else {
+        builder.no_proxy()
+    };
+    let client = builder.build().map_err(|e| {
+        Error::with_message(
+            ErrorKind::Credential,
+            format!("Failed to build the Azure identity HTTP client: {e}"),
+        )
+    })?;
+
+    Ok(ClientOptions {
+        transport: Some(Transport::new(Arc::new(client))),
+        ..Default::default()
+    })
 }
 
 fn managed_identity_credential(
@@ -441,5 +499,43 @@ async fn azure_mock_token_credential_test() {
     assert_eq!(
         access_token.token.secret(),
         "e30.eyJhdWQiOiJodHRwczovL2V4YW1wbGUuY29tIiwiZXhwIjoyMTQ3NDgzNjQ3LCJpYXQiOjAsImlzcyI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LyIsIm5iZiI6MH0."
+    );
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn client_secret_credential_requests_token_through_proxy() {
+    use tokio::io::AsyncReadExt;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let proxy = ProxyConfig {
+        https: Some(format!("http://{}", listener.local_addr().unwrap())),
+        ..Default::default()
+    };
+    let credential = SpecificAzureCredential::ClientSecretCredential {
+        azure_tenant_id: "00000000-0000-0000-0000-000000000000".to_string(),
+        azure_client_id: "00000000-0000-0000-0000-000000000000".to_string(),
+        azure_client_secret: String::from("secret").into(),
+    }
+    .credential(&proxy)
+    .unwrap();
+
+    let token = tokio::spawn(async move {
+        credential
+            .get_token(&["https://monitor.azure.com/.default"], None)
+            .await
+    });
+    let (mut socket, _) =
+        tokio::time::timeout(std::time::Duration::from_secs(10), listener.accept())
+            .await
+            .expect("token request did not go through the proxy")
+            .unwrap();
+    let mut request = [0; 64];
+    let read = socket.read(&mut request).await.unwrap();
+    token.abort();
+
+    assert!(
+        String::from_utf8_lossy(&request[..read])
+            .starts_with("CONNECT login.microsoftonline.com:443")
     );
 }
