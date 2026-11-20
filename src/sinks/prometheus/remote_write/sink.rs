@@ -143,6 +143,24 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
     }
 }
 
+// Prometheus treats empty label values as equivalent to absent labels and
+// rejects them in Remote Write requests. Stripping them prior to
+// normalization ensures metrics with empty tags and metrics without those
+// tags map to the same time series.
+//
+// Uses `as_single()` to stay consistent with `TimeSeries::make_labels` (`into_iter_single`).
+pub(super) fn strip_empty_tags(mut metric: Metric) -> Metric {
+    if let Some(tags) = metric.tags_mut() {
+        tags.retain(|key, values| {
+            !key.is_empty() && values.as_single().is_some_and(|v| !v.is_empty())
+        });
+        if tags.is_empty() {
+            metric.remove_tags();
+        }
+    }
+    metric
+}
+
 pub(super) struct RemoteWriteSink<S> {
     pub(super) tenant_id: Option<ConfinedTemplate>,
     pub(super) batch_settings: BatcherSettings,
@@ -179,6 +197,7 @@ where
 
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
+            .map(strip_empty_tags)
             .normalized_with_ttl::<PrometheusMetricNormalize>(expire_metrics_secs)
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
@@ -247,4 +266,45 @@ fn make_remote_write_event(
     };
 
     Some(RemoteWriteMetric { metric, tenant_id })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{MetricKind, MetricValue};
+    use vector_lib::event::metric::TagValue;
+
+    #[test]
+    fn strip_empty_tags_removes_empty_keys_and_values() {
+        let metric = Metric::new(
+            "requests_total",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(metric_tags!(
+            "host" => "host01",
+            "timezone" => "",
+            "" => "value",
+            "bare" => TagValue::Bare,
+        )));
+
+        let stripped = strip_empty_tags(metric);
+        assert_eq!(stripped.tags(), Some(&metric_tags!("host" => "host01")));
+    }
+
+    #[test]
+    fn strip_empty_tags_clears_tags_when_all_empty() {
+        let metric = Metric::new(
+            "requests_total",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(metric_tags!(
+            "timezone" => "",
+            "" => "value",
+        )));
+
+        let stripped = strip_empty_tags(metric);
+        assert_eq!(stripped.tags(), None);
+    }
 }

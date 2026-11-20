@@ -397,7 +397,6 @@ impl TimeSeries {
         // consistent key for the buffer.
         let mut labels = labels
             .into_iter_single()
-            .filter(|(name, value)| !name.is_empty() && !value.is_empty())
             .map(|(name, value)| proto::Label { name, value })
             .collect::<Labels>();
         labels.sort();
@@ -1068,30 +1067,6 @@ mod tests {
             assert_eq!(encoded, "");
             parse_text(&encoded).unwrap();
         }
-    }
-
-    #[test]
-    fn filters_empty_labels() {
-        let mut tags = MetricTags::default();
-        tags.replace("valid_key".into(), "valid_value");
-        tags.replace("empty_value".into(), "");
-        tags.replace(String::new(), "empty_key");
-
-        let labels = TimeSeries::make_labels(Some(&tags), "test_metric", "", None);
-
-        assert_eq!(
-            labels,
-            vec![
-                proto::Label {
-                    name: "__name__".into(),
-                    value: "test_metric".into(),
-                },
-                proto::Label {
-                    name: "valid_key".into(),
-                    value: "valid_value".into(),
-                },
-            ]
-        );
     }
 
     #[test]
