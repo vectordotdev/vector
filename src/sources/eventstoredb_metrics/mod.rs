@@ -173,6 +173,6 @@ mod integration_tests {
 
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

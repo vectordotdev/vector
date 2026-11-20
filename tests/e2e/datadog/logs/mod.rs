@@ -42,7 +42,7 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
 fn common_assertions(payloads: &mut [Value]) {
-    assert!(!payloads.is_empty());
+    assert_ne!(payloads, [] as [Value; 0]);
 
     let n_log_events = assert_timestamp_hostname(payloads);
 

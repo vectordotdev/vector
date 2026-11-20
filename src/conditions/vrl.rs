@@ -267,7 +267,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default(), &MetricsStorage::default()) {
                 assert_eq!(
-                    cond.check_with_context(event.clone()).0,
+                    cond.check_with_context(event).0,
                     check.map_err(std::string::ToString::to_string)
                 );
             }

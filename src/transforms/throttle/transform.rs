@@ -4,7 +4,6 @@ use vector_lib::internal_event::emit;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{Quota, clock};
-use metrics::Counter;
 use snafu::Snafu;
 
 use super::{
@@ -28,7 +27,6 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
-    pub cpu_ns: Option<Counter>,
 }
 
 impl<C, I> Throttle<C, I>
@@ -70,7 +68,6 @@ where
             key_field: config.key_field.clone(),
             exclude,
             internal_metrics: config.internal_metrics.clone(),
-            cpu_ns: context.cpu_ns.clone(),
         })
     }
 

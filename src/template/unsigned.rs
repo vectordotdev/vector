@@ -1,3 +1,5 @@
+use crate::serde::parse_unsigned_integer_literal;
+
 use super::parsing::{parse_template, render_metric_field, render_timestamp};
 use super::{
     ConfigurableNumber, ConfigurableString, Cow, EventRef, FixedOffset, Hash, NumberClass, Part,
@@ -87,13 +89,13 @@ impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
                 parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
 
             if is_static {
-                match src.parse::<u64>() {
-                    Ok(num) => Ok(UnsignedIntTemplate {
+                match parse_unsigned_integer_literal(&src) {
+                    Some(num) => Ok(UnsignedIntTemplate {
                         src: UnsignedIntTemplateSource::Number(num),
                         parts,
                         tz_offset: None,
                     }),
-                    Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
+                    None => Err(TemplateParseError::InvalidNumericTemplate {
                         template: src.into_owned(),
                     }),
                 }

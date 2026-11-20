@@ -6,7 +6,7 @@
 <div x-data="{ newestFirst: true }">
   <div class="mt-4 flex justify-end">
     <button type="button"
-      @click="newestFirst = !newestFirst; $refs.list.append(...Array.from($refs.list.children).reverse())"
+      @click="newestFirst = !newestFirst; $refs.list.append(...Array.from($refs.list.children).reverse()); $dispatch('deprecations-sorted')"
       :aria-label="'Sorted by {{ .sort_by }}, ' + (newestFirst ? 'newest' : 'oldest') + ' first. Reverse order.'"
       aria-label="Sorted by {{ .sort_by }}, newest first. Reverse order."
       title="Sort by {{ .sort_by }}"

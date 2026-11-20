@@ -380,7 +380,7 @@ mod tests {
         );
         let (result, metrics) = enc.finish().unwrap();
         assert!(result.into_payload().is_empty());
-        assert!(metrics.is_empty());
+        assert_eq!(metrics, [] as [vector_lib::event::Metric; 0]);
     }
 
     /// Encodes one gauge and reports `(uncompressed_size, compressed_size)` for it.
@@ -637,7 +637,7 @@ mod tests {
         )
         .unwrap();
         let encoded = writer.finalize().unwrap();
-        assert!(!encoded.payload.is_empty());
+        assert_ne!(encoded.payload, [] as [u8; 0]);
 
         // `host_metrics` maps to OriginService 211 in V2's `source_type_to_service` table;
         // V3 reuses that same mapping via the shared `generate_origin_metadata` function.

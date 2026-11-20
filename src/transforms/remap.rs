@@ -404,6 +404,16 @@ impl TransformConfig for RemapConfig {
         true
     }
 
+    fn output_ports(&self) -> Option<Vec<(Option<String>, DataType)>> {
+        // The ports only depend on `reroute_dropped`, not on the program, so listing them does not
+        // require compiling VRL. Keep this in sync with `outputs`.
+        let mut ports = vec![(None, DataType::all_bits())];
+        if self.reroute_dropped {
+            ports.push((Some(DROPPED.to_owned()), DataType::all_bits()));
+        }
+        Some(ports)
+    }
+
     fn files_to_watch(&self) -> Vec<&PathBuf> {
         self.file
             .iter()
@@ -645,6 +655,7 @@ where
                         if !self.reroute_dropped {
                             emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
+                                error: &error,
                             });
                         }
                         ("abort", error, self.drop_on_abort)
@@ -709,7 +720,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
-    use vrl::{btreemap, event_path, value::kind::Collection};
+    use vrl::{event_path, objectmap, value::kind::Collection};
 
     use super::*;
     use crate::{
@@ -761,6 +772,38 @@ mod tests {
         Remap::new(&config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
     }
 
+    #[test]
+    fn output_ports_match_outputs() {
+        let sources = [
+            ".foo = \"bar\"",
+            // The ports must not depend on whether the program compiles.
+            "this is not valid VRL",
+        ];
+        for reroute_dropped in [false, true] {
+            for source in sources {
+                let conf = RemapConfig {
+                    source: Some(source.to_string()),
+                    reroute_dropped,
+                    ..Default::default()
+                };
+                let expected = conf
+                    .outputs(
+                        &TransformContext::default(),
+                        &[(OutputId::dummy(), test_default_schema_definition())],
+                    )
+                    .into_iter()
+                    .map(|output| (output.port, output.ty))
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    conf.output_ports(),
+                    Some(expected),
+                    "reroute_dropped: {reroute_dropped}, source: {source}"
+                );
+            }
+        }
+    }
+
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         remap_with_runner(config)
     }
@@ -791,7 +834,7 @@ mod tests {
     #[test]
     fn remap_trace_scalar_root_drops_trace_layout() {
         let event = {
-            let mut trace = TraceEvent::from(btreemap! {
+            let mut trace = TraceEvent::from(objectmap! {
                 "host" => "a_hostname",
             });
             trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
@@ -1157,6 +1200,41 @@ mod tests {
         let mut tform = remap(conf).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none());
+    }
+
+    #[test]
+    fn check_remap_abort_logs_message() {
+        use std::io::{Read as _, Seek as _, SeekFrom};
+
+        let conf = RemapConfig {
+            source: Some(r#"abort "col_ip invalid:\n" + "garbage""#.to_string()),
+            drop_on_abort: true,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+
+        let mut buffer = tempfile::tempfile().unwrap();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(buffer.try_clone().unwrap())
+            .finish();
+        let output = tracing::subscriber::with_default(subscriber, || {
+            // Another test thread may have cached the callsite as disabled before this
+            // subscriber existed.
+            tracing::callsite::rebuild_interest_cache();
+            transform_one(&mut tform, Event::Log(LogEvent::from("message")))
+        });
+
+        assert!(output.is_none());
+        let mut logs = String::new();
+        buffer.seek(SeekFrom::Start(0)).unwrap();
+        buffer.read_to_string(&mut logs).unwrap();
+        // The message is escaped, so event data cannot break the log line.
+        assert!(
+            logs.contains(r#"Event mapping aborted. error="col_ip invalid:\ngarbage""#),
+            "{logs}"
+        );
     }
 
     #[test]
@@ -1727,7 +1805,10 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
+        assert_eq!(
+            tests.remove(0).run().await.errors,
+            [] as [std::string::String; 0]
+        );
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
