@@ -243,7 +243,7 @@ impl SpecificAzureCredential {
     ///
     /// # Errors
     /// Returns an error if credential settings or certificate files are invalid.
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, reason = "one arm per credential kind")]
     pub fn credential(&self, proxy: &ProxyConfig) -> azure_core::Result<Arc<dyn TokenCredential>> {
         Ok(match self {
             #[cfg(not(target_arch = "wasm32"))]
@@ -370,9 +370,20 @@ impl SpecificAzureCredential {
 // Managed identity is left out: its token endpoint is the link-local IMDS address or a local
 // sidecar, which a proxy cannot reach.
 fn identity_client_options(proxy: &ProxyConfig) -> azure_core::Result<ClientOptions> {
+    // Same timeouts and redirect policy as the Azure SDK's default reqwest client.
+    let builder = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .redirect(reqwest::redirect::Policy::none());
     let builder = if proxy.enabled {
+        // `Proxy::custom` skips a proxy URL it cannot parse, so reject it here instead.
+        for url in [&proxy.http, &proxy.https].into_iter().flatten() {
+            reqwest::Proxy::all(url).map_err(|e| {
+                Error::with_message(ErrorKind::Credential, format!("Invalid proxy URL: {e}"))
+            })?;
+        }
         let proxy = proxy.clone();
-        reqwest::Client::builder().proxy(reqwest::Proxy::custom(move |url| {
+        builder.proxy(reqwest::Proxy::custom(move |url| {
             let host = url.host_str()?;
             if proxy.no_proxy.matches(host)
                 || url
@@ -388,7 +399,7 @@ fn identity_client_options(proxy: &ProxyConfig) -> azure_core::Result<ClientOpti
             }
         }))
     } else {
-        reqwest::Client::builder().no_proxy()
+        builder.no_proxy()
     };
     let client = builder.build().map_err(|e| {
         Error::with_message(
