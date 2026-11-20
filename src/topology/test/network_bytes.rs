@@ -16,6 +16,73 @@ use crate::{
 
 #[cfg(feature = "sources-socket")]
 #[tokio::test]
+async fn tcp_network_bytes_include_rejected_payloads_with_source_component_labels() {
+    use tokio::io::AsyncWriteExt;
+
+    trace_init();
+    let (_guard, address) = next_addr();
+    let component = "network_tcp_source";
+    let (events, sink) = basic_sink(10);
+    let mut events = Box::pin(events.flat_map(into_event_stream));
+    let mut config = Config::builder();
+    config.add_source(
+        component,
+        serde_yaml::from_str::<crate::sources::socket::SocketConfig>(&format!(
+            "mode: tcp\naddress: \"{address}\"\ndecoding:\n  codec: json\n"
+        ))
+        .unwrap(),
+    );
+    config.add_sink("network_tcp_output", &[component], sink);
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    wait_for_tcp(address).await;
+    let tags = &[
+        ("component_id", component),
+        ("component_kind", "source"),
+        ("component_type", "socket"),
+        ("protocol", "tcp"),
+    ];
+    let mut total = 0_u32;
+    // Separate connections exercise the shared reader's spawned connection tasks. The first
+    // connection produces no events, but its rejected bytes must already be accounted for.
+    for payload in [b"not json\n".as_slice(), b"{\"message\":\"accepted\"}\n"] {
+        let mut sender = tokio::net::TcpStream::connect(address).await.unwrap();
+        sender.write_all(payload).await.unwrap();
+        sender.shutdown().await.unwrap();
+        total += u32::try_from(payload.len()).unwrap();
+        timeout(Duration::from_secs(10), async {
+            while counter_value_with_tags("component_received_network_bytes_total", tags).to_bits()
+                != f64::from(total).to_bits()
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("TCP network counter did not include bytes from the connection");
+    }
+    let event = timeout(Duration::from_secs(10), events.next())
+        .await
+        .expect("TCP source did not emit the valid event")
+        .expect("TCP source output closed");
+    assert_eq!(
+        event
+            .as_log()
+            .get(log_schema().message_key_target_path().unwrap())
+            .unwrap()
+            .to_string_lossy(),
+        "accepted",
+    );
+    assert_eq!(
+        counter_value_with_tags("component_received_bytes_total", tags).to_bits(),
+        f64::from(total).to_bits(),
+        "serialized-byte accounting must retain its existing behavior",
+    );
+    timeout(Duration::from_secs(10), topology.stop())
+        .await
+        .expect("TCP source topology did not shut down");
+}
+
+#[cfg(feature = "sources-socket")]
+#[tokio::test]
 async fn udp_network_bytes_include_rejected_payloads_with_source_component_labels() {
     trace_init();
     let (_guard, address) = next_addr();
@@ -32,27 +99,38 @@ async fn udp_network_bytes_include_rejected_payloads_with_source_component_label
     );
     config.add_sink("network_udp_output", &[component], sink);
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
-    // UDP has no connection handshake. Wait for the source to own its port before sending.
-    timeout(Duration::from_secs(10), async {
-        loop {
-            match std::net::UdpSocket::bind(address) {
-                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => break,
-                Err(error) => panic!("failed probing UDP source readiness: {error}"),
-                Ok(socket) => drop(socket),
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("UDP source did not bind");
-
-    let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let tags = &[
         ("component_id", component),
         ("component_kind", "source"),
         ("component_type", "socket"),
         ("protocol", "udp"),
     ];
+    // The source registers its counter after binding and before receiving. Unlike probing
+    // bind errors, observing registration does not depend on OS socket-reuse semantics.
+    timeout(Duration::from_secs(10), async {
+        loop {
+            let registered = vector_lib::metrics::Controller::get()
+                .expect("metrics controller initialized")
+                .capture_metrics()
+                .iter()
+                .any(|metric| {
+                    metric.name() == "component_received_network_bytes_total"
+                        && tags.iter().all(|(key, value)| {
+                            metric
+                                .tags()
+                                .is_some_and(|tags| tags.get(key) == Some(*value))
+                        })
+                });
+            if registered {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("UDP source did not register its receive counter");
+
+    let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let mut total = 0_u32;
     for payload in [b"not json".as_slice(), br#"{"message":"accepted"}"#] {
         sender.send_to(payload, address).await.unwrap();
