@@ -10,7 +10,4 @@ conditions, and unit tests. Example paths include:
 
 These fields are read-only: assignments and `del()` leave the metric's value unchanged.
 
-Reading the whole event with `.` also includes the value field. Functions such as
-`encode_json(.)` and `keys(.)` therefore include it in their output.
-
 authors: JinchengCao
