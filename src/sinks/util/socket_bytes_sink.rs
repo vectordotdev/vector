@@ -245,9 +245,24 @@ mod tests {
 
     struct FailingWriter {
         wrote: bool,
+        used_vectored: bool,
     }
 
     impl AsyncWrite for FailingWriter {
+        fn poll_write_vectored(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            _bufs: &[IoSlice<'_>],
+        ) -> Poll<Result<usize, IoError>> {
+            let this = self.get_mut();
+            this.used_vectored = true;
+            Pin::new(this).poll_write(cx, &[])
+        }
+
+        fn is_write_vectored(&self) -> bool {
+            true
+        }
+
         fn poll_write(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
@@ -272,6 +287,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn network_writer_counts_partial_vectored_write_even_when_delivery_fails() {
+        trace_init();
+        let protocol = "network_vectored_writer_failure";
+        let mut writer = NetworkWriter {
+            inner: FailingWriter {
+                wrote: false,
+                used_vectored: false,
+            },
+            bytes_sent: register(SinkNetworkBytesSent {
+                protocol: protocol.into(),
+            }),
+        };
+        assert!(writer.is_write_vectored());
+        // Three accepted bytes span both buffers, not just the first IoSlice.
+        let buffers = [IoSlice::new(b"ab"), IoSlice::new(b"cdef")];
+        assert_eq!(writer.write_vectored(&buffers).await.unwrap(), 3);
+        assert!(writer.inner.used_vectored, "must forward vectored writes");
+        assert!(
+            writer
+                .write_vectored(&[IoSlice::new(b"def")])
+                .await
+                .is_err()
+        );
+        assert!(writer.flush().await.is_err());
+        assert_eq!(
+            counter_value_with_tags(
+                "component_sent_network_bytes_total",
+                &[("protocol", protocol)],
+            )
+            .to_bits(),
+            3.0_f64.to_bits(),
+        );
+        assert_eq!(
+            counter_value_with_tags("component_sent_bytes_total", &[("protocol", protocol)])
+                .to_bits(),
+            0.0_f64.to_bits(),
+        );
+    }
+
+    #[tokio::test]
     async fn network_writer_counts_partial_write_even_when_delivery_fails() {
         trace_init();
         let protocol = "network_writer_failure";
@@ -283,7 +338,10 @@ mod tests {
         };
         let before = counter();
         let mut writer = NetworkWriter {
-            inner: FailingWriter { wrote: false },
+            inner: FailingWriter {
+                wrote: false,
+                used_vectored: false,
+            },
             bytes_sent: register(SinkNetworkBytesSent {
                 protocol: protocol.into(),
             }),

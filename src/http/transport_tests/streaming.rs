@@ -442,6 +442,53 @@ async fn cancelled_request_releases_its_body(#[case] transport: Transport) {
     drop(respond);
 }
 
+#[tokio::test]
+async fn network_bytes_count_only_polled_data_when_http_request_is_cancelled() {
+    use tracing::Instrument;
+
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+
+    trace_init();
+    let component = "network_http_cancelled";
+    let (server, mut received) = spawn_receiving_server(no_tls()).await;
+    let (frames, body) = channel_body();
+    let client = HttpClient::new(no_tls(), &ProxyConfig::default()).unwrap();
+    let request = Request::post(server.http_uri())
+        .body(body.boxed_unsync())
+        .unwrap();
+    let response = tokio::spawn(
+        async move { client.send(request).await }
+            .instrument(tracing::info_span!("component", component_id = component)),
+    );
+    frames.send(Ok(data(b"partial"))).unwrap();
+    let Received { request, respond } = next_request(&mut received).await;
+    let mut body = request.into_body();
+    assert_eq!(next_data(&mut body).await, "partial");
+    let tags = &[("component_id", component), ("protocol", "http")];
+    assert_eq!(
+        counter_value_with_tags("component_sent_network_bytes_total", tags).to_bits(),
+        7.0_f64.to_bits(),
+    );
+
+    response.abort();
+    assert!(response.await.unwrap_err().is_cancelled());
+    timeout(REQUEST_TIMEOUT, frames.closed())
+        .await
+        .expect("cancelled transport must drop its body");
+    assert!(frames.send(Ok(data(b"never sent"))).is_err());
+    assert!(matches!(next_frame(&mut body).await, Some(Err(_))));
+    assert_eq!(
+        counter_value_with_tags("component_sent_network_bytes_total", tags).to_bits(),
+        7.0_f64.to_bits(),
+        "cancellation must retain partial traffic without counting unsent data",
+    );
+    assert_eq!(
+        counter_value_with_tags("component_sent_bytes_total", tags).to_bits(),
+        0.0_f64.to_bits(),
+    );
+    drop(respond);
+}
+
 /// The transport stops polling a body while the server does not read it, and polls it again
 /// once the server reads. HTTP/2 flow control bounds the bytes in flight to the stream window
 /// and the send buffer; HTTP/1.1 to the socket buffers.
