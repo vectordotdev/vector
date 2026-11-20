@@ -1,4 +1,4 @@
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, str::FromStr, sync::Arc};
 
 use vector_lib::{
     configurable::configurable_component,
@@ -62,13 +62,15 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 /// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
-    matcher: Box<dyn Matcher<LogEvent>>,
+    matcher: Arc<dyn Matcher<LogEvent>>,
 }
 
 impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
     type Error = crate::Error;
     fn try_from(config: &DatadogSearchConfig) -> Result<Self, Self::Error> {
-        config.build_matcher().map(|matcher| Self { matcher })
+        config.build_matcher().map(|matcher| Self {
+            matcher: matcher.into(),
+        })
     }
 }
 

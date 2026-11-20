@@ -3,7 +3,7 @@ use std::{
     fs::File,
     io::{self, Read},
     path::PathBuf,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use snafu::{ResultExt, Snafu};
@@ -428,7 +428,7 @@ where
     Runner: VrlRunner,
 {
     component_key: Option<ComponentKey>,
-    program: Program,
+    program: Arc<Program>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -518,7 +518,7 @@ where
         Ok((
             Remap {
                 component_key: context.key.clone(),
-                program,
+                program: Arc::new(program),
                 timezone: config
                     .timezone
                     .unwrap_or_else(|| context.globals.timezone()),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use vector_lib::{
     TimeZone, compile_vrl, configurable::configurable_component, internal_event::emit,
 };
@@ -75,7 +77,7 @@ impl ConditionalConfig for VrlConfig {
 
         match self.runtime {
             VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
-                program,
+                program: Arc::new(program),
                 source: self.source.clone(),
             })),
         }
@@ -84,7 +86,7 @@ impl ConditionalConfig for VrlConfig {
 
 #[derive(Debug, Clone)]
 pub struct Vrl {
-    pub(super) program: Program,
+    pub(super) program: Arc<Program>,
     pub(super) source: String,
 }
 
