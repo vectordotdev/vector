@@ -171,6 +171,12 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
+        // `librdkafka_options` are applied below, after `auth.apply`; reject any that would clobber
+        // the MSK IAM security/mechanism settings.
+        #[cfg(feature = "aws-core")]
+        self.auth
+            .validate_librdkafka_overrides(self.librdkafka_options.iter())?;
+
         // All batch options are producer only.
         client_config
             .set("compression.codec", to_string(self.compression))
@@ -357,8 +363,27 @@ impl ValidatedSink for KafkaSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
-        let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck).boxed();
+
+        // The client/auth config (TLS requirement, conflicting `librdkafka_options`, unsupported
+        // feature) is already checked in `validate()`, so a misconfiguration fails before the
+        // potentially-slow MSK IAM credential load below.
+        #[cfg(feature = "aws-core")]
+        let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
+
+        let sink = KafkaSink::new(
+            self.clone(),
+            topic.clone(),
+            #[cfg(feature = "aws-core")]
+            msk_iam.clone(),
+        )?;
+        let hc = healthcheck(
+            self.clone(),
+            topic.clone(),
+            cx.healthcheck,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )
+        .boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }

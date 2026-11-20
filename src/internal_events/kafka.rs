@@ -3,6 +3,8 @@ use vector_lib::{
     internal_event::{CounterName, GaugeName, InternalEvent, LossyF64},
 };
 
+#[cfg(feature = "aws-core")]
+pub(crate) use self::msk_iam::*;
 #[cfg(feature = "sinks-kafka")]
 pub(crate) use self::sink::*;
 #[cfg(feature = "sources-kafka")]
@@ -42,6 +44,38 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
                     .set(LossyF64(partition.consumer_lag));
                 }
             }
+        }
+    }
+}
+
+#[cfg(feature = "aws-core")]
+mod msk_iam {
+    use vector_lib::{
+        NamedInternalEvent, counter,
+        internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    };
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct KafkaMskIamCredentialsRefreshError {
+        pub error: crate::Error,
+    }
+
+    impl InternalEvent for KafkaMskIamCredentialsRefreshError {
+        fn emit(self) {
+            error!(
+                message = "Failed to refresh AWS credentials for MSK IAM authentication.",
+                error = %self.error,
+                error_code = "msk_iam_credentials_refresh",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "msk_iam_credentials_refresh",
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::PROCESSING,
+            )
+            .increment(1);
         }
     }
 }
