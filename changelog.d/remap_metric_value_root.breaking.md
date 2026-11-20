@@ -2,11 +2,22 @@
 
 ## Summary
 
-On a gauge metric, `.gauge` previously returned `null`. It now returns an object containing `.gauge.value`, so `exists(.gauge)` changes from `false` to `true`. Reading the whole metric event with `.` in VRL now includes the field that holds the metric's value, such as `gauge` or `distribution`. Programs that encode or iterate over `.` on metrics, such as `encode_json(.)` or `keys(.)`, see the new field. `unnest` on a metric also copies the value into each row, so with `metric_tag_values: full`, `unnest!(.tags.region)` on a distribution copies every sample into every row.
+VRL now exposes the value of a metric event under a field named after its type,
+such as `.gauge` or `.distribution`. This changes the result of programs that
+already read these paths or the whole event:
+
+- `.gauge` on a gauge metric previously returned `null`. It now returns an
+  object containing `.gauge.value`, so `exists(.gauge)` changes from `false` to
+  `true`.
+- Reading the whole event with `.` includes the value field, so functions such
+  as `encode_json(.)` and `keys(.)` include it in their output.
+- `unnest` copies the value into each row. With `metric_tag_values: full`,
+  `unnest!(.tags.region)` on a distribution copies every sample into every row.
 
 ## Migration
 
-If a program only needs the tags, unnest a local copy of them instead of the event:
+If a program only needs the tags, unnest a local copy of them instead of the
+event:
 
 #### Old
 
@@ -21,7 +32,9 @@ tag_view = {"tags": .tags}
 rows = unnest!(tag_view.tags.region)
 ```
 
-To keep the previous output of `encode_json(.)`, copy the event and delete the field for the metric's type, such as `counter`, `gauge`, or `distribution`. For a gauge:
+To keep the previous output of `encode_json(.)`, copy the event and delete the
+field for the metric's type, such as `counter`, `gauge`, or `distribution`. For
+a gauge:
 
 #### Old
 
