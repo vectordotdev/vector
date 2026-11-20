@@ -1,3 +1,8 @@
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry"
+))]
+pub(crate) mod cors;
 #[cfg(feature = "sources-utils-http-encoding")]
 mod encoding;
 #[cfg(any(
