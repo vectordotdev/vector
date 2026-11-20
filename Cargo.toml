@@ -542,6 +542,7 @@ antithesis-instrumentation = { workspace = true, optional = true }
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
 tonic-prost-build = { workspace = true, optional = true }
+winresource = { version = "0.1.34", default-features = false }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
