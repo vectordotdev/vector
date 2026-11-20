@@ -346,6 +346,13 @@ impl MezmoEventEncoder {
             map.insert("file".to_string(), json!(file));
         }
 
+        // Mezmo only accepts a string level; any other value stays in `meta`.
+        if log.get(event_path!("level")).is_some_and(Value::is_bytes)
+            && let Some(level) = log.remove(event_path!("level"))
+        {
+            map.insert("level".to_string(), json!(level));
+        }
+
         if !map.contains_key("env") {
             map.insert("env".to_string(), json!(self.default_env));
         }
@@ -717,6 +724,12 @@ mod tests {
         let mut event4 = Event::Log(LogEvent::from("hello world"));
         event4.as_mut_log().insert(event_path!("env"), "staging");
 
+        let mut event5 = Event::Log(LogEvent::from("hello world"));
+        event5.as_mut_log().insert(event_path!("level"), "warning");
+
+        let mut event6 = Event::Log(LogEvent::from("hello world"));
+        event6.as_mut_log().insert(event_path!("level"), 3);
+
         let event1_out = encode(event1);
         let event1_out = event1_out.as_object().unwrap();
         let event2_out = encode(event2);
@@ -725,12 +738,20 @@ mod tests {
         let event3_out = event3_out.as_object().unwrap();
         let event4_out = encode(event4);
         let event4_out = event4_out.as_object().unwrap();
+        let event5_out = encode(event5);
+        let event5_out = event5_out.as_object().unwrap();
+        let event6_out = encode(event6);
+        let event6_out = event6_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));
         assert_eq!(event2_out.get("file").unwrap(), &json!("log.txt"));
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
         assert_eq!(event3_out.get("env").unwrap(), &json!("acceptance"));
         assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
+        assert_eq!(event5_out.get("level").unwrap(), &json!("warning"));
+        assert!(!event5_out.contains_key("meta"));
+        assert!(!event6_out.contains_key("level"));
+        assert_eq!(event6_out["meta"], json!({"level": 3}));
     }
 
     #[test]
