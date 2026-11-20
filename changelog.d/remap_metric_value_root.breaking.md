@@ -21,7 +21,7 @@ tag_view = {"tags": .tags}
 rows = unnest!(tag_view.tags.region)
 ```
 
-To keep the previous output of `encode_json(.)`, copy the event and delete the value field for its type:
+To keep the previous output of `encode_json(.)`, copy the event and delete the field for the metric's type, such as `counter`, `gauge`, or `distribution`. For a gauge:
 
 #### Old
 
