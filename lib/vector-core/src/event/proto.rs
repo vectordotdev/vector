@@ -681,6 +681,8 @@ impl From<EventMetadata> for Metadata {
             source_id,
             source_type,
             upstream_id,
+            schema_origin,
+            schema_definition,
             datadog_origin_metadata,
             datadog_metric_unit,
             source_event_id,
@@ -689,6 +691,15 @@ impl From<EventMetadata> for Metadata {
         } = value.into_owned();
 
         let secrets = (!secrets.is_empty()).then(|| secrets.into());
+        let schema_meanings_present = schema_definition.is_some();
+        let schema_meanings = schema_definition
+            .map(|definition| {
+                definition
+                    .meanings()
+                    .map(|(name, path)| (name.clone(), path.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
         Self {
             value: Some(encode_value(value)),
@@ -696,6 +707,9 @@ impl From<EventMetadata> for Metadata {
             source_id: source_id.map(|s| s.to_string()),
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
+            schema_origin: schema_origin.map(|id| id.as_ref().clone()).map(Into::into),
+            schema_meanings,
+            schema_meanings_present,
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
             datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
@@ -713,6 +727,9 @@ impl TryFrom<Metadata> for EventMetadata {
             source_id,
             source_type,
             upstream_id,
+            schema_origin,
+            schema_meanings,
+            schema_meanings_present,
             secrets,
             datadog_origin_metadata,
             datadog_metric_unit,
@@ -726,6 +743,32 @@ impl TryFrom<Metadata> for EventMetadata {
         };
         let source_id = source_id.map(|s| Arc::new(s.into()));
         let upstream_id = upstream_id.map(|id| Arc::new(id.into()));
+        let schema_origin = schema_origin.map(|id| Arc::new(id.into()));
+        let schema_definition = if schema_meanings_present {
+            use vrl::value::Kind;
+            let mut definition = crate::schema::Definition::new_with_default_metadata(
+                Kind::any_object(),
+                [
+                    crate::config::LogNamespace::Legacy,
+                    crate::config::LogNamespace::Vector,
+                ],
+            );
+            for (meaning, encoded_path) in schema_meanings {
+                let path = lookup::lookup_v2::parse_target_path(&encoded_path).map_err(|_| {
+                    DecodeError::InvalidSchemaMeaningPath {
+                        path: encoded_path.clone(),
+                    }
+                })?;
+                definition.try_with_meaning(path, &meaning).map_err(|_| {
+                    DecodeError::InvalidSchemaMeaningPath {
+                        path: encoded_path.clone(),
+                    }
+                })?;
+            }
+            Some(Arc::new(definition))
+        } else {
+            None
+        };
         let secrets = secrets.map(Into::into);
         let datadog_origin_metadata = datadog_origin_metadata.map(Into::into);
         let source_event_id = if source_event_id.is_empty() {
@@ -753,7 +796,8 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: None,
+                schema_origin,
+                schema_definition,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
                 datadog_metric_unit: datadog_metric_unit.map(Arc::from),
@@ -1232,6 +1276,86 @@ mod tests {
         assert_eq!(log.metadata().value(), &expected);
         assert_eq!(trace.metadata().value(), &expected);
         assert_eq!(metric.metadata().value(), &expected);
+    }
+
+    #[test]
+    fn schema_meaning_snapshot_survives_disk_roundtrip_and_config_changes() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let historical_schema = Arc::new(
+            crate::schema::Definition::new_with_default_metadata(
+                Kind::any_object(),
+                [LogNamespace::Legacy],
+            )
+            .with_event_field(
+                &owned_value_path!("host_before"),
+                Kind::bytes(),
+                Some("host"),
+            ),
+        );
+        let mut log = crate::event::LogEvent::from("test");
+        log.metadata_mut().set_schema_definition(&historical_schema);
+        let batched = EventArray::from(crate::event::EventArray::from(log.clone())).encode_to_vec();
+        let restored_batch =
+            crate::event::EventArray::try_from(EventArray::decode(batched.as_slice()).unwrap())
+                .unwrap();
+        let crate::event::EventArray::Logs(logs) = restored_batch else {
+            panic!("expected disk log batch");
+        };
+        assert_eq!(
+            logs.first().unwrap().find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_before"))),
+            "batched disk-buffer codec must retain schema snapshot"
+        );
+
+        let encoded = EventWrapper::from(crate::event::Event::Log(log)).encode_to_vec();
+        let restored =
+            crate::event::Event::try_from(EventWrapper::decode(encoded.as_slice()).unwrap())
+                .unwrap();
+        assert!(restored.metadata().has_explicit_schema_definition());
+        assert_eq!(
+            restored.as_log().find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_before"))),
+            "disk records must not adopt the current config host_key after restart"
+        );
+    }
+
+    #[test]
+    fn malformed_disk_schema_meanings_are_rejected() {
+        let mut metadata = Metadata::default();
+        metadata.schema_meanings_present = true;
+        metadata
+            .schema_meanings
+            .insert("host".into(), ".[broken".into());
+        assert!(EventMetadata::try_from(metadata).is_err());
+    }
+
+    #[test]
+    fn absent_schema_snapshot_stays_backward_compatible() {
+        let event = crate::event::Event::Log(crate::event::LogEvent::from("test"));
+        let encoded = EventWrapper::from(event).encode_to_vec();
+        let restored =
+            crate::event::Event::try_from(EventWrapper::decode(encoded.as_slice()).unwrap())
+                .unwrap();
+        assert!(!restored.metadata().has_explicit_schema_definition());
+    }
+
+    #[test]
+    fn named_source_schema_origin_survives_event_protobuf_roundtrip() {
+        let origin = crate::config::OutputId {
+            component: "source".into(),
+            port: Some("named".into()),
+        };
+        let mut log = crate::event::LogEvent::from("test");
+        log.metadata_mut()
+            .set_schema_origin(Arc::new(origin.clone()));
+        let encoded = EventWrapper::from(crate::event::Event::Log(log)).encode_to_vec();
+        let decoded = EventWrapper::decode(encoded.as_slice()).unwrap();
+        let restored = crate::event::Event::try_from(decoded).unwrap();
+
+        assert_eq!(restored.metadata().schema_origin(), Some(&origin));
     }
 
     #[test]

@@ -22,6 +22,7 @@ struct TransformOutput {
     fanout: Fanout,
     events_sent: Registered<EventsSent>,
     log_schema_definitions: HashMap<OutputId, Arc<schema::Definition>>,
+    schema_routes: HashMap<OutputId, Arc<OutputId>>,
     output_id: Arc<OutputId>,
 }
 
@@ -57,6 +58,13 @@ impl TransformOutputs {
                         events_sent: register(EventsSent::from(internal_event::Output(Some(
                             DEFAULT_OUTPUT.into(),
                         )))),
+                        schema_routes: super::schema_lineage_routes(
+                            &OutputId {
+                                component: component_key.clone(),
+                                port: None,
+                            },
+                            &log_schema_definitions,
+                        ),
                         log_schema_definitions,
                         output_id: Arc::new(OutputId {
                             component: component_key.clone(),
@@ -73,6 +81,13 @@ impl TransformOutputs {
                             events_sent: register(EventsSent::from(internal_event::Output(Some(
                                 name.clone().into(),
                             )))),
+                            schema_routes: super::schema_lineage_routes(
+                                &OutputId {
+                                    component: component_key.clone(),
+                                    port: Some(name.clone()),
+                                },
+                                &log_schema_definitions,
+                            ),
                             log_schema_definitions,
                             output_id: Arc::new(OutputId {
                                 component: component_key.clone(),
@@ -132,6 +147,7 @@ impl TransformOutputs {
                 event,
                 &output.output_id,
                 &output.log_schema_definitions,
+                &output.schema_routes,
             );
         }
         let count = buf.len();

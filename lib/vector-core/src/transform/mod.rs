@@ -170,6 +170,18 @@ impl SyncTransform for Box<dyn FunctionTransform> {
     }
 }
 
+/// Precompute lineage transitions once per transform output, not once per event.
+#[must_use]
+pub fn schema_lineage_routes(
+    output_id: &OutputId,
+    definitions: &HashMap<OutputId, Arc<Definition>>,
+) -> HashMap<OutputId, Arc<OutputId>> {
+    definitions
+        .keys()
+        .map(|origin| (origin.clone(), Arc::new(origin.schema_route(output_id))))
+        .collect()
+}
+
 #[allow(clippy::implicit_hasher)]
 /// `event`: The event that will be updated
 /// `output_id`: The `output_id` that the current even is being sent to (will be used as the new `parent_id`)
@@ -178,17 +190,37 @@ pub fn update_runtime_schema_definition(
     mut event: EventMutRef,
     output_id: &Arc<OutputId>,
     log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
+    schema_routes: &HashMap<OutputId, Arc<OutputId>>,
 ) {
     if let EventMutRef::Log(log) = &mut event {
-        if let Some(parent_component_id) = log.metadata().upstream_id() {
-            if let Some(definition) = log_schema_definitions.get(parent_component_id) {
-                log.metadata_mut().set_schema_definition(definition);
-            }
-        } else {
-            // there is no parent defined. That means this event originated from a component that
-            // isn't able to track the source, such as `reduce` or `lua`. In these cases, all of the
-            // schema definitions _must_ be the same, so the first one is picked
-            if let Some(definition) = log_schema_definitions.values().next() {
+        // The upstream component changes on every hop. Resolve the schema
+        // through its stable source output instead, retaining distinct meanings
+        // when two sources feed a fan-in transform and then another transform.
+        let lineage = log
+            .metadata()
+            .schema_origin()
+            .filter(|id| log_schema_definitions.contains_key(*id))
+            .or_else(|| {
+                log.metadata()
+                    .upstream_id()
+                    .filter(|id| log_schema_definitions.contains_key(*id))
+            });
+        if let Some(lineage) = lineage {
+            let definition = log_schema_definitions
+                .get(lineage)
+                .expect("lineage checked");
+            let next_lineage = schema_routes.get(lineage).expect("route precomputed");
+            log.metadata_mut().set_schema_definition(definition);
+            log.metadata_mut()
+                .set_schema_origin(Arc::clone(next_lineage));
+        } else if let Some(definition) = log_schema_definitions.values().next() {
+            // Transforms such as reduce can emit a new event with no source
+            // lineage. Preserve a common schema without arbitrarily choosing
+            // among differing source definitions.
+            if log_schema_definitions
+                .values()
+                .all(|candidate| candidate == definition)
+            {
                 log.metadata_mut().set_schema_definition(definition);
             }
         }
@@ -213,6 +245,243 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
 mod test {
     use super::*;
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
+
+    #[test]
+    fn schema_meanings_follow_source_through_two_transform_hops() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let source_a = Arc::new(OutputId::from("source_a"));
+        let source_b = Arc::new(OutputId::from("source_b"));
+        let definition_a = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_a"), Kind::bytes(), Some("host")),
+        );
+        let definition_b = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_b"), Kind::bytes(), Some("host")),
+        );
+        let definitions = HashMap::from([
+            (source_a.as_ref().clone(), definition_a),
+            (source_b.as_ref().clone(), definition_b),
+        ]);
+        let first_hop = Arc::new(OutputId::from("fan_in"));
+        let second_hop = Arc::new(OutputId::from("pass_through"));
+
+        for (origin, expected_path) in [
+            (
+                source_a,
+                OwnedTargetPath::event(owned_value_path!("host_a")),
+            ),
+            (
+                source_b,
+                OwnedTargetPath::event(owned_value_path!("host_b")),
+            ),
+        ] {
+            let mut event = Event::Log(LogEvent::from("hello"));
+            event.metadata_mut().set_schema_origin(Arc::clone(&origin));
+            event.metadata_mut().set_upstream_id(origin);
+            let first_routes = schema_lineage_routes(&first_hop, &definitions);
+            update_runtime_schema_definition(
+                event.as_mut_log().into(),
+                &first_hop,
+                &definitions,
+                &first_routes,
+            );
+            assert_eq!(
+                event.as_log().find_key_by_meaning("host"),
+                Some(&expected_path)
+            );
+            assert_eq!(event.metadata().upstream_id(), Some(first_hop.as_ref()));
+
+            let next_definitions = definitions
+                .iter()
+                .map(|(id, definition)| (id.schema_route(&first_hop), Arc::clone(definition)))
+                .collect();
+            let next_routes = schema_lineage_routes(&second_hop, &next_definitions);
+            update_runtime_schema_definition(
+                event.as_mut_log().into(),
+                &second_hop,
+                &next_definitions,
+                &next_routes,
+            );
+            assert_eq!(
+                event.as_log().find_key_by_meaning("host"),
+                Some(&expected_path)
+            );
+            assert_eq!(event.metadata().upstream_id(), Some(second_hop.as_ref()));
+        }
+    }
+
+    #[test]
+    fn schema_meanings_follow_named_source_ports() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let left = OutputId {
+            component: "source".into(),
+            port: Some("left".into()),
+        };
+        let right = OutputId {
+            component: "source".into(),
+            port: Some("right".into()),
+        };
+        let definitions = HashMap::from([
+            (
+                left.clone(),
+                Arc::new(
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy],
+                    )
+                    .with_event_field(
+                        &owned_value_path!("left_host"),
+                        Kind::bytes(),
+                        Some("host"),
+                    ),
+                ),
+            ),
+            (
+                right.clone(),
+                Arc::new(
+                    Definition::new_with_default_metadata(
+                        Kind::any_object(),
+                        [LogNamespace::Legacy],
+                    )
+                    .with_event_field(
+                        &owned_value_path!("right_host"),
+                        Kind::bytes(),
+                        Some("host"),
+                    ),
+                ),
+            ),
+        ]);
+
+        for (origin, expected_path) in [
+            (left, OwnedTargetPath::event(owned_value_path!("left_host"))),
+            (
+                right,
+                OwnedTargetPath::event(owned_value_path!("right_host")),
+            ),
+        ] {
+            let mut event = Event::Log(LogEvent::from("hello"));
+            let origin = Arc::new(origin);
+            event.metadata_mut().set_schema_origin(Arc::clone(&origin));
+            event.metadata_mut().set_upstream_id(origin);
+            let mut current_definitions = definitions.clone();
+            for hop in ["fan_in", "passthrough"] {
+                let output = Arc::new(OutputId::from(hop));
+                let routes = schema_lineage_routes(&output, &current_definitions);
+                update_runtime_schema_definition(
+                    event.as_mut_log().into(),
+                    &output,
+                    &current_definitions,
+                    &routes,
+                );
+                assert_eq!(
+                    event.as_log().find_key_by_meaning("host"),
+                    Some(&expected_path)
+                );
+                current_definitions = current_definitions
+                    .into_iter()
+                    .map(|(id, def)| (id.schema_route(&output), def))
+                    .collect();
+            }
+        }
+    }
+
+    #[test]
+    fn reconverged_branch_definitions_keep_separate_host_meanings() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let source = Arc::new(OutputId::from("source"));
+        let left = Arc::new(OutputId::from("left"));
+        let right = Arc::new(OutputId::from("right"));
+        let merge = Arc::new(OutputId::from("merge"));
+
+        let initial_definition = Arc::new(Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        ));
+        let original = HashMap::from([(source.as_ref().clone(), initial_definition)]);
+
+        let left_definition = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_left"), Kind::bytes(), Some("host")),
+        );
+        let right_definition = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(
+                    &owned_value_path!("host_right"),
+                    Kind::bytes(),
+                    Some("host"),
+                ),
+        );
+
+        let merged_input_definitions = HashMap::from([
+            (source.schema_route(&left), left_definition),
+            (source.schema_route(&right), right_definition),
+        ]);
+        assert_eq!(merged_input_definitions.len(), 2);
+        let routes = schema_lineage_routes(&merge, &merged_input_definitions);
+
+        for (branch, expected) in [
+            (left, owned_value_path!("host_left")),
+            (right, owned_value_path!("host_right")),
+        ] {
+            let mut event = Event::Log(LogEvent::from("hello"));
+            event.metadata_mut().set_schema_origin(Arc::clone(&source));
+            event.metadata_mut().set_upstream_id(Arc::clone(&source));
+            let source_routes = schema_lineage_routes(&branch, &original);
+            update_runtime_schema_definition(
+                event.as_mut_log().into(),
+                &branch,
+                &original,
+                &source_routes,
+            );
+            update_runtime_schema_definition(
+                event.as_mut_log().into(),
+                &merge,
+                &merged_input_definitions,
+                &routes,
+            );
+            assert_eq!(
+                event.as_log().find_key_by_meaning("host"),
+                Some(&OwnedTargetPath::event(expected)),
+            );
+        }
+    }
+
+    #[test]
+    fn identityless_output_retains_a_definition_common_to_all_inputs() {
+        use crate::config::LogNamespace;
+        use lookup::{OwnedTargetPath, owned_value_path};
+        use vrl::value::Kind;
+
+        let definition = Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
+                .with_event_field(&owned_value_path!("host_a"), Kind::bytes(), Some("host")),
+        );
+        let definitions = HashMap::from([
+            (OutputId::from("source_a"), Arc::clone(&definition)),
+            (OutputId::from("source_b"), definition),
+        ]);
+        let mut event = Event::Log(LogEvent::from("hello"));
+        assert!(event.metadata().schema_origin().is_none());
+        assert!(event.metadata().upstream_id().is_none());
+
+        let output = Arc::new(OutputId::from("reduce"));
+        let routes = schema_lineage_routes(&output, &definitions);
+        update_runtime_schema_definition(event.as_mut_log().into(), &output, &definitions, &routes);
+        assert_eq!(
+            event.as_log().find_key_by_meaning("host"),
+            Some(&OwnedTargetPath::event(owned_value_path!("host_a")))
+        );
+    }
 
     #[test]
     fn buffers_output() {
