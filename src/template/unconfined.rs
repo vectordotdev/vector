@@ -1,7 +1,7 @@
 use super::parsing::{parse_template, render_metric_field, render_timestamp};
 use super::{
     Bytes, ConfigurableString, Cow, EventRef, FixedOffset, Part, PathBuf, TemplateParseError,
-    TemplateRenderingError, TryFrom, UnconfinedTemplate, Value, fmt,
+    TemplateRenderingError, TemplateTimeZone, TryFrom, UnconfinedTemplate, Value, fmt,
 };
 
 #[expect(
@@ -13,7 +13,7 @@ impl fmt::Debug for UnconfinedTemplate {
         f.debug_struct("UnconfinedTemplate")
             .field("src", &self.src)
             .field("is_static", &self.is_static)
-            .field("tz_offset", &self.tz_offset)
+            .field("time_zone", &self.time_zone)
             .finish()
     }
 }
@@ -64,7 +64,7 @@ impl TryFrom<Cow<'_, str>> for UnconfinedTemplate {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
-                tz_offset: None,
+                time_zone: None,
             }
         })
     }
@@ -83,7 +83,7 @@ impl UnconfinedTemplate {
     /// Set tz offset.
     #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.tz_offset = tz_offset;
+        self.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 
@@ -122,7 +122,7 @@ impl UnconfinedTemplate {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset));
+                    out.push_str(&render_timestamp(items, event, self.time_zone));
                 }
                 Part::Reference(key) => {
                     out.push_str(
