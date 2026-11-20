@@ -169,9 +169,22 @@ async fn udp_network_bytes_include_rejected_payloads_with_source_component_label
 }
 
 // The test metrics recorder is thread-local; spawned server tasks must use the same runtime thread.
+#[rstest::rstest]
+#[case::http(false)]
+#[case::https(true)]
 #[tokio::test]
-async fn http_network_bytes_retain_source_component_labels_across_server_tasks() {
+async fn http_network_bytes_retain_source_component_labels_across_server_tasks(#[case] tls: bool) {
     trace_init();
+    let protocol = if tls { "https" } else { "http" };
+    let tls_config = if tls {
+        format!(
+            "tls:\n  enabled: true\n  crt_file: \"{}\"\n  key_file: \"{}\"\n",
+            crate::tls::TEST_PEM_CRT_PATH,
+            crate::tls::TEST_PEM_KEY_PATH,
+        )
+    } else {
+        String::new()
+    };
     let (_first_guard, first_addr) = next_addr();
     let (_second_guard, second_addr) = next_addr();
     let sources = [
@@ -188,7 +201,10 @@ async fn http_network_bytes_retain_source_component_labels_across_server_tasks()
     for (id, address, _) in &sources {
         config.add_source(
             *id,
-            serde_yaml::from_str::<SimpleHttpConfig>(&format!("address: \"{address}\"")).unwrap(),
+            serde_yaml::from_str::<SimpleHttpConfig>(&format!(
+                "address: \"{address}\"\n{tls_config}"
+            ))
+            .unwrap(),
         );
     }
     config.add_sink(
@@ -199,10 +215,18 @@ async fn http_network_bytes_retain_source_component_labels_across_server_tasks()
     // Let the real topology create the component spans. Neither this test nor its HTTP
     // client is instrumented with the source's labels.
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .unwrap();
+    let client_tls = crate::tls::TlsEnableableConfig {
+        enabled: Some(tls),
+        options: crate::tls::TlsConfig {
+            ca_file: Some(crate::tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        },
+    };
+    let client = crate::http::HttpClient::new(
+        crate::tls::MaybeTlsSettings::from_config(Some(&client_tls), false).unwrap(),
+        &crate::config::ProxyConfig::default(),
+    )
+    .unwrap();
     for (id, address, plaintext) in sources {
         wait_for_tcp(address).await;
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -211,12 +235,14 @@ async fn http_network_bytes_retain_source_component_labels_across_server_tasks()
         let network_size = f64::from(u32::try_from(compressed.len()).unwrap());
         let serialized_size = f64::from(u32::try_from(plaintext.len()).unwrap());
         assert!(network_size < serialized_size);
-        let response = client
-            .post(format!("http://{address}/"))
+        let request = http::Request::post(format!("{protocol}://localhost:{}/", address.port()))
             .header("content-encoding", "gzip")
-            .body(compressed)
-            .send()
+            .header("x-forwarded-proto", if tls { "http" } else { "https" })
+            .body(vector_http::full_body(bytes::Bytes::from(compressed)))
+            .unwrap();
+        let response = timeout(Duration::from_secs(10), client.send(request))
             .await
+            .expect("HTTP source request timed out")
             .unwrap();
         assert_eq!(response.status(), 200);
         let event = timeout(Duration::from_secs(10), events.next())
@@ -235,7 +261,7 @@ async fn http_network_bytes_retain_source_component_labels_across_server_tasks()
             ("component_id", id),
             ("component_kind", "source"),
             ("component_type", "http_server"),
-            ("protocol", "http"),
+            ("protocol", protocol),
         ];
         for (name, expected) in [
             ("component_received_network_bytes_total", network_size),
@@ -245,6 +271,18 @@ async fn http_network_bytes_retain_source_component_labels_across_server_tasks()
                 counter_value_with_tags(name, tags).to_bits(),
                 expected.to_bits(),
                 "{name} must retain the receiving source's labels",
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    name,
+                    &[
+                        ("component_id", id),
+                        ("protocol", if tls { "http" } else { "https" }),
+                    ],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+                "{name} must use the listener's protocol, not forwarded headers",
             );
         }
     }

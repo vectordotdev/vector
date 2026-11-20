@@ -605,7 +605,7 @@ async fn post_with_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(capped_body())
+        .and(capped_body("http"))
         .map(|body: bytes::Bytes| {
             // Echo the body back as a string
             String::from_utf8_lossy(&body).to_string()
@@ -715,7 +715,7 @@ async fn post_with_vrl_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(capped_body())
+        .and(capped_body("http"))
         .map(|body: bytes::Bytes| {
             // Echo back the body as a string
             String::from_utf8_lossy(&body).to_string()

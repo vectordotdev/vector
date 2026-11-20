@@ -171,7 +171,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed();
             }
-            let body_filter = capped_body();
+            let body_filter = capped_body(protocol);
 
             let svc = filter
                 .and(warp::path::tail())
