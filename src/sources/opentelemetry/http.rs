@@ -15,7 +15,7 @@ use vector_lib::{
     config::LogNamespace,
     event::BatchNotifier,
     internal_event::{
-        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered, emit,
     },
     opentelemetry::proto::collector::{
         logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
@@ -180,9 +180,9 @@ fn enrich_events(
 
 fn emit_decode_error(error: impl std::fmt::Display) -> ErrorMessage {
     let message = format!("Could not decode request: {error}");
-    emit!(HttpBadRequest::new(
+    emit(HttpBadRequest::new(
         StatusCode::BAD_REQUEST.as_u16(),
-        &message
+        &message,
     ));
     ErrorMessage::new(StatusCode::BAD_REQUEST, message)
 }
@@ -264,9 +264,9 @@ fn build_warp_log_filter(
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
-                    emit!(HttpBadRequest::new(
+                    emit(HttpBadRequest::new(
                         err.status_code().as_u16(),
-                        err.message()
+                        err.message(),
                     ));
                 }
             })
@@ -305,9 +305,9 @@ fn build_warp_metrics_filter(
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
-                    emit!(HttpBadRequest::new(
+                    emit(HttpBadRequest::new(
                         err.status_code().as_u16(),
-                        err.message()
+                        err.message(),
                     ));
                 }
             })
@@ -346,9 +346,9 @@ fn build_warp_trace_filter(
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
-                    emit!(HttpBadRequest::new(
+                    emit(HttpBadRequest::new(
                         err.status_code().as_u16(),
-                        err.message()
+                        err.message(),
                     ));
                 }
             })
@@ -453,7 +453,7 @@ async fn handle_request(
             let count = events.len();
 
             out.send_batch_named(output, events).await.map_err(|_| {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             let mut response = protobuf(resp).into_response();

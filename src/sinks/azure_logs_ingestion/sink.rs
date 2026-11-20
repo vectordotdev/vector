@@ -1,4 +1,5 @@
 use std::{fmt::Debug, io};
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use vector_lib::codecs::{CharacterDelimitedEncoder, JsonSerializerConfig, encoding::Framer};
@@ -49,7 +50,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

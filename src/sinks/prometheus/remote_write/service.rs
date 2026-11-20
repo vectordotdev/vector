@@ -2,6 +2,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use http::{HeaderName, HeaderValue, Method, Request, Response, Uri};
@@ -86,7 +87,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
 
             if response.status().is_success() {
                 // We can't rely on the framework to emit this because we need to specify the additional `endpoint` tag.
-                emit!(EndpointBytesSent {
+                emit(EndpointBytesSent {
                     byte_size: raw_byte_size,
                     protocol: "http",
                     endpoint: &endpoint.to_string(),

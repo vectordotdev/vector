@@ -7,6 +7,7 @@ use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
 use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
@@ -132,7 +133,7 @@ impl Service<VectorRequest> for VectorService {
                 .client
                 .push_events(list.request.into_request())
                 .map_ok(|_response| {
-                    emit!(EndpointBytesSent {
+                    emit(EndpointBytesSent {
                         byte_size,
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,

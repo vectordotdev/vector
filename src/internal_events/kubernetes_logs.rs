@@ -4,7 +4,7 @@ use metrics::Counter;
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
         error_stage, error_type,
     },
     json_size::JsonSize,
@@ -303,7 +303,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: self.message,
         });
@@ -334,7 +334,7 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Found line that exceeds max_merged_line_bytes; discarding.",
         });
@@ -375,20 +375,20 @@ mod tests {
 
         let mut counters = PodCountersCache::default();
         for _ in 0..2 {
-            emit!(KubernetesLogsEventsReceived {
+            emit(KubernetesLogsEventsReceived {
                 file: "k8s.log",
                 byte_size: JsonSize::new(100),
                 pod: Some(("k8s-counters-test-a", "k8s-counters-test-ns")),
                 counters: &mut counters,
             });
         }
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(50),
             pod: Some(("k8s-counters-test-b", "k8s-counters-test-ns")),
             counters: &mut counters,
         });
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(7),
             pod: None,
@@ -450,7 +450,7 @@ mod tests {
         };
 
         let mut counters = PodCountersCache::default();
-        emit!(KubernetesLogsEventsReceived {
+        emit(KubernetesLogsEventsReceived {
             file: "k8s.log",
             byte_size: JsonSize::new(100),
             pod: Some(("k8s-idle-test", "k8s-idle-test-ns")),

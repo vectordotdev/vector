@@ -6,7 +6,7 @@ use vector_lib::{
     shutdown::ShutdownSignal,
 };
 
-use super::{SocketConfig, UnixConfig};
+use super::{HOST, SocketConfig, UnixConfig};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -42,7 +42,7 @@ fn handle_events(
                     SocketConfig::NAME,
                     log,
                     legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("host"),
+                    path!(HOST),
                     host.clone(),
                 );
             }

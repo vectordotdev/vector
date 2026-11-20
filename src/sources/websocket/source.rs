@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -32,8 +33,8 @@ use crate::{
 
 macro_rules! fail_with_event {
     ($context:expr_2021) => {{
-        emit!(WebSocketConnectionFailedError {
-            error: Box::new($context.build())
+        emit(WebSocketConnectionFailedError {
+            error: Box::new($context.build()),
         });
         return $context.fail();
     }};
@@ -85,7 +86,7 @@ impl WebSocketSource {
     }
 
     pub(crate) async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
-        let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 
         let mut out = cx.out;
@@ -107,7 +108,7 @@ impl WebSocketSource {
                     match msg_result {
                         Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
                         Err(error) => {
-                            emit!(WebSocketReceiveError { error: &error });
+                            emit(WebSocketReceiveError { error: &error });
                             Err(WebSocketSourceError::Tungstenite { source: error })
                         }
                     }
@@ -122,26 +123,26 @@ impl WebSocketSource {
                             code = %frame.code,
                             reason = %frame.reason
                         );
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
                         warn!("Connection closed by server without a close frame.");
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
                         error!("Disconnecting due to pong timeout.");
-                        emit!(WebSocketReceiveError {
+                        emit(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
-                                "Pong timeout"
-                            ))
+                                "Pong timeout",
+                            )),
                         });
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                         return Err(error);
                     }
                     WebSocketSourceError::Tungstenite { source: ws_err } => {
                         if is_closed(&ws_err) {
-                            emit!(WebSocketConnectionShutdown);
+                            emit(WebSocketConnectionShutdown);
                         }
                         error!(message = "WebSocket connection error.", error = %ws_err);
                     }
@@ -208,7 +209,7 @@ impl WebSocketSource {
     {
         let payload_bytes = payload.as_ref();
 
-        emit!(WebSocketBytesReceived {
+        emit(WebSocketBytesReceived {
             byte_size: payload_bytes.len(),
             url: &self.config.common.uri,
             protocol: PROTOCOL,
@@ -226,8 +227,8 @@ impl WebSocketSource {
                     let event_count = events.len();
                     let byte_size = events.estimated_json_encoded_size_of();
 
-                    register!(EventsReceived).emit(CountByteSize(event_count, byte_size));
-                    emit!(WebSocketMessageReceived {
+                    register(EventsReceived).emit(CountByteSize(event_count, byte_size));
+                    emit(WebSocketMessageReceived {
                         count: event_count,
                         byte_size,
                         url: &self.config.common.uri,
@@ -319,7 +320,7 @@ impl WebSocketSource {
             .send(Message::text(initial_message.clone()))
             .await
             .map_err(|error| {
-                emit!(WebSocketSendError { error: &error });
+                emit(WebSocketSendError { error: &error });
                 WebSocketSourceError::Tungstenite { source: error }
             })?;
 
@@ -333,7 +334,7 @@ impl WebSocketSource {
             };
 
         let message = response.map_err(|source| {
-            emit!(WebSocketReceiveError { error: &source });
+            emit(WebSocketReceiveError { error: &source });
             WebSocketSourceError::Tungstenite { source }
         })?;
 
@@ -371,7 +372,7 @@ impl WebSocketSource {
             std::io::ErrorKind::ConnectionAborted,
             error_message,
         ));
-        emit!(WebSocketReceiveError { error: &error });
+        emit(WebSocketReceiveError { error: &error });
 
         Err(specific_error)
     }
@@ -417,7 +418,7 @@ impl PingManager {
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
-            emit!(WebSocketSendError { error: &error });
+            emit(WebSocketSendError { error: &error });
             WebSocketSourceError::Tungstenite { source: error }
         })?;
 

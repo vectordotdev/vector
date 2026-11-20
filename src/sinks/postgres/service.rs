@@ -11,10 +11,12 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::JsonSerializerConfig,
     event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, emit},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
 
+use super::config::OnConflict;
 use crate::{
     internal_events::EndpointBytesSent,
     sinks::prelude::{RequestMetadataBuilder, RetryLogic},
@@ -50,6 +52,7 @@ pub(super) struct PostgresService {
     connection_pool: Pool<Postgres>,
     table: String,
     endpoint: String,
+    on_conflict: OnConflict,
 }
 
 impl PostgresService {
@@ -57,11 +60,13 @@ impl PostgresService {
         connection_pool: Pool<Postgres>,
         table: String,
         endpoint: String,
+        on_conflict: OnConflict,
     ) -> Self {
         Self {
             connection_pool,
             table,
             endpoint,
+            on_conflict,
         }
     }
 }
@@ -147,6 +152,7 @@ impl Service<PostgresRequest> for PostgresService {
         let future = async move {
             let table = service.table;
             let metadata = request.metadata;
+            let event_count = request.events.len();
             let json_serializer = JsonSerializerConfig::default().build();
             let serialized_values = request
                 .events
@@ -155,15 +161,31 @@ impl Service<PostgresRequest> for PostgresService {
                 .collect::<Result<Vec<_>, _>>()
                 .context(VectorCommonSnafu)?;
 
-            sqlx::query(&format!(
-                "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
+            let conflict_clause = match service.on_conflict {
+                OnConflict::Error => "",
+                OnConflict::DoNothing => " ON CONFLICT DO NOTHING",
+            };
+
+            let result = sqlx::query(&format!(
+                "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1){conflict_clause}"
             ))
             .bind(Json(serialized_values))
             .execute(&service.connection_pool)
             .await
             .context(PostgresSnafu)?;
 
-            emit!(EndpointBytesSent {
+            if service.on_conflict == OnConflict::DoNothing {
+                let inserted = usize::try_from(result.rows_affected()).unwrap_or(usize::MAX);
+                let skipped = event_count.saturating_sub(inserted);
+                if skipped > 0 {
+                    emit(ComponentEventsDropped::<INTENTIONAL> {
+                        count: skipped,
+                        reason: "Row conflicts with an existing row.",
+                    });
+                }
+            }
+
+            emit(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
                 protocol: POSTGRES_PROTOCOL,
                 endpoint: &service.endpoint,

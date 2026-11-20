@@ -4,6 +4,7 @@ use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -169,8 +170,8 @@ async fn run(
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
-        emit!(InternalLogsBytesReceived { byte_size });
-        emit!(InternalLogsEventsReceived {
+        emit(InternalLogsBytesReceived { byte_size });
+        emit(InternalLogsEventsReceived {
             count: 1,
             byte_size: json_byte_size,
         });
@@ -203,7 +204,7 @@ async fn run(
 
         if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(StreamClosedError { count: 1 });
+            emit(StreamClosedError { count: 1 });
             return Err(error);
         }
     }

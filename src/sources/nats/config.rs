@@ -168,8 +168,10 @@ pub struct NatsSourceConfig {
     pub jetstream: Option<JetStreamConfig>,
 }
 
+pub(super) const SUBJECT_KEY: &str = "subject";
+
 pub(super) fn default_subject_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("subject"))
+    OptionalValuePath::from(owned_value_path!(SUBJECT_KEY))
 }
 
 const fn default_subscription_capacity() -> usize {
@@ -242,7 +244,7 @@ impl SourceConfig for NatsSourceConfig {
             .with_source_metadata(
                 NatsSourceConfig::NAME,
                 legacy_subject_key_field,
-                &owned_value_path!("subject"),
+                &owned_value_path!(SUBJECT_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -253,9 +255,10 @@ impl SourceConfig for NatsSourceConfig {
         )]
     }
 
-    // Acknowledgment is only possible with Jetstream.
+    // JetStream messages are acked once they reach the topology, not when a sink confirms
+    // delivery, so end-to-end acknowledgements are not supported.
     fn can_acknowledge(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -321,6 +324,18 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn does_not_claim_end_to_end_acknowledgements() {
+        let core = NatsSourceConfig::default();
+        let jetstream = NatsSourceConfig {
+            jetstream: Some(JetStreamConfig::default()),
+            ..Default::default()
+        };
+
+        assert!(!core.can_acknowledge());
+        assert!(!jetstream.can_acknowledge());
     }
 
     #[test]

@@ -5,6 +5,7 @@ use crate::sinks::{
     prelude::*,
     util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
 pub(super) struct LogsSinkSetting {
     pub dbname: ConfinedTemplate,
@@ -63,7 +64,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

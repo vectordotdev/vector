@@ -7,6 +7,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -92,10 +93,14 @@ enum BuildError {
     ))]
     DuplicatedMatches { field: String, value: String },
     #[snafu(display(
-        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
-        systemd_version
+        "`current_boot_only: false` is not supported for systemd versions 250 through 257 (got {} from `{}`). Use journalctl from systemd 258 or later in Vector's runtime environment (inside the container for container deployments), or set `current_boot_only: true` to collect only the current boot.",
+        systemd_version,
+        journalctl_path.display()
     ))]
-    AllBootsNotSupported { systemd_version: u32 },
+    AllBootsNotSupported {
+        systemd_version: u32,
+        journalctl_path: PathBuf,
+    },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -114,6 +119,10 @@ pub struct JournaldConfig {
     pub since_now: bool,
 
     /// Only include entries that occurred after the current boot of the system.
+    ///
+    /// Setting this to `false` requires systemd 258 or later, or a version older than 250.
+    /// Versions 250 through 257 are not supported. For container deployments, this
+    /// requirement applies to the `journalctl` inside the container image.
     #[serde(default = "crate::serde::default_true")]
     pub current_boot_only: bool,
 
@@ -384,7 +393,11 @@ impl SourceConfig for JournaldConfig {
 
         if !self.current_boot_only && (250..=257).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
-            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
+            return Err(BuildError::AllBootsNotSupported {
+                systemd_version,
+                journalctl_path,
+            }
+            .into());
         }
 
         let starter = StartJournalctl::new(
@@ -454,7 +467,7 @@ impl JournaldSource {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
-                emit!(JournaldCheckpointFileOpenError {
+                emit(JournaldCheckpointFileOpenError {
                     error: &error,
                     path: self
                         .checkpoint_path
@@ -502,7 +515,7 @@ impl JournaldSource {
                     drop(running);
                 }
                 Err(error) => {
-                    emit!(JournaldStartJournalctlError { error });
+                    emit(JournaldStartJournalctlError { error });
                 }
             }
 
@@ -524,8 +537,8 @@ impl JournaldSource {
         finalizer: &'a Finalizer,
         mut shutdown: ShutdownSignal,
     ) -> bool {
-        let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
-        let events_received = register!(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::from("journald")));
+        let events_received = register(EventsReceived);
 
         // Spawn stderr handler task
         let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
@@ -629,7 +642,7 @@ impl<'a> Batch<'a> {
                 false
             }
             Some(Err(error)) => {
-                emit!(JournaldReadError { error });
+                emit(JournaldReadError { error });
                 false
             }
             Some(Ok(bytes)) => {
@@ -662,9 +675,9 @@ impl<'a> Batch<'a> {
                         }
                     }
                     Err(error) => {
-                        emit!(JournaldInvalidRecordError {
+                        emit(JournaldInvalidRecordError {
                             error,
-                            text: String::from_utf8_lossy(&bytes).into_owned()
+                            text: String::from_utf8_lossy(&bytes).into_owned(),
                         });
                     }
                 }
@@ -695,7 +708,7 @@ impl<'a> Batch<'a> {
                     finalizer.finalize(cursor, self.receiver).await;
                 }
             } else {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 // `out` channel is closed, don't restart journalctl.
                 self.exiting = Some(false);
             }
@@ -1138,7 +1151,7 @@ impl StatefulCheckpointer {
     async fn set(&mut self, token: impl Into<String>) {
         let token = token.into();
         if let Err(error) = self.checkpointer.set(&token).await {
-            emit!(JournaldCheckpointSetError {
+            emit(JournaldCheckpointSetError {
                 error,
                 filename: self
                     .checkpointer

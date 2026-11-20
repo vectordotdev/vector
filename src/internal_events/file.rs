@@ -41,9 +41,9 @@ mod sink {
     use std::borrow::Cow;
 
     use vector_lib::{
-        NamedInternalEvent, counter, emit,
+        NamedInternalEvent, counter,
         internal_event::{
-            ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+            ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
             error_stage, error_type,
         },
     };
@@ -109,7 +109,7 @@ mod sink {
             .increment(1);
 
             if self.dropped_events > 0 {
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                emit(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: self.dropped_events,
                     reason: self.message,
                 });
@@ -140,7 +140,7 @@ mod sink {
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "Rendered path outside base_dir.",
             });
@@ -229,10 +229,10 @@ mod source {
 
     use bytes::BytesMut;
     use vector_lib::{
-        NamedInternalEvent, counter, emit,
+        NamedInternalEvent, counter,
         file_source_common::internal_events::FileSourceInternalEvents,
         internal_event::{
-            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
+            ComponentEventsDropped, CounterName, INTENTIONAL, emit, error_stage, error_type,
         },
     };
 
@@ -608,7 +608,7 @@ mod source {
                 "stage" => error_stage::RECEIVING,
             )
             .increment(1);
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "Found line that exceeds max_line_bytes; discarding.",
             });
@@ -622,30 +622,30 @@ mod source {
 
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_added(&self, file: &Path) {
-            emit!(FileAdded {
+            emit(FileAdded {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_resumed(&self, file: &Path, file_position: u64) {
-            emit!(FileResumed {
+            emit(FileResumed {
                 file,
                 file_position,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_watch_error(&self, file: &Path, error: Error) {
-            emit!(FileWatchError {
+            emit(FileWatchError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: Option<u64>) {
-            emit!(FileUnwatched {
+            emit(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
                 reached_eof,
@@ -654,49 +654,49 @@ mod source {
         }
 
         fn emit_file_deleted(&self, file: &Path) {
-            emit!(FileDeleted {
+            emit(FileDeleted {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_delete_error(&self, file: &Path, error: Error) {
-            emit!(FileDeleteError {
+            emit(FileDeleteError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_fingerprint_read_error(&self, file: &Path, error: Error) {
-            emit!(FileFingerprintReadError {
+            emit(FileFingerprintReadError {
                 file,
                 error,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_checksum_failed(&self, file: &Path) {
-            emit!(FileChecksumFailed {
+            emit(FileChecksumFailed {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
         fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
-            emit!(FileCheckpointed { count, duration });
+            emit(FileCheckpointed { count, duration });
         }
 
         fn emit_file_checkpoint_write_error(&self, error: Error) {
-            emit!(FileCheckpointWriteError { error });
+            emit(FileCheckpointWriteError { error });
         }
 
         fn emit_files_open(&self, count: usize) {
-            emit!(FileOpen { count });
+            emit(FileOpen { count });
         }
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
-            emit!(PathGlobbingError { path, error });
+            emit(PathGlobbingError { path, error });
         }
 
         fn emit_file_line_too_long(
@@ -705,10 +705,10 @@ mod source {
             configured_limit: usize,
             encountered_size_so_far: usize,
         ) {
-            emit!(FileLineTooBigError {
+            emit(FileLineTooBigError {
                 truncated_bytes,
                 configured_limit,
-                encountered_size_so_far
+                encountered_size_so_far,
             });
         }
     }

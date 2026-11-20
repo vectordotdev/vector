@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     pin::Pin,
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
@@ -162,11 +163,11 @@ impl UnixConnector {
         loop {
             match self.connect().await {
                 Ok(stream) => {
-                    emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    emit(UnixSocketConnectionEstablished { path: &self.path });
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketOutgoingConnectionError { error });
+                    emit(UnixSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -249,7 +250,7 @@ where
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
 
             let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
@@ -257,9 +258,9 @@ where
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketSendError {
+                emit(UnixSocketSendError {
                     error: &error,
-                    path: &self.connector.path
+                    path: &self.connector.path,
                 });
             }
         }
@@ -268,7 +269,7 @@ where
     }
 
     async fn run_datagram(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let bytes_sent = register!(BytesSent::from(Protocol::UNIX));
+        let bytes_sent = register(BytesSent::from(Protocol::UNIX));
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();

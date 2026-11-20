@@ -1,4 +1,5 @@
 use super::{AggregateConfig, AggregationMode, LateEventsStrategy};
+use vector_lib::internal_event::emit;
 
 use std::{
     collections::{BTreeMap, HashMap, hash_map::Entry},
@@ -206,7 +207,7 @@ impl Aggregate {
             }
         }
 
-        emit!(AggregateEventRecorded);
+        emit(AggregateEventRecorded);
         None
     }
 
@@ -280,7 +281,7 @@ impl Aggregate {
                 if existing.0.kind == data.kind && existing.0.update(&data) {
                     existing.1.merge(metadata);
                 } else {
-                    emit!(AggregateUpdateFailed);
+                    emit(AggregateUpdateFailed);
                     *existing = (data, metadata);
                 }
             }
@@ -307,7 +308,7 @@ impl Aggregate {
         // kind must not gate the update or mixed-kind series get undercounted.
         existing.1.merge(metadata);
         if !existing.0.update(&count_data) {
-            emit!(AggregateUpdateFailed);
+            emit(AggregateUpdateFailed);
         }
     }
 
@@ -337,7 +338,7 @@ impl Aggregate {
                         }
                     }
                 } else {
-                    emit!(AggregateUpdateFailed);
+                    emit(AggregateUpdateFailed);
                     *existing = (data, metadata);
                 }
             }
@@ -380,7 +381,7 @@ impl Aggregate {
                 && metric.data().kind == prev_entry.0.kind
                 && !metric.subtract(&prev_entry.0)
             {
-                emit!(AggregateUpdateFailed);
+                emit(AggregateUpdateFailed);
             }
             output.push(Event::Metric(metric));
         }
@@ -401,7 +402,7 @@ impl Aggregate {
             for (data, metadata) in entries.iter().skip(1) {
                 if !final_sum.update(data) {
                     // Incompatible types, skip this metric
-                    emit!(AggregateUpdateFailed);
+                    emit(AggregateUpdateFailed);
                     continue 'outer;
                 }
                 final_metadata.merge(metadata.clone());
@@ -448,7 +449,7 @@ impl Aggregate {
         if let InnerMode::Diff { prev_map } = &mut self.mode {
             *prev_map = map;
         }
-        emit!(AggregateFlushed);
+        emit(AggregateFlushed);
     }
 }
 

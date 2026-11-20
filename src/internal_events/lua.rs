@@ -1,6 +1,6 @@
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, LossyF64, UNINTENTIONAL,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, LossyF64, UNINTENTIONAL, emit,
     error_stage, error_type,
 };
 use vector_lib::{counter, gauge};
@@ -39,7 +39,7 @@ impl InternalEvent for LuaScriptError {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: "Error in lua script.",
         });
@@ -70,7 +70,7 @@ impl InternalEvent for LuaBuildError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -80,8 +80,8 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
         ExternalError, FromLuaConversionError, MemoryControlNotAvailable, MemoryError,
         MetaMethodRestricted, MetaMethodTypeError, MismatchedRegistryKey, PreviouslyResumedPanic,
         RecursiveMutCallback, RuntimeError, SafetyError, StackError, SyntaxError,
-        ToLuaConversionError, UserDataBorrowError, UserDataBorrowMutError, UserDataDestructed,
-        UserDataTypeMismatch, WithContext,
+        UserDataBorrowError, UserDataBorrowMutError, UserDataDestructed, UserDataTypeMismatch,
+        WithContext,
     };
 
     match err {
@@ -95,7 +95,6 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
         StackError => "out_of_stack",
         BindError => "too_many_arguments_to_function_bind",
         BadArgument { .. } => "bad_argument",
-        ToLuaConversionError { .. } => "error_converting_value_to_lua",
         FromLuaConversionError { .. } => "error_converting_value_from_lua",
         CoroutineUnresumable => "coroutine_unresumable",
         UserDataTypeMismatch => "userdata_type_mismatch",

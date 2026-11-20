@@ -39,6 +39,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll, ready},
 };
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, Sink, Stream, TryFutureExt, future::BoxFuture, stream::FuturesUnordered};
 use pin_project::pin_project;
@@ -443,7 +444,7 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let events_sent = register(EventsSent::from(Output(None)));
         self.service
             .call(items)
             .err_into()
@@ -459,7 +460,7 @@ where
                         // Emit the `Error` and `EventsDropped` internal events.
                         // This scenario occurs after retries have been attempted.
                         let error = result.err().unwrap_or_else(|| "Response failed.".into());
-                        emit!(CallError {
+                        emit(CallError {
                             error,
                             request_id,
                             count,

@@ -1,4 +1,5 @@
 use std::task::Poll;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use fakedata::logs::{
@@ -31,6 +32,9 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
+
+const SERVICE: &str = "service";
+const HOST: &str = "host";
 
 /// Configuration for the `demo_logs` source.
 #[serde_as]
@@ -146,7 +150,7 @@ const fn lines_example() -> [&'static str; 2] {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(DemoLogsEventProcessed);
+        emit(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
@@ -219,8 +223,8 @@ async fn demo_logs_source(
     let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
     let mut interval = interval.map(time::interval);
 
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
+    let events_received = register(EventsReceived);
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -253,22 +257,22 @@ async fn demo_logs_source(
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
-                            path!("service"),
+                            Some(LegacyKey::InsertIfEmpty(path!(SERVICE))),
+                            path!(SERVICE),
                             "vector",
                         );
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("host"))),
-                            path!("host"),
+                            Some(LegacyKey::InsertIfEmpty(path!(HOST))),
+                            path!(HOST),
                             "localhost",
                         );
 
                         event
                     });
                     out.send_batch(events).await.inspect_err(|_| {
-                        emit!(StreamClosedError { count });
+                        emit(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -319,10 +323,10 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 DemoLogsConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
-                &owned_value_path!("service"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(SERVICE))),
+                &owned_value_path!(SERVICE),
                 Kind::bytes(),
-                Some("service"),
+                Some(SERVICE),
             );
 
         vec![SourceOutput::new_maybe_logs(
