@@ -128,7 +128,16 @@ where
             *probe.method_mut() = request.method().clone();
             *probe.headers_mut() = request.headers().clone();
             let preflight = request.method() == Method::OPTIONS
-                && request.headers().contains_key(header::ORIGIN);
+                && request.headers().contains_key(header::ORIGIN)
+                && request
+                    .headers()
+                    .contains_key(header::ACCESS_CONTROL_REQUEST_METHOD);
+            if request.method() == Method::OPTIONS && !preflight {
+                // Warp treats OPTIONS without a requested method as NotCors.
+                // Validate its origin like a normal request, without changing
+                // the actual method or body passed to ingestion.
+                *probe.method_mut() = Method::GET;
+            }
             let mut policy = warp::service(warp::any().map(warp::reply).with(cors));
             let mut response = match policy.call(probe).await {
                 Ok(response) => response,
@@ -171,6 +180,110 @@ mod tests {
             allowed_headers: vec!["Authorization".into()],
             max_age_secs: Some(3600),
         }
+    }
+
+    #[tokio::test]
+    async fn cors_ordinary_options_preserve_ingestion_and_origin_validation() {
+        let response = request(config(), Method::OPTIONS, Some(ORIGIN), None, None).await;
+        assert_eq!(response.status(), http::StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+            ORIGIN
+        );
+        let response = request(
+            config(),
+            Method::OPTIONS,
+            Some("https://other.example.com"),
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+        assert!(
+            !response
+                .headers()
+                .contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        );
+    }
+
+    #[cfg(feature = "sources-http_server")]
+    #[tokio::test]
+    async fn cors_http_server_ingests_ordinary_options_but_not_preflights() {
+        use crate::{
+            SourceSender,
+            config::{SourceConfig, SourceContext},
+            test_util::{addr::next_addr, wait_for_tcp},
+        };
+        use futures::StreamExt;
+        use serde_json::json;
+        use std::time::Duration;
+
+        let (_guard, address) = next_addr();
+        let source_config: Box<dyn SourceConfig> = serde_json::from_value(json!({
+            "type": "http_server",
+            "address": address,
+            "method": "OPTIONS",
+            "cors": {"allowed_origins": [ORIGIN]},
+            "decoding": {"codec": "bytes"},
+        }))
+        .unwrap();
+        let (sender, receiver) = SourceSender::new_test();
+        let mut receiver = Box::pin(receiver);
+        let source = source_config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        let mut tasks = tokio::task::JoinSet::new();
+        tasks.spawn(source);
+        wait_for_tcp(address).await;
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .unwrap();
+        let url = format!("http://{address}/");
+
+        let preflight = client
+            .request(Method::OPTIONS, &url)
+            .header(header::ORIGIN, ORIGIN)
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS")
+            .body("preflight must not be ingested\n")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(preflight.status(), http::StatusCode::OK);
+        assert!(futures::poll!(receiver.next()).is_pending());
+
+        let response = client
+            .request(Method::OPTIONS, &url)
+            .header(header::ORIGIN, ORIGIN)
+            .body("ordinary OPTIONS\n")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_eq!(
+            response.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+            ORIGIN
+        );
+        let event = tokio::time::timeout(Duration::from_secs(5), receiver.next())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            event.as_log()["message"].to_string_lossy(),
+            "ordinary OPTIONS"
+        );
+
+        let response = client
+            .request(Method::OPTIONS, url)
+            .header(header::ORIGIN, "https://other.example.com")
+            .body("forbidden OPTIONS\n")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+        assert!(futures::poll!(receiver.next()).is_pending());
     }
 
     #[cfg(any(feature = "sources-http_server", feature = "sources-opentelemetry"))]
