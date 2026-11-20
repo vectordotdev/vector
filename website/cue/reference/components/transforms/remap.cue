@@ -103,7 +103,7 @@ components: transforms: "remap": {
 				With [metric events](\(urls.vector_metric)), VRL is much more restrictive. Below is a field-by-field
 				breakdown of VRL's access to metrics:
 
-				Field | Access | Specific restrictions (if any)
+				Field | Access | Details
 				:-----|:-------|:------------------------------
 				`type` | Read/write | You can set `type` to either `counter` or `gauge`, but only on a metric that is currently a counter or a gauge. The value and kind are kept.
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
@@ -119,13 +119,22 @@ components: transforms: "remap": {
 				`aggregated_summary` | Read | `.aggregated_summary.quantiles`, an array of `{quantile, value}` objects, plus `.aggregated_summary.count` and `.aggregated_summary.sum`.
 				`sketch` | Read | Summary statistics only: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`.
 
+				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
+				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
+				the disallowed action.
+				"""
+		}
+		metric_values: {
+			title: "Metric Values"
+			body: """
 				A metric's value is available only under the field for its current type. For example, `.gauge.value`
 				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
 				includes the value field.
 
-				The field names in the table match the JSON encoding of metrics that `vector tap` shows. For some metric
-				types, these names differ from the value of `type`. For example, an aggregated histogram reports
-				`aggregated histogram` in `.type` but exposes its count at `.aggregated_histogram.count`.
+				The field names in the Event Data Model table match the JSON encoding of metrics that `vector tap`
+				shows. For some metric types, these names differ from the value of `type`. For example, an aggregated
+				histogram reports `aggregated histogram` in `.type` but exposes its count at
+				`.aggregated_histogram.count`.
 
 				These fields are read-only. Assigning to them or calling `del()` on them doesn't change the metric's value.
 				To convert between counters and gauges, set `type`.
@@ -148,10 +157,6 @@ components: transforms: "remap": {
 
 				Counter, gauge, and sample values are floats. The `==` operator treats `123` and `123.0` as equal, but
 				`assert_eq!` doesn't, so use float literals in assertions, for example, `assert_eq!(.gauge.value, 123.0)`.
-
-				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
-				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
-				the disallowed action.
 				"""
 		}
 		lazy_event_mutation: {
