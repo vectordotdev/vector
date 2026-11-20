@@ -908,7 +908,49 @@ mod tests {
 
         assert_eq!(
             errors,
-            vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
+            vec!["Cyclic dependency detected among components [ four, three, two ]"]
+        );
+    }
+
+    #[tokio::test]
+    async fn multiple_cycles() {
+        let errors = load(
+            r"
+            sources:
+              in:
+                type: test_basic
+            transforms:
+              a:
+                type: test_basic
+                inputs: [b]
+                suffix: foo
+                increase: 1.25
+              b:
+                type: test_basic
+                inputs: [a]
+                suffix: foo
+                increase: 1.25
+              other:
+                type: test_basic
+                inputs: [other]
+                suffix: foo
+                increase: 1.25
+            sinks:
+              out:
+                type: test_basic
+                inputs: [a, in]
+            ",
+            Format::Yaml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            errors,
+            vec![
+                "Cyclic dependency detected among components [ a, b ]",
+                "Cyclic dependency detected among components [ other ]",
+            ]
         );
     }
 
