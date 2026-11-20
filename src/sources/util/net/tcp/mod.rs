@@ -1,12 +1,13 @@
 pub(super) mod request_limiter;
 
-use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, pin::Pin, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
 use futures_util::future::OptionFuture;
 use ipnet::IpNet;
 use listenfd::ListenFd;
+use openssl::ssl::ErrorCode;
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -14,6 +15,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
+use tokio_openssl::SslStream;
 use tokio_util::codec::Decoder;
 use tracing::Instrument;
 use vector_lib::{
@@ -355,15 +357,12 @@ async fn handle_stream<T>(
     let mut before_first_read = reader.get_ref().get_ref().get_ref().ssl_stream().is_none();
 
     loop {
-        // If the last read found no more data, wait until the socket has data before taking a
+        // If the last read found no more data, wait until the connection has data before taking a
         // permit. Otherwise idle connections take turns holding the permits and starve the
         // connections that have data to read.
-        let idle_socket = if before_first_read || reader.is_inner_pending() {
-            reader.get_ref().get_ref().get_ref().get_ref()
-        } else {
-            None
-        };
+        let wait = before_first_read || reader.is_inner_pending();
         let first_read = std::mem::take(&mut before_first_read);
+        let stream = reader.get_mut().get_mut().get_mut_ref();
 
         let mut permit = tokio::select! {
             () = &mut tripwire => break,
@@ -379,24 +378,24 @@ async fn handle_stream<T>(
                 }
                 None
             },
-            permit = async {
-                if let Some(socket) = idle_socket {
-                    if first_read {
-                        // Tokio marks a newly accepted socket as readable before any data arrives,
-                        // so the first wait uses `peek`, which returns once data or the end of the
-                        // stream arrives and consumes no data.
-                        _ = socket.peek(&mut [0; 1]).await;
-                    } else {
-                        // Later waits do not use `peek`, because it would clear a pending error
-                        // (such as a reset) that the next read must see. An error from `readable`
-                        // is also returned by the next read.
-                        _ = socket.readable().await;
-                    }
+            waited = async {
+                if wait {
+                    wait_for_data(stream, first_read).await?;
                 }
-                request_limiter.acquire().await
-            } => {
-                Some(permit)
-            }
+                Ok::<_, io::Error>(request_limiter.acquire().await)
+            } => match waited {
+                Ok(permit) => Some(permit),
+                Err(error) => {
+                    // The wait took this error from the connection, so the next read would not
+                    // return it. Handle it the way the reader handles a read error.
+                    if let Some(error) = reader.get_ref().read_error(error)
+                        && !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error)
+                    {
+                        emit(DecoderFramingError { error });
+                    }
+                    break;
+                }
+            },
             else => break,
         };
 
@@ -518,6 +517,51 @@ async fn handle_stream<T>(
         }
 
         drop(permit);
+    }
+}
+
+/// Waits until the connection has data to read, or the end of the stream, without reading it.
+///
+/// Returns the error if the wait took one from the connection, because the next read would not
+/// return it.
+async fn wait_for_data(
+    connection: &mut MaybeTlsIncomingStream<TcpStream>,
+    first_read: bool,
+) -> io::Result<()> {
+    if let Some(stream) = connection.ssl_stream_mut() {
+        return wait_for_tls_data(stream).await;
+    }
+    let Some(socket) = connection.get_ref() else {
+        return Ok(());
+    };
+    if first_read {
+        // Tokio marks a newly accepted socket as readable before any data arrives, so the first
+        // wait uses `peek`, which returns once data or the end of the stream arrives and consumes
+        // no data.
+        socket.peek(&mut [0; 1]).await?;
+    } else {
+        // Later waits do not use `peek`, because it would clear a pending error (such as a reset)
+        // that the next read must see. An error from `readable` is also returned by the next read.
+        _ = socket.readable().await;
+    }
+    Ok(())
+}
+
+/// Waits through the TLS layer, which does the I/O it needs and wakes the task when the socket is
+/// ready for it. A read that must first write, for example to answer a TLS 1.3 key update, waits
+/// until the socket is writable instead of readable.
+async fn wait_for_tls_data(stream: &mut SslStream<TcpStream>) -> io::Result<()> {
+    // `peek` leaves the data for the next read.
+    match Pin::new(stream).peek(&mut [0; 1]).await {
+        Ok(_) => Ok(()),
+        // The end of the stream, which the next read also returns.
+        Err(error)
+            if error.code() == ErrorCode::ZERO_RETURN
+                || (error.code() == ErrorCode::SYSCALL && error.io_error().is_none()) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error.into_io_error().unwrap_or_else(io::Error::other)),
     }
 }
 
@@ -740,7 +784,10 @@ mod tests {
     type Client = Pin<Box<dyn AsyncWrite + Send>>;
 
     async fn connect(addr: SocketAddr, tls: bool) -> Client {
-        let stream = TcpStream::connect(addr).await.unwrap();
+        start_tls(TcpStream::connect(addr).await.unwrap(), tls).await
+    }
+
+    async fn start_tls(stream: TcpStream, tls: bool) -> Client {
         if !tls {
             return Box::pin(stream);
         }
@@ -947,24 +994,25 @@ mod tests {
         assert_eq!(read.unwrap(), 0);
     }
 
-    #[tokio::test]
-    async fn drops_partial_frame_when_idle_connection_is_reset() {
+    async fn assert_drops_partial_frame_when_idle_connection_is_reset(tls: bool) {
         let (tx, mut rx) = SourceSender::new_test();
         let (addr, _source) = start_source(
             CountingSource::default(),
-            false,
+            tls,
             SourceContext::new_test(tx, None),
         )
         .await;
 
-        let mut stream = TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"partial").await.unwrap();
-        // Let the source read the partial frame and go idle, then reset the connection.
-        sleep(Duration::from_millis(100)).await;
+        let stream = TcpStream::connect(addr).await.unwrap();
+        // Closing the socket with a zero linger time resets the connection.
         socket2::SockRef::from(&stream)
             .set_linger(Some(Duration::ZERO))
             .unwrap();
-        drop(stream);
+        let mut client = start_tls(stream, tls).await;
+        client.write_all(b"partial").await.unwrap();
+        // Let the source read the partial frame and go idle, then reset the connection.
+        sleep(Duration::from_millis(100)).await;
+        drop(client);
 
         // The reset is reported as an error, so the partial frame is not decoded as an event.
         assert!(
@@ -972,6 +1020,16 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn drops_partial_frame_when_idle_connection_is_reset() {
+        assert_drops_partial_frame_when_idle_connection_is_reset(false).await;
+    }
+
+    #[tokio::test]
+    async fn drops_partial_frame_when_idle_tls_connection_is_reset() {
+        assert_drops_partial_frame_when_idle_connection_is_reset(true).await;
     }
 
     #[tokio::test]
@@ -1001,5 +1059,157 @@ mod tests {
         }
         assert!(shutdown_complete.await);
         source.await.unwrap().unwrap();
+    }
+
+    /// A TLS 1.3 peer can request a key update, which the stream must answer with a write.
+    /// Vector's TLS acceptor does not offer TLS 1.3 by default, so these tests use their own peer.
+    #[cfg(feature = "tls-ring")]
+    mod tls_read_that_must_write {
+        use std::{io::Write as _, pin::Pin, sync::Arc, time::Duration};
+
+        use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject as _};
+        use tokio::{
+            io::{AsyncReadExt, AsyncWriteExt},
+            net::{TcpSocket, TcpStream},
+            time::timeout,
+        };
+
+        use super::super::wait_for_tls_data;
+        use crate::tls::{TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
+
+        async fn write_tls(tls: &mut rustls::ServerConnection, stream: &mut TcpStream) {
+            let mut records = Vec::new();
+            while tls.wants_write() {
+                tls.write_tls(&mut records).unwrap();
+            }
+            stream.write_all(&records).await.unwrap();
+        }
+
+        async fn accept_tls13(stream: &mut TcpStream) -> rustls::ServerConnection {
+            let certs = CertificateDer::pem_file_iter(TEST_PEM_CRT_PATH)
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            let key = PrivateKeyDer::from_pem_file(TEST_PEM_KEY_PATH).unwrap();
+            let provider = Arc::new(rustls::crypto::ring::default_provider());
+            let config = rustls::ServerConfig::builder_with_provider(provider)
+                .with_protocol_versions(&[&rustls::version::TLS13])
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .unwrap();
+            let mut tls = rustls::ServerConnection::new(Arc::new(config)).unwrap();
+
+            let mut buf = vec![0; 16 * 1024];
+            while tls.is_handshaking() {
+                if tls.wants_write() {
+                    write_tls(&mut tls, stream).await;
+                    continue;
+                }
+                let n = stream.read(&mut buf).await.unwrap();
+                assert_ne!(n, 0, "the client closed the handshake");
+                let mut records = &buf[..n];
+                while !records.is_empty() {
+                    tls.read_tls(&mut records).unwrap();
+                    tls.process_new_packets().unwrap();
+                }
+            }
+            write_tls(&mut tls, stream).await;
+            tls
+        }
+
+        #[tokio::test]
+        async fn tls_wait_resumes_when_socket_becomes_writable() {
+            const KEY_UPDATES_PER_ROUND: usize = 50;
+
+            // Small socket buffers, so that a few hundred answers fill them.
+            let listener = TcpSocket::new_v4().unwrap();
+            listener.set_recv_buffer_size(4096).unwrap();
+            listener.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let listener = listener.listen(1).unwrap();
+            let socket = TcpSocket::new_v4().unwrap();
+            socket.set_send_buffer_size(4096).unwrap();
+            let (socket, accepted) = tokio::join!(
+                socket.connect(listener.local_addr().unwrap()),
+                listener.accept()
+            );
+            let (mut peer_socket, _) = accepted.unwrap();
+
+            let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+            connector.set_verify(SslVerifyMode::NONE);
+            let ssl = connector
+                .build()
+                .configure()
+                .unwrap()
+                .into_ssl("localhost")
+                .unwrap();
+            let mut stream = tokio_openssl::SslStream::new(ssl, socket.unwrap()).unwrap();
+            let (connected, mut peer) = tokio::join!(
+                Pin::new(&mut stream).connect(),
+                accept_tls13(&mut peer_socket)
+            );
+            connected.unwrap();
+
+            // The peer requests a key update before each byte and reads nothing, so the answers
+            // fill the socket buffers until a read has to wait to write one.
+            let mut sent = 0;
+            let mut received = 0;
+            let mut buf = [0; 1024];
+            loop {
+                assert!(sent < 100_000, "the socket buffers did not fill");
+                for _ in 0..KEY_UPDATES_PER_ROUND {
+                    peer.refresh_traffic_keys().unwrap();
+                    peer.writer().write_all(b"x").unwrap();
+                }
+                sent += KEY_UPDATES_PER_ROUND;
+                write_tls(&mut peer, &mut peer_socket).await;
+                while received < sent {
+                    match timeout(Duration::from_millis(200), stream.read(&mut buf)).await {
+                        Ok(read) => {
+                            let read = read.unwrap();
+                            assert_ne!(read, 0, "the peer closed the connection");
+                            received += read;
+                        }
+                        Err(_) => break,
+                    }
+                }
+                // The read stopped and the socket is not writable: the read waits to write.
+                if received < sent
+                    && timeout(Duration::from_millis(100), stream.get_ref().writable())
+                        .await
+                        .is_err()
+                {
+                    break;
+                }
+            }
+
+            // Data is buffered, but the read must write first, so the wait does not return
+            // while the socket is not writable.
+            assert!(
+                timeout(Duration::from_millis(100), wait_for_tls_data(&mut stream))
+                    .await
+                    .is_err()
+            );
+
+            // The peer reads, which makes the socket writable, and sends nothing new.
+            tokio::spawn(async move {
+                let mut buf = vec![0; 16 * 1024];
+                while peer_socket.read(&mut buf).await.is_ok_and(|n| n > 0) {}
+            });
+            timeout(Duration::from_secs(5), wait_for_tls_data(&mut stream))
+                .await
+                .expect("the wait did not return when the socket became writable")
+                .unwrap();
+            timeout(Duration::from_secs(5), async {
+                while received < sent {
+                    let read = stream.read(&mut buf).await.unwrap();
+                    assert_ne!(read, 0, "the peer closed the connection");
+                    received += read;
+                }
+            })
+            .await
+            .expect("the rest of the data was not read");
+        }
     }
 }

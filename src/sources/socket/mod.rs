@@ -347,7 +347,7 @@ mod test {
         io::AsyncReadExt,
         net::TcpStream,
         task::JoinHandle,
-        time::{Duration, Instant, timeout},
+        time::{Duration, Instant, sleep, timeout},
     };
     #[cfg(unix)]
     use vector_lib::codecs::{
@@ -355,8 +355,8 @@ mod test {
     };
     use vector_lib::{
         codecs::{
-            GelfDeserializerConfig, LengthDelimitedDecoderConfig, NewlineDelimitedDecoderConfig,
-            decoding::DeserializerConfig,
+            BytesDecoderConfig, GelfDeserializerConfig, LengthDelimitedDecoderConfig,
+            NewlineDelimitedDecoderConfig, decoding::DeserializerConfig,
         },
         event::EventContainer,
         lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
@@ -721,6 +721,58 @@ mod test {
             );
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn tcp_reset_before_first_byte_emits_no_event() {
+        let (tx, mut rx) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_framing(Some(BytesDecoderConfig::new().into()));
+
+        let server = SocketConfig::from(config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        // This client resets the connection without sending anything. It connects as soon as the
+        // source listens, instead of `wait_for_tcp`, whose closed connection would be an event.
+        let stream = timeout(Duration::from_secs(10), async {
+            loop {
+                match TcpStream::connect(addr).await {
+                    Ok(stream) => break stream,
+                    Err(_) => sleep(Duration::from_millis(10)).await,
+                }
+            }
+        })
+        .await
+        .expect("the source did not listen");
+        drop(guard);
+        // Let the source wait for the first byte.
+        sleep(Duration::from_millis(100)).await;
+        socket2::SockRef::from(&stream)
+            .set_linger(Some(Duration::ZERO))
+            .unwrap();
+        drop(stream);
+
+        send_lines(addr, ["hello".to_owned()]).await.unwrap();
+
+        // The only event is the message of the second client.
+        let event = timeout(Duration::from_secs(5), rx.next())
+            .await
+            .expect("no event was received")
+            .unwrap();
+        assert_eq!(
+            event.as_log()[log_schema().message_key().unwrap().to_string()],
+            "hello\n".into()
+        );
+        assert!(
+            timeout(Duration::from_millis(500), rx.next())
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
