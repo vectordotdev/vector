@@ -24,5 +24,6 @@ async-compression.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+proptest.workspace = true
 quickcheck.workspace = true
 tempfile.workspace = true

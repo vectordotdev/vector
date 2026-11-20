@@ -9,13 +9,17 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use tokio::{
-    fs::{self, File},
     io::{AsyncReadExt, BufReader},
     sync::Mutex,
 };
 use tracing::{error, info, warn};
 
-use super::{FilePosition, fingerprinter::FileFingerprint};
+use super::{
+    FilePosition,
+    clock::{Clock, SystemClock},
+    fingerprinter::FileFingerprint,
+    fs::{FileSystem, OsFileSystem},
+};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
@@ -42,26 +46,44 @@ struct Checkpoint {
     modified: DateTime<Utc>,
 }
 
-pub struct Checkpointer {
+pub struct Checkpointer<FS: FileSystem = OsFileSystem, C: Clock = SystemClock> {
     tmp_file_path: PathBuf,
     stable_file_path: PathBuf,
-    checkpoints: Arc<CheckpointsView>,
+    checkpoints: Arc<CheckpointsView<C>>,
     last: Mutex<Option<State>>,
+    fs: FS,
 }
 
 /// A thread-safe handle for reading and writing checkpoints in-memory across
 /// multiple threads.
-#[derive(Debug, Default)]
-pub struct CheckpointsView {
+#[derive(Debug)]
+pub struct CheckpointsView<C: Clock = SystemClock> {
     checkpoints: DashMap<FileFingerprint, FilePosition>,
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    clock: C,
 }
 
-impl CheckpointsView {
+impl Default for CheckpointsView<SystemClock> {
+    fn default() -> Self {
+        Self::new_with_clock(SystemClock)
+    }
+}
+
+impl<C: Clock> CheckpointsView<C> {
+    #[must_use]
+    pub fn new_with_clock(clock: C) -> Self {
+        Self {
+            checkpoints: DashMap::default(),
+            modified_times: DashMap::default(),
+            removed_times: DashMap::default(),
+            clock,
+        }
+    }
+
     pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.insert(fng, pos);
-        self.modified_times.insert(fng, Utc::now());
+        self.modified_times.insert(fng, self.clock.now_utc());
         self.removed_times.remove(&fng);
     }
 
@@ -71,7 +93,7 @@ impl CheckpointsView {
     }
 
     pub fn set_dead(&self, fng: FileFingerprint) {
-        self.removed_times.insert(fng, Utc::now());
+        self.removed_times.insert(fng, self.clock.now_utc());
     }
 
     pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
@@ -89,7 +111,7 @@ impl CheckpointsView {
     }
 
     pub fn remove_expired(&self) {
-        let now = Utc::now();
+        let now = self.clock.now_utc();
 
         // Collect all of the expired keys. Removing them while iterating can
         // lead to deadlocks, the set should be small, and this is not a
@@ -148,7 +170,7 @@ impl CheckpointsView {
                         modified: self
                             .modified_times
                             .get(fingerprint)
-                            .map_or_else(Utc::now, |r| *r.value()),
+                            .map_or_else(|| self.clock.now_utc(), |r| *r.value()),
                     }
                 })
                 .collect(),
@@ -156,21 +178,29 @@ impl CheckpointsView {
     }
 }
 
-impl Checkpointer {
+impl Checkpointer<OsFileSystem, SystemClock> {
     #[must_use]
-    pub fn new(data_dir: &Path) -> Checkpointer {
+    pub fn new(data_dir: &Path) -> Self {
+        Self::new_with(data_dir, OsFileSystem, SystemClock)
+    }
+}
+
+impl<FS: FileSystem, C: Clock> Checkpointer<FS, C> {
+    #[must_use]
+    pub fn new_with(data_dir: &Path, fs: FS, clock: C) -> Self {
         let tmp_file_path = data_dir.join(TMP_FILE_NAME);
         let stable_file_path = data_dir.join(CHECKPOINT_FILE_NAME);
 
         Checkpointer {
             tmp_file_path,
             stable_file_path,
-            checkpoints: Arc::new(CheckpointsView::default()),
+            checkpoints: Arc::new(CheckpointsView::new_with_clock(clock)),
             last: Mutex::new(None),
+            fs,
         }
     }
 
-    pub fn view(&self) -> Arc<CheckpointsView> {
+    pub fn view(&self) -> Arc<CheckpointsView<C>> {
         Arc::clone(&self.checkpoints)
     }
 
@@ -208,24 +238,21 @@ impl Checkpointer {
             // disk. If vector dies anywhere during this section, the existing
             // stable file will still be in its current valid state and we'll be
             // able to recover.
-            let tmp_file_path = self.tmp_file_path.clone();
-
-            // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
-            let current = tokio::task::spawn_blocking(move || -> Result<State, io::Error> {
-                let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
-                serde_json::to_writer(&mut f, &current)?;
-                f.into_inner()?.sync_all()?;
-                Ok(current)
-            })
-            .await
-            .map_err(io::Error::other)??;
+            let current_to_write = current.clone();
+            self.fs
+                .write_file_sync_with(&self.tmp_file_path, move |w| {
+                    serde_json::to_writer(w, &current_to_write).map_err(io::Error::other)
+                })
+                .await?;
 
             // Once the temp file is fully flushed, rename the tmp file to replace
             // the previous stable file. This is an atomic operation on POSIX
             // systems (and the stdlib claims to provide equivalent behavior on
             // Windows), which should prevent scenarios where we don't have at least
             // one full valid file to recover from.
-            fs::rename(&self.tmp_file_path, &self.stable_file_path).await?;
+            self.fs
+                .rename(&self.tmp_file_path, &self.stable_file_path)
+                .await?;
 
             *last = Some(current);
         }
@@ -248,7 +275,11 @@ impl Checkpointer {
 
                 // Try to move this tmp file to the stable location so we don't
                 // immediately overwrite it when we next persist checkpoints.
-                if let Err(error) = fs::rename(&self.tmp_file_path, &self.stable_file_path).await {
+                if let Err(error) = self
+                    .fs
+                    .rename(&self.tmp_file_path, &self.stable_file_path)
+                    .await
+                {
                     warn!(message = "Error persisting recovered checkpoint file.", %error);
                 }
                 return;
@@ -279,10 +310,7 @@ impl Checkpointer {
     }
 
     async fn read_checkpoints_file(&self, path: &Path) -> Result<State, io::Error> {
-        // Possible optimization: mmap the file into a slice and pass it into serde_json instead of
-        // calling read_to_end. Need to investigate if this would work with tokio::fs::File
-
-        let mut reader = BufReader::new(File::open(path).await?);
+        let mut reader = BufReader::new(self.fs.open(path).await?);
         let mut output = Vec::new();
         reader.read_to_end(&mut output).await?;
 

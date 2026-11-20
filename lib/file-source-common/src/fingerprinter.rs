@@ -7,15 +7,16 @@ use std::{
 
 use crc::Crc;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    fs::{self, File},
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
+use tokio::io::{
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader,
 };
 use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
-    AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
+    clock::{Clock, MonotonicInstant},
+    fs::{AsyncFile as _, FileSystem, OsFileSystem},
+    internal_events::FileSourceInternalEvents,
 };
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
@@ -78,13 +79,8 @@ impl SupportedCompressionAlgorithms {
     }
 }
 
-trait UncompressedReader {
-    async fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>>;
-    async fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn AsyncBufRead + Unpin + Send + 'a>>;
-}
-
 struct UncompressedReaderImpl;
-impl UncompressedReader for UncompressedReaderImpl {
+impl UncompressedReaderImpl {
     /// Checks a file for supported compression algorithms by searching for
     /// supported magic header bytes.
     ///
@@ -98,7 +94,9 @@ impl UncompressedReader for UncompressedReaderImpl {
     /// - `Ok(Some(algorithm))` if a supported compression algorithm is detected.
     /// - `Ok(None)` if no supported compression algorithm is detected.
     /// - `Err(std::io::Error)` if an I/O error occurs.
-    async fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>> {
+    async fn check<F: AsyncRead + AsyncSeek + Unpin + Send>(
+        fp: &mut F,
+    ) -> Result<Option<SupportedCompressionAlgorithms>> {
         let mut algorithm: Option<SupportedCompressionAlgorithms> = None;
         for compression_algorithm in SupportedCompressionAlgorithms::values() {
             // magic headers for algorithms can be of different lengths, and using a buffer too long could exceed the length of the file
@@ -124,7 +122,9 @@ impl UncompressedReader for UncompressedReaderImpl {
         Ok(algorithm)
     }
 
-    async fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn AsyncBufRead + Unpin + Send + 'a>> {
+    async fn reader<'a, F: AsyncRead + AsyncSeek + Unpin + Send>(
+        fp: &'a mut F,
+    ) -> Result<Box<dyn AsyncBufRead + Unpin + Send + 'a>> {
         // To support new compression algorithms, add them below
         match Self::check(fp).await? {
             Some(SupportedCompressionAlgorithms::Gzip) => Ok(Box::new(BufReader::new(
@@ -175,24 +175,29 @@ impl Fingerprinter {
         }
     }
 
-    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
-    pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
+    /// Returns the `FileFingerprint` of a file using the provided [`FileSystem`].
+    ///
+    /// # Errors
+    /// Returns an I/O error if opening, querying identity, or reading the file fails.
+    pub async fn fingerprint_with_fs<FS: FileSystem>(
+        &mut self,
+        path: &Path,
+        fs: &FS,
+    ) -> Result<FileFingerprint> {
         use FileFingerprint::{DevInode, FirstLinesChecksum};
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
-                let file_handle = File::open(path).await?;
-                let file_info = file_handle.file_info().await?;
-                let dev = file_info.portable_dev();
-                let ino = file_info.portable_ino();
-                Ok(DevInode(dev, ino))
+                let file_handle = fs.open(path).await?;
+                let identity = file_handle.identity().await?;
+                Ok(DevInode(identity.dev, identity.ino))
             }
             FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes,
                 lines,
             } => {
                 let buffer = self.buffer.resize_slice_mut(self.max_line_length);
-                let mut fp = File::open(path).await?;
+                let mut fp = fs.open(path).await?;
                 let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
                 skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
@@ -203,18 +208,50 @@ impl Fingerprinter {
         }
     }
 
+    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
+    #[cfg(test)]
+    pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
+        self.fingerprint_with_fs(path, &OsFileSystem).await
+    }
+
+    pub async fn fingerprint_or_emit_with_fs<FS: FileSystem, C: Clock>(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut HashMap<PathBuf, MonotonicInstant>,
+        emitter: &impl FileSourceInternalEvents,
+        fs: &FS,
+        clock: &C,
+    ) -> Option<FileFingerprint> {
+        self.fingerprint_or_emit_inner(path, known_small_files, emitter, fs, || clock.now())
+            .await
+    }
+
     pub async fn fingerprint_or_emit(
         &mut self,
         path: &Path,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
-        let metadata = match fs::metadata(path).await {
+        self.fingerprint_or_emit_inner(path, known_small_files, emitter, &OsFileSystem, || {
+            time::Instant::now()
+        })
+        .await
+    }
+
+    async fn fingerprint_or_emit_inner<FS: FileSystem, T>(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut HashMap<PathBuf, T>,
+        emitter: &impl FileSourceInternalEvents,
+        fs: &FS,
+        now_fn: impl FnOnce() -> T,
+    ) -> Option<FileFingerprint> {
+        let metadata = match fs.metadata(path).await {
             Ok(metadata) => {
-                if metadata.is_dir() {
+                if metadata.is_dir {
                     Ok(None)
                 } else {
-                    self.fingerprint(path).await.map(Some)
+                    self.fingerprint_with_fs(path, fs).await.map(Some)
                 }
             }
             Err(e) => Err(e),
@@ -230,7 +267,7 @@ impl Fingerprinter {
                     ErrorKind::UnexpectedEof => {
                         if !known_small_files.contains_key(path) {
                             emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
+                            known_small_files.insert(path.to_path_buf(), now_fn());
                         }
                         return;
                     }
