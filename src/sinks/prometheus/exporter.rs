@@ -504,7 +504,7 @@ impl PrometheusExporter {
             _closed: closed,
         };
 
-        crate::spawn_in_current_span(async move {
+        vector_lib::cpu_time::spawn_timed(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             if let Err(error) = serve(
