@@ -8,6 +8,7 @@ use std::{
 };
 
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, lookup_v2::OwnedSegment};
+use smallvec::SmallVec;
 use snafu::Snafu;
 use vrl::{
     compiler::{ProgramInfo, SecretTarget, Target, value::VrlValueConvert},
@@ -37,10 +38,11 @@ static VALID_METRIC_PATHS_GET: LazyLock<String> = LazyLock::new(|| {
         .join(", ")
 });
 
-/// Metrics aren't interested in paths that have a length longer than 3.
+/// How many segments to look at in a path to a metric field other than its value.
 ///
-/// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
-/// fields such as `.tags.host.thing`.
+/// The longest of these paths is `.tags.<name>`, and the third segment is checked so that paths
+/// such as `.tags.host.thing` are rejected. Paths into the value, such as
+/// `.distribution.samples[0].value`, aren't limited.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
 /// How metric tags are exposed to and accepted from VRL or Lua.
@@ -567,16 +569,11 @@ impl SecretTarget for VrlTarget {
     }
 }
 
-/// Retrieves a value from a the provided metric using the path.
-/// Currently the root path and the following paths are supported:
-/// - `name`
-/// - `namespace`
-/// - `interval_ms`
-/// - `timestamp`
-/// - `kind`
-/// - `tags`
-/// - `tags.<tagname>`
-/// - `type`
+/// Retrieves a value from the provided metric using the path.
+///
+/// Supports the root path, the metric's fields (`name`, `namespace`, `interval_ms`, `timestamp`,
+/// `kind`, `tags`, `tags.<tagname>`, and `type`), and paths into its value, which are declared in
+/// `metric_value_fields!`.
 ///
 /// Any other paths result in a `MetricPathError::InvalidPath` being returned.
 fn target_get_metric<'a>(
@@ -973,7 +970,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
     // Whether the program reads the whole value, or only some of its subfields. Requests are
     // collected first, so that each subfield is converted once however many paths read it.
     let mut value_full = false;
-    let mut value_subfields: Vec<&'static str> = Vec::new();
+    let mut value_subfields: SmallVec<[&'static str; 4]> = SmallVec::new();
 
     for target_path in &info.target_queries {
         // Metadata paths, such as `%distribution`, don't read the event.
