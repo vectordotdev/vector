@@ -671,6 +671,34 @@ fn transform_authored_reserved_keys_are_stripped_on_egress() {
 }
 
 #[test]
+fn empty_event_keeps_its_place_between_coalesced_spans() {
+    let (encoded, counts) = encode_counted(&[
+        typed_event(1, vec![typed_span(1, "a1")]),
+        TraceEvent::new(tid(9)),
+        typed_event(1, vec![typed_span(2, "a2")]),
+    ]);
+    assert_eq!(encoded.len(), 1);
+    let scopes = &encoded[0].scope_spans;
+    assert_eq!(scopes.len(), 2);
+    assert_eq!(
+        scopes[0]
+            .spans
+            .iter()
+            .map(|span| span.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a1", "a2"]
+    );
+    assert!(scopes[1].spans.is_empty());
+    assert_eq!(
+        counts,
+        TraceConversionCounts {
+            empty_events: 1,
+            ..TraceConversionCounts::default()
+        }
+    );
+}
+
+#[test]
 fn empty_events_are_not_coalesced_and_are_reported() {
     let out = encode_counted(&[TraceEvent::new(tid(1)), TraceEvent::new(tid(2))]);
     assert_eq!(

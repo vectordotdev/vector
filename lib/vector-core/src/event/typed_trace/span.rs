@@ -60,7 +60,7 @@ impl ByteSizeOf for DroppedCount {
 }
 
 /// Resource attached to a [`super::TraceEvent`].
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Resource {
     /// `service.name`.
     pub service: Option<String>,
@@ -87,7 +87,7 @@ impl ByteSizeOf for Resource {
 }
 
 /// Instrumentation scope attached to a [`super::TraceEvent`].
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Scope {
     /// Scope name. `None` is OTLP "instrumentation scope name unknown".
     pub name: Option<String>,
