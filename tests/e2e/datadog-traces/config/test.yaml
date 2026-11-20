@@ -24,6 +24,7 @@ paths:
   - "src/sinks/datadog/traces/**"
   - "src/sinks/util/**"
   - "lib/datadog-proto/**"
+  - "lib/trace-conversion/**"
   - "lib/vector-core/src/event/trace.rs"
   - "lib/vector-core/src/event/typed_trace/**"
   - "tests/e2e/datadog/mod.rs"

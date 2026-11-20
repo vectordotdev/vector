@@ -4,6 +4,8 @@ pub use enrichment;
 pub use file_source;
 #[cfg(feature = "file-source")]
 pub use file_source_common;
+#[cfg(feature = "typed-trace")]
+pub use trace_conversion;
 #[cfg(feature = "api-client")]
 pub use vector_api_client as api_client;
 pub use vector_buffers as buffers;
