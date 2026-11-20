@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Sender;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     configurable::configurable_component,
-    cpu_time::spawn_timed,
+    cpu_time::{ThreadTime, spawn_timed},
     event::Event,
     sink::{StreamSink, VectorSink},
 };
@@ -103,7 +103,7 @@ impl ValidatedSink for CompletionSinkConfig {
         };
         let healthcheck = match self.healthcheck_cpu_burn_ms.map(Duration::from_millis) {
             Some(cpu_burn) => async move {
-                spawn_timed(async move { busy_spin(cpu_burn) }).await?;
+                spawn_timed(async move { burn_thread_cpu(cpu_burn) }).await?;
                 Ok(())
             }
             .boxed(),
@@ -111,6 +111,15 @@ impl ValidatedSink for CompletionSinkConfig {
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+/// Spins until the current thread has used `duration` of CPU time. Unlike [`busy_spin`], the
+/// burn holds when the thread is preempted.
+fn burn_thread_cpu(duration: Duration) {
+    let start = ThreadTime::now();
+    while start.elapsed() < duration {
+        busy_spin(Duration::from_millis(1));
     }
 }
 

@@ -262,8 +262,8 @@ async fn component_cpu_usage_includes_sink_healthcheck_tasks() {
     )
     .await;
 
-    // Half the burn, to absorb preemption and Windows' clock-tick granularity.
-    let min_ns = f64::from(HEALTHCHECK_CPU_BURN_MS) * 1e6 / 2.0;
+    // The burn is measured on the same thread clock as the poll timer.
+    let min_ns = f64::from(HEALTHCHECK_CPU_BURN_MS) * 1e6;
     let value = component_cpu_counter(&metrics, &format!("{id}_sink"), has_sink_tags);
     assert!(
         value >= min_ns,
