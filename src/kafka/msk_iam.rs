@@ -28,9 +28,14 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use snafu::{ResultExt, Snafu};
 
-/// MSK IAM presigned tokens are valid for at most 15 minutes. librdkafka refreshes at ~80% of the
-/// remaining lifetime, so 900s gives a comfortable refresh cadence.
+/// MSK IAM presigned tokens are valid for at most 15 minutes.
 const EXPIRY_SECONDS: u64 = 900;
+/// Lifetime advertised to librdkafka, kept well below the 15-minute presign. librdkafka refreshes
+/// the token at 80% of the advertised lifetime; advertising the full window would leave the current
+/// token only ~3 minutes of validity at that point, which MSK can reject during SASL
+/// re-authentication (`connections.max.reauth.ms`) as "Session too short". With 9 minutes the
+/// refresh happens around minute 7, while the token is still valid for ~8 more minutes.
+const MAX_ADVERTISED_LIFETIME: Duration = Duration::from_mins(9);
 const SIGNING_NAME: &str = "kafka-cluster";
 const ACTION: &str = "kafka-cluster:Connect";
 const USER_AGENT: &str = concat!("vector-msk-iam-signer/", env!("CARGO_PKG_VERSION"));
@@ -178,10 +183,10 @@ pub(crate) fn build_token(
     let signed_url = format!("{signed_url}&User-Agent={USER_AGENT}");
     let token = URL_SAFE_NO_PAD.encode(signed_url.as_bytes());
 
-    // The token can't outlive the credentials that signed it: a presign is valid for 15 min, but
-    // temporary (STS/IMDS) credentials may expire sooner. Advertise the earlier of the two so
-    // librdkafka refreshes before the underlying AWS session dies.
-    let token_expiry = signing_time + Duration::from_secs(EXPIRY_SECONDS);
+    // Advertise at most `MAX_ADVERTISED_LIFETIME` (see there), and never past the credentials that
+    // signed the token: temporary (STS/IMDS) credentials may expire sooner, and librdkafka must
+    // refresh before the underlying AWS session dies.
+    let token_expiry = signing_time + MAX_ADVERTISED_LIFETIME;
     let effective_expiry = match credentials.expiry() {
         Some(cred_expiry) if cred_expiry < token_expiry => cred_expiry,
         _ => token_expiry,
@@ -373,7 +378,7 @@ mod tests {
     }
 
     /// The token is base64url-nopad of the presigned URL (+ appended User-Agent), and its lifetime
-    /// is the absolute unix-epoch ms of signing-time + 900s.
+    /// is the absolute unix-epoch ms of signing-time + the advertised 540s (not the 900s presign).
     #[test]
     fn build_token_encodes_and_sets_lifetime() {
         let out = build_token(&region(), HOST, &creds(false), fixed_time()).expect("token");
@@ -385,9 +390,10 @@ mod tests {
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert!(url.ends_with(&format!("&User-Agent={USER_AGENT}")));
         assert!(url.contains(GOLDEN_SIG_NO_TOKEN));
+        assert_eq!(query_param(&url, "X-Amz-Expires"), Some("900"));
         assert_eq!(
             out.lifetime_ms,
-            FIXED_EPOCH_SECS.cast_signed() * 1000 + 900_000
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 540_000
         );
     }
 
@@ -415,10 +421,11 @@ mod tests {
         );
     }
 
-    /// A token must never be advertised as valid past the credentials that signed it.
+    /// A token must never be advertised as valid past the credentials that signed it, nor past the
+    /// advertised cap.
     #[test]
     fn lifetime_clamped_to_credential_expiry() {
-        // Credentials expiring 300s after signing time — earlier than the 900s presign window.
+        // Credentials expiring 300s after signing time — earlier than the advertised 540s.
         let cred_expiry = fixed_time() + Duration::from_secs(300);
         let creds = Credentials::new(
             ACCESS_KEY,
@@ -433,7 +440,21 @@ mod tests {
             FIXED_EPOCH_SECS.cast_signed() * 1000 + 300_000
         );
 
-        // Credentials outliving the window -> full 900s.
+        // Credentials expiring between the cap and the presign window (600s) -> the 540s cap.
+        let medium = Credentials::new(
+            ACCESS_KEY,
+            SECRET_KEY,
+            Some(SESSION_TOKEN.to_string()),
+            Some(fixed_time() + Duration::from_secs(600)),
+            "test",
+        );
+        let out = build_token(&region(), HOST, &medium, fixed_time()).expect("token");
+        assert_eq!(
+            out.lifetime_ms,
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 540_000
+        );
+
+        // Credentials outliving the window -> the 540s cap.
         let long = Credentials::new(
             ACCESS_KEY,
             SECRET_KEY,
@@ -444,7 +465,7 @@ mod tests {
         let out = build_token(&region(), HOST, &long, fixed_time()).expect("token");
         assert_eq!(
             out.lifetime_ms,
-            FIXED_EPOCH_SECS.cast_signed() * 1000 + 900_000
+            FIXED_EPOCH_SECS.cast_signed() * 1000 + 540_000
         );
     }
 
