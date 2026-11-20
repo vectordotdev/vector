@@ -40,7 +40,14 @@ pub(super) fn statsd_unix(
             config.path,
             config.socket_file_mode,
             crate::serde::default_max_length(),
-            decoder,
+            // Bound the framer to the receive limit, so that the unterminated line of a truncated
+            // datagram, which is one byte longer, is dropped instead of parsed as a cut-off metric.
+            Decoder {
+                framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new_with_max_length(
+                    crate::serde::default_max_length(),
+                )),
+                ..decoder
+            },
             |_events, _host| {},
             shutdown,
             out,

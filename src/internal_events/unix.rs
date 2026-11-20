@@ -153,3 +153,31 @@ impl InternalEvent for UnixSocketFileDeleteError<'_> {
         .increment(1);
     }
 }
+
+#[cfg(any(feature = "sources-socket", feature = "sources-statsd"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct UnixSocketDatagramTooLargeError {
+    /// The receive size limit in bytes.
+    pub limit: usize,
+}
+
+#[cfg(any(feature = "sources-socket", feature = "sources-statsd"))]
+impl InternalEvent for UnixSocketDatagramTooLargeError {
+    fn emit(self) {
+        let reason = "Datagram exceeded the receive size limit and was truncated.";
+        error!(
+            message = reason,
+            limit_bytes = self.limit,
+            error_code = "oversized_datagram",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "oversized_datagram",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
