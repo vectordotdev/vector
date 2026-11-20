@@ -215,6 +215,7 @@ impl AwsAuthentication {
     /// The effective credential load timeout for this authentication mechanism (the configured
     /// `load_timeout_secs`, or the shared 5s default). Mirrors the timeout applied by
     /// [`AwsAuthentication::credentials_cache`] for components that resolve credentials directly.
+    #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
     pub(crate) fn load_timeout(&self) -> Duration {
         match self {
             AwsAuthentication::Role {
