@@ -1489,7 +1489,7 @@ mod config_tests {
     #[test]
     fn propagate_acknowledgements() {
         let config_builder: ConfigBuilder = format::deserialize(
-            indoc! {r#"
+            indoc! {r"
                 acknowledgements:
                   enabled: true
                 sources:
@@ -1527,7 +1527,7 @@ mod config_tests {
                       codec: text
                     path: /path/to/out2
                     acknowledgements: false
-            "#},
+            "},
             Format::Yaml,
         )
         .unwrap();
