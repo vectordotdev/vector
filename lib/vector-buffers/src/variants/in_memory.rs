@@ -38,12 +38,15 @@ where
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
-        let (max_bytes, max_size) = match self.capacity {
+        let (max_bytes, max_events) = match self.capacity {
             MemoryBufferSize::MaxEvents(max_events) => (None, Some(max_events.get())),
-            MemoryBufferSize::MaxSize(max_size) => (None, Some(max_size.get())),
+            MemoryBufferSize::MaxSize(max_size) => (
+                Some(u64::try_from(max_size.get()).unwrap_or(u64::MAX)),
+                None,
+            ),
         };
 
-        usage_handle.set_buffer_limits(max_bytes, max_size);
+        usage_handle.set_buffer_limits(max_bytes, max_events);
 
         let (tx, rx) = limited(self.capacity, None, None);
         Ok((tx.into(), rx.into()))
