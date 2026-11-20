@@ -4,8 +4,9 @@ use tokio::time::timeout;
 use tracing::Instrument;
 
 use crate::{
+    assert_reader_last_writer_next_positions,
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::tests::{create_default_buffer_v2, set_file_length},
+    variants::disk_v2::tests::{create_default_buffer_v2, read_next_some, set_file_length},
 };
 
 #[tokio::test]
@@ -237,4 +238,87 @@ async fn restart_aligns_writer_with_reader_checkpoint_one_file_ahead() {
         }
     })
     .await;
+}
+
+#[tokio::test]
+async fn reader_does_not_acknowledge_records_replayed_during_initialization() {
+    // When initializing, the reader replays the already-acknowledged records in its current data
+    // file to reposition itself (`seek_to_next_record`). Those records are dropped, never
+    // delivered, so they must not produce acknowledgements of their own: unclaimed
+    // acknowledgements would be credited to the next records read, moving the ledger past records
+    // that were read but never acknowledged. A crash at that point would skip those records on the
+    // next start.
+    let _a = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Write four records, read the first three and acknowledge only the first two. Reading
+            // the third record applies the two acknowledgements to the ledger.
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            for size in 61..=64 {
+                writer
+                    .write_record(SizedRecord::new(size))
+                    .await
+                    .expect("should not fail to write");
+            }
+            writer.flush().await.expect("flush should not fail");
+
+            for size in 61..=62 {
+                let record = read_next_some(&mut reader).await;
+                assert_eq!(SizedRecord::new(size), record);
+                acknowledge(record).await;
+            }
+            let in_flight = read_next_some(&mut reader).await;
+            assert_eq!(SizedRecord::new(63), in_flight);
+            assert_reader_last_writer_next_positions!(ledger, 2, 5);
+
+            // Stop without acknowledging the third record, as a crash would.
+            ledger.flush().expect("should not fail to flush ledger");
+            drop(in_flight);
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+            tokio::task::yield_now().await;
+
+            // Restart: the reader replays the first two records to reposition itself, then reads
+            // the third and fourth records again. Only the third is acknowledged before the next
+            // read applies acknowledgements.
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            tokio::task::yield_now().await;
+            let third = read_next_some(&mut reader).await;
+            assert_eq!(SizedRecord::new(63), third);
+            let fourth = read_next_some(&mut reader).await;
+            assert_eq!(SizedRecord::new(64), fourth);
+            acknowledge(third).await;
+
+            writer
+                .write_record(SizedRecord::new(65))
+                .await
+                .expect("should not fail to write");
+            writer.flush().await.expect("flush should not fail");
+            let fifth = read_next_some(&mut reader).await;
+            assert_eq!(SizedRecord::new(65), fifth);
+            assert_reader_last_writer_next_positions!(ledger, 3, 6);
+
+            // Stop again without acknowledging the fourth and fifth records: the next start must
+            // resume with the fourth record.
+            ledger.flush().expect("should not fail to flush ledger");
+            drop(fourth);
+            drop(fifth);
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+            tokio::task::yield_now().await;
+
+            let (_writer, mut reader, _ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let resumed = read_next_some(&mut reader).await;
+            assert_eq!(SizedRecord::new(64), resumed);
+        }
+    });
+
+    let parent = trace_span!("reader_does_not_acknowledge_records_replayed_during_initialization");
+    fut.instrument(parent.or_current()).await;
 }
