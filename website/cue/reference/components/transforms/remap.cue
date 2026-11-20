@@ -141,11 +141,10 @@ components: transforms: "remap": {
 				using it in arithmetic, for example, `float!(.gauge.value) * 100`. `float!` fails on a NaN value because
 				NaN reads as the string `"NaN"`.
 
-				`unnest` copies the rest of the event into each row, and on a metric that includes the value. With
-				`metric_tag_values: full`, `.tags.region` is an array, so on a distribution `unnest!(.tags.region)`
-				copies every sample into every row. If the program only needs the tags, unnest a local copy instead,
-				for example
-				`tag_view = {"tags": .tags}; rows = unnest!(tag_view.tags.region)`.
+				`unnest` copies the rest of the event into each row. On a metric event, the rest of the event includes the
+				value. With `metric_tag_values: full`, `.tags.region` is an array, so on a distribution
+				`unnest!(.tags.region)` copies every sample into every row. If the program only needs the tags, unnest a
+				local copy instead, for example, `tag_view = {"tags": .tags}; rows = unnest!(tag_view.tags.region)`.
 
 				Counter, gauge, and sample values are floats. The `==` operator treats `123` and `123.0` as equal, but
 				`assert_eq!` doesn't, so use float literals in assertions, for example, `assert_eq!(.gauge.value, 123.0)`.
