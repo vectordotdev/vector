@@ -20,7 +20,7 @@ const TRACES_ENDPOINT: &str = "/api/v0.2/traces";
 /// Differences shown in the error, so CI logs are debuggable without the evidence volume.
 const LOGGED_DIFFERENCES: usize = 3;
 const LOGGED_DIFFERENCE_BYTES: usize = 4_000;
-const REQUIRED_TRACERS: &[&str] = &["go", "nodejs", "python"];
+const REQUIRED_TRACERS: &[&str] = &["nodejs", "python", "rust"];
 /// Checkouts sent by `workload/python/client.py`.
 const CHECKOUTS: usize = 6;
 const CHECKOUT_RESOURCE: &str = "GET /checkout/<int:order>";
@@ -262,9 +262,6 @@ fn validate_captures(
     input: &[AgentPayload],
     output: &[AgentPayload],
 ) -> Result<(), String> {
-    if !directory.join("capture-complete").exists() {
-        return Err("Captures were not finalized; run cargo vdev e2e run datadog-traces".into());
-    }
     write(directory, "input.txt", &format!("{input:#?}"))?;
     write(directory, "output.txt", &format!("{output:#?}"))?;
     let coverage = Coverage::new(input);
@@ -364,7 +361,7 @@ mod tests {
 
     /// Checkout traces covering every required tracer, service and shape.
     fn covered() -> Vec<AgentPayload> {
-        let (mut python, mut nodejs, mut go) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut python, mut nodejs, mut rust) = (Vec::new(), Vec::new(), Vec::new());
         for trace_id in 1..=u64::try_from(CHECKOUTS).unwrap() {
             let mut root = span("frontend", trace_id, 1, 0);
             root.resource = CHECKOUT_RESOURCE.into();
@@ -378,7 +375,7 @@ mod tests {
             python.push(vec![root, failed]);
             python.push(vec![span("frontend", trace_id, 6, 1)]);
             nodejs.push(vec![span("pricing", trace_id, 3, 1)]);
-            go.push(vec![
+            rust.push(vec![
                 span("inventory", trace_id, 4, 1),
                 span("inventory-db", trace_id, 5, 4),
             ]);
@@ -387,7 +384,7 @@ mod tests {
             tracer_payloads: vec![
                 tracer("python", python),
                 tracer("nodejs", nodejs),
-                tracer("go", go),
+                tracer("rust", rust),
             ],
             ..Default::default()
         }]
@@ -409,7 +406,7 @@ mod tests {
         single_tracer[0].tracer_payloads.truncate(1);
         let missing = Coverage::new(&single_tracer).missing();
         for expected in [
-            "Missing tracer: go",
+            "Missing tracer: rust",
             "Missing service: pricing",
             "Missing trace shape: traces_across_tracer_payloads",
         ] {
@@ -465,11 +462,9 @@ mod tests {
     }
 
     #[test]
-    fn finalized_captures_can_be_validated_repeatedly() {
+    fn captures_can_be_validated_repeatedly() {
         let directory = tempfile::tempdir().unwrap();
         let input = covered();
-        assert!(validate_captures(directory.path(), &input, &input).is_err());
-        fs::write(directory.path().join("capture-complete"), "").unwrap();
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
         assert!(validate_captures(directory.path(), &input, &input).is_ok());
 

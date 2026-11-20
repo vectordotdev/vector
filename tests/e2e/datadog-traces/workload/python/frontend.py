@@ -1,4 +1,4 @@
-"""Frontend service: one checkout trace per request, fanning out to the Node and Go services."""
+"""Frontend service: one checkout trace per request, fanning out to the Node and Rust services."""
 
 import os
 import signal
