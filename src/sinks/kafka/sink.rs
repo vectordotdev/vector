@@ -130,7 +130,7 @@ pub(crate) async fn healthcheck(
     #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
 ) -> crate::Result<()> {
     trace!("Healthcheck started.");
-    let client_config = config.to_rdkafka().unwrap();
+    let client_config = healthcheck_client_config(&config).unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
         Some(topic) => Some(topic),
         _ => match topic_template.render_string(&LogEvent::from_str_legacy("")) {
@@ -145,8 +145,7 @@ pub(crate) async fn healthcheck(
         },
     };
 
-    // Build the client context in the async context (so the tokio runtime handle is captured for
-    // the OAUTHBEARER token callback), then move it into the blocking task.
+    // Build the client context here, then move it into the blocking task.
     #[cfg(feature = "aws-core")]
     let context = KafkaStatisticsContext::new(false, Span::current(), msk_iam);
     #[cfg(not(feature = "aws-core"))]
@@ -169,9 +168,50 @@ pub(crate) async fn healthcheck(
     Ok(())
 }
 
+/// Client config for the healthcheck probe, with librdkafka statistics disabled. The probe uses a
+/// `KafkaStatisticsContext` (for the OAUTHBEARER callback) but runs outside any component span, so
+/// its statistics would be emitted as unlabelled `kafka_*` metrics.
+fn healthcheck_client_config(config: &KafkaSinkConfig) -> crate::Result<ClientConfig> {
+    let mut client_config = config.to_rdkafka()?;
+    client_config.set("statistics.interval.ms", "0");
+    Ok(client_config)
+}
+
 #[async_trait]
 impl StreamSink<Event> for KafkaSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn healthcheck_client_disables_statistics() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            librdkafka_options:
+                statistics.interval.ms: "5000"
+            "#,
+        )
+        .unwrap();
+        // The sink itself keeps collecting statistics...
+        assert_eq!(
+            config.to_rdkafka().unwrap().get("statistics.interval.ms"),
+            Some("5000")
+        );
+        // ...but the healthcheck probe never does, even when overridden.
+        assert_eq!(
+            healthcheck_client_config(&config)
+                .unwrap()
+                .get("statistics.interval.ms"),
+            Some("0")
+        );
     }
 }
