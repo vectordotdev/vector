@@ -96,9 +96,9 @@ Redirects for vector.dev are defined in two places (depending on the use):
 
 ### Link checking
 
-vector.dev uses the [htmltest] link checker to sniff out broken links. Whenever the site is built in CI, be it the preview build or the production build, all internal links on the site are checked. If *any* link is broken, the build fails. If you push changes to the docs/site and your build yields a big red X but running the site locally works fine, scan the CI output for broken links. There's a good chance that that's your culprit.
+vector.dev uses the [htmltest] link checker to sniff out broken links. CI does not run it, so run it locally before you push changes to the docs/site. All internal links on the site are checked. If *any* link is broken, the check fails.
 
-You can run the full CI builds locally, with link checking included:
+You can run the full builds locally, with link checking included:
 
 ```shell
 # Production
