@@ -1,4 +1,7 @@
-use vector_lib::{
+//! Internal events emitted when rendering templates.
+
+use tracing::{error, warn};
+use vector_common::{
     NamedInternalEvent, counter,
     internal_event::{
         ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
@@ -6,19 +9,17 @@ use vector_lib::{
     },
 };
 
+/// Emitted when a template fails to render or renders outside its confinement.
 #[derive(NamedInternalEvent)]
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
     pub drop_event: bool,
-    pub error: crate::template::TemplateRenderingError,
+    pub error: crate::TemplateRenderingError,
 }
 
 impl InternalEvent for TemplateRenderingError<'_> {
     fn emit(self) {
-        let confined = matches!(
-            self.error,
-            crate::template::TemplateRenderingError::Confined { .. }
-        );
+        let confined = matches!(self.error, crate::TemplateRenderingError::Confined { .. });
 
         // Message wording tracks BOTH the error class (confinement vs render
         // failure) AND whether the caller is dropping the event. A caller
