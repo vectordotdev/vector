@@ -3,6 +3,7 @@ public/
 resources/
 hugo_stats.json
 assets/jsconfig.json
+.hugo_build.lock
 
 # JavaScript, Sass, CSS, etc.
 node_modules/

@@ -612,7 +612,6 @@ urls: {
 	vector_readme:                              "\(vector_repo)/blob/master/README.md"
 	vector_releases:                            "/releases/latest/"
 	vector_reduce_transform:                    "/docs/reference/configuration/transforms/reduce"
-	vector_release_policy:                      "https://github.com/vectordotdev/vector/blob/master/docs/RELEASING.md"
 	vector_remap_transform:                     "/docs/reference/configuration/transforms/remap/"
 	vector_remap_transform_multiple:            "/docs/reference/configuration/transforms/remap/#emitting-multiple-log-events"
 	vector_log_to_metric_transform:             "/docs/reference/configuration/transforms/log_to_metric/"
