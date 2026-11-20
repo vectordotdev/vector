@@ -121,20 +121,23 @@ components: transforms: "remap": {
 
 				A metric's value is available only under the field for its current type. For example, `.gauge.value`
 				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
-				includes the value field. The top-level field matches the metric type, as in the JSON encoding of
-				metrics that `vector tap` shows. For sketches, VRL exposes summary statistics directly under `.sketch`.
+				includes the value field. Use the field names in the table, which are the ones in the JSON encoding of
+				metrics that `vector tap` shows. They differ from the value of `type` for some metrics. For example, an
+				aggregated histogram reports `aggregated histogram` in `.type` and exposes its count at
+				`.aggregated_histogram.count`. For sketches, VRL exposes summary statistics directly under `.sketch`.
 				Assigning to these fields or calling `del()` on them doesn't change the metric's value. To convert between
 				counters and gauges, set `type`.
 
-				Metric values are exposed as VRL numbers, with two exceptions:
+				Two kinds of numbers need special handling in VRL:
 
 				* VRL floats can't represent NaN, so a NaN value reads as the string `"NaN"`. Infinities read as
 				  floats, but `encode_json` writes them as `null`.
 				* VRL integers are signed 64-bit, so a count larger than `9223372036854775807` reads as a string with
 				  the exact decimal value.
 
-				Because the type of a metric's value is only known at runtime, coerce it before using it in an
-				expression, for example `float!(.gauge.value) * 100`.
+				The type of a metric's value is only known at runtime, so use `float!` to assert that it's a float before
+				using it in arithmetic, for example `float!(.gauge.value) * 100`. `float!` fails on a NaN value, because it
+				reads as the string `"NaN"`.
 
 				Counter, gauge, and sample values are floats. The `==` operator treats `123` and `123.0` as equal, but
 				`assert_eq!` doesn't, so use float literals in assertions, for example `assert_eq!(.gauge.value, 123.0)`.
