@@ -27,6 +27,9 @@ use aws_types::region::Region;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use snafu::{ResultExt, Snafu};
+use vector_lib::internal_event::emit;
+
+use crate::internal_events::KafkaMskIamCredentialsRefreshError;
 
 /// MSK IAM presigned tokens are valid for at most 15 minutes.
 const EXPIRY_SECONDS: u64 = 900;
@@ -120,7 +123,7 @@ async fn refresh_loop(
         tokio::time::sleep(sleep_for).await;
 
         let Some(cache) = weak.upgrade() else { break };
-        // On failure/timeout keep the previous credentials and retry after the back-off.
+        // On failure/timeout report it, keep the previous credentials and retry after the back-off.
         backoff = match load_credentials(&provider, load_timeout).await {
             Ok(fresh) => {
                 // Still inside the refresh window (e.g. a provider that keeps handing out the same
@@ -131,7 +134,12 @@ async fn refresh_loop(
                 }
                 no_progress
             }
-            Err(_) => true,
+            Err(error) => {
+                emit(KafkaMskIamCredentialsRefreshError {
+                    error: error.into(),
+                });
+                true
+            }
         };
     }
 }
@@ -529,6 +537,67 @@ mod tests {
         // No expiry -> loose cadence.
         assert_eq!(next_refresh(None, false), CRED_REFRESH_NO_EXPIRY);
         assert_eq!(next_refresh(None, true), CRED_REFRESH_NO_EXPIRY);
+    }
+
+    /// A failed background refresh must be reported (it was silently dropped before), while the
+    /// previous credentials stay in use and the refresh is retried after the back-off.
+    #[tokio::test(start_paused = true)]
+    async fn failed_refresh_is_reported_and_retried() {
+        use aws_credential_types::provider::{ProvideCredentials, error::CredentialsError, future};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Debug)]
+        struct FailingAfterFirstProvider(Arc<AtomicUsize>);
+        impl ProvideCredentials for FailingAfterFirstProvider {
+            fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+            where
+                Self: 'a,
+            {
+                // First load: 30s left, so the refresher reloads right away; then every load fails.
+                if self.0.fetch_add(1, Ordering::SeqCst) == 0 {
+                    future::ProvideCredentials::ready(Ok(Credentials::new(
+                        ACCESS_KEY,
+                        SECRET_KEY,
+                        None,
+                        Some(SystemTime::now() + Duration::from_secs(30)),
+                        "test",
+                    )))
+                } else {
+                    future::ProvideCredentials::ready(Err(CredentialsError::provider_error("boom")))
+                }
+            }
+        }
+
+        vector_lib::event_test_util::clear_recorded_events();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let provider =
+            SharedCredentialsProvider::new(FailingAfterFirstProvider(Arc::clone(&calls)));
+        let cache = spawn_credentials_cache(provider, Duration::from_secs(5))
+            .await
+            .expect("initial load");
+        let initial_expiry = cache.lock().unwrap().expiry();
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "refresh attempted right away"
+        );
+        vector_lib::event_test_util::contains_name_once("KafkaMskIamCredentialsRefreshError")
+            .expect("failed refresh must be reported");
+        assert_eq!(
+            cache.lock().unwrap().expiry(),
+            initial_expiry,
+            "previous credentials are kept"
+        );
+
+        // Retried after the back-off, not in a tight loop.
+        tokio::time::sleep(CRED_REFRESH_MIN).await;
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            3,
+            "retried once after the back-off"
+        );
     }
 
     /// The refresher must run in the component's span, so the HTTP telemetry of credential
