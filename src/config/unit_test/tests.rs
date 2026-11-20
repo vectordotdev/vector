@@ -1410,7 +1410,8 @@ async fn ambiguous_output_names_are_reported_as_build_errors() {
     );
 }
 
-// https://github.com/vectordotdev/vector/issues/14853
+/// Regression test for vectordotdev/vector#14853: VRL conditions in unit tests can read metric
+/// values, such as the `gauge.value` that the test output shows.
 #[cfg(feature = "transforms-log_to_metric")]
 #[tokio::test]
 async fn metric_value_assertions() {
