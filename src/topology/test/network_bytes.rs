@@ -93,7 +93,7 @@ async fn udp_network_bytes_include_rejected_payloads_with_source_component_label
     config.add_source(
         component,
         serde_yaml::from_str::<crate::sources::socket::SocketConfig>(&format!(
-            "mode: udp\naddress: \"{address}\"\ndecoding:\n  codec: json\n"
+            "mode: udp\naddress: \"{address}\"\nmax_length: 32\ndecoding:\n  codec: json\n"
         ))
         .unwrap(),
     );
@@ -132,9 +132,20 @@ async fn udp_network_bytes_include_rejected_payloads_with_source_component_label
 
     let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let mut total = 0_u32;
-    for payload in [b"not json".as_slice(), br#"{"message":"accepted"}"#] {
+    let mut legacy_total = 0_u32;
+    for payload in [
+        b"not json".as_slice(),
+        &[b'x'; 64],
+        br#"{"message":"accepted"}"#,
+    ] {
         sender.send_to(payload, address).await.unwrap();
-        total += u32::try_from(payload.len()).unwrap();
+        // The receive buffer includes one extra byte to detect truncation. Windows returns
+        // WSAEMSGSIZE after filling it; Unix returns the prefix as a successful receive.
+        let received = u32::try_from(payload.len().min(33)).unwrap();
+        total += received;
+        if !cfg!(windows) || payload.len() <= 33 {
+            legacy_total += received;
+        }
         // Check each datagram separately, including the one rejected by the JSON decoder.
         timeout(Duration::from_secs(10), async {
             while counter_value_with_tags("component_received_network_bytes_total", tags).to_bits()
@@ -160,7 +171,7 @@ async fn udp_network_bytes_include_rejected_payloads_with_source_component_label
     );
     assert_eq!(
         counter_value_with_tags("component_received_bytes_total", tags).to_bits(),
-        f64::from(total).to_bits(),
+        f64::from(legacy_total).to_bits(),
         "serialized-byte accounting must retain its existing behavior",
     );
     timeout(Duration::from_secs(10), topology.stop())

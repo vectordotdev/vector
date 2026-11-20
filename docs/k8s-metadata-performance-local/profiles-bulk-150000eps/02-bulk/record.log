@@ -1,2 +1,0 @@
-[ perf record: Woken up 170 times to write data ]
-[ perf record: Captured and wrote 43.088 MB /var/tmp/k8s-bulk-profile/02-bulk.data (5287 samples) ]

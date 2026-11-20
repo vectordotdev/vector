@@ -254,6 +254,9 @@ pub(super) fn udp(
                             #[cfg(windows)]
                             if let Some(err) = error.raw_os_error() {
                                 if err == 10040 {
+                                    // Winsock fills the receive buffer before reporting WSAEMSGSIZE.
+                                    // Count the consumed prefix even though this datagram is rejected.
+                                    network_bytes_received.emit(ByteSize(buf.len()));
                                     // 10040 is the Windows error that the Udp message has exceeded max_length
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
