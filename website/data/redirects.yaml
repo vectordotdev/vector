@@ -37,7 +37,6 @@ sinks:
   - sematext_logs
   - sematext_metrics
   - socket
-  - splunk_hec
   - statsd
 
 sources:
