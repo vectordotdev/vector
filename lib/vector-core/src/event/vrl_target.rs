@@ -908,18 +908,6 @@ fn is_metric_type_path(target_path: &OwnedTargetPath) -> bool {
         && matches!(target_path.path.segments.as_slice(), [OwnedSegment::Field(field)] if field.as_ref() == "type")
 }
 
-/// Returns `true` if the path reads one of the arrays in the value of the current type, such as
-/// `.distribution.samples`.
-fn is_metric_value_array_path(target_path: &OwnedTargetPath, value_field: &str) -> bool {
-    target_path.prefix == PathPrefix::Event
-        && matches!(
-            target_path.path.segments.as_slice(),
-            [OwnedSegment::Field(field), OwnedSegment::Field(array), ..]
-                if field.as_ref() == value_field
-                    && matches!(array.as_ref(), "values" | "samples" | "buckets" | "quantiles")
-        )
-}
-
 /// What a path reads from the value of the metric's current type.
 enum MetricValueRead {
     /// The whole value, or a field that is cheap to get only by converting the whole value, such
@@ -1017,17 +1005,13 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
             continue;
         }
 
-        // Accessing a root path requires us to pre-populate all fields, including the value. So
-        // does reading one of the value's arrays, because `unnest` copies the whole event around
-        // each element without registering a query for the root.
+        // Accessing a root path requires us to pre-populate all fields, including the value. VRL
+        // records a root query for functions that read the whole event, such as `unnest`, which
+        // copies the rest of the event around each element.
         //
-        // VRL also registers a root query for every `get` call, even `get(.tags, ...)`. It can't
-        // be told apart from a read of `.`, so those programs convert the value too. The root
-        // can't be built lazily on the first read instead, because the VRL runtime reads the root
-        // before running every program to check that the target exists.
-        let is_root = target_path.path.is_root();
-        let is_value_array = is_metric_value_array_path(target_path, value_field);
-        if is_root || is_value_array {
+        // The root can't be built lazily on the first read instead, because the VRL runtime reads
+        // the root before running every program to check that the target exists.
+        if target_path.path.is_root() {
             let mut properties = [
                 &mut name,
                 &mut kind,
@@ -2784,22 +2768,85 @@ mod test {
 
     /// Runs a program through the VRL runtime, which also reads the root before running it.
     fn run_metric_program(value: MetricValue, source: &str) -> (VrlTarget, Value) {
+        run_metric_program_with_tags(
+            value,
+            metric_tags!("region" => "eu"),
+            MetricTagMode::Single,
+            source,
+        )
+    }
+
+    fn run_metric_program_with_tags(
+        value: MetricValue,
+        tags: MetricTags,
+        tag_mode: MetricTagMode,
+        source: &str,
+    ) -> (VrlTarget, Value) {
         // Only the functions these tests use, since `vector_vrl_functions` depends on this crate.
         let fns: Vec<Box<dyn vrl::compiler::Function>> = vec![
             Box::new(vrl::stdlib::Contains),
             Box::new(vrl::stdlib::EncodeJson),
             Box::new(vrl::stdlib::Exists),
             Box::new(vrl::stdlib::Get),
+            Box::new(vrl::stdlib::Unnest),
         ];
         let program = vrl::compiler::compile(source, &fns).unwrap().program;
-        let metric = Metric::new("m", MetricKind::Absolute, value)
-            .with_tags(Some(metric_tags!("region" => "eu")));
-        let mut target =
-            VrlTarget::new(Event::Metric(metric), program.info(), MetricTagMode::Single);
+        let metric = Metric::new("m", MetricKind::Absolute, value).with_tags(Some(tags));
+        let mut target = VrlTarget::new(Event::Metric(metric), program.info(), tag_mode);
         let result = vrl::compiler::runtime::Runtime::default()
             .resolve(&mut target, &program, &vrl::compiler::TimeZone::default())
             .unwrap();
         (target, result)
+    }
+
+    #[test]
+    fn metric_value_runtime_get_on_tags_skips_value() {
+        // `get` records only the path it reads from, so reading a tag doesn't convert the samples.
+        for source in [
+            r#"get!(.tags, ["region"])"#,
+            r#"tags = .tags; get!(tags, ["region"])"#,
+        ] {
+            let (target, result) = run_metric_program(big_distribution(), source);
+            assert_eq!(result, Value::from("eu"), "{source}");
+            assert_eq!(cached_field(&target, "distribution"), None, "{source}");
+        }
+    }
+
+    #[test]
+    fn metric_value_runtime_missing_array_skips_value() {
+        // A distribution has no `buckets`, so nothing needs to be converted.
+        let (target, result) =
+            run_metric_program(big_distribution(), "exists(.distribution.buckets)");
+        assert_eq!(result, Value::from(false));
+        assert_eq!(cached_field(&target, "distribution"), None);
+    }
+
+    #[test]
+    fn metric_value_runtime_unnest_keeps_metric_fields() {
+        // `unnest` records the root, so each row keeps the rest of the metric.
+        let (_, result) = run_metric_program_with_tags(
+            MetricValue::Gauge { value: 3.0 },
+            metric_tags!("region" => "eu", "region" => "us"),
+            MetricTagMode::Full,
+            "rows = unnest!(.tags.region); [rows[0].name, rows[0].gauge.value]",
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![Value::from("m"), Value::from(3.0)])
+        );
+
+        let (_, result) = run_metric_program(
+            big_distribution(),
+            "rows = unnest!(.distribution.samples); [rows[0].name, rows[0].type, rows[0].distribution.samples.value]",
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![
+                Value::from("m"),
+                Value::from("distribution"),
+                Value::from(1.0)
+            ])
+        );
     }
 
     #[test]
