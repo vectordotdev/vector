@@ -44,7 +44,6 @@ sources:
   - aws_ecs_metrics
   - aws_kinesis_firehose
   - aws_s3
-  - datadog_logs
   - exec
   - file
   - heroku_logs
