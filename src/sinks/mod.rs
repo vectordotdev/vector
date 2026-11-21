@@ -26,8 +26,14 @@ pub mod aws_s_s;
 pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
-#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-azure_logs_ingestion",))]
+#[cfg(any(
+    feature = "sinks-azure_blob",
+    feature = "sinks-azure_logs_ingestion",
+    feature = "sinks-azure_data_explorer",
+))]
 pub mod azure_common;
+#[cfg(feature = "sinks-azure_data_explorer")]
+pub mod azure_data_explorer;
 #[cfg(feature = "sinks-azure_logs_ingestion")]
 pub mod azure_logs_ingestion;
 #[cfg(feature = "sinks-blackhole")]
