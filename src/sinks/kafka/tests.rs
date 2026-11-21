@@ -336,6 +336,7 @@ mod integration_test {
                 username: Some("admin".to_string()),
                 password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
+                azure: None,
             }),
             None,
             KafkaCompression::None,
