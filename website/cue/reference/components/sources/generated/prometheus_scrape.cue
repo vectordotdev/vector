@@ -21,9 +21,36 @@ generated: components: sources: prometheus_scrape: configuration: {
 		type: string: {}
 	}
 	endpoints: {
-		description: "Endpoints to scrape metrics from."
-		required:    true
-		type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
+		description: """
+			Endpoints to scrape metrics from.
+
+			Exactly one of `endpoints` or `targets` must be set.
+			"""
+		required: false
+		required_one_of: ["endpoints", "targets"]
+		required_one_of_group: "targets"
+		type: array: {
+			default: []
+			items: type: string: examples: ["http://localhost:9090/metrics"]
+		}
+	}
+	headers: {
+		description: """
+			Headers to apply to the scrape requests.
+
+			One or more values for the same header can be provided.
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				"X-My-Header": ["value1", "value2"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and its value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
+		}
 	}
 	honor_labels: {
 		description: """
@@ -32,7 +59,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 			If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
 			is renamed by prepending `exported_` to the original name.
 
-			This matches Prometheus’ `honor_labels` configuration.
+			This matches Prometheus' `honor_labels` configuration.
 			"""
 		required: false
 		type: bool: default: false
@@ -51,7 +78,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 			Custom parameters for the scrape request query string.
 
 			One or more values for the same parameter key can be provided. The parameters provided in this option are
-			appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+			appended to any parameters already in the scrape URLs. This option is especially useful when
 			scraping the `/federate` endpoint.
 			"""
 		required: false
@@ -60,7 +87,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 				"match[]": ["{job=\"somejob\"}", "{__name__=~\"job:.*\"}"]
 			}]
 			options: "*": {
-				description: "A query string parameter."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type:        _schemaDefinitions["vector::http::ParameterValue"]
 			}
@@ -84,6 +111,189 @@ generated: components: sources: prometheus_scrape: configuration: {
 		type: float: {
 			default: 5.0
 			unit:    "seconds"
+		}
+	}
+	targets: {
+		description: """
+			Targets to scrape metrics from: fixed URLs, or Pods discovered automatically in Kubernetes.
+
+			Each entry in the list configures a target group. Supported types are
+			`static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
+
+			Exactly one of `endpoints` or `targets` must be set.
+			"""
+		required: false
+		required_one_of: ["endpoints", "targets"]
+		required_one_of_group: "targets"
+		type: array: {
+			default: []
+			items: type: object: {
+				examples: [{
+					static: urls: ["http://localhost:9090/metrics"]
+				}]
+				options: {
+					kubernetes: {
+						description: "Kubernetes Pod auto-discovery via `prometheus.io/*` annotations."
+						required:    false
+						type: object: options: {
+							annotation_prefix: {
+								description: """
+																			Annotation prefix to read scrape configuration from.
+
+																			Defaults to `prometheus.io`, matching the de-facto Prometheus convention.
+																			The source reads `<prefix>/scrape`, `<prefix>/port`, `<prefix>/path`,
+																			`<prefix>/scheme`, and `<prefix>/param_<name>` from Pod annotations.
+
+																			Must be a DNS subdomain, as Kubernetes requires for annotation prefixes. Uppercase letters
+																			are allowed, as in Kubernetes annotation keys.
+																			"""
+								required: false
+								type: string: {
+									default: "prometheus.io"
+									examples: ["prometheus.io"]
+								}
+							}
+							default_path: {
+								description: """
+																			Default scrape path when `<prefix>/path` is not set on a Pod.
+
+																			A leading `/` is added if missing. This path and the `<prefix>/path` annotation can't
+																			contain `?` or `#`; set query parameters with `<prefix>/param_<name>` annotations instead.
+																			"""
+								required: false
+								type: string: {
+									default: "/metrics"
+									examples: ["/metrics"]
+								}
+							}
+							default_scheme: {
+								description: "Default scheme when `<prefix>/scheme` is not set on a Pod."
+								required:    false
+								type: string: {
+									default: "http"
+									enum: {
+										http:  "Plain HTTP."
+										https: "HTTPS."
+									}
+								}
+							}
+							extra_field_selector: {
+								description: """
+																			Kubernetes field selector that further limits which Pods are discovered.
+
+																			When `use_self_node_only` is enabled, it is combined with `spec.nodeName=<node>`.
+																			"""
+								required: false
+								type: string: {
+									default: ""
+									examples: ["metadata.namespace=monitoring"]
+								}
+							}
+							kube_config_file: {
+								description: """
+																			Path to a kubeconfig file.
+
+																			When unset, the source falls back to the local kubeconfig followed by
+																			in-cluster service-account credentials.
+																			"""
+								required: false
+								type: string: {}
+							}
+							label_selector: {
+								description: "Kubernetes label selector that limits which Pods are discovered."
+								required:    false
+								type: string: {
+									default: ""
+									examples: ["tier=frontend"]
+								}
+							}
+							namespaces: {
+								description: """
+																			Restrict discovery to specific namespaces.
+
+																			When non-empty, only Pods in the listed namespaces are watched. When
+																			empty, all namespaces are watched (requires cluster-wide RBAC).
+																			"""
+								required: false
+								type: array: {
+									default: []
+									items: type: string: examples: ["monitoring"]
+								}
+							}
+							pod_annotation_tags: {
+								description: """
+																			Allowlist of Pod annotations to add as metric tags.
+
+																			Tag names are derived the same way as for `pod_label_tags`.
+																			"""
+								required: false
+								type: array: {
+									default: []
+									items: type: string: examples: ["owner"]
+								}
+							}
+							pod_label_tags: {
+								description: """
+																			Allowlist of Pod labels to add as metric tags.
+
+																			Each entry is a label key. The tag name is the key with every character other than
+																			letters, digits, and `_` replaced by `_`, and a leading `_` added if it starts with a
+																			digit, so `app.kubernetes.io/name` becomes `app_kubernetes_io_name`. Default is empty to
+																			avoid cardinality blow-ups.
+																			"""
+								required: false
+								type: array: {
+									default: []
+									items: type: string: examples: ["app", "version"]
+								}
+							}
+							role: {
+								description: """
+																			Discovery role.
+
+																			Only `pod` is currently supported.
+																			"""
+								required: false
+								type: string: {
+									default: "pod"
+									enum: pod: "Discover targets from Pods."
+								}
+							}
+							self_node_name: {
+								description: """
+																			Override for the node name used by `use_self_node_only`.
+
+																			If unset and `use_self_node_only` is `true`, the `VECTOR_SELF_NODE_NAME`
+																			environment variable is read instead.
+																			"""
+								required: false
+								type: string: examples: ["node-01"]
+							}
+							use_self_node_only: {
+								description: """
+																			Restrict discovery to Pods on the current node.
+
+																			When enabled, the source filters Pods by `spec.nodeName=<node>` where
+																			`<node>` is read from the `VECTOR_SELF_NODE_NAME` environment variable
+																			(or the `self_node_name` option). Use this when deploying Vector as a
+																			`DaemonSet`.
+																			"""
+								required: false
+								type: bool: default: false
+							}
+						}
+					}
+					static: {
+						description: "A static list of scrape URLs."
+						required:    true
+						type: object: options: urls: {
+							description: "URLs to scrape."
+							required:    true
+							type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
+						}
+					}
+				}
+			}
 		}
 	}
 	tls: {

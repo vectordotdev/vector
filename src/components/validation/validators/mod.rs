@@ -19,6 +19,12 @@ pub trait Validator {
     ///
     /// Additionally, all telemetry events received for the component for the validation run are
     /// provided as well.
+    ///
+    /// # Errors
+    ///
+    /// Implementations return an error containing the failure messages if the inputs, outputs,
+    /// telemetry events, or runner metrics do not satisfy the validator's requirements for the
+    /// given component type and test case expectation.
     fn check_validation(
         &self,
         component_type: ComponentType,

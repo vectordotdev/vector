@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream::Stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
 use vector_lib::event::{BatchNotifier, BatchStatus};

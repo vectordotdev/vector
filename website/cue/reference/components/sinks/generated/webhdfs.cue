@@ -10,7 +10,7 @@ generated: components: sinks: webhdfs: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -112,6 +112,11 @@ generated: components: sinks: webhdfs: configuration: {
 			default: ""
 			syntax:  "template"
 		}
+	}
+	request: {
+		description: "Settings for outbound requests, including timeouts and retries."
+		required:    false
+		type:        _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
 	}
 	root: {
 		description: """

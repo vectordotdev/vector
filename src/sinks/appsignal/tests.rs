@@ -20,7 +20,7 @@ async fn component_spec_compliance() {
 
     let mut config: AppsignalConfig =
         serde_json::from_value(AppsignalConfig::generate_config()).expect("config should be valid");
-    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
+    config.endpoint = HttpEndpoint::new(mock_endpoint).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

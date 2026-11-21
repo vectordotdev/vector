@@ -15,7 +15,7 @@ pub(crate) struct WithAllocationGroup {
 /// More information on using this layer can be found in the examples, or directly in the
 /// `tracing_subscriber` docs, found [here][tracing_subscriber::layer].
 #[cfg_attr(docsrs, doc(cfg(feature = "tracing-compat")))]
-pub struct AllocationLayer<S> {
+pub(crate) struct AllocationLayer<S> {
     ctx: WithAllocationGroup,
     _subscriber: PhantomData<S>,
 }
@@ -26,7 +26,7 @@ where
 {
     /// Creates a new [`AllocationLayer`].
     #[must_use]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let ctx = WithAllocationGroup {
             with_allocation_group: Self::with_allocation_group,
         };

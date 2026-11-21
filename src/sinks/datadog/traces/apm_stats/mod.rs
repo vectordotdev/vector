@@ -2,15 +2,15 @@
 //!
 //! This module contains the logic for computing APM statistics based on the incoming trace
 //! events this sink receives. It is modelled closely to the trace-agent component of the
-//! Datadog Agent, and sends out StatsPayload packets formatted and Aggregated by the same
+//! Datadog Agent, and sends out `StatsPayload` packets formatted and Aggregated by the same
 //! algorithm, at ten second intervals, independently of the sink's trace payloads.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use vector_lib::event::TraceEvent;
 
-pub use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
+pub(crate) use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
 pub(crate) use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     request_builder::{DDTracesMetadata, RequestBuilderError, build_request},
@@ -28,7 +28,12 @@ mod integration_tests;
 /// The duration of time in nanoseconds that a bucket covers.
 pub(crate) const BUCKET_DURATION_NANOSECONDS: u64 = 10_000_000_000;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
+#[allow(
+    warnings,
+    unreachable_pub,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::nursery
+)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
@@ -103,12 +108,12 @@ pub(crate) struct ClientGroupedStats {
 ///
 /// # arguments
 ///
-/// * `key`           - PartitionKey associated with this set of trace events.
+/// * `key`           - `PartitionKey` associated with this set of trace events.
 /// * `aggregator`    - Aggregator to use in computing and caching APM stats buckets.
 /// * `trace_events`  - Newly received trace events to process.
 pub(crate) fn compute_apm_stats(
     key: &PartitionKey,
-    aggregator: Arc<Mutex<Aggregator>>,
+    aggregator: &Mutex<Aggregator>,
     trace_events: &[TraceEvent],
 ) {
     let mut aggregator = aggregator.lock().unwrap();
@@ -117,7 +122,7 @@ pub(crate) fn compute_apm_stats(
     aggregator.update_agent_properties(key);
 
     // process the incoming traces
-    trace_events
-        .iter()
-        .for_each(|t| aggregator.handle_trace(key, t));
+    for trace in trace_events {
+        aggregator.handle_trace(key, trace);
+    }
 }

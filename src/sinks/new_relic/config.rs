@@ -1,11 +1,5 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::sync::Arc;
 
-use derivative::Derivative;
 use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
@@ -24,7 +18,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum NewRelicRegion {
+pub(super) enum NewRelicRegion {
     /// US region.
     #[default]
     Us,
@@ -37,7 +31,7 @@ pub enum NewRelicRegion {
 #[configurable_component]
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum NewRelicApi {
+pub(super) enum NewRelicApi {
     /// Events API.
     #[default]
     Events,
@@ -50,7 +44,7 @@ pub enum NewRelicApi {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NewRelicDefaultBatchSettings;
+pub(super) struct NewRelicDefaultBatchSettings;
 
 impl SinkBatchSettings for NewRelicDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100);
@@ -59,7 +53,7 @@ impl SinkBatchSettings for NewRelicDefaultBatchSettings {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct NewRelicApiRetry;
+pub(super) struct NewRelicApiRetry;
 
 impl RetryLogic for NewRelicApiRetry {
     type Error = NewRelicSinkError;
@@ -76,7 +70,7 @@ impl RetryLogic for NewRelicApiRetry {
 #[configurable_component(sink("new_relic", "Deliver events to New Relic."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub struct NewRelicConfig {
+pub(super) struct NewRelicConfig {
     /// A valid New Relic license key.
     #[configurable(metadata(docs::examples = "xxxx"))]
     #[configurable(metadata(docs::examples = "${NEW_RELIC_LICENSE_KEY}"))]
@@ -117,12 +111,11 @@ pub struct NewRelicConfig {
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
-    pub fn build_healthcheck(
-        &self,
+    fn build_healthcheck(
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
-    ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck::healthcheck(client, credentials).boxed())
+    ) -> super::Healthcheck {
+        healthcheck::healthcheck(client, credentials).boxed()
     }
 }
 
@@ -138,14 +131,13 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
-pub struct ValidatedNewRelic {
+#[derive(Clone, derive_more::Debug)]
+pub(super) struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
     // The credentials contain the license key and account ID, so they are
     // intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     credentials: Arc<NewRelicCredentials>,
 }
 
@@ -182,9 +174,9 @@ impl ValidatedSink for NewRelicConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
-        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(credentials))?;
+        let healthcheck = Self::build_healthcheck(client.clone(), Arc::clone(credentials));
 
         let service = ServiceBuilder::new()
             .settings(request_limits.clone(), NewRelicApiRetry)
@@ -206,7 +198,7 @@ impl ValidatedSink for NewRelicConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewRelicCredentials {
+pub(super) struct NewRelicCredentials {
     pub license_key: HeaderValue,
     pub account_id: String,
     pub api: NewRelicApi,
@@ -215,11 +207,17 @@ pub struct NewRelicCredentials {
 }
 
 impl NewRelicCredentials {
-    pub fn get_uri(&self) -> Uri {
+    /// Returns the sink endpoint.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the credentials produce an invalid URI.
+    #[must_use]
+    pub(super) fn get_uri(&self) -> Uri {
         self.try_get_uri().expect("URI should be valid")
     }
 
-    pub fn try_get_uri(&self) -> crate::Result<Uri> {
+    fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
             return Ok(override_uri.as_uri().clone());
         }
@@ -256,7 +254,7 @@ impl NewRelicCredentials {
 }
 
 impl NewRelicCredentials {
-    pub fn try_from_config(config: &NewRelicConfig) -> crate::Result<Self> {
+    fn try_from_config(config: &NewRelicConfig) -> crate::Result<Self> {
         let license_key = HeaderValue::from_str(config.license_key.inner())
             .map_err(|_| "New Relic `license_key` must be a valid HTTP header value".to_string())?;
         Ok(Self {
@@ -331,7 +329,7 @@ mod tests {
         config.account_id = SensitiveString::from("super-secret-account-id".to_string());
 
         let validated = config.validate().expect("validation should succeed");
-        let debug = format!("{:?}", validated);
+        let debug = format!("{validated:?}");
 
         assert!(!debug.contains("super-secret-license-key"));
         assert!(!debug.contains("super-secret-account-id"));

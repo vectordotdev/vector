@@ -42,8 +42,8 @@ _All buffers_ MUST emit a `BufferCreated` event upon creation. To avoid stale me
   - `max_size_bytes` - the max size of the buffer in bytes if relevant
   - `max_size_events` - the max size of the buffer in number of events if relevant
 - Metric
-  - MUST emit the `buffer_max_size_events` gauge (in-memory buffers) if the defined `max_size_events` value is present, and emit `buffer_max_event_size` for backward compatibility
-  - MUST emit the `buffer_max_size_bytes` gauge (disk buffers) if the defined `max_size_bytes` value is present, and emit `buffer_max_byte_size` for backward compatibility
+  - MUST emit the `buffer_max_size_events` gauge (in-memory buffers) if the defined `max_size_events` value is present
+  - MUST emit the `buffer_max_size_bytes` gauge (disk buffers) if the defined `max_size_bytes` value is present
 
 #### BufferEventsReceived
 

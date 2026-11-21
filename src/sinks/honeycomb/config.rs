@@ -1,12 +1,8 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use http::{HeaderValue, Request, StatusCode};
+use http_body_util::BodyExt;
+use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -24,6 +20,7 @@ use crate::{
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
+    tls::MaybeTlsSettings,
 };
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
@@ -31,7 +28,7 @@ pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     /// Honeycomb's endpoint to send logs to
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
@@ -93,8 +90,8 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
 impl GenerateConfig for HoneycombConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"api_key: ${HONEYCOMB_API_KEY}
-            dataset: my-honeycomb-dataset"#,
+            r"api_key: ${HONEYCOMB_API_KEY}
+            dataset: my-honeycomb-dataset",
         })
         .unwrap()
     }
@@ -114,22 +111,20 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
-pub struct ValidatedHoneycomb {
+#[derive(Clone, derive_more::Debug)]
+pub(super) struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
     request_limits: TowerRequestSettings,
     // Omitted: `api_key` is sent as the `X-Honeycomb-Team` header on every
     // request.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     api_key: HeaderValue,
 }
 
 #[async_trait::async_trait]
 impl ValidatedSink for HoneycombConfig {
     type Validated = ValidatedHoneycomb;
-
     fn validate(&self) -> crate::Result<ValidatedHoneycomb> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
         let uri = self.build_uri()?;
@@ -171,7 +166,7 @@ impl ValidatedSink for HoneycombConfig {
             compression: self.compression,
         };
 
-        let client = HttpClient::new(None, cx.proxy())?;
+        let client = HttpClient::new(MaybeTlsSettings::from_config(None, false)?, cx.proxy())?;
 
         let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
@@ -197,23 +192,22 @@ impl HoneycombConfig {
             .append_path(&format!("1/batch/{}", self.dataset))?)
     }
 }
-
 async fn healthcheck(
     uri: HttpEndpoint,
     api_key: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key);
+    let request = Request::post(uri.into_uri()).header(HTTP_HEADER_HONEYCOMB, api_key);
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
     let req: Request<Bytes> = request.body(body)?;
-    let req = req.map(hyper::Body::from);
+    let req = req.map(full_body);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
+    let body = res.into_body().collect().await?.to_bytes();
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

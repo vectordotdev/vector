@@ -3,7 +3,6 @@ use mlua::prelude::*;
 use super::super::{EventMetadata, LogEvent, Value};
 
 impl IntoLua for LogEvent {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let (value, _metadata) = self.into_parts();
         value.into_lua(lua)
@@ -19,8 +18,10 @@ impl FromLua for LogEvent {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use chrono::{TimeZone, Timelike, Utc};
     use vrl::event_path;
+
+    use super::*;
 
     #[test]
     fn into_lua() {
@@ -48,7 +49,7 @@ mod test {
                 .load(assertion)
                 .eval()
                 .unwrap_or_else(|_| panic!("Failed to verify assertion {assertion:?}"));
-            assert!(result, "{}", assertion);
+            assert!(result, "{assertion}");
         }
     }
 
@@ -77,5 +78,24 @@ mod test {
             event["nested.array[2]"],
             Value::Bytes("another value".into())
         );
+    }
+
+    #[test]
+    fn from_lua_timestamp_truncates_fractional_nanosec() {
+        let lua_event = r#"
+            local log = { message = "hello" }
+            log.timestamp = os.date("!*t", 1584297428)
+            log.timestamp.nanosec = 1e9 / 3
+            return log
+        "#;
+
+        let event: LogEvent = Lua::new().load(lua_event).eval().unwrap();
+
+        let expected = Utc
+            .with_ymd_and_hms(2020, 3, 15, 18, 37, 8)
+            .single()
+            .and_then(|t| t.with_nanosecond(333_333_333))
+            .expect("invalid timestamp");
+        assert_eq!(event["timestamp"], Value::Timestamp(expected));
     }
 }

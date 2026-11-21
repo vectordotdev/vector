@@ -14,14 +14,16 @@ use crate::{
             GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,
             logs::{
                 http_request_builder::{
-                    GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
-                    http_healthcheck,
+                    GreptimeDBLogsHttpRequestBuilder, PartitionKey, http_healthcheck,
                 },
                 sink::{GreptimeDBLogsHttpSink, LogsSinkSetting},
             },
         },
         prelude::*,
-        util::{HttpEndpoint, http::HttpService},
+        util::{
+            HttpEndpoint,
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
+        },
     },
     template::ConfinementConfig,
 };
@@ -40,7 +42,7 @@ fn default_endpoint() -> HttpEndpoint {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct GreptimeDBLogsConfig {
+pub(super) struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
     #[derivative(Default(value = "default_endpoint()"))]
@@ -149,7 +151,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedGreptimeDBLogs {
+pub(super) struct ValidatedGreptimeDBLogs {
     confined_table: ConfinedTemplate,
     confined_dbname: ConfinedTemplate,
     confined_pipeline_name: ConfinedTemplate,
@@ -216,7 +218,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
@@ -239,7 +241,10 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, GreptimeDBHttpRetryLogic::default())
+            .settings(
+                request_limits,
+                http_response_retry_logic(RetryStrategy::default()),
+            )
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {

@@ -188,11 +188,90 @@ components: transforms: aggregate: {
 				"""
 		}
 
+		event_time_aggregation: {
+			title: "Event-Time Aggregation"
+			body: """
+				When an `event_time` configuration block is present, metrics are bucketed by the
+				timestamp on each event rather than by the moment Vector processes it. Bucket
+				boundaries are aligned to multiples of `interval_ms` from the Unix epoch, so the
+				same source timestamp always maps to the same bucket regardless of when Vector
+				receives it. Omit the `event_time` block to keep the default system-time behavior.
+
+				This is useful when downstream sinks key on the metric timestamp. For example, the
+				Datadog Metrics sink overwrites earlier values for an identical timestamp; bucketing on
+				event time prevents distinct samples from collapsing into a single point.
+				"""
+			sub_sections: [
+				{
+					title: "Watermark and Late Events"
+					body: """
+						Vector tracks a *watermark* — the exclusive end of the most recently emitted bucket.
+						Events whose bucket has already been emitted are dropped and counted via
+						`component_discarded_events_total`. Use `event_time.allowed_lateness_ms` to extend
+						how long each bucket accepts events after its window ends
+						(`bucket_end + allowed_lateness_ms`, compared to the system clock). That cutoff
+						applies when *recording* an event, not only when the periodic flush runs, so
+						`allowed_lateness_ms = 0` enforces strict lateness even if the flush interval is
+						long or misaligned.
+
+						Set `event_time.late_events.strategy` to `forward` to send late events downstream
+						unchanged instead of dropping them. Forwarded events skip aggregation and do not
+						create buckets or affect the watermark. Because they keep their original
+						timestamp, they can share a timestamp with the aggregate emitted for their bucket;
+						sinks that overwrite values for an identical timestamp, such as the Datadog Metrics
+						sink, may then replace the aggregate with the late value. Sinks that convert
+						absolute metrics to deltas, such as the Datadog Metrics sink, treat a late
+						absolute counter or histogram as a reset and reset their baseline, inflating the
+						next delta. In `count` and `diff` modes, forwarded events carry their raw value
+						rather than a count or delta.
+
+						Set `event_time.late_events.metric_types` to forward only late events of the
+						listed types, for example `["distribution", "aggregated_histogram", "sketch"]`.
+						With a list, only incremental events are forwarded, which keeps late absolute
+						counters and histograms from resetting a sink's delta baseline. The rule applies
+						to every type, so absolute gauges are dropped too; gauges are usually absolute,
+						so listing `gauge` rarely forwards anything. Forwarding only the types the
+						Datadog Metrics sink sends as distributions also avoids overwriting the bucket's
+						aggregate, because distributions are merged rather than overwritten.
+
+						Metrics the configured `mode` does not aggregate (for example an `incremental`
+						event in `mean` mode, or an `absolute` event in `sum` mode) pass through
+						unchanged, matching system-time behavior, without creating buckets or affecting
+						the watermark. Absolute non-gauge values in `mean` or `stdev` mode are ignored
+						(not passed through), also matching system-time behavior.
+						"""
+				},
+				{
+					title: "Missing and Future Timestamps"
+					body: """
+						By default, metrics that will be bucketed and have no timestamp are dropped. Metrics
+						that pass through unchanged (see above) do not require a timestamp. Set
+						`event_time.missing_timestamp` to `use_system_time` to fall back to the current
+						system time for bucketed metrics instead. Bucketed events whose timestamp is more
+						than `event_time.max_future_ms` ahead of the system clock are dropped as a
+						clock-skew guard. All such drops increment
+						`component_discarded_events_total` (the drop reason is logged, not tagged on
+						the metric).
+						"""
+				},
+				{
+					title: "Shutdown and Reload"
+					body: """
+						When the input stream closes — during shutdown or topology reload — every remaining
+						event-time bucket is flushed before Vector exits, so in-flight metrics are not
+						silently dropped. In `diff` mode a small rolling window of previous buckets is also
+						retained to compute deltas across bucket boundaries; other modes do not retain
+						previous buckets.
+						"""
+				},
+			]
+		}
+
 	}
 
 	telemetry: metrics: {
 		aggregate_events_recorded_total: components.sources.internal_metrics.output.metrics.aggregate_events_recorded_total
-		aggregate_failed_updates:        components.sources.internal_metrics.output.metrics.aggregate_failed_updates
+		aggregate_failed_updates_total:  components.sources.internal_metrics.output.metrics.aggregate_failed_updates_total
 		aggregate_flushes_total:         components.sources.internal_metrics.output.metrics.aggregate_flushes_total
 	}
 }

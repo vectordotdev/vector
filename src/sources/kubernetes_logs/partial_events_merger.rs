@@ -10,7 +10,7 @@ use futures::{Stream, StreamExt};
 use vector_lib::codecs::OversizedAction;
 use vector_lib::{
     config::LogNamespace,
-    internal_event::{ComponentEventsDropped, INTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, emit},
     lookup::OwnedTargetPath,
     stream::expiration_map::{Emitter, map_with_expiration},
 };
@@ -48,7 +48,7 @@ impl PartialEventMergeState {
         if let Some(bucket) = self.buckets.get_mut(file) {
             if bucket.exceeds_max_merged_line_limit {
                 if !bucket.truncated {
-                    emit!(ComponentEventsDropped::<INTENTIONAL> {
+                    emit(ComponentEventsDropped::<INTENTIONAL> {
                         count: 1,
                         reason: "Partial event arrived after merged line exceeded max_merged_line_bytes limit.",
                     });
@@ -56,10 +56,12 @@ impl PartialEventMergeState {
                 return;
             }
 
-            if let (Some(Value::Bytes(prev_value)), Some(Value::Bytes(new_value))) =
-                (bucket.event.get_mut(message_path), event.get(message_path))
+            if let (Some(prev_value), Some(new_value)) = (
+                bucket.event.get_mut(message_path),
+                event.get(message_path).and_then(Value::as_bytes),
+            ) && let Some(prev_bytes) = prev_value.as_bytes()
             {
-                bytes_mut.extend_from_slice(prev_value);
+                bytes_mut.extend_from_slice(prev_bytes);
                 bytes_mut.extend_from_slice(new_value);
 
                 if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
@@ -68,10 +70,10 @@ impl PartialEventMergeState {
                     bucket.exceeds_max_merged_line_limit = true;
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            emit!(KubernetesMergedLineTooBigError {
+                            emit(KubernetesMergedLineTooBigError {
                                 event: &Value::Bytes(new_value.clone()),
                                 configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len()
+                                encountered_size_so_far: bytes_mut.len(),
                             });
                         }
                         OversizedAction::Truncate => {
@@ -83,7 +85,7 @@ impl PartialEventMergeState {
                                 bytes_mut.truncate(max_merged_line_bytes);
                             }
                             bucket.truncated = true;
-                            emit!(KubernetesMergedLineTruncated {
+                            emit(KubernetesMergedLineTruncated {
                                 configured_limit: max_merged_line_bytes,
                                 original_size,
                             });
@@ -92,16 +94,16 @@ impl PartialEventMergeState {
                 }
 
                 if !bucket.exceeds_max_merged_line_limit || bucket.truncated {
-                    *prev_value = bytes_mut.freeze();
+                    *prev_value = Value::Bytes(bytes_mut.freeze());
                 } else {
-                    *prev_value = bytes::Bytes::new();
+                    *prev_value = Value::Bytes(bytes::Bytes::new());
                 }
             }
         } else {
             let mut exceeds_max_merged_line_limit = false;
             let mut truncated = false;
 
-            if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
+            if let Some(event_bytes) = event.get(message_path).and_then(Value::as_bytes) {
                 bytes_mut.extend_from_slice(event_bytes);
                 if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
                     && bytes_mut.len() > max_merged_line_bytes
@@ -109,10 +111,10 @@ impl PartialEventMergeState {
                     exceeds_max_merged_line_limit = true;
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            emit!(KubernetesMergedLineTooBigError {
+                            emit(KubernetesMergedLineTooBigError {
                                 event: &Value::Bytes(event_bytes.clone()),
                                 configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len()
+                                encountered_size_so_far: bytes_mut.len(),
                             });
                         }
                         OversizedAction::Truncate => {
@@ -124,7 +126,7 @@ impl PartialEventMergeState {
                                 bytes_mut.truncate(max_merged_line_bytes);
                             }
                             truncated = true;
-                            emit!(KubernetesMergedLineTruncated {
+                            emit(KubernetesMergedLineTruncated {
                                 configured_limit: max_merged_line_bytes,
                                 original_size,
                             });
@@ -189,7 +191,7 @@ struct Bucket {
 }
 
 /// Merges partial events from a stream, with support for size limits and oversized behavior.
-pub fn merge_partial_events(
+pub(super) fn merge_partial_events(
     stream: impl Stream<Item = Event> + 'static,
     log_namespace: LogNamespace,
     maybe_max_merged_line_bytes: Option<usize>,
@@ -235,7 +237,7 @@ fn merge_partial_events_with_custom_expiration(
 
     map_with_expiration(
         state,
-        stream.map(|e| e.into_log()),
+        stream.map(Event::into_log),
         Duration::from_secs(1),
         move |state: &mut PartialEventMergeState,
               event: LogEvent,
@@ -243,12 +245,12 @@ fn merge_partial_events_with_custom_expiration(
             // called for each event
             let is_partial = event
                 .get(&partial_flag_path)
-                .and_then(|x| x.as_boolean())
+                .and_then(Value::as_boolean)
                 .unwrap_or(false);
 
             let file = event
                 .get(&file_path)
-                .and_then(|x| x.as_str())
+                .and_then(Value::to_str_lossy)
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
@@ -259,7 +261,7 @@ fn merge_partial_events_with_custom_expiration(
         },
         |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // check for expired events
-            state.emit_expired_events(emitter)
+            state.emit_expired_events(emitter);
         },
         |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // the source is ending, flush all pending events
@@ -267,7 +269,7 @@ fn merge_partial_events_with_custom_expiration(
         },
     )
     // LogEvent -> Event
-    .map(|e| e.into())
+    .map(Into::into)
 }
 
 #[cfg(test)]

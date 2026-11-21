@@ -14,7 +14,7 @@ use crate::{
 #[configurable_component]
 #[configurable(title = "Configure the AMQP message properties.")]
 #[derive(Clone, Debug, Default)]
-pub struct AmqpPropertiesConfig {
+pub(crate) struct AmqpPropertiesConfig {
     /// Content-Type for the AMQP messages.
     pub(crate) content_type: Option<String>,
 
@@ -29,7 +29,7 @@ pub struct AmqpPropertiesConfig {
 }
 
 impl AmqpPropertiesConfig {
-    pub(super) fn build(&self, event: &Event) -> Option<BasicProperties> {
+    pub(super) fn build(&self, event: &Event) -> BasicProperties {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
             prop = prop.with_content_type(ShortString::from(content_type.clone()));
@@ -53,10 +53,10 @@ impl AmqpPropertiesConfig {
             });
 
             // Clamp the value to the range of 0-255, as AMQP priority is a u8.
-            let priority = priority.clamp(0, u8::MAX.into()) as u8;
+            let priority = u8::try_from(priority).unwrap_or(u8::MAX);
             prop = prop.with_priority(priority);
         }
-        Some(prop)
+        prop
     }
 }
 
@@ -169,6 +169,7 @@ impl ValidatedSink for AmqpSinkConfig {
             .connection_string
             .parse::<AMQPUri>()
             .map_err(|e| format!("Invalid connection string: {e}"))?;
+        self.encoding.validate()?;
         let exchange = self
             .exchange
             .clone()
@@ -193,7 +194,7 @@ impl ValidatedSink for AmqpSinkConfig {
             exchange,
             routing_key,
         } = validated.clone();
-        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key)?;
         let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
@@ -224,7 +225,7 @@ mod tests {
     use vrl::event_path;
 
     #[test]
-    pub fn generate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
     }
 
@@ -320,12 +321,12 @@ mod tests {
                 .unwrap()
                 .render(event)
                 .unwrap(),
-            priority as u64
+            u64::from(priority)
         );
     }
 
     #[test]
-    pub fn parse_config_priority_static() {
+    fn parse_config_priority_static() {
         for (format, config) in [
             (
                 Format::Yaml,
@@ -373,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    pub fn parse_config_priority_templated() {
+    fn parse_config_priority_templated() {
         for (format, config) in [
             (
                 Format::Yaml,

@@ -69,15 +69,43 @@ pub(crate) struct BreakingSections {
 const SUMMARY_MARKER: &str = "\n## Summary\n";
 const MIGRATION_MARKER: &str = "\n## Migration\n";
 
-/// Anchors that would collide with fixed headings emitted by the upgrade-guide renderer.
+/// Fixed release-page headings and structural IDs that migration anchors must not shadow.
 /// Fragments may not choose these as their `{#anchor}` override, or produce them via slugify.
-pub(crate) const RESERVED_ANCHORS: &[&str] = &["vector-breaking-changes", "vector-upgrade-guide"];
+pub(crate) const RESERVED_ANCHORS: &[&str] = &[
+    "breaking-changes",
+    "bug-fixes",
+    "changelog",
+    "chore",
+    "deprecation-announcements",
+    "deprecations",
+    "enhancements",
+    "footer-heading",
+    "known-issues",
+    "new-features",
+    "page-content",
+    "security-changes",
+    "toc",
+    "upgrade-guide",
+    "vector-breaking-changes",
+    "vector-changelog",
+    "vector-upgrade-guide",
+    "vrl-breaking-changes",
+    "vrl-breaking-changes--upgrade-guide",
+    "vrl-changelog",
+    "vrl-enhancements",
+    "vrl-fixes",
+    "vrl-new-features",
+    "vrl-security",
+    "whats-next",
+];
 
 /// Slug rule shared by the CI checker and the release generator: lowercase ASCII alnum
 /// with `-` separators, non-empty, no leading/trailing hyphen, not a reserved name.
+/// The renderer owns `upgrade-guide-*` for migration subheadings.
 pub(crate) fn is_valid_anchor(anchor: &str) -> bool {
     !anchor.is_empty()
         && !RESERVED_ANCHORS.contains(&anchor)
+        && !anchor.starts_with("upgrade-guide-")
         && !anchor.starts_with('-')
         && !anchor.ends_with('-')
         && anchor
@@ -223,16 +251,18 @@ mod tests {
             vector --config vector.yaml --dangerously-allow-env-var-interpolation
             ```
         "};
-        let s = parse_breaking_sections(body).unwrap();
-        assert_eq!(s.title, "Env var interpolation off");
-        assert_eq!(s.anchor.as_deref(), Some("env-var"));
-        assert_eq!(s.summary, "Off by default now.");
-        assert!(s.migration.contains("### Old"));
-        assert!(s.migration.contains("### New"));
-        assert!(
-            s.migration
-                .contains("--dangerously-allow-env-var-interpolation")
-        );
+        for body in [body.to_owned(), body.replace('\n', "\r\n")] {
+            let s = parse_breaking_sections(&body).unwrap();
+            assert_eq!(s.title, "Env var interpolation off");
+            assert_eq!(s.anchor.as_deref(), Some("env-var"));
+            assert_eq!(s.summary, "Off by default now.");
+            assert!(s.migration.contains("### Old"));
+            assert!(s.migration.contains("### New"));
+            assert!(
+                s.migration
+                    .contains("--dangerously-allow-env-var-interpolation")
+            );
+        }
     }
 
     #[test]
@@ -246,92 +276,56 @@ mod tests {
 
             ## Migration
         "};
-        let s = parse_breaking_sections(body).unwrap();
-        assert_eq!(s.title, "A change");
-        assert_eq!(s.anchor, None);
-        assert_eq!(s.summary, "Summary.");
-        assert_eq!(s.migration, "");
+        for body in [
+            body.to_owned(),
+            body.trim_end().to_owned(),
+            body.replace('\n', "\r\n"),
+        ] {
+            let sections = parse_breaking_sections(&body).unwrap();
+            assert_eq!(sections.title, "A change");
+            assert_eq!(sections.anchor, None);
+            assert_eq!(sections.summary, "Summary.");
+            assert_eq!(sections.migration, "");
+        }
     }
 
     #[test]
-    fn missing_title_errors() {
-        let body = "## Summary\n\nx\n\n## Migration\n\ny\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("H1 title"), "{err}");
+    fn rejects_invalid_breaking_sections() {
+        for (body, expected) in [
+            ("## Summary\n\nx\n\n## Migration\n\ny\n", "H1 title"),
+            (
+                "# \n\n## Summary\n\nx\n\n## Migration\n",
+                "must not be empty",
+            ),
+            ("# x\n\n## Migration\n\ny\n", "`## Summary`"),
+            ("# x\n\n## Summary\n\ny\n", "`## Migration`"),
+            (
+                "# x\n\n## Summary\n\n## Migration\n",
+                "Summary` must not be empty",
+            ),
+            (
+                "# x\n\n## Migration\n\ny\n\n## Summary\n\nz\n",
+                "must come before",
+            ),
+            (
+                "# x\n\n## Summary\n\ny\n\n## Summary\n\nz\n\n## Migration\n",
+                "exactly one",
+            ),
+        ] {
+            let error = parse_breaking_sections(body).unwrap_err();
+            assert!(error.to_string().contains(expected), "{body:?}: {error}");
+        }
     }
 
     #[test]
-    fn empty_title_errors() {
-        let body = "# \n\n## Summary\n\nx\n\n## Migration\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("must not be empty"), "{err}");
-    }
-
-    #[test]
-    fn missing_summary_errors() {
-        let body = "# x\n\n## Migration\n\ny\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("`## Summary`"), "{err}");
-    }
-
-    #[test]
-    fn missing_migration_errors() {
-        let body = "# x\n\n## Summary\n\ny\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("`## Migration`"), "{err}");
-    }
-
-    #[test]
-    fn empty_summary_errors() {
-        let body = "# x\n\n## Summary\n\n## Migration\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(
-            err.to_string().contains("Summary` must not be empty"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn empty_migration_is_allowed() {
-        let body = "# x\n\n## Summary\n\nSummary.\n\n## Migration\n";
-        let s = parse_breaking_sections(body).unwrap();
-        assert_eq!(s.migration, "");
-    }
-
-    #[test]
-    fn migration_before_summary_errors() {
-        let body = "# x\n\n## Migration\n\ny\n\n## Summary\n\nz\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("must come before"), "{err}");
-    }
-
-    #[test]
-    fn crlf_fragment_parses() {
-        let body = "# x\r\n\r\n## Summary\r\n\r\ny\r\n\r\n## Migration\r\n\r\nz\r\n";
-        let s = parse_breaking_sections(body).unwrap();
-        assert_eq!(s.title, "x");
-        assert_eq!(s.summary, "y");
-        assert_eq!(s.migration, "z");
-    }
-
-    #[test]
-    fn duplicate_section_marker_errors() {
-        let body = "# x\n\n## Summary\n\ny\n\n## Summary\n\nz\n\n## Migration\n";
-        let err = parse_breaking_sections(body).unwrap_err();
-        assert!(err.to_string().contains("exactly one"), "{err}");
-    }
-
-    #[test]
-    fn split_title_and_anchor_extracts_anchor() {
-        let (t, a) = split_title_and_anchor("Some Title {#my-anchor}");
-        assert_eq!(t, "Some Title");
-        assert_eq!(a, Some("my-anchor"));
-    }
-
-    #[test]
-    fn split_title_and_anchor_without_anchor() {
-        let (t, a) = split_title_and_anchor("Some Title");
-        assert_eq!(t, "Some Title");
-        assert_eq!(a, None);
+    fn derives_anchor_slugs() {
+        for (title, expected) in [
+            ("A Big Change!", "a-big-change"),
+            ("  --Foo/Bar--  ", "foo-bar"),
+            ("already-good", "already-good"),
+            ("Numbers 123 OK", "numbers-123-ok"),
+        ] {
+            assert_eq!(slugify(title), expected, "{title}");
+        }
     }
 }

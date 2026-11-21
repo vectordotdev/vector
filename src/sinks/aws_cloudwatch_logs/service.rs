@@ -61,7 +61,7 @@ type Svc = Buffer<
 >;
 
 #[derive(Debug)]
-pub enum CloudwatchError {
+pub(super) enum CloudwatchError {
     Put(SdkError<PutLogEventsError, HttpResponse>),
     DescribeLogStreams(SdkError<DescribeLogStreamsError, HttpResponse>),
     CreateStream(SdkError<CreateLogStreamError, HttpResponse>),
@@ -106,7 +106,7 @@ impl From<SdkError<DescribeLogStreamsError, HttpResponse>> for CloudwatchError {
 }
 
 #[derive(Debug)]
-pub struct CloudwatchResponse {
+pub(super) struct CloudwatchResponse {
     events_byte_size: GroupedCountByteSize,
 }
 
@@ -131,7 +131,7 @@ impl DriverResponse for CloudwatchResponse {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(
+    pub(super) fn new(
         config: CloudwatchLogsSinkConfig,
         client: CloudwatchLogsClient,
         headers: BTreeMap<OrderedHeaderName, HeaderValue>,
@@ -210,7 +210,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(
+    pub(super) fn new(
         config: CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
         client: CloudwatchLogsClient,
@@ -225,7 +225,7 @@ impl CloudwatchLogsSvc {
         let retention = config.retention.clone();
 
         let kms_key = config.kms_key.clone();
-        let tags = config.tags.clone();
+        let tags = config.tags;
 
         CloudwatchLogsSvc {
             headers,
@@ -242,7 +242,7 @@ impl CloudwatchLogsSvc {
         }
     }
 
-    pub fn process_events(&self, mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
+    pub(super) fn process_events(mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
         // Sort by timestamp
         events.sort_by_key(|e| e.timestamp);
 
@@ -298,7 +298,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
         if self.token_rx.is_none() {
-            let event_batches = self.process_events(req);
+            let event_batches = Self::process_events(req);
 
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
@@ -310,7 +310,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
-                self.retention.clone(),
+                &self.retention,
                 self.kms_key.clone(),
                 self.tags.clone(),
                 event_batches,
@@ -323,7 +323,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     }
 }
 
-pub struct CloudwatchLogsSvc {
+pub(super) struct CloudwatchLogsSvc {
     client: CloudwatchLogsClient,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     stream_name: String,
@@ -344,7 +344,7 @@ impl EncodedLength for InputLogEvent {
 }
 
 #[derive(Clone)]
-pub struct CloudwatchLogsPartitionSvc {
+pub(super) struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     clients: HashMap<CloudwatchKey, Svc>,

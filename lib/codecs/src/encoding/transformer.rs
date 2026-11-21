@@ -1,7 +1,5 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Utc};
 use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
@@ -12,7 +10,10 @@ use vector_core::{
     schema::meaning,
     serde::is_default,
 };
-use vrl::{path::OwnedValuePath, value::Value};
+use vrl::{
+    path::OwnedValuePath,
+    value::{ObjectMap, Value},
+};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
@@ -64,8 +65,10 @@ impl<'de> Deserialize<'de> for Transformer {
 impl Transformer {
     /// Creates a new `Transformer`.
     ///
-    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
-    /// exclusive.
+    /// # Errors
+    ///
+    /// Returns an error if `only_fields` and `except_fields` are not mutually exclusive, i.e. they
+    /// share at least one field path.
     pub fn new(
         only_fields: Option<Vec<ConfigValuePath>>,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -82,16 +85,19 @@ impl Transformer {
 
     /// Get the `Transformer`'s `only_fields`.
     #[cfg(any(test, feature = "test"))]
+    #[must_use]
     pub const fn only_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.only_fields
     }
 
     /// Get the `Transformer`'s `except_fields`.
+    #[must_use]
     pub const fn except_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.except_fields
     }
 
     /// Get the `Transformer`'s `timestamp_format`.
+    #[must_use]
     pub const fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
@@ -126,7 +132,7 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(ObjectMap::new()));
 
             for field in only_fields {
                 if let Some(value) = old_value.remove(field, true) {
@@ -173,7 +179,7 @@ impl Transformer {
         }
     }
 
-    fn format_timestamps<F, T>(&self, log: &mut LogEvent, extract: F)
+    fn format_timestamps<F, T>(log: &mut LogEvent, extract: F)
     where
         F: Fn(&DateTime<Utc>) -> T,
         T: Into<Value>,
@@ -182,7 +188,7 @@ impl Transformer {
             let mut unix_timestamps = Vec::new();
             for (k, v) in log.all_event_fields().expect("must be an object") {
                 if let Value::Timestamp(ts) = v {
-                    unix_timestamps.push((k.clone(), extract(ts).into()));
+                    unix_timestamps.push((k, extract(ts).into()));
                 }
             }
             for (k, v) in unix_timestamps {
@@ -202,16 +208,25 @@ impl Transformer {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = self.timestamp_format.as_ref() {
             match timestamp_format {
-                TimestampFormat::Unix => self.format_timestamps(log, |ts| ts.timestamp()),
-                TimestampFormat::UnixMs => self.format_timestamps(log, |ts| ts.timestamp_millis()),
-                TimestampFormat::UnixUs => self.format_timestamps(log, |ts| ts.timestamp_micros()),
-                TimestampFormat::UnixNs => self.format_timestamps(log, |ts| {
+                TimestampFormat::Unix => Self::format_timestamps(log, chrono::DateTime::timestamp),
+                TimestampFormat::UnixMs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_millis);
+                }
+                TimestampFormat::UnixUs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_micros);
+                }
+                TimestampFormat::UnixNs => Self::format_timestamps(log, |ts| {
                     ts.timestamp_nanos_opt().expect("Timestamp out of range")
                 }),
-                TimestampFormat::UnixFloat => self.format_timestamps(log, |ts| {
+                TimestampFormat::UnixFloat => Self::format_timestamps(log, |ts| {
                     NotNan::new(ts.timestamp_micros() as f64 / 1e6)
                         .expect("this division will never produce a NaN")
                 }),
@@ -223,8 +238,10 @@ impl Transformer {
 
     /// Set the `except_fields` value.
     ///
-    /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
-    /// with `only_fields`.
+    /// # Errors
+    ///
+    /// Returns an error if the new `except_fields` are not mutually exclusive with `only_fields`,
+    /// i.e. they share at least one field path.
     #[cfg(any(test, feature = "test"))]
     pub fn set_except_fields(
         &mut self,
@@ -369,6 +386,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn deserialize_and_transform_timestamp() {
         let mut base = Event::Log(LogEvent::from("Demo"));
         let timestamp = base
@@ -421,7 +443,7 @@ mod tests {
             except_fields = ["Doop"]
             only_fields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]
@@ -433,7 +455,7 @@ mod tests {
         let config: std::result::Result<Transformer, _> = toml::from_str(indoc! {r#"
             onlyfields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]

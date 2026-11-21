@@ -47,6 +47,9 @@ Examples:
 Add a fragment when the change is user-observable: it alters behavior, configuration, output
 format, performance, or security posture that a Vector user would notice.
 
+For a new deprecation announcement, add a notice to [`deprecation.d/`](../deprecation.d/README.md)
+instead, following the [deprecation policy](../docs/DEPRECATION_POLICY.md).
+
 Skip the fragment (and add the `no-changelog` label) for internal-only changes: refactors with
 no behavior change, CI/test tooling, documentation, or dependency bumps that don't affect behavior.
 
@@ -60,8 +63,8 @@ with the name of the release (e.g. '0.42.0.cue').
 
 ### Pull Requests
 
-By default, PRs are required to add at least one entry to this directory.
-This is enforced during CI.
+By default, PRs are required to add at least one entry to this directory or a new deprecation
+announcement to `deprecation.d/`. This is enforced during CI.
 
 To mark a PR as not requiring user-facing changelog notes, add the label 'no-changelog'.
 
@@ -117,10 +120,11 @@ Finally, a good fragment is concise and avoids implementation details.
 
 ### Breaking changes
 
-Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optional anchor, and
-`## Summary` / `## Migration` sections) so the release process can auto-generate the upgrade
-guide from them. See [Examples](#examples) below for the exact shape — or just run the
-scaffolder from [Quick start](#quick-start).
+Breaking fragments (`*.breaking.md`) generate an upgrade guide below the VRL changelog.
+Use the [scaffolder](#quick-start) or follow the [example](#breaking).
+
+Preview with `cargo vdev release generate-cue --version <vector-version>`.
+This keeps source fragments and refuses to overwrite release files.
 
 ## Authors
 

@@ -32,19 +32,6 @@ components: sinks: _datadog: {
 				examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 			}
 		}
-		region: {
-			description:   "The region to send data to."
-			required:      false
-			relevant_when: "endpoint is not set"
-			warnings: ["This option has been deprecated, the `site` option should be used."]
-			type: string: {
-				default: null
-				enum: {
-					us: "United States"
-					eu: "Europe"
-				}
-			}
-		}
 		site: {
 			description:   "The [Datadog site](https://docs.datadoghq.com/getting_started/site) to send data to. "
 			required:      false

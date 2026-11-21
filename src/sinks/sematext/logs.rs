@@ -1,13 +1,9 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use async_trait::async_trait;
-use derivative::Derivative;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, sensitive_string::SensitiveString, sink::SinkError,
+};
 use vrl::event_path;
 
 use super::Region;
@@ -67,9 +63,9 @@ pub struct SematextLogsConfig {
 
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             token: ${SEMATEXT_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -89,12 +85,11 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedSematextLogs {
     endpoint: String,
     // Omitted: `index` is built from the write token and would leak it via Debug.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     index: Template,
 }
 
@@ -168,12 +163,12 @@ impl SematextLogsConfig {
 }
 
 struct MapTimestampStream {
-    inner: Box<dyn StreamSink<EventArray> + Send>,
+    inner: Box<dyn StreamSink<EventArray, SinkError> + Send>,
 }
 
 #[async_trait]
-impl StreamSink<EventArray> for MapTimestampStream {
-    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
+impl StreamSink<EventArray, SinkError> for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), SinkError> {
         let mapped_input = input.map(map_timestamp).boxed();
         self.inner.run(mapped_input).await
     }
@@ -226,10 +221,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "mylogtoken".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -246,10 +241,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: token.to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -270,10 +265,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "{{ index }}".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -291,10 +286,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "%".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let err = config
@@ -316,10 +311,10 @@ mod tests {
             region: Region::Us,
             endpoint: Some("/path".to_string()),
             token: "mylogtoken".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let err = config

@@ -15,13 +15,13 @@ use crate::sinks::{
     },
 };
 
-pub struct HecMetricsRequestBuilder {
+pub(super) struct HecMetricsRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoder: HecMetricsEncoder,
 }
 
 impl HecMetricsRequestBuilder {
-    pub const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
+    pub(super) const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
         Self {
             compression,
             encoder: HecMetricsEncoder {

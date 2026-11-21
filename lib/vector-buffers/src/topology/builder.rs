@@ -194,6 +194,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     ///
     #[allow(clippy::print_stderr)]
+    #[must_use]
     pub fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
@@ -232,6 +233,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     #[cfg(test)]
+    #[must_use]
     pub fn standalone_memory_test(
         max_events: NonZeroUsize,
         when_full: WhenFull,

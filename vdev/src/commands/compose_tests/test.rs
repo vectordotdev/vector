@@ -1,6 +1,6 @@
 use std::iter::once;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 use crate::testing::{
     config::ComposeTestConfig,
@@ -9,6 +9,36 @@ use crate::testing::{
 };
 
 use super::active_projects::find_active_environment_for_integration;
+
+/// RAII guard that triggers test environment cleanup.
+///
+/// Cleanup is skipped if the environment was already running prior to the test execution
+/// (preserving caller-owned environments and fast repeated runs).
+struct DespawnGuard<'a> {
+    local_config: ComposeTestLocalConfig,
+    integration: &'a str,
+    should_despawn: bool,
+}
+
+impl DespawnGuard<'_> {
+    pub fn disarm_and_stop(mut self) -> Result<()> {
+        if self.should_despawn {
+            self.should_despawn = false;
+            super::stop::exec(self.local_config, self.integration)?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for DespawnGuard<'_> {
+    fn drop(&mut self) {
+        if self.should_despawn
+            && let Err(e) = super::stop::exec(self.local_config, self.integration)
+        {
+            warn!("Failed to stop environment (cleanup): {e}");
+        }
+    }
+}
 
 pub fn exec(
     local_config: ComposeTestLocalConfig,
@@ -35,11 +65,18 @@ pub fn exec(
     };
 
     if coverage {
-        clear_coverage();
+        clear_coverage()?;
     }
 
     let mut ran_environments = Vec::new();
+    let is_running = active.is_some();
     for environment in environments {
+        let despawn_guard = DespawnGuard {
+            local_config,
+            integration,
+            should_despawn: !is_running,
+        };
+
         run_environment(
             local_config,
             integration,
@@ -51,13 +88,11 @@ pub fn exec(
         if coverage {
             ran_environments.push(environment.clone());
         }
+        despawn_guard.disarm_and_stop()?;
     }
 
-    // Consolidate per-environment coverage files into the canonical lcov.info
-    // so callers get a single, predictable output path regardless of how many
-    // environments ran.
     if coverage {
-        merge_coverage(&ran_environments)?;
+        validate_coverage(&ran_environments)?;
     }
 
     Ok(())
@@ -75,59 +110,37 @@ pub(crate) fn run_environment(
         .test(args.to_owned())
 }
 
-pub(crate) fn clear_coverage() {
-    let coverage_dir = local_coverage_output_dir();
-    std::fs::remove_file(coverage_dir.join(coverage_filename(None))).ok();
-}
-
-pub(crate) fn merge_coverage(environments: &[String]) -> Result<()> {
-    if environments.is_empty() {
-        return Ok(());
-    }
-
-    let coverage_dir = local_coverage_output_dir();
-    let merged_path = coverage_dir.join(coverage_filename(None));
-    let mut merged = String::new();
-
-    for environment in environments {
-        let coverage_path = coverage_dir.join(coverage_filename(Some(environment)));
-        match std::fs::read_to_string(&coverage_path) {
-            Ok(contents) => {
-                merged.push_str(&normalize_coverage_paths(&contents));
-                std::fs::remove_file(&coverage_path).ok();
+/// Remove only generated coverage reports so retries cannot reuse stale data.
+pub(crate) fn clear_coverage() -> Result<()> {
+    let directory = local_coverage_output_dir();
+    if directory.exists() {
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name == "lcov.info"
+                || name == "manifest.json"
+                || (name.starts_with("lcov-") && name.ends_with(".info"))
+            {
+                std::fs::remove_file(entry.path())?;
             }
-            Err(e) => warn!(
-                "Could not read coverage file {}: {e}",
-                coverage_path.display()
-            ),
         }
     }
-
-    if !merged.is_empty() {
-        std::fs::write(&merged_path, merged)?;
-        info!(
-            "Wrote coverage for {} environment(s) to {}",
-            environments.len(),
-            merged_path.display()
-        );
-    }
-
     Ok(())
 }
 
-fn normalize_coverage_paths(contents: &str) -> String {
-    contents.replace("SF:/home/vector/", "SF:")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normalize_coverage_paths;
-
-    #[test]
-    fn normalizes_container_source_paths() {
-        assert_eq!(
-            normalize_coverage_paths("SF:/home/vector/src/main.rs\nDA:1,1\n"),
-            "SF:src/main.rs\nDA:1,1\n"
+/// Keep each environment's original report. Missing output is a test failure,
+/// not a reason to publish an incomplete service report.
+pub(crate) fn validate_coverage(environments: &[String]) -> Result<()> {
+    for environment in environments {
+        let path = local_coverage_output_dir().join(coverage_filename(Some(environment)));
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("Missing coverage report {}", path.display()))?;
+        anyhow::ensure!(
+            !contents.trim().is_empty(),
+            "Empty coverage report {}",
+            path.display()
         );
     }
+    Ok(())
 }

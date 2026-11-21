@@ -25,6 +25,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{
+    DiskBufferUsageSnapshot,
     common::{DiskBufferConfig, create_crc32c_hasher},
     io::Filesystem,
     ledger::Ledger,
@@ -604,8 +605,7 @@ where
         if serialized_len <= 8 || self.ser_buf.len() != serialized_len {
             return Err(WriterError::InconsistentState {
                 reason: format!(
-                    "serializer position invalid after serializing record: pos={} len={}",
-                    serialized_len,
+                    "serializer position invalid after serializing record: pos={serialized_len} len={}",
                     self.ser_buf.len(),
                 ),
             });
@@ -910,6 +910,18 @@ where
             next_record_id,
             unflushed_events: 0,
             _t: PhantomData,
+        }
+    }
+
+    /// Gets the current approximate usage of the buffer.
+    ///
+    /// Includes both usage published to the ledger and writes buffered locally by this writer. The
+    /// two ledger counters are sampled separately, so the result is approximate when reads are
+    /// being acknowledged concurrently.
+    pub fn usage_snapshot(&self) -> DiskBufferUsageSnapshot {
+        DiskBufferUsageSnapshot {
+            event_count: self.ledger.get_total_records() + self.unflushed_events,
+            byte_size: self.ledger.get_total_buffer_size() + self.unflushed_bytes,
         }
     }
 

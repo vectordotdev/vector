@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -34,8 +35,8 @@ pub(crate) struct MemorySource {
 
 impl MemorySource {
     pub(crate) async fn run(mut self) -> Result<(), ()> {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
         let source_config = self
             .memory
             .config
@@ -43,10 +44,7 @@ impl MemorySource {
             .clone()
             .expect("Unexpected missing source config in memory table used as a source.");
         let mut interval = IntervalStream::new(interval(Duration::from_secs(
-            source_config
-                .export_interval
-                .map(Into::into)
-                .unwrap_or(u64::MAX),
+            source_config.export_interval.map_or(u64::MAX, Into::into),
         )))
         .take_until(self.shutdown.clone());
         let mut expired_receiver = self.memory.subscribe_to_expired_items();
@@ -69,6 +67,11 @@ impl MemorySource {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn export_table_items(
         &mut self,
         source_config: &MemorySourceConfig,
@@ -127,7 +130,7 @@ impl MemorySource {
             bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
             if self.out.send_batch(events).await.is_err() {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
             }
 
             sent += count;
@@ -178,7 +181,7 @@ impl MemorySource {
             .await
             .is_err()
         {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
         }
     }
 }

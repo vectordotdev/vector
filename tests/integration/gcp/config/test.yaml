@@ -1,5 +1,6 @@
 features:
   - gcp-integration-tests
+  - gcp-pubsub-integration-tests
 
 test_filter: "::gcp"
 
@@ -7,7 +8,7 @@ env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
 
 matrix:
-  version: [latest]
+  version: ["594.0.0"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

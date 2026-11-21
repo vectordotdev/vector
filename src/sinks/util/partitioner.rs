@@ -1,4 +1,4 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use crate::{
     internal_events::{KeyOutsideBasePrefixError, TemplateRenderingError},
@@ -25,7 +25,7 @@ pub(crate) fn render_key_with_fallback(
             rendered_len,
             message,
         }) => {
-            emit!(KeyOutsideBasePrefixError {
+            emit(KeyOutsideBasePrefixError {
                 key_preview: &rendered_preview,
                 key_len: rendered_len,
                 message: &message,
@@ -34,14 +34,14 @@ pub(crate) fn render_key_with_fallback(
         }
         Err(error) => {
             if let Some(fallback) = dead_letter {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key_prefix"),
                     drop_event: false,
                 });
                 Some(fallback.to_owned())
             } else {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key_prefix"),
                     drop_event: true,
@@ -63,6 +63,7 @@ pub struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
+    #[must_use]
     pub const fn new(
         key_prefix_template: ConfinedTemplate,
         dead_letter_key_prefix: Option<String>,

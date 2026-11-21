@@ -148,6 +148,7 @@ fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse(HOST).expect("static default endpoint should be a valid http(s) URL")
 }
 
+#[must_use]
 pub fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
@@ -168,9 +169,9 @@ impl GenerateConfig for HumioLogsConfig {
             batch: BatchConfig::default(),
             tls: None,
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             timestamp_key: config_timestamp_key_target_path(),
-            confinement: Default::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -294,9 +295,9 @@ mod tests {
             batch: BatchConfig::default(),
             tls: None,
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             timestamp_key: config_timestamp_key_target_path(),
-            confinement: Default::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         };
 
         let result = config.validate();
@@ -481,9 +482,9 @@ mod integration_tests {
             batch,
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
-            acknowledgements: Default::default(),
-            timestamp_key: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timestamp_key: OptionalTargetPath::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         }
     }
 
@@ -563,9 +564,8 @@ mod integration_tests {
 
         // https://docs.humio.com/api/using-the-search-api-with-humio
         let search_url = format!(
-            "{}/api/v1/repositories/{}/query",
-            humio_address(),
-            repository_name
+            "{}/api/v1/repositories/{repository_name}/query",
+            humio_address()
         );
         let search_query = format!(r#"message="{message}""#);
 
