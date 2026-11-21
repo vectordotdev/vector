@@ -12,7 +12,7 @@ generated: components: sources: mqtt: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::ecaf68519ebaccc332a7868a"]
 	}
 	framing: {
 		description: """

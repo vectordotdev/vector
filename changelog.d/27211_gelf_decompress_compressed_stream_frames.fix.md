@@ -1,0 +1,3 @@
+The GELF decoder now decompresses gzip/zlib-compressed messages on stream transports (e.g. GELF over TCP) instead of failing JSON parsing and dropping them, matching datagram transports. With the default NUL-delimited stream framing, only compressed messages that contain no NUL bytes arrive intact — note that gzip headers typically embed NUL bytes. A new `gelf.decompression` decoding option controls this (`Auto` by default, `None` to reject compressed messages).
+
+authors: yackushevas
