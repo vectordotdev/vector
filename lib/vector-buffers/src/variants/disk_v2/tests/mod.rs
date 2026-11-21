@@ -31,6 +31,7 @@ mod known_errors;
 mod model;
 mod record;
 mod size_limits;
+mod split_records;
 
 #[expect(
     clippy::unused_async_trait_impl,
