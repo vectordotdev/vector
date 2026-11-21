@@ -3,6 +3,10 @@ version: "3"
 services:
   emqx:
     image: docker.io/emqx:${CONFIG_VERSION}
+    environment:
+      # Retransmit unacknowledged publishes quickly (the default is 30s) so the
+      # source's handling of same-connection retransmissions is testable.
+      - EMQX_MQTT__RETRY_INTERVAL=2s
     ports:
       - 1883:1883
 
