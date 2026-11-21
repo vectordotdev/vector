@@ -127,6 +127,9 @@
 //! As the reader emits records, we cannot yet consider them fully processed until they are
 //! acknowledged. The acknowledgement process is tied into the normal acknowledgement machinery, and
 //! the reader collects and processes those acknowledgements incrementally as reads occur.
+//! Input EOF means every readable record has been returned, even if acknowledgements are still
+//! outstanding. After downstream consumers finish, [`BufferReader::finish`] processes the remaining
+//! acknowledgements and persists the reader checkpoint.
 //!
 //! When all records from a data file have been fully acknowledged, the data file is scheduled for
 //! deletion. We only delete entire data files, rather than truncating them piecemeal, which reduces
