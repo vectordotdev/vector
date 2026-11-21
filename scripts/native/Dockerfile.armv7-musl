@@ -1,0 +1,18 @@
+# Upstream Rust does not distribute an ARMv7 musl host compiler. Test Alpine's
+# native compiler at exactly Vector's Rust version, not a glibc compatibility shim.
+FROM alpine:edge@sha256:020dfcbaaf4cc1078bf2d9c7ba31a8466e334061dcd2f248001d68f79e52c000
+
+ARG RUST_VERSION
+RUN apk add --no-cache \
+    "rust=${RUST_VERSION}-r0" "cargo=${RUST_VERSION}-r0" \
+    bash build-base ca-certificates clang cmake curl git linux-headers \
+    openssl-dev openssl-libs-static perl pkgconf protobuf protobuf-dev \
+    cyrus-sasl-dev zlib-static libstdc++-dev
+
+# Use Alpine's matching stdlib and armv7-alpine-linux-musleabihf host triple.
+# Upstream stdlib artifacts reject Alpine's vendor-tagged compiler, even when
+# the Rust version and source commit match. Verify the release ABI in CI.
+
+ENV PROTOC=/usr/bin/protoc
+ENV CARGO_INCREMENTAL=0
+WORKDIR /work

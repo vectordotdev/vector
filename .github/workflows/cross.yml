@@ -1,3 +1,5 @@
+# Retain the workflow and job names for existing callers and required checks.
+# The implementation uses native host tools, not cross-rs or QEMU.
 name: Cross
 
 on:
@@ -14,49 +16,63 @@ permissions:
 jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
     env:
       CARGO_INCREMENTAL: 0
-      CARGO_PROFILE_RELEASE_LTO: thin # fat LTO OOMs/timeouts on standard 16GB runners; thin is sufficient to verify linking
+      CARGO_BUILD_JOBS: 6
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
-          - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-gnueabihf
-          - armv7-unknown-linux-musleabihf
-          - arm-unknown-linux-gnueabi
-          - arm-unknown-linux-musleabi
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04-8core
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core-arm
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-8core-arm
+          - target: armv7-unknown-linux-gnueabihf
+            runner: ubuntu-24.04-8core-arm
+          - target: armv7-unknown-linux-musleabihf
+            runner: ubuntu-24.04-8core-arm
+          - target: arm-unknown-linux-gnueabi
+            runner: ubuntu-24.04-8core-arm
+          - target: arm-unknown-linux-musleabi
+            runner: ubuntu-24.04-8core-arm
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          mold: false
+          vdev: false
+
+      - uses: ./.github/actions/prepare-armv6-runtime
+        if: startsWith(matrix.target, 'arm-unknown-linux-')
+
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         name: Cache Cargo registry + index
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-${{ runner.arch }}-cargo-
 
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: |
-          rustup target add x86_64-unknown-linux-gnu
-          cargo install cross --version 0.2.4 --force --locked
-      # Why is this build, not check? Because we need to make sure the linking phase works.
-      # aarch64 and musl in particular are notoriously hard to link.
-      # While it may be tempting to slot a `check` in here for quickness, please don't.
-      - run: make cross-build-${{ matrix.target }}
+      # Link the actual release features with fat LTO; cargo check is not enough.
+      # Exercise the compatibility Make target as well as the shared vdev builder.
+      - run: make NATIVE_VERIFY=true NATIVE_VDEV="cargo vdev" cross-build-${{ matrix.target }}
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: "vector-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/release/vector"
+          if-no-files-found: error

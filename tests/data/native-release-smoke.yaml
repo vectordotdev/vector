@@ -1,0 +1,16 @@
+data_dir: /tmp
+sources:
+  stdin:
+    type: stdin
+    log_namespace: false
+transforms:
+  uppercase:
+    type: remap
+    inputs: [stdin]
+    source: .message = upcase!(.message)
+sinks:
+  stdout:
+    type: console
+    inputs: [uppercase]
+    encoding:
+      codec: json

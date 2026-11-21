@@ -1,0 +1,39 @@
+name: GNU ARM compatibility probe
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-gnu-compat-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      github.event.pull_request.number == 27197 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == 'thomasqueirozb' &&
+      github.event.review.body == '/ci-run-native-gnu-compat'
+    runs-on: ubuntu-24.04-8core-arm
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - arm-unknown-linux-gnueabi
+          - armv7-unknown-linux-gnueabihf
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+          persist-credentials: false
+      - name: Compile and run with a compatible GNU sysroot
+        uses: ./.github/actions/build-linux-native
+        with:
+          target: ${{ matrix.target }}
+          probe-only: "true"

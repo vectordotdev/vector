@@ -5,7 +5,6 @@ SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
 # Tool versions. Keep pins here so CI and local setup use the same versions.
 CARGO_DEB_VERSION="3.6.2"
-CROSS_VERSION="0.2.5"
 CARGO_NEXTEST_VERSION="0.9.152"
 CARGO_DENY_VERSION="0.20.2"
 CARGO_MSRV_VERSION="0.18.4"
@@ -26,7 +25,6 @@ DEFAULT_MODULES=(
   rustup
   protoc
   cargo-deb
-  cross
   cargo-nextest
   cargo-deny
   cargo-msrv
@@ -98,8 +96,8 @@ EOF
 If a module requires Rust, rustup is installed automatically.
 By default, developer tooling is installed without system packages. To install
 only a subset:
-  INSTALL_MODULES=cargo-deb,cross    # via environment variable
-  $0 --modules=cargo-deb,cross       # via CLI
+  INSTALL_MODULES=cargo-deb,cargo-nextest    # via environment variable
+  $0 --modules=cargo-deb,cargo-nextest       # via CLI
 EOF
 }
 
@@ -488,8 +486,8 @@ maybe_install_npm_tools() {
 
 # Installation orchestration
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
-REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
+REQUIRES_BINSTALL=(cargo-deb cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 require_binstall=false
 cargo_tool_installer=(install)
 
@@ -546,7 +544,6 @@ install_protoc() {
 
 install_cargo_tools() {
   maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
-  maybe_install_cargo_tool cross "${CROSS_VERSION}"
   maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
   maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
   maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"

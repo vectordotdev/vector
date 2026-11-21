@@ -1,0 +1,98 @@
+ARG BASE=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+FROM ${BASE}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash build-essential ca-certificates clang cmake curl git libclang-dev \
+    libprotobuf-dev libsasl2-dev libssl-dev perl pkg-config protobuf-compiler strace unzip xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG RUST_VERSION
+ARG RUST_HOST
+ARG RUST_TARGET
+ENV CARGO_HOME=/opt/cargo
+ENV PATH="/opt/rust/bin:${PATH}"
+# ARMv6 host tools stall, and ARMv7 rustc runs out of 32-bit address space with
+# the release feature set. Cross-compile ARM32 with native ARM64 host tools,
+# without cross-rs or emulated build tools. Install target libraries for both
+# linking and execution through the runner kernel's native ARM32 support.
+RUN set -eu; \
+    case "${RUST_TARGET}" in \
+      arm-unknown-linux-gnueabi) arch=armel; triple=arm-linux-gnueabi ;; \
+      armv7-unknown-linux-gnueabihf) arch=armhf; triple=arm-linux-gnueabihf ;; \
+      *) arch= ;; \
+    esac; \
+    if [ -n "${arch}" ] && [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
+      dpkg --add-architecture "${arch}" \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends \
+        "gcc-${triple}" "g++-${triple}" \
+        "libc6-dev:${arch}" "libgcc-s1:${arch}" "libstdc++6:${arch}" \
+        "libsasl2-dev:${arch}" "libssl-dev:${arch}" "zlib1g-dev:${arch}" \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Verify and install upstream Rust archives without relying on rustup at runtime.
+ARG INSTALL_CLIPPY=false
+RUN set -eux; \
+    cd /tmp; \
+    set -- "rustc-${RUST_VERSION}-${RUST_HOST}" \
+      "cargo-${RUST_VERSION}-${RUST_HOST}" "rust-std-${RUST_VERSION}-${RUST_HOST}"; \
+    if [ "${INSTALL_CLIPPY}" = true ]; then \
+      set -- "$@" "clippy-${RUST_VERSION}-${RUST_HOST}"; \
+    fi; \
+    if [ "${RUST_TARGET}" != "${RUST_HOST}" ]; then \
+      case "${RUST_TARGET}" in \
+        *-gnueabi|*-gnueabihf) set -- "$@" "rust-std-${RUST_VERSION}-${RUST_TARGET}" ;; \
+      esac; \
+    fi; \
+    for component; do \
+      archive="${component}.tar.xz"; \
+      curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}"; \
+      curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLO "https://static.rust-lang.org/dist/${archive}.sha256"; \
+      sha256sum -c "${archive}.sha256"; \
+      tar -xJf "${archive}"; \
+      "./${archive%.tar.xz}/install.sh" --prefix=/opt/rust --disable-ldconfig; \
+      rm -rf "/tmp/${archive}" "/tmp/${archive}.sha256" "/tmp/${archive%.tar.xz}"; \
+    done
+
+# Use a maintained native linker with versioned GNU libc support. The target
+# headers and symbol stubs come from Zig, not the runner's newer GNU sysroot.
+# Runtime libraries installed above are only for native ARM32 execution checks.
+ARG ZIG_VERSION=0.17.1
+ARG CARGO_ZIGBUILD_VERSION=0.24.1
+RUN set -eux; \
+    case "${RUST_TARGET}" in \
+      arm-unknown-linux-gnueabi|armv7-unknown-linux-gnueabihf) \
+        cd /tmp; \
+        curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLo zig.tar.xz \
+          "https://ziglang.org/download/${ZIG_VERSION}/zig-aarch64-linux-${ZIG_VERSION}.tar.xz"; \
+        echo 'a1546d5646eb184437918d6635ca6b762a0e889eac09cef720ee7a1ed3fe7795  zig.tar.xz' | sha256sum -c -; \
+        mkdir -p /opt/zig /opt/cargo/bin /opt/target-pkgconfig; \
+        tar -xJf zig.tar.xz --strip-components=1 -C /opt/zig; \
+        curl --retry 5 --connect-timeout 30 --max-time 180 -fsSLo cargo-zigbuild.tar.xz \
+          "https://github.com/rust-cross/cargo-zigbuild/releases/download/v${CARGO_ZIGBUILD_VERSION}/cargo-zigbuild-aarch64-unknown-linux-gnu.tar.xz"; \
+        echo '70bb4c9cc71a6d16211b9079996e3cd588671053312adeff4d043499ed887601  cargo-zigbuild.tar.xz' | sha256sum -c -; \
+        tar -xJf cargo-zigbuild.tar.xz --strip-components=1 -C /opt/cargo/bin; \
+        rm zig.tar.xz cargo-zigbuild.tar.xz; \
+        /opt/zig/zig version; \
+        /opt/cargo/bin/cargo-zigbuild --version; \
+        ;; \
+    esac
+ENV PATH="/opt/zig:/opt/cargo/bin:${PATH}"
+
+ENV CC_arm_unknown_linux_gnueabi=arm-linux-gnueabi-gcc \
+    CXX_arm_unknown_linux_gnueabi=arm-linux-gnueabi-g++ \
+    AR_arm_unknown_linux_gnueabi=arm-linux-gnueabi-ar \
+    CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER=arm-linux-gnueabi-gcc \
+    PKG_CONFIG_ALLOW_CROSS_arm_unknown_linux_gnueabi=1 \
+    PKG_CONFIG_LIBDIR_arm_unknown_linux_gnueabi=/usr/lib/arm-linux-gnueabi/pkgconfig
+ENV CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc \
+    CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++ \
+    AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar \
+    CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc \
+    PKG_CONFIG_ALLOW_CROSS_armv7_unknown_linux_gnueabihf=1 \
+    PKG_CONFIG_LIBDIR_armv7_unknown_linux_gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig
+ENV PROTOC=/usr/bin/protoc
+ENV CARGO_INCREMENTAL=0
+RUN git config --global --add safe.directory /work
+WORKDIR /work
