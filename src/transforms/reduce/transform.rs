@@ -5,7 +5,7 @@ use std::{
 };
 use vector_lib::internal_event::emit;
 
-use futures::Stream;
+use futures::{Stream, StreamExt as _, stream::BoxStream};
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
@@ -20,6 +20,7 @@ use crate::{
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
+        partitioned::KeyedTransform,
         reduce::{
             config::ReduceConfig,
             merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
@@ -98,21 +99,9 @@ impl ReduceState {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
                 match self.fields.entry(parsed_path) {
                     Entry::Vacant(entry) => {
-                        if let Some(strategy) = maybe_strategy {
-                            match get_value_merger(value.clone(), strategy) {
-                                Ok(m) => {
-                                    entry.insert(m);
-                                }
-                                Err(error) => {
-                                    warn!(message = "Failed to merge value.", %error);
-                                }
-                            }
-                        } else {
-                            entry.insert(value.clone().into());
-                        }
+                        entry.insert(value.clone().into());
                     }
                     Entry::Occupied(mut entry) => {
                         if let Err(error) = entry.get_mut().add(value.clone()) {
@@ -177,6 +166,10 @@ impl Reduce {
     /// # Errors
     ///
     /// Returns an error for incompatible conditions, invalid merge paths, or a condition that cannot be built.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "merge strategy paths are validated by validate_merge_strategies"
+    )]
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -209,15 +202,12 @@ impl Reduce {
             merge_strategies: config
                 .merge_strategies
                 .iter()
-                .filter_map(|(path, strategy)| {
-                    // TODO Invalid paths are ignored to preserve backwards compatibility.
-                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
-                    //      which means an invalid path would result in an configuration error.
-                    let parsed_path = parse_target_path(path).ok();
-                    if parsed_path.is_none() {
-                        warn!(message = "Ignoring strategy with invalid path.", %path);
-                    }
-                    parsed_path.map(|path| (path, strategy.clone()))
+                .map(|(path, strategy)| {
+                    // There are no invalid paths here: `validate_merge_strategies` above already
+                    // returns a configuration error for any path that fails to parse.
+                    let path =
+                        parse_target_path(path).expect("validated by validate_merge_strategies");
+                    (path, strategy.clone())
                 })
                 .collect(),
             merge_states: HashMap::new(),
@@ -269,6 +259,19 @@ impl Reduce {
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+        let discriminant = self.key(&event);
+        self.transform_one_with_key(emitter, discriminant, event);
+    }
+
+    /// Like [`Self::transform_one`], for an event whose `discriminant` was already computed.
+    ///
+    /// Conditions are compiled read-only, so evaluating them can't change the `discriminant`.
+    fn transform_one_with_key(
+        &mut self,
+        emitter: &mut Emitter<Event>,
+        discriminant: Discriminant,
+        event: Event,
+    ) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -280,7 +283,6 @@ impl Reduce {
         };
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
@@ -300,16 +302,14 @@ impl Reduce {
 
             self.push_or_new_reduce_state(&event, discriminant);
         } else if ends_here {
-            emitter.emit(
-                if let Some(mut state) = self.merge_states.remove(&discriminant) {
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                } else {
-                    let mut state = ReduceState::new();
-                    state.add_event(&event, &self.merge_strategies);
-                    state.flush().into()
-                },
-            );
+            emitter.emit({
+                let mut state = self
+                    .merge_states
+                    .remove(&discriminant)
+                    .unwrap_or_else(ReduceState::new);
+                state.add_event(&event, &self.merge_strategies);
+                state.flush().into()
+            });
         } else {
             self.push_or_new_reduce_state(&event, discriminant);
         }
@@ -329,6 +329,32 @@ impl TaskTransform<Event> for Reduce {
         };
 
         construct_output_stream(self, input_rx, transform_fn)
+    }
+}
+
+impl KeyedTransform for Reduce {
+    type Key = Discriminant;
+
+    fn key(&self, event: &Event) -> Discriminant {
+        Discriminant::from_log_event(event.as_log(), &self.group_by)
+    }
+
+    fn transform_keyed(
+        self: Box<Self>,
+        input: BoxStream<'static, (Discriminant, Event)>,
+    ) -> BoxStream<'static, Event> {
+        let flush_period = self.flush_period;
+        map_with_expiration(
+            self,
+            input,
+            flush_period,
+            |me, (discriminant, event), emitter| {
+                me.transform_one_with_key(emitter, discriminant, event);
+            },
+            |me, emitter| me.flush_into(emitter),
+            |me, emitter| me.flush_all_into(emitter),
+        )
+        .boxed()
     }
 }
 
@@ -362,7 +388,7 @@ mod test {
     use crate::config::TransformContext;
     use std::sync::Arc;
 
-    use indoc::indoc;
+    use indoc::{formatdoc, indoc};
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -370,13 +396,47 @@ mod test {
     use vrl::event_path;
     use vrl::value::Kind;
 
+    use std::collections::BTreeMap;
+
+    use futures::stream;
+    use vector_lib::event::{EventArray, EventContainer as _};
+
     use super::*;
     use crate::{
         config::{OutputId, TransformConfig, schema, schema::Definition},
         event::{LogEvent, Value},
         test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
+        transforms::{Transform, test::create_topology},
     };
+
+    /// Builds the transform from `config` and runs `events` through it until they are all flushed.
+    async fn run(config: &ReduceConfig, events: Vec<Event>) -> Vec<LogEvent> {
+        let Transform::Task(task) = config
+            .build(&TransformContext::default())
+            .await
+            .expect("the config is valid")
+        else {
+            unreachable!("reduce builds a task transform");
+        };
+
+        task.transform(stream::iter(events).map(EventArray::from).boxed())
+            .flat_map(|events| stream::iter(events.into_events()))
+            .map(Event::into_log)
+            .collect()
+            .await
+    }
+
+    /// The reduced events of each group, in output order.
+    fn per_group(events: Vec<LogEvent>) -> BTreeMap<String, Vec<LogEvent>> {
+        let mut groups = BTreeMap::<String, Vec<LogEvent>>::new();
+        for event in events {
+            let group = event
+                .get(event_path!("request_id"))
+                .map_or_else(String::new, |id| id.to_string_lossy().into_owned());
+            groups.entry(group).or_default().push(event);
+        }
+        groups
+    }
 
     #[tokio::test]
     async fn reduce_from_condition() {
@@ -1041,5 +1101,100 @@ mod test {
             assert_eq!(out.recv().await, None);
         }))
         .await;
+    }
+
+    #[tokio::test]
+    async fn partitioned_keeps_arrival_order_within_group() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            concurrency: 4
+            merge_strategies:
+              foo: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            for (foo, request_id, end) in [
+                (1, "1", false),
+                (2, "2", false),
+                (3, "1", false),
+                (4, "2", false),
+                (5, "1", true),
+                (6, "2", true),
+            ] {
+                let mut event = LogEvent::from(format!("test message {foo}"));
+                event.insert(event_path!("foo"), foo);
+                event.insert(event_path!("request_id"), request_id);
+                if end {
+                    event.insert(event_path!("test_end"), "yep");
+                }
+                tx.send(event.into()).await.unwrap();
+            }
+
+            // Groups may reach different shards, so either group can come out first.
+            let mut outputs = [
+                out.recv().await.unwrap().into_log(),
+                out.recv().await.unwrap().into_log(),
+            ];
+            outputs.sort_by_key(|output| output["request_id"].to_string());
+
+            assert_eq!(outputs[0]["message"], "test message 1".into());
+            assert_eq!(outputs[0]["foo"], json!([1, 3, 5]).into());
+            assert_eq!(outputs[1]["message"], "test message 2".into());
+            assert_eq!(outputs[1]["foo"], json!([2, 4, 6]).into());
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn partitioned_reduce_matches_a_single_reduce() {
+        let config = |concurrency: usize| {
+            serde_yaml::from_str::<ReduceConfig>(&formatdoc! {"
+                group_by:
+                  - request_id
+                ends_when:
+                  type: vrl
+                  source: exists(.end)
+                max_events: 4
+                merge_strategies:
+                  message: concat_newline
+                  counter: sum
+                concurrency: {concurrency}
+            "})
+            .expect("the config is valid")
+        };
+
+        // Many interleaved groups, some events without `request_id`, and groups ended both by
+        // `ends_when` and by `max_events`. The order-sensitive `concat_newline` checks that each
+        // group still sees its events in arrival order.
+        let events: Vec<Event> = (0..600_i64)
+            .map(|i| {
+                let mut event = LogEvent::from(format!("event {i}"));
+                event.insert(event_path!("counter"), i);
+                if i % 17 != 0 {
+                    event.insert(event_path!("request_id"), (i * 7 % 23).to_string());
+                }
+                if i % 11 == 0 {
+                    event.insert(event_path!("end"), true);
+                }
+                event.into()
+            })
+            .collect();
+
+        let single = run(&config(1), events.clone()).await;
+        let partitioned = run(&config(4), events).await;
+
+        assert_eq!(per_group(partitioned), per_group(single));
     }
 }
