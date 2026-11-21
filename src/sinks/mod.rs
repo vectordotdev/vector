@@ -92,6 +92,8 @@ pub mod opendal_common;
 pub mod opensearch;
 #[cfg(feature = "sinks-opentelemetry")]
 pub mod opentelemetry;
+#[cfg(feature = "sinks-opsimate")]
+pub mod opsimate;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-postgres")]
