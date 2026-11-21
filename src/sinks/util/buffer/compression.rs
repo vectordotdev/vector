@@ -8,8 +8,8 @@ use vector_lib::configurable::{
     attributes::CustomAttribute,
     schema::{
         SchemaGenerator, SchemaObject, apply_metadata, generate_const_string_schema,
-        generate_enum_schema, generate_one_of_schema, generate_struct_schema,
-        get_or_generate_schema,
+        generate_enum_schema, generate_number_schema, generate_one_of_schema,
+        generate_struct_schema, get_or_generate_schema,
     },
 };
 
@@ -35,7 +35,11 @@ pub enum Compression {
     /// [Zstandard][zstd] compression.
     ///
     /// [zstd]: https://facebook.github.io/zstd/
-    Zstd(CompressionLevel),
+    Zstd {
+        level: CompressionLevel,
+        /// Base-2 log of the match window, the level's default when `None`.
+        window_log: Option<u32>,
+    },
 
     /// [Snappy][snappy] compression.
     ///
@@ -69,7 +73,10 @@ impl Compression {
 
     #[must_use]
     pub const fn zstd_default() -> Compression {
-        Compression::Zstd(CompressionLevel::const_default())
+        Compression::Zstd {
+            level: CompressionLevel::const_default(),
+            window_log: None,
+        }
     }
 
     #[must_use]
@@ -78,7 +85,7 @@ impl Compression {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
-            Self::Zstd(_) => Some("zstd"),
+            Self::Zstd { .. } => Some("zstd"),
             Self::Snappy => Some("snappy"),
         }
     }
@@ -88,7 +95,7 @@ impl Compression {
         match self {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
-            Self::Zstd(_) => Some("zstd"),
+            Self::Zstd { .. } => Some("zstd"),
             Self::Snappy => Some("snappy"),
             Self::None => None,
         }
@@ -100,7 +107,7 @@ impl Compression {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",
             Self::Zlib(_) => "log.zz",
-            Self::Zstd(_) => "log.zst",
+            Self::Zstd { .. } => "log.zst",
             Self::Snappy => "log.snappy",
         }
     }
@@ -110,7 +117,7 @@ impl Compression {
         match self {
             Compression::None | Compression::Snappy => 0,
             Compression::Gzip(_) | Compression::Zlib(_) => 9,
-            Compression::Zstd(_) => 21,
+            Compression::Zstd { .. } => 21,
         }
     }
 
@@ -118,7 +125,7 @@ impl Compression {
     pub const fn compression_level(self) -> CompressionLevel {
         match self {
             Self::None | Self::Snappy => CompressionLevel::None,
-            Self::Gzip(level) | Self::Zlib(level) | Self::Zstd(level) => level,
+            Self::Gzip(level) | Self::Zlib(level) | Self::Zstd { level, .. } => level,
         }
     }
 }
@@ -129,7 +136,7 @@ impl fmt::Display for Compression {
             Compression::None => write!(f, "none"),
             Compression::Gzip(ref level) => write!(f, "gzip({})", level.as_flate2().level()),
             Compression::Zlib(ref level) => write!(f, "zlib({})", level.as_flate2().level()),
-            Compression::Zstd(ref level) => {
+            Compression::Zstd { ref level, .. } => {
                 write!(f, "zstd({})", ZstdCompressionLevel::from(*level))
             }
             Compression::Snappy => write!(f, "snappy"),
@@ -174,6 +181,7 @@ impl<'de> de::Deserialize<'de> for Compression {
             {
                 let mut algorithm = None;
                 let mut level = None;
+                let mut window_log = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -189,21 +197,33 @@ impl<'de> de::Deserialize<'de> for Compression {
                             }
                             level = Some(map.next_value::<CompressionLevel>()?);
                         }
-                        _ => return Err(de::Error::unknown_field(&key, &["algorithm", "level"])),
+                        "window_log" => {
+                            if window_log.is_some() {
+                                return Err(de::Error::duplicate_field("window_log"));
+                            }
+                            window_log = Some(map.next_value::<u32>()?);
+                        }
+                        _ => {
+                            return Err(de::Error::unknown_field(
+                                &key,
+                                &["algorithm", "level", "window_log"],
+                            ));
+                        }
                     }
                 }
 
-                let compression = match algorithm
-                    .ok_or_else(|| de::Error::missing_field("algorithm"))?
-                    .as_str()
-                {
+                let algorithm = algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))?;
+                let compression = match algorithm.as_str() {
                     "none" => match level {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
                     "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     "zlib" => Ok(Compression::Zlib(level.unwrap_or_default())),
-                    "zstd" => Ok(Compression::Zstd(level.unwrap_or_default())),
+                    "zstd" => Ok(Compression::Zstd {
+                        level: level.unwrap_or_default(),
+                        window_log,
+                    }),
                     "snappy" => match level {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::Snappy),
@@ -224,12 +244,28 @@ impl<'de> de::Deserialize<'de> for Compression {
                     }
                 }
 
+                if let Some(window_log) = window_log {
+                    check_window_log(&compression, window_log)?;
+                }
+
                 Ok(compression)
             }
         }
 
         deserializer.deserialize_any(StringOrMap)
     }
+}
+
+fn check_window_log<E: de::Error>(compression: &Compression, window_log: u32) -> Result<(), E> {
+    if !matches!(compression, Compression::Zstd { .. }) {
+        return Err(E::unknown_field("window_log", &[]));
+    }
+    if !(ZSTD_WINDOW_LOG_MIN..=ZSTD_WINDOW_LOG_MAX).contains(&window_log) {
+        return Err(E::custom(std::format!(
+            "invalid window_log `{window_log}`, expected value in range [{ZSTD_WINDOW_LOG_MIN}, {ZSTD_WINDOW_LOG_MAX}]"
+        )));
+    }
+    Ok(())
 }
 
 impl ser::Serialize for Compression {
@@ -261,13 +297,19 @@ impl ser::Serialize for Compression {
                     map.end()
                 }
             }
-            Compression::Zstd(zstd_level) => {
-                if *zstd_level == CompressionLevel::Default {
+            Compression::Zstd {
+                level: zstd_level,
+                window_log,
+            } => {
+                if *zstd_level == CompressionLevel::Default && window_log.is_none() {
                     serializer.serialize_str("zstd")
                 } else {
                     let mut map = serializer.serialize_map(None)?;
                     map.serialize_entry("algorithm", "zstd")?;
                     map.serialize_entry("level", &zstd_level)?;
+                    if let Some(window_log) = window_log {
+                        map.serialize_entry("window_log", window_log)?;
+                    }
                     map.end()
                 }
             }
@@ -278,6 +320,11 @@ impl ser::Serialize for Compression {
 
 pub const ALGORITHM_NAME: &str = "algorithm";
 pub const LEVEL_NAME: &str = "level";
+pub const WINDOW_LOG_NAME: &str = "window_log";
+
+// ZSTD_WINDOWLOG_MIN to ZSTD_WINDOWLOG_LIMIT_DEFAULT: frames decode with zstd's default limits.
+const ZSTD_WINDOW_LOG_MIN: u32 = 10;
+const ZSTD_WINDOW_LOG_MAX: u32 = 27;
 pub const LOGICAL_NAME: &str = "logical_name";
 pub const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
 
@@ -377,6 +424,16 @@ impl Configurable for Compression {
             all_string_oneof_subschema.clone(),
         );
         properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
+        let mut window_log_schema = generate_number_schema::<u32>();
+        window_log_schema.number().minimum = Some(f64::from(ZSTD_WINDOW_LOG_MIN));
+        window_log_schema.number().maximum = Some(f64::from(ZSTD_WINDOW_LOG_MAX));
+        apply_metadata(
+            &mut window_log_schema,
+            Metadata::with_description(
+                "Zstandard window size, as a power of two. Only valid with `zstd`.",
+            ),
+        );
+        properties.insert(WINDOW_LOG_NAME.to_string(), window_log_schema);
 
         let mut full_subschema = generate_struct_schema(properties, required, None);
         let mut full_metadata =
@@ -530,7 +587,27 @@ impl ToValue for CompressionLevel {
 
 #[cfg(test)]
 mod test {
-    use super::{Compression, CompressionLevel};
+    use super::{Compression, CompressionLevel, ZSTD_WINDOW_LOG_MAX, ZSTD_WINDOW_LOG_MIN};
+
+    #[test]
+    fn deserialization_window_log_invalid() {
+        let fixtures_invalid = [
+            (
+                r#"{"algorithm": "gzip", "window_log": 27}"#,
+                "unknown field `window_log`, there are no fields at line 1 column 39".to_string(),
+            ),
+            (
+                r#"{"algorithm": "zstd", "window_log": 28}"#,
+                format!(
+                    "invalid window_log `28`, expected value in range [{ZSTD_WINDOW_LOG_MIN}, {ZSTD_WINDOW_LOG_MAX}] at line 1 column 39"
+                ),
+            ),
+        ];
+        for (source, result) in &fixtures_invalid {
+            let error = serde_json::from_str::<Compression>(source).expect_err("invalid source");
+            assert_eq!(&error.to_string(), result);
+        }
+    }
 
     #[test]
     fn deserialization_json() {
@@ -601,7 +678,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,
-                r"unknown field `key`, expected `algorithm` or `level` at line 1 column 47",
+                r"unknown field `key`, expected one of `algorithm`, `level`, `window_log` at line 1 column 47",
             ),
             (
                 r#"{"algorithm": "gzip", "level": 10}"#,
@@ -632,6 +709,15 @@ mod test {
                    level = 8"#,
                 Compression::Gzip(CompressionLevel::Val(8)),
             ),
+            (
+                r#"algorithm = "zstd"
+                   level = 9
+                   window_log = 27"#,
+                Compression::Zstd {
+                    level: CompressionLevel::Val(9),
+                    window_log: Some(27),
+                },
+            ),
         ];
         for (sources, result) in &fixtures_valid {
             let deserialized: Result<Compression, _> = toml::from_str(sources);
@@ -647,16 +733,32 @@ mod test {
             Compression::Gzip(CompressionLevel::Val(7)),
             Compression::Zlib(CompressionLevel::Best),
             Compression::Zlib(CompressionLevel::Val(7)),
-            Compression::Zstd(CompressionLevel::Val(6)),
-            Compression::Zstd(CompressionLevel::default()),
-            Compression::Zstd(CompressionLevel::Best),
-            Compression::Zstd(CompressionLevel::Fast),
+            Compression::Zstd {
+                level: CompressionLevel::Val(6),
+                window_log: None,
+            },
+            Compression::Zstd {
+                level: CompressionLevel::default(),
+                window_log: None,
+            },
+            Compression::Zstd {
+                level: CompressionLevel::Best,
+                window_log: None,
+            },
+            Compression::Zstd {
+                level: CompressionLevel::Fast,
+                window_log: None,
+            },
+            Compression::Zstd {
+                level: CompressionLevel::default(),
+                window_log: Some(27),
+            },
         ];
 
         for v in fixtures_valid {
             // Check serialize-deserialize round trip with defaults
             let value = serde_json::to_value(v).unwrap();
-            serde_json::from_value::<Compression>(value).unwrap();
+            assert_eq!(serde_json::from_value::<Compression>(value).unwrap(), v);
         }
     }
 }

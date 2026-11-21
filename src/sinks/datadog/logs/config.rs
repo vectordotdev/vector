@@ -587,7 +587,7 @@ mod test {
 
         let config: DatadogLogsConfig = serde_yaml::from_str(config_yaml).unwrap();
         // The serde default applies immediately during deserialization
-        assert!(matches!(config.compression, Some(Compression::Zstd(_))));
+        assert!(matches!(config.compression, Some(Compression::Zstd { .. })));
 
         // Test 2: When explicitly set to "none", it should be Some(Compression::None)
         let config_yaml_with_none = indoc! {r#"
@@ -608,7 +608,7 @@ mod test {
         let config_zstd: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_zstd).unwrap();
         assert!(matches!(
             config_zstd.compression,
-            Some(Compression::Zstd(_))
+            Some(Compression::Zstd { .. })
         ));
 
         // Test 4: When explicitly set to "gzip", it should be Some(Compression::Gzip)
