@@ -220,6 +220,10 @@ impl<T: Bufferable> PartialEq for ReaderError<T> {
 pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
+    // Length of the record whose payload is being collected into `aligned_buf`.  Kept across
+    // calls so a cancelled `try_next_record` resumes the record instead of losing the bytes it
+    // already consumed from `reader`.
+    pending_record_len: Option<usize>,
     checksummer: Hasher,
     current_record_id: u64,
     _t: PhantomData<T>,
@@ -238,6 +242,7 @@ where
         Self {
             reader: BufReader::with_capacity(256 * 1024, reader),
             aligned_buf: AlignedVec::new(),
+            pending_record_len: None,
             checksummer: create_crc32c_hasher(),
             current_record_id: 0,
             _t: PhantomData,
@@ -329,25 +334,41 @@ where
         &mut self,
         is_finalized: bool,
     ) -> Result<Option<ReadToken>, ReaderError<T>> {
-        let Some(record_len) = self.read_length_delimiter(is_finalized).await? else {
-            return Ok(None);
+        // This method must be cancel-safe: the topology polls it inside `select!` against the
+        // memory stage of an overflow buffer, which drops it whenever the memory stage wins.
+        let record_len = if let Some(record_len) = self.pending_record_len {
+            record_len
+        } else {
+            let Some(record_len) = self.read_length_delimiter(is_finalized).await? else {
+                return Ok(None);
+            };
+
+            if record_len == 0 {
+                return Err(ReaderError::Deserialization {
+                    reason: "record length was zero".to_string(),
+                    record_bytes: 8,
+                });
+            }
+
+            self.aligned_buf.clear();
+            self.pending_record_len = Some(record_len);
+            record_len
         };
 
-        if record_len == 0 {
-            return Err(ReaderError::Deserialization {
-                reason: "record length was zero".to_string(),
-                record_bytes: 8,
-            });
-        }
-
         // Read in all of the bytes we need first.
-        self.aligned_buf.clear();
         while self.aligned_buf.len() < record_len {
             let needed = record_len - self.aligned_buf.len();
-            let buf = self.reader.fill_buf().await.context(IoSnafu)?;
+            let buf = match self.reader.fill_buf().await {
+                Ok(buf) => buf,
+                Err(source) => {
+                    self.pending_record_len = None;
+                    return Err(ReaderError::Io { source });
+                }
+            };
             if buf.is_empty() && is_finalized {
                 // If we needed more data, but there was none available, and we're finalized: we've
                 // got ourselves a partial write situation.
+                self.pending_record_len = None;
                 return Err(ReaderError::PartialWrite);
             }
 
@@ -355,6 +376,7 @@ where
             self.aligned_buf.extend_from_slice(&buf[..available]);
             self.reader.consume(available);
         }
+        self.pending_record_len = None;
 
         // Now see if we can deserialize our archived record from this.
         let buf = self.aligned_buf.as_slice();
@@ -415,6 +437,7 @@ where
             .field("aligned_buf", &self.aligned_buf)
             .field("checksummer", &self.checksummer)
             .field("current_record_id", &self.current_record_id)
+            .field("pending_record_len", &self.pending_record_len)
             .finish()
     }
 }
