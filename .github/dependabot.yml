@@ -78,6 +78,16 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      # goauth::get_token takes a smpl_jwt::Jwt, so both must be updated together.
+      #
+      # We also do not want to upgrade to goauth 0.17. Reasoning:
+      # https://github.com/vectordotdev/vector/pull/24761#issuecomment-6068898876
+      goauth-major:
+        patterns:
+          - "goauth"
+          - "smpl_jwt"
+        update-types:
+          - "major"
       # These dependencies share metrics-util layer traits and must be updated
       # together to avoid incompatible trait implementations across versions.
       metrics:
@@ -110,6 +120,12 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      prost-major:
+        patterns:
+          - "prost"
+          - "prost-*"
+        update-types:
+          - "major"
       serde:
         patterns:
           - "serde"
@@ -173,10 +189,14 @@ updates:
           - "*"
         exclude-patterns:
           - "bytecheck"
+          - "goauth"
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
+          - "prost"
+          - "prost-*"
           - "rkyv"
+          - "smpl_jwt"
         update-types:
           - "major"
       cargo-security:
