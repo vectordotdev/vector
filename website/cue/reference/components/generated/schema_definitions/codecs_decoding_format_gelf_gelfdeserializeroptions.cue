@@ -23,6 +23,8 @@ _schemaDefinitions: "codecs::decoding::format::gelf::GelfDeserializerOptions": o
 
 					This mode does not treat specification violations as errors, allowing the decoder
 					to accept messages from sources that don't strictly follow the GELF spec.
+					Spec'd numeric fields (`level`, `line`, `timestamp`) sent as JSON strings with
+					numeric values (e.g. `"level": "6"`) are coerced to numbers, like the Graylog server.
 					"""
 				strict: "Uses strict validation that closely follows the GELF spec."
 			}
