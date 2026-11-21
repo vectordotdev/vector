@@ -1919,6 +1919,69 @@ mod test {
     }
 
     #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_discards_truncated_final_frame() {
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let mut config = UnixConfig::new(tempfile::tempdir().unwrap().keep().join("unix_test"));
+            config.framing = Some(NewlineDelimitedDecoderConfig::new_with_max_length(16).into());
+            let path = init_unix_with_config(tx, false, false, config).await;
+
+            // Only the first 17 bytes (`max_length` + 1) are received: the complete `one` and
+            // `two` frames, then the incomplete `three-is-`, which must be discarded.
+            send_packets_unix_datagram(
+                path,
+                [
+                    Bytes::from_static(b"one\ntwo\nthree-is-long\n"),
+                    Bytes::from_static(b"ok\n"),
+                ],
+            )
+            .await;
+
+            let events = timeout(Duration::from_secs(10), collect_n(rx, 3))
+                .await
+                .expect("timed out waiting for events");
+            let messages = events
+                .iter()
+                .map(|event| {
+                    event.as_log()[log_schema().message_key().unwrap().to_string()].clone()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(messages, ["one".into(), "two".into(), "ok".into()]);
+
+            vector_lib::event_test_util::contains_name_once("UnixSocketDatagramTooLargeError")
+                .unwrap();
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_keeps_frame_ending_at_limit() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let mut config = UnixConfig::new(tempfile::tempdir().unwrap().keep().join("unix_test"));
+            config.framing = Some(NewlineDelimitedDecoderConfig::new_with_max_length(16).into());
+            let path = init_unix_with_config(tx, false, false, config).await;
+
+            // `max_length` excludes the delimiter, so this 17-byte datagram is within the limit.
+            send_packets_unix_datagram(path, [Bytes::from_static(b"0123456789abcdef\n")]).await;
+
+            let events = timeout(Duration::from_secs(10), collect_n(rx, 1))
+                .await
+                .expect("timed out waiting for events");
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                "0123456789abcdef".into()
+            );
+
+            vector_lib::event_test_util::contains_name_once("UnixSocketDatagramTooLargeError")
+                .unwrap_err();
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
     #[test]
     fn parses_unix_datagram_config() {
         let config = parses_unix_config("unix_datagram");
