@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt, task::Poll, time::Instant};
+use std::{
+    collections::HashMap,
+    fmt,
+    task::{Context, Poll},
+    time::Instant,
+};
 
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
@@ -118,13 +123,21 @@ impl Fanout {
     /// Returns `true` if a message was processed, `false` if the control
     /// channel was closed.
     pub async fn recv_control_message(&mut self) -> bool {
-        match self.control_channel.recv().await {
+        std::future::poll_fn(|cx| self.poll_control_message(cx)).await
+    }
+
+    /// Polls for the next control message and applies it if one is ready.
+    ///
+    /// Returns `Ready(true)` if a message was processed, `Ready(false)` if the control channel
+    /// was closed.
+    pub fn poll_control_message(&mut self, cx: &mut Context<'_>) -> Poll<bool> {
+        self.control_channel.poll_recv(cx).map(|msg| match msg {
             Some(msg) => {
                 self.apply_control_message(msg);
                 true
             }
             None => false,
-        }
+        })
     }
 
     /// Apply a control message directly against this instance.
@@ -175,6 +188,8 @@ impl Fanout {
     ///
     /// This function will send events until the provided stream finishes. It will also block on the
     /// resolution of any pending reload before proceeding with a send operation, similar to `send`.
+    /// While the stream is idle, control messages are applied as they arrive, so a quiet component
+    /// releases the senders of removed or replaced downstream components immediately.
     ///
     /// # Panics
     ///
@@ -191,8 +206,23 @@ impl Fanout {
         events: impl Stream<Item = (EventArray, Instant)>,
     ) -> crate::Result<()> {
         tokio::pin!(events);
-        while let Some((event_array, send_reference)) = events.next().await {
-            self.send(event_array, Some(send_reference)).await?;
+        let mut control_channel_open = true;
+        loop {
+            tokio::select! {
+                biased;
+                // Apply control messages while the stream is idle. Otherwise a quiet
+                // component keeps the senders of a removed or changed downstream until its
+                // next event, and that downstream's task never sees its input close.
+                alive = self.recv_control_message(), if control_channel_open => {
+                    control_channel_open = alive;
+                }
+                item = events.next() => match item {
+                    Some((event_array, send_reference)) => {
+                        self.send(event_array, Some(send_reference)).await?;
+                    }
+                    None => break,
+                },
+            }
         }
         Ok(())
     }
@@ -503,9 +533,9 @@ impl Sender {
 
 #[cfg(test)]
 mod tests {
-    use std::{mem, num::NonZeroUsize};
+    use std::{mem, num::NonZeroUsize, time::Instant};
 
-    use futures::poll;
+    use futures::{StreamExt, poll, stream};
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
@@ -656,6 +686,62 @@ mod tests {
             .and_then(Value::as_bytes)
             .and_then(|b| String::from_utf8(b.to_vec()).ok())
             .expect("must be valid log event with `message` field")
+    }
+
+    /// Asserts that every sender of `receiver` is gone and nothing was sent to it.
+    fn assert_closed(receiver: BufferReceiver<EventArray>) {
+        let mut stream = receiver.into_stream();
+        let mut next = spawn(stream.next());
+        assert!(assert_ready!(next.poll()).is_none(), "no events were sent");
+    }
+
+    #[tokio::test]
+    async fn send_stream_applies_remove_while_idle() {
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[2]);
+        let mut idle = spawn(fanout.send_stream(stream::pending::<(EventArray, Instant)>()));
+        assert_pending!(idle.poll());
+
+        remove_sender_from_fanout(&control, 0);
+        assert!(idle.is_woken());
+        assert_pending!(idle.poll());
+        drop(idle);
+
+        assert_closed(receivers.remove(0));
+    }
+
+    #[tokio::test]
+    async fn send_stream_applies_replace_while_idle() {
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[2]);
+        let (events_tx, events_rx) = futures::channel::mpsc::unbounded();
+        let mut idle = spawn(fanout.send_stream(events_rx));
+        assert_pending!(idle.poll());
+
+        let old_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 2);
+        assert!(idle.is_woken());
+        assert_pending!(idle.poll());
+        assert_closed(old_receiver);
+
+        let events = make_events(1);
+        events_tx
+            .unbounded_send((events[0].clone().into(), Instant::now()))
+            .expect("send stream should be open");
+        drop(events_tx);
+        assert_ready!(idle.poll()).expect("send should not fail");
+        drop(idle);
+
+        assert_eq!(
+            collect_ready_events(receivers.remove(0).into_stream()),
+            events
+        );
+    }
+
+    #[tokio::test]
+    async fn send_stream_finishes_after_control_channel_closes() {
+        let (mut fanout, control, _receivers) = fanout_from_senders(&[2]);
+        drop(control);
+        let events = make_event_array(1);
+        let mut send = spawn(fanout.send_stream(stream::iter([(events, Instant::now())])));
+        assert_ready!(send.poll()).expect("send should not fail");
     }
 
     #[tokio::test]
