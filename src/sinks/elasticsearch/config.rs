@@ -1,4 +1,8 @@
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    path::PathBuf,
+};
 
 use futures::{FutureExt, TryFutureExt};
 use vector_lib::{
@@ -794,6 +798,12 @@ impl SinkConfig for ElasticsearchConfig {
         Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
     }
 
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        self.tls
+            .as_ref()
+            .map_or_else(Vec::new, TlsConfig::files_to_watch)
+    }
+
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
@@ -968,7 +978,10 @@ impl ElasticsearchConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::{ConfinementConfig, Template};
+    use crate::{
+        config::BoxedSink,
+        template::{ConfinementConfig, Template},
+    };
 
     #[test]
     fn generate_config() {
@@ -1701,5 +1714,30 @@ mod tests {
         );
         assert!(matches!(config.auth, Some(ElasticsearchAuthConfig::Aws(_))));
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
+    }
+
+    #[test]
+    fn files_to_watch_includes_tls_files() {
+        let config: BoxedSink = serde_yaml::from_str(
+            r"
+            type: elasticsearch
+            endpoints: [https://localhost:9200]
+            tls:
+                ca_file: /etc/tls/ca.crt
+                crt_file: /etc/tls/tls.crt
+                key_file: /etc/tls/tls.key
+            ",
+        )
+        .unwrap();
+
+        let files: Vec<PathBuf> = config.files_to_watch().into_iter().cloned().collect();
+        assert_eq!(
+            files,
+            vec![
+                PathBuf::from("/etc/tls/ca.crt"),
+                PathBuf::from("/etc/tls/tls.crt"),
+                PathBuf::from("/etc/tls/tls.key"),
+            ],
+        );
     }
 }
