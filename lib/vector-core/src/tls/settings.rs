@@ -471,13 +471,12 @@ impl TlsSettings {
         Ok(())
     }
 
-    pub(super) fn apply_context_base(
+    /// Sets how `context` verifies peer certificates, including the client verifier on servers.
+    fn apply_peer_verification(
         &self,
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        self.apply_protocol_versions(context, for_server)?;
-
         match &self.client_cert_verifier {
             Some(verifier) if for_server => {
                 // Without a CA, client chains would be checked against the system roots, which
@@ -516,6 +515,16 @@ impl TlsSettings {
                 .set_session_id_context(b"vector")
                 .context(SetSessionIdContextSnafu)?;
         }
+        Ok(())
+    }
+
+    pub(super) fn apply_context_base(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
+        self.apply_protocol_versions(context, for_server)?;
+        self.apply_peer_verification(context, for_server)?;
         if let Some(identity) = &self.identity {
             context
                 .set_certificate(&identity.cert)
