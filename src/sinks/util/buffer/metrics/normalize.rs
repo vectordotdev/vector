@@ -608,7 +608,7 @@ impl MetricSet {
     }
 
     /// Perform TTL cleanup if configured and needed.
-    fn maybe_cleanup(&mut self) {
+    pub(crate) fn maybe_cleanup(&mut self) {
         // Check if cleanup is needed and get the current timestamp in one operation
         let Some(now) = self.ttl_policy().and_then(TtlPolicy::should_cleanup) else {
             return;
