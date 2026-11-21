@@ -29,7 +29,8 @@ pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
 pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
     TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
-    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
+    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig, TlsVersion,
+    host_protocol_version_range,
 };
 
 /// Install the built-in process-wide Rustls provider if none is already installed.
@@ -53,6 +54,27 @@ pub fn install_default_crypto_provider() {
 }
 
 pub type Result<T> = std::result::Result<T, TlsError>;
+
+/// The versions rustls always negotiates, and the range native-tls pins itself to.
+pub const TLS12_TO_TLS13: (TlsVersion, TlsVersion) = (TlsVersion::Tls12, TlsVersion::Tls13);
+
+/// Fails unless a TLS stack that ignores Vector's settings, and may negotiate any version in
+/// `negotiable_range`, already guarantees `min`/`max`.
+pub fn enforce_protocol_version_bounds(
+    min: Option<TlsVersion>,
+    max: Option<TlsVersion>,
+    tls_stack: &'static str,
+    (lowest, highest): (TlsVersion, TlsVersion),
+) -> Result<()> {
+    if min.is_some_and(|min| min > lowest) || max.is_some_and(|max| max < highest) {
+        return Err(TlsError::ProtocolVersionUnenforceable {
+            tls_stack,
+            lowest,
+            highest,
+        });
+    }
+    Ok(())
+}
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
@@ -145,6 +167,32 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting the TLS protocol version: {}", source))]
+    SetTlsVersion { source: ErrorStack },
+    #[snafu(display(
+        "`min_version` ({}) must not be greater than `max_version` ({})",
+        min,
+        max
+    ))]
+    InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
+    #[snafu(display(
+        "No TLS protocol version is usable: the host's OpenSSL configuration allows none within \
+         `min_version`/`max_version`. OpenSSL security levels above 0 also disable TLS v1.0 and \
+         v1.1."
+    ))]
+    EmptyTlsVersionWindow,
+    #[snafu(display(
+        "`tls.min_version`/`tls.max_version` cannot be enforced by {}, which may negotiate \
+         anything from {} to {}. Widen or remove the bound.",
+        tls_stack,
+        lowest,
+        highest
+    ))]
+    ProtocolVersionUnenforceable {
+        tls_stack: &'static str,
+        lowest: TlsVersion,
+        highest: TlsVersion,
+    },
     #[snafu(display("Error setting the TLS session id context: {}", source))]
     SetSessionIdContext { source: ErrorStack },
     #[snafu(display("Error setting SNI: {}", source))]
@@ -249,7 +297,10 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
 mod tests {
     use rustls::crypto::CryptoProvider;
 
-    use super::install_default_crypto_provider;
+    use super::{
+        TLS12_TO_TLS13, TlsVersion, enforce_protocol_version_bounds,
+        install_default_crypto_provider,
+    };
 
     /// Runs `test_name` in a child process and returns `true` in the parent.
     ///
@@ -325,5 +376,20 @@ mod tests {
             &original,
             CryptoProvider::get_default().unwrap(),
         ));
+    }
+
+    #[test]
+    fn bounds_must_lie_within_the_negotiable_range() {
+        use TlsVersion::{Tls10, Tls12, Tls13};
+        for (min, max, enforceable) in [
+            (None, None, true),
+            (Some(Tls10), Some(Tls13), true),
+            (Some(Tls12), None, true),
+            (Some(Tls13), None, false),
+            (None, Some(Tls12), false),
+        ] {
+            let result = enforce_protocol_version_bounds(min, max, "async-nats", TLS12_TO_TLS13);
+            assert_eq!(result.is_ok(), enforceable, "min {min:?}, max {max:?}");
+        }
     }
 }

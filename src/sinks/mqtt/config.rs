@@ -149,6 +149,20 @@ impl ValidatedSink for MqttSinkConfig {
             }
         }
         self.encoding.validate()?;
+        if let Some(tls) = self
+            .common
+            .tls
+            .as_ref()
+            .filter(|tls| tls.enabled.unwrap_or(false))
+        {
+            vector_lib::tls::enforce_protocol_version_bounds(
+                tls.options.min_version,
+                tls.options.max_version,
+                "rumqttc",
+                vector_lib::tls::TLS12_TO_TLS13,
+            )
+            .context(TlsSnafu)?;
+        }
         let topic = self
             .topic
             .clone()
@@ -206,6 +220,7 @@ impl MqttSinkConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
+
             // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
             // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
             let alpn = self

@@ -7,7 +7,10 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
     config::ValidatedSink,
-    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config, validate_tls_cert_key_pair},
+    nats::{
+        NatsAuthConfig, NatsConfigError, from_tls_auth_config, validate_tls_cert_key_pair,
+        validate_tls_protocol_versions,
+    },
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
 };
@@ -210,6 +213,7 @@ impl ValidatedSink for NatsSinkConfig {
 
         if let Some(tls) = &self.tls {
             validate_tls_cert_key_pair(tls).context(ConfigSnafu)?;
+            validate_tls_protocol_versions(tls).context(ConfigSnafu)?;
         }
 
         Ok(ValidatedNatsSink {
