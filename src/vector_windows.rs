@@ -1,5 +1,9 @@
 #![allow(missing_docs)]
-use std::{ffi::OsString, time::Duration};
+use std::{
+    ffi::OsString,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 use windows_service::{
     Result, define_windows_service,
@@ -7,7 +11,7 @@ use windows_service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
-    service_control_handler::ServiceControlHandlerResult,
+    service_control_handler::{ServiceControlHandlerResult, ServiceStatusHandle},
     service_dispatcher,
 };
 
@@ -269,7 +273,9 @@ pub mod service_control {
 
         let service_status = service.query_status().context(ServiceSnafu)?;
         if service_status.current_state != ServiceState::Stopped {
-            service.stop().context(ServiceSnafu)?;
+            if service_status.current_state != ServiceState::StopPending {
+                service.stop().context(ServiceSnafu)?;
+            }
             emit(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -390,10 +396,24 @@ pub fn run() -> Result<i32> {
     // Always returns 0 exit code as errors are handled by the service dispatcher.
 }
 
+fn stop_wait_hint(graceful_shutdown_duration: Option<Duration>) -> Duration {
+    let longest = Duration::from_millis(u32::MAX.into());
+    graceful_shutdown_duration.map_or(longest, |limit| limit.min(longest))
+}
+
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
     match Application::prepare_start(ExtraContext::default()) {
         Ok((runtime, app)) => {
             let signal_tx = app.signals.handler.clone_tx();
+            let stop_wait_hint = stop_wait_hint(
+                app.topology_controller
+                    .blocking_lock()
+                    .topology
+                    .config
+                    .graceful_shutdown_duration,
+            );
+            let registered_handle = Arc::new(OnceLock::<ServiceStatusHandle>::new());
+            let handler_status_handle = Arc::clone(&registered_handle);
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
                 match control_event {
                     // Notifies a service to report its current status information to the service
@@ -402,6 +422,17 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
+                        if let Some(status_handle) = handler_status_handle.get() {
+                            _ = status_handle.set_service_status(ServiceStatus {
+                                service_type: SERVICE_TYPE,
+                                current_state: ServiceState::StopPending,
+                                controls_accepted: ServiceControlAccept::empty(),
+                                exit_code: ServiceExitCode::Win32(NO_ERROR),
+                                checkpoint: 1,
+                                wait_hint: stop_wait_hint,
+                                process_id: None,
+                            });
+                        }
                         while signal_tx.send(SignalTo::Shutdown(None)).is_err() {}
                         ServiceControlHandlerResult::NoError
                     }
@@ -412,6 +443,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
             let status_handle =
                 windows_service::service_control_handler::register(SERVICE_NAME, event_handler)?;
+            _ = registered_handle.set(status_handle);
 
             status_handle.set_service_status(ServiceStatus {
                 service_type: SERVICE_TYPE,
