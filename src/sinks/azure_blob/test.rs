@@ -38,6 +38,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
         connection_string: None,
         account_name: None,
         blob_endpoint: None,
+        api_version: None,
         container_name: String::new(),
         blob_prefix: Template::default(),
         blob_time_format: None,
