@@ -23,12 +23,20 @@ use crate::sinks::azure_blob::config::{AzureBlobRequest, AzureBlobResponse, Azur
 pub struct AzureBlobService {
     // Using the new azure_storage_blob container client.
     client: Arc<BlobContainerClient>,
+    // Whether block blob names end in a UUID, which makes each name unique to one request.
+    unique_blob_names: bool,
 }
 
 impl AzureBlobService {
     #[must_use]
-    pub const fn new(client: Arc<BlobContainerClient>) -> AzureBlobService {
-        AzureBlobService { client }
+    pub const fn new(
+        client: Arc<BlobContainerClient>,
+        unique_blob_names: bool,
+    ) -> AzureBlobService {
+        AzureBlobService {
+            client,
+            unique_blob_names,
+        }
     }
 }
 
@@ -61,6 +69,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                         request.content_encoding,
                         request.tags,
                         request.blob_metadata,
+                        this.unique_blob_names,
                     )
                     .await
                 }
@@ -94,6 +103,7 @@ async fn upload_block_blob(
     content_encoding: Option<&'static str>,
     tags: Option<String>,
     blob_metadata: Option<std::collections::HashMap<String, String>>,
+    unique_blob_names: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let upload_options = BlockBlobClientUploadOptions {
         blob_content_type: Some(content_type.to_string()),
@@ -104,12 +114,44 @@ async fn upload_block_blob(
     }
     .if_not_exists();
 
-    blob_client
+    match blob_client
         .upload(RequestContent::from(data.to_vec()), Some(upload_options))
         .instrument(info_span!("request").or_current())
         .await
-        .map(|_| ())
-        .map_err(Into::into)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if unique_blob_names && is_existing_blob_conflict(&error) => {
+            // The upload is conditional on the blob not existing, and the name ends in a UUID
+            // generated for this request, so the existing blob was written by an earlier attempt
+            // of this same request whose response was lost (a timeout, a connection reset, or a
+            // retry inside the Azure SDK). Uploads are atomic, so that blob holds this payload.
+            debug!(
+                message = "Blob already exists from an earlier attempt of this request; treating as delivered.",
+                error = %error,
+            );
+            Ok(())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Whether `error` is the service rejecting a conditional (`If-None-Match: *`) upload because the
+/// blob already exists.
+///
+/// A single-shot upload (`Put Blob`) reports this as `409 BlobAlreadyExists`; an upload large
+/// enough to be staged in blocks ends in `Put Block List`, which may report it as
+/// `412 ConditionNotMet`. No other precondition is set on the upload, so both mean the same thing.
+pub(super) fn is_existing_blob_conflict(error: &azure_core::Error) -> bool {
+    let error_code = storage_error_code(error);
+    match error.http_status() {
+        Some(StatusCode::Conflict) => {
+            error_code.as_deref() == Some(StorageErrorCode::BlobAlreadyExists.as_ref())
+        }
+        Some(StatusCode::PreconditionFailed) => {
+            error_code.as_deref() == Some(StorageErrorCode::ConditionNotMet.as_ref())
+        }
+        _ => false,
+    }
 }
 
 // Extracts the Azure storage error code string from an azure_core::Error, if present.
