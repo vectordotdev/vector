@@ -125,7 +125,7 @@ Vector's Docker source files are located
 [docs.strategies#daemon]: https://vector.dev/docs/setup/deployment/strategies/#daemon
 [docs.strategies#service]: https://vector.dev/docs/setup/deployment/strategies/#service
 [docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
-[docs.transforms]: https://vector.dev/docs/reference/configurationtransforms/
+[docs.transforms]: https://vector.dev/docs/reference/configuration/transforms/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
 [urls.example_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.yaml
@@ -133,6 +133,6 @@ Vector's Docker source files are located
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_docker_source_files]: https://github.com/vectordotdev/vector/tree/master/distribution/docker
-[urls.vector_releases]: https://vector.dev/releases/latest/
+[urls.vector_releases]: https://vector.dev/releases/
 [urls.vector_repo]: https://github.com/vectordotdev/vector
 [urls.distroless]: https://github.com/GoogleContainerTools/distroless
