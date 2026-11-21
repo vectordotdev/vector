@@ -152,6 +152,7 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
+    buffered_delim_len: usize,
 }
 
 impl FileWatcher {
@@ -268,6 +269,7 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
+            buffered_delim_len: 0,
         })
     }
 
@@ -380,6 +382,7 @@ impl FileWatcher {
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
+            &mut self.buffered_delim_len,
             self.max_line_bytes,
         )
         .await
