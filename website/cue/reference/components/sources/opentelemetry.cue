@@ -235,6 +235,40 @@ components: sources: opentelemetry: {
 	}
 
 	how_it_works: {
+		cors: {
+			title: "Cross-origin HTTP requests"
+			body: """
+				To receive OTLP/HTTP data directly from a browser on another origin, configure `http.cors`:
+
+				```yaml
+				sources:
+				  otlp:
+				    type: opentelemetry
+				    grpc:
+				      address: 0.0.0.0:4317
+				    http:
+				      address: 0.0.0.0:4318
+				      cors:
+				        allowed_origins: ["https://app.example.com"]
+				        allowed_headers: ["Authorization"]
+				        max_age_secs: 3600
+				```
+
+				CORS is disabled when this block is omitted and does not affect the gRPC listener.
+				Origins are matched exactly, including the scheme and port, without a trailing slash.
+				Use `["*"]` to permit any origin; subdomain wildcards are not supported.
+				An empty list rejects every cross-origin request. `Content-Type` and `Content-Encoding`
+				are always allowed. Only `POST` is permitted as a cross-origin ingestion method.
+
+				Preflight `OPTIONS` requests do not generate events or consume ingestion concurrency
+				permits. Disallowed origins receive HTTP 403. Allowed origins receive CORS headers
+				on successful responses and errors, including request-limit errors.
+				Requests without an `Origin` header retain normal ingestion behavior.
+
+				CORS does not authenticate senders. Credentialed browser requests (such as requests
+				with cookies) are not supported.
+				"""
+		}
 		otlp_decoding: {
 			title: "OTLP Decoding Usage"
 			body: """

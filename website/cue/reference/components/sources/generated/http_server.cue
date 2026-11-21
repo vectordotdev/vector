@@ -41,6 +41,16 @@ generated: components: sources: http_server: configuration: {
 		required: false
 		type:     _schemaDefinitions["core::option::Option<vector::common::http::server_auth::HttpServerAuthConfig>"]
 	}
+	cors: {
+		description: """
+			Cross-origin resource sharing (CORS) configuration.
+
+			Omit this block to disable CORS. Preflight requests do not generate events.
+			CORS is not authentication; use authentication and TLS to protect the endpoint.
+			"""
+		required: false
+		type:     _schemaDefinitions["core::option::Option<vector::sources::util::http::cors::CorsConfig>"]
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output

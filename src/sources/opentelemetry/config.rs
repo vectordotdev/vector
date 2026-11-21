@@ -282,6 +282,9 @@ fn example_grpc_config() -> GrpcConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cors: Option<crate::sources::util::http::cors::CorsConfig>,
+
     /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
@@ -310,8 +313,18 @@ pub struct HttpConfig {
     pub headers: Vec<String>,
 }
 
+impl HttpConfig {
+    fn build_cors(&self) -> crate::Result<Option<warp::cors::Cors>> {
+        self.cors
+            .as_ref()
+            .map(|cors| cors.build(http::Method::POST))
+            .transpose()
+    }
+}
+
 fn example_http_config() -> HttpConfig {
     HttpConfig {
+        cors: None,
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
         keepalive: KeepaliveConfig::default(),
@@ -380,7 +393,7 @@ impl OpentelemetryConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if TLS, decoding, request limits, or header matching cannot be configured.
+    /// Returns an error if TLS, decoding, request limits, CORS, or header matching cannot be configured.
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
     pub fn build_with_tls_reloaders(
         &self,
@@ -493,6 +506,7 @@ impl OpentelemetryConfig {
             http_tls_settings,
             http_tls_reloader,
             filters,
+            self.http.build_cors()?,
             cx.shutdown,
             self.http.keepalive.clone(),
             request_control.http_layer(http_error_response),

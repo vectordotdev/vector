@@ -199,6 +199,37 @@ components: sources: http_server: {
 	}
 
 	how_it_works: {
+		cors: {
+			title: "Cross-origin requests"
+			body: """
+				To receive events directly from a browser on another origin, configure `cors`:
+
+				```yaml
+				sources:
+				  browser:
+				    type: http_server
+				    address: 0.0.0.0:8080
+				    cors:
+				      allowed_origins: ["https://app.example.com"]
+				      allowed_headers: ["Authorization"]
+				      max_age_secs: 3600
+				```
+
+				CORS is disabled when this block is omitted. Origins are matched exactly, including
+				the scheme and port, without a trailing slash. Use `["*"]` to permit any origin;
+				subdomain wildcards are not supported. An empty list rejects every cross-origin request.
+				`Content-Type` and `Content-Encoding` are always allowed. The permitted request method
+				is the configured `method`.
+
+				Preflight `OPTIONS` requests are answered before authentication or body decoding and
+				do not generate events. Disallowed origins receive HTTP 403. Allowed origins receive
+				CORS headers on both successful and error responses. Requests without an `Origin`
+				header retain normal ingestion behavior.
+
+				CORS does not authenticate senders. Use authentication and TLS as appropriate.
+				Credentialed browser requests (such as requests with cookies) are not supported.
+				"""
+		}
 		decompression: {
 			title: "Decompression"
 			body: """

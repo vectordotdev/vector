@@ -59,6 +59,7 @@ async fn receive_logs_legacy_namespace() {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: source_http_address().parse().unwrap(),
                 tls: Option::default(),
                 keepalive: KeepaliveConfig::default(),
@@ -163,6 +164,7 @@ async fn receive_trace() {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: source_http_address().parse().unwrap(),
                 tls: Option::default(),
                 keepalive: KeepaliveConfig::default(),
@@ -277,6 +279,7 @@ async fn receive_metric() {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: source_http_address().parse().unwrap(),
                 tls: Option::default(),
                 keepalive: KeepaliveConfig::default(),

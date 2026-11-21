@@ -82,6 +82,9 @@ pub struct SimpleHttpConfig {
     /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
     auth: Option<HttpServerAuthConfig>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cors: Option<crate::sources::util::http::cors::CorsConfig>,
+
     /// Whether or not to treat the configured `path` as an absolute path.
     ///
     /// If set to `true`, only requests using the exact URL path specified in `path` are accepted. Otherwise,
@@ -215,6 +218,7 @@ impl Default for SimpleHttpConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
+            cors: None,
             path: default_path(),
             path_key: default_path_key(),
             host_key: default_host_key(),
@@ -311,7 +315,7 @@ impl SimpleHttpConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if the decoder, TLS, or authentication cannot be built, or if `tls_reloader`
+    /// Returns an error if the decoder, TLS, authentication, or CORS cannot be built, or if `tls_reloader`
     /// is set but TLS is disabled.
     pub fn build_with_tls_reloader(
         &self,
@@ -334,6 +338,7 @@ impl SimpleHttpConfig {
             host_key: self.host_key.clone(),
             decoder,
             log_namespace,
+            cors: self.cors.clone(),
         };
         source.run(
             self.address,
@@ -390,9 +395,17 @@ struct SimpleHttpSource {
     host_key: OptionalValuePath,
     decoder: Decoder,
     log_namespace: LogNamespace,
+    cors: Option<crate::sources::util::http::cors::CorsConfig>,
 }
 
 impl HttpSource for SimpleHttpSource {
+    fn cors(&self, method: HttpMethod) -> crate::Result<Option<warp::cors::Cors>> {
+        self.cors
+            .as_ref()
+            .map(|cors| cors.build(method.into()))
+            .transpose()
+    }
+
     fn log_namespace(&self) -> LogNamespace {
         self.log_namespace
     }
@@ -582,6 +595,7 @@ mod tests {
                 response_code,
                 tls: None,
                 auth,
+                cors: None,
                 strict_path,
                 path_key,
                 host_key,
@@ -1856,6 +1870,7 @@ mod tests {
         .with_log_namespace(LogNamespace::Vector);
 
         let source = super::SimpleHttpSource {
+            cors: None,
             headers: vec![],
             query_parameters: vec![],
             path_key: OptionalValuePath::none(),
@@ -1919,6 +1934,7 @@ mod tests {
         .with_log_namespace(LogNamespace::Vector);
 
         let source = super::SimpleHttpSource {
+            cors: None,
             headers: vec![],
             query_parameters: vec![],
             path_key: OptionalValuePath::none(),
@@ -1975,6 +1991,7 @@ mod tests {
         .with_log_namespace(LogNamespace::Vector);
 
         let source = super::SimpleHttpSource {
+            cors: None,
             headers: vec![],
             query_parameters: vec![],
             path_key: OptionalValuePath::none(),
