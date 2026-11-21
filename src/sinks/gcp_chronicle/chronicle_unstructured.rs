@@ -41,16 +41,14 @@ use crate::{
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
         },
-        gcs_common::{
-            config::{GcsRetryLogic, healthcheck_status},
-            service::GcsResponse,
-        },
+        gcs_common::{config::healthcheck_status, service::GcsResponse},
         util::{
             BatchConfig, Compression, HttpEndpoint, RequestBuilder, SinkBatchSettings,
             TowerRequestConfig,
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
+            retries::RetryLogic,
             service::TowerRequestConfigDefaults,
         },
     },
@@ -385,7 +383,7 @@ impl ChronicleUnstructuredConfig {
         let partitioner = self.partitioner();
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic::default())
+            .settings(request, ChronicleRetryLogic)
             .service(ChronicleService::new(client, base_url, creds));
 
         let request_builder = ChronicleRequestBuilder::new(self)?;
@@ -670,6 +668,29 @@ pub enum ChronicleResponseError {
     HttpError { error: HttpError },
 }
 
+#[derive(Clone, Copy)]
+struct ChronicleRetryLogic;
+
+impl RetryLogic for ChronicleRetryLogic {
+    type Error = ChronicleResponseError;
+    type Request = ChronicleRequest;
+    type Response = GcsResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            ChronicleResponseError::HttpError { error } => error.is_retriable(),
+            ChronicleResponseError::ServerError { code } => {
+                matches!(
+                    *code,
+                    StatusCode::UNAUTHORIZED
+                        | StatusCode::REQUEST_TIMEOUT
+                        | StatusCode::TOO_MANY_REQUESTS
+                ) || (code.is_server_error() && *code != StatusCode::NOT_IMPLEMENTED)
+            }
+        }
+    }
+}
+
 impl Service<ChronicleRequest> for ChronicleService {
     type Response = GcsResponse;
     type Error = ChronicleResponseError;
@@ -714,13 +735,74 @@ impl Service<ChronicleRequest> for ChronicleService {
 
 #[cfg(test)]
 mod unit_tests {
-    use std::io::Write;
+    use std::{io::Write, time::Duration};
+
+    use tower::retry::Policy;
 
     use tempfile::NamedTempFile;
     use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
 
     use super::*;
+    use crate::sinks::util::retries::{FibonacciRetryPolicy, JitterMode};
     use crate::test_util::{random_string, trace_init};
+
+    #[test]
+    fn retries_transient_chronicle_errors() {
+        let retry = ChronicleRetryLogic;
+        for status in [
+            StatusCode::UNAUTHORIZED,
+            StatusCode::REQUEST_TIMEOUT,
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            assert!(
+                retry.is_retriable_error(&ChronicleResponseError::ServerError { code: status })
+            );
+        }
+
+        for status in [
+            StatusCode::BAD_REQUEST,
+            StatusCode::FORBIDDEN,
+            StatusCode::NOT_FOUND,
+            StatusCode::NOT_IMPLEMENTED,
+        ] {
+            assert!(
+                !retry.is_retriable_error(&ChronicleResponseError::ServerError { code: status })
+            );
+        }
+
+        let transport_error = std::io::Error::other("connection reset");
+        assert!(
+            retry.is_retriable_error(&ChronicleResponseError::HttpError {
+                error: HttpError::new(transport_error),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn retry_policy_recognizes_chronicle_service_error() {
+        let mut policy = FibonacciRetryPolicy::new(
+            1,
+            Duration::from_millis(1),
+            Duration::from_millis(1),
+            ChronicleRetryLogic,
+            JitterMode::None,
+        );
+        let mut request = ChronicleRequest {
+            body: Bytes::new(),
+            finalizers: EventFinalizers::default(),
+            headers: HashMap::new(),
+            metadata: RequestMetadata::default(),
+        };
+        let mut result: Result<GcsResponse, crate::Error> =
+            Err(ChronicleResponseError::ServerError {
+                code: StatusCode::SERVICE_UNAVAILABLE,
+            }
+            .into());
+
+        assert!(policy.retry(&mut request, &mut result).is_some());
+    }
 
     #[tokio::test]
     async fn invalid_credentials_rejected_by_oauth_server() {
