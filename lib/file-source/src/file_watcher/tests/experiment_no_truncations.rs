@@ -18,6 +18,7 @@ async fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
     let mut rotation_count = 0;
     let mut fw = FileWatcher::new(
         path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         ReadFrom::Beginning,
         None,
         100_000,
