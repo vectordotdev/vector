@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures::{Stream, StreamExt, future::BoxFuture};
-use headers::{Authorization, HeaderMapExt};
+use headers::{Authorization, HeaderMapExt, authorization::Credentials};
 use http::{Request, Response, Version};
 use hyper::body::Incoming;
 use hyper_util::{
@@ -141,6 +141,76 @@ impl Auth {
             #[cfg(feature = "aws-core")]
             _ => {}
         }
+    }
+}
+
+/// Configuration of the authentication strategy for gRPC requests between Vector instances.
+///
+/// This mirrors the header based strategies of [`Auth`] but leaves out `aws`, which signs each
+/// request rather than sending a fixed header and so does not apply here.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+pub enum VectorAuthConfig {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// The bearer token value (OAuth 2.0, JWT, etc.) is passed as-is.
+    Bearer {
+        /// The bearer authentication token.
+        token: SensitiveString,
+    },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: SensitiveString,
+    },
+}
+
+impl VectorAuthConfig {
+    /// Returns the `Authorization` header value for this strategy.
+    ///
+    /// The value is marked sensitive, which redacts it from debug output and keeps HTTP/2 header
+    /// compression from indexing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the invalid option if the credentials cannot be encoded into a
+    /// header value. The error never contains the credentials.
+    pub fn authorization_header(&self) -> crate::Result<http::HeaderValue> {
+        let mut header = match self {
+            Self::Basic { user, password } => {
+                Authorization::basic(user, password.inner()).0.encode()
+            }
+            Self::Bearer { token } => Authorization::bearer(token.inner())
+                .map_err(|_| "The configured `auth.token` is not a valid header value.")?
+                .0
+                .encode(),
+            Self::Custom { value } => http::HeaderValue::from_str(value.inner())
+                .map_err(|_| "The configured `auth.value` is not a valid header value.")?,
+        };
+        header.set_sensitive(true);
+        Ok(header)
     }
 }
 
@@ -571,6 +641,47 @@ mod tests {
 
     use super::*;
     use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
+
+    #[test]
+    fn authorization_header_for_each_strategy() {
+        let cases = [
+            (
+                VectorAuthConfig::Bearer {
+                    token: "token123".to_owned().into(),
+                },
+                "Bearer token123",
+            ),
+            (
+                VectorAuthConfig::Basic {
+                    user: "user".to_owned(),
+                    password: "pass".to_owned().into(),
+                },
+                "Basic dXNlcjpwYXNz",
+            ),
+            (
+                VectorAuthConfig::Custom {
+                    value: "SSWS token123".to_owned().into(),
+                },
+                "SSWS token123",
+            ),
+        ];
+
+        for (auth, expected) in cases {
+            let header = auth.authorization_header().unwrap();
+            assert_eq!(header, http::HeaderValue::from_static(expected));
+            assert!(header.is_sensitive(), "{expected} should be sensitive");
+        }
+    }
+
+    #[test]
+    fn authorization_header_error_omits_credentials() {
+        let custom = VectorAuthConfig::Custom {
+            value: "SSWS dummy-custom-secret\n".to_owned().into(),
+        };
+        let error = custom.authorization_header().unwrap_err().to_string();
+        assert!(!error.contains("dummy-custom-secret"), "{error}");
+        assert!(error.contains("auth.value"), "{error}");
+    }
 
     #[test]
     fn test_auth_apply() {

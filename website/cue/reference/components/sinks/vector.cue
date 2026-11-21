@@ -75,7 +75,28 @@ components: sinks: vector: {
 
 	configuration: generated.components.sinks.vector.configuration
 
-	how_it_works: components.sinks.vector.how_it_works
+	how_it_works: {
+		authentication: {
+			title: "Authentication"
+			body: """
+				You can require authentication between Vector instances by setting the `auth`
+				option, which supports the `bearer`, `basic`, and `custom` strategies.
+
+				The sink sends the credentials with every request, including the health check.
+				The downstream `vector` source must be configured with the same credentials or it
+				rejects the request.
+
+				Because the token is a normal configuration value, you can pull it from a secrets
+				backend, for example `token: "SECRET[backend.vector_token]"`. The value is read
+				when the configuration loads and again on reload. The source accepts one
+				credential at a time and the sink does not retry rejected requests, so batches
+				sent while the source and its sinks hold different credentials are dropped.
+
+				Enable TLS when using authentication so the credentials are not sent in
+				plaintext.
+				"""
+		}
+	}
 
 	telemetry: metrics: {}
 }

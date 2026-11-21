@@ -27,6 +27,15 @@ generated: components: sources: vector: configuration: {
 		required: true
 		type: string: {}
 	}
+	auth: {
+		description: """
+			Authentication required on incoming requests.
+
+			Use TLS to keep credentials from being received in plaintext.
+			"""
+		required: false
+		type:     _schemaDefinitions["core::option::Option<vector::http::VectorAuthConfig>"]
+	}
 	keepalive: {
 		description: "Configuration of gRPC server keepalive parameters."
 		required:    false
