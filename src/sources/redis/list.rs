@@ -68,7 +68,7 @@ impl InputHandler {
                     }
                     Some(Ok(Some(line))) => {
                         backoff.reset();
-                        if let Err(()) = self.handle_line(line).await {
+                        if let Err(()) = self.handle_line(line, None).await {
                             break;
                         }
                     }
