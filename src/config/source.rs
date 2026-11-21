@@ -233,7 +233,6 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
             .enabled()
     }

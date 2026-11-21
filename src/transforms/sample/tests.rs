@@ -22,7 +22,7 @@ use crate::{
             },
             transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
         },
-        test::{create_topology, transform_one},
+        test::create_topology,
     },
 };
 
@@ -885,6 +885,18 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         assert_eq!(out.recv().await, None);
     }))
     .await;
+}
+
+/// Transforms a single event.
+///
+/// # Panics
+///
+/// Panics if the transform emits more than one event.
+fn transform_one(transform: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
+    let mut buf = OutputBuffer::with_capacity(1);
+    transform.transform(&mut buf, event);
+    assert!(buf.len() <= 1);
+    buf.into_events().next()
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {

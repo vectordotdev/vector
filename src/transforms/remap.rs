@@ -1281,6 +1281,132 @@ mod tests {
         );
     }
 
+    fn gauge(value: f64) -> Event {
+        Event::Metric(Metric::new(
+            "queue_depth",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        ))
+    }
+
+    #[test]
+    fn check_remap_metric_value_in_expression() {
+        let mut tform = remap(RemapConfig {
+            source: Some(".tags.scaled = to_string(float!(.gauge.value) * 100)".to_string()),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let result = transform_one(&mut tform, gauge(0.5)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("scaled"),
+            Some("50".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Gauge { value: 0.5 }
+        );
+    }
+
+    #[test]
+    fn check_remap_metric_value_special_values() {
+        // Reads of special values, and of the fields for other types.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    .tags.json = encode_json(.gauge)
+                    .tags.is_counter = to_string(exists(.counter))
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let cases = [
+            (0.5, r#"{"value":0.5}"#),
+            // VRL floats can't hold NaN, so it reads as the string "NaN".
+            (f64::NAN, r#"{"value":"NaN"}"#),
+            // Infinity reads as a float, but `encode_json` writes non-finite floats as `null`.
+            (f64::INFINITY, r#"{"value":null}"#),
+        ];
+        for (value, json) in cases {
+            let result = transform_one(&mut tform, gauge(value)).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.tag_value("json"), Some(json.to_owned()), "{value}");
+            assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
+        }
+    }
+
+    #[test]
+    fn check_remap_metric_value_get() {
+        // `get` with a dynamic path reads values from `.`, and `get` on another field still works.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    .tags.value = to_string(float!(get!(., ["gauge", "value"])))
+                    .tags.copy = string!(get!(.tags, ["region"]))
+                "#}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let metric = gauge(0.5)
+            .into_metric()
+            .with_tags(Some(vector_lib::metric_tags!(
+                "region" => "us-east-1"
+            )));
+        let result = transform_one(&mut tform, Event::Metric(metric)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("value"),
+            Some("0.5".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().tag_value("copy"),
+            Some("us-east-1".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_remap_metric_value_unnest() {
+        // `unnest` keeps the other fields of the metric around each element.
+        let mut tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    rows = unnest!(.distribution.samples)
+                    .tags.first_name = string!(rows[0].name)
+                    .tags.first_value = to_string(float!(rows[0].distribution.samples.value))
+                    .tags.first_type = string!(rows[0].type)
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let distribution = Event::Metric(Metric::new(
+            "observations",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![2.5 => 1, 4.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        ));
+        let result = transform_one(&mut tform, distribution).unwrap();
+        let metric = result.as_metric();
+        assert_eq!(
+            metric.tag_value("first_name"),
+            Some("observations".to_owned())
+        );
+        assert_eq!(metric.tag_value("first_value"), Some("2.5".to_owned()));
+        assert_eq!(
+            metric.tag_value("first_type"),
+            Some("distribution".to_owned())
+        );
+    }
+
     #[test]
     fn check_remap_metric_type() {
         let conf = RemapConfig {
