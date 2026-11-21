@@ -41,6 +41,11 @@ impl DatadogEventContext {
         self.agent = agent.map(Box::new);
     }
 
+    /// Removes and returns the agent envelope.
+    pub fn take_agent(&mut self) -> Option<DatadogAgentEnvelope> {
+        self.agent.take().map(|agent| *agent)
+    }
+
     /// Returns the chunk context if present.
     #[must_use]
     pub fn chunk(&self) -> Option<&DatadogChunkContext> {
@@ -55,6 +60,11 @@ impl DatadogEventContext {
     /// Replaces the chunk context.
     pub fn set_chunk(&mut self, chunk: Option<DatadogChunkContext>) {
         self.chunk = chunk.map(Box::new);
+    }
+
+    /// Removes and returns the chunk context.
+    pub fn take_chunk(&mut self) -> Option<DatadogChunkContext> {
+        self.chunk.take().map(|chunk| *chunk)
     }
 }
 

@@ -23,6 +23,7 @@ use tower_http::{
 use tracing::Span;
 use vector_lib::{
     configurable::configurable_component,
+    internal_event::emit,
     sensitive_string::SensitiveString,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, TlsError},
@@ -192,10 +193,10 @@ pub fn build_http_trace_layer<T, U>(
             )
         })
         .on_request(Box::new(|_request: &Request<T>, _span: &Span| {
-            emit!(HttpServerRequestReceived);
+            emit(HttpServerRequestReceived);
         }))
         .on_response(|response: &Response<U>, latency: Duration, _span: &Span| {
-            emit!(HttpServerResponseSent { response, latency });
+            emit(HttpServerResponseSent { response, latency });
         })
         .on_failure(())
         .on_body_chunk(())

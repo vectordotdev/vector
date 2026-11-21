@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use vrl::{
@@ -9,7 +7,7 @@ use vrl::{
     },
     diagnostic::{DiagnosticList, Formatter},
     docs::{FunctionDoc, build_functions_doc},
-    value::{Secrets, Value},
+    value::{ObjectMap, Secrets, Value},
 };
 use wasm_bindgen::prelude::*;
 
@@ -121,7 +119,7 @@ fn compile(
 
     let mut target_value = TargetValue {
         value: event.clone(),
-        metadata: Value::Object(BTreeMap::new()),
+        metadata: Value::Object(ObjectMap::new()),
         secrets: Secrets::new(),
     };
 
@@ -227,7 +225,6 @@ mod tests {
     // `compile`/`run_vrl` can't be exercised here: they call `web_sys::window()`, which
     // panics on non-wasm targets, so they need a `wasm-bindgen-test` harness.
     use super::*;
-    use vrl::value::ObjectMap;
 
     // A scalar integer larger than f64's safe range must serialize to its exact digits.
     // JS `JSON.parse` (used when marshaling the wasm result) would round these; see
@@ -252,7 +249,7 @@ mod tests {
         let parse_json = docs.iter().find(|doc| doc.name == "parse_json").unwrap();
         assert_eq!(parse_json.arguments[0].name, "value");
         assert!(parse_json.arguments[0].required);
-        assert!(!parse_json.internal_failure_reasons.is_empty());
+        assert_ne!(parse_json.internal_failure_reasons, Vec::<String>::new());
         // Vector's own functions are documented too, not only the stdlib's.
         assert!(
             docs.iter()

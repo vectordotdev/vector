@@ -1,6 +1,7 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by `RabbitMQ`.
 use std::{io::Cursor, pin::Pin};
+use vector_lib::internal_event::{emit, register};
 
 use async_stream::stream;
 use bytes::Bytes;
@@ -344,13 +345,13 @@ async fn receive_event(
         exchange: &exchange,
         delivery_tag: msg.delivery_tag as i64,
     };
-    let events_received = register!(EventsReceived);
+    let events_received = register(EventsReceived);
 
     let stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, byte_size)) => {
-                    emit!(AmqpBytesReceived {
+                    emit(AmqpBytesReceived {
                         byte_size,
                         protocol: "amqp_0_9_1",
                     });
@@ -404,7 +405,7 @@ async fn finalize_event_stream(
 
             match out.send_event_stream(&mut stream).await {
                 Err(_) => {
-                    emit!(StreamClosedError { count: 1 });
+                    emit(StreamClosedError { count: 1 });
                 }
                 Ok(()) => {
                     finalizer.add(msg.into(), receiver);
@@ -413,11 +414,11 @@ async fn finalize_event_stream(
         }
         None => {
             if out.send_event_stream(&mut stream).await.is_err() {
-                emit!(StreamClosedError { count: 1 });
+                emit(StreamClosedError { count: 1 });
             } else {
                 let ack_options = lapin::options::BasicAckOptions::default();
                 if let Err(error) = msg.acker.ack(ack_options).await {
-                    emit!(AmqpAckError { error });
+                    emit(AmqpAckError { error });
                 }
             }
         }
@@ -475,7 +476,7 @@ async fn run_amqp_source(
                 if let Some(try_m) = opt_m {
                     match try_m {
                         Err(error) => {
-                            emit!(AmqpEventError { error: &error });
+                            emit(AmqpEventError { error: &error });
                             return Err(crate::sources::SourceError::from(error));
                         }
                         Ok(msg) => {
@@ -497,13 +498,13 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
         BatchStatus::Delivered => {
             let ack_options = lapin::options::BasicAckOptions::default();
             if let Err(error) = entry.acker.ack(ack_options).await {
-                emit!(AmqpAckError { error });
+                emit(AmqpAckError { error });
             }
         }
         BatchStatus::Errored | BatchStatus::Rejected => {
             let ack_options = lapin::options::BasicRejectOptions::default();
             if let Err(error) = entry.acker.reject(ack_options).await {
-                emit!(AmqpRejectError { error });
+                emit(AmqpRejectError { error });
             }
         }
     }
@@ -769,7 +770,7 @@ mod integration_test {
         trace!("Receiving event...");
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let log = events[0].as_log();
         trace!("{log:?}");

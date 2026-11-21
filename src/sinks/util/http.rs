@@ -22,6 +22,7 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::EventStatus,
+    internal_event::emit,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     stream::{DriverResponse, batcher::limiter::ItemBatchSize},
 };
@@ -87,7 +88,7 @@ mod status_code_vec {
     use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 
     /// Deserializes a [`Vec<StatusCode>`]
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -99,7 +100,10 @@ mod status_code_vec {
     }
 
     /// Serializes a [`Vec<StatusCode>`]
-    pub fn serialize<S>(status_codes: &[StatusCode], serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(
+        status_codes: &[StatusCode],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -469,11 +473,13 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Generic `Service` implementation for HTTP stream sinks.
+///
+/// Requests advertise `Accept-Encoding: zstd,gzip,deflate,br` unless the request builder set the
+/// header, and compressed responses are decoded before retry logic reads them.
 #[derive(Clone)]
 pub struct HttpService<B, T: Send> {
     client: HttpClient,
     request_builder: Arc<B>,
-    response_decompression: bool,
     #[cfg(feature = "aws-core")]
     sig_v4_config: Option<Arc<SigV4Config>>,
     _phantom: PhantomData<fn() -> T>,
@@ -488,7 +494,6 @@ where
         Self {
             client,
             request_builder: Arc::new(request_builder),
-            response_decompression: false,
             #[cfg(feature = "aws-core")]
             sig_v4_config: None,
             _phantom: PhantomData,
@@ -510,15 +515,6 @@ where
             sig_v4_config: Some(Arc::new(sig_v4_config)),
             ..Self::new(client, request_builder)
         }
-    }
-
-    /// Requests and decodes compressed responses, matching legacy HTTP batch services.
-    ///
-    /// Other services continue to request identity encoding.
-    #[must_use]
-    pub const fn with_response_decompression(mut self) -> Self {
-        self.response_decompression = true;
-        self
     }
 }
 
@@ -557,7 +553,6 @@ where
     fn call(&mut self, mut request: HttpRequest<T>) -> Self::Future {
         let request_builder = Arc::clone(&self.request_builder);
         let client = self.client.clone();
-        let response_decompression = self.response_decompression;
         #[cfg(feature = "aws-core")]
         let sig_v4_config = self.sig_v4_config.clone();
         let metadata = std::mem::take(request.metadata_mut());
@@ -568,7 +563,7 @@ where
             let request = request_builder
                 .build(request)
                 .inspect_err(|error| {
-                    emit!(SinkRequestBuildError { error });
+                    emit(SinkRequestBuildError { error });
                 })
                 .map_err(HttpError::from)?;
             #[cfg(feature = "aws-core")]
@@ -576,18 +571,18 @@ where
             let byte_size = request.body().len();
             let (protocol, endpoint) = protocol_endpoint(request.uri().clone());
             let request = request.map(full_body);
-            let response = if response_decompression {
-                let mut service = Decompression::new(service_fn(|request| client.send(request)));
-                let response = service.call(request).await?;
-                collect_response(response, byte_size, &protocol, &endpoint)
-                    .await
-                    .map_err(HttpError::from)?
-            } else {
-                let response = client.send(request).await?;
-                collect_response(response, byte_size, &protocol, &endpoint)
-                    .await
-                    .map_err(HttpError::new)?
-            };
+            let mut service = Decompression::new(service_fn(|request| client.send(request)));
+            let response = service.call(request).await?;
+            let response = collect_response(response, byte_size, &protocol, &endpoint)
+                .await
+                .map_err(|error| {
+                    // Decompression preserves transport errors but boxes them alongside decoder errors.
+                    if error.is::<hyper::Error>() {
+                        HttpError::new(error)
+                    } else {
+                        HttpError::from(error)
+                    }
+                })?;
             Ok(HttpResponse {
                 response,
                 events_byte_size,
@@ -607,7 +602,7 @@ where
     B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
-        emit!(EndpointBytesSent {
+        emit(EndpointBytesSent {
             byte_size,
             protocol,
             endpoint,
@@ -658,6 +653,10 @@ mod tests {
 
     use flate2::write::GzEncoder;
     use http_body_util::Full;
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+        net::TcpListener,
+    };
     use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
     use super::*;
@@ -697,7 +696,7 @@ mod tests {
             }
         })
         .await;
-        HttpService::new(client(), request_builder(&uri)).with_response_decompression()
+        HttpService::new(client(), request_builder(&uri))
     }
 
     fn client() -> HttpClient {
@@ -745,6 +744,65 @@ mod tests {
             retry_logic.should_retry_response(&response),
             RetryAction::Retry(_)
         ));
+    }
+
+    #[rstest::rstest]
+    #[case::plain(false)]
+    #[case::gzip(true)]
+    #[tokio::test]
+    async fn retries_incomplete_response_body(#[case] compressed: bool) {
+        let message = b"retry after the service has recovered";
+        let body = if compressed {
+            let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(message).unwrap();
+            encoder.finish().unwrap()
+        } else {
+            message.to_vec()
+        };
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let uri = format!("http://{}/", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut stream = BufReader::new(stream);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                assert_ne!(stream.read_line(&mut line).await.unwrap(), 0);
+                if line == "\r\n" {
+                    break;
+                }
+            }
+            let mut request_body = [0; 6];
+            stream.read_exact(&mut request_body).await.unwrap();
+            assert_eq!(&request_body, b"events");
+
+            let encoding = if compressed {
+                "content-encoding: gzip\r\n"
+            } else {
+                ""
+            };
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n{encoding}connection: close\r\n\r\n",
+                body.len()
+            );
+            stream.write_all(headers.as_bytes()).await.unwrap();
+            stream.write_all(&body[..body.len() / 2]).await.unwrap();
+            stream.shutdown().await.unwrap();
+        });
+        let mut service = HttpService::new(client(), request_builder(&uri));
+        let error =
+            tokio::time::timeout(std::time::Duration::from_secs(5), service.call(request()))
+                .await
+                .unwrap()
+                .unwrap_err();
+        server.await.unwrap();
+
+        let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);
+        assert!(retry_logic.is_retriable_error(&error), "{error:?}");
+        let no_retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::None);
+        assert!(!no_retry_logic.is_retriable_error(&error));
     }
 
     #[tokio::test]
@@ -864,7 +922,6 @@ mod tests {
                     service: "example-service".to_owned(),
                 },
             )
-            .with_response_decompression()
         }
 
         #[tokio::test]

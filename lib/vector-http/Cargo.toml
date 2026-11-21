@@ -1,6 +1,6 @@
 [package]
 name = "vector-http"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
@@ -28,4 +28,5 @@ url = { version = "2.5.4", default-features = false }
 vector-core = { path = "../vector-core" }
 
 [dev-dependencies]
+socket2 = { workspace = true, features = ["all"] }
 tokio = { workspace = true, features = ["io-util", "macros", "test-util"] }

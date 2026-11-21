@@ -8,6 +8,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::emit,
 };
 use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
 use warp::{
@@ -30,7 +31,7 @@ use crate::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig, TlsError},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -117,10 +118,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         decompress_body(encoding_header, body)
     }
 
+    /// Serves the acceptor held by `tls_reloader` when set, so the caller can swap in new TLS
+    /// material at runtime.
     ///
     /// # Errors
     ///
-    /// Returns an error if TLS or authentication cannot be configured.
+    /// Returns an error if TLS or authentication cannot be configured, or if `tls_reloader` is set
+    /// but TLS is disabled.
     #[allow(
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
@@ -134,12 +138,17 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         response_code: StatusCode,
         strict_path: bool,
         tls: Option<&TlsEnableableConfig>,
+        tls_reloader: Option<TlsAcceptorReloader>,
         auth: Option<&HttpServerAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
+        // Binding would catch this too, but only once the source runs.
+        if tls_reloader.is_some() && tls.is_raw() {
+            return Err(TlsError::ReloaderWithoutTls.into());
+        }
         let protocol = tls.http_protocol_name();
         let auth_matcher = auth
             .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
@@ -170,8 +179,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        emit!(HttpInternalError {
-                            message: "Path not found."
+                        emit(HttpInternalError {
+                            message: "Path not found.",
                         });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
@@ -209,7 +218,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|body| (body, auth_enrichment))
                             })
                             .and_then(|(body, auth_enrichment)| {
-                                emit!(HttpBytesReceived {
+                                emit(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
@@ -218,7 +227,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|events| (events, auth_enrichment))
                             })
                             .map(|(mut events, auth_enrichment)| {
-                                emit!(HttpEventsReceived {
+                                emit(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
@@ -253,8 +262,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {r:?}")
+                    emit(HttpInternalError {
+                        message: &format!("Internal error: {r:?}"),
                     });
                     Err(r)
                 }
@@ -265,7 +274,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls
-                .bind(&address)
+                .bind_reloadable(&address, tls_reloader)
                 .await
                 .inspect_err(|err| error!("An error occurred: {err:?}."))?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
@@ -339,14 +348,14 @@ async fn handle_request(
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { count });
+                    emit(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
                 .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest::new(error.code(), error.message()));
+            emit(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

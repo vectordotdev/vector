@@ -99,8 +99,7 @@ impl AppsignalConfig {
             compression: self.compression,
         };
 
-        let service =
-            HttpService::new(http_client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(http_client, service_request_builder);
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
@@ -143,7 +142,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 #[derive(Clone, derive_more::Debug)]
-pub struct ValidatedAppsignal {
+pub(super) struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
@@ -208,7 +207,7 @@ async fn healthcheck(
     }
 }
 
-pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+pub(super) fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
     Ok(endpoint.append_path(path)?)
 }
 

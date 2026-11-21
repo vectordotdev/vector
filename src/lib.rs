@@ -44,7 +44,6 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
 pub mod internal_telemetry;
 
 #[macro_use]
-#[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
 pub mod components;
@@ -98,9 +97,7 @@ pub mod serde;
 pub mod service;
 pub mod signal;
 pub(crate) mod sink_ext;
-#[allow(unreachable_pub)]
 pub mod sinks;
-#[allow(unreachable_pub)]
 pub mod sources;
 #[cfg(feature = "api-client")]
 pub mod tap;
@@ -218,6 +215,9 @@ pub fn get_version() -> String {
 #[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+
+    /// The full version of this package.
+    pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 }
 
 /// Returns the host name of the current system.

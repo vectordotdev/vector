@@ -596,7 +596,7 @@ async fn does_not_send_too_big_payloads() {
         }
     }
 
-    assert!(!sizes.is_empty());
+    assert_ne!(sizes, [] as [usize; 0]);
     for size in sizes {
         assert!(size < 5_000_000, "{size} not less than max");
     }

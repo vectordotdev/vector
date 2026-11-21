@@ -45,6 +45,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     finalizer::OrderedFinalizer,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, ObjectMap, kind::Collection};
@@ -66,6 +67,13 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+const MESSAGE_KEY_KEY: &str = "message_key";
+const TOPIC_KEY: &str = "topic";
+const PARTITION_KEY: &str = "partition";
+const OFFSET_KEY: &str = "offset";
+const HEADERS_KEY: &str = "headers";
+const TIMESTAMP_KEY: &str = "timestamp";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("The drain_timeout_ms ({}) must be less than session_timeout_ms ({})", value, session_timeout_ms.as_millis()))]
@@ -79,7 +87,7 @@ enum BuildError {
     SubscribeError { source: rdkafka::error::KafkaError },
 }
 
-/// Metrics (beta) configuration.
+/// Metrics configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 struct Metrics {
@@ -281,23 +289,23 @@ fn default_auto_offset_reset() -> String {
 }
 
 fn default_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("message_key"))
+    OptionalValuePath::from(owned_value_path!(MESSAGE_KEY_KEY))
 }
 
 fn default_topic_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("topic"))
+    OptionalValuePath::from(owned_value_path!(TOPIC_KEY))
 }
 
 fn default_partition_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("partition"))
+    OptionalValuePath::from(owned_value_path!(PARTITION_KEY))
 }
 
 fn default_offset_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("offset"))
+    OptionalValuePath::from(owned_value_path!(OFFSET_KEY))
 }
 
 fn default_headers_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("headers"))
+    OptionalValuePath::from(owned_value_path!(HEADERS_KEY))
 }
 
 const fn example_auto_offset_reset_values() -> [&'static str; 7] {
@@ -374,42 +382,42 @@ impl SourceConfig for KafkaSourceConfig {
             .with_source_metadata(
                 Self::NAME,
                 keys.timestamp.map(LegacyKey::Overwrite),
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.topic.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("topic"),
+                &owned_value_path!(TOPIC_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.partition.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("partition"),
+                &owned_value_path!(PARTITION_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.offset.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("offset"),
+                &owned_value_path!(OFFSET_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.headers.clone().map(LegacyKey::Overwrite),
-                &owned_value_path!("headers"),
+                &owned_value_path!(HEADERS_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 keys.key_field.map(LegacyKey::Overwrite),
-                &owned_value_path!("message_key"),
+                &owned_value_path!(MESSAGE_KEY_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -644,7 +652,7 @@ impl ConsumerStateInner<Consuming> {
                         Some((status, entry)) => {
                             if status == BatchStatus::Delivered
                                 && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                                    emit!(KafkaOffsetUpdateError { error });
+                                    emit(KafkaOffsetUpdateError { error });
                                 }
                         }
                         None if finalizer.is_none() => {
@@ -664,10 +672,10 @@ impl ConsumerStateInner<Consuming> {
                                 status = PartitionConsumerStatus::PartitionEOF;
                                 finalizer.take();
                             },
-                            _ => emit!(KafkaReadError { error }),
+                            _ => emit(KafkaReadError { error }),
                         },
                         Some(Ok(msg)) => {
-                            emit!(KafkaBytesReceived {
+                            emit(KafkaBytesReceived {
                                 byte_size: msg.payload_len(),
                                 protocol: "tcp",
                                 topic: msg.topic(),
@@ -705,7 +713,7 @@ impl ConsumerStateInner<Consuming> {
         (Some(deadline).into(), draining)
     }
 
-    pub const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Consuming(self))
     }
 }
@@ -758,7 +766,7 @@ impl ConsumerStateInner<Draining> {
         }
     }
 
-    pub const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (deadline, ConsumerState::Draining(self))
     }
 }
@@ -894,10 +902,6 @@ async fn coordinate_kafka_callbacks(
                         callbacks.close();
                         let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, true);
                         if let Ok(tpl) = consumer.assignment() {
-                            // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-                            if tpl.capacity() == 0 {
-                                return;
-                            }
                             tpl.elements()
                                 .iter()
                                 .for_each(|el| {
@@ -966,7 +970,7 @@ fn drive_kafka_consumer(
                 // the consumer to serve client callbacks, such as rebalance notifications
                 message = stream.next() => match message {
                     None => unreachable!("MessageStream never returns Ready(None)"),
-                    Some(Err(error)) => emit!(KafkaReadError { error }),
+                    Some(Err(error)) => emit(KafkaReadError { error }),
                     Some(Ok(_msg)) => {
                         unreachable!("Messages are consumed in dedicated tasks for each partition.")
                     }
@@ -1004,7 +1008,7 @@ async fn parse_message(
             }
         });
         if out.send_event_stream(&mut stream).await.is_err() {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
         } else {
             // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
             // here, when `stream` is dropped and runs the destructor [...]".
@@ -1032,7 +1036,7 @@ fn parse_stream<'a>(
         Some(decompressor) => match decompressor.decompress(payload) {
             Ok(decompressed) => Bytes::from(decompressed),
             Err(error) => {
-                emit!(KafkaPayloadDecompressionError {
+                emit(KafkaPayloadDecompressionError {
                     error: &error,
                     topic: msg.topic(),
                     partition: msg.partition(),
@@ -1055,7 +1059,7 @@ fn parse_stream<'a>(
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, _byte_size)) => {
-                    emit!(KafkaEventsReceived {
+                    emit(KafkaEventsReceived {
                         count: events.len(),
                         byte_size: events.estimated_json_encoded_size_of(),
                         topic: &rmsg.topic,
@@ -1171,7 +1175,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.key_field.as_ref().map(LegacyKey::Overwrite),
-                path!("message_key"),
+                path!(MESSAGE_KEY_KEY),
                 self.key.clone(),
             );
 
@@ -1179,7 +1183,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.timestamp.as_ref().map(LegacyKey::Overwrite),
-                path!("timestamp"),
+                path!(TIMESTAMP_KEY),
                 self.timestamp,
             );
 
@@ -1187,7 +1191,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.topic.as_ref().map(LegacyKey::Overwrite),
-                path!("topic"),
+                path!(TOPIC_KEY),
                 self.topic.clone(),
             );
 
@@ -1195,7 +1199,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.partition.as_ref().map(LegacyKey::Overwrite),
-                path!("partition"),
+                path!(PARTITION_KEY),
                 self.partition,
             );
 
@@ -1203,7 +1207,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.offset.as_ref().map(LegacyKey::Overwrite),
-                path!("offset"),
+                path!(OFFSET_KEY),
                 self.offset,
             );
 
@@ -1211,7 +1215,7 @@ impl ReceivedMessage {
                 KafkaSourceConfig::NAME,
                 log,
                 keys.headers.as_ref().map(LegacyKey::Overwrite),
-                path!("headers"),
+                path!(HEADERS_KEY),
                 self.headers.clone(),
             );
         }
@@ -1358,10 +1362,6 @@ impl KafkaSourceContext {
     /// each topic-partition has been set up. This function blocks until the
     /// rendezvous channel sender is dropped by the callback handler.
     fn consume_partitions(&self, tpl: &TopicPartitionList) {
-        // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-        if tpl.capacity() == 0 {
-            return;
-        }
         let (send, rendezvous) = sync_channel(0);
         self.callbacks
             .send(KafkaCallback::PartitionsAssigned(
@@ -1411,7 +1411,7 @@ impl KafkaSourceContext {
                 Ok(()) | Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
                     /* Success, or nothing to do - yay \0/ */
                 }
-                Err(error) => emit!(KafkaOffsetUpdateError { error }),
+                Err(error) => emit(KafkaOffsetUpdateError { error }),
             }
         }
     }
@@ -1446,15 +1446,15 @@ mod test {
 
     use super::*;
 
-    pub fn kafka_host() -> String {
+    pub(super) fn kafka_host() -> String {
         std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
     }
-    pub fn kafka_port() -> u16 {
+    fn kafka_port() -> u16 {
         let port = std::env::var("KAFKA_PORT").unwrap_or_else(|_| "9091".into());
         port.parse().expect("Invalid port number")
     }
 
-    pub fn kafka_address() -> String {
+    pub(super) fn kafka_address() -> String {
         format!("{}:{}", kafka_host(), kafka_port())
     }
 
@@ -2202,8 +2202,8 @@ mod integration_test {
 
         sleep(Duration::from_secs(1)).await;
 
-        assert!(!events1.is_empty());
-        assert!(!events2.is_empty());
+        assert_ne!(events1, [] as [vector_lib::event::EventArray; 0]);
+        assert_ne!(events2, [] as [vector_lib::event::EventArray; 0]);
 
         match fetch_tpl_offset(&group_id, &topic, 0) {
             Offset::Offset(offset) => {

@@ -1,7 +1,7 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL, emit,
         error_stage, error_type,
     },
 };
@@ -96,12 +96,12 @@ impl InternalEvent for TemplateRenderingError<'_> {
         // lands somewhere, just at the operator-authored fallback key.
         if self.drop_event {
             if confined {
-                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                emit(ComponentEventsDropped::<INTENTIONAL> {
                     count: 1,
                     reason: "Template rendered a value outside the confined base.",
                 });
             } else {
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                emit(ComponentEventsDropped::<UNINTENTIONAL> {
                     count: 1,
                     reason: "Failed to render template.",
                 });

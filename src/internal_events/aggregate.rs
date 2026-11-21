@@ -1,6 +1,6 @@
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, emit},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -38,7 +38,7 @@ pub(crate) struct AggregateEventDropped {
 
 impl InternalEvent for AggregateEventDropped {
     fn emit(self) {
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: self.reason,
         });

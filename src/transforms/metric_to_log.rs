@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use chrono::Utc;
 use serde_json::Value;
@@ -7,11 +7,12 @@ use vector_lib::{
     codecs::MetricTagValues,
     config::LogNamespace,
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{PathPrefix, event_path, owned_value_path, path},
 };
 use vrl::{
     path::OwnedValuePath,
-    value::{Kind, kind::Collection},
+    value::{Kind, ObjectMap, kind::Collection},
 };
 
 use crate::{
@@ -59,10 +60,8 @@ pub struct MetricToLogConfig {
     ///
     /// When set to `single`, only the last non-bare value of tags is displayed with the
     /// metric.  When set to `full`, all metric tags are exposed as separate assignments as
-    /// described by [the `native_json` codec][vector_native_json].
+    /// arrays that retain every value, including bare values.
     /// When set to `auto`, tag values are encoded using their underlying shape.
-    ///
-    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 }
@@ -298,7 +297,7 @@ impl MetricToLog {
             metric.reduce_tags_to_single();
         }
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogSerializeError { error }))
+            .map_err(|error| emit(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -336,7 +335,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            vrl::value::Value::Object(BTreeMap::new()),
+                            vrl::value::Value::Object(ObjectMap::new()),
                         );
                     }
                     Some(log)

@@ -33,7 +33,7 @@ fn status_is_retryable(status: StatusCode) -> bool {
 // Alias the SDK types under the names the rest of the sink already uses.
 #[cfg(test)]
 use databricks_zerobus_ingest_sdk::schema::UcColumn as UnityCatalogColumn;
-pub use databricks_zerobus_ingest_sdk::schema::UcTableSchema as UnityCatalogTableSchema;
+pub(super) use databricks_zerobus_ingest_sdk::schema::UcTableSchema as UnityCatalogTableSchema;
 
 /// OAuth token response from Databricks
 #[derive(Debug, Deserialize)]
@@ -42,7 +42,7 @@ struct OAuthTokenResponse {
 }
 
 /// Fetch table schema from Unity Catalog API
-pub async fn fetch_table_schema(
+pub(super) async fn fetch_table_schema(
     unity_catalog_endpoint: &str,
     table_name: &str,
     client_id: &str,
@@ -212,7 +212,7 @@ async fn get_oauth_token(
 /// The returned schema is used both to declare the Zerobus Arrow stream and to
 /// drive the Arrow batch encoder, so a single source of truth keeps the encoded
 /// `RecordBatch` schema in lock-step with the stream's declared schema.
-pub fn generate_arrow_schema_from_schema(
+pub(super) fn generate_arrow_schema_from_schema(
     schema: &UnityCatalogTableSchema,
 ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
     let arrow_schema =

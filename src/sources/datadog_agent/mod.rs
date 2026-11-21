@@ -1,8 +1,10 @@
+use vector_lib::internal_event::{emit, register};
 #[cfg(all(test, feature = "datadog-agent-integration-tests"))]
 mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub mod apm_stats;
 pub mod llmobs;
 pub mod logs;
 pub mod metrics;
@@ -24,7 +26,10 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        BytesDeserializerConfig,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::{BatchNotifier, BatchStatus},
@@ -66,6 +71,7 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
+pub const APM_STATS: &str = "apm_stats";
 
 #[allow(
     clippy::struct_excessive_bools,
@@ -91,7 +97,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
-    /// The data types accepted by the component. Defaults to all data types.
+    /// The data types accepted by the component. Defaults to all data types except `apm_stats`.
     ///
     /// When `multiple_outputs` is enabled, each data type is sent to its own output.
     /// Data types disabled by the deprecated `disable_*` options are removed from this list.
@@ -106,7 +112,7 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_logs: Option<bool>,
 
-    /// If this is set to `true`, metrics (beta) are not accepted by the component.
+    /// If this is set to `true`, metrics are not accepted by the component.
     #[configurable(
         deprecated = "This option has been deprecated, use `enabled_data_types` instead."
     )]
@@ -128,12 +134,13 @@ pub struct DatadogAgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disable_llmobs: Option<bool>,
 
-    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
+    /// If this is set to `true`, logs, metrics, and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
+    /// For a source component named `agent`, the received logs, metrics, and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
-    /// `agent.traces`, respectively.
+    /// `agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
+    /// sent to `agent.apm_stats`.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
@@ -179,6 +186,25 @@ pub struct DatadogAgentConfig {
     /// and increment the `component_timed_out_events_total` internal metric instead.
     #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
     send_timeout_secs: Option<f64>,
+
+    /// The maximum number of bytes that indexed trace payloads in a single request can expand to
+    /// while being converted into trace events.
+    ///
+    /// Indexed trace payloads are compact, so the converted events can be much larger than the
+    /// request body. A string is stored once and referenced from any number of spans, and each
+    /// reference becomes its own copy. Numbers, booleans, and ids that become tag strings or list
+    /// elements also take more bytes than they did on the wire: the double `5e-324` is an 8-byte
+    /// value in a payload but a 326-byte tag. This limit counts the bytes of all of these copies and
+    /// conversions. Requests that would exceed it are rejected with an HTTP 422 Unprocessable
+    /// Entity response as soon as the conversion reaches the limit.
+    #[serde(default = "default_max_trace_expansion_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::advanced))]
+    max_trace_expansion_bytes: usize,
+}
+
+const fn default_max_trace_expansion_bytes() -> usize {
+    100 * 1024 * 1024
 }
 
 /// Data types accepted by the `datadog_agent` source.
@@ -189,7 +215,7 @@ pub enum DatadogAgentDataType {
     /// Logs.
     Logs,
 
-    /// Metrics (beta).
+    /// Metrics.
     Metrics,
 
     /// Traces (alpha).
@@ -197,6 +223,17 @@ pub enum DatadogAgentDataType {
 
     /// LLM Observability events.
     Llmobs,
+
+    /// APM stats (alpha), emitted as received (still encoded and compressed).
+    ///
+    /// Not enabled by default. Requires `multiple_outputs`.
+    ApmStats,
+}
+
+impl DatadogAgentDataType {
+    const fn enabled_by_default(self) -> bool {
+        !matches!(self, Self::ApmStats)
+    }
 }
 
 const fn example_enabled_data_types() -> [&'static str; 3] {
@@ -223,6 +260,7 @@ impl GenerateConfig for DatadogAgentConfig {
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         })
         .unwrap()
     }
@@ -245,6 +283,9 @@ impl SourceConfig for DatadogAgentConfig {
                 "DEPRECATED: `disable_logs`, `disable_metrics`, `disable_traces`, and `disable_llmobs` are deprecated. Use `enabled_data_types` instead. See https://vector.dev/deprecations/#datadog_agent-disable_options for migration instructions."
             );
         }
+        if self.is_enabled(DatadogAgentDataType::ApmStats) && !self.multiple_outputs {
+            return Err("`apm_stats` requires `multiple_outputs` to be enabled.".into());
+        }
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let logs_schema_definition = cx
@@ -258,15 +299,18 @@ impl SourceConfig for DatadogAgentConfig {
                 .build()?;
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let source = DatadogAgentSource::new(
-            self.store_api_key,
-            decoder,
-            tls.http_protocol_name(),
-            logs_schema_definition,
-            log_namespace,
-            self.parse_ddtags,
-            self.split_metric_namespace,
-        );
+        let source = DatadogAgentSource {
+            max_trace_expansion_bytes: self.max_trace_expansion_bytes,
+            ..DatadogAgentSource::new(
+                self.store_api_key,
+                decoder,
+                tls.http_protocol_name(),
+                logs_schema_definition,
+                log_namespace,
+                self.parse_ddtags,
+                self.split_metric_namespace,
+            )
+        };
         let listener = tls
             .bind(&self.address)
             .await?
@@ -420,6 +464,26 @@ impl SourceConfig for DatadogAgentConfig {
         )
         .with_standard_vector_source_metadata();
 
+        let apm_stats_definition = BytesDeserializerConfig::new()
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    "content_encoding"
+                ))),
+                &owned_value_path!("content_encoding"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("content_type"))),
+                &owned_value_path!("content_type"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
+
         let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
@@ -437,6 +501,12 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
+                );
+            }
+            if self.is_enabled(DatadogAgentDataType::ApmStats) {
+                output.push(
+                    SourceOutput::new_maybe_logs(DataType::Log, apm_stats_definition)
+                        .with_port(APM_STATS),
                 );
             }
         } else {
@@ -468,10 +538,13 @@ impl DatadogAgentConfig {
             DatadogAgentDataType::Metrics => self.disable_metrics,
             DatadogAgentDataType::Traces => self.disable_traces,
             DatadogAgentDataType::Llmobs => self.disable_llmobs,
+            DatadogAgentDataType::ApmStats => None,
         };
         self.enabled_data_types
             .as_ref()
-            .is_none_or(|data_types| data_types.contains(&data_type))
+            .map_or(data_type.enabled_by_default(), |data_types| {
+                data_types.contains(&data_type)
+            })
             && !disabled.unwrap_or(false)
     }
 }
@@ -501,6 +574,7 @@ pub(crate) struct DatadogAgentSource {
     events_received: Registered<EventsReceived>,
     parse_ddtags: bool,
     split_metric_namespace: bool,
+    max_trace_expansion_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -559,9 +633,10 @@ impl DatadogAgentSource {
             protocol,
             logs_schema_definition: logs_schema_definition.map(Arc::new),
             log_namespace,
-            events_received: register!(EventsReceived),
+            events_received: register(EventsReceived),
             parse_ddtags,
             split_metric_namespace,
+            max_trace_expansion_bytes: default_max_trace_expansion_bytes(),
         }
     }
 
@@ -574,8 +649,11 @@ impl DatadogAgentSource {
             .is_enabled(DatadogAgentDataType::Logs)
             .then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
+        let apm_stats_enabled = config.is_enabled(DatadogAgentDataType::ApmStats);
+
         if config.is_enabled(DatadogAgentDataType::Traces) {
-            let trace_filter = traces::build_warp_filter(handler.clone(), self.clone());
+            let trace_filter =
+                traces::build_warp_filter(handler.clone(), self.clone(), !apm_stats_enabled);
             filters = filters
                 .map(|f| f.or(trace_filter.clone()).unify().boxed())
                 .or(Some(trace_filter));
@@ -586,6 +664,13 @@ impl DatadogAgentSource {
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
+        }
+
+        if apm_stats_enabled {
+            let apm_stats_filter = apm_stats::build_warp_filter(handler.clone(), self.clone());
+            filters = filters
+                .map(|f| f.or(apm_stats_filter.clone()).unify().boxed())
+                .or(Some(apm_stats_filter));
         }
 
         if config.is_enabled(DatadogAgentDataType::Llmobs) {
@@ -644,7 +729,7 @@ impl DatadogAgentSource {
                 }
             }
         }
-        emit!(HttpBytesReceived {
+        emit(HttpBytesReceived {
             byte_size: body.len(),
             http_path: path,
             protocol: self.protocol,
@@ -689,7 +774,7 @@ impl RequestHandler {
         match result {
             Ok(()) => {}
             Err(SendError::Closed) => {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(warp::reject::custom(ApiError::ServerShutdown));
             }
             Err(SendError::Timeout) => {

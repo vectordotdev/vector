@@ -58,12 +58,15 @@ pub struct MqttSourceConfig {
     pub topic_key: OptionalValuePath,
 }
 
+pub(super) const TOPIC_KEY: &str = "topic";
+const TIMESTAMP_KEY: &str = "timestamp";
+
 fn default_topic() -> OneOrMany<String> {
     OneOrMany::One("vector".into())
 }
 
 fn default_topic_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("topic"))
+    OptionalValuePath::from(owned_value_path!(TOPIC_KEY))
 }
 
 #[async_trait::async_trait]
@@ -89,10 +92,10 @@ impl SourceConfig for MqttSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             );
 
         vec![SourceOutput::new_maybe_logs(

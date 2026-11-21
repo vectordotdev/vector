@@ -1,5 +1,6 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
@@ -26,7 +27,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketOutgoingConnectionError { error: self.error });
+        emit(SocketOutgoingConnectionError { error: self.error });
     }
 }
 
@@ -85,7 +86,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -113,7 +114,7 @@ impl InternalEvent for UnixSendIncompleteError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
