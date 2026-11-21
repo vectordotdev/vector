@@ -31,7 +31,7 @@ use crate::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig, TlsError},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -118,10 +118,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         decompress_body(encoding_header, body)
     }
 
+    /// Serves the acceptor held by `tls_reloader` when set, so the caller can swap in new TLS
+    /// material at runtime.
     ///
     /// # Errors
     ///
-    /// Returns an error if TLS or authentication cannot be configured.
+    /// Returns an error if TLS or authentication cannot be configured, or if `tls_reloader` is set
+    /// but TLS is disabled.
     #[allow(
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
@@ -135,12 +138,17 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         response_code: StatusCode,
         strict_path: bool,
         tls: Option<&TlsEnableableConfig>,
+        tls_reloader: Option<TlsAcceptorReloader>,
         auth: Option<&HttpServerAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
+        // Binding would catch this too, but only once the source runs.
+        if tls_reloader.is_some() && tls.is_raw() {
+            return Err(TlsError::ReloaderWithoutTls.into());
+        }
         let protocol = tls.http_protocol_name();
         let auth_matcher = auth
             .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
@@ -266,7 +274,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls
-                .bind(&address)
+                .bind_reloadable(&address, tls_reloader)
                 .await
                 .inspect_err(|err| error!("An error occurred: {err:?}."))?
                 .with_keepalive(keepalive_settings.tcp_keepalive);

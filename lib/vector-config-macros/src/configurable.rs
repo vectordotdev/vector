@@ -463,12 +463,22 @@ fn build_named_struct_generate_schema_fn(
     // Collect required_one_of groups at macro-expansion time: group_name -> [serde field names].
     let mut groups: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();
+    // The names a config may use for each group member: the field name and its serde aliases.
+    let mut group_accepted_names: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     for field in fields.iter().filter(|f| f.visible()) {
         if let Some(group) = field.required_one_of() {
             groups
                 .entry(group.to_string())
                 .or_default()
                 .push(field.name().to_string());
+            group_accepted_names
+                .entry(group.to_string())
+                .or_default()
+                .extend(
+                    std::iter::once(field.name().to_string())
+                        .chain(field.aliases().iter().cloned()),
+                );
         }
     }
 
@@ -490,8 +500,9 @@ fn build_named_struct_generate_schema_fn(
         .collect();
 
     // For each group, push a oneOf schema into `flattened_subschemas` so the JSON Schema
-    // expresses the "exactly one of" constraint via allOf.
-    let group_pushes = groups.values().map(|members| {
+    // expresses the "exactly one of" constraint via allOf. Aliases get their own branch, so a
+    // config that sets a member through an alias still satisfies the constraint.
+    let group_pushes = group_accepted_names.values().map(|members| {
         let required_entries = members.iter().map(|name| {
             quote! {
                 {
