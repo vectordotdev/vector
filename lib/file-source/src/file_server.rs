@@ -345,6 +345,7 @@ where
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after
+                        && !watcher.skipped_unread()
                         && watcher.last_read_success().elapsed() >= grace_period
                     {
                         // Try to remove
