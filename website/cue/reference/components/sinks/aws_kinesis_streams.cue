@@ -81,6 +81,74 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	}
 
 	how_it_works: {
+		aggregation: {
+			title: "Record aggregation"
+			body: """
+				Enable `aggregation.enabled` to combine original logs into fewer Kinesis records.
+				Aggregation is disabled by default. When enabled, it uses standard KPL framing.
+				Select `aggregation.format: newline` explicitly for text/JSONL.
+				Consumers must support the selected format. This option belongs to the
+				Kinesis Streams sink, including streams consumed by Firehose; it does not
+				change the direct Firehose sink.
+
+				```yaml
+				aggregation:
+				  enabled: true
+				  format: kpl
+				  max_events: 500
+				  max_bytes: 943718
+				  timeout_secs: 1.0
+				```
+
+				`max_events` counts original logs. KPL accepts at most 1000 original logs per
+				record. `max_bytes` includes newline delimiters or the KPL envelope. Newline
+				counts uncompressed data; KPL counts the independently compressed user payloads
+				and envelope. Random-key mode reserves the maximum possible key-table size.
+				The timeout starts with the first buffered log.
+				The existing `batch` options group completed Kinesis records into API requests;
+				both stages can add buffering time.
+				An underfilled record can wait for the aggregation timeout and then a new API
+				batch timeout. A shorter `batch.timeout_secs`, such as `0.05`, reduces that
+				additional API wait. It can also produce smaller API requests during sparse input.
+
+				For newline mode, use text or compact JSON encoding. Each serialized log receives a trailing LF
+				if it does not already have one. Text bytes, including embedded newlines, are
+				preserved. Compression applies once to each completed aggregate. Consumers must
+				decompress the record before splitting its lines.
+				These text/JSON restrictions apply to newline mode only. KPL supports any
+				configured log serializer, including binary formats, and preserves exact
+				user payload boundaries without adding LF. Compression applies to each user
+				payload before KPL framing; the KPL envelope itself remains uncompressed.
+
+				For Firehose JSON or newline-delimiter deaggregation, use uncompressed
+				compact JSON objects with `format: newline` and at most 500 objects per record.
+				Do not use a JSON array. Firehose deaggregates KPL automatically when consuming
+				from Kinesis Data Streams; KPL deaggregation alone does not decompress user
+				payloads. Use uncompressed JSON for built-in Firehose JSON processing and
+				configure destination compression in Firehose if required.
+
+				The aggregator holds one active record; normal sink and request buffers also apply.
+				With an explicit `partition_key_field`,
+				only consecutive logs with the same key combine; a key change flushes the buffer.
+				Changing keys for every log prevents aggregation and can reduce throughput.
+				Without that field, a random key is generated for each completed record.
+				KPL uses the same key for every inner user record and the outer Kinesis record.
+				It does not combine unrelated explicit keys or implement shard-aware buffering.
+				The sink enforces a conservative 1 MiB limit, including the actual partition-key
+				bytes and KPL envelope where applicable. Newline checks before and after compression;
+				KPL checks the complete framed record. It splits oversized aggregates at original
+				log boundaries and rejects a singleton that cannot fit. Original log counts and
+				acknowledgements are retained for every aggregate.
+
+				KPL requires `USER_PARTITION_KEY` distribution. Startup calls
+				`DescribeStreamSummary` even if healthchecks are disabled, requiring the
+				`kinesis:DescribeStreamSummary` IAM permission. It rejects `AUTO` or unknown
+				distribution values. Provisioned streams and older compatible endpoints can
+				omit the distribution field. This is a startup check; do not change a running
+				KPL producer's stream to `AUTO`. Service-managed distribution can cause KCL
+				consumers to discard KPL records.
+				"""
+		}
 		partitioning: {
 			title: "Partitioning"
 			body:  """

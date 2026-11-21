@@ -27,6 +27,7 @@ pub struct KinesisKey {
 #[derive(Clone)]
 pub struct KinesisSink<S, R> {
     pub batch_settings: BatcherSettings,
+    pub aggregation: Option<super::aggregation::Settings>,
     pub service: S,
     pub request_builder: KinesisRequestBuilder<R>,
     pub partition_key_field: Option<ConfigValuePath>,
@@ -40,31 +41,45 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
     R: Record + Send + Sync + Unpin + Clone + 'static,
+    R::T: Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
 
-        input
-            .filter_map(|event| {
-                // Panic: This sink only accepts Logs, so this should never panic
-                let log = event.into_log();
-                let processed = process_log(log, self.partition_key_field.as_ref());
-
-                future::ready(processed)
-            })
-            .request_builder(
-                default_request_builder_concurrency_limit(),
+        let requests: BoxStream<'_, KinesisRequest<R>> = if let Some(settings) = self.aggregation {
+            super::newline::requests(
+                input,
                 self.request_builder,
+                self.partition_key_field,
+                settings,
             )
-            .filter_map(|request| async move {
-                match request {
-                    Err(error) => {
-                        emit(SinkRequestBuildError { error });
-                        None
-                    }
-                    Ok(req) => Some(req),
-                }
-            })
+        } else {
+            Box::pin(
+                input
+                    .filter_map(|event| {
+                        // Panic: This sink only accepts Logs, so this should never panic
+                        let log = event.into_log();
+                        let processed = process_log(log, self.partition_key_field.as_ref());
+
+                        future::ready(processed)
+                    })
+                    .request_builder(
+                        default_request_builder_concurrency_limit(),
+                        self.request_builder,
+                    )
+                    .filter_map(|request| async move {
+                        match request {
+                            Err(error) => {
+                                emit(SinkRequestBuildError { error });
+                                None
+                            }
+                            Ok(req) => Some(req),
+                        }
+                    }),
+            )
+        };
+
+        requests
             .batched(batch_settings.as_byte_size_config())
             .map(|events| {
                 let metadata = RequestMetadata::from_batch(
@@ -86,6 +101,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
     R: Record + Send + Sync + Unpin + Clone + 'static,
+    R::T: Send,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
@@ -131,7 +147,7 @@ pub(crate) fn process_log(
     })
 }
 
-fn gen_partition_key() -> String {
+pub(crate) fn gen_partition_key() -> String {
     random::<[char; 16]>()
         .iter()
         .fold(String::new(), |mut s, c| {

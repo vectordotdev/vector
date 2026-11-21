@@ -988,7 +988,7 @@ sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
-sinks-aws_kinesis_streams = ["aws-core", "dep:aws-sdk-kinesis"]
+sinks-aws_kinesis_streams = ["aws-core", "dep:aws-sdk-kinesis", "dep:prost", "dep:md-5"]
 sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
@@ -1249,6 +1249,11 @@ proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
 name = "default"
 harness = false
 required-features = ["benches"]
+
+[[bench]]
+name = "kinesis_aggregation"
+harness = false
+required-features = ["sinks-aws_kinesis_streams"]
 
 [[bench]]
 name = "dnstap"

@@ -173,6 +173,7 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
             &self.base,
             self.base.partition_key_field.clone(),
             validated.batch_settings,
+            None,
             KinesisFirehoseClient { client },
             KinesisRetryLogic {
                 retry_partial: self.base.request_retry_partial,
