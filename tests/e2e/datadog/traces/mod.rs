@@ -15,6 +15,8 @@ use vector_common::decompression::CappedDecoder;
 
 use super::*;
 
+mod contract;
+
 const OUTPUT: &str = "/output/datadog-traces";
 const TRACES_ENDPOINT: &str = "/api/v0.2/traces";
 /// Differences shown in the error, so CI logs are debuggable without the evidence volume.
