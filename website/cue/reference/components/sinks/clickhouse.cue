@@ -73,9 +73,16 @@ components: sinks: clickhouse: {
 	configuration: generated.components.sinks.clickhouse.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 
 	how_it_works: {
@@ -156,6 +163,23 @@ components: sinks: clickhouse: {
 
 				DateTime and DateTime64 columns with timezone information will be converted to Arrow timestamps
 				without timezone metadata. All timestamps are treated as UTC by default.
+				"""
+		}
+		metrics: {
+			title: "Metrics"
+			body:  """
+				With the JSON formats, metric events are encoded as one JSON object per row, using
+				Vector's native metric shape. For example, a counter is sent as:
+
+				```json
+				{"name":"requests_total","namespace":"app","tags":{"host":"a"},"timestamp":"2025-01-01T00:00:00Z","kind":"incremental","counter":{"value":2.0}}
+				```
+
+				Vector does not enforce a table schema for metrics, so create a table whose columns match the
+				fields you want to keep, and enable `skip_unknown_fields` to drop the rest. Enable
+				`date_time_best_effort` to parse the RFC 3339 `timestamp` into a `DateTime64` column.
+
+				Metrics are not supported when `batch_encoding` is set (`arrow_stream` format).
 				"""
 		}
 	}
