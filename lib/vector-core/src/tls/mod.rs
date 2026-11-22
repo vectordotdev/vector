@@ -231,7 +231,7 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
     Ok(builder)
 }
 
-fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
+fn tls_connector(settings: &MaybeTlsSettings, host: &str) -> Result<ConnectConfiguration> {
     let mut configure = tls_connector_builder(settings)?
         .build()
         .configure()
@@ -239,7 +239,7 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let tls_setting = settings.tls().cloned();
     if let Some(tls_setting) = &tls_setting {
         tls_setting
-            .apply_connect_configuration(&mut configure, false)
+            .apply_connect_configuration(&mut configure, host, false)
             .context(SetSniSnafu)?;
     }
     Ok(configure)
