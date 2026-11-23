@@ -21,7 +21,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json.workspace = true
 bstr = { version = "1.12", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
-dashmap = { version = "6.1", default-features = false }
+dashmap.workspace = true
 async-compression.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
