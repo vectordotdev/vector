@@ -8,6 +8,8 @@
 //!
 //! This ensures no race window between port allocation and registration.
 
+#[cfg(windows)]
+use std::net::UdpSocket;
 use std::{
     collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener as StdTcpListener},
@@ -21,13 +23,14 @@ const MAX_PORT_ALLOCATION_ATTEMPTS: usize = 100;
 
 /// A guard that reserves a port in the registry, preventing port reuse until dropped.
 /// The guard does NOT hold the actual listener - it just marks the port as reserved
-/// so that concurrent calls to next_addr() won't return the same port.
+/// so that concurrent calls to `next_addr()` won't return the same port.
 pub struct PortGuard {
     addr: SocketAddr,
 }
 
 impl PortGuard {
     /// Get the socket address that this guard is holding.
+    #[must_use]
     pub const fn addr(&self) -> SocketAddr {
         self.addr
     }
@@ -63,6 +66,10 @@ static RESERVED_PORTS: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(|| Mutex::n
 /// // Use addr for your test
 /// // Port is automatically released when _guard goes out of scope
 /// ```
+///
+/// # Panics
+///
+/// Panics if an OS-assigned port cannot be bound or inspected, or port tracking fails.
 pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
     for _ in 0..MAX_PORT_ALLOCATION_ATTEMPTS {
         let listener = StdTcpListener::bind((ip, 0)).expect("Failed to bind to OS-assigned port");
@@ -76,6 +83,14 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
         if reserved.contains(&port) {
             // OS recycled a port that's still reserved by another test.
             // Lock and listener will be dropped implicitly after continuing
+            continue;
+        }
+
+        // On Windows, certain ports are in OS-excluded ranges (e.g. set by Hyper-V/WSL).
+        // TCP bind(0) may return such a port, but UDP bind to the same port will fail with
+        // WSAEACCES (10013). Probe with a UDP socket and retry if it is excluded.
+        #[cfg(windows)]
+        if UdpSocket::bind(addr).is_err() {
             continue;
         }
 
@@ -94,14 +109,17 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
     panic!("Failed to allocate a unique port after {MAX_PORT_ALLOCATION_ATTEMPTS} attempts");
 }
 
+#[must_use]
 pub fn next_addr() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
 }
 
+#[must_use]
 pub fn next_addr_any() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
 }
 
+#[must_use]
 pub fn next_addr_v6() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V6(Ipv6Addr::LOCALHOST))
 }

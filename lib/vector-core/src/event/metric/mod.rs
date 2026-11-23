@@ -1,4 +1,3 @@
-#[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
     convert::AsRef,
@@ -15,11 +14,10 @@ use vector_common::{
     request_metadata::GetEventCountTags,
 };
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, MergeFinalizable,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
@@ -326,6 +324,20 @@ impl Metric {
         self.series.remove_tag(key)
     }
 
+    /// Removes a tag from this metric, returning its full value set.
+    pub fn remove_tag_set(&mut self, key: &str) -> Option<TagValueSet> {
+        match &mut self.series.tags {
+            None => None,
+            Some(tags) => {
+                let result = tags.remove_set(key);
+                if tags.is_empty() {
+                    self.series.tags = None;
+                }
+                result
+            }
+        }
+    }
+
     /// Removes all the tags.
     pub fn remove_tags(&mut self) {
         self.series.remove_tags();
@@ -334,8 +346,8 @@ impl Metric {
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
-            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
-            .is_some()
+            .as_ref()
+            .is_some_and(|t| t.get(name).as_ref().is_some_and(|v| *v == value))
     }
 
     /// Returns the string value of a tag, if it exists
@@ -478,6 +490,12 @@ impl Finalizable for Metric {
     }
 }
 
+impl MergeFinalizable for Metric {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
+    }
+}
+
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
@@ -520,7 +538,6 @@ pub enum MetricKind {
     Absolute,
 }
 
-#[cfg(feature = "vrl")]
 impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
@@ -536,7 +553,6 @@ impl TryFrom<vrl::value::Value> for MetricKind {
     }
 }
 
-#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
@@ -847,7 +863,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(2.0 => 1),
             },
         );
@@ -857,7 +873,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 3,
-                sum: 3.0,
+                sum: Some(3.0),
                 buckets: buckets!(2.0 => 3),
             },
         );
@@ -867,7 +883,7 @@ mod test {
             new_histogram.value(),
             &MetricValue::AggregatedHistogram {
                 count: 2,
-                sum: 2.0,
+                sum: Some(2.0),
                 buckets: buckets!(2.0 => 2),
             }
         );
@@ -878,7 +894,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 3,
-                sum: 3.0,
+                sum: Some(3.0),
                 buckets: buckets!(2.0 => 3),
             },
         );
@@ -888,7 +904,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(2.0 => 1),
             },
         );
@@ -904,7 +920,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 15,
-                sum: 15.0,
+                sum: Some(15.0),
                 buckets: buckets!(1.0 => 10, 2.0 => 5),
             },
         );
@@ -914,13 +930,95 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 20,
-                sum: 20.0,
+                sum: Some(20.0),
                 // Total count is higher (20 > 15), but bucket1 count is lower (8 < 10)
                 buckets: buckets!(1.0 => 8, 2.0 => 12),
             },
         );
 
         assert!(!new_histogram_with_redistribution.subtract(&old_histogram));
+    }
+
+    fn histogram_with_sum(count: u64, sum: Option<f64>) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            count,
+            sum,
+            buckets: buckets!(2.0 => count),
+        }
+    }
+
+    /// The sum of a known and an unknown quantity is unknown, so absence on either side has to win.
+    /// Reading a missing sum as zero would quietly skew the total instead.
+    #[test]
+    fn add_aggregated_histograms_propagates_an_unreported_sum() {
+        for (left, right, expected) in [
+            (Some(1.0), Some(2.0), Some(3.0)),
+            (Some(1.0), None, None),
+            (None, Some(2.0), None),
+            (None, None, None),
+        ] {
+            let mut value = histogram_with_sum(1, left);
+            assert!(value.add(&histogram_with_sum(2, right)));
+            assert_eq!(
+                value,
+                histogram_with_sum(3, expected),
+                "adding {left:?} and {right:?}"
+            );
+        }
+    }
+
+    /// Matters for the absolute-to-incremental conversion that feeds sketch-based sinks: the sketch
+    /// conversion has to see the absent sum to know it must estimate one.
+    #[test]
+    fn subtract_aggregated_histograms_propagates_an_unreported_sum() {
+        for (left, right, expected) in [
+            (Some(3.0), Some(2.0), Some(1.0)),
+            (Some(3.0), None, None),
+            (None, Some(2.0), None),
+            (None, None, None),
+        ] {
+            let mut value = histogram_with_sum(3, left);
+            assert!(value.subtract(&histogram_with_sum(2, right)));
+            assert_eq!(
+                value,
+                histogram_with_sum(1, expected),
+                "subtracting {right:?} from {left:?}"
+            );
+        }
+    }
+
+    /// A histogram with no observations sums to zero whatever it reports, so it must not erase the
+    /// other side's sum. Otherwise one empty, sum-less sample would drop `_sum` from an accumulated
+    /// series for good.
+    #[test]
+    fn add_aggregated_histograms_keeps_the_sum_of_a_non_empty_side() {
+        let mut value = histogram_with_sum(0, None);
+        assert!(value.add(&histogram_with_sum(2, Some(2.0))));
+        assert_eq!(value, histogram_with_sum(2, Some(2.0)));
+
+        let mut value = histogram_with_sum(2, Some(2.0));
+        assert!(value.add(&histogram_with_sum(0, None)));
+        assert_eq!(value, histogram_with_sum(2, Some(2.0)));
+    }
+
+    #[test]
+    fn subtract_aggregated_histograms_keeps_the_sum_over_an_empty_baseline() {
+        let mut value = histogram_with_sum(3, Some(3.0));
+        assert!(value.subtract(&histogram_with_sum(0, None)));
+        assert_eq!(value, histogram_with_sum(3, Some(3.0)));
+    }
+
+    /// Zeroing the observations says nothing about whether the source reports a sum, so a histogram
+    /// that never had one must not acquire one.
+    #[test]
+    fn zero_aggregated_histogram_preserves_whether_a_sum_was_reported() {
+        let mut reported = histogram_with_sum(3, Some(7.0));
+        reported.zero();
+        assert_eq!(reported, histogram_with_sum(0, Some(0.0)));
+
+        let mut unreported = histogram_with_sum(3, None);
+        unreported.zero();
+        assert_eq!(unreported, histogram_with_sum(0, None));
     }
 
     #[test]
@@ -1017,11 +1115,28 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         buckets: buckets![51.0 => 53, 52.0 => 54],
                         count: 107,
-                        sum: 103.0,
+                        sum: Some(103.0),
                     }
                 )
             ),
             r"five{} = count=107 sum=103 53@51 54@52"
+        );
+
+        // A histogram that reports no sum shows no `sum=` at all, rather than `sum=0`.
+        assert_eq!(
+            format!(
+                "{}",
+                Metric::new(
+                    "five",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets![51.0 => 53, 52.0 => 54],
+                        count: 107,
+                        sum: None,
+                    }
+                )
+            ),
+            r"five{} = count=107 53@51 54@52"
         );
 
         assert_eq!(
@@ -1119,7 +1234,7 @@ mod test {
                         count: 0,
                     },
                 ],
-                sum: 30.0,
+                sum: Some(30.0),
                 count: 17,
             })
         );

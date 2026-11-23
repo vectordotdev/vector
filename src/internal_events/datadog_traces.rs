@@ -1,11 +1,11 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogTracesEncodingError {
+pub(crate) struct DatadogTracesEncodingError {
     pub error_message: &'static str,
     pub error_reason: String,
     pub dropped_events: usize,
@@ -22,14 +22,14 @@ impl InternalEvent for DatadogTracesEncodingError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
 
         if self.dropped_events > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.dropped_events,
                 reason,
             });
@@ -38,7 +38,7 @@ impl InternalEvent for DatadogTracesEncodingError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogTracesAPMStatsError<E> {
+pub(crate) struct DatadogTracesAPMStatsError<E> {
     pub error: E,
 }
 
@@ -51,7 +51,7 @@ impl<E: std::fmt::Display> InternalEvent for DatadogTracesAPMStatsError<E> {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )

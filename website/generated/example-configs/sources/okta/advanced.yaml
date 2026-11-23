@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: okta
+    domain: foo.okta.com
+    scrape_interval_secs: 15
+    scrape_timeout_secs: 5.0
+    token: 00xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

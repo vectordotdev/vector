@@ -15,7 +15,7 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{Duration, sleep};
 use tower::Service;
-use vector_lib::{configurable::configurable_component, emit};
+use vector_lib::{configurable::configurable_component, internal_event::emit};
 
 use crate::{
     common::backoff::ExponentialBackoff,
@@ -29,7 +29,7 @@ const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
 /// Options for determining the health of an endpoint.
 #[serde_as]
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct HealthConfig {
     /// Initial delay between attempts to reactivate endpoints once they become unhealthy.
@@ -52,6 +52,15 @@ const fn default_retry_initial_backoff_secs() -> u64 {
 
 const fn default_retry_max_duration_secs() -> std::time::Duration {
     Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
+}
+
+impl Default for HealthConfig {
+    fn default() -> Self {
+        Self {
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+        }
+    }
 }
 
 impl HealthConfig {
@@ -215,7 +224,7 @@ where
     }
 }
 
-/// Future for HealthService.
+/// Future for `HealthService`.
 #[pin_project]
 pub struct HealthFuture<F, L> {
     #[pin]
@@ -250,7 +259,7 @@ where
     }
 }
 
-/// Tracker of response health, incremented by HealthFuture and used by HealthService.
+/// Tracker of response health, incremented by `HealthFuture` and used by `HealthService`.
 struct HealthCounters {
     healthy: AtomicUsize,
     unhealthy: AtomicUsize,
@@ -307,7 +316,7 @@ struct HealthSnapshot {
 }
 
 fn emit_active_endpoints(count: usize) {
-    emit!(EndpointsActive { count });
+    emit(EndpointsActive { count });
 }
 
 #[cfg(test)]
@@ -328,5 +337,19 @@ mod tests {
 
         counters.inc_healthy();
         assert!(counters.healthy(snapshot).is_ok());
+    }
+
+    #[test]
+    fn health_config_default_matches_deserialize_defaults() {
+        let config = HealthConfig::default();
+
+        assert_eq!(
+            config.retry_initial_backoff_secs,
+            RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
+        );
+        assert_eq!(
+            config.retry_max_duration_secs,
+            Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
+        );
     }
 }

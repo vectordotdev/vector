@@ -1,0 +1,41 @@
+version: 1
+applications:
+  - appRoot: website
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - source "${NVM_DIR}/nvm.sh"
+            - nvm use 24.11.0
+            - node --version
+        build:
+          commands:
+            - |
+              if [[ "${AWS_BRANCH}" == "website" ]]; then
+                make ci-production-build
+              else
+                make ci-preview-build
+              fi
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
+  - appRoot: lib/vector-vrl/web-playground
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - mv ../../../scripts/ensure-wasm-target-installed.sh ./
+            - chmod +x ./ensure-wasm-target-installed.sh
+        build:
+          commands:
+            - ./ensure-wasm-target-installed.sh && wasm-pack build --target web --out-dir public/pkg
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths: []

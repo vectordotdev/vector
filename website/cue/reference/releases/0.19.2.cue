@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.19.2": {
-	date:     "2022-02-08"
-	codename: ""
+	date: "2022-02-08"
 
 	whats_next: []
 

@@ -42,7 +42,7 @@ impl TransformOutputs {
         let mut controls = HashMap::new();
 
         for output in outputs_in {
-            let (fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new(component_key.clone());
 
             let log_schema_definitions = output
                 .log_schema_definitions
@@ -80,7 +80,7 @@ impl TransformOutputs {
                             }),
                         },
                     );
-                    controls.insert(Some(name.clone()), control);
+                    controls.insert(Some(name), control);
                 }
             }
         }
@@ -159,7 +159,7 @@ impl TransformOutputsBuf {
                     primary_buffer = Some(OutputBuffer::with_capacity(capacity));
                 }
                 Some(name) => {
-                    named_buffers.insert(name.clone(), OutputBuffer::default());
+                    named_buffers.insert(name, OutputBuffer::default());
                 }
             }
         }

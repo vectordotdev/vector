@@ -9,6 +9,7 @@ use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
     criterion_main, measurement::WallTime,
 };
+use tempfile::TempDir;
 use tokio::runtime::{Handle, Runtime};
 use vector_buffers::{BufferType, MemoryBufferSize, WhenFull};
 
@@ -16,27 +17,28 @@ use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
 
 mod common;
 
-/// A struct to manage the data_dir of an on-disk benchmark
+/// A struct to manage the `data_dir` of an on-disk benchmark
 ///
-/// The way our benchmarks function we have the choice of sharing a data_dir
-/// between benchmarks or give each benchmark its own data_dir. The first option
+/// The way our benchmarks function we have the choice of sharing a `data_dir`
+/// between benchmarks or give each benchmark its own `data_dir`. The first option
 /// will cause cross-pollution of benchmarks so that's a no-go. The second
 /// option will fill up the benchmarker's disk. Filling up disk is a no-go but
 /// is something we can manage.
 ///
 /// This struct keeps track of the current iteration of the tests and manages
-/// new sub-data_dir paths. These paths, wrapped in a [`PathGuard`]
+/// new sub-`data_dir` paths. These paths, wrapped in a [`PathGuard`]
 /// self-destruct when the benchmark drops them while this struct self-destructs
 /// when it is dropped. This keeps disk consumption to a minimum.
 struct DataDir {
     index: usize,
-    base: PathBuf,
+    base: TempDir,
 }
 
 struct PathGuard {
     inner: PathBuf,
 }
 
+#[derive(Clone, Copy)]
 enum BoundBy {
     Bytes,
     NumberEvents,
@@ -44,30 +46,21 @@ enum BoundBy {
 
 impl DataDir {
     fn new(name: &str) -> Self {
-        let mut base_dir = PathBuf::new();
-        base_dir.push(std::env::temp_dir());
-        base_dir.push(name);
-        std::fs::create_dir_all(&base_dir).expect("could not make base dir");
+        let base = tempfile::Builder::new()
+            .prefix(name)
+            .tempdir()
+            .expect("could not make base dir");
 
-        Self {
-            index: 0,
-            base: base_dir,
-        }
+        Self { index: 0, base }
     }
 
     fn next(&mut self) -> PathGuard {
-        let mut nxt = self.base.clone();
+        let mut nxt = self.base.path().to_path_buf();
         nxt.push(self.index.to_string());
         self.index += 1;
         std::fs::create_dir_all(&nxt).expect("could not make next dir");
 
         PathGuard { inner: nxt }
-    }
-}
-
-impl Drop for DataDir {
-    fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.base).expect("could not remove base dir");
     }
 }
 
@@ -84,6 +77,10 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the benchmark buffer-size conversion on all target widths. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn create_in_memory_variant(bound_by: BoundBy, max_events: usize, max_size: u64) -> BufferType {
     let size = match bound_by {
         BoundBy::Bytes => MemoryBufferSize::MaxSize(NonZeroUsize::new(max_size as usize).unwrap()),
@@ -109,9 +106,7 @@ macro_rules! experiment {
 
         $(
             // Additional constant factor here is to avoid potential message
-            // drops due to reuse of disk buffer's internals between
-            // runs. Tempdir has low entropy compared to the number of
-            // iterations we make in these benchmarks.
+            // drops due to reuse of disk buffer's internals between runs.
             let max_size = 1_000_000 * max_events as u64 * mem::size_of::<crate::common::Message<$width>>() as u64;
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
@@ -213,7 +208,7 @@ fn write_and_read(c: &mut Criterion) {
 criterion_group!(
     name = sized_records;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(60))
+        .measurement_time(Duration::from_mins(1))
         .confidence_level(0.99)
         .nresamples(500_000)
         .sample_size(100);

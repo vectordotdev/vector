@@ -15,6 +15,12 @@ Pull the Vector image:
 docker pull timberio/vector:{{< version >}}-debian
 ```
 
+Vector images are also available from the [GitHub Container Registry]:
+
+```shell
+docker pull ghcr.io/vectordotdev/vector:{{< version >}}-debian
+```
+
 {{< success >}}
 Other available distributions (beyond `debian`):
 
@@ -22,6 +28,34 @@ Other available distributions (beyond `debian`):
 * `distroless-libc`
 * `distroless-static`
 {{< /success >}}
+
+### Collecting journals from previous boots
+
+The official `debian` image uses Debian 13, which provides systemd 257. The
+[`journald` source](/docs/reference/configuration/sources/journald/) works with
+this image using the default `current_boot_only: true`, which excludes entries
+from previous boots.
+
+Setting `current_boot_only: false` requires systemd 258 or later, or a version
+older than 250. Vector rejects this setting with systemd versions 250 through
+257 because those versions cannot follow entries from all boots without changing
+journal selection. The `alpine` and `distroless` variants do not include
+`journalctl`.
+
+For previous-boot collection, install Vector natively on a host with systemd 258
+or later, or build a custom image that supplies a compatible `journalctl` and its
+required libraries. Vector uses the `journalctl` installed inside the container;
+upgrading systemd on the host does not change that version. Check the version
+inside the image with:
+
+```shell
+docker run --rm --entrypoint /usr/bin/journalctl timberio/vector:{{< version >}}-debian --version
+```
+
+Mount the host's journal directory into the container and set `journal_directory`
+to the mounted path. Persist Vector's `data_dir` to retain checkpoints across
+container restarts. Reading previous boots also requires the host to retain those
+journal entries.
 
 ## Deployment
 
@@ -108,3 +142,4 @@ docker rm vector
 ```
 
 [docker]: https://docker.com
+[GitHub Container Registry]: https://github.com/vectordotdev/vector/pkgs/container/vector

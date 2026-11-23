@@ -2,7 +2,6 @@ package metadata
 
 data_model: schema: {
 	log: {
-		common: true
 		description: """
 			A Vector log event is a structured representation of a
 			point-in-time event. It contains an arbitrary set of
@@ -25,7 +24,6 @@ data_model: schema: {
 			]
 			options: {
 				"*": {
-					common:      true
 					description: "An arbitrary set of key/value pairs that can be infinitely nested."
 					required:    false
 					type: "*": {}
@@ -35,7 +33,6 @@ data_model: schema: {
 	}
 
 	metric: {
-		common: true
 		description: """
 			A Vector metric event represents a numerical operation
 			performed on a time series. Unlike other tools, metrics
@@ -55,7 +52,6 @@ data_model: schema: {
 			examples: []
 			options: {
 				counter: {
-					common: true
 					description: """
 						A single value that can be incremented or reset to a zero value but *not* decremented.
 						"""
@@ -75,7 +71,6 @@ data_model: schema: {
 				}
 
 				distribution: {
-					common: true
 					description: """
 						A distribution represents a distribution of
 						sampled values. It is used with services
@@ -127,7 +122,6 @@ data_model: schema: {
 				}
 
 				gauge: {
-					common: true
 					description: """
 						A gauge represents a point-in-time value
 						that can increase and decrease. Vector's
@@ -152,7 +146,6 @@ data_model: schema: {
 				}
 
 				histogram: {
-					common: true
 					description: """
 						Also called a **timer**. A histogram samples
 						observations (usually things like request
@@ -244,7 +237,6 @@ data_model: schema: {
 				}
 
 				set: {
-					common: true
 					description: """
 						A set represents an array of unique values.
 						"""
@@ -264,7 +256,6 @@ data_model: schema: {
 				}
 
 				summary: {
-					common: true
 					description: """
 						Similar to a histogram, a summary samples
 						observations (usually things like request
@@ -338,7 +329,6 @@ data_model: schema: {
 						]
 						options: {
 							"*": {
-								common:      true
 								description: "A mapping of tag names to either a single value or a list of values, where each value is either a string or `null`."
 								required:    false
 								type: "*": {}
@@ -357,7 +347,6 @@ data_model: schema: {
 	}
 
 	trace: {
-		common: true
 		description: """
 			A Vector trace event is a vendor agnostic trace representation.
 			It is similar to a Vector log event but it contains a list of spans
@@ -379,7 +368,6 @@ data_model: schema: {
 			]
 			options: {
 				"*": {
-					common:      true
 					description: "An arbitrary set of key/value pairs."
 					required:    false
 					type: "*": {}

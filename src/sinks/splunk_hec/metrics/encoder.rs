@@ -2,7 +2,8 @@ use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+    EstimatedJsonEncodedSizeOf, config::telemetry, internal_event::emit,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::sink::HecProcessedEvent;
@@ -10,12 +11,12 @@ use crate::{internal_events::SplunkEventEncodeError, sinks::util::encoding::Enco
 
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(untagged)]
-pub enum HecFieldValue<'a> {
+pub(super) enum HecFieldValue<'a> {
     Float(f64),
     Str(&'a str),
 }
 
-pub type HecFieldMap<'a> = BTreeMap<&'a str, HecFieldValue<'a>>;
+pub(super) type HecFieldMap<'a> = BTreeMap<&'a str, HecFieldValue<'a>>;
 
 #[derive(Serialize, Debug)]
 struct HecData<'a> {
@@ -33,7 +34,7 @@ struct HecData<'a> {
 }
 
 impl<'a> HecData<'a> {
-    pub const fn new(fields: HecFieldMap<'a>, time: f64) -> Self {
+    const fn new(fields: HecFieldMap<'a>, time: f64) -> Self {
         Self {
             event: "metric",
             fields,
@@ -46,19 +47,23 @@ impl<'a> HecData<'a> {
     }
 }
 
-pub struct HecMetricsEncoder;
+/// Encoder for Splunk HEC metrics events.
+///
+pub(super) struct HecMetricsEncoder {
+    pub(super) templated_field_keys: Box<[String]>,
+}
 
 impl HecMetricsEncoder {
-    pub fn encode_event(processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
+    pub(super) fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
         let metadata = processed_event.metadata;
         let metric = processed_event.event;
 
         let fields = metric
             .tags()
             .into_iter()
-            .flat_map(|tags| tags.iter_single())
+            .flat_map(vector_lib::event::MetricTags::iter_single)
             // skip the metric tags used for templating
-            .filter(|(k, _)| !metadata.templated_field_keys.iter().any(|f| f == k))
+            .filter(|(k, _)| !self.templated_field_keys.iter().any(|f| f == k))
             .map(|(k, v)| (k, HecFieldValue::Str(v)))
             .chain(iter::once((
                 "metric_name",
@@ -69,6 +74,10 @@ impl HecMetricsEncoder {
                 HecFieldValue::Float(metadata.metric_value),
             )))
             .collect::<HecFieldMap>();
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "HEC timestamps use floating-point seconds."
+        )]
         let time = metric
             .timestamp()
             .unwrap_or_else(chrono::Utc::now)
@@ -84,8 +93,8 @@ impl HecMetricsEncoder {
         match serde_json::to_vec(&hec_data) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(SplunkEventEncodeError {
-                    error: error.into()
+                emit(SplunkEventEncodeError {
+                    error: error.into(),
                 });
                 None
             }
@@ -106,7 +115,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
 
         let encoded_input: Vec<u8> = input
             .into_iter()
-            .filter_map(Self::encode_event)
+            .filter_map(|e| self.encode_event(e))
             .flatten()
             .collect();
         let encoded_size = encoded_input.len();

@@ -3,6 +3,7 @@ use std::fmt;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     event::Metric,
+    internal_event::emit,
     stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
 };
 
@@ -42,7 +43,7 @@ impl ByteSizeOf for RemoteWriteMetric {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PrometheusRemoteWriteDefaultBatchSettings;
+pub(crate) struct PrometheusRemoteWriteDefaultBatchSettings;
 
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);
@@ -103,11 +104,11 @@ impl EventCollection {
     /// or store all the metrics, depending on the value of the `aggregate` parameter.
     fn new(aggregate: bool) -> Self {
         Self {
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
             events: if aggregate {
-                BatchedMetrics::Aggregated(Default::default())
+                BatchedMetrics::Aggregated(MetricSet::default())
             } else {
-                BatchedMetrics::Unaggregated(Default::default())
+                BatchedMetrics::Unaggregated(Vec::default())
             },
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),
@@ -143,7 +144,7 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
 }
 
 pub(super) struct RemoteWriteSink<S> {
-    pub(super) tenant_id: Option<Template>,
+    pub(super) tenant_id: Option<ConfinedTemplate>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) aggregate: bool,
     pub(super) compression: super::Compression,
@@ -194,7 +195,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build Remote Write request: {:?}.", e);
+                        error!("Failed to build Remote Write request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),
@@ -220,21 +221,30 @@ where
 }
 
 fn make_remote_write_event(
-    tenant_id: Option<&Template>,
+    tenant_id: Option<&ConfinedTemplate>,
     metric: Metric,
 ) -> Option<RemoteWriteMetric> {
-    let tenant_id = tenant_id.and_then(|template| {
-        template
-            .render_string(&metric)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
+    let tenant_id = match tenant_id {
+        None => None,
+        Some(template) => match template.render_string(&metric) {
+            Ok(s) => Some(s),
+            Err(error) => {
+                let confined = matches!(
+                    error,
+                    crate::template::TemplateRenderingError::Confined { .. }
+                );
+                emit(TemplateRenderingError {
                     error,
                     field: Some("tenant_id"),
-                    drop_event: true,
-                })
-            })
-            .ok()
-    });
+                    drop_event: confined,
+                });
+                if confined {
+                    return None; // Confined — intentional security drop
+                }
+                None
+            }
+        },
+    };
 
     Some(RemoteWriteMetric { metric, tenant_id })
 }

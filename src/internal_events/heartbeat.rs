@@ -1,8 +1,9 @@
 use std::time::Instant;
 
-use metrics::gauge;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    NamedInternalEvent, gauge,
+    internal_event::{GaugeName, InternalEvent, LossyF64},
+};
 
 use crate::built_info;
 
@@ -13,10 +14,11 @@ pub struct Heartbeat {
 
 impl InternalEvent for Heartbeat {
     fn emit(self) {
-        trace!(target: "vector", message = "Beep.");
-        gauge!("uptime_seconds").set(self.since.elapsed().as_secs() as f64);
+        // Periodic by design (1 Hz); a 1-minute window avoids rate-limiter chatter.
+        trace!(target: "vector", message = "Beep.", internal_log_rate_secs = 60);
+        gauge!(GaugeName::UptimeSeconds).set(LossyF64(self.since.elapsed().as_secs()));
         gauge!(
-            "build_info",
+            GaugeName::BuildInfo,
             "debug" => built_info::DEBUG,
             "version" => built_info::PKG_VERSION,
             "rust_version" => built_info::RUST_VERSION,

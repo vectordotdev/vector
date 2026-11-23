@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.34.1": {
-	date:     "2023-11-16"
-	codename: ""
+	date: "2023-11-16"
 
 	whats_next: []
 
@@ -38,7 +37,7 @@ releases: "0.34.1": {
 	]
 
 	commits: [
-		{sha: "09df599a655a116b7eb6016a28705165519fa3f9", date: "2023-11-08 02:44:54 UTC", description: "Add deprecation note about respositories.timber.io deprecation", pr_number: 19078, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 2, insertions_count: 16, deletions_count: 0},
+		{sha: "09df599a655a116b7eb6016a28705165519fa3f9", date: "2023-11-08 02:44:54 UTC", description: "Add deprecation note about repositories.timber.io deprecation", pr_number: 19078, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 2, insertions_count: 16, deletions_count: 0},
 		{sha: "def235e8e7d67f9461898bd72b55809f6ee09a3a", date: "2023-11-08 03:56:37 UTC", description: "Replace setup.vector.dev references", pr_number: 19080, scopes: ["docs"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 3, insertions_count: 3, deletions_count: 3},
 		{sha: "356927197e86f280a2762cc0a2a4ee610650df8b", date: "2023-11-08 07:45:06 UTC", description: "Fix formatting for v0.34.0 release note", pr_number: 19085, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 6, deletions_count: 6},
 		{sha: "dba0ba17a5c7888ddb20fe808422532939c57619", date: "2023-11-11 06:12:35 UTC", description: "Add upgrade note about TOML breaking change to v0.34.0", pr_number: 19120, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 13, deletions_count: 0},

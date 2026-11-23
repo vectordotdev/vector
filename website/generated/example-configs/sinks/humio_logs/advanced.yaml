@@ -1,0 +1,16 @@
+sinks:
+  my_sink_id:
+    type: humio_logs
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: https://cloud.humio.com/
+    event_type: json
+    host_key: .host
+    index: index-{{ host }}
+    timestamp_key: .timestamp
+    timestamp_nanos_key: "@timestamp.nanos"
+    token: ${HUMIO_TOKEN}

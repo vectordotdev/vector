@@ -1,10 +1,8 @@
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, TimeZone, Utc};
-use vector_core::event::{Event, TraceEvent};
+use vector_core::event::{Event, TraceEvent, TraceLayout};
 use vrl::{
     event_path,
-    value::{KeyString, Value},
+    value::{ObjectMap, Value},
 };
 
 use super::{
@@ -52,6 +50,9 @@ struct ResourceSpan {
 impl ResourceSpan {
     fn into_event(self, now: DateTime<Utc>) -> Event {
         let mut trace = TraceEvent::default();
+        trace
+            .metadata_mut()
+            .set_trace_layout(TraceLayout::OtelFlattened);
         let span = self.span;
         trace.insert(
             event_path!(TRACE_ID_KEY),
@@ -65,10 +66,20 @@ impl ResourceSpan {
         );
         trace.insert(event_path!("name"), span.name);
         trace.insert(event_path!("kind"), span.kind);
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         trace.insert(
             event_path!("start_time_unix_nano"),
             Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
         );
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         trace.insert(
             event_path!("end_time_unix_nano"),
             Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
@@ -119,8 +130,13 @@ impl ResourceSpan {
 
 impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("name".into(), ev.name.into());
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         obj.insert(
             "time_unix_nano".into(),
             Value::Timestamp(Utc.timestamp_nanos(ev.time_unix_nano as i64)),
@@ -128,7 +144,7 @@ impl From<SpanEvent> for Value {
         obj.insert("attributes".into(), kv_list_into_value(ev.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
-            Value::Integer(ev.dropped_attributes_count as i64),
+            Value::Integer(i64::from(ev.dropped_attributes_count)),
         );
         Value::Object(obj)
     }
@@ -136,14 +152,14 @@ impl From<SpanEvent> for Value {
 
 impl From<Link> for Value {
     fn from(link: Link) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("trace_id".into(), Value::from(to_hex(&link.trace_id)));
         obj.insert("span_id".into(), Value::from(to_hex(&link.span_id)));
         obj.insert("trace_state".into(), link.trace_state.into());
         obj.insert("attributes".into(), kv_list_into_value(link.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
-            Value::Integer(link.dropped_attributes_count as i64),
+            Value::Integer(i64::from(link.dropped_attributes_count)),
         );
         Value::Object(obj)
     }
@@ -151,7 +167,7 @@ impl From<Link> for Value {
 
 impl From<SpanStatus> for Value {
     fn from(status: SpanStatus) -> Self {
-        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
+        let mut obj = ObjectMap::new();
         obj.insert("message".into(), status.message.into());
         obj.insert("code".into(), status.code.into());
         Value::Object(obj)

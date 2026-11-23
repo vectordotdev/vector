@@ -1,0 +1,11 @@
+optimization_goal: cpu
+erratic: false
+
+target:
+  name: vector
+  command: /usr/bin/vector
+  cpu_allotment: 8
+  memory_allotment: 8GiB
+  environment:
+    VECTOR_THREADS: 8
+    PIPELINE_ENV: "production"

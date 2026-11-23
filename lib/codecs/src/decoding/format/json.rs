@@ -8,7 +8,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, value::simdutf_bytes_utf8_lossy};
 
 use super::{Deserializer, default_lossy};
 
@@ -23,21 +23,25 @@ pub struct JsonDeserializerConfig {
 
 impl JsonDeserializerConfig {
     /// Creates a new `JsonDeserializerConfig`.
+    #[must_use]
     pub fn new(options: JsonDeserializerOptions) -> Self {
         Self { json: options }
     }
 
     /// Build the `JsonDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> JsonDeserializer {
         Into::<JsonDeserializer>::into(self)
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -90,6 +94,7 @@ pub struct JsonDeserializer {
 
 impl JsonDeserializer {
     /// Creates a new `JsonDeserializer`.
+    #[must_use]
     pub fn new(lossy: bool) -> Self {
         Self { lossy }
     }
@@ -107,19 +112,21 @@ impl Deserializer for JsonDeserializer {
             return Ok(smallvec![]);
         }
 
-        let json: serde_json::Value = match self.lossy {
-            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
-            false => serde_json::from_slice(&bytes),
+        let json: serde_json::Value = if self.lossy {
+            serde_json::from_str(&simdutf_bytes_utf8_lossy(&bytes))
+        } else {
+            serde_json::from_slice(&bytes)
         }
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         // If the root is an Array, split it into multiple events
-        let mut events = match json {
-            serde_json::Value::Array(values) => values
+        let mut events = if let serde_json::Value::Array(values) = json {
+            values
                 .into_iter()
                 .map(|json| Event::from_json_value(json, log_namespace))
-                .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![Event::from_json_value(json, log_namespace)?],
+                .collect::<Result<SmallVec<[Event; 1]>, _>>()?
+        } else {
+            smallvec![Event::from_json_value(json, log_namespace)?]
         };
 
         let events = match log_namespace {
@@ -188,11 +195,11 @@ mod tests {
 
     #[test]
     fn deserialize_non_object_vector_namespace() {
-        let input = Bytes::from(r#"null"#);
+        let input = Bytes::from(r"null");
         let deserializer = JsonDeserializer::default();
 
         let namespace = LogNamespace::Vector;
-        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let events = deserializer.parse(input, namespace).unwrap();
         let mut events = events.into_iter();
 
         let event = events.next().unwrap();

@@ -30,4 +30,4 @@ sources:
 
 If it doesn't, that's a bug. [**Report it.**][urls.new_bug_report] We squash bugs.
 
-[urls.new_bug_report]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+bug
+[urls.new_bug_report]: https://github.com/vectordotdev/vector/issues/new?template=bug.yml

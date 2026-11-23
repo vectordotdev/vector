@@ -191,7 +191,7 @@ transform, and use the value to inform which conversion mode to use on tags.
 The guiding rationale for all of the external changes is to maximize backwards compatibility while
 adding support for the new functionality. This means that, where possible, Vector should accept all
 existing tag assignments as-is using current formats, understanding that output representations will
-have to change to accomodate the new capabilities of the data set.
+have to change to accommodate the new capabilities of the data set.
 
 The proposed Protobuf representation allows all possible combination of values for a tag set, and
 minimizes the encoded size in the presence of repeated tag names. It also requires no further
@@ -284,7 +284,7 @@ that would support this feature but with different semantics:
 
 1. `Vec<String>` — Retains the ordering of tags as they appear, but allows for duplicate values and
    cannot support both bare tags and multiple values simultaneously.
-2. `Vec<Option<String>>` — Same as above but supports bare tags and mutiple values simultaneously.
+2. `Vec<Option<String>>` — Same as above but supports bare tags and multiple values simultaneously.
 3. `BTreeSet<Option<String>>` — Duplicate values are merged but are sorted, likely putting the bare
    tag first for single-value uses.
 
@@ -352,7 +352,7 @@ increased complexity when accessing a particular named tag.
 
 Metric tag sets are most often repeated a great number of times across different metrics. This
 suggests that a shared copy-on-write storage scheme where the individual metrics would contain just
-a handle to the shared value. This would improve Vector's memory efficience at least, and possibly
+a handle to the shared value. This would improve Vector's memory efficiency at least, and possibly
 run-time performance as well.
 
 The schema definitions that are already present on sinks could be enhanced to add support for what

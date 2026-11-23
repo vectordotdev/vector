@@ -16,9 +16,8 @@ transforms:
     inputs: [ "file" ]
     type: "remap"
     drop_on_error: false
-    source: '''
-    . |= parse_apache_log!(string!(.message), "common")
-    '''
+    source: |
+      . |= parse_apache_log!(string!(.message), "common")
 
   # Transform into metrics
   log_to_metric:

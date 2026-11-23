@@ -16,11 +16,7 @@ generated: components: sources: journald: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """
@@ -35,8 +31,14 @@ generated: components: sources: journald: configuration: {
 		}
 	}
 	current_boot_only: {
-		description: "Only include entries that occurred after the current boot of the system."
-		required:    false
+		description: """
+			Only include entries that occurred after the current boot of the system.
+
+			Setting this to `false` requires systemd 258 or later, or a version older than 250.
+			Versions 250 through 257 are not supported. For container deployments, this
+			requirement applies to the `journalctl` inside the container image.
+			"""
+		required: false
 		type: bool: default: true
 	}
 	data_dir: {

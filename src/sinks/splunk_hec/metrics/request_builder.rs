@@ -15,8 +15,20 @@ use crate::sinks::{
     },
 };
 
-pub struct HecMetricsRequestBuilder {
+pub(super) struct HecMetricsRequestBuilder {
     pub(super) compression: Compression,
+    pub(super) encoder: HecMetricsEncoder,
+}
+
+impl HecMetricsRequestBuilder {
+    pub(super) const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
+        Self {
+            compression,
+            encoder: HecMetricsEncoder {
+                templated_field_keys,
+            },
+        }
+    }
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
@@ -32,7 +44,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &HecMetricsEncoder
+        &self.encoder
     }
 
     fn split_input(

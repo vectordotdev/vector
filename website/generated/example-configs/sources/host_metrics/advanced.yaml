@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: host_metrics
+    collectors:
+      - cgroups
+    namespace: host
+    scrape_interval_secs: 15

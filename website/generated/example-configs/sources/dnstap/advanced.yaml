@@ -1,0 +1,13 @@
+sources:
+  my_source_id:
+    type: dnstap
+    address: 0.0.0.0:9000
+    lowercase_hostnames: false
+    max_frame_length: 102400
+    mode: tcp
+    multithreaded: false
+    permit_origin:
+      - 192.168.0.0/16
+    port_key: port
+    raw_data_only: false
+    shutdown_timeout_secs: 30

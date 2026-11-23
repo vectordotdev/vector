@@ -8,6 +8,8 @@ use std::time::Duration;
 use futures::StreamExt;
 use tokio::fs;
 
+use vrl::event_path;
+
 use super::*;
 use crate::config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext};
 use crate::test_util::components::run_and_assert_source_compliance;
@@ -22,10 +24,14 @@ use vector_lib::event::EventStatus;
 /// Each test should use a unique `source` name (e.g. `"VT_stress"`) to
 /// prevent cross-test pollution when tests run in parallel. The source
 /// name is used as the Provider/@Name in the event, which tests then
-/// filter on via XPath.
+/// filter on via `XPath`.
 ///
 /// Requires administrator privileges. Panics with a clear message if
 /// `eventcreate` is missing or the call fails.
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn emit_event(source: &str, event_type: &str, event_id: u32, description: &str) {
     // Retry a few times because eventcreate can transiently fail with exit
     // code 1 when multiple tests invoke it concurrently (registry contention).
@@ -71,7 +77,7 @@ fn temp_data_dir() -> tempfile::TempDir {
     tempfile::tempdir().expect("failed to create temp data_dir for test")
 }
 
-/// XPath query that matches events from a specific test source.
+/// `XPath` query that matches events from a specific test source.
 fn test_query(source: &str) -> String {
     format!("*[System[Provider[@Name='{source}'] and EventID=1000]]")
 }
@@ -125,7 +131,7 @@ async fn test_basic_event_ingestion() {
         "level",
     ] {
         assert!(
-            log.contains(field),
+            log.contains(event_path!(field)),
             "Event is missing required field '{field}'. \
              Full event keys: {:?}",
             log.keys().into_iter().flatten().collect::<Vec<_>>()
@@ -138,7 +144,7 @@ async fn test_basic_event_ingestion() {
 // ---------------------------------------------------------------------------
 
 /// Emit N events, verify all N arrive with no duplicates.
-/// This exercises the EvtNext drain loop across multiple batches.
+/// This exercises the `EvtNext` drain loop across multiple batches.
 #[tokio::test]
 async fn test_backlog_drain_no_duplicates() {
     let data_dir = temp_data_dir();
@@ -168,7 +174,7 @@ async fn test_backlog_drain_no_duplicates() {
     let mut record_ids = HashSet::new();
     let mut duplicate_count = 0;
     for event in &events {
-        if let Some(rid) = event.as_log().get("record_id") {
+        if let Some(rid) = event.as_log().get(event_path!("record_id")) {
             if !record_ids.insert(rid.to_string_lossy()) {
                 duplicate_count += 1;
             }
@@ -188,7 +194,7 @@ async fn test_backlog_drain_no_duplicates() {
 // ---------------------------------------------------------------------------
 
 /// Run the source, stop it, emit new events, run again with the same
-/// data_dir. The second run should see ONLY the new events.
+/// `data_dir`. The second run should see ONLY the new events.
 #[tokio::test]
 async fn test_checkpoint_resume_no_redelivery() {
     let data_dir = temp_data_dir();
@@ -212,9 +218,8 @@ async fn test_checkpoint_resume_no_redelivery() {
     // Phase 1 event should NOT be redelivered (checkpoint should have advanced past it)
     let has_phase1 = second_run.iter().any(|e| {
         e.as_log()
-            .get("message")
-            .map(|m| m.to_string_lossy().contains("checkpoint-test-phase1"))
-            .unwrap_or(false)
+            .get(event_path!("message"))
+            .is_some_and(|m| m.to_string_lossy().contains("checkpoint-test-phase1"))
     });
     assert!(
         !has_phase1,
@@ -226,9 +231,8 @@ async fn test_checkpoint_resume_no_redelivery() {
     // The new phase 2 event should be present
     let has_phase2 = second_run.iter().any(|e| {
         e.as_log()
-            .get("message")
-            .map(|m| m.to_string_lossy().contains("checkpoint-test-phase2"))
-            .unwrap_or(false)
+            .get(event_path!("message"))
+            .is_some_and(|m| m.to_string_lossy().contains("checkpoint-test-phase2"))
     });
     assert!(
         has_phase2,
@@ -259,7 +263,7 @@ async fn test_channel_isolation() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(3), &[]).await;
 
     for event in &events {
-        if let Some(channel) = event.as_log().get("channel") {
+        if let Some(channel) = event.as_log().get(event_path!("channel")) {
             let ch = channel.to_string_lossy();
             assert_eq!(
                 ch, "System",
@@ -274,7 +278,7 @@ async fn test_channel_isolation() {
 // Event ID filtering
 // ---------------------------------------------------------------------------
 
-/// Verify only_event_ids includes only matching events.
+/// Verify `only_event_ids` includes only matching events.
 /// Note: eventcreate.exe only supports IDs 1-1000, so we use 999 and 1000.
 #[tokio::test]
 async fn test_only_event_ids_filter() {
@@ -294,7 +298,7 @@ async fn test_only_event_ids_filter() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -308,7 +312,7 @@ async fn test_only_event_ids_filter() {
     }
 }
 
-/// Verify ignore_event_ids excludes matching events.
+/// Verify `ignore_event_ids` excludes matching events.
 #[tokio::test]
 async fn test_ignore_event_ids_filter() {
     let data_dir = temp_data_dir();
@@ -326,7 +330,7 @@ async fn test_ignore_event_ids_filter() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(3), &[]).await;
 
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -340,13 +344,13 @@ async fn test_ignore_event_ids_filter() {
     }
 }
 
-/// Verify that only_event_ids generates an XPath filter when no explicit
-/// event_query is set. The existing `test_only_event_ids_filter` always sets
-/// both `only_event_ids` AND `event_query`, so the auto-generated XPath path
+/// Verify that `only_event_ids` generates an `XPath` filter when no explicit
+/// `event_query` is set. The existing `test_only_event_ids_filter` always sets
+/// both `only_event_ids` AND `event_query`, so the auto-generated `XPath` path
 /// in `build_xpath_query()` was never exercised — that is how the original
 /// performance bug shipped.
 ///
-/// This test sets only_event_ids=[1000] WITHOUT event_query, so the source
+/// This test sets `only_event_ids`=[1000] WITHOUT `event_query`, so the source
 /// must auto-generate `*[System[EventID=1000]]` and only receive matching
 /// events from the Windows API.
 #[tokio::test]
@@ -378,7 +382,7 @@ async fn test_only_event_ids_generates_xpath_filter() {
 
     // Every event must have event_id == 1000.
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -410,7 +414,7 @@ async fn test_multiple_event_levels() {
 
     let mut levels_seen: HashSet<String> = HashSet::new();
     for event in &events {
-        if let Some(level) = event.as_log().get("level") {
+        if let Some(level) = event.as_log().get(event_path!("level")) {
             levels_seen.insert(level.to_string_lossy().to_string());
         }
     }
@@ -428,7 +432,7 @@ async fn test_multiple_event_levels() {
 // Rendered message
 // ---------------------------------------------------------------------------
 
-/// With render_message enabled (the default), the message field should contain
+/// With `render_message` enabled (the default), the message field should contain
 /// the actual event description, not the generic fallback.
 #[tokio::test]
 async fn test_rendered_message_content() {
@@ -443,9 +447,8 @@ async fn test_rendered_message_content() {
 
     let found = events.iter().any(|e| {
         e.as_log()
-            .get("message")
-            .map(|m| m.to_string_lossy().contains(marker))
-            .unwrap_or(false)
+            .get(event_path!("message"))
+            .is_some_and(|m| m.to_string_lossy().contains(marker))
     });
 
     assert!(
@@ -456,12 +459,12 @@ async fn test_rendered_message_content() {
         events.len(),
         events
             .first()
-            .and_then(|e| e.as_log().get("message"))
+            .and_then(|e| e.as_log().get(event_path!("message")))
             .map(|m| m.to_string_lossy())
     );
 }
 
-/// With render_message disabled, events should still have a message field
+/// With `render_message` disabled, events should still have a message field
 /// (the generic fallback).
 #[tokio::test]
 async fn test_render_message_disabled_fallback() {
@@ -476,7 +479,7 @@ async fn test_render_message_disabled_fallback() {
     if !events.is_empty() {
         let log = events[0].as_log();
         assert!(
-            log.contains("message"),
+            log.contains(event_path!("message")),
             "render_message=false should still produce a message field (generic fallback). \
              Event keys: {:?}",
             log.keys().into_iter().flatten().collect::<Vec<_>>()
@@ -503,7 +506,7 @@ async fn test_include_xml_well_formed() {
     );
 
     let log = events[0].as_log();
-    let xml = log.get("xml").expect(
+    let xml = log.get(event_path!("xml")).expect(
         "include_xml=true but 'xml' field missing. \
          Check raw_xml population in parse_event_xml.",
     );
@@ -511,11 +514,11 @@ async fn test_include_xml_well_formed() {
     assert!(
         xml_str.contains("<Event") && xml_str.contains("</Event>"),
         "XML field should contain well-formed <Event>...</Event>, got: {}",
-        &xml_str[..xml_str.len().min(200)]
+        xml_str.chars().take(200).collect::<String>()
     );
 }
 
-/// When include_xml is false (default), no xml field should be present.
+/// When `include_xml` is false (default), no xml field should be present.
 #[tokio::test]
 async fn test_exclude_xml_by_default() {
     let data_dir = temp_data_dir();
@@ -528,7 +531,7 @@ async fn test_exclude_xml_by_default() {
 
     for event in &events {
         assert!(
-            !event.as_log().contains("xml"),
+            !event.as_log().contains(event_path!("xml")),
             "include_xml=false but 'xml' field is present."
         );
     }
@@ -560,11 +563,11 @@ async fn test_field_filter_exclude_event_data() {
     for event in events.iter().take(10) {
         let log = event.as_log();
         assert!(
-            !log.contains("event_data"),
+            !log.contains(event_path!("event_data")),
             "include_event_data=false but 'event_data' field is present."
         );
         assert!(
-            !log.contains("user_data"),
+            !log.contains(event_path!("user_data")),
             "include_user_data=false but 'user_data' field is present."
         );
     }
@@ -650,7 +653,7 @@ async fn test_event_field_completeness() {
 
     let mut missing = Vec::new();
     for field in &required {
-        if !log.contains(*field) {
+        if !log.contains(event_path!(*field)) {
             missing.push(*field);
         }
     }
@@ -664,10 +667,10 @@ async fn test_event_field_completeness() {
     );
 
     // Verify event_id is a positive integer
-    if let Some(eid) = log.get("event_id") {
+    if let Some(eid) = log.get(event_path!("event_id")) {
         match eid {
             vrl::value::Value::Integer(i) => {
-                assert!(*i > 0, "event_id should be a positive integer, got {i}")
+                assert!(*i > 0, "event_id should be a positive integer, got {i}");
             }
             other => panic!(
                 "event_id should be an integer, got: {other:?}. \
@@ -677,17 +680,17 @@ async fn test_event_field_completeness() {
     }
 
     // Verify record_id is a positive integer
-    if let Some(rid) = log.get("record_id") {
+    if let Some(rid) = log.get(event_path!("record_id")) {
         match rid {
             vrl::value::Value::Integer(i) => {
-                assert!(*i > 0, "record_id should be a positive integer, got {i}")
+                assert!(*i > 0, "record_id should be a positive integer, got {i}");
             }
             other => panic!("record_id should be an integer, got: {other:?}."),
         }
     }
 
     // Verify level is a human-readable string
-    if let Some(level) = log.get("level") {
+    if let Some(level) = log.get(event_path!("level")) {
         let level_str = level.to_string_lossy();
         assert!(
             ["Information", "Warning", "Error", "Critical", "Verbose"]
@@ -702,7 +705,7 @@ async fn test_event_field_completeness() {
 // Rate limiting
 // ---------------------------------------------------------------------------
 
-/// With events_per_second set, events should still arrive but the source
+/// With `events_per_second` set, events should still arrive but the source
 /// should not exceed the configured rate over a sustained period.
 #[tokio::test]
 async fn test_rate_limiting() {
@@ -744,7 +747,7 @@ async fn test_rate_limiting() {
 // Event data truncation
 // ---------------------------------------------------------------------------
 
-/// With max_event_data_length set, long event data values should be truncated.
+/// With `max_event_data_length` set, long event data values should be truncated.
 #[tokio::test]
 async fn test_event_data_truncation() {
     let data_dir = temp_data_dir();
@@ -771,7 +774,7 @@ async fn test_event_data_truncation() {
 // Max event age filtering
 // ---------------------------------------------------------------------------
 
-/// With max_event_age_secs set to a very low value, old events should be
+/// With `max_event_age_secs` set to a very low value, old events should be
 /// filtered out.
 #[tokio::test]
 async fn test_max_event_age_filtering() {
@@ -801,7 +804,7 @@ async fn test_max_event_age_filtering() {
 
     // If we got events, verify none of them are our old test event
     for event in &events {
-        if let Some(msg) = event.as_log().get("message") {
+        if let Some(msg) = event.as_log().get(event_path!("message")) {
             assert!(
                 !msg.to_string_lossy().contains("age-filter-test"),
                 "max_event_age_secs=3 but old event was not filtered out. \
@@ -815,7 +818,7 @@ async fn test_max_event_age_filtering() {
 // Event data format coercion
 // ---------------------------------------------------------------------------
 
-/// With event_data_format configured, specific fields should be coerced
+/// With `event_data_format` configured, specific fields should be coerced
 /// to the requested type.
 #[tokio::test]
 async fn test_event_data_format_coercion() {
@@ -840,12 +843,11 @@ async fn test_event_data_format_coercion() {
 
     // event_id should be converted to string by the custom formatter
     let log = events[0].as_log();
-    if let Some(eid) = log.get("event_id") {
+    if let Some(eid) = log.get(event_path!("event_id")) {
         assert!(
-            matches!(eid, vrl::value::Value::Bytes(_)),
-            "event_data_format set event_id to String but got {:?}. \
-             Check apply_custom_formatting in parser.",
-            eid
+            matches!(eid, vrl::value::Value::String(_)),
+            "event_data_format set event_id to String but got {eid:?}. \
+             Check apply_custom_formatting in parser."
         );
     }
 }
@@ -874,7 +876,7 @@ async fn test_multi_channel_ingestion() {
 
     let mut channels_seen: HashSet<String> = HashSet::new();
     for event in &events {
-        if let Some(channel) = event.as_log().get("channel") {
+        if let Some(channel) = event.as_log().get(event_path!("channel")) {
             channels_seen.insert(channel.to_string_lossy().to_string());
         }
     }
@@ -924,8 +926,8 @@ async fn test_all_channels_invalid_no_panic() {
 }
 
 /// Verify that when events are successfully ingested, the standard
-/// component metrics (component_received_events_total,
-/// component_received_bytes_total, etc.) are emitted correctly.
+/// component metrics (`component_received_events_total`,
+/// `component_received_bytes_total`, etc.) are emitted correctly.
 /// This is the happy-path compliance check with explicit metric verification.
 #[tokio::test]
 async fn test_source_compliance_metrics() {
@@ -961,7 +963,7 @@ async fn test_source_compliance_metrics() {
 // ---------------------------------------------------------------------------
 
 /// Wildcard channel patterns must be rejected at config validation time,
-/// not passed to EvtSubscribe where they can cause heap corruption with
+/// not passed to `EvtSubscribe` where they can cause heap corruption with
 /// many matching channels.
 #[tokio::test]
 async fn test_wildcard_channels_rejected() {
@@ -986,7 +988,7 @@ async fn test_wildcard_channels_rejected() {
     }
 }
 
-/// XPath injection attempts must be rejected at config validation time.
+/// `XPath` injection attempts must be rejected at config validation time.
 #[tokio::test]
 async fn test_xpath_injection_rejected() {
     let attacks = vec![
@@ -1031,7 +1033,7 @@ async fn test_dangerous_channel_names_rejected() {
     }
 }
 
-/// Unbalanced XPath brackets/parentheses must be rejected.
+/// Unbalanced `XPath` brackets/parentheses must be rejected.
 #[tokio::test]
 async fn test_unbalanced_xpath_rejected() {
     let unbalanced = vec![
@@ -1063,8 +1065,8 @@ async fn test_unbalanced_xpath_rejected() {
 /// if Vector crashes before the sink acks, the checkpoint hasn't moved,
 /// so events are re-read on restart.
 ///
-/// Test approach: run source with acks enabled and EventStatus::Delivered,
-/// then restart with the same data_dir — the second run should skip
+/// Test approach: run source with acks enabled and `EventStatus::Delivered`,
+/// then restart with the same `data_dir` — the second run should skip
 /// already-delivered events (proving checkpoint advanced after ack).
 #[tokio::test]
 async fn test_acknowledgements_checkpoint_after_delivery() {
@@ -1103,7 +1105,7 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
                         break;
                     }
                 }
-                _ = tokio::time::sleep_until(deadline) => {
+                () = tokio::time::sleep_until(deadline) => {
                     break;
                 }
             }
@@ -1132,8 +1134,7 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     assert!(
         checkpoint_path.exists(),
         "Checkpoint file should exist after acknowledged delivery. \
-         Path: {:?}",
-        checkpoint_path
+         Path: {checkpoint_path:?}"
     );
 
     // Phase 2: emit a NEW event, run with same data_dir
@@ -1144,9 +1145,8 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     // Should NOT see phase1 event again (checkpoint advanced)
     let has_phase1 = events.iter().any(|e| {
         e.as_log()
-            .get("message")
-            .map(|m| m.to_string_lossy().contains("ack-test-phase1"))
-            .unwrap_or(false)
+            .get(event_path!("message"))
+            .is_some_and(|m| m.to_string_lossy().contains("ack-test-phase1"))
     });
     assert!(
         !has_phase1,
@@ -1210,7 +1210,7 @@ async fn test_checkpoint_corruption_recovery() {
 // Rejected acknowledgement — checkpoint must NOT advance
 // ---------------------------------------------------------------------------
 
-/// With acknowledgements enabled and EventStatus::Rejected, checkpoints
+/// With acknowledgements enabled and `EventStatus::Rejected`, checkpoints
 /// should NOT advance. This is the other half of at-least-once: if the
 /// sink rejects events, the source must re-read them on restart.
 #[tokio::test]
@@ -1250,7 +1250,7 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
                         break;
                     }
                 }
-                _ = tokio::time::sleep_until(deadline) => {
+                () = tokio::time::sleep_until(deadline) => {
                     break;
                 }
             }
@@ -1276,19 +1276,17 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
         let log = e.as_log();
         // Check message field (rendered message or string_inserts fallback)
         let in_message = log
-            .get("message")
-            .map(|m| m.to_string_lossy().contains("rejected-ack-test-marker"))
-            .unwrap_or(false);
+            .get(event_path!("message"))
+            .is_some_and(|m| m.to_string_lossy().contains("rejected-ack-test-marker"));
         // Also check string_inserts directly in case EvtFormatMessage is unavailable
         // on this CI runner and the fallback doesn't surface the description.
         let in_inserts = log
-            .get("string_inserts")
+            .get(event_path!("string_inserts"))
             .and_then(|v| v.as_array())
-            .map(|arr| {
+            .is_some_and(|arr| {
                 arr.iter()
                     .any(|v| v.to_string_lossy().contains("rejected-ack-test-marker"))
-            })
-            .unwrap_or(false);
+            });
         in_message || in_inserts
     });
     assert!(
@@ -1344,7 +1342,7 @@ async fn test_stress_burst_ingestion() {
     let mut record_ids = HashSet::new();
     let mut dups = 0;
     for event in &events {
-        if let Some(rid) = event.as_log().get("record_id") {
+        if let Some(rid) = event.as_log().get(event_path!("record_id")) {
             if !record_ids.insert(rid.to_string_lossy()) {
                 dups += 1;
             }
@@ -1360,7 +1358,7 @@ async fn test_stress_burst_ingestion() {
         let log = event.as_log();
         for field in ["event_id", "record_id", "channel", "provider_name"] {
             assert!(
-                log.contains(field),
+                log.contains(event_path!(field)),
                 "Stress test event missing field '{field}' — possible render corruption."
             );
         }
@@ -1378,9 +1376,7 @@ fn write_custom_log_event(log_name: &str, source: &str, event_id: u32, message: 
             "-NoProfile",
             "-Command",
             &format!(
-                "Write-EventLog -LogName '{}' -Source '{}' -EventId {} -EntryType Information -Message '{}'",
-                log_name, source, event_id, message
-            ),
+                "Write-EventLog -LogName '{log_name}' -Source '{source}' -EventId {event_id} -EntryType Information -Message '{message}'"),
         ])
         .status()
         .expect("failed to run powershell Write-EventLog");
@@ -1396,6 +1392,11 @@ fn write_custom_log_event(log_name: &str, source: &str, event_id: u32, message: 
 ///
 /// Requires Administrator privileges.
 #[tokio::test]
+#[allow(
+    clippy::items_after_statements,
+    clippy::too_many_lines,
+    reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn test_resubscribe_after_log_clear() {
     let log_name = "VectorTestResub";
     let source_name = "VT_resub";
@@ -1472,7 +1473,7 @@ async fn test_resubscribe_after_log_clear() {
                     break;
                 }
             }
-            _ = tokio::time::sleep_until(deadline) => {
+            () = tokio::time::sleep_until(deadline) => {
                 break;
             }
         }
@@ -1493,7 +1494,7 @@ async fn test_resubscribe_after_log_clear() {
                 tokio::select! {
                     event = rx.next() => {
                         if let Some(event) = event {
-                            if let Some(msg) = event.as_log().get("message") {
+                            if let Some(msg) = event.as_log().get(event_path!("message")) {
                                 if msg.to_string_lossy().contains("post-clear-event") {
                                     found_post_clear = true;
                                     break;
@@ -1503,7 +1504,7 @@ async fn test_resubscribe_after_log_clear() {
                             break;
                         }
                     }
-                    _ = tokio::time::sleep_until(deadline) => {
+                    () = tokio::time::sleep_until(deadline) => {
                         break;
                     }
                 }
@@ -1531,10 +1532,10 @@ async fn test_resubscribe_after_log_clear() {
 // ---------------------------------------------------------------------------
 
 /// Verify that reading events produces the expected checkpoint file,
-/// proving the full data path (EvtNext -> render -> parse -> emit ->
+/// proving the full data path (`EvtNext` -> render -> parse -> emit ->
 /// checkpoint) works end-to-end including the metric-instrumented code paths.
 ///
-/// Note: Direct custom metric assertions (windows_event_log_events_read_total
+/// Note: Direct custom metric assertions (`windows_event_log_events_read_total`
 /// etc.) are not feasible without adding metrics-util/debugging as a
 /// dependency. Instead, we verify the observable side effects: events arrive,
 /// checkpoint file is written, and compliance metrics pass.
@@ -1583,7 +1584,7 @@ async fn test_full_data_path_produces_checkpoint() {
         contents.contains("\"version\"") && contents.contains("\"channels\""),
         "Checkpoint file should contain valid JSON with version and channels. \
          Got: {}",
-        &contents[..contents.len().min(200)]
+        contents.chars().take(200).collect::<String>()
     );
 }
 
@@ -1591,8 +1592,8 @@ async fn test_full_data_path_produces_checkpoint() {
 // Checkpoint resume: no duplicate record IDs across runs
 // ---------------------------------------------------------------------------
 
-/// Run the source twice with the same data_dir, emitting distinct events
-/// before each run. Assert that the record_id sets from run 1 and run 2
+/// Run the source twice with the same `data_dir`, emitting distinct events
+/// before each run. Assert that the `record_id` sets from run 1 and run 2
 /// do not overlap, proving the bookmark/checkpoint correctly prevents
 /// re-delivery.
 #[tokio::test]
@@ -1620,7 +1621,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
         .iter()
         .filter_map(|e| {
             e.as_log()
-                .get("record_id")
+                .get(event_path!("record_id"))
                 .map(|v| v.to_string_lossy().into_owned())
         })
         .collect();
@@ -1649,7 +1650,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
         .iter()
         .filter_map(|e| {
             e.as_log()
-                .get("record_id")
+                .get(event_path!("record_id"))
                 .map(|v| v.to_string_lossy().into_owned())
         })
         .collect();
@@ -1663,12 +1664,10 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
     let overlap: HashSet<_> = first_ids.intersection(&second_ids).collect();
     assert!(
         overlap.len() <= batch_size,
-        "Found {} duplicate record_ids between run 1 and run 2 (max allowed: {}): {:?}. \
+        "Found {} duplicate record_ids between run 1 and run 2 (max allowed: {batch_size}): {overlap:?}. \
          Bookmark checkpoint is not preventing re-delivery. \
          Run 1 had {} IDs, run 2 had {} IDs.",
         overlap.len(),
-        batch_size,
-        overlap,
         first_ids.len(),
         second_ids.len()
     );

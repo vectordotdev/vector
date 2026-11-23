@@ -70,7 +70,7 @@ While `check_fields` is deprecated and still supported, you will need to explici
  lanes.errors."level.eq" = "error"
 ```
 
-Alteratively, we recommend migrating to the new VRL syntax:
+Alternatively, we recommend migrating to the new VRL syntax:
 
 ```diff
  [transforms.route]

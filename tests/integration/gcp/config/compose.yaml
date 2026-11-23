@@ -1,20 +1,14 @@
-version: "3"
-
 services:
   gcloud-pubsub:
-    image: docker.io/messagebird/gcloud-pubsub-emulator:${CONFIG_VERSION}
-    environment:
-      - PUBSUB_PROJECT1=testproject,topic1:subscription1
-      - PUBSUB_PROJECT2=sourceproject,topic2:subscription2
-  chronicle-emulator:
-    image: docker.io/timberio/chronicle-emulator:${CONFIG_VERSION}
-    ports:
-      - 3000:3000
-    volumes:
-      - ./public.pem:/public.pem:ro
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:${CONFIG_VERSION}-emulators
     command:
-      - -p
-      - /public.pem
+      - gcloud
+      - beta
+      - emulators
+      - pubsub
+      - start
+      - --project=testproject
+      - --host-port=0.0.0.0:8681
 
 networks:
   default:
