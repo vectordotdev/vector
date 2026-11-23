@@ -242,6 +242,7 @@ fn effective_framer_config(encoding: &EncodingConfigWithFraming) -> FramingConfi
             SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
             #[cfg(feature = "codecs-opentelemetry")]
             SerializerConfig::Otlp => FramingConfig::Bytes,
+            SerializerConfig::PrometheusText => FramingConfig::Bytes,
         },
     }
 }

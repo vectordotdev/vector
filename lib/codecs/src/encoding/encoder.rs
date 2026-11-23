@@ -268,6 +268,7 @@ impl Encoder<Framer> {
                 | Serializer::Json(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
+                | Serializer::PrometheusText(_)
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
                 _,
