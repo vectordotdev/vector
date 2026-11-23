@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -7,8 +7,8 @@ use std::{
 use chrono::Utc;
 use futures::{StreamExt, future::join_all, stream::BoxStream};
 use iggy::prelude::{
-    Client, IggyClient, IggyConsumer, IggyError, PollingKind, PollingStrategy, ReadError,
-    ReceivedMessage,
+    Checkpoint, Client, IggyClient, IggyConsumer, IggyError, PollingKind, PollingStrategy,
+    ReadError, ReceivedMessage,
 };
 use tokio::time::{MissedTickBehavior, interval, sleep, sleep_until};
 use tokio_stream::StreamMap;
@@ -76,14 +76,24 @@ struct PartitionState {
     /// replayed indefinitely; permanent ones are skipped after
     /// `MAX_REDELIVERY_ATTEMPTS`.
     rejected: BTreeMap<u64, bool>,
-    /// Highest offset skipped because its broker record could not be decoded.
-    /// A late acknowledgement at or below it must not re-fence the partition:
-    /// the record can never be delivered, and the seek already moved past it.
-    skipped_through: Option<u64>,
+    /// Offsets the broker could not decode or decrypt and a seek moved past;
+    /// a late acknowledgement for one must not re-fence the partition.
+    /// Earlier offsets stay actionable: they gate the checkpoint.
+    skipped: BTreeSet<u64>,
     /// Replay attempts already made for the current fence.
     retry_attempts: u32,
     /// Polled messages whose final acknowledgement has not arrived yet.
     in_flight: usize,
+    /// Offsets of those messages, counted so overlapping replays settle
+    /// correctly. The lowest unsettled offset caps the checkpoint, so a skip
+    /// cannot commit past an earlier message that has not been acknowledged.
+    in_flight_offsets: BTreeMap<u64, usize>,
+    /// The checkpoint each polled offset arrived with, kept until its offset is
+    /// committed. A commit of the checkpoint carries the partition incarnation
+    /// and owner that delivered the message, so the SDK refuses it after a
+    /// rebalance or a recreated partition instead of storing the offset under
+    /// the new context.
+    checkpoints: BTreeMap<u64, Checkpoint>,
 }
 
 /// What the source should do about an outstanding rejection.
@@ -109,12 +119,21 @@ struct PendingSeek {
 }
 
 impl PartitionState {
-    const fn mark_in_flight(&mut self) {
+    fn mark_in_flight(&mut self, offset: u64, checkpoint: Checkpoint) {
         self.in_flight += 1;
+        *self.in_flight_offsets.entry(offset).or_default() += 1;
+        self.checkpoints.insert(offset, checkpoint);
     }
 
-    const fn settle(&mut self) {
+    fn settle(&mut self, offset: u64) {
         self.in_flight = self.in_flight.saturating_sub(1);
+        match self.in_flight_offsets.get_mut(&offset) {
+            Some(count) if *count > 1 => *count -= 1,
+            Some(_) => {
+                self.in_flight_offsets.remove(&offset);
+            }
+            None => {}
+        }
     }
 
     const fn is_settled(&self) -> bool {
@@ -138,10 +157,11 @@ impl PartitionState {
     /// true for `BatchStatus::Errored`, where another replay may succeed, and
     /// false for a permanent `Rejected`. Returns `true` if the fence moved.
     fn record_rejection(&mut self, offset: u64, transient: bool) -> bool {
-        if self
-            .skipped_through
-            .is_some_and(|skipped| offset <= skipped)
-        {
+        if self.skipped.remove(&offset) {
+            // Undecodable and already moved past: replaying fails the same
+            // way forever. Lower offsets stay actionable so their failure
+            // still holds the checkpoint.
+            self.recompute_pending();
             return false;
         }
         let prev_fence = self.fence();
@@ -175,15 +195,17 @@ impl PartitionState {
         }
     }
 
-    /// Forget fences at or below a record the broker cannot decode. The seek
-    /// moves past them, so any acknowledgement still in flight arrives late
-    /// and must be ignored rather than re-fence the partition. Advancing
-    /// `max_delivered` lets a commit cover the skipped offset.
+    /// Mark the record the broker cannot decode as skipped so its late
+    /// acknowledgement cannot re-fence the partition, and drop fences the
+    /// seek passed. `in_flight_offsets` still caps the checkpoint below any
+    /// earlier message that has not settled.
     fn skip_through(&mut self, offset: u64) {
-        self.skipped_through = Some(
-            self.skipped_through
-                .map_or(offset, |skipped| skipped.max(offset)),
-        );
+        // A marker only suppresses its own offset's acknowledgement, and only
+        // a message in flight can still acknowledge, so parked markers would
+        // otherwise accumulate for the lifetime of the assignment.
+        self.skipped
+            .retain(|skipped| self.in_flight_offsets.contains_key(skipped));
+        self.skipped.insert(offset);
         self.rejected.retain(|&rejected, _| rejected > offset);
         self.max_delivered = Some(self.max_delivered.map_or(offset, |m| m.max(offset)));
         self.retry_attempts = 0;
@@ -204,6 +226,17 @@ impl PartitionState {
         let Some(max) = self.max_delivered else {
             return;
         };
+        // A skip or poison-message skip can raise `max_delivered` above
+        // messages that were polled but have not settled. Capping at the
+        // lowest unsettled offset keeps a restart from resuming past them.
+        let max = match self.in_flight_offsets.first_key_value() {
+            Some((&0, _)) => {
+                self.pending = None;
+                return;
+            }
+            Some((&lowest, _)) => max.min(lowest - 1),
+            None => max,
+        };
         self.pending = match self.fence() {
             // The very first message (offset 0) was rejected; nothing can be
             // committed safely.
@@ -211,6 +244,19 @@ impl PartitionState {
             Some(f) => Some(max.min(f - 1)),
             None => Some(max),
         };
+    }
+
+    /// Take the safe commit offset together with the checkpoint of that
+    /// offset, if a delivered message supplied one. Skips raise `pending` past
+    /// the last delivered message, so a skip-only commit has no checkpoint.
+    fn take_pending(&mut self) -> Option<(u64, Option<Checkpoint>)> {
+        let pending = self.pending.take()?;
+        Some((pending, self.checkpoints.get(&pending).copied()))
+    }
+
+    fn committed_through(&mut self, offset: u64) {
+        self.committed = Some(offset);
+        self.checkpoints.retain(|&polled, _| polled > offset);
     }
 
     /// How far the highest safely-committable offset is ahead of what the
@@ -296,13 +342,12 @@ fn queue_seek(
 }
 
 fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus, offset: u64) {
-    // Acks settle in registration order per partition, not offset order: a
-    // replay registers a lower offset after later ones already queued, so a
-    // later acknowledgement can arrive below `committed`. That is harmless:
-    // delivered offsets only raise the maximum, and an offset already skipped
-    // as undecodable must not re-fence the partition.
+    // Acks settle in registration order, not offset order: a replay registers
+    // a lower offset after later ones queued, so an acknowledgement can arrive
+    // below `committed`. That is harmless: delivered offsets only raise the
+    // maximum, and a skipped record's own acknowledgement must not re-fence.
     // Every acknowledgement settles exactly one registered message.
-    state.settle();
+    state.settle(offset);
     match status {
         BatchStatus::Delivered => {
             if state.record_delivered(offset) {
@@ -331,7 +376,10 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
 }
 
 /// Store each partition's pending offset on the Iggy server. Stores run
-/// concurrently so a slow partition cannot stall the commit tick. A
+/// concurrently so a slow partition cannot stall the commit tick. A delivered
+/// message's checkpoint commits under the partition history that delivered it,
+/// so the SDK drops a store that a rebalance or a recreated partition made
+/// stale; a skipped offset has no checkpoint and is stored raw. A
 /// `NotResolvedConsumer` or `ConsumerGroupPartitionNotOwned` error prunes the
 /// partition's state after a rebalance, since its checkpoint can never be
 /// stored again; other errors restore the pending offset so a later tick or
@@ -350,30 +398,38 @@ async fn commit_offsets(
     finalizers: &mut HashMap<u32, OrderedFinalizer<u64>>,
     ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
 ) {
-    let pending: Vec<(u32, u64)> = partitions
+    let pending: Vec<(u32, u64, Option<Checkpoint>)> = partitions
         .iter_mut()
-        .filter_map(|(&partition_id, state)| state.pending.take().map(|o| (partition_id, o)))
+        .filter_map(|(&partition_id, state)| {
+            state
+                .take_pending()
+                .map(|(offset, checkpoint)| (partition_id, offset, checkpoint))
+        })
         .collect();
 
     if pending.is_empty() {
         return;
     }
 
-    let results = join_all(
-        pending
-            .into_iter()
-            .map(|(partition_id, offset)| async move {
-                let result = consumer.store_offset(offset, Some(partition_id)).await;
-                (partition_id, offset, result)
-            }),
-    )
+    let results = join_all(pending.into_iter().map(
+        |(partition_id, offset, checkpoint)| async move {
+            let result = match checkpoint {
+                Some(checkpoint) => consumer.commit(checkpoint).await,
+                // Nothing was delivered at this offset: it is past a record the
+                // broker could not decode or a permanently rejected event, so only
+                // its offset is available to store.
+                None => consumer.store_offset(offset, Some(partition_id)).await,
+            };
+            (partition_id, offset, result)
+        },
+    ))
     .await;
 
     for (partition_id, offset, result) in results {
         match result {
             Ok(()) => {
                 if let Some(state) = partitions.get_mut(&partition_id) {
-                    state.committed = Some(offset);
+                    state.committed_through(offset);
                 }
                 emit(IggyOffsetCommitted {
                     stream,
@@ -431,7 +487,13 @@ struct AckTracker<'a> {
 }
 
 impl AckTracker<'_> {
-    fn register(&mut self, partition_id: u32, offset: u64, receiver: BatchStatusReceiver) {
+    fn register(
+        &mut self,
+        partition_id: u32,
+        offset: u64,
+        checkpoint: Checkpoint,
+        receiver: BatchStatusReceiver,
+    ) {
         let finalizer = self.finalizers.entry(partition_id).or_insert_with(|| {
             let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
             self.ack_streams.insert(partition_id, stream);
@@ -440,7 +502,7 @@ impl AckTracker<'_> {
         self.partitions
             .entry(partition_id)
             .or_default()
-            .mark_in_flight();
+            .mark_in_flight(offset, checkpoint);
         finalizer.add(offset, receiver);
     }
 }
@@ -453,6 +515,7 @@ impl AckTracker<'_> {
 #[allow(clippy::too_many_lines, reason = "One frame-decode and ack path")]
 async fn process_received_message(
     received: ReceivedMessage,
+    checkpoint: Checkpoint,
     decoder: &Decoder,
     metadata: &MessageMetadata<'_>,
     acknowledgements: bool,
@@ -581,7 +644,7 @@ async fn process_received_message(
             // settle. An empty batch resolves as Delivered immediately. A
             // downstream rejection holds the fence until this offset is
             // replayed, matching the non-decode path.
-            tracker.register(partition_id, offset, status_receiver);
+            tracker.register(partition_id, offset, checkpoint, status_receiver);
         }
         // Without acknowledgements `CommitPolicy::OnRead` stored the end of the
         // polled batch when it was read, so the failed record is already behind
@@ -591,7 +654,7 @@ async fn process_received_message(
     }
 
     if acknowledgements {
-        tracker.register(partition_id, offset, status_receiver);
+        tracker.register(partition_id, offset, checkpoint, status_receiver);
     }
 
     Ok(())
@@ -907,6 +970,7 @@ pub(crate) async fn run_iggy_source(
                             }
                         }
 
+                        let checkpoint = received.checkpoint();
                         let mut tracker = AckTracker {
                             partitions: &mut partitions,
                             finalizers: &mut finalizers,
@@ -914,6 +978,7 @@ pub(crate) async fn run_iggy_source(
                         };
                         if process_received_message(
                             received,
+                            checkpoint,
                             &decoder,
                             &metadata,
                             acknowledgements,
@@ -1115,7 +1180,9 @@ pub(crate) async fn run_iggy_source(
 
 #[cfg(test)]
 mod tests {
-    use iggy::prelude::{IggyError, PollingKind, PollingStrategy, ReadError};
+    use iggy::prelude::{
+        Checkpoint, IggyError, PartitionContext, PollingKind, PollingStrategy, ReadError,
+    };
 
     use std::collections::HashMap;
 
@@ -1124,6 +1191,18 @@ mod tests {
         queue_seek, record_ack, seek_started, stopped_partition,
     };
     use crate::event::BatchStatus;
+
+    fn checkpoint(offset: u64) -> Checkpoint {
+        Checkpoint::new(0, offset, PartitionContext::default())
+    }
+
+    /// The fence logic only needs a checkpoint to exist for a polled offset;
+    /// its partition history is what the commit path carries.
+    impl PartitionState {
+        fn mark_offset_in_flight(&mut self, offset: u64) {
+            self.mark_in_flight(offset, checkpoint(offset));
+        }
+    }
 
     #[test]
     fn delivered_sets_pending_to_max() {
@@ -1245,11 +1324,38 @@ mod tests {
         assert!(!at_capacity(&partitions));
 
         let mut state = PartitionState::default();
-        for _ in 0..MAX_IN_FLIGHT {
-            state.mark_in_flight();
+        for offset in 0..MAX_IN_FLIGHT as u64 {
+            state.mark_offset_in_flight(offset);
         }
         partitions.insert(0, state);
         assert!(at_capacity(&partitions));
+    }
+
+    #[test]
+    fn commit_carries_the_checkpoint_that_delivered_the_offset() {
+        let mut s = PartitionState::default();
+        s.mark_in_flight(5, checkpoint(5));
+        record_ack(&mut s, 0, BatchStatus::Delivered, 5);
+        assert_eq!(s.take_pending(), Some((5, Some(checkpoint(5)))));
+    }
+
+    #[test]
+    fn skipped_offset_commits_without_a_checkpoint() {
+        let mut s = PartitionState::default();
+        s.mark_in_flight(3, checkpoint(3));
+        record_ack(&mut s, 0, BatchStatus::Delivered, 3);
+        s.skip_through(7);
+        assert_eq!(s.take_pending(), Some((7, None)));
+    }
+
+    #[test]
+    fn committing_drops_checkpoints_it_covers() {
+        let mut s = PartitionState::default();
+        s.mark_in_flight(1, checkpoint(1));
+        s.mark_in_flight(2, checkpoint(2));
+        s.committed_through(1);
+        assert!(!s.checkpoints.contains_key(&1));
+        assert!(s.checkpoints.contains_key(&2));
     }
 
     #[test]
@@ -1328,14 +1434,12 @@ mod tests {
     fn settle_tracks_in_flight_messages() {
         let mut s = PartitionState::default();
         assert!(s.is_settled());
-        s.mark_in_flight();
-        s.mark_in_flight();
+        s.mark_offset_in_flight(1);
+        s.mark_offset_in_flight(2);
         assert!(!s.is_settled());
-        s.record_delivered(1);
-        s.record_delivered(2);
-        s.settle();
+        record_ack(&mut s, 0, BatchStatus::Delivered, 1);
         assert!(!s.is_settled());
-        s.settle();
+        record_ack(&mut s, 0, BatchStatus::Delivered, 2);
         assert!(s.is_settled());
         // A fully settled sparse batch has committable lag even though it
         // never reaches the eager-commit threshold.
@@ -1345,15 +1449,13 @@ mod tests {
     #[test]
     fn rejection_also_settles_and_fences_sparse_batch() {
         let mut s = PartitionState::default();
-        s.mark_in_flight();
-        s.record_delivered(5);
-        s.settle();
+        s.mark_offset_in_flight(5);
+        record_ack(&mut s, 0, BatchStatus::Delivered, 5);
         assert_eq!(s.pending, Some(5));
-        s.mark_in_flight();
-        s.record_rejection(7, false);
+        s.mark_offset_in_flight(7);
         // The rejected message settles too when its acknowledgement arrives,
         // but the fence holds the pending offset below it.
-        s.settle();
+        record_ack(&mut s, 0, BatchStatus::Rejected, 7);
         assert!(s.is_settled());
         assert_eq!(s.pending, Some(5));
     }
@@ -1421,6 +1523,58 @@ mod tests {
     }
 
     #[test]
+    fn skipped_markers_do_not_outlive_their_acknowledgements() {
+        let mut s = PartitionState::default();
+        // Undecodable records never register an acknowledgement, so their
+        // markers cannot stay for the lifetime of the assignment.
+        s.skip_through(4);
+        s.skip_through(5);
+        s.skip_through(6);
+        assert_eq!(s.skipped.iter().copied().collect::<Vec<_>>(), vec![6]);
+
+        // A skipped record with a message still in flight keeps its marker so
+        // the late acknowledgement cannot re-fence the partition.
+        s.mark_offset_in_flight(9);
+        s.skip_through(9);
+        s.skip_through(10);
+        assert_eq!(s.skipped.iter().copied().collect::<Vec<_>>(), vec![9, 10]);
+        assert!(!s.record_rejection(9, false));
+        assert_eq!(s.fence(), None);
+    }
+
+    #[test]
+    fn skip_does_not_commit_past_an_earlier_unsettled_offset() {
+        let mut s = PartitionState::default();
+        // Offset 5 was polled and forwarded but its acknowledgement has not
+        // arrived when the broker reports offset 6 as undecodable.
+        s.mark_offset_in_flight(5);
+        s.record_delivered(4);
+        s.skip_through(6);
+
+        // Advancing to the skipped offset would checkpoint past 5 and lose it
+        // on restart, so the commit stays behind the unsettled message.
+        assert_eq!(s.pending, Some(4));
+
+        record_ack(&mut s, 0, BatchStatus::Delivered, 5);
+        assert_eq!(s.pending, Some(6));
+    }
+
+    #[test]
+    fn late_rejection_below_a_skipped_offset_still_fences() {
+        let mut s = PartitionState::default();
+        s.mark_offset_in_flight(5);
+        s.record_delivered(4);
+        s.skip_through(6);
+
+        // The record after 5 was undecodable, but 5 itself is readable: its
+        // failure must hold the checkpoint and be replayed rather than being
+        // skipped with the unreadable record.
+        record_ack(&mut s, 0, BatchStatus::Rejected, 5);
+        assert_eq!(s.fence(), Some(5));
+        assert_eq!(s.pending, Some(4));
+    }
+
+    #[test]
     fn replay_ack_below_the_committed_offset_is_accepted() {
         // A replay seek can register a lower offset after a later one was
         // delivered and committed, so its acknowledgement arrives below
@@ -1428,7 +1582,7 @@ mod tests {
         let mut s = PartitionState::default();
         s.record_delivered(10);
         s.committed = Some(10);
-        s.mark_in_flight();
+        s.mark_offset_in_flight(5);
 
         record_ack(&mut s, 0, BatchStatus::Delivered, 5);
 
