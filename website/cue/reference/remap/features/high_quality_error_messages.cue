@@ -6,7 +6,7 @@ remap: features: high_quality_error_messages: {
 
 		This VRL program, for example...
 
-		```coffee
+		```vrl
 		parse_json!(1)
 		```
 

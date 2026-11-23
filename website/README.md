@@ -89,16 +89,16 @@ vector.dev uses two different icon sets for different purposes:
 
 ### Redirects
 
-Redirects for vector.dev are defined in three difference places (depending on the use):
+The website source includes two forms of redirect configuration (depending on the use):
 
-1. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
+1. Splat-style redirects (which can't be defined as Hugo aliases) are generated into `_redirects` by [`layouts/index.redirects`](./layouts/index.redirects), using the integration guide lists in [`data/redirects.yaml`](./data/redirects.yaml).
 2. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
 
 ### Link checking
 
-vector.dev uses the [htmltest] link checker to sniff out broken links. Whenever the site is built in CI, be it the preview build or the production build, all internal links on the site are checked. If *any* link is broken, the build fails. If you push changes to the docs/site and your build yields a big red X but running the site locally works fine, scan the CI output for broken links. There's a good chance that that's your culprit.
+vector.dev uses the [htmltest] link checker to sniff out broken links. CI does not run it, so run it locally before you push changes to the docs/site. All internal links on the site are checked. If *any* link is broken, the check fails.
 
-You can run the full CI builds locally, with link checking included:
+You can run the full builds locally, with link checking included:
 
 ```shell
 # Production
