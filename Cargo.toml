@@ -166,7 +166,7 @@ todo = "warn"
 datadog-agent-metrics-v3 = { path = "lib/vendored/datadog-agent-metrics-v3" }
 protobuf = { version = "3.7", default-features = false, features = ["with-bytes"] }
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
-antithesis_sdk = { version = "0.3", default-features = false, features = [] }
+antithesis_sdk = { version = "0.4", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
 async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
