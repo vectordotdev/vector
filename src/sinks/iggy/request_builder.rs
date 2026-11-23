@@ -60,13 +60,14 @@ pub(super) fn request_builder(
         match encoder.encode(event, &mut buf) {
             Ok(()) => {
                 let frame = buf.split().freeze();
-                // The SDK rejects empty and oversized payloads, which would
-                // fail the whole request and error its valid siblings.
+                // Empty and oversized frames cannot be published and would
+                // fail the whole request. Re-encoding yields the same frame,
+                // so reject it and let the bounded poison-message policy run.
                 if frame.is_empty() || frame.len() > MAX_PAYLOAD_SIZE as usize {
                     emit(IggyInvalidPayloadError {
                         payload_len: frame.len(),
                     });
-                    event_finalizers.update_status(EventStatus::Errored);
+                    event_finalizers.update_status(EventStatus::Rejected);
                     continue;
                 }
                 byte_size.add_event(&tags, json_size);
@@ -77,13 +78,15 @@ pub(super) fn request_builder(
                 payloads.push(frame);
             }
             Err(_) => {
-                event_finalizers.update_status(EventStatus::Errored);
+                // The same event fails to encode on every replay, so a
+                // retriable status would pin the partition's checkpoint;
+                // `Rejected` lets the bounded poison-message policy skip it.
+                event_finalizers.update_status(EventStatus::Rejected);
             }
         }
     }
 
-    // All events failed encoding and were marked Errored above. Drop the
-    // request instead of emitting "Delivered" for an empty send.
+    // Drop the request rather than report a delivery with nothing sent.
     if payloads.is_empty() {
         return None;
     }
