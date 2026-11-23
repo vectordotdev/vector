@@ -1,13 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use vector::{
     config::{DataType, TransformContext, TransformOutput},
-    event::{Event, EventArray, LogEvent, Value},
+    event::{Event, LogEvent, Value},
     transforms::{
-        SyncTransform, TransformOutputsBuf,
-        remap::{Remap, RemapConfig},
+        ErasedSyncTransform, StatefulTransform, TransformOutputsBuf,
+        remap::{AstRunner, Remap, RemapConfig},
     },
 };
 use vrl::{event_path, prelude::*};
@@ -33,12 +33,12 @@ criterion_main!(benches);
 fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
-    let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
+    let add_fields_runner = |tform: &Remap<AstRunner>, state: &mut AstRunner, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
-        tform.transform(event, &mut outputs);
+        tform.transform(state, event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
 
@@ -59,27 +59,26 @@ fn benchmark_remap(c: &mut Criterion) {
     };
 
     group.bench_function("add_fields/remap", |b| {
-        let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new_ast(
-                &RemapConfig {
-                    source: Some(
-                        indoc! {r#".foo = "bar"
+        let tform = Remap::new_ast(
+            &RemapConfig {
+                source: Some(
+                    indoc! {r#".foo = "bar"
                             .bar = "baz"
                             .copy = string!(.copy_from)
                         "#}
-                        .to_string(),
-                    ),
-                    file: None,
-                    timezone: None,
-                    drop_on_error: true,
-                    drop_on_abort: true,
-                    ..Default::default()
-                },
-                &Default::default(),
-            )
-            .unwrap()
-            .0,
-        );
+                    .to_string(),
+                ),
+                file: None,
+                timezone: None,
+                drop_on_error: true,
+                drop_on_abort: true,
+                ..Default::default()
+            },
+            &Default::default(),
+        )
+        .unwrap()
+        .0;
+        let mut state = tform.new_state();
 
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
@@ -91,17 +90,17 @@ fn benchmark_remap(c: &mut Criterion) {
 
         b.iter_batched(
             || event.clone(),
-            |event| add_fields_runner(&mut tform, event),
+            |event| add_fields_runner(&tform, &mut state, event),
             BatchSize::SmallInput,
         );
     });
 
-    let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
+    let json_parser_runner = |tform: &Remap<AstRunner>, state: &mut AstRunner, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
-        tform.transform(event, &mut outputs);
+        tform.transform(state, event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
 
@@ -118,21 +117,20 @@ fn benchmark_remap(c: &mut Criterion) {
     };
 
     group.bench_function("parse_json/remap", |b| {
-        let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new_ast(
-                &RemapConfig {
-                    source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
-                    file: None,
-                    timezone: None,
-                    drop_on_error: true,
-                    drop_on_abort: true,
-                    ..Default::default()
-                },
-                &Default::default(),
-            )
-            .unwrap()
-            .0,
-        );
+        let tform = Remap::new_ast(
+            &RemapConfig {
+                source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
+                file: None,
+                timezone: None,
+                drop_on_error: true,
+                drop_on_abort: true,
+                ..Default::default()
+            },
+            &Default::default(),
+        )
+        .unwrap()
+        .0;
+        let mut state = tform.new_state();
 
         let event = {
             let mut event = Event::Log(LogEvent::from("parse me"));
@@ -144,39 +142,41 @@ fn benchmark_remap(c: &mut Criterion) {
 
         b.iter_batched(
             || event.clone(),
-            |event| json_parser_runner(&mut tform, event),
+            |event| json_parser_runner(&tform, &mut state, event),
             BatchSize::SmallInput,
         );
     });
 
-    let coerce_runner =
-        |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut outputs = TransformOutputsBuf::new_with_capacity(
-                vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
-                1,
-            );
-            tform.transform(event, &mut outputs);
-            let result = outputs.take_primary();
-            let output_1 = result.first().unwrap().as_log();
+    let coerce_runner = |tform: &Remap<AstRunner>,
+                         state: &mut AstRunner,
+                         event: Event,
+                         timestamp: DateTime<Utc>| {
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
+            1,
+        );
+        tform.transform(state, event, &mut outputs);
+        let result = outputs.take_primary();
+        let output_1 = result.first().unwrap().as_log();
 
-            debug_assert_eq!(
-                output_1.get(event_path!("number")).unwrap(),
-                &Value::Integer(1234)
-            );
-            debug_assert_eq!(
-                output_1.get(event_path!("bool")).unwrap(),
-                &Value::Boolean(true)
-            );
-            debug_assert_eq!(
-                output_1.get(event_path!("timestamp")).unwrap(),
-                &Value::Timestamp(timestamp),
-            );
+        debug_assert_eq!(
+            output_1.get(event_path!("number")).unwrap(),
+            &Value::Integer(1234)
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("bool")).unwrap(),
+            &Value::Boolean(true)
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("timestamp")).unwrap(),
+            &Value::Timestamp(timestamp),
+        );
 
-            result
-        };
+        result
+    };
 
     group.bench_function("coerce/remap", |b| {
-        let mut tform: Box<dyn SyncTransform> = Box::new(
+        let tform =
             Remap::new_ast(&RemapConfig {
                 source: Some(indoc! {r#"
                     .number = to_int!(.number)
@@ -191,8 +191,8 @@ fn benchmark_remap(c: &mut Criterion) {
                     ..Default::default()
             }, &Default::default())
             .unwrap()
-            .0,
-        );
+            .0;
+        let mut state = tform.new_state();
 
         let mut event = Event::Log(LogEvent::from("coerce me"));
         for &(key, value) in &[
@@ -210,13 +210,14 @@ fn benchmark_remap(c: &mut Criterion) {
 
         b.iter_batched(
             || event.clone(),
-            |event| coerce_runner(&mut tform, event, timestamp),
+            |event| coerce_runner(&tform, &mut state, event, timestamp),
             BatchSize::SmallInput,
         );
     });
 }
 
 // Keep the executed path short while retaining a large compiled expression tree.
+// This exposes setup costs that can otherwise be hidden by expensive event work.
 fn benchmark_remap_huge(c: &mut Criterion) {
     // Repeat the cold assignments to reach roughly 321 KB without adding new fields.
     let branches = (0..256)
@@ -226,32 +227,32 @@ fn benchmark_remap_huge(c: &mut Criterion) {
         .collect::<Vec<_>>()
         .join("\n");
     let source = format!("if .branch == true {{\n{branches}\n}}\n.processed = true");
-    let (remap, _) = Remap::new_ast(
+    let (definition, _) = Remap::new_ast(
         &RemapConfig {
             source: Some(source),
-            ..RemapConfig::default()
+            ..Default::default()
         },
         &TransformContext::default(),
     )
     .unwrap();
-    let transform: Box<dyn SyncTransform> = Box::new(remap);
-
+    let shared: Arc<dyn ErasedSyncTransform> = Arc::new(definition);
     let mut group = c.benchmark_group("remap/huge");
     for size in [1, 32, 256] {
         group.throughput(Throughput::Elements(size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             b.iter_batched(
                 || {
-                    let events = (0..size).map(|_| LogEvent::from("test")).collect();
+                    let events = (0..size)
+                        .map(|_| LogEvent::from("test"))
+                        .collect::<Vec<_>>();
                     let output = TransformOutputsBuf::new_with_capacity(
                         vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
                         size,
                     );
-                    (EventArray::Logs(events), output)
+                    (vec![vector::event::EventArray::Logs(events)], output)
                 },
-                |(events, mut output)| {
-                    // The concurrent runner clones the transform once per batch.
-                    transform.clone().transform_all(events, &mut output);
+                |(arrays, mut output)| {
+                    shared.transform_batch(arrays, &mut output);
                     std::hint::black_box(output);
                 },
                 BatchSize::SmallInput,

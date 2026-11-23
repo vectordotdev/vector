@@ -101,14 +101,9 @@ impl TransformConfig for NoopTransformConfig {
         let delay = self.delay_ms.map(Duration::from_millis);
         let cpu_burn = self.cpu_burn_ms.map(Duration::from_millis);
         match self.transform_type {
-            TransformType::Function => Ok(Transform::Function(Box::new(NoopTransform {
-                delay,
-                cpu_burn,
-            }))),
-            TransformType::Synchronous => Ok(Transform::Synchronous(Box::new(NoopTransform {
-                delay,
-                cpu_burn,
-            }))),
+            TransformType::Function | TransformType::Synchronous => {
+                Ok(Transform::stateless(NoopTransform { delay, cpu_burn }))
+            }
             TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform { delay, cpu_burn }))),
         }
     }
@@ -147,7 +142,7 @@ pub(crate) fn busy_spin(duration: Duration) {
 }
 
 impl FunctionTransform for NoopTransform {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         if let Some(delay) = self.delay {
             std::thread::sleep(delay);
         }
