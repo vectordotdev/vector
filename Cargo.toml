@@ -517,7 +517,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps
 
 # make sure to update the external docs when the Lua version changes
 mlua = { workspace = true, features = ["macros"], optional = true }
-sysinfo = "0.37.2"
+sysinfo = "0.38.4"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8.0"
