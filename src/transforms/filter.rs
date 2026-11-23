@@ -43,7 +43,7 @@ impl GenerateConfig for FilterConfig {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(self.condition.build(
+        Ok(Transform::stateless(Filter::new(self.condition.build(
             &context.enrichment_tables,
             &context.metrics_storage,
         )?)))
@@ -91,7 +91,7 @@ impl Filter {
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         let (result, event) = self.condition.check(event);
         if result {
             output.push(event);

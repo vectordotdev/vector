@@ -40,7 +40,10 @@ where
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         let (max_bytes, max_events) = match self.capacity {
             MemoryBufferSize::MaxEvents(max_events) => (None, Some(max_events.get())),
-            MemoryBufferSize::MaxSize(max_size) => (Some(max_size.get() as u64), None),
+            MemoryBufferSize::MaxSize(max_size) => (
+                Some(u64::try_from(max_size.get()).unwrap_or(u64::MAX)),
+                None,
+            ),
         };
 
         usage_handle.set_buffer_limits(max_bytes, max_events);
@@ -57,9 +60,12 @@ mod tests {
     use tracing::Span;
 
     use super::*;
-    use crate::{buffer_usage_data::BufferUsage, test::SizedRecord};
+    use crate::{
+        buffer_usage_data::{BufferUsage, BufferUsageSnapshot},
+        test::SizedRecord,
+    };
 
-    async fn reported_limits(buffer: MemoryBuffer) -> (u64, usize) {
+    async fn reported_limits(buffer: MemoryBuffer) -> BufferUsageSnapshot {
         let mut buffer_usage = BufferUsage::from_span(Span::none());
         let usage_handle = buffer_usage.add_stage(0);
 
@@ -70,29 +76,28 @@ mod tests {
         .await
         .unwrap();
 
-        let snapshot = usage_handle.snapshot();
-        (snapshot.max_size_bytes, snapshot.max_size_events)
+        usage_handle.snapshot()
     }
 
     #[tokio::test]
     async fn event_based_limit_is_reported_in_the_events_slot() {
-        let (max_bytes, max_events) = reported_limits(MemoryBuffer::with_max_events(
+        let snapshot = reported_limits(MemoryBuffer::with_max_events(
             NonZeroUsize::new(500).unwrap(),
         ))
         .await;
 
-        assert_eq!(max_events, 500);
-        assert_eq!(max_bytes, 0);
+        assert_eq!(snapshot.max_size_events, 500);
+        assert_eq!(snapshot.max_size_bytes, 0);
     }
 
     #[tokio::test]
     async fn byte_based_limit_is_reported_in_the_bytes_slot() {
-        let (max_bytes, max_events) = reported_limits(MemoryBuffer::new(
-            MemoryBufferSize::MaxSize(NonZeroUsize::new(268_435_488).unwrap()),
-        ))
+        let snapshot = reported_limits(MemoryBuffer::new(MemoryBufferSize::MaxSize(
+            NonZeroUsize::new(268_435_488).unwrap(),
+        )))
         .await;
 
-        assert_eq!(max_bytes, 268_435_488);
-        assert_eq!(max_events, 0);
+        assert_eq!(snapshot.max_size_bytes, 268_435_488);
+        assert_eq!(snapshot.max_size_events, 0);
     }
 }

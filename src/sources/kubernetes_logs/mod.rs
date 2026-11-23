@@ -61,7 +61,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     sources::kubernetes_logs::partial_events_merger::merge_partial_events,
-    transforms::{FunctionTransform, OutputBuffer},
+    transforms::OutputBuffer,
 };
 
 mod k8s_paths_provider;
@@ -77,7 +77,8 @@ mod util;
 
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
-    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    node_metadata_annotator::NodeMetadataAnnotator,
+    parser::{Parser, ParserState},
     pod_metadata_annotator::PodMetadataAnnotator,
 };
 
@@ -993,10 +994,11 @@ impl Source {
             event
         });
 
-        let mut parser = Parser::new(log_namespace);
+        let parser = Parser::new(log_namespace);
+        let mut parser_state = ParserState::default();
         let events = events.flat_map(move |event| {
             let mut buf = OutputBuffer::with_capacity(1);
-            parser.transform(&mut buf, event);
+            parser.transform(&mut parser_state, &mut buf, event);
             futures::stream::iter(buf.into_events())
         });
 
