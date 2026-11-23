@@ -2,6 +2,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
     path::PathBuf,
+    sync::Arc,
     time::Duration,
 };
 use vector_lib::internal_event::{emit, register};
@@ -376,7 +377,7 @@ async fn statsd_udp(
 
     let codec = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer::udp(
+        Deserializer::Shared(Arc::new(StatsdDeserializer::udp(
             config.sanitize,
             config.convert_to,
         ))),
@@ -417,7 +418,7 @@ impl TcpSource for StatsdTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(StatsdDeserializer::tcp(
+            Deserializer::Shared(Arc::new(StatsdDeserializer::tcp(
                 self.sanitize,
                 self.convert_to,
             ))),

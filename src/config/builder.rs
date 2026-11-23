@@ -6,8 +6,8 @@ use vector_lib::{config::GlobalOptions, configurable::configurable_component};
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
-    HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter, compiler, schema,
+    ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SharedSink, SharedSource,
+    SharedTransform, SinkOuter, SourceOuter, TestDefinition, TransformOuter, compiler, schema,
 };
 use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 
@@ -179,12 +179,12 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<K: Into<String>, S: Into<BoxedSource>>(&mut self, key: K, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<SharedSource>>(&mut self, key: K, source: S) {
         self.sources
             .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<K: Into<String>, S: Into<BoxedSink>>(
+    pub fn add_sink<K: Into<String>, S: Into<SharedSink>>(
         &mut self,
         key: K,
         inputs: &[&str],
@@ -208,7 +208,7 @@ impl ConfigBuilder {
         &mut self,
         key: impl Into<String>,
         inputs: &[&str],
-        transform: impl Into<BoxedTransform>,
+        transform: impl Into<SharedTransform>,
     ) {
         let inputs = inputs
             .iter()

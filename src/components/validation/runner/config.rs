@@ -14,7 +14,7 @@ use crate::{
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
     },
-    config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
+    config::{ConfigBuilder, SharedSink, SharedSource, SharedTransform},
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
     test_util::addr::next_addr,
@@ -59,7 +59,7 @@ impl TopologyBuilder {
     }
 
     /// Creates a component topology for validating a source.
-    fn from_source(source: BoxedSource) -> Self {
+    fn from_source(source: SharedSource) -> Self {
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
@@ -73,7 +73,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_transform(transform: BoxedTransform, log_namespace: LogNamespace) -> Self {
+    fn from_transform(transform: SharedTransform, log_namespace: LogNamespace) -> Self {
         let (input_edge, input_source) = build_input_edge(log_namespace);
         let (output_edge, output_sink) = build_output_edge();
 
@@ -89,7 +89,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_sink(sink: BoxedSink, log_namespace: LogNamespace) -> Self {
+    fn from_sink(sink: SharedSink, log_namespace: LogNamespace) -> Self {
         let (input_edge, input_source) = build_input_edge(log_namespace);
 
         let mut config_builder = ConfigBuilder::default();
@@ -131,7 +131,7 @@ impl TopologyBuilder {
     }
 }
 
-fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
+fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<SharedSource>) {
     // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
     let input_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
@@ -145,7 +145,7 @@ fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedS
     (input_edge, input_source)
 }
 
-fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
+fn build_output_edge() -> (OutputEdge, impl Into<SharedSink>) {
     // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
     let output_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");

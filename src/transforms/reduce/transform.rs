@@ -27,7 +27,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct ReduceState {
     events: usize,
     fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
@@ -140,7 +140,7 @@ impl ReduceState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,

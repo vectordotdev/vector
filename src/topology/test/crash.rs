@@ -6,7 +6,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     config::AcknowledgementsConfig,
-    config::{BoxedSource, Config},
+    config::{Config, SharedSource},
     signal::ShutdownError,
     sinks::socket::SocketSinkConfig,
     sources::socket::{SocketConfig, udp::UdpConfig},
@@ -278,7 +278,7 @@ async fn test_source_panic() {
 
 /// The application shuts down without an error as soon as all sources finish, so a failed source
 /// must not count as finished before its error is sent.
-async fn assert_source_error_sent_before_sources_finish(source: impl Into<BoxedSource>) {
+async fn assert_source_error_sent_before_sources_finish(source: impl Into<SharedSource>) {
     let mut config = Config::builder();
     config.add_source("in", source);
     config.add_sink("out", &["in"], basic_sink(1).1);

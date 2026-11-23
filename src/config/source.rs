@@ -1,7 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, time::Duration};
+use std::{cell::RefCell, collections::HashMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use dyn_clone::DynClone;
 use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
 use vector_config_common::{
     attributes::CustomAttribute,
@@ -22,9 +21,61 @@ use vector_lib::extra_context::ExtraContext;
 
 use crate::{SourceSender, shutdown::ShutdownSignal};
 
-pub type BoxedSource = Box<dyn SourceConfig>;
+/// A shared source configuration.
+///
+/// Configurations are immutable once loaded, so the components that reference
+/// one share it instead of cloning it.
+#[derive(Clone)]
+pub struct SharedSource(Arc<dyn SourceConfig>);
 
-impl Configurable for BoxedSource {
+impl SharedSource {
+    /// Creates a shared source configuration.
+    pub fn new<T: SourceConfig + 'static>(config: T) -> Self {
+        Self(Arc::new(config))
+    }
+}
+
+impl std::ops::Deref for SharedSource {
+    type Target = dyn SourceConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl AsRef<dyn SourceConfig> for SharedSource {
+    fn as_ref(&self) -> &(dyn SourceConfig + 'static) {
+        &*self.0
+    }
+}
+
+impl std::fmt::Debug for SharedSource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&*self.0, formatter)
+    }
+}
+
+impl serde::Serialize for SharedSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SharedSource {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self(Arc::from(Box::<dyn SourceConfig>::deserialize(
+            deserializer,
+        )?)))
+    }
+}
+
+impl Configurable for SharedSource {
     fn referenceable_name() -> Option<&'static str> {
         Some("vector::sources::Sources")
     }
@@ -44,9 +95,9 @@ impl Configurable for BoxedSource {
     }
 }
 
-impl<T: SourceConfig + 'static> From<T> for BoxedSource {
+impl<T: SourceConfig + 'static> From<T> for SharedSource {
     fn from(value: T) -> Self {
-        Box::new(value)
+        Self::new(value)
     }
 }
 
@@ -65,11 +116,11 @@ pub struct SourceOuter {
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub(crate) inner: BoxedSource,
+    pub(crate) inner: SharedSource,
 }
 
 impl SourceOuter {
-    pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
+    pub(crate) fn new<I: Into<SharedSource>>(inner: I) -> Self {
         Self {
             proxy: ProxyConfig::default(),
             graph: GraphConfig::default(),
@@ -82,7 +133,7 @@ impl SourceOuter {
 /// Generalized interface for describing and building source components.
 #[async_trait]
 #[typetag::serde(tag = "type")]
-pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
+pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the source with the given context.
     ///
     /// If the source is built successfully, `Ok(...)` is returned containing the source.
@@ -140,8 +191,6 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
         None
     }
 }
-
-dyn_clone::clone_trait_object!(SourceConfig);
 
 pub struct SourceContext {
     pub key: ComponentKey,

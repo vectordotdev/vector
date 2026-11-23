@@ -17,8 +17,8 @@ use vrl::{path::OwnedTargetPath, value::Kind};
 use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUTE};
 use crate::{
     config::{
-        EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
-        ValidatedSink,
+        EnrichmentTableConfig, SharedSink, SharedSource, SinkConfig, SinkContext, SourceConfig,
+        SourceContext, SourceOutput, ValidatedSink,
     },
     enrichment_tables::memory::{
         bloom_table::{BloomMemoryConfig, BloomMemoryTable},
@@ -287,14 +287,14 @@ impl EnrichmentTableConfig for MemoryConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+    ) -> crate::Result<Arc<dyn Table>> {
         self.validate_filter()?;
         match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
-                Ok(Box::new(self.get_or_build_cuckoo(prev_state).await?))
+                Ok(Arc::new(self.get_or_build_cuckoo(prev_state).await?))
             }
-            Some(TableFilter::Bloom(_)) => Ok(Box::new(self.get_or_build_bloom(prev_state).await?)),
-            None => Ok(Box::new(self.get_or_build_memory(prev_state).await)),
+            Some(TableFilter::Bloom(_)) => Ok(Arc::new(self.get_or_build_bloom(prev_state).await?)),
+            None => Ok(Arc::new(self.get_or_build_memory(prev_state).await)),
         }
     }
 
@@ -302,17 +302,11 @@ impl EnrichmentTableConfig for MemoryConfig {
         matches!(self.reload_behavior, ReloadBehavior::PreserveState)
     }
 
-    fn sink_config(
-        &self,
-        default_key: &ComponentKey,
-    ) -> Option<(ComponentKey, Box<dyn SinkConfig>)> {
-        Some((default_key.clone(), Box::new(self.clone())))
+    fn sink_config(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SharedSink)> {
+        Some((default_key.clone(), self.clone().into()))
     }
 
-    fn source_config(
-        &self,
-        _default_key: &ComponentKey,
-    ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
+    fn source_config(&self, _default_key: &ComponentKey) -> Option<(ComponentKey, SharedSource)> {
         let Some(source_config) = &self.source_config else {
             return None;
         };
@@ -320,10 +314,7 @@ impl EnrichmentTableConfig for MemoryConfig {
         if self.filter.is_some() {
             return None;
         }
-        Some((
-            source_config.source_key.clone().into(),
-            Box::new(self.clone()),
-        ))
+        Some((source_config.source_key.clone().into(), self.clone().into()))
     }
 }
 

@@ -41,7 +41,7 @@ use super::{Condition, Error, IndexHandle, InternalError, Table};
 use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
-type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
+type TableMap = HashMap<String, Arc<dyn Table>>;
 
 #[derive(Clone, Default)]
 pub struct TableRegistry {
@@ -78,11 +78,10 @@ impl TableRegistry {
     /// transforms that will need to add indexes to these tables during the
     /// reload.
     ///
-    /// Our only option is to clone the data that is in `tables` and move it
-    /// into the `loading` field so it can be mutated. This could be a
-    /// potentially expensive operation. For the period whilst the config is
-    /// reloading we could potentially have double the enrichment data loaded
-    /// into memory.
+    /// Tables that are already loaded are shared with the `loading` field rather
+    /// than copied, so the enrichment data itself is never duplicated. Tables
+    /// register indexes through interior mutability, so a shared table can still
+    /// be indexed during the reload.
     ///
     /// Once loading is complete, the data is swapped out of `loading` and we
     /// return to a single copy of the tables.
@@ -98,7 +97,7 @@ impl TableRegistry {
             let extend = existing
                 .iter()
                 .filter(|(key, _)| !tables.contains_key(*key))
-                .map(|(key, value)| (key.clone(), value.clone()))
+                .map(|(key, value)| (key.clone(), Arc::clone(value)))
                 .collect::<HashMap<_, _>>();
 
             tables.extend(extend);
@@ -153,18 +152,18 @@ impl TableRegistry {
     /// Returns an error after loading has finished, if the table is not loaded,
     /// or if the table cannot index the requested fields.
     pub fn add_index(
-        &mut self,
+        &self,
         table: &str,
         case: Case,
         fields: &[&str],
     ) -> Result<IndexHandle, Error> {
-        let mut locked = self.loading.lock().unwrap();
+        let locked = self.loading.lock().unwrap();
 
-        match *locked {
+        match &*locked {
             None => Err(Error::Internal {
                 source: InternalError::FinishLoadCalled,
             }),
-            Some(ref mut tables) => match tables.get_mut(table) {
+            Some(tables) => match tables.get(table) {
                 None => Err(Error::TableNotLoaded {
                     table: table.to_string(),
                 }),
@@ -330,8 +329,8 @@ mod tests {
     #[test]
     fn tables_loaded() {
         let mut tables: TableMap = HashMap::new();
-        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
-        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy1".to_string(), Arc::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy2".to_string(), Arc::new(DummyEnrichmentTable::new()));
 
         let registry = super::TableRegistry::default();
         registry.load(tables);
@@ -345,8 +344,8 @@ mod tests {
         let mut tables: TableMap = HashMap::new();
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
-        tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut registry = super::TableRegistry::default();
+        tables.insert("dummy1".to_string(), Arc::new(dummy));
+        let registry = super::TableRegistry::default();
         registry.load(tables);
         assert_eq!(
             Ok(IndexHandle(0)),
@@ -361,7 +360,7 @@ mod tests {
     fn can_not_find_table_row_before_finish() {
         let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
-        tables.insert("dummy1".to_string(), Box::new(dummy));
+        tables.insert("dummy1".to_string(), Arc::new(dummy));
         let registry = super::TableRegistry::default();
         registry.load(tables);
         let tables = registry.as_readonly();
@@ -388,8 +387,8 @@ mod tests {
     fn can_not_add_indexes_after_finish() {
         let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
-        tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut registry = super::TableRegistry::default();
+        tables.insert("dummy1".to_string(), Arc::new(dummy));
+        let registry = super::TableRegistry::default();
         registry.load(tables);
         registry.finish_load();
         assert_eq!(
@@ -404,7 +403,7 @@ mod tests {
     fn can_find_table_row_after_finish() {
         let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
-        tables.insert("dummy1".to_string(), Box::new(dummy));
+        tables.insert("dummy1".to_string(), Arc::new(dummy));
 
         let registry = super::TableRegistry::default();
         registry.load(tables);
@@ -431,7 +430,7 @@ mod tests {
     #[test]
     fn can_reload() {
         let mut tables: TableMap = HashMap::new();
-        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy1".to_string(), Arc::new(DummyEnrichmentTable::new()));
 
         let registry = super::TableRegistry::default();
         registry.load(tables);
@@ -444,7 +443,7 @@ mod tests {
         assert_eq!(registry.table_ids(), Vec::<String>::new());
 
         let mut tables: TableMap = HashMap::new();
-        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy2".to_string(), Arc::new(DummyEnrichmentTable::new()));
 
         // A load should put both tables back into the list.
         registry.load(tables);
@@ -457,8 +456,8 @@ mod tests {
     #[test]
     fn reloads_existing_tables() {
         let mut tables: TableMap = HashMap::new();
-        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
-        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy1".to_string(), Arc::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy2".to_string(), Arc::new(DummyEnrichmentTable::new()));
 
         let registry = super::TableRegistry::default();
         registry.load(tables);
@@ -473,7 +472,7 @@ mod tests {
         let mut tables: TableMap = HashMap::new();
         tables.insert(
             "dummy2".to_string(),
-            Box::new(DummyEnrichmentTable::new_with_data(new_data)),
+            Arc::new(DummyEnrichmentTable::new_with_data(new_data)),
         );
 
         // A load should put both tables back into the list.

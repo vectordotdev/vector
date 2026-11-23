@@ -37,7 +37,6 @@ pub use arrow::{
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
-use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};
 pub use json::{JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
@@ -56,7 +55,7 @@ pub use self::csv::{CsvSerializer, CsvSerializerConfig};
 
 /// Serialize a structured event into a byte frame.
 pub trait Serializer:
-    tokio_util::codec::Encoder<Event, Error = vector_common::Error> + DynClone + Debug + Send + Sync
+    tokio_util::codec::Encoder<Event, Error = vector_common::Error> + Debug + Send + Sync
 {
 }
 
@@ -70,5 +69,3 @@ impl<Encoder> Serializer for Encoder where
         + Sync
 {
 }
-
-dyn_clone::clone_trait_object!(Serializer);

@@ -2,10 +2,10 @@ use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     path::PathBuf,
+    sync::Arc,
 };
 
 use async_trait::async_trait;
-use dyn_clone::DynClone;
 use serde::Serialize;
 use vector_lib::{
     config::{DataType, GlobalOptions, Input, LogNamespace, TransformOutput},
@@ -25,9 +25,61 @@ use vector_lib::extra_context::ExtraContext;
 
 use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
 
-pub type BoxedTransform = Box<dyn TransformConfig>;
+/// A shared transform configuration.
+///
+/// Configurations are immutable once loaded, so the components that reference
+/// one share it instead of cloning it.
+#[derive(Clone)]
+pub struct SharedTransform(Arc<dyn TransformConfig>);
 
-impl Configurable for BoxedTransform {
+impl SharedTransform {
+    /// Creates a shared transform configuration.
+    pub fn new<T: TransformConfig + 'static>(config: T) -> Self {
+        Self(Arc::new(config))
+    }
+}
+
+impl std::ops::Deref for SharedTransform {
+    type Target = dyn TransformConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl AsRef<dyn TransformConfig> for SharedTransform {
+    fn as_ref(&self) -> &(dyn TransformConfig + 'static) {
+        &*self.0
+    }
+}
+
+impl std::fmt::Debug for SharedTransform {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&*self.0, formatter)
+    }
+}
+
+impl serde::Serialize for SharedTransform {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SharedTransform {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self(Arc::from(Box::<dyn TransformConfig>::deserialize(
+            deserializer,
+        )?)))
+    }
+}
+
+impl Configurable for SharedTransform {
     fn referenceable_name() -> Option<&'static str> {
         Some("vector::transforms::Transforms")
     }
@@ -47,9 +99,9 @@ impl Configurable for BoxedTransform {
     }
 }
 
-impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+impl<T: TransformConfig + 'static> From<T> for SharedTransform {
     fn from(that: T) -> Self {
-        Box::new(that)
+        Self::new(that)
     }
 }
 
@@ -82,7 +134,7 @@ where
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub inner: BoxedTransform,
+    pub inner: SharedTransform,
 }
 
 impl<T> TransformOuter<T>
@@ -92,7 +144,7 @@ where
     pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
     where
         I: IntoIterator<Item = T>,
-        IT: Into<BoxedTransform>,
+        IT: Into<SharedTransform>,
     {
         let inputs = Inputs::from_iter(inputs);
         let inner = inner.into();
@@ -215,7 +267,7 @@ impl TransformContext {
 /// Generalized interface for describing and building transform components.
 #[async_trait]
 #[typetag::serde(tag = "type")]
-pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
+pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
     ///
     /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
@@ -308,8 +360,6 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         Vec::new()
     }
 }
-
-dyn_clone::clone_trait_object!(TransformConfig);
 
 /// Often we want to call outputs just to retrieve the `OutputId`'s without needing
 /// the schema definitions.

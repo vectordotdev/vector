@@ -19,8 +19,9 @@ mod syslog;
 mod vrl;
 
 use ::bytes::Bytes;
+use std::sync::Arc;
+
 pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
-use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions};
@@ -43,7 +44,7 @@ pub use self::{
 };
 
 /// Parse structured events from bytes.
-pub trait Deserializer: DynClone + Send + Sync {
+pub trait Deserializer: Send + Sync {
     /// Parses structured events from bytes.
     ///
     /// It returns a `SmallVec` rather than an `Event` directly, since one byte
@@ -66,10 +67,12 @@ pub trait Deserializer: DynClone + Send + Sync {
     ) -> vector_common::Result<SmallVec<[Event; 1]>>;
 }
 
-dyn_clone::clone_trait_object!(Deserializer);
-
-/// A `Box` containing a `Deserializer`.
-pub type BoxedDeserializer = Box<dyn Deserializer>;
+/// A shared `Deserializer` trait object.
+///
+/// Deserializers parse through `&self`, so one instance can serve every
+/// connection that uses it. Sharing keeps custom deserializers out of the
+/// `Clone` requirement.
+pub type SharedDeserializer = Arc<dyn Deserializer>;
 
 /// Default value for the UTF-8 lossy option.
 const fn default_lossy() -> bool {

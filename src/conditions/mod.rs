@@ -160,7 +160,7 @@ pub trait Conditional: std::fmt::Debug {
     }
 }
 
-pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+pub trait ConditionalConfig: std::fmt::Debug + Send + Sync {
     /// Builds the condition described by this configuration.
     ///
     /// # Errors
@@ -173,8 +173,6 @@ pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone
         metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition>;
 }
-
-dyn_clone::clone_trait_object!(ConditionalConfig);
 
 /// An event matching condition.
 ///

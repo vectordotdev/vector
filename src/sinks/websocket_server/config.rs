@@ -188,6 +188,8 @@ impl_generate_config_from_default!(WebSocketListenerSinkConfig);
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use super::*;
     use indoc::indoc;
     use vector_lib::codecs::encoding::SerializerConfig;
@@ -196,12 +198,11 @@ mod test {
 
     fn sink_context_with_allowed_users() -> SinkContext {
         let cx = SinkContext::default();
-        let mut stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> =
-            HashMap::new();
+        let mut stubs: HashMap<String, Arc<dyn vector_lib::enrichment::Table>> = HashMap::new();
         stubs.insert(
             "allowed_users".to_string(),
-            Box::new(crate::validate::StubEnrichmentTable)
-                as Box<dyn vector_lib::enrichment::Table + Send + Sync>,
+            Arc::new(crate::validate::StubEnrichmentTable)
+                as Arc<dyn vector_lib::enrichment::Table>,
         );
         cx.enrichment_tables.load(stubs);
         cx

@@ -1,7 +1,6 @@
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
 use vector_lib::{
@@ -25,9 +24,61 @@ use vector_lib::extra_context::ExtraContext;
 
 use crate::sinks::{Healthcheck, util::UriSerde};
 
-pub type BoxedSink = Box<dyn SinkConfig>;
+/// A shared sink configuration.
+///
+/// Configurations are immutable once loaded, so the components that reference
+/// one share it instead of cloning it.
+#[derive(Clone)]
+pub struct SharedSink(Arc<dyn SinkConfig>);
 
-impl Configurable for BoxedSink {
+impl SharedSink {
+    /// Creates a shared sink configuration.
+    pub fn new<T: SinkConfig + 'static>(config: T) -> Self {
+        Self(Arc::new(config))
+    }
+}
+
+impl std::ops::Deref for SharedSink {
+    type Target = dyn SinkConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl AsRef<dyn SinkConfig> for SharedSink {
+    fn as_ref(&self) -> &(dyn SinkConfig + 'static) {
+        &*self.0
+    }
+}
+
+impl std::fmt::Debug for SharedSink {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&*self.0, formatter)
+    }
+}
+
+impl Serialize for SharedSink {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SharedSink {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self(Arc::from(Box::<dyn SinkConfig>::deserialize(
+            deserializer,
+        )?)))
+    }
+}
+
+impl Configurable for SharedSink {
     fn referenceable_name() -> Option<&'static str> {
         Some("vector::sinks::Sinks")
     }
@@ -47,9 +98,9 @@ impl Configurable for BoxedSink {
     }
 }
 
-impl<T: SinkConfig + 'static> From<T> for BoxedSink {
+impl<T: SinkConfig + 'static> From<T> for SharedSink {
     fn from(value: T) -> Self {
-        Box::new(value)
+        Self::new(value)
     }
 }
 
@@ -103,7 +154,7 @@ where
 
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
-    pub inner: BoxedSink,
+    pub inner: SharedSink,
 
     /// Validated state, filled in during config compilation.
     ///
@@ -146,7 +197,7 @@ where
     pub fn new<I, IS>(inputs: I, inner: IS) -> SinkOuter<T>
     where
         I: IntoIterator<Item = T>,
-        IS: Into<BoxedSink>,
+        IS: Into<SharedSink>,
     {
         SinkOuter {
             inputs: Inputs::from_iter(inputs),
@@ -287,9 +338,7 @@ impl From<UriSerde> for SinkHealthcheckOptions {
 /// Generalized interface for describing and building sink components.
 #[async_trait]
 #[typetag::serde(tag = "type")]
-pub trait SinkConfig:
-    DynClone + NamedComponent + core::fmt::Debug + Send + Sync + DynValidatedSink
-{
+pub trait SinkConfig: NamedComponent + core::fmt::Debug + Send + Sync + DynValidatedSink {
     /// Builds the sink with the given context.
     ///
     /// This default validates the sink structure on the fly and builds from the
@@ -336,8 +385,6 @@ pub trait SinkConfig:
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 }
-
-dyn_clone::clone_trait_object!(SinkConfig);
 
 #[derive(Clone, Debug)]
 pub struct SinkContext {

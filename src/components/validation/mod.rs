@@ -8,7 +8,7 @@ mod validators;
 
 use vector_lib::config::LogNamespace;
 
-use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
+use crate::config::{SharedSink, SharedSource, SharedTransform};
 
 /// For components implementing `ValidatableComponent`
 pub mod prelude {
@@ -62,13 +62,13 @@ impl ComponentType {
 #[derive(Clone, Debug)]
 pub enum ComponentConfiguration {
     /// A source component.
-    Source(BoxedSource),
+    Source(SharedSource),
 
     /// A transform component.
-    Transform(BoxedTransform),
+    Transform(SharedTransform),
 
     /// A sink component.
-    Sink(BoxedSink),
+    Sink(SharedSink),
 }
 
 /// Component configuration for a test case.
@@ -81,7 +81,7 @@ pub struct ComponentTestCaseConfig {
 }
 
 impl ComponentTestCaseConfig {
-    pub fn from_source<C: Into<BoxedSource>>(
+    pub fn from_source<C: Into<SharedSource>>(
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,
@@ -92,7 +92,7 @@ impl ComponentTestCaseConfig {
             external_resource,
         }
     }
-    pub fn from_transform<C: Into<BoxedTransform>>(
+    pub fn from_transform<C: Into<SharedTransform>>(
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,
@@ -103,7 +103,7 @@ impl ComponentTestCaseConfig {
             external_resource,
         }
     }
-    pub fn from_sink<C: Into<BoxedSink>>(
+    pub fn from_sink<C: Into<SharedSink>>(
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,

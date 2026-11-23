@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use vector_lib::codecs::{
     NewlineDelimitedDecoder,
     decoding::{Deserializer, Framer},
@@ -18,7 +20,7 @@ pub(super) fn statsd_unix(
 ) -> crate::Result<Source> {
     let decoder = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer::unix(
+        Deserializer::Shared(Arc::new(StatsdDeserializer::unix(
             config.sanitize,
             config.convert_to,
         ))),

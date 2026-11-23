@@ -36,7 +36,7 @@ pub use format::{
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
-    BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
+    BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,
     LengthDelimitedEncoder, LengthDelimitedEncoderConfig, NewlineDelimitedEncoder,
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
