@@ -5,7 +5,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
@@ -854,10 +854,21 @@ fn new_client(
     keepalive: Option<VectorKeepaliveConfig>,
     idle_connection_timeout_secs: NonZeroU64,
 ) -> crate::Result<Http2Client<TonicBody>> {
+    let idle_connection_timeout = Duration::from_secs(idle_connection_timeout_secs.get());
+    // Hyper's pool adds the timeout to the current time in its background task that evicts idle
+    // connections. That addition panics if the sum is out of range for the clock, and the pool
+    // then stops evicting in the background.
+    if Instant::now()
+        .checked_add(idle_connection_timeout)
+        .is_none()
+    {
+        return Err("`idle_connection_timeout_secs` is too large".into());
+    }
+
     let mut builder = Builder::new(CpuTimedExecutor);
     builder
         .http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE)
-        .pool_idle_timeout(Duration::from_secs(idle_connection_timeout_secs.get()));
+        .pool_idle_timeout(idle_connection_timeout);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.
@@ -1560,6 +1571,18 @@ mod tests {
         .unwrap();
 
         assert_eq!(config.idle_connection_timeout_secs.get(), 350);
+    }
+
+    #[test]
+    fn idle_connection_timeout_too_large_for_the_clock_is_rejected() {
+        let result = new_client(
+            &MaybeTlsSettings::Raw(()),
+            &ProxyConfig::default(),
+            None,
+            NonZeroU64::new(u64::MAX).unwrap(),
+        );
+
+        assert!(result.is_err());
     }
 
     /// Sends two requests, with `gap` between them, to a server that counts the connections it
