@@ -741,7 +741,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<ReaderMessage>,
 ) {
     // Start the green background thread for collecting
-    drop(crate::spawn_in_current_span(async move {
+    drop(vector_lib::cpu_time::spawn_timed(async move {
         debug!("Start capturing {origin} command output.");
 
         let mut stream = DecoderFramedRead::new(reader, decoder);
