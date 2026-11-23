@@ -1,4 +1,4 @@
-{{- $categories := slice "platforms" "sinks" "sources" -}}
+{{- $categories := slice "sinks" "sources" -}}
 {{/* Integration guide redirects (302 because we hope to replace later) */}}
 {{- range $categories -}}
 {{- $category := . -}}

@@ -67,7 +67,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

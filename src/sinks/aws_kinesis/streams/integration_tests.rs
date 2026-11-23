@@ -11,8 +11,8 @@ use vrl::event_path;
 use super::{config::KinesisClientBuilder, *};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
-    config::{ProxyConfig, SinkConfig, SinkContext},
-    sinks::util::{BatchConfig, Compression},
+    config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext},
+    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -38,18 +38,18 @@ async fn kinesis_put_records_with_partition_key() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        request_retry_partial: Default::default(),
+        request: TowerRequestConfig::default(),
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        request_retry_partial: false,
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -68,7 +68,7 @@ async fn kinesis_put_records_with_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -76,14 +76,14 @@ async fn kinesis_put_records_with_partition_key() {
     let mut output_lines = records
         .into_iter()
         .inspect(|e| {
-            assert_eq!(partition_value, e.partition_key());
+            assert_eq!(Some(partition_value), e.partition_key());
         })
         .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
     output_lines.sort();
-    assert_eq!(output_lines, input_lines)
+    assert_eq!(output_lines, input_lines);
 }
 
 #[tokio::test]
@@ -100,15 +100,15 @@ async fn kinesis_put_records_without_partition_key() {
         region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        request_retry_partial: Default::default(),
+        request: TowerRequestConfig::default(),
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        request_retry_partial: false,
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -120,7 +120,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    // Hard-coded sleeps are bad, but we're waiting on the emulator's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -132,7 +132,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     input_lines.sort();
     output_lines.sort();
-    assert_eq!(output_lines, input_lines)
+    assert_eq!(output_lines, input_lines);
 }
 
 async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec<Record>> {
@@ -200,13 +200,9 @@ async fn ensure_stream(stream_name: String) {
     {
         Ok(_) => (),
         Err(error) => panic!("Unable to check the stream {error:?}"),
-    };
+    }
 
-    // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
-    // during PutRecords
-    //
-    // I initially tried using `wait_for` with `DescribeStream` but localstack would
-    // successfully return the stream before it was able to accept PutRecords requests
+    // Give the new stream time to accept PutRecords requests.
     sleep(Duration::from_secs(1)).await;
 }
 
@@ -228,15 +224,15 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
         region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        request: TowerRequestConfig::default(),
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         request_retry_partial: true, // Enable partial failure retry
         partition_key_field: Some(ConfigValuePath::try_from("partition_key".to_string()).unwrap()),
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -261,7 +257,7 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
     // Send events through the sink
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Wait for localstack to process all records including retries
+    // Wait for the emulator to process all records including retries
     sleep(Duration::from_secs(3)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -301,15 +297,15 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
         region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        request: TowerRequestConfig::default(),
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         request_retry_partial: false, // Disable partial failure retry
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -323,7 +319,7 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
     // Send events through the sink
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
-    // Wait for localstack to process records
+    // Wait for the emulator to process records
     sleep(Duration::from_secs(2)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();

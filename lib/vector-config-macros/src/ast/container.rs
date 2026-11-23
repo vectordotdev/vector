@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use darling::{FromAttributes, error::Accumulator, util::Flag};
+use proc_macro2::Span;
 use serde_derive_internals::{Ctxt, Derive, ast as serde_ast};
 use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
@@ -37,11 +38,21 @@ pub struct Container<'a> {
 
 impl<'a> Container<'a> {
     /// Creates a new `Container<'a>` from the raw derive macro input.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keep the existing schema derivation together; splitting is deferred"
+    )]
     pub fn from_derive_input(input: &'a DeriveInput) -> darling::Result<Container<'a>> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
         let context = Ctxt::new();
-        let serde = match serde_ast::Container::from_ast(&context, input, Derive::Deserialize) {
+        let serde = match serde_ast::Container::from_ast(
+            &context,
+            input,
+            Derive::Deserialize,
+            &Ident::new("__private", Span::call_site()),
+        ) {
             Some(serde) => {
                 // This `serde_derive_internals` helper will panic if `check` isn't _always_ called, so we also have to
                 // call it on the success path.
@@ -146,13 +157,7 @@ impl<'a> Container<'a> {
                                 !variant.attrs.skip_deserializing()
                                     && !variant.attrs.skip_serializing()
                             })
-                            .map(|variant| {
-                                Variant::from_ast(
-                                    variant,
-                                    tagging.clone(),
-                                    virtual_newtype.is_some(),
-                                )
-                            })
+                            .map(|variant| Variant::from_ast(variant, tagging.clone()))
                             .collect_darling_results(&mut accumulator);
 
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
@@ -211,13 +216,7 @@ impl<'a> Container<'a> {
                                 matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| {
-                                    Field::from_ast(
-                                        field,
-                                        virtual_newtype.is_some(),
-                                        is_newtype_wrapper_field,
-                                    )
-                                })
+                                .map(|field| Field::from_ast(field, is_newtype_wrapper_field))
                                 .collect_darling_results(&mut accumulator);
 
                             (Data::Struct(style.into(), fields), false)
@@ -443,6 +442,11 @@ struct Attributes {
 }
 
 impl Attributes {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "retain the fallible finalization interface used by the AST parsing pipeline"
+    )]
     fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in

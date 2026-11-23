@@ -128,7 +128,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -138,7 +138,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: array: {
 			default: [
-				"**/*",
+				"**/*"
 			]
 			items: type: string: examples: ["**/include/**"]
 		}
@@ -168,16 +168,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for file-based components."
 		required:    false
-		type: object: options: include_file_tag: {
-			description: """
-				Whether or not to include the "file" tag on the component's corresponding internal metrics.
-
-				This is useful for distinguishing between different files while monitoring. However, the tag's
-				cardinality is unbounded.
-				"""
-			required: false
-			type: bool: default: false
-		}
+		type:        _schemaDefinitions["vector::internal_events::file::FileInternalMetricsConfig"]
 	}
 	kube_config_file: {
 		description: """
@@ -265,16 +256,30 @@ generated: components: sources: kubernetes_logs: configuration: {
 	namespace_annotation_fields: {
 		description: "Configuration for how the events are enriched with Namespace metadata."
 		required:    false
-		type: object: options: namespace_labels: {
-			description: """
-				Event field for the Namespace's labels.
+		type: object: options: {
+			namespace_annotations: {
+				description: """
+					Event field for the Namespace's annotations.
 
-				Set to `""` to suppress this key.
-				"""
-			required: false
-			type: string: {
-				default: ".kubernetes.namespace_labels"
-				examples: [".k8s.ns_labels", "k8s.ns_labels", ""]
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.namespace_annotations"
+					examples: [".k8s.ns_annotations", "k8s.ns_annotations", ""]
+				}
+			}
+			namespace_labels: {
+				description: """
+					Event field for the Namespace's labels.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.namespace_labels"
+					examples: [".k8s.ns_labels", "k8s.ns_labels", ""]
+				}
 			}
 		}
 	}
@@ -425,7 +430,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_node_name: {
 				description: """
-					Event field for the Pod's node_name.
+					Event field for the Pod's `node_name`.
 
 					Set to `""` to suppress this key.
 					"""

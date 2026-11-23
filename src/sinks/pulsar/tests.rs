@@ -18,14 +18,14 @@ fn pulsar_get_headers() {
         .expect("unable to parse OptionalTargetPath");
     let mut property_values = ObjectMap::new();
     property_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-    property_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+    property_values.insert("b-key".into(), Value::from("b-value"));
 
     let mut event = Event::Log(LogEvent::from("hello"));
     event
         .as_mut_log()
         .insert(properties_key.path.as_ref().unwrap(), property_values);
 
-    let properties = super::util::get_properties(&event, &Some(properties_key)).unwrap();
+    let properties = super::util::get_properties(&event, Some(&properties_key)).unwrap();
     assert_eq!(properties.get("a-key").unwrap(), "a-value".as_bytes());
     assert_eq!(properties.get("b-key").unwrap(), "b-value".as_bytes());
 }

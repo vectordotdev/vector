@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceStart<'a> {
+pub(crate) struct WindowsServiceStart<'a> {
     pub already_started: bool,
     pub name: &'a str,
 }
@@ -25,7 +25,7 @@ impl InternalEvent for WindowsServiceStart<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceStop<'a> {
+pub(crate) struct WindowsServiceStop<'a> {
     pub already_stopped: bool,
     pub name: &'a str,
 }
@@ -46,7 +46,7 @@ impl InternalEvent for WindowsServiceStop<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceRestart<'a> {
+pub(crate) struct WindowsServiceRestart<'a> {
     pub name: &'a str,
 }
 
@@ -56,12 +56,12 @@ impl InternalEvent for WindowsServiceRestart<'_> {
             name = ?self.name,
             "Restarted Windows Service."
         );
-        counter!(CounterName::WindowsServiceRestartTotal).increment(1)
+        counter!(CounterName::WindowsServiceRestartTotal).increment(1);
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceInstall<'a> {
+pub(crate) struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }
 
@@ -76,7 +76,7 @@ impl InternalEvent for WindowsServiceInstall<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceUninstall<'a> {
+pub(crate) struct WindowsServiceUninstall<'a> {
     pub name: &'a str,
 }
 
@@ -91,7 +91,7 @@ impl InternalEvent for WindowsServiceUninstall<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsServiceDoesNotExistError<'a> {
+pub(crate) struct WindowsServiceDoesNotExistError<'a> {
     pub name: &'a str,
 }
 

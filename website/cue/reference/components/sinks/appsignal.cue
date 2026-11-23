@@ -5,7 +5,7 @@ components: sinks: appsignal: {
 
 	classes: {
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AppSignal"]
 		stateful: false
@@ -56,7 +56,6 @@ components: sinks: appsignal: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.appsignal.configuration

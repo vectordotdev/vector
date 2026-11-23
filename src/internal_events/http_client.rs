@@ -4,7 +4,7 @@ use http::{
     HeaderMap, Request, Response, Version,
     header::{self, HeaderName, HeaderValue},
 };
-use hyper::body::HttpBody;
+use http_body::Body;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
@@ -70,50 +70,6 @@ pub trait HttpResponseTelemetry {
     /// Returns the headers with sensitive values redacted.
     fn sanitized_headers(&self) -> HeaderMap<HeaderValue> {
         remove_sensitive(self.headers(), self.extra_sensitive_headers())
-    }
-}
-
-// ── Implementations for the hyper HTTP types (full data) ──────────────────────
-
-impl<T: HttpBody> HttpRequestTelemetry for Request<T> {
-    fn method(&self) -> &str {
-        self.method().as_str()
-    }
-
-    fn uri(&self) -> String {
-        self.uri().to_string()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.headers().clone()
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        Some(self.version())
-    }
-}
-
-impl<T: HttpBody> HttpResponseTelemetry for Response<T> {
-    fn status_u16(&self) -> u16 {
-        self.status().as_u16()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.headers().clone()
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        Some(self.version())
     }
 }
 
@@ -189,6 +145,48 @@ impl InternalEvent for GotHttpWarning<'_> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+impl<T: Body> HttpRequestTelemetry for Request<T> {
+    fn method(&self) -> &str {
+        self.method().as_str()
+    }
+
+    fn uri(&self) -> String {
+        self.uri().to_string()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        self.headers().clone()
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = self.body().size_hint();
+        (hint.lower(), hint.upper())
+    }
+
+    fn version(&self) -> Option<Version> {
+        Some(self.version())
+    }
+}
+
+impl<T: Body> HttpResponseTelemetry for Response<T> {
+    fn status_u16(&self) -> u16 {
+        self.status().as_u16()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        self.headers().clone()
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = self.body().size_hint();
+        (hint.lower(), hint.upper())
+    }
+
+    fn version(&self) -> Option<Version> {
+        Some(self.version())
+    }
+}
+
 fn remove_sensitive(
     mut headers: HeaderMap<HeaderValue>,
     extra: &'static [HeaderName],
@@ -206,7 +204,7 @@ fn remove_sensitive(
         HeaderName::from_static("x-api-key"),
         HeaderName::from_static("api-key"),
     ];
-    for (name, value) in headers.iter_mut() {
+    for (name, value) in &mut headers {
         if sensitive.contains(name) || extra.contains(name) {
             value.set_sensitive(true);
         }

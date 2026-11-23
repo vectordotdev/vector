@@ -50,7 +50,6 @@ components: sinks: redis: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.redis.configuration

@@ -60,7 +60,6 @@ components: sinks: websocket_server: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	input: {

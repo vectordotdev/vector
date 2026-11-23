@@ -68,7 +68,6 @@ components: sinks: clickhouse: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.clickhouse.configuration

@@ -47,7 +47,6 @@ components: sources: dnstap: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.dnstap.configuration & {
@@ -856,6 +855,7 @@ components: sources: dnstap: {
 					}
 				}
 			}
+			client_metadata: fields._client_metadata
 		}
 	}
 

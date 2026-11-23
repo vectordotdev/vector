@@ -44,7 +44,6 @@ components: sources: http_client: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

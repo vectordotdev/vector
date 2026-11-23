@@ -82,7 +82,7 @@ fn clean_generate() {
 fn validate_cleanup() {
     // Create component directories with some file.
     let dir = create_directory();
-    let mut path = dir.clone();
+    let mut path = dir.path().to_path_buf();
     path.push("tmp");
     path.set_extension("data");
     overwrite_file(path.clone(), "");
@@ -101,7 +101,7 @@ fn validate_cleanup() {
     cmd.arg("validate")
         .arg("--dangerously-allow-env-var-interpolation")
         .arg(config)
-        .env("VECTOR_DATA_DIR", dir.clone());
+        .env("VECTOR_DATA_DIR", dir.path());
 
     let output = cmd.output().expect("Failed to execute process");
     println!(
@@ -115,11 +115,46 @@ fn validate_cleanup() {
     // Assert that data folder didn't change
     assert_eq!(
         HashSet::from([path]),
-        read_dir(dir)
+        read_dir(dir.path())
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect::<HashSet<_>>()
     );
+}
+
+#[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
+#[test]
+fn validate_ignored_fields_honors_deny_warnings() {
+    const CONFIG: &str = indoc! {r#"
+        sources:
+          http:
+            type: http_server
+            address: "127.0.0.1:18080"
+        sinks:
+          out:
+            type: http
+            inputs: [http]
+            uri: "http://127.0.0.1:18081/"
+            encoding:
+              codec: json
+            request:
+              retry_atempts: 3
+    "#};
+    for (args, expected) in [
+        (vec!["--no-environment"], exitcode::OK),
+        (
+            vec!["--no-environment", "--deny-warnings"],
+            exitcode::CONFIG,
+        ),
+    ] {
+        let output = validate_output_with_args(CONFIG, &args);
+        assert_eq!(output.status.code(), Some(expected));
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains("/sinks/out/request/retry_atempts"),
+            "{stdout}"
+        );
+    }
 }
 
 #[test]
@@ -130,11 +165,11 @@ fn validate_failing_healthcheck() {
 #[test]
 fn validate_ignore_healthcheck() {
     assert_eq!(
-        validate(&formatdoc! {r#"
+        validate(&formatdoc! {r"
             healthchecks:
               enabled: false
             {FAILING_HEALTHCHECK}
-        "#}),
+        "}),
         exitcode::OK
     );
 }
@@ -333,7 +368,7 @@ fn validate_output_with_args(config: &str, args: &[&str]) -> std::process::Outpu
     for arg in args {
         cmd.arg(arg);
     }
-    cmd.arg(config).env("VECTOR_DATA_DIR", dir);
+    cmd.arg(config).env("VECTOR_DATA_DIR", dir.path());
 
     let output = cmd.output().unwrap();
     println!(

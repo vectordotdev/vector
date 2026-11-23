@@ -2,7 +2,6 @@ package metadata
 
 components: sinks: greptimedb_metrics: {
 	title: "GreptimeDB Metrics"
-	alias: "greptimedb"
 
 	classes: {
 		delivery:      "at_least_once"
@@ -59,7 +58,6 @@ components: sinks: greptimedb_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.greptimedb_metrics.configuration

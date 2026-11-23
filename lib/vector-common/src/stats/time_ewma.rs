@@ -66,7 +66,6 @@ mod tests {
     use std::time::{Duration, Instant};
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "exact values for this test")]
     fn time_ewma_uses_previous_point_duration() {
         let mut ewma = TimeEwma::new(1.0);
         let t0 = Instant::now();

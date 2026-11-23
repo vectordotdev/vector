@@ -25,15 +25,16 @@ use crate::{
 #[serde(untagged)]
 pub enum PongMessage {
     /// For exact string matching.
-    /// e.g., pong_message: "pong"
+    /// e.g., `pong_message`: "pong"
     Simple(String),
 
     /// For advanced matching strategies.
-    /// e.g., pong_message: { type: contains, value: "pong" }
+    /// e.g., `pong_message`: { type: contains, value: "pong" }
     Advanced(PongValidation),
 }
 
 impl PongMessage {
+    #[must_use]
     pub fn matches(&self, msg: &str) -> bool {
         match self {
             PongMessage::Simple(expected) => msg == expected,
@@ -65,6 +66,7 @@ pub enum PongValidation {
 }
 
 impl PongValidation {
+    #[must_use]
     pub fn matches(&self, msg: &str) -> bool {
         match self {
             PongValidation::Exact { value: expected } => msg == expected,
@@ -82,12 +84,10 @@ pub struct WebSocketConfig {
     pub common: WebSocketCommonConfig,
 
     /// Decoder to use on each received message.
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// Framing to use in the decoding.
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
@@ -158,8 +158,8 @@ impl SourceConfig for WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
-        let connector =
-            WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
+        let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
+        let connector = WebSocketConnector::from_validated(uri, tls, self.common.auth.clone());
 
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
@@ -174,7 +174,7 @@ impl SourceConfig for WebSocketConfig {
 
         let source = WebSocketSource::new(self.clone(), params);
 
-        Ok(Box::pin(source.run(cx).map_err(|_err| ())))
+        Ok(Box::pin(source.run(cx).map_err(Into::into)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

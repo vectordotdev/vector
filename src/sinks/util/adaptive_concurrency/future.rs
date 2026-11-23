@@ -40,13 +40,13 @@ pub struct ResponseFuture<F, L> {
 impl<F, L> ResponseFuture<F, L> {
     pub(super) fn new(
         inner: F,
-        _permit: OwnedSemaphorePermit,
+        permit: OwnedSemaphorePermit,
         controller: Arc<Controller<L>>,
         measure_call: bool,
     ) -> Self {
         Self {
             inner,
-            _permit,
+            _permit: permit,
             controller,
             start: measure_call.then(instant_now),
         }

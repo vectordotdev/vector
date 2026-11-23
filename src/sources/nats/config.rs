@@ -1,6 +1,5 @@
 use async_nats::jetstream::{
-    consumer::{PullConsumer, StreamError as ConsumerStreamError},
-    context::GetStreamError,
+    consumer::StreamError as ConsumerStreamError, context::GetStreamError,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -18,7 +17,9 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::{
         Source,
-        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
+        nats::source::{
+            create_consumer_stream, create_subscription, run_nats_core, run_nats_jetstream,
+        },
     },
     tls::TlsEnableableConfig,
 };
@@ -49,15 +50,15 @@ pub enum BuildError {
 /// **Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct BatchConfig {
+pub(super) struct BatchConfig {
     /// The maximum number of messages to pull in a single batch.
     #[serde(default = "default_batch")]
-    batch: usize,
+    pub(super) batch: usize,
 
     /// The maximum total byte size for a batch. The pull request will be
     /// fulfilled when either `size` or `max_bytes` is reached.
     #[serde(default = "default_max_bytes")]
-    max_bytes: usize,
+    pub(super) max_bytes: usize,
 }
 
 const fn default_batch() -> usize {
@@ -87,8 +88,7 @@ pub struct JetStreamConfig {
     pub consumer: String,
 
     #[serde(default)]
-    #[configurable(derived)]
-    pub batch_config: BatchConfig,
+    pub(super) batch_config: BatchConfig,
 }
 
 /// Configuration for the `nats` source.
@@ -136,18 +136,14 @@ pub struct NatsSourceConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<NatsAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -168,16 +164,17 @@ pub struct NatsSourceConfig {
     #[derivative(Default(value = "default_subscription_capacity()"))]
     pub subscriber_capacity: usize,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub jetstream: Option<JetStreamConfig>,
 }
 
-pub fn default_subject_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("subject"))
+pub(super) const SUBJECT_KEY: &str = "subject";
+
+pub(super) fn default_subject_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!(SUBJECT_KEY))
 }
 
-pub const fn default_subscription_capacity() -> usize {
+const fn default_subscription_capacity() -> usize {
     65536
 }
 
@@ -205,27 +202,9 @@ impl SourceConfig for NatsSourceConfig {
         match self.mode() {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
-                let js = async_nats::jetstream::new(connection.clone());
-                let stream = js
-                    .get_stream(&js_config.stream)
-                    .await
-                    .context(StreamSnafu)?;
-                let consumer: PullConsumer = stream
-                    .get_consumer(&js_config.consumer)
-                    .await
-                    .context(ConsumerSnafu)?;
+                let messages = create_consumer_stream(&connection, js_config).await?;
 
-                let batch_config = js_config.batch_config.clone();
-
-                let messages = consumer
-                    .stream()
-                    .max_messages_per_batch(batch_config.batch)
-                    .max_bytes_per_batch(batch_config.max_bytes)
-                    .messages()
-                    .await
-                    .context(MessagesSnafu)?;
-
-                Ok(Box::pin(run_nats_jetstream(
+                Ok(crate::sources::source_with_error(run_nats_jetstream(
                     self.clone(),
                     connection,
                     messages,
@@ -238,7 +217,7 @@ impl SourceConfig for NatsSourceConfig {
             NatsMode::Core => {
                 let (connection, subscription) = create_subscription(self).await?;
 
-                Ok(Box::pin(run_nats_core(
+                Ok(crate::sources::source_with_error(run_nats_core(
                     self.clone(),
                     connection,
                     subscription,
@@ -265,7 +244,7 @@ impl SourceConfig for NatsSourceConfig {
             .with_source_metadata(
                 NatsSourceConfig::NAME,
                 legacy_subject_key_field,
-                &owned_value_path!("subject"),
+                &owned_value_path!(SUBJECT_KEY),
                 Kind::bytes(),
                 None,
             );
@@ -276,9 +255,10 @@ impl SourceConfig for NatsSourceConfig {
         )]
     }
 
-    // Acknowledgment is only possible with Jetstream.
+    // JetStream messages are acked once they reach the topology, not when a sink confirms
+    // delivery, so end-to-end acknowledgements are not supported.
     fn can_acknowledge(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -319,8 +299,12 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
-            .map(|options| options.subscription_capacity(config.subscriber_capacity))
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
+        .map(|options| options.subscription_capacity(config.subscriber_capacity))
     }
 }
 
@@ -340,6 +324,18 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn does_not_claim_end_to_end_acknowledgements() {
+        let core = NatsSourceConfig::default();
+        let jetstream = NatsSourceConfig {
+            jetstream: Some(JetStreamConfig::default()),
+            ..Default::default()
+        };
+
+        assert!(!core.can_acknowledge());
+        assert!(!jetstream.can_acknowledge());
     }
 
     #[test]

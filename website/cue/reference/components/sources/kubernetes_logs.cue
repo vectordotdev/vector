@@ -51,7 +51,6 @@ components: sources: kubernetes_logs: {
 				This source is only tested on Linux. Your mileage may vary for clusters on Windows.
 				""",
 		]
-		notices: []
 	}
 
 	installation: {
@@ -107,6 +106,14 @@ components: sources: kubernetes_logs: {
 				required:    false
 				type: object: {
 					examples: [{"mylabel": "myvalue"}]
+					options: {}
+				}
+			}
+			"kubernetes.namespace_annotations": {
+				description: "Set of annotations attached to the Namespace."
+				required:    false
+				type: object: {
+					examples: [{"myannotation": "myvalue"}]
 					options: {}
 				}
 			}
@@ -458,7 +465,10 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
-		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
+		files_unwatched_bytes_unread_total:       components.sources.internal_metrics.output.metrics.files_unwatched_bytes_unread_total
+		files_unwatched_total:                    components.sources.internal_metrics.output.metrics.files_unwatched_total
+		files_unwatched_with_unknown_bytes_total: components.sources.internal_metrics.output.metrics.files_unwatched_with_unknown_bytes_total
+		k8s_format_picker_edge_cases_total:       components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
+		k8s_docker_format_parse_failures_total:   components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 	}
 }

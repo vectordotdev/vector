@@ -1,11 +1,12 @@
 use std::time::Duration;
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, StreamExt};
-use http::Uri;
-use http_body::Collected;
-use hyper::{Body, Request};
+use http::{Request, Uri};
+use http_body_util::{BodyExt as _, Collected};
 use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
+use vector_http::empty_body;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
@@ -56,6 +57,7 @@ const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
@@ -67,7 +69,7 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
-            self.endpoint.clone(),
+            &self.endpoint,
             self.scrape_interval_secs,
             self.default_namespace.clone(),
             cx,
@@ -84,43 +86,40 @@ impl SourceConfig for EventStoreDbConfig {
 }
 
 fn eventstoredb(
-    endpoint: String,
+    endpoint: &str,
     interval: Duration,
     namespace: Option<String>,
     mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
     let mut ticks = IntervalStream::new(tokio::time::interval(interval)).take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(None)?;
-    let client = HttpClient::new(tls_settings, &cx.proxy)?;
-    let url: Uri = endpoint.as_str().parse()?;
+    let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
+    let url: Uri = endpoint.parse()?;
 
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let events_received = register(EventsReceived);
 
     Ok(Box::pin(
         async move {
             while ticks.next().await.is_some() {
                 let req = Request::get(&url)
                     .header("content-type", "application/json")
-                    .body(Body::empty())
+                    .body(empty_body())
                     .expect("Building request should be infallible.");
 
                 match client.send(req).await {
                     Err(error) => {
-                        emit!(EventStoreDbMetricsHttpError {
+                        emit(EventStoreDbMetricsHttpError {
                             error: error.into(),
                         });
-                        continue;
                     }
 
                     Ok(resp) => {
-                        let bytes = match http_body::Body::collect(resp.into_body())
-                            .await
-                            .map(Collected::to_bytes)
+                        let bytes = match resp.into_body().collect().await.map(Collected::to_bytes)
                         {
                             Ok(b) => b,
                             Err(error) => {
-                                emit!(EventStoreDbMetricsHttpError {
+                                emit(EventStoreDbMetricsHttpError {
                                     error: error.into(),
                                 });
                                 continue;
@@ -130,8 +129,7 @@ fn eventstoredb(
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
-                                emit!(EventStoreDbStatsParsingError { error });
-                                continue;
+                                emit(EventStoreDbStatsParsingError { error });
                             }
 
                             Ok(stats) => {
@@ -142,7 +140,7 @@ fn eventstoredb(
                                 events_received.emit(CountByteSize(count, byte_size));
 
                                 if (cx.out.send_batch(metrics).await).is_err() {
-                                    emit!(StreamClosedError { count });
+                                    emit(StreamClosedError { count });
                                     break;
                                 }
                             }
@@ -175,6 +173,6 @@ mod integration_tests {
 
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

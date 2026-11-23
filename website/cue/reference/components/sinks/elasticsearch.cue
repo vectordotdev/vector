@@ -69,13 +69,6 @@ components: sinks: elasticsearch: {
 				"""#,
 		]
 		warnings: []
-		notices: [
-			#"""
-				This sink is compatible with OpenSearch, including both self-managed OpenSearch instances
-				and Amazon OpenSearch Service. For OpenSearch Serverless, set `opensearch_service_type = "serverless"`
-				and use AWS authentication.
-				"""#,
-		]
 	}
 
 	configuration: generated.components.sinks.elasticsearch.configuration

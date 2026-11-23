@@ -12,7 +12,10 @@ env:
   TEST_DATADOG_API_KEY:
 
 matrix:
-  version: [latest]
+  # Pin to 7.83.3 because Agent 7.84.0 enables indexed trace payloads by default,
+  # which the datadog_agent source does not yet support. Re-add an unpinned
+  # version once indexed trace payload support lands.
+  version: ["7.83.3"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

@@ -1,1 +1,1 @@
-{"type":"record","name":"test","fields":[{"name":"array_field","type":{"type":"array","items":"string"},"items":"string"}]}
+{"type":"record","name":"test","fields":[{"name":"array_field","type":{"type":"array","items":"string"}}]}

@@ -1,14 +1,15 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
 use crate::event::metric::Metric;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SematextMetricsInvalidMetricError<'a> {
+pub(crate) struct SematextMetricsInvalidMetricError<'a> {
     pub metric: &'a Metric,
 }
 
@@ -31,12 +32,12 @@ impl InternalEvent for SematextMetricsInvalidMetricError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SematextMetricsEncodeEventError<E> {
+pub(crate) struct SematextMetricsEncodeEventError<E> {
     pub error: E,
 }
 
@@ -56,6 +57,6 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

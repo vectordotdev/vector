@@ -9,7 +9,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
+use futures::{FutureExt, StreamExt, TryStreamExt, future::Either, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
 use metrics::Counter;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -31,12 +31,21 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuScopedFuture, CpuTimedExt, CpuTimedFuture, spawn_timed},
     enrichment::Table,
-    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    extra_context::ExtraContext,
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, register,
+    },
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -52,20 +61,13 @@ use crate::{
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput,
+        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
-    extra_context::ExtraContext,
     internal_events::EventsReceived,
-    shutdown::SourceShutdownCoordinator,
-    spawn_named,
+    shutdown::{ShutdownSignal, SourceShutdownCoordinator},
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -121,9 +123,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads()
-        .map(std::num::NonZeroUsize::get)
-        .unwrap_or_else(crate::num_threads)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -132,6 +132,7 @@ struct Builder<'a> {
     config: &'a super::Config,
     diff: &'a ConfigDiff,
     shutdown_coordinator: SourceShutdownCoordinator,
+    source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     errors: Vec<String>,
     outputs: HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: HashMap<ComponentKey, Task>,
@@ -165,6 +166,7 @@ impl<'a> Builder<'a> {
             diff,
             buffers,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
+            source_shutdown_guards: HashMap::new(),
             errors: vec![],
             outputs: HashMap::new(),
             tasks: HashMap::new(),
@@ -179,6 +181,9 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        // Library callers may build topologies without going through CLI startup.
+        vector_lib::tls::install_default_crypto_provider();
+
         let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;
@@ -197,6 +202,7 @@ impl<'a> Builder<'a> {
                 source_tasks,
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
+                source_shutdown_guards: self.source_shutdown_guards,
                 detach_triggers: self.detach_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
@@ -229,7 +235,7 @@ impl<'a> Builder<'a> {
         let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
-        'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
+        'tables: for (name, table_outer) in &self.config.enrichment_tables {
             let table_name = name.to_string();
             if ENRICHMENT_TABLES.needs_reload(&table_name)
                 || self.diff.enrichment_tables.tables.is_changed(name)
@@ -262,7 +268,7 @@ impl<'a> Builder<'a> {
 
                 for (case, index) in indexes {
                     match table
-                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                        .add_index(case, &index.iter().map(AsRef::as_ref).collect::<Vec<_>>())
                     {
                         Ok(_) => (),
                         Err(error) => {
@@ -292,12 +298,8 @@ impl<'a> Builder<'a> {
     ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
-        let table_sources = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_source(key))
-            .collect::<Vec<_>>();
+        let table_sources =
+            enrichment_table_sources(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
@@ -330,6 +332,10 @@ impl<'a> Builder<'a> {
         source_tasks
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn build_instrumented_source(
         &mut self,
         key: &ComponentKey,
@@ -355,7 +361,7 @@ impl<'a> Builder<'a> {
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for output in source_outputs.into_iter() {
+        for output in source_outputs {
             let rx = builder.add_source_output(output.clone(), key.clone());
 
             let (fanout, control) = Fanout::new(key.clone());
@@ -415,6 +421,8 @@ impl<'a> Builder<'a> {
         let (shutdown_signal, force_shutdown_tripwire) = self
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
+        self.source_shutdown_guards
+            .insert(key.clone(), shutdown_signal.clone());
 
         let context = SourceContext {
             key: key.clone(),
@@ -451,7 +459,7 @@ impl<'a> Builder<'a> {
                 biased;
 
                 // We've been told that we must forcefully shut down.
-                _ = force_shutdown_tripwire => Ok(()),
+                () = force_shutdown_tripwire => Ok(()),
 
                 // The source pump encountered an error, which we're now bubbling up here to stop
                 // the source as well, since the source running makes no sense without the pump.
@@ -461,17 +469,12 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| TaskError::Opaque),
+                result = server => result.map_err(Into::into),
             };
 
-            // Even though we already tried to receive any pump task error above, we may have exited
-            // on the source itself returning an error due to task scheduling, where the pump task
-            // encountered an error, sent it over the oneshot, but we were polling the source
-            // already and hit an error trying to send to the now-shutdown pump task.
-            //
-            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
-            // time to see if the pump task encountered an error, using _that_ instead if so, to
-            // propagate the true error that caused the source to have to stop.
+            // The pump may fail while the source is being polled, before its error is received
+            // above. Prefer the pump error if both tasks fail: a source send error can be a
+            // consequence of the pump stopping, even when the source reports its cause.
             if let Ok(e) = pump_error_rx.try_recv() {
                 result = Err(e);
             }
@@ -482,7 +485,7 @@ impl<'a> Builder<'a> {
                     Ok(TaskOutput::Source)
                 }
                 Err(e) => {
-                    debug!("Source finished with an error.");
+                    debug!(error = %e, "Source finished with an error.");
                     Err(e)
                 }
             }
@@ -508,19 +511,16 @@ impl<'a> Builder<'a> {
         {
             debug!(component_id = %key, "Building new transform.");
 
-            let input_definitions = match schema::input_definitions(
+            let Ok(input_definitions) = schema::input_definitions(
                 &transform.inputs,
                 self.config,
-                enrichment_tables.clone(),
+                enrichment_tables,
                 &mut definition_cache,
-            ) {
-                Ok(definitions) => definitions,
-                Err(_) => {
-                    // We have received an error whilst retrieving the definitions,
-                    // there is no point in continuing.
+            ) else {
+                // We have received an error whilst retrieving the definitions,
+                // there is no point in continuing.
 
-                    return;
-                }
+                return;
             };
 
             let span = error_span!(
@@ -578,29 +578,24 @@ impl<'a> Builder<'a> {
             merged_schema_definition: merged_definition.clone(),
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
-            // Resolve the per-component CPU counter inside the transform span so it
-            // picks up component_id/component_kind/component_type tags. The same
-            // handle is shared between the main transform task and any helper
-            // tokio tasks the transform spawns at construction time. On platforms
-            // without per-thread CPU time, `register_counter` returns a noop
-            // handle and the metric is silently omitted.
-            //
-            // `None` when `measure_cpu_usage` is false (the default): no counter
-            // is registered and no per-poll `ThreadTime` measurement takes place.
-            cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
-            } else {
-                None
-            },
         };
 
-        let node = TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = transform.measure_cpu_usage.then(cpu_time::register_counter);
 
-        let transform = match transform
-            .inner
-            .build(&context)
-            .instrument(Span::current())
-            .await
+        let node = TransformNode::from_parts(
+            key.clone(),
+            &context,
+            transform,
+            &input_definitions,
+            cpu_ns.clone(),
+        );
+
+        let transform = match cpu_scoped_if(
+            transform.inner.build(&context).instrument(Span::current()),
+            cpu_ns,
+        )
+        .await
         {
             Err(error) => {
                 self.errors.push(format!("Transform \"{key}\": {error}"));
@@ -628,12 +623,8 @@ impl<'a> Builder<'a> {
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
-        let table_sinks = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_sink(key))
-            .collect::<Vec<_>>();
+        let table_sinks =
+            enrichment_table_sinks(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, sink) in self
             .config
             .sinks()
@@ -660,6 +651,10 @@ impl<'a> Builder<'a> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn build_instrumented_sink(
         &mut self,
         key: &ComponentKey,
@@ -678,34 +673,33 @@ impl<'a> Builder<'a> {
         // transform that mutates the schema provided by their sources. We can now validate the
         // schema expectations of each individual sink.
         if let Err(mut err) =
-            schema::validate_sink_expectations(key, sink, self.config, enrichment_tables.clone())
+            schema::validate_sink_expectations(key, sink, self.config, enrichment_tables)
         {
             self.errors.append(&mut err);
-        };
+        }
 
-        let (tx, rx) = match self.buffers.remove(key) {
-            Some(buffer) => buffer,
-            _ => {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{key}\": {error}"));
-                        return;
-                    }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+        let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
+            buffer
+        } else {
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
+                BufferType::DiskV2 { .. } => "disk",
+            };
+            let buffer_span = error_span!("sink", buffer_type);
+            let buffer = sink
+                .buffer
+                .build(
+                    self.config.global.data_dir.clone(),
+                    key.to_string(),
+                    buffer_span,
+                )
+                .await;
+            match buffer {
+                Err(error) => {
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
+                    return;
                 }
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
             }
         };
 
@@ -721,7 +715,10 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.build(cx).await {
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = sink.measure_cpu_usage.then(cpu_time::register_counter);
+
+        let (sink, healthcheck) = match cpu_scoped_if(sink.build(cx), cpu_ns.clone()).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;
@@ -752,7 +749,7 @@ impl<'a> Builder<'a> {
 
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
-            let events_received = register!(EventsReceived);
+            let events_received = register(EventsReceived);
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
@@ -760,29 +757,29 @@ impl<'a> Builder<'a> {
                         events_received.emit(CountByteSize(
                             events.len(),
                             events.estimated_json_encoded_size_of(),
-                        ))
+                        ));
                     })
                     .take_until_if(tripwire),
             )
             .await
-            .map(|_| {
+            .map(|()| {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|_| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
+            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+            .map_err(Into::into)
         };
 
-        let task = Task::new(key.clone(), typetag, sink);
+        // Connections opened by the healthcheck can be pooled and reused by the sink.
+        let healthcheck = cpu_scoped_if(healthcheck, cpu_ns.clone());
+        let task = Task::new(key.clone(), typetag, cpu_timed_if(sink, cpu_ns));
 
         let component_key = key.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 timeout(healthcheck_timeout, healthcheck)
                     .map(|result| match result {
-                        Ok(Ok(_)) => {
+                        Ok(Ok(())) => {
                             info!("Healthcheck passed.");
                             Ok(TaskOutput::Healthcheck)
                         }
@@ -853,31 +850,14 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
-            node.cpu_ns.clone(),
         );
 
-        // Attribute the runner task's per-poll CPU time (driver loop +,
-        // for the inline variant, the transform body) to the component. The
-        // concurrent variant additionally spawns transform invocations onto
-        // their own tasks with `spawn_timed`, which feed the same counter.
-        // When `cpu_ns` is `None` the futures are returned as-is — no
-        // `ThreadTime` sampling takes place.
+        // The concurrent variant spawns transform invocations onto their own
+        // tasks with `spawn_timed`, which inherit the counter.
         let transform = if node.enable_concurrency {
-            let fut = runner.run_concurrently();
-
-            if let Some(cpu_ns) = node.cpu_ns {
-                fut.cpu_timed(cpu_ns).boxed()
-            } else {
-                fut.boxed()
-            }
+            cpu_timed_if(runner.run_concurrently(), node.cpu_ns).boxed()
         } else {
-            let fut = runner.run_inline();
-
-            if let Some(cpu_ns) = node.cpu_ns {
-                fut.cpu_timed(cpu_ns).boxed()
-            } else {
-                fut.boxed()
-            }
+            cpu_timed_if(runner.run_inline(), node.cpu_ns).boxed()
         };
 
         let transform = async move {
@@ -897,9 +877,10 @@ impl<'a> Builder<'a> {
 
         let mut output_controls = HashMap::new();
         for (name, control) in controls {
-            let id = name
-                .map(|name| OutputId::from((&node.key, name)))
-                .unwrap_or_else(|| OutputId::from(&node.key));
+            let id = name.map_or_else(
+                || OutputId::from(&node.key),
+                |name| OutputId::from((&node.key, name)),
+            );
             output_controls.insert(id, control);
         }
 
@@ -932,16 +913,16 @@ impl<'a> Builder<'a> {
         let output_sender = sender.clone();
         let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
 
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let filtered = input_rx
             .filter(move |events| ready(filter_events_type(events, input_type)))
             .inspect(move |events| {
                 events_received.emit(CountByteSize(
                     events.len(),
                     events.estimated_json_encoded_size_of(),
-                ))
+                ));
             });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+        let events_sent = register(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
             component: key.clone(),
             port: None,
@@ -959,24 +940,27 @@ impl<'a> Builder<'a> {
             .map(|(key, value)| (key, Arc::new(value)))
             .collect();
 
-        let stream = t
-            .transform(Box::pin(filtered))
-            .map(move |mut events| {
-                for event in events.iter_events_mut() {
-                    update_runtime_schema_definition(event, &output_id, &schema_definition_map);
-                }
-                let now = Instant::now();
-                latency_recorder.on_send(&mut events, now);
-                (events, now)
-            })
-            .inspect(move |(events, _): &(EventArray, Instant)| {
-                events_sent.emit(CountByteSize(
-                    events.len(),
-                    events.estimated_json_encoded_size_of(),
-                ));
-            });
-        let stream = OutputUtilization::new(output_sender, stream);
+        // The stream is built inside the task so that helper tasks spawned by
+        // `transform()` inherit the component's CPU counter.
         let transform = async move {
+            let stream = t
+                .transform(Box::pin(filtered))
+                .map(move |mut events| {
+                    for event in events.iter_events_mut() {
+                        update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+                    }
+                    let now = Instant::now();
+                    latency_recorder.on_send(&mut events, now);
+                    (events, now)
+                })
+                .inspect(move |(events, _): &(EventArray, Instant)| {
+                    events_sent.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
+                });
+            let stream = OutputUtilization::new(output_sender, stream);
+
             debug!("Task transform starting.");
 
             match fanout.send_stream(stream).await {
@@ -991,11 +975,7 @@ impl<'a> Builder<'a> {
             }
         };
 
-        let transform = if let Some(cpu_ns) = cpu_ns {
-            transform.cpu_timed(cpu_ns).boxed()
-        } else {
-            transform.boxed()
-        };
+        let transform = cpu_timed_if(transform, cpu_ns).boxed();
 
         let mut outputs = HashMap::new();
         outputs.insert(OutputId::from(&key), control);
@@ -1003,6 +983,23 @@ impl<'a> Builder<'a> {
         let task = Task::new(key, typetag, transform);
 
         (task, outputs)
+    }
+}
+
+/// Times `future` with `cpu_ns` when CPU usage measurement is enabled for the component.
+fn cpu_timed_if<F: Future>(future: F, cpu_ns: Option<Counter>) -> Either<CpuTimedFuture<F>, F> {
+    match cpu_ns {
+        Some(counter) => Either::Left(future.cpu_timed(counter)),
+        None => Either::Right(future),
+    }
+}
+
+/// Makes `cpu_ns` inheritable by tasks spawned from `future` when CPU usage measurement is
+/// enabled for the component, without timing `future` itself.
+fn cpu_scoped_if<F: Future>(future: F, cpu_ns: Option<Counter>) -> Either<CpuScopedFuture<F>, F> {
+    match cpu_ns {
+        Some(counter) => Either::Left(future.cpu_scoped(counter)),
+        None => Either::Right(future),
     }
 }
 
@@ -1063,7 +1060,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
     let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
-    'tables: for (name, table_outer) in config.enrichment_tables.iter() {
+    'tables: for (name, table_outer) in &config.enrichment_tables {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name)
             // Tables that can act as sinks are reloaded through topology
@@ -1082,7 +1079,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
             if let Some(indexes) = indexes {
                 for (case, index) in indexes {
                     match table
-                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                        .add_index(case, &index.iter().map(AsRef::as_ref).collect::<Vec<_>>())
                     {
                         Ok(_) => (),
                         Err(error) => {
@@ -1115,12 +1112,16 @@ pub struct TopologyPieces {
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    /// A copy of each source's shutdown signal, held by the topology until the source task's error
+    /// is reported. The source counts as finished only once every copy is dropped, so the error is
+    /// always observable by then.
+    pub(crate) source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
-/// Builder for constructing TopologyPieces with a fluent API.
+/// Builder for constructing `TopologyPieces` with a fluent API.
 ///
 /// # Examples
 ///
@@ -1141,6 +1142,7 @@ pub struct TopologyPiecesBuilder<'a> {
 
 impl<'a> TopologyPiecesBuilder<'a> {
     /// Creates a new builder with required parameters.
+    #[must_use]
     pub fn new(config: &'a Config, diff: &'a ConfigDiff) -> Self {
         Self {
             config,
@@ -1152,18 +1154,21 @@ impl<'a> TopologyPiecesBuilder<'a> {
     }
 
     /// Sets the buffers for the topology.
+    #[must_use]
     pub fn with_buffers(mut self, buffers: HashMap<ComponentKey, BuiltBuffer>) -> Self {
         self.buffers = buffers;
         self
     }
 
     /// Sets the extra context for the topology.
+    #[must_use]
     pub fn with_extra_context(mut self, extra_context: ExtraContext) -> Self {
         self.extra_context = extra_context;
         self
     }
 
     /// Sets the utilization registry for the topology.
+    #[must_use]
     pub fn with_utilization_registry(mut self, registry: Option<UtilizationRegistry>) -> Self {
         self.utilization_registry = registry;
         self
@@ -1173,6 +1178,9 @@ impl<'a> TopologyPiecesBuilder<'a> {
     ///
     /// Use this method when you need to handle errors explicitly,
     /// such as in tests or validation code.
+    /// # Errors
+    ///
+    /// Returns the accumulated errors if any topology component cannot be built.
     pub async fn build(self) -> Result<TopologyPieces, Vec<String>> {
         Builder::new(
             self.config,
@@ -1219,6 +1227,10 @@ impl TopologyPieces {
     }
 
     /// Builds only the new pieces, and doesn't check their topology.
+    ///
+    /// # Errors
+    ///
+    /// Returns the accumulated errors if any topology component cannot be built.
     pub async fn build(
         config: &super::Config,
         diff: &ConfigDiff,
@@ -1255,11 +1267,12 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         key: ComponentKey,
         context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
+        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             key,
@@ -1268,7 +1281,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
-            cpu_ns: context.cpu_ns.clone(),
+            cpu_ns,
         }
     }
 }
@@ -1281,7 +1294,6 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
-    cpu_ns: Option<Counter>,
 }
 
 impl Runner {
@@ -1292,7 +1304,6 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
-        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             transform,
@@ -1301,8 +1312,7 @@ impl Runner {
             outputs,
             timer_tx,
             latency_recorder,
-            events_received: register!(EventsReceived),
-            cpu_ns,
+            events_received: register(EventsReceived),
         }
     }
 
@@ -1372,39 +1382,30 @@ impl Runner {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(error)) => return Err(TaskError::from(error)),
+                        None => unreachable!("bad poll"),
                     }
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
-                    match input_arrays {
-                        Some(input_arrays) => {
-                            let mut len = 0;
-                            for events in &input_arrays {
-                                self.on_events_received(events);
-                                len += events.len();
-                            }
+                    if let Some(input_arrays) = input_arrays {
+                        let mut len = 0;
+                        for events in &input_arrays {
+                            self.on_events_received(events);
+                            len += events.len();
+                        }
 
-                            let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            // Hook CPU-time accounting onto the spawned task at
-                            // the `Future::poll` boundary.
-                            // This is a separate task from the current one, so there is no double-counting.
-                            let task = spawn_timed(
-                                async move {
-                                    for events in input_arrays {
-                                        t.transform_all(events, &mut outputs_buf);
-                                    }
-                                    outputs_buf
-                                },
-                                self.cpu_ns.clone(),
-                            );
-                            in_flight.push_back(task);
-                        }
-                        None => {
-                            shutting_down = true;
-                            continue
-                        }
+                        let mut t = self.transform.clone();
+                        let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                        let task = spawn_timed(async move {
+                            for events in input_arrays {
+                                t.transform_all(events, &mut outputs_buf);
+                            }
+                            outputs_buf
+                        });
+                        in_flight.push_back(task);
+                    } else {
+                        shutting_down = true;
                     }
                 }
 

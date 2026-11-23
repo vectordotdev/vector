@@ -3,6 +3,10 @@ sources:
     type: prometheus_scrape
     endpoints:
       - http://localhost:9090/metrics
+    headers:
+      X-My-Header:
+        - value1
+        - value2
     honor_labels: false
     query:
       match[]:

@@ -1,5 +1,6 @@
 //! Emits a heartbeat internal metric.
 use std::time::{Duration, Instant};
+use vector_lib::internal_event::emit;
 
 use tokio::time::interval;
 
@@ -11,6 +12,6 @@ pub async fn heartbeat() {
     let mut interval = interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
-        emit!(Heartbeat { since });
+        emit(Heartbeat { since });
     }
 }
