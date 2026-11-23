@@ -572,10 +572,8 @@ impl SecretTarget for VrlTarget {
 /// Retrieves a value from the provided metric using the path.
 ///
 /// Supports the root path, the metric's fields (`name`, `namespace`, `interval_ms`, `timestamp`,
-/// `kind`, `tags`, `tags.<tagname>`, and `type`), and paths into its value, which are declared in
-/// `metric_value_fields!`.
-///
-/// Any other paths result in a `MetricPathError::InvalidPath` being returned.
+/// `kind`, `tags`, `tags.<tagname>`, and `type`), and paths into its value, under the fields listed
+/// in `METRIC_VALUE_FIELDS`.
 fn target_get_metric<'a>(
     path: &OwnedValuePath,
     value: &'a Value,
@@ -787,99 +785,121 @@ fn statistic_to_vrl_value(statistic: StatisticKind) -> Value {
     .into()
 }
 
-/// Declares, in one place, the VRL field that holds each type of metric value and the subfields
-/// VRL can read from it.
+/// The fields that hold a metric's value, one per metric type.
 ///
-/// Each entry names the `MetricValue` variant, the VRL field, and how to convert each subfield.
-/// A conversion returns `None` when the subfield is missing, like the sum of a histogram that
-/// doesn't have one.
-macro_rules! metric_value_fields {
-    ($(
-        $variant:ident { $($binding:tt)* } => $field:literal {
-            $($subfield:literal => $convert:expr),+ $(,)?
-        }
-    ),+ $(,)?) => {
-        /// The fields that hold a metric's value, one per metric type.
-        ///
-        /// These match the JSON encoding of metrics, which is what `vector tap` shows. Only the
-        /// field for the metric's current type is present; the others read as `null`.
-        const METRIC_VALUE_FIELDS: &[&str] = &[$($field),+];
+/// These match the JSON encoding of metrics, which is what `vector tap` shows. Only the field for
+/// the metric's current type is present; the others read as `null`.
+const METRIC_VALUE_FIELDS: &[&str] = &[
+    "counter",
+    "gauge",
+    "set",
+    "distribution",
+    "aggregated_histogram",
+    "aggregated_summary",
+    "sketch",
+];
 
-        /// Returns the field that holds the value of a metric of this type.
-        const fn metric_value_field(value: &MetricValue) -> &'static str {
-            match value {
-                $(MetricValue::$variant { .. } => $field,)+
-            }
-        }
-
-        /// Returns the subfields that VRL can read from a metric's value, in order.
-        const fn metric_value_subfields(value: &MetricValue) -> &'static [&'static str] {
-            match value {
-                $(MetricValue::$variant { .. } => &[$($subfield),+],)+
-            }
-        }
-
-        /// Converts one subfield of a metric's value for VRL.
-        ///
-        /// Returns `None` if the type has no such subfield, and `Some(None)` if the subfield is
-        /// missing from this value.
-        fn metric_value_subfield(value: &MetricValue, subfield: &str) -> Option<Option<Value>> {
-            match value {
-                $(MetricValue::$variant { $($binding)* } => match subfield {
-                    $($subfield => Some($convert),)+
-                    _ => None,
-                },)+
-            }
-        }
-    };
+/// Returns the field that holds the value of a metric of this type.
+const fn metric_value_field(value: &MetricValue) -> &'static str {
+    match value {
+        MetricValue::Counter { .. } => "counter",
+        MetricValue::Gauge { .. } => "gauge",
+        MetricValue::Set { .. } => "set",
+        MetricValue::Distribution { .. } => "distribution",
+        MetricValue::AggregatedHistogram { .. } => "aggregated_histogram",
+        MetricValue::AggregatedSummary { .. } => "aggregated_summary",
+        MetricValue::Sketch { .. } => "sketch",
+    }
 }
 
-metric_value_fields! {
-    Counter { value } => "counter" {
-        "value" => Some(metric_float_to_vrl_value(*value)),
-    },
-    Gauge { value } => "gauge" {
-        "value" => Some(metric_float_to_vrl_value(*value)),
-    },
-    Set { values } => "set" {
-        "values" => Some(Value::Array(values.iter().map(|value| value.as_str().into()).collect())),
-    },
-    Distribution { samples, statistic } => "distribution" {
-        "samples" => Some(Value::Array(samples.iter().map(sample_to_vrl_value).collect())),
-        "statistic" => Some(statistic_to_vrl_value(*statistic)),
-    },
-    AggregatedHistogram { buckets, count, sum } => "aggregated_histogram" {
-        "buckets" => Some(Value::Array(buckets.iter().map(bucket_to_vrl_value).collect())),
-        "count" => Some(metric_count_to_vrl_value(*count)),
-        // Like the JSON encoding, a missing sum is left out, so `exists` can tell it apart from
-        // a sum of zero.
-        "sum" => sum.map(metric_float_to_vrl_value),
-    },
-    AggregatedSummary { quantiles, count, sum } => "aggregated_summary" {
-        "quantiles" => Some(Value::Array(quantiles.iter().map(quantile_to_vrl_value).collect())),
-        "count" => Some(metric_count_to_vrl_value(*count)),
-        "sum" => Some(metric_float_to_vrl_value(*sum)),
-    },
-    // Only summary statistics are exposed. The bins are an internal representation and shouldn't
-    // become part of the VRL interface. Statistics of an empty sketch are present but `null`.
-    Sketch { sketch: MetricSketch::AgentDDSketch(sketch) } => "sketch" {
-        "count" => Some(Value::from(i64::from(sketch.count()))),
-        "min" => Some(optional_metric_float_to_vrl_value(sketch.min())),
-        "max" => Some(optional_metric_float_to_vrl_value(sketch.max())),
-        "sum" => Some(optional_metric_float_to_vrl_value(sketch.sum())),
-        "avg" => Some(optional_metric_float_to_vrl_value(sketch.avg())),
-    },
+/// Returns the subfields that VRL can read from a metric's value, in order.
+const fn metric_value_subfields(value: &MetricValue) -> &'static [&'static str] {
+    match value {
+        MetricValue::Counter { .. } | MetricValue::Gauge { .. } => &["value"],
+        MetricValue::Set { .. } => &["values"],
+        MetricValue::Distribution { .. } => &["samples", "statistic"],
+        MetricValue::AggregatedHistogram { .. } => &["buckets", "count", "sum"],
+        MetricValue::AggregatedSummary { .. } => &["quantiles", "count", "sum"],
+        // Only summary statistics are exposed. The bins are an internal representation and
+        // shouldn't become part of the VRL interface.
+        MetricValue::Sketch { .. } => &["count", "min", "max", "sum", "avg"],
+    }
 }
 
-/// Converts the given subfields of a metric's value to the object VRL reads under the field for
-/// its type. Missing subfields are left out.
-fn metric_value_subfields_to_vrl_value(value: &MetricValue, subfields: &[&str]) -> Value {
-    subfields
+/// Converts one subfield of a metric's value for VRL.
+///
+/// Returns `None` if the subfield is missing from this value, like the sum of a histogram that
+/// doesn't have one, or isn't one of the subfields listed in `metric_value_subfields`.
+fn metric_value_subfield(value: &MetricValue, subfield: &str) -> Option<Value> {
+    match value {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => match subfield {
+            "value" => Some(metric_float_to_vrl_value(*value)),
+            _ => None,
+        },
+        MetricValue::Set { values } => match subfield {
+            "values" => Some(Value::Array(
+                values.iter().map(|value| value.as_str().into()).collect(),
+            )),
+            _ => None,
+        },
+        MetricValue::Distribution { samples, statistic } => match subfield {
+            "samples" => Some(Value::Array(
+                samples.iter().map(sample_to_vrl_value).collect(),
+            )),
+            "statistic" => Some(statistic_to_vrl_value(*statistic)),
+            _ => None,
+        },
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        } => match subfield {
+            "buckets" => Some(Value::Array(
+                buckets.iter().map(bucket_to_vrl_value).collect(),
+            )),
+            "count" => Some(metric_count_to_vrl_value(*count)),
+            // Like the JSON encoding, a missing sum is left out, so `exists` can tell it apart
+            // from a sum of zero.
+            "sum" => sum.map(metric_float_to_vrl_value),
+            _ => None,
+        },
+        MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        } => match subfield {
+            "quantiles" => Some(Value::Array(
+                quantiles.iter().map(quantile_to_vrl_value).collect(),
+            )),
+            "count" => Some(metric_count_to_vrl_value(*count)),
+            "sum" => Some(metric_float_to_vrl_value(*sum)),
+            _ => None,
+        },
+        // The statistics of an empty sketch are present but `null`.
+        MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(sketch),
+        } => match subfield {
+            "count" => Some(Value::from(i64::from(sketch.count()))),
+            "min" => Some(optional_metric_float_to_vrl_value(sketch.min())),
+            "max" => Some(optional_metric_float_to_vrl_value(sketch.max())),
+            "sum" => Some(optional_metric_float_to_vrl_value(sketch.sum())),
+            "avg" => Some(optional_metric_float_to_vrl_value(sketch.avg())),
+            _ => None,
+        },
+    }
+}
+
+/// Converts the requested subfields of a metric's value to the object VRL reads under the field
+/// for its type. Missing subfields are left out.
+///
+/// Subfields are converted in the order of `metric_value_subfields`, so each is converted once
+/// even if it is requested more than once.
+fn metric_value_subfields_to_vrl_value(value: &MetricValue, requested: &[&str]) -> Value {
+    metric_value_subfields(value)
         .iter()
+        .filter(|subfield| requested.contains(subfield))
         .filter_map(|subfield| {
-            metric_value_subfield(value, subfield)
-                .flatten()
-                .map(|converted| ((*subfield).into(), converted))
+            metric_value_subfield(value, subfield).map(|converted| ((*subfield).into(), converted))
         })
         .collect::<ObjectMap>()
         .into()
@@ -967,8 +987,8 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: Metric
         metric.value(),
         MetricValue::Counter { .. } | MetricValue::Gauge { .. }
     ) && info.target_assignments.iter().any(is_metric_type_path);
-    // Whether the program reads the whole value, or only some of its subfields. Requests are
-    // collected first, so that each subfield is converted once however many paths read it.
+    // Whether the program reads the whole value, or only some of its subfields. Each subfield is
+    // recorded once, however many paths read it, such as several `.distribution.samples[i]`.
     let mut value_full = false;
     let mut value_subfields: SmallVec<[&'static str; 4]> = SmallVec::new();
 
@@ -2470,8 +2490,8 @@ mod test {
 
     /// One metric of each type, with the VRL field for its value and the expected object.
     ///
-    /// The expected objects are written by hand, so that tests catch a subfield missing from the
-    /// shared field definitions.
+    /// The expected objects are written by hand, so that tests catch a subfield missing from
+    /// `metric_value_subfields` or `metric_value_subfield`.
     fn metric_value_cases() -> Vec<(MetricValue, &'static str, Value)> {
         let mut sketch = AgentDDSketch::with_agent_defaults();
         sketch.insert_many(&[1.0, 3.0]);
@@ -2601,6 +2621,47 @@ mod test {
                 let source = format!("exists(.{field}.{subfield})");
                 let (_, result) = run_metric_program(value.clone(), &source);
                 assert_eq!(result, Value::from(true), "{source}");
+            }
+        }
+    }
+
+    #[test]
+    fn metric_value_field_lists_match() {
+        use std::collections::HashSet;
+
+        let cases = metric_value_cases();
+
+        // Each type has its own field, and `METRIC_VALUE_FIELDS` lists exactly those fields.
+        let fields: Vec<_> = cases
+            .iter()
+            .map(|(value, _, _)| metric_value_field(value))
+            .collect();
+        let unique_fields: HashSet<_> = fields.iter().copied().collect();
+        assert_eq!(unique_fields.len(), fields.len(), "duplicate in {fields:?}");
+        let listed: HashSet<_> = METRIC_VALUE_FIELDS.iter().copied().collect();
+        assert_eq!(
+            listed.len(),
+            METRIC_VALUE_FIELDS.len(),
+            "duplicate in {METRIC_VALUE_FIELDS:?}"
+        );
+        assert_eq!(unique_fields, listed);
+
+        for (value, field, _) in &cases {
+            assert_eq!(metric_value_field(value), *field);
+
+            // Each listed subfield is unique and converts for a fully populated value.
+            let subfields = metric_value_subfields(value);
+            let unique_subfields: HashSet<_> = subfields.iter().collect();
+            assert_eq!(
+                unique_subfields.len(),
+                subfields.len(),
+                "duplicate in {field}: {subfields:?}"
+            );
+            for subfield in subfields {
+                assert!(
+                    metric_value_subfield(value, subfield).is_some(),
+                    "{field}.{subfield}"
+                );
             }
         }
     }
