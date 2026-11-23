@@ -308,7 +308,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { workspace = true, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.4.1", default-features = false, optional = true }
+console-subscriber = { version = "0.5.0", default-features = false, optional = true }
 
 # Tracing
 tracing.workspace = true

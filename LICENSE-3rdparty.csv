@@ -843,7 +843,6 @@ toml_edit,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_edit Author
 toml_parser,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_parser Authors
 toml_writer,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_writer Authors
 tonic,https://github.com/grpc/grpc-rust,MIT,gRPC authors
-tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
 tonic-health,https://github.com/grpc/grpc-rust,MIT,James Nugent <james@jen20.com>
 tonic-prost,https://github.com/grpc/grpc-rust,MIT,gRPC authors
 tonic-reflection,https://github.com/grpc/grpc-rust,MIT,"James Nugent <james@jen20.com>, Samani G. Gikandi <samani@gojulas.com>"
