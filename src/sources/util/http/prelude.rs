@@ -1,27 +1,24 @@
-use std::{
-    collections::HashMap, convert::Infallible, fmt, net::SocketAddr, sync::Arc, time::Duration,
-};
+use std::{collections::HashMap, fmt, net::SocketAddr, sync::Arc, time::Duration};
 
 use serde_json::Value as JsonValue;
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
-use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
-    config::SourceAcknowledgementsConfig,
+    config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventMetadata, VrlTarget},
+    internal_event::emit,
 };
-use vrl::value::ObjectMap;
 use vrl::{
     compiler::{
         Program,
         runtime::{Runtime, Terminate},
     },
-    value::Value,
+    path::{PathPrefix, ValuePath as _},
+    value::{ObjectMap, Value},
 };
 use warp::{
     Filter,
@@ -34,17 +31,17 @@ use warp::{
     reply::Reply,
 };
 
-use super::encoding::{decompress_body, limited_body, max_decompressed_size_bytes};
+use super::encoding::{capped_body, decompress_body};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig, TlsError},
 };
 
 /// The decision returned by `build_vrl_response` after running the VRL `response_source` program.
@@ -88,6 +85,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) {
     }
 
+    fn log_namespace(&self) -> LogNamespace;
+
+    fn name() -> &'static str;
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request body cannot be decoded into events.
     fn build_events(
         &self,
         body: Bytes,
@@ -96,22 +101,71 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
-    /// Called after `enrich_events` when `custom` auth returned metadata enrichment fields.
-    /// Sources that do not override this will emit a warning and drop the enrichment.
-    fn inject_auth_enrichment(&self, _events: &mut [Event], enrichment: ObjectMap) {
-        if !enrichment.is_empty() {
-            warn!(
-                message = "Auth metadata enrichment is not supported by this source and will be dropped. \
-                           Remove %field writes from the custom auth VRL program or switch to a source that supports enrichment.",
-                fields = ?enrichment.keys().collect::<Vec<_>>(),
-            );
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Both namespaces use insert-if-empty semantics so auth enrichment never
+    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
+    /// `enrich_events` already populated.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
+    ///   all event types (Log, Metric, Trace).
+    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            match self.log_namespace() {
+                LogNamespace::Vector => {
+                    // metadata_mut() dispatches to Log, Metric, and Trace so every
+                    // decoded event type receives the auth enrichment fields.
+                    let meta = event.metadata_mut().value_mut();
+                    let source_name = Self::name();
+                    for (key, value) in &enrichment {
+                        let key_str = key.as_str();
+                        let name_part = vrl::path!(source_name);
+                        let key_part = vrl::path!(key_str);
+                        let full_path = name_part.concat(key_part);
+                        if meta.get(full_path.clone()).is_none() {
+                            meta.insert(full_path, value.clone());
+                        }
+                    }
+                }
+                LogNamespace::Legacy => {
+                    // Legacy enrichment targets the event body; only Log events have one.
+                    if let Event::Log(log) = event {
+                        for (key, value) in &enrichment {
+                            log.try_insert(
+                                (PathPrefix::Event, vrl::path!(key.as_str())),
+                                value.clone(),
+                            );
+                        }
+                    } else if !enrichment.is_empty() {
+                        warn!(
+                            message = "Auth metadata enrichment is not supported for trace/metric events in the legacy namespace and will be dropped. \
+                                       Switch this source to the Vector namespace (`log_namespace: true`) to enable it for all event types.",
+                            fields = ?enrichment.keys().collect::<Vec<_>>(),
+                        );
+                    }
+                }
+            }
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content encoding is unsupported or decompression fails.
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
     }
 
+    /// Serves the acceptor held by `tls_reloader` when set, so the caller can swap in new TLS
+    /// material at runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured, or if `tls_reloader` is set
+    /// but TLS is disabled.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -121,12 +175,17 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         response_code: StatusCode,
         strict_path: bool,
         tls: Option<&TlsEnableableConfig>,
+        tls_reloader: Option<TlsAcceptorReloader>,
         auth: Option<&HttpServerAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
+        // Binding would catch this too, but only once the source runs.
+        if tls_reloader.is_some() && tls.is_raw() {
+            return Err(TlsError::ReloaderWithoutTls.into());
+        }
         let protocol = tls.http_protocol_name();
         let auth_matcher = auth
             .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
@@ -146,12 +205,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Options => warp::options().boxed(),
             };
 
-            // https://github.com/rust-lang/rust-clippy/issues/8148
-            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                filter = filter.and(warp::path(s.to_string())).boxed()
+                filter = filter.and(warp::path(s.to_string())).boxed();
             }
-            let body_filter = limited_body(max_decompressed_size_bytes());
+            let body_filter = capped_body();
 
             let svc = filter
                 .and(warp::path::tail())
@@ -159,8 +216,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        emit!(HttpInternalError {
-                            message: "Path not found."
+                        emit(HttpInternalError {
+                            message: "Path not found.",
                         });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
@@ -198,7 +255,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|body| (body, auth_enrichment))
                             })
                             .and_then(|(body, auth_enrichment)| {
-                                emit!(HttpBytesReceived {
+                                emit(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
@@ -207,7 +264,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|events| (events, auth_enrichment))
                             })
                             .map(|(mut events, auth_enrichment)| {
-                                emit!(HttpEventsReceived {
+                                emit(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
                                     http_path,
@@ -251,47 +308,47 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {r:?}")
+                    emit(HttpInternalError {
+                        message: &format!("Internal error: {r:?}"),
                     });
                     Err(r)
                 }
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let remote_addr = conn.peer_addr();
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            remote_addr,
-                        )
-                    }))
-                    .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
-
-                        request
-                    })
-                    .service(warp::service(routes.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.map_err(|err| {
-                error!("An error occurred: {:?}.", err);
-            })?;
-
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+            let listener = tls
+                .bind_reloadable(&address, tls_reloader)
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?
+                .with_keepalive(keepalive_settings.tcp_keepalive);
+
+            serve(
+                listener.accept_stream(),
+                cx.shutdown.map(|_| ()),
+                move |conn| {
+                    let remote_addr = conn.peer_addr();
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                remote_addr,
+                            )
+                        }))
+                        .map_request(move |mut request: http::Request<_>| {
+                            request.extensions_mut().insert(PeerAddr::new(remote_addr));
+
+                            request
+                        })
+                        .service(warp::service(routes.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -353,16 +410,16 @@ async fn handle_request(
                         .map_err(|_| {
                             // can only fail if receiving end disconnected, so we are shutting down,
                             // probably not gracefully.
-                            emit!(StreamClosedError { count });
+                            emit(StreamClosedError { count });
                             warp::reject::custom(RejectShuttingDown)
                         })
-                        .and_then(|_| handle_batch_status(response, receiver))
+                        .and_then(|()| handle_batch_status(response, receiver))
                         .await
                 }
             }
         }
         Err(error) => {
-            emit!(HttpBadRequest::new(error.code(), error.message()));
+            emit(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }
@@ -433,7 +490,7 @@ fn build_vrl_response(
                 },
                 None => warp::http::Response::builder()
                     .status(reject_code)
-                    .body(hyper::Body::empty())
+                    .body(Bytes::new().into())
                     .map_err(|err| {
                         warp::reject::custom(ErrorMessage::new(
                             StatusCode::INTERNAL_SERVER_ERROR,
@@ -443,19 +500,19 @@ fn build_vrl_response(
             };
             Ok(VrlResponseDecision::Reject(response))
         }
-        Err(Terminate::Error(err)) => {
-            emit!(HttpInternalError {
-                message: &format!("VRL response program failed: {err}")
+        Err(err @ (Terminate::Error(_) | Terminate::Interrupted)) => {
+            emit(HttpInternalError {
+                message: &format!("VRL response program failed: {err}"),
             });
             Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("VRL response program failed: {err}"),
             )))
         }
-        Ok(Value::Bytes(body)) => {
+        Ok(body @ (Value::Bytes(_) | Value::String(_))) => {
             let response = warp::http::Response::builder()
                 .status(default_status)
-                .body(hyper::Body::from(body))
+                .body(body.coerce_to_bytes().into())
                 .map_err(|err| {
                     warp::reject::custom(ErrorMessage::new(
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -469,8 +526,8 @@ fn build_vrl_response(
             Ok(VrlResponseDecision::Forward(response))
         }
         Ok(other) => {
-            emit!(HttpInternalError {
-                message: "VRL response program returned unexpected type"
+            emit(HttpInternalError {
+                message: "VRL response program returned unexpected type",
             });
             Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -493,7 +550,7 @@ fn build_response_from_vrl_obj(
 ) -> Result<warp::reply::Response, Rejection> {
     let status = obj
         .get("status")
-        .and_then(|v| v.as_integer())
+        .and_then(Value::as_integer)
         .and_then(|n| u16::try_from(n).ok())
         .and_then(|n| StatusCode::from_u16(n).ok())
         .unwrap_or(default_status);
@@ -501,22 +558,22 @@ fn build_response_from_vrl_obj(
     let body = obj
         .get("body")
         .map(|v| match v {
-            Value::Bytes(b) => hyper::Body::from(b.clone()),
-            other => hyper::Body::from(other.to_string()),
+            v @ (Value::Bytes(_) | Value::String(_)) => v.coerce_to_bytes(),
+            other => Bytes::from(other.to_string()),
         })
-        .unwrap_or_else(hyper::Body::empty);
+        .unwrap_or_default();
 
     let mut builder = warp::http::Response::builder().status(status);
 
     if let Some(Value::Object(headers)) = obj.get("headers") {
         for (k, v) in headers {
-            if let Value::Bytes(v) = v {
-                insert_validated_header(&mut builder, k.as_str(), v.as_ref());
+            if matches!(v, Value::Bytes(_) | Value::String(_)) {
+                insert_validated_header(&mut builder, k.as_str(), &v.coerce_to_bytes());
             }
         }
     }
 
-    builder.body(body).map_err(|err| {
+    builder.body(body.into()).map_err(|err| {
         warp::reject::custom(ErrorMessage::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to build response: {err}"),
@@ -572,7 +629,7 @@ fn build_response_from_json_obj(
 ) -> Result<warp::reply::Response, Rejection> {
     let status = obj
         .get("status")
-        .and_then(|v| v.as_u64())
+        .and_then(JsonValue::as_u64)
         .and_then(|n| u16::try_from(n).ok())
         .and_then(|n| StatusCode::from_u16(n).ok())
         .unwrap_or(default_status);
@@ -580,8 +637,8 @@ fn build_response_from_json_obj(
     let body = obj
         .get("body")
         .and_then(|v| v.as_str())
-        .map(|s| hyper::Body::from(s.to_owned()))
-        .unwrap_or_else(hyper::Body::empty);
+        .map(|s| Bytes::from(s.to_owned()))
+        .unwrap_or_default();
 
     let mut builder = warp::http::Response::builder().status(status);
 
@@ -593,7 +650,7 @@ fn build_response_from_json_obj(
         }
     }
 
-    builder.body(body).map_err(|err| {
+    builder.body(body.into()).map_err(|err| {
         warp::reject::custom(ErrorMessage::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to build reject response: {err}"),
@@ -608,7 +665,7 @@ fn build_plain_reject_response(
 ) -> Result<warp::reply::Response, Rejection> {
     warp::http::Response::builder()
         .status(reject_code)
-        .body(hyper::Body::from(msg))
+        .body(msg.into())
         .map_err(|err| {
             warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,

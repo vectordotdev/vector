@@ -6,21 +6,32 @@ use std::{
 };
 
 use futures::StreamExt;
-use tokio::time::sleep;
+use tokio::{sync::oneshot::channel, time::sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull},
     config::ComponentKey,
+    event::{Event, EventContainer, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use crate::{
-    config::Config,
+    config::{Config, unit_test::UnitTestSourceConfig},
+    enrichment_tables::{
+        EnrichmentTables,
+        memory::{MemoryConfig, MemorySourceConfig, ReloadBehavior},
+    },
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
         splunk_hec::SplunkConfig,
     },
-    test_util::{self, addr::next_addr, mock::basic_sink, start_topology, temp_dir, wait_for_tcp},
+    test_util::{
+        self,
+        addr::next_addr,
+        mock::{basic_sink, oneshot_sink},
+        start_topology, wait_for_tcp,
+    },
     topology::ReloadError::*,
 };
 
@@ -69,7 +80,7 @@ async fn topology_reuse_old_port() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -94,7 +105,7 @@ async fn topology_rebuild_old() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     let result = topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await;
 
     // Should fail with TopologyBuildFailed error due to port conflict
@@ -113,7 +124,7 @@ async fn topology_old() {
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(old_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -182,24 +193,23 @@ async fn topology_disk_buffer_conflict() {
     let (_guard_0, address_0) = next_addr();
     let (_guard_1, address_1) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address_0, 1));
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].inner = prom_exporter_sink(address_1, 1).into();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -264,7 +274,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -274,7 +284,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -282,11 +292,11 @@ async fn topology_readd_input() {
     topology.stop().await;
 
     // sink should not crash
-    assert!(
+    assert_eq!(
         UnboundedReceiverStream::new(crash)
             .collect::<Vec<_>>()
-            .await
-            .is_empty()
+            .await,
+        [] as [crate::signal::ShutdownError; 0]
     );
 }
 
@@ -305,7 +315,7 @@ async fn topology_reload_component() {
     topology.extend_reload_set(HashSet::from_iter(vec![ComponentKey::from("out")]));
 
     topology
-        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(old_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -314,7 +324,7 @@ async fn topology_reload_component() {
     sleep(Duration::from_secs(2)).await;
 
     tokio::select! {
-        _ = wait_for_tcp(address_0) => {},
+        () = wait_for_tcp(address_0) => {},
         _ = crash_stream.next() => panic!(),
     }
 }
@@ -330,24 +340,23 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     let (_guard, address) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     // Change only the disk buffer's max_size.
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(536870912).unwrap(),
+        max_size: NonZeroU64::new(536_870_912).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -355,7 +364,7 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
     let mut crash_stream = UnboundedReceiverStream::new(crash);
 
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed before reload"),
     }
 
@@ -365,7 +374,7 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     let reload_result = tokio::time::timeout(
         Duration::from_secs(5),
-        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default()),
     )
     .await;
 
@@ -377,9 +386,10 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     // Verify the new sink is running.
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
+    topology.stop().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -390,8 +400,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
 
     let (_guard, address) = next_addr();
 
-    let data_dir = temp_dir();
-    std::fs::create_dir(&data_dir).unwrap();
+    let data_dir = tempfile::tempdir().unwrap();
 
     let memory_stage = BufferType::Memory {
         size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
@@ -399,7 +408,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     };
 
     let mut old_config = Config::builder();
-    old_config.global.data_dir = Some(data_dir);
+    old_config.global.data_dir = Some(data_dir.path().to_path_buf());
     old_config.add_source("in", internal_metrics_source());
     old_config.add_sink("out", &["in"], prom_exporter_sink(address, 1));
 
@@ -407,7 +416,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     old_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
         memory_stage,
         BufferType::DiskV2 {
-            max_size: NonZeroU64::new(268435488).unwrap(),
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
             when_full: WhenFull::Block,
         },
     ]);
@@ -417,7 +426,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     new_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
         memory_stage,
         BufferType::DiskV2 {
-            max_size: NonZeroU64::new(536870912).unwrap(),
+            max_size: NonZeroU64::new(536_870_912).unwrap(),
             when_full: WhenFull::Block,
         },
     ]);
@@ -426,7 +435,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     let mut crash_stream = UnboundedReceiverStream::new(crash);
 
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed before reload"),
     }
 
@@ -434,7 +443,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
 
     let reload_result = tokio::time::timeout(
         Duration::from_secs(5),
-        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default()),
     )
     .await;
 
@@ -446,8 +455,202 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
 
     // Verify the new sink is running.
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
+    }
+    topology.stop().await;
+}
+
+#[tokio::test]
+async fn topology_reload_preserves_enrichment_table_state() {
+    // Changing an enrichment table that has state and supports state preservation should preserve
+    // the state after reload, even if it was changed (if the state is still valid after the chaange).
+    test_util::trace_init();
+
+    let source_event = Event::Log(LogEvent::from("test"));
+    let (old_tx, old_rx) = channel();
+
+    let mut old_config = Config::builder();
+    let mut old_memory_config = MemoryConfig::default();
+    old_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: "memory_test_source".to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    old_memory_config.ttl = 100;
+    old_config.add_enrichment_table(
+        "memory_test",
+        &["in"],
+        EnrichmentTables::Memory(old_memory_config),
+    );
+    old_config.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: vec![source_event.clone()],
+        },
+    );
+    old_config.add_sink("out", &["memory_test_source"], oneshot_sink(old_tx));
+
+    let (new_tx, new_rx) = channel();
+    let mut new_config = Config::builder();
+    let mut new_memory_config = MemoryConfig::default();
+    new_memory_config.reload_behavior = ReloadBehavior::PreserveState;
+    new_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: "memory_test_source".to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    new_memory_config.ttl = 101;
+    new_config.add_enrichment_table(
+        "memory_test",
+        // No input to ensure old state is read and not new
+        &[],
+        EnrichmentTables::Memory(new_memory_config),
+    );
+    new_config.add_source("in_2", UnitTestSourceConfig { events: vec![] });
+    new_config.add_sink("out_2", &["memory_test_source"], oneshot_sink(new_tx));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    // Make sure the topology is fully running: other components, etc.
+    sleep(Duration::from_secs(2)).await;
+
+    tokio::select! {
+        events = old_rx => {
+            let events = events.expect("must get event to output");
+            let events = events.into_events().collect::<Vec<_>>();
+            assert_eq!(events.len(), 2);
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.to_str_lossy().is_some_and(|k| k == "message")))
+                .and_then(|entry| {
+                    entry
+                        .get("value")
+                        .cloned()
+                        .map(|m| m.to_string_lossy().into_owned())
+                });
+            assert_eq!(message.unwrap(), "test");
+        }
+        _ = crash_stream.next() => panic!(),
+    }
+
+    // Now reload the topology with the new configuration, and ensure the table still has the same state
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
+
+    // Give the old topology configuration a chance to shutdown cleanly, etc.
+    sleep(Duration::from_secs(2)).await;
+    tokio::select! {
+        events = new_rx => {
+            let events = events.expect("must get event to output");
+            let events = events.into_events().collect::<Vec<_>>();
+            assert_eq!(events.len(), 2);
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.to_str_lossy().is_some_and(|k| k == "message")))
+                .and_then(|entry| {
+                    entry
+                        .get("value")
+                        .cloned()
+                        .map(|m| m.to_string_lossy().into_owned())
+                });
+            assert_eq!(message.unwrap(), "test");
+        },
+        () = tokio::time::sleep(Duration::from_secs(10)) => {
+            panic!("Never received the events")
+        }
+        _ = crash_stream.next() => panic!(),
+    }
+}
+
+#[tokio::test]
+async fn topology_reload_reuses_removed_enrichment_table_source_key() {
+    test_util::trace_init();
+
+    let table_source_key = "memory_test_source";
+    let (old_tx, old_rx) = channel();
+
+    let mut old_config = Config::builder();
+    old_config.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: vec![Event::Log(LogEvent::from("old"))],
+        },
+    );
+
+    let mut old_memory_config = MemoryConfig::default();
+    old_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: table_source_key.to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    old_config.add_enrichment_table(
+        "memory_test",
+        &["in"],
+        EnrichmentTables::Memory(old_memory_config),
+    );
+    old_config.add_sink("old_out", &[table_source_key], oneshot_sink(old_tx));
+
+    let (new_tx, new_rx) = channel();
+    let mut new_config = Config::builder();
+    new_config.add_enrichment_table(
+        "memory_test",
+        &[],
+        EnrichmentTables::Memory(MemoryConfig::default()),
+    );
+    new_config.add_source(
+        table_source_key,
+        UnitTestSourceConfig {
+            events: vec![Event::Log(LogEvent::from("new"))],
+        },
+    );
+    new_config.add_sink("new_out", &[table_source_key], oneshot_sink(new_tx));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        events = old_rx => {
+            let events = events
+                .expect("old table source must send output before reload")
+                .into_events()
+                .collect::<Vec<_>>();
+            assert_ne!(events, [] as [vector_lib::event::Event; 0]);
+        },
+        () = tokio::time::sleep(Duration::from_secs(5)) => {
+            panic!("old table source never produced output")
+        }
+        error = crash_stream.next() => panic!("topology crashed before reload: {error:?}"),
+    }
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default()),
+    )
+    .await;
+    assert!(
+        reload_result.is_ok(),
+        "reload stalled while reusing removed enrichment table source key"
+    );
+    reload_result.unwrap().unwrap();
+
+    tokio::select! {
+        events = new_rx => {
+            let events = events
+                .expect("new source must send output after reload")
+                .into_events()
+                .collect::<Vec<_>>();
+            assert_eq!(events.len(), 1);
+        },
+        () = tokio::time::sleep(Duration::from_secs(5)) => {
+            panic!("new source never produced output after reload")
+        }
+        error = crash_stream.next() => panic!("topology crashed after reload: {error:?}"),
     }
 }
 
@@ -468,7 +671,7 @@ async fn reload_sink_test(
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
     topology
-        .reload_config_and_respawn(new_config, Default::default())
+        .reload_config_and_respawn(new_config, ExtraContext::default())
         .await
         .unwrap();
 
@@ -476,7 +679,7 @@ async fn reload_sink_test(
     sleep(Duration::from_secs(2)).await;
 
     tokio::select! {
-        _ = wait_for_tcp(new_address) => {},
+        () = wait_for_tcp(new_address) => {},
         _ = crash_stream.next() => panic!(),
     }
 }

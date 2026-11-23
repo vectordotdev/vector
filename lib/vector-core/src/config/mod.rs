@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 
 mod global_options;
@@ -501,7 +500,7 @@ impl LogNamespace {
             log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(source_name.as_bytes()),
+            Value::from_static_str(source_name),
         );
         self.insert_vector_metadata(
             log,
@@ -652,7 +651,7 @@ mod test {
         valid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), 32);
+            .insert(path!("vector").concat(path!("zork")), 32);
 
         let valid_event = valid_event.into();
 
@@ -663,7 +662,7 @@ mod test {
         invalid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), "noog");
+            .insert(path!("vector").concat(path!("zork")), "noog");
 
         let invalid_event = invalid_event.into();
 

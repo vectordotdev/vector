@@ -18,7 +18,6 @@ components: sinks: influxdb_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}
@@ -39,7 +38,6 @@ components: sinks: influxdb_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.influxdb_metrics.configuration

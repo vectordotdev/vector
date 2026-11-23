@@ -43,7 +43,7 @@ pub async fn custom_reflector<K, W>(
                             // Delay reconciling any `Delete` events
                             watcher::Event::Delete(ref obj) => {
                                 trace!(message = "Delaying processing Delete event.", event_type = std::any::type_name::<K>(), event = ?event);
-                                delay_queue.insert(event.to_owned(), delay_deletion);
+                                delay_queue.insert(event.clone(), delay_deletion);
                                 let meta_descr = MetaDescribe::from_meta(obj.meta());
                                 meta_cache.delete(&meta_descr);
                             }
@@ -61,7 +61,7 @@ pub async fn custom_reflector<K, W>(
                                 store.apply_watcher_event(&event);
                                 let meta_descr = MetaDescribe::from_meta(obj.meta());
                                 meta_cache.store(meta_descr.clone());
-                                init_buffer_meta.push(meta_descr.clone());
+                                init_buffer_meta.push(meta_descr);
                             }
                             // Reconcile `InitApply` events and implied deletions
                             watcher::Event::InitDone => {

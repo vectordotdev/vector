@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: redis
+    key: vector
+    url: redis://127.0.0.1:6379/0

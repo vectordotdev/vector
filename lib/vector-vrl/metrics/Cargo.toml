@@ -1,6 +1,6 @@
 [package]
 name = "vector-vrl-metrics"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
@@ -13,8 +13,8 @@ workspace = true
 arc-swap.workspace = true
 const-str.workspace = true
 vrl.workspace = true
-vector-core = { path = "../../vector-core", default-features = false, features = ["vrl"] }
+vector-core = { path = "../../vector-core", default-features = false }
 vector-common = { path = "../../vector-common", default-features = false }
 tokio.workspace = true
-tokio-stream.workspace = true
+tokio-stream = { workspace = true, features = ["time"] }
 vector-vrl-category.workspace = true

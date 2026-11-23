@@ -5,7 +5,7 @@ use vector_lib::{
 use vrl::{path::PathParseError, value::KeyString};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ReduceStaleEventFlushed;
+pub(crate) struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
     fn emit(self) {
@@ -14,7 +14,7 @@ impl InternalEvent for ReduceStaleEventFlushed {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ReduceAddEventError {
+pub(crate) struct ReduceAddEventError {
     pub error: PathParseError,
     pub path: KeyString,
 }

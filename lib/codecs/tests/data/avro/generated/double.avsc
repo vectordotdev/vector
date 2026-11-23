@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"double_field","type":"double"}]}
+{"type":"record","name":"test","fields":[{"name":"double_field","type":"double","default":0}]}

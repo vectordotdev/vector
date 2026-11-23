@@ -36,11 +36,11 @@ fn timestamp() -> DateTime<Utc> {
 
 fn create_event(id: i64) -> Event {
     let mut event = LogEvent::from("raw log line");
-    event.insert("id", id);
-    event.insert("host", "example.com");
+    event.insert(event_path!("id"), id);
+    event.insert(event_path!("host"), "example.com");
     let event_payload = event.clone().into_parts().0;
-    event.insert("payload", event_payload);
-    event.insert("timestamp", timestamp());
+    event.insert(event_path!("payload"), event_payload);
+    event.insert(event_path!("timestamp"), timestamp());
     event.into()
 }
 
@@ -51,7 +51,8 @@ fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
 }
 
 fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
-    let mut events = (0..count as i64).map(create_event).collect::<Vec<_>>();
+    let count = i64::try_from(count).expect("test event count fits in i64");
+    let mut events = (0..count).map(create_event).collect::<Vec<_>>();
     let receiver = BatchNotifier::apply_to(&mut events);
     (events, receiver)
 }
@@ -96,7 +97,7 @@ fn create_span(resource: &str) -> ObjectMap {
     ])
 }
 
-pub fn create_trace(resource: &str) -> TraceEvent {
+fn create_trace(resource: &str) -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert(event_path!("trace_id"), Value::Integer(123));
     t.insert(
@@ -419,7 +420,7 @@ async fn extra_fields_are_ignored() {
     let expected_value = input_log_event
         .get_message()
         .unwrap()
-        .as_str()
+        .to_str_lossy()
         .unwrap()
         .into_owned();
 
@@ -513,4 +514,56 @@ async fn insertion_fails_primary_key_violation() {
         &COMPONENT_ERROR_TAGS,
     )
     .await;
+}
+
+#[tokio::test]
+async fn insertion_skips_conflicting_rows_with_on_conflict_do_nothing() {
+    trace_init();
+
+    let table = random_table_name();
+    let endpoint = pg_url();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            on_conflict = "do_nothing"
+        "#,
+    );
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+    let mut connection = PgConnection::connect(endpoint.as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+    let insert_existing_sql = format!("INSERT INTO {table} (id, host) VALUES (1, 'existing')");
+    sqlx::query(&insert_existing_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let mut events = [0, 1, 2, 2].map(create_event).to_vec();
+    let mut receiver = BatchNotifier::apply_to(&mut events);
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &POSTGRES_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_sql = format!("SELECT id, host FROM {table} ORDER BY id");
+    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(&select_sql)
+        .fetch_all(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (0, Some("example.com".to_owned())),
+            (1, Some("existing".to_owned())),
+            (2, Some("example.com".to_owned())),
+        ]
+    );
 }

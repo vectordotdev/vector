@@ -1,18 +1,31 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use vector_vrl_category::Category;
-use vrl::prelude::{expression::Expr, *};
+use vrl::prelude::{
+    example, expression::Expr, indoc, kind, state, ArgumentList, Compiled, Context,
+    DiagnosticMessage, Example, Expression, ExpressionError, Function, FunctionCompileContext,
+    FunctionExpression, KeyString, ObjectMap, Parameter, Resolved, TypeDef, TypeState, Value,
+};
 
 use crate::common::{
     metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn get_metric(
     metrics_storage: &MetricsStorage,
     key: Value,
     tags: BTreeMap<String, String>,
 ) -> Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let value = match metrics_storage.get_metric(&key_str, tags) {
         Some(value) => metric_into_vrl(&value),
         None => Value::Null,
@@ -20,7 +33,7 @@ fn get_metric(
     Ok(value)
 }
 
-static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(ObjectMap::new()));
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
@@ -42,7 +55,7 @@ impl Function for GetVectorMetric {
         "get_vector_metric"
     }
 
-    fn usage(&self) -> &'static str {
+    fn description(&self) -> &'static str {
         const_str::concat!(
             "Searches internal Vector metrics by name and optionally by tags. Returns the first matching metric.\n\n",
             crate::VECTOR_METRICS_EXPLAINER

@@ -1,12 +1,13 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
 use crate::event::metric::{MetricKind, MetricValue};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct StatsdInvalidMetricError<'a> {
+pub(crate) struct StatsdInvalidMetricError<'a> {
     pub value: &'a MetricValue,
     pub kind: MetricKind,
 }
@@ -30,6 +31,6 @@ impl InternalEvent for StatsdInvalidMetricError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { reason, count: 1 });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { reason, count: 1 });
     }
 }

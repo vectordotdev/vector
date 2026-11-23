@@ -13,7 +13,8 @@ use super::{
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
-    config::{ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext},
+    sinks::util::TowerRequestConfig,
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -69,21 +70,21 @@ async fn sns_send_message_batch() {
     let topic_name = gen_topic_name();
     let topic_arn = ensure_topic(topic_name.clone()).await;
 
-    let sqs_client = create_sqs_test_client().await;
-    let queue_url = ensure_queue(&sqs_client, gen_queue_name()).await;
-    let queue_arn = get_queue_arn(&sqs_client, queue_url.clone()).await;
+    let queue_client = create_sqs_test_client().await;
+    let queue_url = ensure_queue(&queue_client, gen_queue_name()).await;
+    let queue_arn = get_queue_arn(&queue_client, queue_url.clone()).await;
 
-    let sns_client = create_sns_test_client().await;
+    let topic_client = create_sns_test_client().await;
 
     let base_config = BaseSSSinkConfig {
         encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
-        request: Default::default(),
-        tls: Default::default(),
+        request: TowerRequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
     };
 
     let config = SnsSinkConfig {
@@ -92,11 +93,12 @@ async fn sns_send_message_batch() {
         base_config,
     };
 
-    healthcheck(sns_client.clone(), config.topic_arn.clone())
+    healthcheck(topic_client.clone(), config.topic_arn.clone())
         .await
         .unwrap();
 
-    subscribe_queue_to_topic(&sns_client, &topic_arn, &queue_arn).await;
+    allow_topic_to_send(&queue_client, &queue_url, &queue_arn, &topic_arn).await;
+    subscribe_queue_to_topic(&topic_client, &topic_arn, &queue_arn).await;
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await.unwrap().0;
@@ -106,9 +108,9 @@ async fn sns_send_message_batch() {
 
     sleep(Duration::from_secs(1)).await;
 
-    let response = sqs_client
+    let response = queue_client
         .receive_message()
-        .max_number_of_messages(input_lines.len() as i32)
+        .max_number_of_messages(i32::try_from(input_lines.len()).unwrap())
         .queue_url(queue_url)
         .send()
         .await
@@ -178,6 +180,33 @@ async fn get_queue_arn(client: &SqsClient, queue_url: String) -> String {
 
 fn gen_queue_name() -> String {
     format!("test-{}", random_string(10).to_lowercase())
+}
+
+/// SNS only delivers to a queue whose policy lets the topic send to it.
+async fn allow_topic_to_send(
+    client: &SqsClient,
+    queue_url: &str,
+    queue_arn: &str,
+    topic_arn: &str,
+) {
+    let policy = serde_json::json!({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": "sns.amazonaws.com" },
+            "Action": "sqs:SendMessage",
+            "Resource": queue_arn,
+            "Condition": { "ArnEquals": { "aws:SourceArn": topic_arn } },
+        }],
+    });
+
+    client
+        .set_queue_attributes()
+        .queue_url(queue_url)
+        .attributes(QueueAttributeName::Policy, policy.to_string())
+        .send()
+        .await
+        .unwrap();
 }
 
 async fn subscribe_queue_to_topic(sns_client: &SnsClient, topic_arn: &str, queue_arn: &str) {

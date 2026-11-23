@@ -1,0 +1,10 @@
+transforms:
+  my_transform_id:
+    type: reduce
+    inputs:
+      - my-source-or-transform-id
+    expire_after_ms: 30000
+    flush_period_ms: 1000
+    group_by:
+      - request_id
+    measure_cpu_usage: false

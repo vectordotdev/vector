@@ -14,7 +14,6 @@ Vector team member will find this document useful.
   - [Git Commits](#git-commits)
     - [Style](#style)
   - [GitHub Pull Requests](#github-pull-requests)
-    - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
   - [CI](#ci)
@@ -145,13 +144,15 @@ make check-fmt
 make check-clippy
 make check-generated-docs
 
+# Lint GitHub Actions workflows.
+make check-actionlint
+
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
 make check-docs
 make check-examples
 make check-scripts
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 
 # Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
 typos
@@ -166,29 +167,11 @@ relevant to your PR. This command is defined in the
 
 ### GitHub Pull Requests
 
+Please see [Community response expectations](COMMUNITY_RESPONSE_EXPECTATIONS.md)
+for information about how maintainers prioritize pull requests, issues, and
+discussions.
+
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
-
-#### Title
-
-The pull request title must follow the format outlined in the [conventional commits spec](https://www.conventionalcommits.org).
-[Conventional commits](https://www.conventionalcommits.org) is a standardized
-format for commit messages. Vector only requires this format for commits on
-the `master` branch. And because Vector squashes commits before merging
-branches, this means that only the pull request title must conform to this
-format. Vector performs a pull request check to verify the pull request title
-in case you forget.
-
-A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
-
-The following are all good examples of pull request titles:
-
-```text
-feat(new sink): new `xyz` sink
-feat(tcp source): add foo bar baz feature
-fix(tcp source): fix foo bar baz bug
-chore: improve build process
-docs: fix typos
-```
 
 #### Reviews & Approvals
 
@@ -221,6 +204,9 @@ the label 'no-changelog' to your PR. When in doubt, consult the vector team
 for guidance. The details on how to add a changelog entry for your PR are
 outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
+For a new deprecation announcement, follow the [deprecation policy](docs/DEPRECATION_POLICY.md)
+and add a notice to `deprecation.d/` instead.
+
 ### CI
 
 Currently, Vector uses GitHub Actions to run tests. The workflows are defined in
@@ -232,14 +218,6 @@ GitHub Actions is responsible for releasing updated versions of Vector through
 various channels.
 
 #### Testing
-
-##### Skipping tests
-
-Tests are run for all changes except those that have the label:
-
-```text
-ci-condition: skip
-```
 
 ##### Daily tests
 
@@ -297,9 +275,6 @@ cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
 make check-generated-docs
-# Generate the code documentation for the Vector project.
-# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
-cd rust-doc && make docs
 ```
 
 ### Updating licences

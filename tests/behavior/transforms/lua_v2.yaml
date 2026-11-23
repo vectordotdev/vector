@@ -1,0 +1,135 @@
+transforms:
+  lua_v2_log:
+    inputs: []
+    type: "lua"
+    version: "2"
+    hooks:
+      process: |
+        function (event, emit)
+          event.log.a, event.log.b = nil, event.log.a
+          emit(event)
+        end
+
+  lua_v2_source:
+    inputs: []
+    type: "lua"
+    version: "2"
+    source: |
+      function hook_process (event, emit)
+        event.log.inserted_field = "inserted value"
+        emit(event)
+      end
+    hooks:
+      process: "hook_process"
+
+  lua_v2_metric:
+    inputs: []
+    type: "lua"
+    version: "2"
+    hooks:
+      process: |
+        function (event, emit)
+          event.metric.counter.value = event.metric.counter.value + 1
+          emit(event)
+        end
+
+  lua_v2_log_to_metric:
+    inputs: []
+    type: "lua"
+    version: "2"
+    hooks:
+      process: |
+        function (event, emit)
+          event.log = nil
+          event.metric = {
+            name = "example metric",
+            counter = {
+              value = 1.0
+            }
+          }
+          emit(event)
+        end
+
+  lua_v2_metric_to_log:
+    inputs: []
+    type: "lua"
+    version: "2"
+    hooks:
+      process: |
+        function (event, emit)
+          event.metric = nil
+          event.log = {
+            field = "example value"
+          }
+          emit(event)
+        end
+
+tests:
+  - name: "lua_v2_log"
+    input:
+      insert_at: "lua_v2_log"
+      type: "log"
+      log_fields:
+        a: "example value"
+    outputs:
+      - extract_from: "lua_v2_log"
+        conditions:
+          - type: "vrl"
+            source: |
+              !exists(.a) &&
+              .b == "example value"
+
+  - name: "lua_v2_source"
+    input:
+      insert_at: "lua_v2_source"
+      type: "log"
+      log_fields:
+        some_field: "some value"
+    outputs:
+      - extract_from: "lua_v2_source"
+        conditions:
+          - type: "vrl"
+            source: |
+              .some_field == "some value" &&
+              .inserted_field == "inserted value"
+
+  - name: "lua_v2_metric"
+    input:
+      insert_at: "lua_v2_metric"
+      type: "metric"
+      metric:
+        name: "example counter"
+        kind: "absolute"
+        counter:
+          value: 1.0
+    outputs:
+      - extract_from: "lua_v2_metric"
+        conditions:
+          - type: "is_metric"
+
+  - name: "lua_v2_log_to_metric"
+    input:
+      insert_at: "lua_v2_log_to_metric"
+      type: "log"
+      log_fields:
+        a: "example value"
+    outputs:
+      - extract_from: "lua_v2_log_to_metric"
+        conditions:
+          - type: "is_metric"
+
+  - name: "lua_v2_metric_to_log"
+    input:
+      insert_at: "lua_v2_metric_to_log"
+      type: "metric"
+      metric:
+        name: "example metric"
+        kind: "absolute"
+        counter:
+          value: 1.0
+    outputs:
+      - extract_from: "lua_v2_metric_to_log"
+        conditions:
+          - type: "vrl"
+            source: |
+              .field == "example value"

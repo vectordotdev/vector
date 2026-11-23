@@ -14,6 +14,7 @@ use tokio::{
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     config::{ComponentKey, OutputId},
+    extra_context::ExtraContext,
     source_sender::SourceSenderItem,
 };
 
@@ -34,17 +35,24 @@ use crate::{
 
 mod backpressure;
 mod compliance;
+mod confinement_gauge;
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+mod cpu_metrics;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
+#[cfg(feature = "sinks-greptimedb_metrics")]
+mod crypto_provider;
 mod doesnt_reload;
 #[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
 mod latency_metrics;
+mod panic;
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
     feature = "sources-internal_metrics",
-    feature = "sources-splunk_hec"
+    feature = "sources-splunk_hec",
+    feature = "enrichment-tables-memory",
 ))]
 mod reload;
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
@@ -69,6 +77,10 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
     config.build().unwrap()
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Stream adapters consume each event."
+)]
 fn into_message(event: Event) -> String {
     let message_key = crate::config::log_schema()
         .message_key_target_path()
@@ -196,11 +208,11 @@ async fn topology_multiple_sources() {
 
     in1.send_event(event1.clone()).await.unwrap();
 
-    let out_event1: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event1: Option<EventArray> = out1.next().await.map(Into::into);
 
     in2.send_event(event2.clone()).await.unwrap();
 
-    let out_event2: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event2: Option<EventArray> = out1.next().await.map(Into::into);
 
     topology.stop().await;
 
@@ -297,7 +309,7 @@ async fn topology_remove_one_source() {
     config.add_sink("out1", &["in1"], sink1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -341,7 +353,7 @@ async fn topology_remove_one_sink() {
     config.add_sink("out1", &["in1"], basic_sink(10).1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -389,7 +401,7 @@ async fn topology_remove_one_transform() {
     config.add_sink("out1", &["t2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -438,7 +450,7 @@ async fn topology_swap_source() {
     config.add_sink("out1", &["in2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -499,7 +511,7 @@ async fn topology_swap_transform() {
     config.add_sink("out1", &["t1"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -551,7 +563,7 @@ async fn topology_swap_sink() {
     config.add_sink("out1", &["in1"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -635,7 +647,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], basic_sink(10).1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -648,6 +660,78 @@ async fn topology_swap_transform_is_atomic() {
         send_total.load(Ordering::Acquire),
         recv_total.load(Ordering::Acquire)
     );
+}
+
+#[tokio::test]
+async fn topology_swap_transform_for_sink_with_same_key() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (_out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_transform("d", &["in1"], basic_transform(" transformed", 0.0));
+    config.add_sink("out1", &["d"], sink1);
+
+    let (mut topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+
+    // Replace transform `d` with a sink that has the same key and the same inputs.
+    let (out2, sink2) = basic_sink(10);
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_sink("d", &["in1"], sink2);
+
+    topology
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
+
+    let h_out2 = tokio::spawn(out2.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(Event::Log(LogEvent::from("this")))
+        .await
+        .unwrap();
+    drop(in1);
+    topology.stop().await;
+
+    assert!(crash.try_recv().is_err(), "topology crashed after reload");
+    assert_eq!(vec!["this"], h_out2.await.unwrap());
+}
+
+#[tokio::test]
+async fn topology_swap_sink_for_transform_with_same_key() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (_out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("d", &["in1"], sink1);
+
+    let (mut topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+
+    // Replace sink `d` with a transform that has the same key and the same inputs.
+    let (out2, sink2) = basic_sink(10);
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_transform("d", &["in1"], basic_transform(" transformed", 0.0));
+    config.add_sink("out2", &["d"], sink2);
+
+    topology
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
+
+    let h_out2 = tokio::spawn(out2.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(Event::Log(LogEvent::from("this")))
+        .await
+        .unwrap();
+    drop(in1);
+    topology.stop().await;
+
+    assert!(crash.try_recv().is_err(), "topology crashed after reload");
+    assert_eq!(vec!["this transformed"], h_out2.await.unwrap());
 }
 
 #[tokio::test]
@@ -671,7 +755,7 @@ async fn topology_rebuild_connected() {
     config.add_sink("out1", &["in1"], sink1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -721,7 +805,7 @@ async fn topology_rebuild_connected_transform() {
     config.add_sink("out1", &["t2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -750,7 +834,7 @@ async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     assert!(
-        RunningTopology::start_init_validated(config, Default::default())
+        RunningTopology::start_init_validated(config, ExtraContext::default())
             .await
             .is_none()
     );
@@ -760,7 +844,7 @@ async fn topology_required_healthcheck_fails_start() {
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
     assert!(
-        RunningTopology::start_init_validated(config, Default::default())
+        RunningTopology::start_init_validated(config, ExtraContext::default())
             .await
             .is_some()
     );
@@ -772,7 +856,7 @@ async fn topology_optional_healthcheck_does_not_fail_reload() {
     let (mut topology, _) = start_topology(config, false).await;
     let config = basic_config_with_sink_failing_healthcheck();
     topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await
         .unwrap();
 }
@@ -785,7 +869,7 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await
         .unwrap();
 }
@@ -811,11 +895,99 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
     let mut config = config.build().unwrap();
     config.healthchecks.require_healthy = true;
     let result = topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await;
 
     // Should fail with TopologyBuildFailed error due to healthcheck failure
     assert!(matches!(result, Err(TopologyBuildFailed)));
+}
+
+#[tokio::test]
+async fn topology_restores_removed_sink_after_failed_reload() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], sink1);
+
+    let (mut topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+
+    // Removing `out1` disconnects it from `in1` before the new sink's healthcheck fails, so
+    // restoring the old configuration has to connect `out1` again.
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_sink("out2", &["in1"], basic_sink_failing_healthcheck(10).1);
+    let mut config = config.build().unwrap();
+    config.healthchecks.require_healthy = true;
+
+    let result = topology
+        .reload_config_and_respawn(config, ExtraContext::default())
+        .await;
+    assert!(matches!(result, Err(TopologyBuildFailed)));
+
+    let h_out1 = tokio::spawn(out1.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(Event::Log(LogEvent::from("this")))
+        .await
+        .unwrap();
+    drop(in1);
+    topology.stop().await;
+
+    assert!(
+        crash.try_recv().is_err(),
+        "topology crashed after restoring the old configuration"
+    );
+    assert_eq!(vec!["this"], h_out1.await.unwrap());
+}
+
+#[tokio::test]
+async fn topology_restores_changed_sink_inputs_after_failed_reload() {
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let (mut in2, source2) = basic_source();
+    let (out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_source("in2", source2);
+    config.add_sink("out1", &["in1", "in2"], sink1);
+
+    let (mut topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_source("in2", basic_source().1);
+    config.add_sink("out1", &["in1"], basic_sink(10).1);
+    config.add_sink("out2", &["in1"], basic_sink_failing_healthcheck(10).1);
+    let mut config = config.build().unwrap();
+    config.healthchecks.require_healthy = true;
+
+    let result = topology
+        .reload_config_and_respawn(config, ExtraContext::default())
+        .await;
+    assert!(matches!(result, Err(TopologyBuildFailed)));
+
+    let h_out1 = tokio::spawn(out1.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(Event::Log(LogEvent::from("this")))
+        .await
+        .unwrap();
+    in2.send_event(Event::Log(LogEvent::from("that")))
+        .await
+        .unwrap();
+    drop(in1);
+    drop(in2);
+    topology.stop().await;
+
+    assert!(
+        crash.try_recv().is_err(),
+        "topology crashed after restoring the old configuration"
+    );
+    let mut received = h_out1.await.unwrap();
+    received.sort();
+    assert_eq!(vec!["that", "this"], received);
 }
 
 #[tokio::test]
@@ -839,7 +1011,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
         sink1,
     );
     sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: std::num::NonZeroU64::new(268435488).unwrap(),
+        max_size: std::num::NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out1", sink1_outer);
@@ -886,9 +1058,8 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors = match TopologyPiecesBuilder::new(&config, &diff).build().await {
-        Ok(_) => panic!("build pieces should not succeed"),
-        Err(err) => err,
+    let Err(errors) = TopologyPiecesBuilder::new(&config, &diff).build().await else {
+        panic!("build pieces should not succeed")
     };
 
     assert_eq!(

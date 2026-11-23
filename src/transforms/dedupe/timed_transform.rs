@@ -1,4 +1,5 @@
 use std::{future::ready, num::NonZeroUsize, pin::Pin, time::Instant};
+use vector_lib::internal_event::emit;
 
 use futures::{Stream, StreamExt};
 use lru::LruCache;
@@ -17,6 +18,7 @@ pub struct TimedDedupe {
 }
 
 impl TimedDedupe {
+    #[must_use]
     pub fn new(
         num_entries: NonZeroUsize,
         fields: FieldMatchConfig,
@@ -32,21 +34,18 @@ impl TimedDedupe {
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         let now = Instant::now();
-        let drop_event = match self.cache.get(&cache_entry) {
-            Some(&time) => {
-                let drop = now.duration_since(time) < self.time_config.max_age_ms;
-                if self.time_config.refresh_on_drop || !drop {
-                    self.cache.put(cache_entry, now);
-                }
-                drop
-            }
-            None => {
+        let drop_event = if let Some(&time) = self.cache.get(&cache_entry) {
+            let drop = now.duration_since(time) < self.time_config.max_age_ms;
+            if self.time_config.refresh_on_drop || !drop {
                 self.cache.put(cache_entry, now);
-                false
             }
+            drop
+        } else {
+            self.cache.put(cache_entry, now);
+            false
         };
         if drop_event {
-            emit!(DedupeEventsDropped { count: 1 });
+            emit(DedupeEventsDropped { count: 1 });
             None
         } else {
             Some(event)

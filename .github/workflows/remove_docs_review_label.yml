@@ -32,7 +32,7 @@ jobs:
       - name: Download PR number
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: docs-review-pr
           run-id: ${{ github.event.workflow_run.id }}
@@ -42,8 +42,8 @@ jobs:
         id: read
         if: steps.download.outcome == 'success'
         run: |
-          pr_number=$(cat pr-number | tr -d '[:space:]')
-          echo "pr_number=${pr_number}" >> $GITHUB_OUTPUT
+          pr_number=$(tr -d '[:space:]' < pr-number)
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
 
   remove_label:
     needs: download

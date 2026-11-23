@@ -42,7 +42,6 @@ components: sources: prometheus_remote_write: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

@@ -21,15 +21,16 @@ pub struct TripwireSourceConfig {
 }
 
 impl GenerateConfig for TripwireSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let config = Self {
             tripwire: Arc::new(Mutex::new(None)),
         };
-        toml::Value::try_from(&config).unwrap()
+        serde_json::to_value(&config).unwrap()
     }
 }
 
 impl TripwireSourceConfig {
+    #[must_use]
     pub fn new() -> (Trigger, Self) {
         let (trigger, tripwire) = Tripwire::new();
         (
@@ -60,8 +61,10 @@ impl SourceConfig for TripwireSourceConfig {
                     .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
-            .map(|_| drop(out))
-            .unit_error(),
+            .map(|_| {
+                drop(out);
+                Ok(())
+            }),
         ))
     }
 

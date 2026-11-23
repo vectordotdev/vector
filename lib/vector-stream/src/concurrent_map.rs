@@ -1,5 +1,4 @@
 use std::{
-    future::Future,
     num::NonZeroUsize,
     panic,
     pin::Pin,
@@ -8,10 +7,12 @@ use std::{
 
 use futures_util::{
     Stream, StreamExt,
+    future::BoxFuture,
     stream::{Fuse, FuturesOrdered},
 };
 use pin_project::pin_project;
 use tokio::task::JoinHandle;
+use vector_common::cpu_time::spawn_timed_without_span;
 
 #[pin_project]
 pub struct ConcurrentMap<St, T>
@@ -23,7 +24,7 @@ where
     stream: Fuse<St>,
     limit: Option<NonZeroUsize>,
     in_flight: FuturesOrdered<JoinHandle<T>>,
-    f: Box<dyn Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send>,
+    f: Box<dyn Fn(St::Item) -> BoxFuture<'static, T> + Send>,
 }
 
 impl<St, T> ConcurrentMap<St, T>
@@ -33,7 +34,7 @@ where
 {
     pub fn new<F>(stream: St, limit: Option<NonZeroUsize>, f: F) -> Self
     where
-        F: Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
+        F: Fn(St::Item) -> BoxFuture<'static, T> + Send + 'static,
     {
         Self {
             stream: stream.fuse(),
@@ -77,7 +78,7 @@ where
                         // time is not necessarily meaningful for the work being performed. It is
                         // the caller's responsibility to propagate any span (e.g. the owning
                         // component's span for internal metric/log tagging) into `fut`.
-                        let handle = tokio::spawn(fut);
+                        let handle = spawn_timed_without_span(fut);
                         this.in_flight.push_back(handle);
                     }
                 }
@@ -100,11 +101,10 @@ where
                     if let Ok(reason) = e.try_into_panic() {
                         // Resume the panic here on the calling task.
                         panic::resume_unwind(reason);
-                    } else {
-                        // The task was cancelled, which makes no sense, because _we_ hold the join
-                        // handle. Only sensible thing to do is panic, because this is a bug.
-                        panic!("concurrent map task cancelled outside of our control");
                     }
+                    // The task was cancelled, which makes no sense, because _we_ hold the join
+                    // handle. Only sensible thing to do is panic, because this is a bug.
+                    panic!("concurrent map task cancelled outside of our control");
                 }
             },
         }

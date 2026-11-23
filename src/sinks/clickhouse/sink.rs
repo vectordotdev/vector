@@ -2,12 +2,13 @@
 
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use vector_lib::internal_event::emit;
 
-pub struct ClickhouseSink<S> {
+pub(super) struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
     service: S,
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
 }
@@ -19,11 +20,11 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub(super) const fn new(
         batch_settings: BatcherSettings,
         service: S,
-        database: Template,
-        table: Template,
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
     ) -> Self {
@@ -54,7 +55,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -82,23 +83,23 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct PartitionKey {
+pub(crate) struct PartitionKey {
     pub database: String,
     pub table: String,
     pub format: Format,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct KeyPartitioner {
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
     format: Format,
 }
 
 impl KeyPartitioner {
-    const fn new(database: Template, table: Template, format: Format) -> Self {
+    const fn new(database: ConfinedTemplate, table: ConfinedTemplate, format: Format) -> Self {
         Self {
             database,
             table,
@@ -106,11 +107,11 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,

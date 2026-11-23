@@ -15,22 +15,23 @@ use crate::sinks::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct GreptimeDBMetricNormalize;
+pub(super) struct GreptimeDBMetricNormalize;
 
 impl MetricNormalize for GreptimeDBMetricNormalize {
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
-            (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
-            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
+            (_, MetricValue::Counter { .. } | MetricValue::Gauge { .. }) => {
+                state.make_absolute(metric)
+            }
             // All others are left as-is
             _ => Some(metric),
         }
     }
 }
 
-/// GreptimeDBGrpcSink is a sink that sends metrics to GreptimeDB via gRPC.
+/// `GreptimeDBGrpcSink` is a sink that sends metrics to GreptimeDB via gRPC.
 /// It uses the `GreptimeDBGrpcService` to send the metrics.
-pub struct GreptimeDBGrpcSink {
+pub(super) struct GreptimeDBGrpcSink {
     pub(super) service: Svc<GreptimeDBGrpcService, GreptimeDBGrpcRetryLogic>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) request_builder_options: RequestBuilderOptions,
@@ -39,7 +40,7 @@ pub struct GreptimeDBGrpcSink {
 impl GreptimeDBGrpcSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .normalized_with_default::<GreptimeDBMetricNormalize>()
             .batched(
                 self.batch_settings

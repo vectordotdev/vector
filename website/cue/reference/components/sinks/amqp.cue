@@ -19,7 +19,6 @@ components: sinks: amqp: {
 		send: {
 			batch: {
 				enabled:      false
-				common:       false
 				timeout_secs: null
 			}
 			compression: {
@@ -49,7 +48,9 @@ components: sinks: amqp: {
 
 	support: components._amqp.support
 
-	configuration: generated.components.sinks.amqp.configuration
+	configuration: generated.components.sinks.amqp.configuration & {
+		exchange: type: string: examples: ["my-exchange"]
+	}
 
 	input: {
 		logs:    true

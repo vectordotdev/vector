@@ -30,10 +30,13 @@ remap: features: ergonomic_safety: {
 				"""
 		}
 		recursion_limitation: {
-			title: "Lack of recursion"
+			title:       "Lack of recursion"
 			description: """
-				VRL lacks recursion capabilities, making it impossible to create large or infinite loops that could
-				stall VRL programs or needlessly drain memory.
+				VRL does not support user-defined recursive functions or unbounded loops. It supports iteration over
+				arrays and objects through functions such as [`for_each`](\(urls.vrl_functions)#for_each),
+				[`map_values`](\(urls.vrl_functions)#map_values), and [`map_keys`](\(urls.vrl_functions)#map_keys).
+				Some functions can recursively traverse nested data, but this does not allow programs to define
+				arbitrary recursive calls.
 				"""
 		}
 		no_custom_functions: {

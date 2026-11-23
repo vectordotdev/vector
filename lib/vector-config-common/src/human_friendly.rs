@@ -25,7 +25,6 @@ static WELL_KNOWN_REPLACEMENTS: LazyLock<HashMap<String, &'static str>> = LazyLo
         ("influxdb", "InfluxDB"),
         ("webhdfs", "WebHDFS"),
         ("cloudwatch", "CloudWatch"),
-        ("logdna", "LogDNA"),
         ("geoip", "GeoIP"),
         ("ssekms", "SSE-KMS"),
         ("aes256", "AES-256"),
@@ -59,12 +58,12 @@ static WELL_KNOWN_ACRONYMS: LazyLock<HashSet<String>> = LazyLock::new(|| {
 /// Generates a human-friendly version of the given string.
 ///
 /// Many instances exist where type names, or string constants, represent a condensed form of an
-/// otherwise human-friendly/recognize string, such as "aws_s3" (for AWS S3) or "InfluxdbMetrics"
-/// (for InfluxDB Metrics) and so on.
+/// otherwise human-friendly/recognize string, such as "`aws_s3`" (for AWS S3) or "`InfluxdbMetrics`"
+/// (for `InfluxDB` Metrics) and so on.
 ///
 /// This function takes a given input and restores it back to the human-friendly version by
 /// splitting it on the relevant word boundaries, adjusting the input to title case, and applying
-/// well-known replacements to ensure that brand-specific casing (such as "CloudWatch" instead of
+/// well-known replacements to ensure that brand-specific casing (such as "`CloudWatch`" instead of
 /// "Cloudwatch", or handling acronyms like AWS, GCP, and so on) makes it into the final version.
 pub fn generate_human_friendly_string(input: &str) -> String {
     // Create our case converter, which specifically ignores letter/digit boundaries, which is
@@ -72,7 +71,7 @@ pub fn generate_human_friendly_string(input: &str) -> String {
     // respectively.
     let converter = Converter::new()
         .to_case(Case::Title)
-        .remove_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT]);
+        .remove_boundaries(&[Boundary::LowerDigit, Boundary::UpperDigit]);
     let normalized = converter.convert(input);
 
     let replaced_segments = normalized

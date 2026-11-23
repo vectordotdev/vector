@@ -18,7 +18,6 @@ components: sinks: clickhouse: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -69,7 +68,6 @@ components: sinks: clickhouse: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.clickhouse.configuration

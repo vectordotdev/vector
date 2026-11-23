@@ -18,7 +18,7 @@ use crate::{
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event(
+pub(super) fn make_log_event(
     message: Value,
     timestamp: &str,
     stream: &str,
@@ -60,7 +60,7 @@ pub fn make_log_event(
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, L, S, F>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
+pub(super) fn test_parser<B, L, S, F>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
 where
     B: Fn() -> F,
     F: FunctionTransform,

@@ -21,6 +21,13 @@ on:
       ENDPOINT:
         description: "Request endpoint"
         required: true
+    outputs:
+      pr_number:
+        description: "PR number the preview was built for"
+        value: ${{ jobs.create_preview_site.outputs.pr_number }}
+      sanitized_branch_name:
+        description: "Sanitized branch name used for the preview URL"
+        value: ${{ jobs.create_preview_site.outputs.sanitized_branch_name }}
 
 permissions:
   contents: read # Restrictive default
@@ -32,9 +39,10 @@ jobs:
     permissions:
       contents: read # Required for repository context
       actions: read # Required to download artifacts
-      issues: write # Required to post preview link comments
-      pull-requests: write # Required to post preview link comments
       statuses: write # Required to update commit status
+    outputs:
+      pr_number: ${{ steps.extract.outputs.pr_number }}
+      sanitized_branch_name: ${{ steps.extract.outputs.sanitized_branch_name }}
     steps:
       # Get the artifacts with the PR number and branch name
       - name: Download artifact
@@ -58,6 +66,7 @@ jobs:
 
       # Extract the info from the artifact and set variables
       - name: Extract PR info from artifact
+        id: extract
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -70,18 +79,15 @@ jobs:
             const prNumber = fs.readFileSync(path.join('pr', 'number'), 'utf8').trim();
             const integrity = fs.readFileSync(path.join('pr', 'integrity'), 'utf8').trim();
 
-            // Validate branch name again (only allow alphanumeric, dash, and underscore)
-            const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
-            if (!branchNameRegex.test(branchName)) {
-              core.setFailed(`Invalid branch name detected: ${branchName}`);
-              return;
-            }
-
-            const sanitizedBranchName = branchName.replace(/[\/\.]/g, '-');
+            // Any character outside a-zA-Z0-9 becomes a dash, so any git-legal branch name is
+            // safe to use in the Amplify subdomain regardless of its raw content.
+            const sanitizedBranchName = branchName.replace(/[^a-zA-Z0-9]/g, '-');
             core.exportVariable('SANITIZED_BRANCH_NAME', sanitizedBranchName);
             core.exportVariable('BRANCH_NAME', branchName);
             core.exportVariable('PR_NUMBER', prNumber);
             core.exportVariable('INTEGRITY', integrity);
+            core.setOutput('sanitized_branch_name', sanitizedBranchName);
+            core.setOutput('pr_number', prNumber);
 
       # Validate the integrity of the artifact
       - name: Validate Artifact Integrity
@@ -163,25 +169,3 @@ jobs:
             if (!response.ok) {
               core.setFailed(`Request failed with response code ${response.status}`);
             }
-
-      # Add preview link to comment if all 3 sites successfully start
-      - name: Comment Preview Link
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_ID: ${{ inputs.APP_ID }}
-          APP_NAME: ${{ inputs.APP_NAME }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const fs = require('fs');
-            const prNumber = fs.readFileSync('./pr/number', 'utf8');
-            const issueNumber = parseInt(prNumber);
-            const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-              body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
-            });

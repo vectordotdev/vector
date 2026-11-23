@@ -23,8 +23,8 @@ mod tests;
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests;
 
-#[cfg(all(test, feature = "sources-prometheus-remote-write"))]
-pub use config::RemoteWriteConfig;
+#[cfg(all(test, feature = "sources-prometheus_remote_write"))]
+pub(crate) use config::RemoteWriteConfig;
 
 #[cfg(feature = "aws-core")]
 #[derive(Debug, snafu::Snafu)]

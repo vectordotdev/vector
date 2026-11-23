@@ -6,7 +6,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ApiStarted {
+pub(crate) struct ApiStarted {
     pub addr: SocketAddr,
 }
 

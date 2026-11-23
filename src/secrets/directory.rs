@@ -20,8 +20,8 @@ pub struct DirectoryBackend {
 }
 
 impl GenerateConfig for DirectoryBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(DirectoryBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(DirectoryBackend {
             path: PathBuf::from("/path/to/secrets"),
             remove_trailing_whitespace: false,
         })
@@ -36,7 +36,7 @@ impl SecretBackend for DirectoryBackend {
         _: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
         let mut secrets = HashMap::new();
-        for k in secret_keys.into_iter() {
+        for k in secret_keys {
             let file_path = self.path.join(&k);
             let contents = tokio::fs::read_to_string(&file_path).await?;
             let secret = if self.remove_trailing_whitespace {

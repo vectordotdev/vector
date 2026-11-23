@@ -92,7 +92,8 @@ impl Histogram {
         let log = value.max(Self::MIN_BUCKET).log2().ceil();
         // Offset it based on the minimum bucket's exponent. The result will be non-negative thanks
         // to the `.max` above, so we can coerce it directly to `usize`.
-        #[allow(clippy::cast_possible_truncation)] // The log will always be smaller than `usize`.
+        // The log will always be smaller than `usize`.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let index = (log - Self::MIN_BUCKET_EXP) as usize;
         // Now bound the value for values larger than the largest bucket.
         index.min(Self::BUCKETS - 1)
@@ -120,7 +121,9 @@ impl Histogram {
         MetricValue::AggregatedHistogram {
             buckets: self.buckets(),
             count: self.count(),
-            sum: self.sum(),
+            // Vector's own histograms accumulate their sum as observations arrive, so it is always
+            // known.
+            sum: Some(self.sum()),
         }
     }
 }
@@ -176,15 +179,13 @@ mod test {
                 let index = Histogram::bucket_index(value);
                 assert!(
                     value <= sut.buckets[index].0,
-                    "Value {} is not less than the upper limit {}.",
-                    value,
+                    "Value {value} is not less than the upper limit {}.",
                     sut.buckets[index].0
                 );
                 if index > 0 {
                     assert!(
                         value > sut.buckets[index - 1].0,
-                        "Value {} is not greater than the previous upper limit {}.",
-                        value,
+                        "Value {value} is not greater than the previous upper limit {}.",
                         sut.buckets[index - 1].0
                     );
                 }

@@ -79,7 +79,6 @@ cfg_if! {
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 #[serde(default)]
 pub struct Telemetry {
-    #[configurable(derived)]
     pub tags: Tags,
 }
 
