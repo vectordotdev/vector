@@ -6,7 +6,7 @@ SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 # Tool versions. Keep pins here so CI and local setup use the same versions.
 CARGO_DEB_VERSION="3.6.2"
 CROSS_VERSION="0.2.5"
-CARGO_NEXTEST_VERSION="0.9.95"
+CARGO_NEXTEST_VERSION="0.9.152"
 CARGO_DENY_VERSION="0.20.2"
 CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"

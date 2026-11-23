@@ -22,7 +22,7 @@ use crate::{
             },
             transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
         },
-        test::{create_topology, transform_one},
+        test::create_topology,
     },
 };
 
@@ -526,7 +526,6 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
     clippy::cast_precision_loss,
     reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
 )]
-#[expect(clippy::float_cmp, reason = "Fixture counts and rates are exact.")]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
@@ -886,6 +885,18 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         assert_eq!(out.recv().await, None);
     }))
     .await;
+}
+
+/// Transforms a single event.
+///
+/// # Panics
+///
+/// Panics if the transform emits more than one event.
+fn transform_one(transform: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
+    let mut buf = OutputBuffer::with_capacity(1);
+    transform.transform(&mut buf, event);
+    assert!(buf.len() <= 1);
+    buf.into_events().next()
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
