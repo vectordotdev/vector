@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FirehoseCommonAttributesHeader {
+pub(super) struct FirehoseCommonAttributesHeader {
     #[serde(default)]
     pub common_attributes: HashMap<String, String>,
 }
@@ -21,7 +21,7 @@ pub struct FirehoseCommonAttributesHeader {
 /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FirehoseRequest {
+pub(super) struct FirehoseRequest {
     pub access_key: Option<String>,
     pub request_id: String,
 
@@ -32,7 +32,7 @@ pub struct FirehoseRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EncodedFirehoseRecord {
+pub(super) struct EncodedFirehoseRecord {
     /// data is base64 encoded, gzip'd, bytes
     pub data: String,
 }
@@ -44,7 +44,7 @@ pub struct EncodedFirehoseRecord {
 /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FirehoseResponse {
+pub(super) struct FirehoseResponse {
     pub request_id: String,
 
     #[serde(with = "ts_milliseconds")]

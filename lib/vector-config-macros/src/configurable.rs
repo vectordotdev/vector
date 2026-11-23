@@ -231,11 +231,21 @@ fn generate_struct_field(field: &Field<'_>, sibling_keys: &[String]) -> proc_mac
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
     let field_schema_ty = get_field_schema_ty(field);
 
-    // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
-    // validates the parent object, which is never JSON `null`. Tagged enums get an absence
-    // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
     let spanned_generate_schema =
-        if let (true, Some(inner_ty)) = (field.flatten(), option_inner_type(field_schema_ty)) {
+        // Flattened fields receive map entries, so the shorthand cannot apply there.
+        // This changes only schema generation; Serde keeps using the original helper.
+        if field.bool_or_struct() && !field.flatten() && !field.skip_deserializing() {
+            quote_spanned! {field.span()=>
+                ::vector_config::schema::generate_bool_or_struct_schema(
+                    &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                    schema_gen,
+                    Some(#field_metadata_ref),
+                )?
+            }
+        } else if let (true, Some(inner_ty)) = (field.flatten(), option_inner_type(field_schema_ty)) {
+            // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
+            // validates the parent object, which is never JSON `null`. Tagged enums get an absence
+            // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
             let sibling_key_lits = sibling_keys.iter().map(|key| quote! { #key });
             quote_spanned! {field.span()=>
                 ::vector_config::schema::generate_flattened_optional_schema(
@@ -453,12 +463,22 @@ fn build_named_struct_generate_schema_fn(
     // Collect required_one_of groups at macro-expansion time: group_name -> [serde field names].
     let mut groups: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();
+    // The names a config may use for each group member: the field name and its serde aliases.
+    let mut group_accepted_names: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     for field in fields.iter().filter(|f| f.visible()) {
         if let Some(group) = field.required_one_of() {
             groups
                 .entry(group.to_string())
                 .or_default()
                 .push(field.name().to_string());
+            group_accepted_names
+                .entry(group.to_string())
+                .or_default()
+                .extend(
+                    std::iter::once(field.name().to_string())
+                        .chain(field.aliases().iter().cloned()),
+                );
         }
     }
 
@@ -480,8 +500,9 @@ fn build_named_struct_generate_schema_fn(
         .collect();
 
     // For each group, push a oneOf schema into `flattened_subschemas` so the JSON Schema
-    // expresses the "exactly one of" constraint via allOf.
-    let group_pushes = groups.values().map(|members| {
+    // expresses the "exactly one of" constraint via allOf. Aliases get their own branch, so a
+    // config that sets a member through an alias still satisfies the constraint.
+    let group_pushes = group_accepted_names.values().map(|members| {
         let required_entries = members.iter().map(|name| {
             quote! {
                 {

@@ -1,7 +1,5 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Utc};
 use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
@@ -12,7 +10,10 @@ use vector_core::{
     schema::meaning,
     serde::is_default,
 };
-use vrl::{path::OwnedValuePath, value::Value};
+use vrl::{
+    path::OwnedValuePath,
+    value::{ObjectMap, Value},
+};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
@@ -64,13 +65,10 @@ impl<'de> Deserialize<'de> for Transformer {
 impl Transformer {
     /// Creates a new `Transformer`.
     ///
-    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
-    /// exclusive.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    /// # Errors
+    ///
+    /// Returns an error if `only_fields` and `except_fields` are not mutually exclusive, i.e. they
+    /// share at least one field path.
     pub fn new(
         only_fields: Option<Vec<ConfigValuePath>>,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -134,7 +132,7 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(ObjectMap::new()));
 
             for field in only_fields {
                 if let Some(value) = old_value.remove(field, true) {
@@ -190,7 +188,7 @@ impl Transformer {
             let mut unix_timestamps = Vec::new();
             for (k, v) in log.all_event_fields().expect("must be an object") {
                 if let Value::Timestamp(ts) = v {
-                    unix_timestamps.push((k.clone(), extract(ts).into()));
+                    unix_timestamps.push((k, extract(ts).into()));
                 }
             }
             for (k, v) in unix_timestamps {
@@ -240,14 +238,11 @@ impl Transformer {
 
     /// Set the `except_fields` value.
     ///
-    /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
-    /// with `only_fields`.
+    /// # Errors
+    ///
+    /// Returns an error if the new `except_fields` are not mutually exclusive with `only_fields`,
+    /// i.e. they share at least one field path.
     #[cfg(any(test, feature = "test"))]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     pub fn set_except_fields(
         &mut self,
         except_fields: Option<Vec<ConfigValuePath>>,

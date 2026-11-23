@@ -19,9 +19,9 @@ pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
     GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
     InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
-    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
-    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
+    MsgPackDeserializer, MsgPackDeserializerConfig, NativeDeserializer, NativeDeserializerConfig,
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
+    ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
@@ -42,6 +42,7 @@ use vector_core::{
     config::{DataType, LogNamespace},
     event::{Event, EventMetadata},
     schema,
+    serde::AsciiChar,
 };
 
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
@@ -282,13 +283,16 @@ pub enum DeserializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Decodes the raw bytes as [native JSON format][vector_native_json].
+    /// Decodes the [ProtoJSON mapping][protojson] of Vector's
+    /// [native event schema][vector_native_protobuf]. The legacy native JSON representation is
+    /// also accepted for compatibility.
     ///
     /// This decoder can output all types of events: logs, metrics, and traces.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
-    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [protojson]: https://protobuf.dev/programming-guides/json/
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson(NativeJsonDeserializerConfig),
 
@@ -322,6 +326,14 @@ pub enum DeserializerConfig {
         /// Apache Avro-specific encoder options.
         avro: AvroDeserializerOptions,
     },
+
+    /// Decodes the raw bytes as an [MessagePack][messagepack] message.
+    ///
+    /// Stream-based `socket` sources (`tcp` and `unix_stream` modes) require an explicit
+    /// `framing` method, such as `length_delimited`.
+    ///
+    /// [messagepack]: https://msgpack.org/
+    MessagePack,
 
     /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
     ///
@@ -374,11 +386,12 @@ impl From<InfluxdbDeserializerConfig> for DeserializerConfig {
 
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Avro schema cannot be parsed, the protobuf descriptor set file
+    /// cannot be read or decoded or does not contain the message type, or the VRL program fails
+    /// to compile.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
             DeserializerConfig::Avro { avro } => Ok(Deserializer::Avro(
@@ -401,6 +414,9 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
             DeserializerConfig::Influxdb(config) => Ok(Deserializer::Influxdb(config.build())),
             DeserializerConfig::Vrl(config) => Ok(Deserializer::Vrl(config.build()?)),
+            DeserializerConfig::MessagePack => {
+                Ok(Deserializer::MessagePack(MsgPackDeserializer::new()))
+            }
         }
     }
 
@@ -426,9 +442,10 @@ impl DeserializerConfig {
                 FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::default())
             }
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
-            DeserializerConfig::Gelf(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
-            }
+            DeserializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedDecoderConfig::new(AsciiChar::new('\0')),
+            ),
+            DeserializerConfig::MessagePack => FramingConfig::Bytes,
         }
     }
 
@@ -470,6 +487,7 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => config.output_type(),
             DeserializerConfig::Vrl(config) => config.output_type(),
             DeserializerConfig::Influxdb(config) => config.output_type(),
+            DeserializerConfig::MessagePack => MsgPackDeserializerConfig.output_type(),
         }
     }
 
@@ -493,6 +511,9 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Influxdb(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Vrl(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::MessagePack => {
+                MsgPackDeserializerConfig.schema_definition(log_namespace)
+            }
         }
     }
 
@@ -508,15 +529,21 @@ impl DeserializerConfig {
                 DeserializerConfig::Gelf(_)
                 | DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_),
+                FramingConfig::Bytes,
+            ) => "application/json",
+            (
+                DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Json(_)
+                | DeserializerConfig::NativeJson(_),
                 FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
                     character_delimited:
                         CharacterDelimitedDecoderOptions {
-                            delimiter: b',',
+                            delimiter,
                             max_length: Some(usize::MAX),
                             ..
                         },
                 }),
-            ) => "application/json",
+            ) if delimiter.as_byte() == b',' => "application/json",
             (DeserializerConfig::Native | DeserializerConfig::Avro { .. }, _) => {
                 "application/octet-stream"
             }
@@ -534,6 +561,7 @@ impl DeserializerConfig {
             ) => "text/plain",
             #[cfg(feature = "syslog")]
             (DeserializerConfig::Syslog(_), _) => "text/plain",
+            (DeserializerConfig::MessagePack, _) => "application/msgpack",
         }
     }
 }
@@ -564,6 +592,8 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `MsgPackDeserializer` for deserialization.
+    MessagePack(MsgPackDeserializer),
     /// Uses a `InfluxdbDeserializer` for deserialization.
     Influxdb(InfluxdbDeserializer),
     /// Uses a `VrlDeserializer` for deserialization.
@@ -603,6 +633,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::MessagePack(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }
@@ -619,11 +650,25 @@ mod tests {
             framing_config,
             FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
-                    delimiter: 0,
+                    delimiter,
                     max_length: None,
                     ..
                 }
-            })
+            }) if delimiter.as_byte() == 0
         ));
+    }
+
+    #[test]
+    fn json_content_type_with_bytes_framing() {
+        for deserializer_config in [
+            DeserializerConfig::from(GelfDeserializerConfig::default()),
+            DeserializerConfig::from(JsonDeserializerConfig::default()),
+            DeserializerConfig::from(NativeJsonDeserializerConfig::default()),
+        ] {
+            assert_eq!(
+                deserializer_config.content_type(&FramingConfig::Bytes),
+                "application/json"
+            );
+        }
     }
 }

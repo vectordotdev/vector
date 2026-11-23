@@ -34,7 +34,7 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `StatsdSink`.
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
         request_builder: StatsdRequestBuilder,

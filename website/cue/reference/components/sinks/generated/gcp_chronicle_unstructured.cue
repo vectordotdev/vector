@@ -10,7 +10,7 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	api_key: {
 		description: """
@@ -184,8 +184,8 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 			paris:     "Paris Region"
 			singapore: "Singapore Region"
 			sydney:    "Sydney Region"
-			são_paulo: "SãoPaulo Region"
-			tel_aviv:  "TelAviv Region"
+			são_paulo: "São Paulo Region"
+			tel_aviv:  "Tel Aviv Region"
 			tokyo:     "Tokyo Region"
 			turin:     "Turin Region"
 			us:        "US Multi region"

@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HostMetricsScrapeError {
+pub(crate) struct HostMetricsScrapeError {
     pub message: &'static str,
 }
 
@@ -26,7 +26,7 @@ impl InternalEvent for HostMetricsScrapeError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HostMetricsScrapeDetailError<E> {
+pub(crate) struct HostMetricsScrapeDetailError<E> {
     pub message: &'static str,
     pub error: E,
 }
@@ -50,7 +50,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct HostMetricsScrapeFilesystemError {
+pub(crate) struct HostMetricsScrapeFilesystemError {
     pub message: &'static str,
     pub error: heim::Error,
     pub mount_point: String,

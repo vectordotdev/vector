@@ -180,8 +180,7 @@ impl<'a> ConfigDecanter<'a> {
     fn get_payload(&self) -> String {
         self.log
             .get_message()
-            .map(|v| v.to_string_lossy().to_string())
-            .unwrap_or_default()
+            .map_or_else(String::new, |v| v.to_string_lossy().to_string())
     }
 
     fn get_facility(&self, config: &SyslogSerializerOptions) -> Facility {
@@ -637,7 +636,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::NaiveDate;
     use std::sync::Arc;
-    use vector_core::config::LogNamespace;
+    use vector_core::config::{LogNamespace, log_schema};
     use vector_core::event::Event::Metric;
     use vector_core::event::{Event, MetricKind, MetricValue, StatisticKind};
     use vrl::path::parse_target_path;
@@ -829,7 +828,7 @@ mod tests {
 
         let mut log = create_simple_log();
         log.insert(
-            event_path!("message"),
+            log_schema().message_key_target_path().unwrap(),
             "A\nB\tC, Привіт D, E\u{0007}F", //newline, tab, unicode
         );
 
@@ -953,7 +952,7 @@ mod tests {
         .unwrap();
 
         let mut log = create_simple_log();
-        log.insert(event_path!("message"), "");
+        log.insert(log_schema().message_key_target_path().unwrap(), "");
         log.insert(event_path!("structured_data"), value!({}));
 
         let output = run_encode(config, Event::Log(log));

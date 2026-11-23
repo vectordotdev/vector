@@ -21,10 +21,9 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     ComponentKey, DynValidatedSink, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
 };
-use crate::{
-    extra_context::ExtraContext,
-    sinks::{Healthcheck, util::UriSerde},
-};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::sinks::{Healthcheck, util::UriSerde};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 
@@ -82,6 +81,26 @@ where
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
+    /// Enable CPU usage metrics for this sink.
+    ///
+    /// When set to `true`, each poll of the sink task, and of the tasks it spawns (such as request
+    /// building or HTTP connections), is timed using the OS thread CPU clock and the accumulated
+    /// nanoseconds are reported as the `component_cpu_usage_ns_total` counter, tagged with
+    /// `component_id`, `component_kind`, and `component_type`.
+    ///
+    /// Defaults to `false`. Enable only for sinks where CPU attribution is needed, as it adds a
+    /// `clock_gettime` call on every future poll.
+    ///
+    /// CPU spent on threads or tasks that a third-party library manages on its own is not
+    /// included. Notably, the `kafka` sink compresses batches and performs TLS and network I/O on
+    /// librdkafka threads.
+    ///
+    /// On Windows, `component_cpu_usage_ns_total` is a rough estimate: thread CPU time advances
+    /// only at the scheduler clock tick (typically 15.6 ms), so short polls are counted either as
+    /// zero or as a whole tick.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub measure_cpu_usage: bool,
+
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
@@ -106,6 +125,16 @@ where
     /// Every sink participates in the validated lifecycle, so the validated state is
     /// always present (filled in during config compilation) and the sink is built
     /// through the `DynValidatedSink` boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sink or its healthcheck cannot be built, for example when an
+    /// HTTP client, credentials, or other environment-dependent resources cannot be set up.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the validated state is missing because the sink was not validated during
+    /// config compilation, or if its type does not match the sink's expected validated state type.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let validated = self
             .validated
@@ -121,12 +150,13 @@ where
     {
         SinkOuter {
             inputs: Inputs::from_iter(inputs),
-            buffer: Default::default(),
+            buffer: BufferConfig::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
             inner: inner.into(),
-            proxy: Default::default(),
-            graph: Default::default(),
+            proxy: ProxyConfig::default(),
+            measure_cpu_usage: false,
+            graph: GraphConfig::default(),
             validated: None,
         }
     }
@@ -146,11 +176,11 @@ where
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
             warn!(
                 "Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`."
-            )
+            );
         } else if self.healthcheck_uri.is_some() {
             warn!(
                 "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
-            )
+            );
         }
         SinkHealthcheckOptions {
             uri: self
@@ -186,6 +216,7 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            measure_cpu_usage: self.measure_cpu_usage,
             graph: self.graph,
             validated: self.validated,
         }
@@ -325,17 +356,22 @@ pub struct SinkContext {
 }
 
 impl Default for SinkContext {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     fn default() -> Self {
         Self {
-            healthcheck: Default::default(),
-            globals: Default::default(),
+            healthcheck: SinkHealthcheckOptions::default(),
+            globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
-            metrics_storage: Default::default(),
-            proxy: Default::default(),
+            metrics_storage: MetricsStorage::default(),
+            proxy: ProxyConfig::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
-            extra_context: Default::default(),
+            extra_context: ExtraContext::default(),
         }
     }
 }

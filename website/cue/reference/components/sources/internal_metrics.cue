@@ -125,10 +125,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		connection_send_errors_total: {
-			description:       "The total number of errors sending data via the connection."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			description:        "The total number of errors sending data via the connection."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _internal_metrics_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
@@ -158,7 +160,20 @@ components: sources: internal_metrics: {
 			description:       "The total number of times the Vector instance has been stopped."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags: _internal_metrics_tags & {
+				reason: {
+					description: "The reason for the shutdown, or `none` if no error triggered it."
+					required:    true
+					enum: {
+						"none":                     "No error triggered the shutdown, such as after a shutdown signal or after all sources finish."
+						"api_failed":               "The API failed to start."
+						"reload_failed_to_restore": "A reload failed, and Vector couldn't restore the previous configuration."
+						"source_aborted":           "A source task stopped unexpectedly during execution."
+						"transform_aborted":        "A transform task stopped unexpectedly during execution."
+						"sink_aborted":             "A sink task stopped unexpectedly during execution."
+					}
+				}
+			}
 		}
 
 		// Metrics emitted by one or more components
@@ -410,7 +425,7 @@ components: sources: internal_metrics: {
 			tags:              _buffer_tags
 		}
 		component_cpu_usage_ns_total: {
-			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms only. Emitted only on Linux, macOS, and Windows."
+			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms and sinks. Emitted only on Linux, macOS, and Windows. On Windows, the value is a rough estimate because thread CPU time is updated only at the scheduler clock tick. CPU spent on threads that third-party libraries manage on their own is not counted, notably librdkafka threads in the `kafka` sink; see the `measure_cpu_usage` option of each component for details."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -423,6 +438,10 @@ components: sources: internal_metrics: {
 				intentional: {
 					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
 					required:    true
+				}
+				group: {
+					description: "The group that the discarded event belonged to. This tag is included only when enabled in the component configuration, such as `internal_metrics.include_group_tag` on the `throttle` transform."
+					required:    false
 				}
 			}
 		}
@@ -574,12 +593,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: {}
-		}
-		internal_metrics_cardinality_total: {
-			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              internal_metrics_cardinality.tags
 		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
@@ -852,10 +865,12 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		metadata_refresh_failed_total: {
-			description:       "The total number of failed efforts to refresh AWS EC2 metadata."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
+			description:        "The total number of failed efforts to refresh AWS EC2 metadata."
+			type:               "counter"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`component_errors_total`](#component_errors_total)."
 		}
 		metadata_refresh_successful_total: {
 			description:       "The total number of AWS EC2 metadata refreshes."
@@ -868,6 +883,12 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
+		}
+		prometheus_kubernetes_service_discovery_targets_discovered: {
+			description:       "The number of scrape targets that the `prometheus_scrape` source currently discovers from Kubernetes Pods."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		source_lag_time_seconds: {
 			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
@@ -886,26 +907,6 @@ components: sources: internal_metrics: {
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
-		}
-		source_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
-		}
-		source_buffer_max_event_size: {
-			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				output: _output
-			}
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
 		}
 		source_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
@@ -1052,22 +1053,6 @@ components: sources: internal_metrics: {
 					required: false
 				}
 			}
-		}
-		transform_buffer_max_byte_size: {
-			description:        "The maximum number of bytes the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
-		}
-		transform_buffer_max_event_size: {
-			description:        "The maximum number of events the buffer that feeds into a transform can hold."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _component_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
 		}
 		transform_buffer_max_size_bytes: {
 			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."

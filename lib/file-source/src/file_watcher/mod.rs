@@ -40,10 +40,10 @@ mod tests;
 /// - Raw fd with `fstat()`: Works but requires unsafe code
 ///
 /// The enum approach has zero extra fd overhead - we access the same File owned by
-/// BufReader through `get_ref()`. This is critical for accurately tracking
+/// `BufReader` through `get_ref()`. This is critical for accurately tracking
 /// `bytes_unread` even after file deletion (the fd remains valid).
 enum FileReader {
-    /// Plain file reader - we can access the File via get_ref() for metadata
+    /// Plain file reader - we can access the File via `get_ref()` for metadata
     Plain(BufReader<File>),
     /// Gzipped file reader - no meaningful file position tracking
     /// Boxed to reduce enum size (this variant is much larger than others)
@@ -159,7 +159,14 @@ impl FileWatcher {
     ///
     /// The input path will be used by `FileWatcher` to prime its state
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
-    /// None if the path does not exist or is not readable by the current process.
+    /// an error if the path does not exist or is not readable by the current process.
+    ///
+    /// # Errors
+    /// Returns an error if opening the file, reading its metadata, or checking
+    /// its compression header fails.
+    ///
+    /// # Panics
+    /// Panics if seeking to the initial position in an uncompressed file fails.
     pub async fn new(
         path: PathBuf,
         read_from: ReadFrom,
@@ -224,10 +231,6 @@ impl FileWatcher {
                     FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
                     0,
                 ),
-                (false, true, _) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
                 (false, false, ReadFrom::Checkpoint(file_position)) => {
                     let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
                     (FileReader::Plain(reader), pos)
@@ -236,7 +239,7 @@ impl FileWatcher {
                     let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
                     (FileReader::Plain(reader), pos)
                 }
-                (false, false, ReadFrom::End) => {
+                (false, true, _) | (false, false, ReadFrom::End) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
                     (FileReader::Plain(reader), pos)
                 }
@@ -273,12 +276,18 @@ impl FileWatcher {
     /// If the file at the new path has a different inode, this indicates the file
     /// was replaced (not just renamed). In this case, returns `FileUnwatchInfo`
     /// containing metrics about the old file so the caller can emit appropriate events.
+    ///
+    /// # Errors
+    /// Returns an error if opening the replacement file, reading its metadata
+    /// or compression header, or restoring the file position fails.
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
         let new_file = File::open(&path).await?;
 
         let file_info = new_file.file_info().await?;
         let unwatch_info =
-            if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
+            if (file_info.portable_dev(), file_info.portable_ino()) == (self.devno, self.inode) {
+                None
+            } else {
                 // Capture metrics from the old file before switching
                 let old_info = self.get_unwatch_info().await;
 
@@ -300,8 +309,6 @@ impl FileWatcher {
                 self.inode = file_info.portable_ino();
 
                 Some(old_info)
-            } else {
-                None
             };
 
         self.reached_eof = false;
@@ -337,7 +344,7 @@ impl FileWatcher {
     /// Uses the current file size from the underlying File (works even after
     /// file deletion since the fd remains valid).
     /// Returns None for metadata errors, gzipped files, or skipped readers.
-    /// For gzip, file_position tracks decompressed bytes while the on-disk size is
+    /// For gzip, `file_position` tracks decompressed bytes while the on-disk size is
     /// compressed, so the subtraction would be meaningless, even after reaching EOF.
     /// Some(0) means the size is known and no bytes remain unread at measurement time.
     pub async fn get_bytes_unread(&self) -> Option<u64> {
@@ -394,7 +401,13 @@ impl FileWatcher {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
             }) => {
-                if !self.file_findable() {
+                if self.file_findable() {
+                    self.track_read_eof();
+                    Ok(RawLineResult {
+                        raw_line: None,
+                        discarded_for_size_and_truncated,
+                    })
+                } else {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it
                     // didn't end with a newline. This is not a perfect signal for when we should
@@ -416,12 +429,6 @@ impl FileWatcher {
                             discarded_for_size_and_truncated,
                         })
                     }
-                } else {
-                    self.track_read_eof();
-                    Ok(RawLineResult {
-                        raw_line: None,
-                        discarded_for_size_and_truncated,
-                    })
                 }
             }
             Err(e) => {

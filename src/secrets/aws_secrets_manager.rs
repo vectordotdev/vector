@@ -41,8 +41,8 @@ impl GenerateConfig for AwsSecretsManagerBackend {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(AwsSecretsManagerBackend {
             secret_id: String::from("secret-id"),
-            region: Default::default(),
-            auth: Default::default(),
+            region: RegionOrEndpoint::default(),
+            auth: AwsAuthentication::default(),
             tls: None,
         })
         .unwrap()
@@ -76,26 +76,26 @@ impl SecretBackend for AwsSecretsManagerBackend {
             .secret_string
             .ok_or::<String>(format!(
                 "secret for secret-id '{}' could not be retrieved",
-                &self.secret_id
+                self.secret_id
             ))?;
 
         let output = serde_json::from_str::<HashMap<String, String>>(secret_string.as_str())?;
 
         let mut secrets = HashMap::new();
-        for k in secret_keys.into_iter() {
+        for k in secret_keys {
             if let Some(secret) = output.get(&k) {
                 if secret.is_empty() {
                     return Err(format!(
                         "value for key '{k}' in secret with id '{}' was empty",
-                        &self.secret_id
+                        self.secret_id
                     )
                     .into());
                 }
-                secrets.insert(k.to_string(), secret.to_string());
+                secrets.insert(k, secret.clone());
             } else {
                 return Err(format!(
                     "key '{k}' in secret with id '{}' does not exist",
-                    &self.secret_id
+                    self.secret_id
                 )
                 .into());
             }

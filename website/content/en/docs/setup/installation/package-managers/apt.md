@@ -15,6 +15,11 @@ through the [APT package repository][apt].
 * ARM64
 * ARMv7
 
+**Signing key change notice:** On November 30, 2026, Vector's package repositories
+will switch to a new signing key. Existing installations must [add the new
+key](/deprecations/#package-repository-signing-key) before this date to continue
+receiving package updates.
+
 ## Installation
 
 First, add the Vector repo:

@@ -1,4 +1,5 @@
 use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -103,7 +104,7 @@ impl SourceConfig for StaticMetricsConfig {
 
         let metrics = self.metrics.clone();
 
-        Ok(Box::pin(
+        Ok(crate::sources::source_with_error(
             StaticMetrics {
                 namespace,
                 metrics,
@@ -133,9 +134,13 @@ struct StaticMetrics {
 }
 
 impl StaticMetrics {
-    async fn run(mut self) -> Result<(), ()> {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    async fn run(mut self) -> vector_lib::source_sender::SendResult {
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::STATIC));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
 
@@ -185,9 +190,9 @@ impl StaticMetrics {
                 .into_iter()
                 .map(|metric| metric.with_timestamp(Some(Utc::now())));
 
-            if (self.out.send_batch(batch).await).is_err() {
-                emit!(StreamClosedError { count });
-                return Err(());
+            if let Err(error) = self.out.send_batch(batch).await {
+                emit(StreamClosedError { count });
+                return Err(error);
             }
         }
 
@@ -218,7 +223,7 @@ mod tests {
 
     fn default_metric() -> StaticMetricConfig {
         StaticMetricConfig {
-            name: "".to_string(),
+            name: String::new(),
             value: MetricValue::Gauge { value: 0.0 },
             kind: MetricKind::Absolute,
             tags: BTreeMap::default(),
@@ -226,10 +231,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_error_retains_cause() {
+        let (out, receiver) = SourceSender::new_test();
+        drop(receiver);
+
+        let source = StaticMetrics {
+            namespace: "static".to_owned(),
+            metrics: vec![default_metric()],
+            interval: time::Duration::from_secs(1),
+            out,
+            shutdown: ShutdownSignal::noop(),
+        };
+
+        let error = crate::sources::source_with_error(source.run())
+            .await
+            .expect_err("sending to a closed output should fail");
+        assert_eq!(
+            error.downcast_ref::<vector_lib::source_sender::SendError>(),
+            Some(&vector_lib::source_sender::SendError::Closed)
+        );
+    }
+
+    #[tokio::test]
     async fn default_empty() {
         let events = events_from_config(StaticMetricsConfig::default()).await;
 
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -240,7 +267,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
     }
@@ -253,7 +280,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
         let event = events.remove(0);
@@ -271,7 +298,7 @@ mod tests {
         };
 
         let mut events = events_from_config(config).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
@@ -290,7 +317,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         let metric = event.as_metric();
 

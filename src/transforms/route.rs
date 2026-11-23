@@ -23,9 +23,13 @@ pub struct Route {
 }
 
 impl Route {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a route condition cannot be built.
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
+        for (output_name, condition) in &config.route {
             let condition =
                 condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
@@ -252,7 +256,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -268,7 +272,7 @@ mod test {
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == UNMATCHED_ROUTE {
-                assert!(events.is_empty());
+                assert_eq!(events, [] as [vector_lib::event::Event; 0]);
             } else {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
@@ -298,7 +302,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -341,7 +345,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -385,7 +389,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -430,7 +434,10 @@ mod test {
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
+        assert_eq!(
+            tests.remove(0).run().await.errors,
+            [] as [std::string::String; 0]
+        );
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }

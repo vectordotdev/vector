@@ -16,7 +16,7 @@ generated: components: sources: datadog_agent: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	address: {
 		description: """
@@ -33,27 +33,58 @@ generated: components: sources: datadog_agent: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	disable_llmobs: {
-		description: "If this is set to `true`, LLM Observability events are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, LLM Observability events are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_logs: {
-		description: "If this is set to `true`, logs are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, logs are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_metrics: {
-		description: "If this is set to `true`, metrics (beta) are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, metrics are not accepted by the component."
+		required:           false
+		type: bool: {}
 	}
 	disable_traces: {
-		description: "If this is set to `true`, traces (alpha) are not accepted by the component."
-		required:    false
-		type: bool: default: false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `enabled_data_types` instead."
+		description:        "If this is set to `true`, traces (alpha) are not accepted by the component."
+		required:           false
+		type: bool: {}
+	}
+	enabled_data_types: {
+		description: """
+			The data types accepted by the component. Defaults to all data types except `apm_stats`.
+
+			When `multiple_outputs` is enabled, each data type is sent to its own output.
+			Data types disabled by the deprecated `disable_*` options are removed from this list.
+			"""
+		required: false
+		type: array: items: type: string: {
+			enum: {
+				apm_stats: """
+					APM stats (alpha), emitted as received (still encoded and compressed).
+
+					Not enabled by default. Requires `multiple_outputs`.
+					"""
+				llmobs:  "LLM Observability events."
+				logs:    "Logs."
+				metrics: "Metrics."
+				traces:  "Traces (alpha)."
+			}
+			examples: ["logs", "metrics", "traces"]
+		}
 	}
 	framing: {
 		description: """
@@ -71,13 +102,33 @@ generated: components: sources: datadog_agent: configuration: {
 		required:    false
 		type:        _schemaDefinitions["vector::http::KeepaliveConfig"]
 	}
+	max_trace_expansion_bytes: {
+		description: """
+			The maximum number of bytes that indexed trace payloads in a single request can expand to
+			while being converted into trace events.
+
+			Indexed trace payloads are compact, so the converted events can be much larger than the
+			request body. A string is stored once and referenced from any number of spans, and each
+			reference becomes its own copy. Numbers, booleans, and ids that become tag strings or list
+			elements also take more bytes than they did on the wire: the double `5e-324` is an 8-byte
+			value in a payload but a 326-byte tag. This limit counts the bytes of all of these copies and
+			conversions. Requests that would exceed it are rejected with an HTTP 422 Unprocessable
+			Entity response as soon as the conversion reaches the limit.
+			"""
+		required: false
+		type: uint: {
+			default: 104857600
+			unit:    "bytes"
+		}
+	}
 	multiple_outputs: {
 		description: """
-			If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
+			If this is set to `true`, logs, metrics, and traces (alpha) are sent to different outputs.
 
-			For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
+			For a source component named `agent`, the received logs, metrics, and traces (alpha) can then be
 			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
-			`agent.traces`, respectively.
+			`agent.traces`, respectively. When `apm_stats` is listed in `enabled_data_types`, APM stats are
+			sent to `agent.apm_stats`.
 			"""
 		required: false
 		type: bool: default: false

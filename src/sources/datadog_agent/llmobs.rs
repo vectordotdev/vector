@@ -8,7 +8,7 @@ use serde_json::Value;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LegacyKey,
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{CountByteSize, InternalEventHandle as _, emit},
     json_size::JsonSize,
     lookup::{event_path, path},
 };
@@ -147,6 +147,14 @@ struct LLMObsSpan {
     collection_errors: Option<Value>,
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_llmobs_body(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -154,7 +162,7 @@ pub(crate) fn decode_llmobs_body(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let envelope: Vec<LLMObsEnvelopeItem> = serde_json::from_slice::<LLMObsEnvelope>(&body)
         .map_err(|error| {
-            emit!(DatadogAgentJsonParseError { error: &error });
+            emit(DatadogAgentJsonParseError { error: &error });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Error parsing JSON: {error:?}"),

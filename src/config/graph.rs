@@ -103,7 +103,7 @@ struct Edge {
 }
 
 #[derive(Default)]
-pub struct Graph {
+pub(super) struct Graph {
     nodes: HashMap<ComponentKey, NodeSpec>,
     edges: Vec<Edge>,
     input_errors: Vec<String>,
@@ -114,7 +114,7 @@ impl Graph {
     ///
     /// Unresolved inputs are retained as diagnostics for `check_inputs`; ambiguous
     /// output names prevent construction entirely.
-    pub fn new(
+    pub(super) fn new(
         nodes: impl IntoIterator<Item = NodeSpec>,
         wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
@@ -144,7 +144,7 @@ impl Graph {
 
     /// Reports unresolved inputs after construction. Partial graphs used while
     /// preparing config unit tests can be inspected before this check.
-    pub fn check_inputs(&self) -> Result<(), Vec<String>> {
+    pub(super) fn check_inputs(&self) -> Result<(), Vec<String>> {
         if self.input_errors.is_empty() {
             Ok(())
         } else {
@@ -224,7 +224,7 @@ impl Graph {
             .expect("output didn't exist")
     }
 
-    pub fn typecheck(&self) -> Result<(), Vec<String>> {
+    pub(super) fn typecheck(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         // check that all edges connect components with compatible data types
@@ -249,7 +249,7 @@ impl Graph {
         }
     }
 
-    pub fn check_for_cycles(&self) -> Result<(), String> {
+    pub(super) fn check_for_cycles(&self) -> Result<(), String> {
         // find all sinks
         let sinks = self
             .nodes
@@ -265,13 +265,13 @@ impl Graph {
             traversal.push_back(s.to_owned());
             while !traversal.is_empty() {
                 let n = traversal.back().expect("can't be empty").clone();
-                if !visited.contains(&n) {
-                    visited.insert(n.clone());
-                    stack.insert(n.clone());
-                } else {
+                if visited.contains(&n) {
                     // we came back to the node after exploring all its children - remove it from the stack and traversal
                     stack.shift_remove(&n);
                     traversal.pop_back();
+                } else {
+                    visited.insert(n.clone());
+                    stack.insert(n.clone());
                 }
                 let inputs = self
                     .edges
@@ -287,7 +287,7 @@ impl Graph {
                             .iter()
                             .skip(1) // skip the sink
                             .rev()
-                            .map(|item| item.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>();
                         return Err(format!(
                             "Cyclic dependency detected in the chain [ {} -> {} ]",
@@ -306,7 +306,7 @@ impl Graph {
     /// A dotted name such as `route.branch` can identify either an expanded
     /// component or a named output. Distinct output IDs must therefore have
     /// distinct string representations.
-    pub fn output_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
+    pub(super) fn output_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
         let outputs = self
             .nodes
             .iter()
@@ -334,7 +334,7 @@ impl Graph {
     }
 
     /// Resolves inputs belonging to a configured component, including its table tasks.
-    pub fn inputs_for_component(&self, component: &ComponentKey) -> Vec<OutputId> {
+    pub(super) fn inputs_for_component(&self, component: &ComponentKey) -> Vec<OutputId> {
         self.edges
             .iter()
             .filter(|edge| &self.nodes[&edge.to].component_id == component)
@@ -347,7 +347,7 @@ impl Graph {
     /// components are relevant in a Vector unit test.
     ///
     /// Caller must check for cycles before calling this function.
-    pub fn paths_to_sink_from(&self, root: &ComponentKey) -> Vec<Vec<ComponentKey>> {
+    pub(super) fn paths_to_sink_from(&self, root: &ComponentKey) -> Vec<Vec<ComponentKey>> {
         let mut traversal: VecDeque<(ComponentKey, Vec<_>)> = VecDeque::new();
         let mut paths = Vec::new();
 
@@ -928,7 +928,7 @@ mod test {
             .collect();
 
         assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"])
+        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"]);
     }
 
     #[test]

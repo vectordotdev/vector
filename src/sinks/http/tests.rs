@@ -8,21 +8,26 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
-use hyper::{Body, Method, Response, StatusCode};
+use http::{Method, Response, StatusCode};
+use http_body_util::Full;
 use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::FramingConfig,
+        JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
     finalization::AddBatchNotifier,
+    metrics::Controller,
+    serde::AsciiChar,
+    stream::batcher::limiter::ItemBatchSize as _,
 };
 
 use vrl::event_path;
 
 use super::{
+    batch::HttpBatchSizer,
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
 };
@@ -61,19 +66,19 @@ fn generate_config() {
 
 fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
     HttpSinkConfig {
-        uri: Default::default(),
-        method: Default::default(),
-        auth: Default::default(),
-        compression: Default::default(),
+        uri: crate::template::UriTemplate::default(),
+        method: super::config::HttpMethod::default(),
+        auth: Option::default(),
+        compression: Compression::default(),
         encoding,
-        payload_prefix: Default::default(),
-        payload_suffix: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
-        acknowledgements: Default::default(),
-        retry_strategy: Default::default(),
-        confinement: Default::default(),
+        payload_prefix: String::default(),
+        payload_suffix: String::default(),
+        batch: BatchConfig::default(),
+        request: crate::sinks::util::http::RequestConfig::default(),
+        tls: Option::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        retry_strategy: crate::sinks::util::http::RetryStrategy::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     }
 }
 
@@ -85,17 +90,27 @@ fn http_encode_event_text() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer, String::new(), String::new());
 
-    let mut encoded = vec![];
-    let (encoded_size, _byte_size) = encoder.encode_input(vec![event], &mut encoded).unwrap();
+    let mut output_buffer = vec![];
+    let (encoded_size, _byte_size) = encoder
+        .encode_input(vec![event], &mut output_buffer)
+        .unwrap();
 
-    assert_eq!(encoded, Vec::from("hello world\n"));
-    assert_eq!(encoded.len(), encoded_size);
+    assert_eq!(output_buffer, Vec::from("hello world\n"));
+    assert_eq!(output_buffer.len(), encoded_size);
 }
 
 #[test]
 fn http_encode_event_ndjson() {
+    #[derive(Deserialize, Debug)]
+    #[serde(deny_unknown_fields)]
+    #[allow(dead_code)] // deserialize all fields
+    struct ExpectedEvent {
+        message: String,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    }
+
     let event = Event::Log(LogEvent::from("hello world"));
 
     let cfg = default_cfg(
@@ -108,22 +123,84 @@ fn http_encode_event_ndjson() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer, String::new(), String::new());
 
-    let mut encoded = vec![];
-    encoder.encode_input(vec![event], &mut encoded).unwrap();
+    let mut output_buffer = vec![];
+    encoder
+        .encode_input(vec![event], &mut output_buffer)
+        .unwrap();
 
-    #[derive(Deserialize, Debug)]
-    #[serde(deny_unknown_fields)]
-    #[allow(dead_code)] // deserialize all fields
-    struct ExpectedEvent {
-        message: String,
-        timestamp: chrono::DateTime<chrono::Utc>,
-    }
-
-    let output = serde_json::from_slice::<ExpectedEvent>(&encoded[..]).unwrap();
+    let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_native_json_batch_sizing_does_not_report_dropped_events() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    let config = indoc::indoc! {r#"
+        uri: "http://127.0.0.1:8080"
+        encoding:
+          codec: native_json
+          except_fields: [bad]
+        framing:
+          method: newline_delimited
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
+    let encoder = config.build_encoder().unwrap();
+    let sizer = HttpBatchSizer {
+        encoder: encoder.clone(),
+    };
+    let expected = Event::Log(LogEvent::from("keep this event"));
+    let mut event = expected.clone();
+    let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+    event.as_mut_log().insert(event_path!("bad"), too_deep);
+
+    assert_eq!(sizer.size(&event), event.size_of());
+
+    let filtered_encoder = HttpEncoder::new(
+        encoder.clone(),
+        config.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+    let mut output = Vec::new();
+    filtered_encoder
+        .encode_input(vec![event.clone()], &mut output)
+        .expect("excluding the deeply nested field should allow encoding");
+    let decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(output.into(), crate::config::LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.as_slice(), &[expected]);
+
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        assert!(
+            !metrics.iter().any(|metric| metric.name() == name),
+            "batch sizing must not report {name} for an event that encodes after filtering"
+        );
+    }
+
+    let unfiltered_encoder = HttpEncoder::new(
+        encoder,
+        Transformer::default(),
+        String::new(),
+        String::new(),
+    );
+    assert!(
+        unfiltered_encoder
+            .encode_input(vec![event], &mut Vec::new())
+            .is_err()
+    );
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
+    }
 }
 
 #[test]
@@ -175,7 +252,7 @@ fn http_validates_payload_prefix_and_suffix() {
     let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
         // Message-based default for JSON is comma-delimited framing.
         FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
-            b',',
+            AsciiChar::new(','),
         ))
     });
     assert!(
@@ -203,7 +280,7 @@ fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
     let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
         // Message-based default for JSON is comma-delimited framing.
         FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
-            b',',
+            AsciiChar::new(','),
         ))
     });
     assert!(
@@ -244,12 +321,12 @@ async fn http_headers_auth_conflict() {
 #[tokio::test]
 async fn http_happy_path_post() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         auth:
           strategy: basic
           user: waldo
           password: hunter2
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -265,13 +342,13 @@ async fn http_happy_path_post() {
 #[tokio::test]
 async fn http_happy_path_put() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         method: put
         auth:
           strategy: basic
           user: waldo
           password: hunter2
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::PUT, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -287,12 +364,12 @@ async fn http_happy_path_put() {
 #[tokio::test]
 async fn http_passes_custom_headers() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         request:
           headers:
             foo: bar
             baz: quux
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -457,10 +534,10 @@ async fn retries_on_temporary_error() {
                 // Send a temporary error for the first two responses
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::empty())
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::default())
             }
         });
 
@@ -494,7 +571,7 @@ async fn custom_retry_retries_only_configured_status_code() {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         const NUM_LINES: usize = 1;
         const NUM_FAILURES: usize = 2;
-        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r"
             request:
               retry_attempts: 2
               retry_initial_backoff_secs: 1
@@ -502,7 +579,7 @@ async fn custom_retry_retries_only_configured_status_code() {
             retry_strategy:
               type: custom
               status_codes: [408, 425, 429, 503]
-        "#};
+        "};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -513,10 +590,10 @@ async fn custom_retry_retries_only_configured_status_code() {
             if count < NUM_FAILURES {
                 Response::builder()
                     .status(StatusCode::SERVICE_UNAVAILABLE)
-                    .body(Body::empty())
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::default())
             }
         });
 
@@ -549,7 +626,7 @@ async fn custom_retry_retries_only_configured_status_code() {
 async fn custom_retry_does_not_retry_unconfigured_status_code() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         const NUM_LINES: usize = 1;
-        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r"
             request:
               retry_attempts: 2
               retry_initial_backoff_secs: 1
@@ -557,7 +634,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             retry_strategy:
               type: custom
               status_codes: [408, 425, 429, 503]
-        "#};
+        "};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -567,7 +644,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             in_counter.fetch_add(1, atomic::Ordering::Relaxed);
             Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Body::empty())
+                .body(Full::default())
                 .unwrap_or_else(|_| unreachable!())
         });
 
@@ -587,7 +664,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             unreachable!("There should be no successful requests")
         })
         .await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -614,7 +691,7 @@ async fn fails_on_permanent_error() {
 
         let output_lines =
             get_received_gzip(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -759,7 +836,7 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
 
                 let message: serde_json::Value = parse_compressed_json(compression, body);
 
-                let lines: Vec<serde_json::Value> = message["data"].as_array().unwrap().to_vec();
+                let lines: Vec<serde_json::Value> = message["data"].as_array().unwrap().clone();
                 stream::iter(lines)
             })
             .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
@@ -774,10 +851,11 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
 
 #[tokio::test]
 async fn templateable_uri_path() {
-    init_test();
     fn create_event_with_id(id: i64) -> Event {
         log_event!["id" => id]
     }
+
+    init_test();
 
     let num_events_per_id = 100;
     let an_id = 1;
@@ -829,7 +907,7 @@ async fn templateable_uri_path() {
 
             for event in events {
                 let event_id = event["id"].as_i64().unwrap();
-                assert_eq!(event_id, expected_event_id)
+                assert_eq!(event_id, expected_event_id);
             }
 
             // Assert that the uri path is the expected one for the given id
@@ -838,16 +916,16 @@ async fn templateable_uri_path() {
         })
         .collect::<Vec<_>>()
         .await;
-    assert_eq!(request_batches.len(), 2)
+    assert_eq!(request_batches.len(), 2);
 }
 
 #[tokio::test]
 async fn templateable_uri_auth() {
-    init_test();
-
     fn create_event_with_user_and_pass(user: &str, pass: &str) -> Event {
         log_event!["user" => user, "pass" => pass]
     }
+
+    init_test();
 
     let num_events_per_auth = 100;
     let an_user = "an_user";
@@ -1091,7 +1169,7 @@ async fn sends_through_authenticated_proxy() {
         enabled: true,
         http: Some(proxy.url().to_owned()),
         https: None,
-        no_proxy: Default::default(),
+        no_proxy: vector_lib::config::proxy::NoProxy::default(),
     };
 
     let config = indoc::formatdoc! {r#"
@@ -1122,7 +1200,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         observation
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
 
     // The proxy forwards the request to the origin without the proxy credentials,
@@ -1133,7 +1211,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         !parts
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
     let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(event["message"], "simple message");

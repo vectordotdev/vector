@@ -1,12 +1,11 @@
 use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
-use bytes::Bytes;
 use itertools::Itertools;
 use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     lookup::event_path,
 };
 use vrl::{
@@ -71,11 +70,13 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
+    #[must_use]
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
+    #[must_use]
     pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
         self.truncation = truncation;
         self
@@ -191,8 +192,8 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         .cloned()
         .collect::<Vec<_>>();
     for key in keys_to_move {
-        if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
-            local_root.insert(entry_k, entry_v);
+        if let Some(entry_v) = object_map.remove(key.as_str()) {
+            local_root.insert(key, entry_v);
         }
     }
     // .. nest this object at the root under the reserved key named 'message'
@@ -217,7 +218,7 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            emit!(DatadogLogsReservedAttributeConflict {
+            emit(DatadogLogsReservedAttributeConflict {
                 meaning,
                 source_path: current_path,
                 destination_path: expected_field_name,
@@ -235,6 +236,7 @@ pub fn position_reserved_attr_event_root(
 // `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
 // `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
 // just to test equality.
+#[must_use]
 pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
     path.prefix == PathPrefix::Event
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
@@ -272,7 +274,12 @@ struct LogRequestBuilder {
 }
 
 impl LogRequestBuilder {
-    pub fn build_request(
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Retain ownership of the API key while building and returning its requests."
+    )]
+    fn build_request(
         &self,
         events: Vec<Event>,
         api_key: Arc<str>,
@@ -298,9 +305,9 @@ impl LogRequestBuilder {
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
                 if events_with_estimated_size.pop_front().is_some() {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
-                        reason: "Event too large to encode."
+                        reason: "Event too large to encode.",
                     });
                 }
                 continue;
@@ -354,6 +361,11 @@ impl LogRequestBuilder {
         Ok((events_serialized, buf, byte_size))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Release the uncompressed request buffer before returning the encoded request."
+    )]
     fn finish_request(
         &self,
         buf: Vec<u8>,
@@ -408,8 +420,9 @@ fn encode_log(
         return Ok(false);
     };
 
-    let Some(message) =
-        message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
+    let Some(message) = message_value_mut(event.as_mut_log(), conforms_as_agent)
+        .and_then(|message| message.as_bytes())
+        .cloned()
     else {
         return Ok(false);
     };
@@ -444,7 +457,7 @@ fn encode_log(
     // mismatch here indicates that the size calculation has diverged. Request serialization
     // separately enforces `max_payload_bytes` in release builds.
     debug_assert!(encoded_size <= truncation.max_log_bytes);
-    emit!(DatadogLogsEventTruncated {
+    emit(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
     });
@@ -495,12 +508,18 @@ fn set_truncated_message(
     body_len: usize,
     conforms_as_agent: bool,
 ) {
-    let marker = TRUNCATION_MARKER.as_bytes();
-    let mut truncated = Vec::with_capacity(body_len + marker.len());
-    truncated.extend_from_slice(&message.as_bytes()[..body_len]);
-    truncated.extend_from_slice(marker);
-    *message_bytes_mut(log, conforms_as_agent).expect("the message was previously found") =
-        Bytes::from(truncated);
+    // The current caller supplies a character boundary because `select_message_body_len`
+    // advances via `char_indices`; keep the clamp as a defensive guard for future callers.
+    let body_len = message.floor_char_boundary(body_len);
+    let mut truncated = String::with_capacity(body_len + TRUNCATION_MARKER.len());
+    #[expect(
+        clippy::string_slice,
+        reason = "floor_char_boundary guarantees a valid char boundary"
+    )]
+    truncated.push_str(&message[..body_len]);
+    truncated.push_str(TRUNCATION_MARKER);
+    *message_value_mut(log, conforms_as_agent).expect("the message was previously found") =
+        Value::from(truncated);
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
@@ -531,13 +550,13 @@ fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<u
     })
 }
 
-fn message_bytes_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Bytes> {
+fn message_value_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Value> {
     match log.as_map_mut()?.get_mut(MESSAGE)? {
-        Value::Bytes(message) => Some(message),
-        Value::Object(fields) if conforms_as_agent => match fields.get_mut(MESSAGE)? {
-            Value::Bytes(message) => Some(message),
-            _ => None,
-        },
+        message @ (Value::Bytes(_) | Value::String(_)) => Some(message),
+        Value::Object(fields) if conforms_as_agent => {
+            let message = fields.get_mut(MESSAGE)?;
+            message.is_bytes().then_some(message)
+        }
         _ => None,
     }
 }
@@ -610,7 +629,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(reqs) => Some(futures::stream::iter(reqs)),
@@ -660,6 +679,7 @@ mod tests {
         simdutf_bytes_utf8_lossy,
     };
     use crate::{
+        codecs::Transformer,
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
         sinks::{
             datadog::logs::config::{
@@ -732,7 +752,7 @@ mod tests {
     ) -> Vec<super::LogApiRequest> {
         LogRequestBuilder {
             default_api_key: Arc::from("unused"),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             compression: Compression::None,
             conforms_as_agent,
             max_payload_bytes,
@@ -901,6 +921,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
     #[test]
     fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();
@@ -1196,7 +1217,7 @@ mod tests {
         log.insert(event_path!("source"), "the_source");
         log.insert(event_path!("severity"), "the_severity");
 
-        assert!(log.namespace() == LogNamespace::Legacy);
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
 
         let mut event = Event::Log(log);
         normalize_event(&mut event);
@@ -1244,7 +1265,7 @@ mod tests {
         log.insert(metadata_path!("datadog_agent", "source"), "the_source");
         log.insert(metadata_path!("datadog_agent", "severity"), "the_severity");
 
-        assert!(log.namespace() == LogNamespace::Vector);
+        assert_eq!(log.namespace(), LogNamespace::Vector);
         Event::Log(log)
     }
 

@@ -1,7 +1,11 @@
 use std::task::Poll;
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
-use fakedata::logs::*;
+use fakedata::logs::{
+    apache_common_log_line, apache_error_log_line, json_log_line, syslog_3164_log_line,
+    syslog_5424_log_line,
+};
 use futures::StreamExt;
 use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
@@ -28,6 +32,9 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
+
+const SERVICE: &str = "service";
+const HOST: &str = "host";
 
 /// Configuration for the `demo_logs` source.
 #[serde_as]
@@ -143,7 +150,7 @@ const fn lines_example() -> [&'static str; 2] {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(DemoLogsEventProcessed);
+        emit(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
@@ -183,6 +190,7 @@ impl OutputFormat {
 
 impl DemoLogsConfig {
     #[cfg(test)]
+    #[must_use]
     pub fn repeat(
         lines: Vec<String>,
         count: usize,
@@ -211,12 +219,12 @@ async fn demo_logs_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
     let mut interval = interval.map(time::interval);
 
-    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let events_received = register!(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::NONE));
+    let events_received = register(EventsReceived);
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -249,22 +257,22 @@ async fn demo_logs_source(
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
-                            path!("service"),
+                            Some(LegacyKey::InsertIfEmpty(path!(SERVICE))),
+                            path!(SERVICE),
                             "vector",
                         );
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,
-                            Some(LegacyKey::InsertIfEmpty(path!("host"))),
-                            path!("host"),
+                            Some(LegacyKey::InsertIfEmpty(path!(HOST))),
+                            path!(HOST),
                             "localhost",
                         );
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|_| {
-                        emit!(StreamClosedError { count });
+                    out.send_batch(events).await.inspect_err(|_| {
+                        emit(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -293,7 +301,7 @@ impl SourceConfig for DemoLogsConfig {
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
-        Ok(Box::pin(demo_logs_source(
+        Ok(crate::sources::source_with_error(demo_logs_source(
             self.interval,
             self.count,
             self.format.clone(),
@@ -315,10 +323,10 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 DemoLogsConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
-                &owned_value_path!("service"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(SERVICE))),
+                &owned_value_path!(SERVICE),
                 Kind::bytes(),
-                Some("service"),
+                Some(SERVICE),
             );
 
         vec![SourceOutput::new_maybe_logs(
@@ -402,7 +410,7 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_copies_lines() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
@@ -410,7 +418,7 @@ mod tests {
               - three
               - four
             count: 5
-        "#})
+        "})
         .await;
 
         let lines = &["one", "two", "three", "four"];
@@ -418,7 +426,7 @@ mod tests {
         for _ in 0..5 {
             let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
-                _ => unreachable!(),
+                Poll::Pending => unreachable!(),
             };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
@@ -430,13 +438,13 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_limits_count() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -448,20 +456,20 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_adds_sequence() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             sequence: true
             count: 5
-        "#})
+        "})
         .await;
 
         for n in 0..5 {
             let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
-                _ => unreachable!(),
+                Poll::Pending => unreachable!(),
             };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
@@ -474,14 +482,14 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_obeys_interval() {
         let start = Instant::now();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             count: 3
             interval: 1.0
-        "#})
+        "})
         .await;
 
         for _ in 0..3 {
@@ -496,15 +504,15 @@ mod tests {
     #[tokio::test]
     async fn host_is_set() {
         let host_key = log_schema().host_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: syslog
             count: 5
-        "#})
+        "})
         .await;
 
         let event = match poll!(rx.next()) {
             Poll::Ready(event) => event.unwrap(),
-            _ => unreachable!(),
+            Poll::Pending => unreachable!(),
         };
         let log = event.as_log();
         let host = log[&host_key].to_string_lossy();
@@ -513,10 +521,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_common_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: apache_common
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -527,10 +535,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_error_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: apache_error
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -541,10 +549,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_5424_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: syslog
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -555,10 +563,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_3164_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: bsd_syslog
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -570,16 +578,16 @@ mod tests {
     #[tokio::test]
     async fn json_format_generates_output() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: json
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
             let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
-                _ => unreachable!(),
+                Poll::Pending => unreachable!(),
             };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();

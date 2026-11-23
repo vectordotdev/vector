@@ -13,10 +13,10 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
-        opendal_common::*,
+        opendal_common::{OpenDalRequestBuilder, OpenDalRetryLogic, OpenDalService, OpenDalSink},
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
-            partitioner::KeyPartitioner,
+            ServiceBuilderExt, TowerRequestConfig, partitioner::KeyPartitioner,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
@@ -71,6 +71,9 @@ pub struct WebHdfsConfig {
 
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+    /// Settings for outbound requests, including timeouts and retries.
+    #[serde(default)]
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
@@ -97,8 +100,9 @@ impl GenerateConfig for WebHdfsConfig {
                 .into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
 
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -158,6 +162,10 @@ impl ValidatedSink for WebHdfsConfig {
 }
 
 impl WebHdfsConfig {
+    /// Builds the WebHDFS operator.
+    ///
+    /// # Errors
+    /// Returns an error if OpenDAL cannot initialize the operator from this configuration.
     pub fn build_operator(&self) -> crate::Result<Operator> {
         install_opendal_defaults();
 
@@ -171,6 +179,10 @@ impl WebHdfsConfig {
         Ok(op)
     }
 
+    /// Builds the sink from the operator and validated settings.
+    ///
+    /// # Errors
+    /// Returns an error if the event encoder cannot be built.
     pub fn build_processor(
         &self,
         op: Operator,
@@ -189,8 +201,11 @@ impl WebHdfsConfig {
             compression: self.compression,
         };
 
-        // TODO: we can add tower middleware here.
-        let svc = ServiceBuilder::new().service(OpenDalService::new(op));
+        let request_settings = self.request.into_settings();
+
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, OpenDalRetryLogic)
+            .service(OpenDalService::new(op));
 
         let sink = OpenDalSink::new(
             svc,
@@ -207,6 +222,10 @@ impl WebHdfsConfig {
         prefix.confine(&self.confinement, Self::NAME, "prefix")
     }
 
+    /// Builds the partitioner from the configured prefix.
+    ///
+    /// # Errors
+    /// Returns an error if the prefix template is invalid or violates confinement rules.
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
@@ -244,8 +263,9 @@ mod tests {
             )
                 .into(),
             compression: crate::sinks::util::Compression::None,
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
     }
@@ -308,7 +328,7 @@ mod tests {
         // Bulk size-based defaults: 10 MB batches, 300s timeout.
         assert_eq!(
             validated.batcher_settings.timeout,
-            std::time::Duration::from_secs(300)
+            std::time::Duration::from_mins(5)
         );
         assert_eq!(validated.batcher_settings.size_limit, 10_000_000);
         // The confined prefix retains the validated value.

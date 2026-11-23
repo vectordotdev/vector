@@ -118,6 +118,10 @@ pub fn max_zlib_compressed_frame_size_bytes() -> usize {
 /// that on top.
 #[must_use]
 #[allow(clippy::manual_clamp)] // `usize::clamp` is not a const fn; the manual form keeps this const
+#[allow(
+    clippy::manual_bit_width,
+    reason = "usize::bit_width requires Rust 1.97; preserve the Rust 1.95 MSRV"
+)]
 pub const fn zstd_window_log_max(max_decompressed_size: usize) -> Option<u32> {
     const MIN_ZSTD_WINDOW_LOG: u32 = 10;
     const MAX_ZSTD_WINDOW_LOG: u32 = 31;
@@ -297,7 +301,7 @@ impl<S: Read> CappedDecoder<ZlibDecoder<S>> {
     }
 }
 
-impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S>>> {
+impl<'a, S: Read> CappedDecoder<zstd::stream::read::Decoder<'a, io::BufReader<S>>> {
     /// Creates a capped zstd decoder using the global decompressed-size cap.
     ///
     /// Also constrains the decoder's internal window allocation via `window_log_max` so a crafted
@@ -356,7 +360,7 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
     /// Returns an error if the zstd decoder cannot be initialized with the dictionary.
     pub fn zstd_with_dictionary(
         reader: S,
-        dictionary: &DecoderDictionary<'static>,
+        dictionary: &'a DecoderDictionary<'static>,
     ) -> io::Result<Self> {
         Self::zstd_with_dictionary_and_limit(reader, dictionary, max_decompressed_size_bytes())
     }
@@ -369,7 +373,7 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
     /// Returns an error if the zstd decoder cannot be initialized with the dictionary.
     pub fn zstd_with_dictionary_and_limit(
         reader: S,
-        dictionary: &DecoderDictionary<'static>,
+        dictionary: &'a DecoderDictionary<'static>,
         limit: usize,
     ) -> io::Result<Self> {
         let buffered = io::BufReader::with_capacity(zstd::zstd_safe::DCtx::in_size(), reader);
@@ -391,7 +395,7 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
 
     /// Applies the window allocation clamp to a raw zstd decoder and wraps it in the size cap.
     fn capped_zstd(
-        mut decoder: zstd::stream::read::Decoder<'static, io::BufReader<S>>,
+        mut decoder: zstd::stream::read::Decoder<'a, io::BufReader<S>>,
         limit: usize,
         window_log_max: Option<u32>,
     ) -> io::Result<Self> {

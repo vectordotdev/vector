@@ -74,7 +74,7 @@ pub fn add_headers(
                     }
                 }
             }
-        };
+        }
     }
 }
 
@@ -83,7 +83,7 @@ mod tests {
     use chrono::{DateTime, Utc};
     use std::time::SystemTime;
     use vector_lib::config::LogNamespace;
-    use vrl::{path, value};
+    use vrl::{objectmap, path, value};
     use warp::http::HeaderMap;
 
     use crate::event::{Event, MetricKind, MetricTags, MetricValue};
@@ -147,7 +147,7 @@ mod tests {
             "test",
         );
 
-        let mut trace = [TraceEvent::from(btreemap! {
+        let mut trace = [TraceEvent::from(objectmap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
@@ -177,6 +177,10 @@ mod tests {
         );
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn multiple_headers_wildcard() {
         let header_names = [HttpConfigParamKind::Glob(
@@ -268,7 +272,7 @@ mod tests {
             "Checking metric contains Content-Encoding header"
         );
 
-        let mut trace = [TraceEvent::from(btreemap! {
+        let mut trace = [TraceEvent::from(objectmap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",

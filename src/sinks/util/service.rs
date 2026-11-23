@@ -5,14 +5,14 @@ use serde_with::serde_as;
 use tower::{
     Service, ServiceBuilder,
     balance::p2c::Balance,
-    buffer::{Buffer, BufferLayer},
+    buffer::Buffer,
     discover::Change,
     layer::{Layer, util::Stack},
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
 };
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, cpu_time::spawn_timed};
 
 pub use crate::sinks::util::service::{
     concurrency::Concurrency,
@@ -216,6 +216,7 @@ impl<D: TowerRequestConfigDefaults> Default for TowerRequestConfig<D> {
 }
 
 impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
+    #[must_use]
     pub const fn into_settings(&self) -> TowerRequestSettings {
         // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
@@ -306,14 +307,14 @@ impl TowerRequestSettings {
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
     ///
-    /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
+    /// [`BufferLayer`] suggests that the `buffer_bound` should be at least equal to
     /// the number of the callers of the service. For sinks, this should typically be 1.
     pub fn distributed_service<Req, RL, HL, S>(
         self,
-        retry_logic: RL,
+        retry_logic: &RL,
         services: Vec<(String, S)>,
-        health_config: HealthConfig,
-        health_logic: HL,
+        health_config: &HealthConfig,
+        health_logic: &HL,
         buffer_bound: usize,
     ) -> DistributedService<S, RL, HL, usize, Req>
     where
@@ -354,13 +355,20 @@ impl TowerRequestSettings {
             .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
+        // [Balance] must be wrapped with a [Buffer] so that the overall service implements Clone.
+        // The worker is spawned here rather than by `Buffer::new` so that it inherits the sink's
+        // CPU counter.
+        let (buffer, worker) = Buffer::pair(
+            Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>),
+            buffer_bound,
+        );
+        spawn_timed(worker);
+
         // Build sink service
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            // [Balance] must be wrapped with a [BufferLayer] so that the overall service implements Clone.
-            .layer(BufferLayer::new(buffer_bound))
-            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
+            .service(buffer)
     }
 }
 
@@ -456,7 +464,7 @@ mod tests {
         let settings = cfg.into_settings();
 
         assert_eq!(settings.concurrency, None);
-        assert_eq!(settings.timeout, Duration::from_secs(60));
+        assert_eq!(settings.timeout, Duration::from_mins(1));
         assert_eq!(settings.rate_limit_duration, Duration::from_secs(1));
         assert_eq!(settings.rate_limit_num, i64::MAX as u64);
         assert_eq!(settings.retry_attempts, isize::MAX as usize);
@@ -465,7 +473,7 @@ mod tests {
     }
 
     #[derive(Clone, Copy, Debug)]
-    pub struct TestTowerRequestConfigDefaults;
+    pub(super) struct TestTowerRequestConfigDefaults;
 
     impl TowerRequestConfigDefaults for TestTowerRequestConfigDefaults {
         const CONCURRENCY: Concurrency = Concurrency::None;

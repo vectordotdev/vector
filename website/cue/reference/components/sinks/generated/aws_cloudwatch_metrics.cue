@@ -10,7 +10,7 @@ generated: components: sinks: aws_cloudwatch_metrics: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
@@ -178,7 +178,7 @@ generated: components: sinks: aws_cloudwatch_metrics: configuration: {
 															strategy.
 
 															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-															of creating accidental denial of service (DoS) conditions against your own systems when
+															of creating accidental denial of service (`DoS`) conditions against your own systems when
 															many clients are recovering from a failure state.
 															"""
 						None: "No jitter."

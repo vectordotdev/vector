@@ -1,13 +1,14 @@
 use std::sync::Arc;
+use vector_lib::internal_event::emit;
 
 use futures_util::FutureExt as _;
 use tokio::sync::{Mutex, MutexGuard};
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(feature = "api")]
 use crate::api;
 use crate::{
     config,
-    extra_context::ExtraContext,
     internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded},
     signal::ShutdownError,
     topology::{ReloadError, RunningTopology},
@@ -17,6 +18,7 @@ use crate::{
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
 
 impl SharedTopologyController {
+    #[must_use]
     pub fn new(inner: TopologyController) -> Self {
         Self(Arc::new(Mutex::new(inner)))
     }
@@ -29,6 +31,11 @@ impl SharedTopologyController {
         self.0.lock().await
     }
 
+    /// Unwraps the controller when no other shared handles remain.
+    ///
+    /// # Errors
+    ///
+    /// Returns this handle if another handle still shares the controller.
     pub fn try_into_inner(self) -> Result<Mutex<TopologyController>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -48,7 +55,7 @@ impl std::fmt::Debug for TopologyController {
         f.debug_struct("TopologyController")
             .field("config_paths", &self.config_paths)
             .field("require_healthy", &self.require_healthy)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -107,8 +114,8 @@ impl TopologyController {
             .await
         {
             Ok(()) => {
-                emit!(VectorReloaded {
-                    config_paths: &self.config_paths
+                emit(VectorReloaded {
+                    config_paths: &self.config_paths,
                 });
                 ReloadOutcome::Success
             }
@@ -118,7 +125,7 @@ impl TopologyController {
                     changed_fields = %changed_fields.join(", "),
                     internal_log_rate_limit = false,
                 );
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "global_options_changed",
                 });
                 ReloadOutcome::RolledBack
@@ -129,22 +136,22 @@ impl TopologyController {
                     error = %source,
                     internal_log_rate_limit = false,
                 );
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "global_diff_failed",
                 });
                 ReloadOutcome::RolledBack
             }
             Err(ReloadError::TopologyBuildFailed) => {
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "topology_build_failed",
                 });
                 ReloadOutcome::RolledBack
             }
             Err(ReloadError::FailedToRestore) => {
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "restore_failed",
                 });
-                emit!(VectorRecoveryError);
+                emit(VectorRecoveryError);
                 ReloadOutcome::FatalError(ShutdownError::ReloadFailedToRestore)
             }
         }
@@ -195,8 +202,6 @@ impl TopologyController {
             let top = mutex.lock().await;
             if top.topology.sources_finished().now_or_never().is_some() {
                 return;
-            } else {
-                continue;
             }
         }
     }

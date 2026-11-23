@@ -1,7 +1,8 @@
+{{- /* Inline contributor and PR credits for a changelog entry; empty when there
+       are none. Rendered as the footer of releases/changelog-card.html. */ -}}
 {{- $contributors := .contributors -}}
 {{- $prNumbers := .pr_numbers -}}
 {{- if or (gt (len $contributors) 0) (gt (len $prNumbers) 0) }}
-<div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
   {{- if gt (len $contributors) 0 }}
     {{- printf "Thanks to " -}}
     {{- range $i, $contributor := $contributors }}
@@ -20,5 +21,4 @@
     <a href="{{ $prLink }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary" rel="noopener" target="_blank">#{{ $prNumber }}</a>
   {{- end -}}
   {{- if gt (len $prNumbers) 0 }}!{{ end -}}
-</div>
 {{- end }}

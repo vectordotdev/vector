@@ -1,9 +1,13 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::{ensure_stable, generate_cue, preparation_branch};
+use crate::commands::release::{
+    ensure_stable, generate_cue, preparation_branch,
+    versions::{VersionOptions, current_cargo_version, preparation_version},
+    vrl_changelog,
+};
 use crate::utils::{command::run_command, git, paths};
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use semver::Version;
 use std::{
     env, fs,
@@ -19,12 +23,8 @@ const INSTALL_SCRIPT: &str = "distribution/install.sh";
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The new Vector version.
-    #[arg(long)]
-    version: Version,
-    /// The new VRL version.
-    #[arg(long)]
-    vrl_version: Version,
+    #[command(flatten)]
+    versions: VersionOptions,
     /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
@@ -42,18 +42,66 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        ensure_stable(&self.version, "release version")?;
-        ensure_stable(&self.vrl_version, "VRL version")?;
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
+        if !self.dry_run {
+            if self.versions.vector_version.is_none() {
+                git::ensure_worktree_clean().context(
+                    "release preparation without --version requires a clean master checkout; commit or stash your changes and retry",
+                )?;
+                let branch = git::current_branch()?;
+                ensure!(
+                    branch == git::MASTER_BRANCH,
+                    "release preparation without --version must start on master (currently {branch}); switch to master and retry"
+                );
+                git::run_and_check_output(&[
+                    "fetch",
+                    "origin",
+                    "--tags",
+                    "+refs/heads/master:refs/remotes/origin/master",
+                ])?;
+                ensure!(
+                    git::run_and_check_output(&["rev-parse", "HEAD"])?
+                        == git::run_and_check_output(&["rev-parse", "origin/master"])?,
+                    "release preparation without --version requires master to match origin/master; update your local master and retry"
+                );
+            } else {
+                git::run_and_check_output(&["fetch"])?;
+                git::checkout_main_branch()?;
+            }
+        }
+        let version = match self.versions.vector_version {
+            Some(ref version) => {
+                ensure_stable(version, "release version")?;
+                version.clone()
+            }
+            None => self.versions.resolve_vector()?,
+        };
+        let release_branch = format!("v{}.{}", version.major, version.minor);
+        let release_preparation_branch = preparation_branch(&version);
+        if !self.dry_run && self.versions.vector_version.is_none() {
+            let master = git::run_and_check_output(&["rev-parse", "HEAD"])?;
+            for branch in [&release_branch, &release_preparation_branch] {
+                ensure!(
+                    !git::branch_exists(branch)?
+                        || git::run_and_check_output(&[
+                            "rev-parse",
+                            &format!("refs/heads/{branch}"),
+                        ])? == master,
+                    "release preparation without --version requires existing branch {branch} to match master; rename the existing branch and retry"
+                );
+            }
+        }
+        let vrl_version = self.versions.resolve_vrl(None)?;
+
         let prepare = Prepare {
-            new_vector_version: self.version.clone(),
-            vrl_version: self.vrl_version,
+            new_vector_version: version,
+            vrl_version,
             repo_root,
             latest_vector_version: git::latest_release_version()?,
-            release_branch: format!("v{}.{}", self.version.major, self.version.minor),
-            release_preparation_branch: preparation_branch(&self.version),
+            release_branch,
+            release_preparation_branch,
             dry_run: self.dry_run,
         };
         prepare.run()
@@ -88,14 +136,19 @@ impl Prepare {
                 "dry-run: generating changes on HEAD ({}) without switching branches",
                 head.trim()
             );
+        } else {
+            git::checkout_or_create_branch(self.release_branch.as_str())?;
+        }
+
+        // Explicit versions must match the selected release branch, not master.
+        preparation_version(
+            &current_cargo_version()?,
+            Some(self.new_vector_version.clone()),
+        )?;
+        if self.dry_run {
             return Ok(());
         }
 
-        // Step 1: Sync with remote and start from master.
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
-
-        git::checkout_or_create_branch(self.release_branch.as_str())?;
         git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
@@ -136,13 +189,14 @@ impl Prepare {
     // Step 4
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
+        let vrl_notes = vrl_changelog::fetch(&self.vrl_version)?;
         generate_cue::run(
             &self.new_vector_version,
             generate_cue::PullRequestMetadata::Required,
+            Some(&vrl_notes),
         )?;
         generate_cue::retire_all_fragments()?;
 
-        self.append_vrl_changelog_to_release_cue()?;
         debug!("Generated release CUE file");
         Ok(())
     }
@@ -216,31 +270,6 @@ impl Prepare {
         info!("Successfully created PR against {}", self.release_branch);
         Ok(())
     }
-
-    fn append_vrl_changelog_to_release_cue(&self) -> Result<()> {
-        debug!("append_vrl_changelog_to_release_cue");
-
-        let releases_path = self.repo_root.join("website/cue/reference/releases");
-        let version = &self.new_vector_version;
-        let cue_path = releases_path.join(format!("{version}.cue"));
-        if !cue_path.is_file() {
-            return Err(anyhow!("{} not found", cue_path.display()));
-        }
-
-        let vrl_changelog = get_vrl_changelog(&self.vrl_version)?;
-        let vrl_changelog_block = format_vrl_changelog_block(&vrl_changelog);
-
-        let original = fs::read_to_string(&cue_path)?;
-        let updated = insert_block_after_changelog(&original, &vrl_changelog_block);
-
-        let tmp_path = cue_path.with_extension("cue.tmp");
-        fs::write(&tmp_path, &updated)?;
-        fs::rename(&tmp_path, &cue_path)?;
-
-        run_command(&format!("cue fmt {}", cue_path.display()));
-        debug!("Successfully added VRL changelog to the release cue file.");
-        Ok(())
-    }
 }
 
 // FREE FUNCTIONS AFTER THIS LINE
@@ -289,110 +318,42 @@ pub(super) fn update_vector_package_version(
     let mut doc = cargo_toml_contents
         .parse::<DocumentMut>()
         .context("Failed to parse Cargo.toml")?;
-    let current_version = doc["package"]["version"]
+    // Release branches cut before the workspace.package migration store a string
+    // at package.version. Later manifests use version.workspace = true.
+    let legacy_version = doc
+        .get("package")
+        .and_then(|package| package.get("version"))
+        .is_some_and(toml_edit::Item::is_str);
+    let (label, version) = if legacy_version {
+        (
+            "package.version",
+            doc.get_mut("package")
+                .and_then(|package| package.get_mut("version")),
+        )
+    } else {
+        (
+            "workspace.package.version",
+            doc.get_mut("workspace")
+                .and_then(|workspace| workspace.get_mut("package"))
+                .and_then(|package| package.get_mut("version")),
+        )
+    };
+    let version = version
+        .context("Cargo.toml package.version or workspace.package.version must be a string")?;
+    let current_version = version
         .as_str()
-        .context("package.version should be a string")?;
-
+        .with_context(|| format!("Cargo.toml {label} should be a string"))?;
     if current_version != expected_version {
-        bail!("expected package version {expected_version}, found {current_version}");
+        bail!("expected {label} {expected_version}, found {current_version}");
     }
 
-    doc["package"]["version"] = toml_edit::value(release_version);
+    *version = toml_edit::value(release_version);
     Ok(doc.to_string())
-}
-
-fn format_vrl_changelog_block(changelog: &str) -> String {
-    let double_tab = "\t\t";
-    let body = changelog
-        .lines()
-        .map(|line| {
-            let line = line.trim();
-            if line.starts_with('#') {
-                format!("{double_tab}#{line}")
-            } else {
-                format!("{double_tab}{line}")
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let opening = "\tvrl_changelog: #\"\"\"";
-    let closing = format!("{double_tab}\"\"\"#");
-
-    format!("{opening}\n{body}\n{closing}")
-}
-
-fn insert_block_after_changelog(original: &str, block: &str) -> String {
-    let mut result = Vec::new();
-    let mut inserted = false;
-    let mut in_changelog = false;
-
-    for line in original.lines() {
-        result.push(line.to_string());
-
-        if line.trim_start().starts_with("changelog:") {
-            in_changelog = true;
-        }
-
-        // Insert after the closing `]` of the changelog array specifically.
-        if !inserted && in_changelog && line.trim() == "]" {
-            result.push(String::new()); // empty line before
-            result.push(block.to_string());
-            inserted = true;
-        }
-    }
-
-    result.join("\n")
-}
-
-fn get_vrl_changelog(version: &Version) -> Result<String> {
-    let tag = format!("v{version}");
-    let changelog_output = Command::new("gh")
-        .args([
-            "api",
-            &format!("repos/vectordotdev/vrl/contents/CHANGELOG.md?ref={tag}"),
-            "-H",
-            "Accept: application/vnd.github.raw+json",
-        ])
-        .output()
-        .context("Failed to run `gh api` for VRL CHANGELOG.md")?;
-
-    if !changelog_output.status.success() {
-        let stderr = String::from_utf8_lossy(&changelog_output.stderr);
-        bail!("gh api CHANGELOG.md failed: {stderr}");
-    }
-
-    let changelog =
-        String::from_utf8(changelog_output.stdout).context("CHANGELOG.md is not valid UTF-8")?;
-
-    // Extract the first release section (from the first ## to the next ##)
-    let mut section = Vec::new();
-    let mut found_first = false;
-    for line in changelog.lines() {
-        if line.starts_with("## ") {
-            if found_first {
-                break;
-            }
-            found_first = true;
-        }
-        if found_first {
-            section.push(line);
-        }
-    }
-
-    if !found_first {
-        bail!("No ## headers found in VRL CHANGELOG.md");
-    }
-
-    Ok(section.join("\n"))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog, update_vector_package_version,
-        update_vrl_to_version,
-    };
+    use crate::commands::release::prepare::{update_vector_package_version, update_vrl_to_version};
     use indoc::indoc;
 
     #[test]
@@ -421,62 +382,84 @@ mod tests {
         let input = indoc! {r#"
             [package]
             name = "vector"
-            version = "0.59.0-dev"
+            version.workspace = true
 
             [workspace]
             resolver = "2"
+
+            [workspace.package]
+            version = "0.59.0-dev"
         "#};
 
         let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
             .expect("should update the expected development version");
+        assert!(result.contains("version.workspace = true"));
         assert!(result.contains("version = \"0.59.0\""));
+        assert!(!result.contains("0.59.0-dev"));
 
         let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
             .expect_err("should reject an unexpected starting version");
         assert!(
             error
                 .to_string()
-                .contains("expected package version 0.58.0-dev")
+                .contains("expected workspace.package.version 0.58.0-dev")
         );
     }
 
     #[test]
-    fn test_insert_block_after_changelog() {
-        let vrl_changelog = "### [0.2.0]\n- Feature\n- Fix";
-        let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
-
-        let expected = concat!(
-            "\tvrl_changelog: #\"\"\"\n",
-            "\t\t#### [0.2.0]\n",
-            "\t\t- Feature\n",
-            "\t\t- Fix\n",
-            "\t\t\"\"\"#"
-        );
-
-        assert_eq!(vrl_changelog_block, expected);
-
-        let original = indoc! {r#"
-            version: "1.2.3"
-            changelog: [
-                {
-                    type: "fix"
-                    description: "Some fix"
-                },
-            ]
+    fn test_update_legacy_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
         "#};
-        let updated = insert_block_after_changelog(original, &vrl_changelog_block);
 
-        // Assert the last 5 lines match the VRL changelog block
-        let expected_lines_len = 5;
-        let updated_tail: Vec<&str> = updated
-            .lines()
-            .rev()
-            .take(expected_lines_len)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-        let expected_lines: Vec<&str> = vrl_changelog_block.lines().collect();
-        assert_eq!(updated_tail, expected_lines);
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update a pre-migration manifest");
+        assert!(result.contains("version = \"0.59.0\""));
+        assert!(!result.contains("workspace"));
+        assert!(!result.contains("0.59.0-dev"));
+
+        let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
+            .expect_err("should reject an unexpected starting version");
+        assert!(
+            error
+                .to_string()
+                .contains("expected package.version 0.58.0-dev")
+        );
+    }
+
+    #[test]
+    fn test_update_vector_package_version_prefers_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
+
+            [workspace.package]
+            version = "0.1.0"
+        "#};
+
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update package.version when both layouts exist");
+        assert!(result.contains("version = \"0.59.0\""));
+        assert!(result.contains("version = \"0.1.0\""));
+        assert_eq!(
+            crate::commands::release::versions::parse_cargo_version(&result)
+                .expect("valid Cargo.toml"),
+            "0.59.0".parse().expect("valid version")
+        );
+    }
+
+    #[test]
+    fn test_update_vector_package_version_requires_a_version_string() {
+        let error =
+            update_vector_package_version("[package]\nname = \"vector\"\n", "0.59.0-dev", "0.59.0")
+                .expect_err("should reject a manifest with no version");
+        assert!(
+            error
+                .to_string()
+                .contains("package.version or workspace.package.version")
+        );
     }
 }

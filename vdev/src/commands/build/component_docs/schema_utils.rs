@@ -446,13 +446,6 @@ impl SchemaContext {
                 Value::String(condition.clone()),
             );
         }
-
-        if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
-            resolved_schema
-                .as_object_mut()
-                .unwrap()
-                .insert("minimal".to_string(), minimal.clone());
-        }
     }
 
     pub fn sort_hash_nested(
@@ -552,8 +545,7 @@ impl SchemaContext {
         let type_field_keys: Vec<String> = resolved
             .get("type")
             .and_then(Value::as_object)
-            .map(|o| o.keys().cloned().collect())
-            .unwrap_or_default();
+            .map_or_else(Vec::new, |o| o.keys().cloned().collect());
 
         for type_field in &type_field_keys {
             let const_pointer = format!("/type/{type_field}/const");

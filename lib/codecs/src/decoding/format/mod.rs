@@ -8,6 +8,7 @@ mod bytes;
 mod gelf;
 mod influxdb;
 mod json;
+mod msgpack;
 mod native;
 mod native_json;
 #[cfg(feature = "opentelemetry")]
@@ -23,6 +24,7 @@ use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions};
+pub use msgpack::{MsgPackDeserializer, MsgPackDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
@@ -52,11 +54,11 @@ pub trait Deserializer: DynClone + Send + Sync {
     /// **Note**: The type of the produced events depends on the implementation.
     ///
     /// TODO: <https://github.com/vectordotdev/vector/issues/25044>
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Implementations must return an error if the bytes cannot be parsed into events of the
+    /// expected format.
     fn parse(
         &self,
         bytes: Bytes,

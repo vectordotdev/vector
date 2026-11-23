@@ -11,7 +11,7 @@ use vector_lib::configurable::configurable_component;
 #[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{
     MAX_IN_FLIGHT_EVENTS_TARGET, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker,
-    request_limiter::RequestLimiter, try_bind_tcp_listener,
+    build_tls_client_metadata, request_limiter::RequestLimiter, try_bind_tcp_listener,
 };
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
@@ -68,12 +68,14 @@ impl SocketListenAddr {
 
     /// Gets this listen address as a `Resource`, specifically for TCP.
     #[cfg(feature = "sources-utils-net-tcp")]
+    #[must_use]
     pub const fn as_tcp_resource(self) -> Resource {
         self.as_resource(Protocol::Tcp)
     }
 
     /// Gets this listen address as a `Resource`, specifically for UDP.
     #[cfg(feature = "sources-utils-net-udp")]
+    #[must_use]
     pub const fn as_udp_resource(self) -> Resource {
         self.as_resource(Protocol::Udp)
     }
@@ -105,25 +107,22 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        match input.parse::<SocketAddr>() {
-            Ok(socket_addr) => Ok(socket_addr.into()),
+        if let Ok(socket_addr) = input.parse::<SocketAddr>() {
+            Ok(socket_addr.into())
+        } else {
+            let fd: usize = match input.as_str() {
+                "systemd" => Ok(0),
+                s if let Some(rest) = s.strip_prefix("systemd#") => rest
+                    .parse::<usize>()
+                    .map_err(|_| Self::Error::UsizeParse)?
+                    .checked_sub(1)
+                    .ok_or(Self::Error::OneBased),
 
-            // then attempt to parse a systemd file descriptor
-            Err(_) => {
-                let fd: usize = match input.as_str() {
-                    "systemd" => Ok(0),
-                    s if let Some(rest) = s.strip_prefix("systemd#") => rest
-                        .parse::<usize>()
-                        .map_err(|_| Self::Error::UsizeParse)?
-                        .checked_sub(1)
-                        .ok_or(Self::Error::OneBased),
+                // otherwise fail
+                _ => Err(Self::Error::UnableToParse),
+            }?;
 
-                    // otherwise fail
-                    _ => Err(Self::Error::UnableToParse),
-                }?;
-
-                Ok(fd.into())
-            }
+            Ok(fd.into())
         }
     }
 }

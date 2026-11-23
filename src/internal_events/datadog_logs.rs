@@ -5,7 +5,7 @@ use vector_lib::{
 use vrl::path::OwnedTargetPath;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogLogsEventTruncated {
+pub(crate) struct DatadogLogsEventTruncated {
     pub max_log_bytes: usize,
     pub original_encoded_size: usize,
 }
@@ -23,7 +23,7 @@ impl InternalEvent for DatadogLogsEventTruncated {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DatadogLogsReservedAttributeConflict<'a> {
+pub(crate) struct DatadogLogsReservedAttributeConflict<'a> {
     pub meaning: &'static str,
     pub source_path: &'a OwnedTargetPath,
     pub destination_path: &'a str,

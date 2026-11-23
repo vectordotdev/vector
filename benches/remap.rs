@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use vector::{
-    config::{DataType, TransformOutput},
-    event::{Event, LogEvent, Value},
+    config::{DataType, TransformContext, TransformOutput},
+    event::{Event, EventArray, LogEvent, Value},
     transforms::{
         SyncTransform, TransformOutputsBuf,
         remap::{Remap, RemapConfig},
@@ -17,10 +17,19 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
-    targets = benchmark_remap
+    targets = benchmark_remap, benchmark_remap_huge
 );
 criterion_main!(benches);
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
@@ -52,7 +61,7 @@ fn benchmark_remap(c: &mut Criterion) {
     group.bench_function("add_fields/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
             Remap::new_ast(
-                RemapConfig {
+                &RemapConfig {
                     source: Some(
                         indoc! {r#".foo = "bar"
                             .bar = "baz"
@@ -111,7 +120,7 @@ fn benchmark_remap(c: &mut Criterion) {
     group.bench_function("parse_json/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
             Remap::new_ast(
-                RemapConfig {
+                &RemapConfig {
                     source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
                     timezone: None,
@@ -168,7 +177,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("coerce/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new_ast(RemapConfig {
+            Remap::new_ast(&RemapConfig {
                 source: Some(indoc! {r#"
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
@@ -205,4 +214,49 @@ fn benchmark_remap(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+}
+
+// Keep the executed path short while retaining a large compiled expression tree.
+fn benchmark_remap_huge(c: &mut Criterion) {
+    // Repeat the cold assignments to reach roughly 321 KB without adding new fields.
+    let branches = (0..256)
+        .cycle()
+        .take(256 * 61)
+        .map(|index| format!(".field_{index} = \"value\""))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let source = format!("if .branch == true {{\n{branches}\n}}\n.processed = true");
+    let (remap, _) = Remap::new_ast(
+        &RemapConfig {
+            source: Some(source),
+            ..RemapConfig::default()
+        },
+        &TransformContext::default(),
+    )
+    .unwrap();
+    let transform: Box<dyn SyncTransform> = Box::new(remap);
+
+    let mut group = c.benchmark_group("remap/huge");
+    for size in [1, 32, 256] {
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            b.iter_batched(
+                || {
+                    let events = (0..size).map(|_| LogEvent::from("test")).collect();
+                    let output = TransformOutputsBuf::new_with_capacity(
+                        vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
+                        size,
+                    );
+                    (EventArray::Logs(events), output)
+                },
+                |(events, mut output)| {
+                    // The concurrent runner clones the transform once per batch.
+                    transform.clone().transform_all(events, &mut output);
+                    std::hint::black_box(output);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
 }

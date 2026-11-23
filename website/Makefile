@@ -31,20 +31,17 @@ cue-%:
 	${CUE} $*
 
 .PHONY: component-examples
-component-examples: setup-vdev
+component-examples: generate-vrl-docs
 	$(VDEV) build component-examples website/generated/example-configs
 
 .PHONY: config-examples
 config-examples: component-examples
 
-generate-vrl-docs:
+generate-vrl-docs: setup-vdev
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
-generate-deprecations-json:
-	$(VDEV) deprecation generate
-
-structured-data: generate-vrl-docs generate-deprecations-json component-examples
+structured-data: generate-vrl-docs component-examples
 
 serve: clean setup cargo-data structured-data
 	$(MAKE) serve-development
@@ -55,7 +52,7 @@ serve-development:
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 	yarn concurrently --kill-others --success first --names hugo,pagefind \
 		"hugo server --bind $(SERVER_BIND) --port $(SERVER_PORT) --buildDrafts --buildFuture --environment development" \
 		"yarn pagefind:watch"
@@ -65,7 +62,7 @@ production-build:
 	hugo \
 	--environment "production" \
 	--minify
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 
 ci-production-build: setup cargo-data structured-data production-build
 
@@ -77,7 +74,7 @@ preview-build:
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
-	$(MAKE) pagefind
+	$(MAKE) highlight-vrl pagefind
 
 ci-preview-build: setup cargo-data structured-data preview-build
 
@@ -89,6 +86,12 @@ run-external-link-checker:
 
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
+
+# Highlight VRL in rendered pages before indexing or serving them.
+.PHONY: highlight-vrl
+highlight-vrl:
+	# Installed vdev binaries may predate this command; use the checkout's version.
+	cargo vdev build vrl-highlights
 
 # Search
 pagefind:
@@ -110,3 +113,9 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Browser tests use a static server over the same minified assets as deployment.
+.PHONY: test
+test: cargo-data structured-data
+	$(MAKE) production-build
+	yarn test

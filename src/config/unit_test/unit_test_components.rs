@@ -41,7 +41,7 @@ impl SourceConfig for UnitTestSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_batch(events).await.map_err(|_| ())?;
+            out.send_batch(events).await?;
             Ok(())
         }))
     }
@@ -98,7 +98,7 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_event_stream(stream).await.map_err(|_| ())?;
+            out.send_event_stream(stream).await?;
             Ok(())
         }))
     }
@@ -197,7 +197,7 @@ impl ValidatedSink for UnitTestSinkConfig {
     }
 }
 
-pub struct UnitTestSink {
+pub(super) struct UnitTestSink {
     pub test_name: String,
     pub transform_ids: Vec<String>,
     // None for NoOp test sinks
@@ -240,9 +240,9 @@ impl StreamSink<Event> for UnitTestSink {
                         let mut check_errors = Vec::new();
                         for (j, condition) in check.iter().enumerate() {
                             let mut condition_errors = Vec::new();
-                            for event in output_events.iter() {
+                            for event in &output_events {
                                 match condition.check_with_context(event.clone()).0 {
-                                    Ok(_) => {
+                                    Ok(()) => {
                                         condition_errors.clear();
                                         break;
                                     }
@@ -297,13 +297,16 @@ impl StreamSink<Event> for UnitTestSink {
     }
 }
 
+/// The sink that receives the processed events in a `unit_test_stream` sink.
+type UnitTestStreamSink = Box<dyn Sink<Event, Error = ()> + Send + Unpin>;
+
 /// Configuration for the `unit_test_stream` sink.
 #[configurable_component(sink("unit_test_stream", "Unit test stream."))]
 #[derive(Clone, Default)]
 pub struct UnitTestStreamSinkConfig {
     /// Sink that receives the processed events.
     #[serde(skip)]
-    sink: Arc<Mutex<Option<Box<dyn Sink<Event, Error = ()> + Send + Unpin>>>>,
+    sink: Arc<Mutex<Option<UnitTestStreamSink>>>,
 }
 
 impl_generate_config_from_default!(UnitTestStreamSinkConfig);
