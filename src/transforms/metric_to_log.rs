@@ -94,7 +94,7 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(self.build_transform(context)))
+        Ok(Transform::stateless(self.build_transform(context)))
     }
 
     fn input(&self) -> Input {
@@ -346,7 +346,7 @@ impl MetricToLog {
 }
 
 impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
             .map(std::convert::Into::into);

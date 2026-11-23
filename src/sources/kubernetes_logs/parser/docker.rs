@@ -38,7 +38,7 @@ impl Docker {
 }
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log, self.log_namespace) {
             emit(KubernetesLogsDockerFormatParseError { error: &err });
@@ -311,9 +311,7 @@ pub(super) mod tests {
         trace_init();
 
         test_util::test_parser(
-            || Docker {
-                log_namespace: LogNamespace::Vector,
-            },
+            |output, event| Docker::new(LogNamespace::Vector).transform(output, event),
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
@@ -324,9 +322,7 @@ pub(super) mod tests {
         trace_init();
 
         test_util::test_parser(
-            || Docker {
-                log_namespace: LogNamespace::Legacy,
-            },
+            |output, event| Docker::new(LogNamespace::Legacy).transform(output, event),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
@@ -339,7 +335,7 @@ pub(super) mod tests {
         let cases = invalid_cases();
 
         for bytes in cases {
-            let mut parser = Docker::new(LogNamespace::Vector);
+            let parser = Docker::new(LogNamespace::Vector);
             let input = LogEvent::from(value!(bytes));
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
@@ -355,7 +351,7 @@ pub(super) mod tests {
         let cases = invalid_cases();
 
         for bytes in cases {
-            let mut parser = Docker::new(LogNamespace::Legacy);
+            let parser = Docker::new(LogNamespace::Legacy);
             let input = LogEvent::from(bytes);
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
