@@ -5,7 +5,30 @@ use futures::{
     task::{Context, Poll},
 };
 
-use crate::event::{Event, EventArray, EventContainer, into_event_stream};
+use crate::event::{
+    Event, EventArray, EventContainer, EventFinalizers, EventStatus, into_event_stream,
+};
+
+/// A failure that prevents an event or batch from reaching the sink driver.
+#[derive(Debug)]
+pub enum PreparationError<E> {
+    /// Retrying the same input cannot resolve the failure.
+    Permanent(E),
+    /// A retry may succeed.
+    Transient(E),
+}
+
+impl<E> PreparationError<E> {
+    /// Updates the affected finalizers and returns the original error for reporting.
+    pub fn record_failure(self, finalizers: &EventFinalizers) -> E {
+        let (status, error) = match self {
+            Self::Permanent(error) => (EventStatus::Rejected, error),
+            Self::Transient(error) => (EventStatus::Errored, error),
+        };
+        finalizers.update_status(status);
+        error
+    }
+}
 
 /// Error returned by a running sink.
 #[repr(transparent)]

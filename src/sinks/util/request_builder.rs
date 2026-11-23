@@ -1,7 +1,11 @@
 use std::{io, num::NonZeroUsize};
 
 use bytes::Bytes;
-use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
+use vector_lib::{
+    event::EventFinalizers,
+    request_metadata::{GroupedCountByteSize, RequestMetadata},
+    sink::PreparationError,
+};
 
 use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
@@ -60,6 +64,14 @@ impl<P> EncodeResult<P> {
     }
 }
 
+/// The data and acknowledgement state of one prospective request.
+pub struct RequestParts<M, E> {
+    pub metadata: M,
+    pub request_metadata_builder: RequestMetadataBuilder,
+    pub events: E,
+    pub finalizers: EventFinalizers,
+}
+
 /// Generalized interface for defining how a batch of events will be turned into a request.
 pub trait RequestBuilder<Input> {
     type Metadata;
@@ -77,9 +89,8 @@ pub trait RequestBuilder<Input> {
 
     /// Splits apart the input into the metadata and event portions.
     ///
-    /// The metadata should be any information that needs to be passed back to `build_request`
-    /// as-is, such as event finalizers, while the events are the actual events to process.
-    fn split_input(&self, input: Input) -> (Self::Metadata, RequestMetadataBuilder, Self::Events);
+    /// The shared builder holds the finalizers while encoding consumes the events.
+    fn split_input(&self, input: Input) -> RequestParts<Self::Metadata, Self::Events>;
 
     /// Encodes and compresses the events.
     ///
@@ -89,16 +100,22 @@ pub trait RequestBuilder<Input> {
     fn encode_events(
         &self,
         events: Self::Events,
-    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
+    ) -> Result<EncodeResult<Self::Payload>, PreparationError<Self::Error>> {
         // TODO: Should we add enough bounds on `Self::Events` that we could automatically derive event count/event byte
         // size, and then we could generate `BatchRequestMetadata` and pass it directly to `build_request`? That would
         // obviate needing to wrap `payload` in `EncodeResult`, although practically speaking.. the name would be kind
         // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
-        let (_, json_size) = self.encoder().encode_input(events, &mut compressor)?;
+        let (_, json_size) = self
+            .encoder()
+            .encode_input(events, &mut compressor)
+            .map_err(|error| PreparationError::Permanent(error.into()))?;
 
-        let payload = compressor.into_inner().freeze();
+        let payload = compressor
+            .finish()
+            .map_err(|error| PreparationError::Transient(error.into()))?
+            .freeze();
         let result = if is_compressed {
             let compressed_byte_size = payload.len();
             EncodeResult::compressed(payload.into(), compressed_byte_size, json_size)
@@ -113,14 +130,19 @@ pub trait RequestBuilder<Input> {
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request;
 }
 
-/// The payloads returned by [`IncrementalRequestBuilder::encode_events_incremental`], each with
-/// its metadata.
-type IncrementalPayloads<Metadata, Payload, Error> = Vec<Result<(Metadata, Payload), Error>>;
+/// One output of incremental encoding, with the finalizers for exactly those events.
+pub struct EncodedChunk<M, P, E> {
+    pub result: Result<(M, P), PreparationError<E>>,
+    pub finalizers: EventFinalizers,
+}
+
+pub type IncrementalPayloads<M, P, E> = Vec<EncodedChunk<M, P, E>>;
 
 /// Generalized interface for defining how a batch of events will incrementally be turned into requests.
 ///
@@ -145,5 +167,10 @@ pub trait IncrementalRequestBuilder<Input> {
     ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error>;
 
     /// Builds a request for the given metadata and payload.
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
+    fn build_request(
+        &mut self,
+        metadata: Self::Metadata,
+        finalizers: EventFinalizers,
+        payload: Self::Payload,
+    ) -> Self::Request;
 }

@@ -948,6 +948,7 @@ mod tests {
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
+    pub(super) finalizers: EventFinalizers,
     pub blob_data: Bytes,
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
@@ -963,7 +964,7 @@ pub struct AzureBlobRequest {
 
 impl Finalizable for AzureBlobRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -981,7 +982,6 @@ impl MetaDescriptive for AzureBlobRequest {
 pub struct AzureBlobMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub finalizers: EventFinalizers,
 }
 
 #[derive(Debug, Clone)]

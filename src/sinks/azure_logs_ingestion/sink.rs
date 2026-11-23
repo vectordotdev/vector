@@ -143,7 +143,7 @@ struct AzureLogsIngestionRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for AzureLogsIngestionRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = JsonEncoding;
     type Payload = Bytes;
@@ -158,18 +158,21 @@ impl RequestBuilder<Vec<Event>> for AzureLogsIngestionRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(
-        &self,
-        mut events: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut events: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

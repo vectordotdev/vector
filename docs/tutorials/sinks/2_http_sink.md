@@ -202,7 +202,7 @@ is passed in to start the request building process.
 There are a number of associated types:
 
 ```rust
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Event;
     type Encoder = BasicEncoder;
     type Payload = Bytes;
@@ -210,9 +210,8 @@ There are a number of associated types:
     type Error = std::io::Error;
 ```
 
-*Metadata* - any information to be passed while building the request
-that is additional to the actual event being used. In this case we just need the
-[`EventFinalizers`][event_finalizers].
+*Metadata* - sink-specific information used to build the request. This example uses
+`()` because it needs no routing metadata.
 
 *Events* - the event type passed to the [`Encoder`][encoder].
 
@@ -248,9 +247,10 @@ implementing:
     }
 ```
 
-[*split_input*][request_builder_split_input] - takes the input and extracts the
-metadata from the events. In this case we are returning the `input` parameter
-unprocessed.
+[*split_input*][request_builder_split_input] extracts the request metadata and
+[`EventFinalizers`][event_finalizers]. The shared builder keeps the finalizers
+while the encoder consumes the event. An encoding failure updates the
+acknowledgement status before releasing them.
 
 This may not always be the case. For example, the `amqp` sink will initially
 process the event to extract fields to be used to calculate the `amqp`
@@ -263,10 +263,14 @@ when sending the event to an `amqp` server.
     fn split_input(
         &self,
         mut input: Event,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = input.take_finalizers();
-        let metadata_builder = RequestMetadataBuilder::from_event(&input);
-        (finalizers, metadata_builder, input)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: RequestMetadataBuilder::from_event(&input),
+            events: input,
+            finalizers,
+        }
     }
 ```
 
@@ -278,12 +282,13 @@ where the data is actually sent.
 ```rust
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         BasicRequest {
-            finalizers: metadata,
+            finalizers,
             payload: payload.into_payload(),
             metadata: request_metadata,
         }

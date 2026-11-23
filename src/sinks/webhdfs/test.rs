@@ -3,7 +3,7 @@ use std::{ffi::OsStr, path::Path};
 use bytes::Bytes;
 use vector_lib::{
     codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
-    partition::Partitioner,
+    partition::{PartitionDecision, Partitioner},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -15,7 +15,7 @@ use crate::{
         opendal_common::{OpenDalRequest, OpenDalRequestBuilder},
         util::{
             Compression, HttpEndpoint, TowerRequestConfig,
-            request_builder::{EncodeResult, RequestBuilder},
+            request_builder::{EncodeResult, RequestBuilder, RequestParts},
         },
     },
 };
@@ -65,19 +65,26 @@ fn build_request(compression: Compression) -> OpenDalRequest {
         )
     };
     let log = LogEvent::default().into();
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
     let request_builder = request_builder(&sink_config);
-    let (metadata, metadata_request_builder, _events) =
-        request_builder.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder: metadata_request_builder,
+        finalizers,
+        ..
+    } = request_builder.split_input((key, vec![log]));
     let byte_size = GroupedCountByteSize::new_untagged();
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = metadata_request_builder.build(&payload);
 
-    request_builder.build_request(metadata, request_metadata, payload)
+    request_builder.build_request(metadata, finalizers, request_metadata, payload)
 }
 
 #[test]

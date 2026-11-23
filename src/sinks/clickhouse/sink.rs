@@ -1,7 +1,10 @@
 //! Implementation of the `clickhouse` sink.
 
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::{
+    prelude::*,
+    util::{http::HttpRequest, partitioner::render_partition_value},
+};
 use vector_lib::internal_event::emit;
 
 pub(super) struct ClickhouseSink<S> {
@@ -47,7 +50,7 @@ where
                 batch_settings.timeout,
                 |_| batch_settings.as_byte_size_config(),
             )
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move { result.ok() })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -106,32 +109,31 @@ impl KeyPartitioner {
             format,
         }
     }
-
-    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
 }
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let database = Self::render(&self.database, item, "database_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
-        Some(PartitionKey {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(database) =
+            render_partition_value(self.database.render_string(item), "database_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        let PartitionDecision::Route(table) =
+            render_partition_value(self.table.render_string(item), "table_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        Ok(PartitionDecision::Route(PartitionKey {
             database,
             table,
             format: self.format,
-        })
+        }))
     }
 }

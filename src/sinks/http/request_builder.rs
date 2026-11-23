@@ -13,7 +13,7 @@ pub(super) struct HttpRequestBuilder {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for HttpRequestBuilder {
-    type Metadata = (PartitionKey, EventFinalizers);
+    type Metadata = PartitionKey;
     type Events = Vec<Event>;
     type Encoder = HttpEncoder;
     type Payload = Bytes;
@@ -31,21 +31,26 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for HttpRequestBuilder {
     fn split_input(
         &self,
         input: (PartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
 
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        ((partition_key, finalizers), builder, events)
+        RequestParts {
+            metadata: partition_key,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        partition_key: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (partition_key, finalizers) = metadata;
         HttpRequest::new(
             payload.into_payload(),
             finalizers,

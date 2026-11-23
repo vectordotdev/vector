@@ -1037,15 +1037,52 @@ async fn missing_field_in_uri_template() {
 
     drop(trigger);
 
-    // TODO(https://github.com/vectordotdev/vector/issues/23366): Currently, When the KeyPartitioner fails to build the batch key from
-    // an event, the finalizer is not notified with
-    // EventStatus::Rejected. The error is silently ignored.
-    // See src/sinks/http/sink.rs:47
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
     // No requests should have been made to the server
     let requests = rx.collect::<Vec<_>>().await;
     assert!(requests.is_empty());
+}
+
+#[tokio::test]
+async fn encode_error_rejects_the_unsent_request_and_keeps_draining() {
+    let (_guard, in_addr) = next_addr();
+    let config: HttpSinkConfig = serde_yaml::from_str(&format!(
+        r#"
+        uri: "http://{in_addr}/"
+        encoding:
+          codec: avro
+          avro:
+            schema: '{{"type":"record","name":"Log","fields":[{{"name":"required_field","type":"string"}}]}}'
+        batch:
+          max_events: 2
+        compression: none
+        "#,
+    ))
+    .unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+    tokio::spawn(server);
+
+    let event = |has_required_field| {
+        let mut log = LogEvent::from("test message");
+        if has_required_field {
+            log.insert(event_path!("required_field"), "present");
+        }
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        (Event::Log(log.with_batch_notifier(&batch)), receiver)
+    };
+    let (first, first_status) = event(true);
+    let (invalid, invalid_status) = event(false);
+    let (next, next_status) = event(true);
+
+    sink.run_events([first, invalid, next]).await.unwrap();
+    drop(trigger);
+
+    assert_eq!(first_status.await, BatchStatus::Rejected);
+    assert_eq!(invalid_status.await, BatchStatus::Rejected);
+    assert_eq!(next_status.await, BatchStatus::Delivered);
+    assert_eq!(rx.collect::<Vec<_>>().await.len(), 1);
 }
 
 #[tokio::test]

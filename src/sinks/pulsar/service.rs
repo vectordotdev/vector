@@ -18,6 +18,7 @@ use crate::{
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {
+    pub(super) finalizers: EventFinalizers,
     pub body: Bytes,
     pub metadata: PulsarMetadata,
     pub request_metadata: RequestMetadata,
@@ -44,7 +45,7 @@ impl DriverResponse for PulsarResponse {
 
 impl Finalizable for PulsarRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
