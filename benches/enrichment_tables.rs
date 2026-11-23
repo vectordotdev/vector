@@ -60,7 +60,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             })
             .collect::<Vec<_>>();
 
-        let mut file = File::new(
+        let file = File::new(
             Default::default(),
             FileData {
                 data,
