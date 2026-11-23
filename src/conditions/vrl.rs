@@ -243,6 +243,16 @@ mod test {
                 Ok(()),
             ),
             (
+                Event::Metric(Metric::new(
+                    "zork",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )),
+                r".counter.value == 1.0 && .gauge.value == null",
+                Ok(()),
+                Ok(()),
+            ),
+            (
                 log_event![],
                 r#""i_return_a_string""#,
                 Err("VRL conditions must return a boolean.".into()),

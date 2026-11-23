@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use approx::assert_relative_eq;
 use indoc::indoc;
 use tokio::sync::mpsc;
@@ -9,18 +11,20 @@ use vrl::{event_path, owned_value_path};
 
 use crate::{
     conditions::{Condition, ConditionalConfig, VrlConfig},
-    config::log_schema,
+    config::{DataType, TransformOutput, log_schema},
     event::{Event, LogEvent, TraceEvent},
     template::UnconfinedTemplate,
     test_util::{components::assert_transform_compliance, random_lines},
     transforms::{
-        FunctionTransform, OutputBuffer,
+        StatefulTransform, TransformOutputsBuf,
         sample::{
             config::{
                 SampleConfig, SampleInternalMetricsConfig, default_max_state_bytes,
                 default_sample_rate_key,
             },
-            transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
+            transform::{
+                DynamicSampleFields, Sample, SampleMode, SampleState, group_state_entry_bytes,
+            },
         },
         test::create_topology,
     },
@@ -65,7 +69,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
     let num_events = 10000;
 
     let events = random_events(num_events);
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
@@ -78,19 +82,16 @@ fn hash_samples_at_roughly_the_configured_rate() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
     let total_passed = events
         .into_iter()
-        .filter_map(|event| {
-            let mut buf = OutputBuffer::with_capacity(1);
-            sampler.transform(&mut buf, event);
-            buf.into_events().next()
-        })
+        .filter_map(|event| transform_one(&sampler, &mut sampler_state, event))
         .count();
     let actual = total_passed as f64 / num_events as f64;
     assert_relative_eq!(sampler.ratio(), actual, epsilon = 0.03);
 
     let events = random_events(num_events);
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_ratio(0.04),
         log_schema().message_key().map(ToString::to_string),
@@ -103,13 +104,10 @@ fn hash_samples_at_roughly_the_configured_rate() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
     let total_passed = events
         .into_iter()
-        .filter_map(|event| {
-            let mut buf = OutputBuffer::with_capacity(1);
-            sampler.transform(&mut buf, event);
-            buf.into_events().next()
-        })
+        .filter_map(|event| transform_one(&sampler, &mut sampler_state, event))
         .count();
     let actual = total_passed as f64 / num_events as f64;
     assert_relative_eq!(sampler.ratio(), actual, epsilon = 0.03);
@@ -118,7 +116,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
 #[test]
 fn hash_consistently_samples_the_same_events() {
     let events = random_events(1000);
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
@@ -131,23 +129,16 @@ fn hash_consistently_samples_the_same_events() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let first_run = events
         .clone()
         .into_iter()
-        .filter_map(|event| {
-            let mut buf = OutputBuffer::with_capacity(1);
-            sampler.transform(&mut buf, event);
-            buf.into_events().next()
-        })
+        .filter_map(|event| transform_one(&sampler, &mut sampler_state, event))
         .collect::<Vec<_>>();
     let second_run = events
         .into_iter()
-        .filter_map(|event| {
-            let mut buf = OutputBuffer::with_capacity(1);
-            sampler.transform(&mut buf, event);
-            buf.into_events().next()
-        })
+        .filter_map(|event| transform_one(&sampler, &mut sampler_state, event))
         .collect::<Vec<_>>();
 
     assert_eq!(first_run, second_run);
@@ -157,7 +148,7 @@ fn hash_consistently_samples_the_same_events() {
 fn always_passes_events_matching_pass_list() {
     for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
         let event = Event::Log(LogEvent::from("i am important"));
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_rate(0),
             key_field.clone(),
@@ -170,10 +161,12 @@ fn always_passes_events_matching_pass_list() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let iterations = 0..1000;
         let total_passed = iterations
             .filter_map(|_| {
-                transform_one(&mut sampler, event.clone()).map(|result| assert_eq!(result, event))
+                transform_one(&sampler, &mut sampler_state, event.clone())
+                    .map(|result| assert_eq!(result, event))
             })
             .count();
         assert_eq!(total_passed, 1000);
@@ -189,7 +182,7 @@ fn handles_group_by() {
         let mut event = Event::Log(LogEvent::from("nananana"));
         let log = event.as_mut_log();
         log.insert(event_path!("other_field"), "foo");
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_rate(0),
             log_schema().message_key().map(ToString::to_string),
@@ -202,10 +195,12 @@ fn handles_group_by() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let iterations = 0..1000;
         let total_passed = iterations
             .filter_map(|_| {
-                transform_one(&mut sampler, event.clone()).map(|result| assert_eq!(result, event))
+                transform_one(&sampler, &mut sampler_state, event.clone())
+                    .map(|result| assert_eq!(result, event))
             })
             .count();
         assert_eq!(total_passed, 1000);
@@ -218,7 +213,7 @@ fn handles_key_field() {
         let mut event = Event::Log(LogEvent::from("nananana"));
         let log = event.as_mut_log();
         log.insert(event_path!("other_field"), "foo");
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_ratio(0.0),
             key_field.clone(),
@@ -228,10 +223,12 @@ fn handles_key_field() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let iterations = 0..1000;
         let total_passed = iterations
             .filter_map(|_| {
-                transform_one(&mut sampler, event.clone()).map(|result| assert_eq!(result, event))
+                transform_one(&sampler, &mut sampler_state, event.clone())
+                    .map(|result| assert_eq!(result, event))
             })
             .count();
         assert_eq!(total_passed, 1000);
@@ -243,7 +240,7 @@ fn sampler_adds_sampling_rate_to_event() {
     for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
         let events = random_events(10000);
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_ratio(0.1),
             key_field.clone(),
@@ -253,15 +250,16 @@ fn sampler_adds_sampling_rate_to_event() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let passing = events
             .into_iter()
             .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
-            .find_map(|event| transform_one(&mut sampler, event))
+            .find_map(|event| transform_one(&sampler, &mut sampler_state, event))
             .unwrap();
         assert_eq!(passing.as_log()["sample_rate"], "0.1".into());
 
         let events = random_events(10000);
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_rate(25),
             key_field.clone(),
@@ -271,16 +269,17 @@ fn sampler_adds_sampling_rate_to_event() {
             OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let passing = events
             .into_iter()
             .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
-            .find_map(|event| transform_one(&mut sampler, event))
+            .find_map(|event| transform_one(&sampler, &mut sampler_state, event))
             .unwrap();
         assert_eq!(passing.as_log()["custom_sample_rate"], "25".into());
         assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
 
         let events = random_events(10000);
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_rate(2),
             key_field.clone(),
@@ -290,15 +289,16 @@ fn sampler_adds_sampling_rate_to_event() {
             OptionalValuePath::from(owned_value_path!("")),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let passing = events
             .into_iter()
             .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
-            .find_map(|event| transform_one(&mut sampler, event))
+            .find_map(|event| transform_one(&sampler, &mut sampler_state, event))
             .unwrap();
         assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
 
         // If the event passed the regex check, don't include the sampling rate
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_ratio(0.04),
             key_field.clone(),
@@ -308,8 +308,9 @@ fn sampler_adds_sampling_rate_to_event() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let event = Event::Log(LogEvent::from("nananana"));
-        let passing = transform_one(&mut sampler, event).unwrap();
+        let passing = transform_one(&sampler, &mut sampler_state, event).unwrap();
         assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
     }
 }
@@ -319,7 +320,7 @@ fn handles_trace_event() {
     let event: TraceEvent = LogEvent::from("trace").into();
     let trace = Event::Trace(event);
 
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_rate(2),
         None,
@@ -329,17 +330,18 @@ fn handles_trace_event() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let iterations = 0..2;
     let total_passed = iterations
-        .filter_map(|_| transform_one(&mut sampler, trace.clone()))
+        .filter_map(|_| transform_one(&sampler, &mut sampler_state, trace.clone()))
         .count();
     assert_eq!(total_passed, 1);
 }
 
 #[test]
 fn group_by_uses_independent_ratio_samplers() {
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_ratio(0.5),
         None,
@@ -349,11 +351,12 @@ fn group_by_uses_independent_ratio_samplers() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let decisions = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
-        transform_one(&mut sampler, event.into()).is_some()
+        transform_one(&sampler, &mut sampler_state, event.into()).is_some()
     });
 
     assert_eq!(decisions, [true, false, false, true]);
@@ -361,7 +364,7 @@ fn group_by_uses_independent_ratio_samplers() {
 
 #[test]
 fn group_state_evicts_least_recently_used_group() {
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_rate(2),
         None,
@@ -371,6 +374,7 @@ fn group_state_evicts_least_recently_used_group() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let decisions = [
         "service-a",
@@ -383,7 +387,7 @@ fn group_state_evicts_least_recently_used_group() {
     .map(|service| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
-        transform_one(&mut sampler, event.into()).is_some()
+        transform_one(&sampler, &mut sampler_state, event.into()).is_some()
     });
 
     assert_eq!(decisions, [true, false, false, true, true, false]);
@@ -395,7 +399,7 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
         ("rate", SampleMode::new_rate(2)),
         ("ratio", SampleMode::new_ratio(0.5)),
     ] {
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             mode,
             None,
@@ -405,11 +409,12 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
 
         let decisions = (0..6).map(|index| {
             let mut event = LogEvent::from("event");
             event.insert(event_path!("service"), format!("service-{}", index % 3));
-            transform_one(&mut sampler, event.into()).is_some()
+            transform_one(&sampler, &mut sampler_state, event.into()).is_some()
         });
 
         assert_eq!(
@@ -423,7 +428,7 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
 #[test]
 fn group_state_stays_within_max_state_bytes_for_large_keys() {
     let max_state_bytes = 4096;
-    let mut sampler = Sample::new(
+    let sampler = Sample::new(
         "sample".to_string(),
         SampleMode::new_rate(2),
         None,
@@ -433,6 +438,7 @@ fn group_state_stays_within_max_state_bytes_for_large_keys() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
     let make_event = |service: &str| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
@@ -441,18 +447,18 @@ fn group_state_stays_within_max_state_bytes_for_large_keys() {
 
     for index in 0..200 {
         let service = format!("{index}-{}", "x".repeat(index * 37 % 3000));
-        transform_one(&mut sampler, make_event(&service));
-        assert!(sampler.retained_state_bytes() <= max_state_bytes);
+        transform_one(&sampler, &mut sampler_state, make_event(&service));
+        assert!(sampler_state.retained_state_bytes() <= max_state_bytes);
     }
 
     // A group larger than the limit is not retained and does not evict other groups, but its
     // events are still sampled at the configured rate.
-    let retained_before = sampler.retained_state_bytes();
+    let retained_before = sampler_state.retained_state_bytes();
     let oversized = "y".repeat(max_state_bytes);
     let passed = (0..10)
-        .filter(|_| transform_one(&mut sampler, make_event(&oversized)).is_some())
+        .filter(|_| transform_one(&sampler, &mut sampler_state, make_event(&oversized)).is_some())
         .count();
-    assert_eq!(sampler.retained_state_bytes(), retained_before);
+    assert_eq!(sampler_state.retained_state_bytes(), retained_before);
     assert_eq!(passed, 5);
 }
 
@@ -497,23 +503,25 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
             event.into()
         };
 
-        let mut sampler = make_sampler();
+        let sampler = make_sampler();
+        let mut sampler_state = sampler.new_state();
         let retained = (0..30)
             .filter(|index| {
-                let original = sampler.clone();
+                let original = sampler_state.clone();
                 let service = (0..1000)
                     .find_map(|attempt| {
                         let service = format!("service-{index}-{attempt}");
-                        let mut candidate = original.clone();
-                        transform_one(&mut candidate, make_event(&service));
-                        transform_one(&mut candidate, make_event(&service))
+                        let mut candidate_state = original.clone();
+                        let candidate = &sampler;
+                        transform_one(candidate, &mut candidate_state, make_event(&service));
+                        transform_one(candidate, &mut candidate_state, make_event(&service))
                             .is_some()
                             .then_some(service)
                     })
                     .unwrap_or_else(|| format!("service-{index}-miss"));
 
-                transform_one(&mut sampler, make_event(&service));
-                transform_one(&mut sampler, make_event(&service)).is_some()
+                transform_one(&sampler, &mut sampler_state, make_event(&service));
+                transform_one(&sampler, &mut sampler_state, make_event(&service)).is_some()
             })
             .count();
 
@@ -531,7 +539,7 @@ fn sample_at_rates_higher_then_half() {
     let events = random_events(10000);
     let ratios = vec![0.8, 0.7, 0.9, 0.672];
     for ratio in ratios {
-        let mut sampler = Sample::new(
+        let sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_ratio(ratio),
             None,
@@ -541,13 +549,10 @@ fn sample_at_rates_higher_then_half() {
             default_sample_rate_key(),
             false,
         );
+        let mut sampler_state = sampler.new_state();
         let total_observed = events
             .iter()
-            .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                sampler.transform(&mut buf, event.clone());
-                buf.into_events().next()
-            })
+            .filter_map(|event| transform_one(&sampler, &mut sampler_state, event.clone()))
             .count();
         assert_eq!(total_observed as f64, 10000.0 * sampler.ratio());
     }
@@ -555,7 +560,7 @@ fn sample_at_rates_higher_then_half() {
 
 #[test]
 fn dynamic_ratio_field_overrides_static_ratio() {
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.1),
         DynamicSampleFields {
@@ -568,18 +573,20 @@ fn dynamic_ratio_field_overrides_static_ratio() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
     log.insert(event_path!("dynamic_ratio"), 1.0);
 
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    let output =
+        transform_one(&sampler, &mut sampler_state, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
 #[test]
 fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(1.0),
         DynamicSampleFields {
@@ -592,15 +599,17 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let event = Event::Log(LogEvent::from("hello"));
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    let output =
+        transform_one(&sampler, &mut sampler_state, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
 #[test]
 fn dynamic_rate_field_overrides_static_ratio() {
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
         DynamicSampleFields {
@@ -613,18 +622,20 @@ fn dynamic_rate_field_overrides_static_ratio() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
     log.insert(event_path!("dynamic_rate"), 1);
 
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    let output =
+        transform_one(&sampler, &mut sampler_state, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
 #[test]
 fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(1.0),
         DynamicSampleFields {
@@ -637,15 +648,17 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let event = Event::Log(LogEvent::from("hello"));
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    let output =
+        transform_one(&sampler, &mut sampler_state, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
 #[test]
 fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(1.0),
         DynamicSampleFields {
@@ -658,12 +671,14 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
     log.insert(event_path!("dynamic_rate"), 2.0);
 
-    let output = transform_one(&mut sampler, event).expect("event should be sampled");
+    let output =
+        transform_one(&sampler, &mut sampler_state, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
 }
 
@@ -671,7 +686,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
 fn dynamic_ratio_honors_group_by_key() {
     let ratio = 0.5_f64;
     let events_per_service = 200;
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
         DynamicSampleFields {
@@ -684,6 +699,7 @@ fn dynamic_ratio_honors_group_by_key() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut sampled_service_a = 0;
     let mut sampled_service_b = 0;
@@ -693,7 +709,7 @@ fn dynamic_ratio_honors_group_by_key() {
             let log = event.as_mut_log();
             log.insert(event_path!("service"), service);
             log.insert(event_path!("dynamic_ratio"), ratio);
-            if let Some(output) = transform_one(&mut sampler, event) {
+            if let Some(output) = transform_one(&sampler, &mut sampler_state, event) {
                 assert_eq!(output.as_log()["sample_rate"], "0.5".into());
                 if service == "service-a" {
                     sampled_service_a += 1;
@@ -718,7 +734,7 @@ fn dynamic_ratio_honors_group_by_key() {
 fn dynamic_rate_honors_group_by_key() {
     let rate = 2_i64;
     let events_per_service = 200;
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
         DynamicSampleFields {
@@ -731,6 +747,7 @@ fn dynamic_rate_honors_group_by_key() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut sampled_service_a = 0;
     let mut sampled_service_b = 0;
@@ -740,7 +757,7 @@ fn dynamic_rate_honors_group_by_key() {
             let log = event.as_mut_log();
             log.insert(event_path!("service"), service);
             log.insert(event_path!("dynamic_rate"), rate);
-            if let Some(output) = transform_one(&mut sampler, event) {
+            if let Some(output) = transform_one(&sampler, &mut sampler_state, event) {
                 assert_eq!(output.as_log()["sample_rate"], "2".into());
                 if service == "service-a" {
                     sampled_service_a += 1;
@@ -764,7 +781,7 @@ fn dynamic_rate_honors_group_by_key() {
 #[test]
 fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
     let events_per_ratio = 500;
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
         DynamicSampleFields {
@@ -777,6 +794,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut sampled_low_ratio = 0;
     let mut sampled_high_ratio = 0;
@@ -786,7 +804,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
             let log = event.as_mut_log();
             log.insert(event_path!("service"), "service-a");
             log.insert(event_path!("dynamic_ratio"), ratio);
-            if let Some(output) = transform_one(&mut sampler, event) {
+            if let Some(output) = transform_one(&sampler, &mut sampler_state, event) {
                 assert_eq!(output.as_log()["sample_rate"], ratio.to_string().into());
                 if is_low_ratio {
                     sampled_low_ratio += 1;
@@ -814,7 +832,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
 #[test]
 fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
     let events_per_rate = 600;
-    let mut sampler = Sample::new_with_dynamic(
+    let sampler = Sample::new_with_dynamic(
         "sample".to_string(),
         SampleMode::new_ratio(0.0),
         DynamicSampleFields {
@@ -827,6 +845,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
         default_sample_rate_key(),
         false,
     );
+    let mut sampler_state = sampler.new_state();
 
     let mut sampled_rate_2 = 0;
     let mut sampled_rate_3 = 0;
@@ -836,7 +855,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
             let log = event.as_mut_log();
             log.insert(event_path!("service"), "service-a");
             log.insert(event_path!("dynamic_rate"), rate);
-            if let Some(output) = transform_one(&mut sampler, event) {
+            if let Some(output) = transform_one(&sampler, &mut sampler_state, event) {
                 assert_eq!(output.as_log()["sample_rate"], rate.to_string().into());
                 if rate == 2 {
                     sampled_rate_2 += 1;
@@ -892,9 +911,13 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
 /// # Panics
 ///
 /// Panics if the transform emits more than one event.
-fn transform_one(transform: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
-    let mut buf = OutputBuffer::with_capacity(1);
-    transform.transform(&mut buf, event);
+fn transform_one(transform: &Sample, state: &mut SampleState, event: Event) -> Option<Event> {
+    let mut output = TransformOutputsBuf::new_with_capacity(
+        vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
+        1,
+    );
+    transform.transform(state, event, &mut output);
+    let buf = output.take_primary();
     assert!(buf.len() <= 1);
     buf.into_events().next()
 }
