@@ -68,7 +68,7 @@ impl SchemaContext {
         schema_name: &str,
         friendly_name: &str,
     ) -> Result<Map<String, Value>> {
-        debug!("[*] Resolving schema definition for {}...", friendly_name);
+        debug!("[*] Resolving schema definition for {friendly_name}...");
 
         let resolved_schema = self.resolve_schema_by_name(schema_name)?;
 
@@ -331,6 +331,7 @@ impl SchemaContext {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn apply_schema_metadata(&self, source_schema: &Value, resolved_schema: &mut Value) {
         let is_templateable = get_schema_metadata(source_schema, "docs::templateable")
             .and_then(Value::as_bool)
@@ -425,6 +426,24 @@ impl SchemaContext {
             resolved_schema.as_object_mut().unwrap().insert(
                 "required_one_of_group".to_string(),
                 Value::String(group.clone()),
+            );
+        }
+
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::relevant_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "relevant_when".to_string(),
+                Value::String(condition.clone()),
+            );
+        }
+
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::required_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "required_when".to_string(),
+                Value::String(condition.clone()),
             );
         }
     }
@@ -526,8 +545,7 @@ impl SchemaContext {
         let type_field_keys: Vec<String> = resolved
             .get("type")
             .and_then(Value::as_object)
-            .map(|o| o.keys().cloned().collect())
-            .unwrap_or_default();
+            .map_or_else(Vec::new, |o| o.keys().cloned().collect());
 
         for type_field in &type_field_keys {
             let const_pointer = format!("/type/{type_field}/const");

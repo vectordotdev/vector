@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{
     config::Config,
     test_util::{
@@ -24,7 +26,7 @@ async fn topology_doesnt_reload_new_data_dir() {
     new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
     let result = topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await;
 
     // Should fail with GlobalOptionsChanged error

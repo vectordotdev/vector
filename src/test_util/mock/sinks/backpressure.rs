@@ -3,7 +3,7 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::Event,
     sinks::{Healthcheck, VectorSink, util::StreamSink},
 };
@@ -35,19 +35,32 @@ impl_generate_config_from_default!(BackpressureSinkConfig);
 #[async_trait]
 #[typetag::serde(name = "test_backpressure")]
 impl SinkConfig for BackpressureSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = BackpressureSink {
-            num_to_consume: self.num_to_consume,
-        };
-        let healthcheck = futures::future::ok(()).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for BackpressureSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = BackpressureSink {
+            num_to_consume: self.num_to_consume,
+        };
+        let healthcheck = futures::future::ok(()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }

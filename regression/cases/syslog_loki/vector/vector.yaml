@@ -33,4 +33,4 @@ sinks:
     out_of_order_action: "accept"
 
     labels:
-      host: "{{ .host }}"
+      host: "h-{{ .host }}"

@@ -18,7 +18,6 @@ components: sinks: gcp_chronicle_unstructured: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
@@ -65,7 +64,6 @@ components: sinks: gcp_chronicle_unstructured: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_chronicle_unstructured.configuration

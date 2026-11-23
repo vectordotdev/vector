@@ -6,6 +6,7 @@
 use super::{common::*, harness::*};
 use indoc::indoc;
 use tokio_stream::StreamExt;
+use vector_lib::api_client::proto::ComponentType;
 use vector_lib::api_client::proto::{
     GetComponentsResponse, MetricName, stream_component_metrics_response::Value,
 };
@@ -96,7 +97,6 @@ async fn displays_pipeline_topology_and_metrics() {
         .expect("Failed to query components");
 
     // Verify component types are reported correctly
-    use vector_lib::api_client::proto::ComponentType;
     for component in &response.components {
         let component_id = &component.component_id;
         let component_type =
@@ -105,7 +105,7 @@ async fn displays_pipeline_topology_and_metrics() {
         match component_id.as_str() {
             "demo" => assert_eq!(component_type, ComponentType::Source),
             "blackhole1" | "blackhole2" => assert_eq!(component_type, ComponentType::Sink),
-            _ => panic!("Unexpected component: {}", component_id),
+            _ => panic!("Unexpected component: {component_id}"),
         }
     }
 
@@ -346,13 +346,11 @@ async fn multi_output_transform_reports_per_output_sent_events() {
         .collect();
     assert!(
         output_ids.contains(&"all"),
-        "Missing 'all' output, got: {:?}",
-        output_ids
+        "Missing 'all' output, got: {output_ids:?}"
     );
     assert!(
         output_ids.contains(&"has_host"),
-        "Missing 'has_host' output, got: {:?}",
-        output_ids
+        "Missing 'has_host' output, got: {output_ids:?}"
     );
 
     // --- Assert 2: StreamComponentMetrics(SentEventsTotal) populates output_totals ---
@@ -379,20 +377,16 @@ async fn multi_output_transform_reports_per_output_sent_events() {
 
                     assert!(
                         all_total > 0,
-                        "Expected positive total for 'all' output, got {}",
-                        all_total
+                        "Expected positive total for 'all' output, got {all_total}"
                     );
                     assert!(
                         has_host_total > 0,
-                        "Expected positive total for 'has_host' output, got {}",
-                        has_host_total
+                        "Expected positive total for 'has_host' output, got {has_host_total}"
                     );
                     // "all" must be >= "has_host" since it matches every event
                     assert!(
                         all_total >= has_host_total,
-                        "'all' ({}) should be >= 'has_host' ({})",
-                        all_total,
-                        has_host_total
+                        "'all' ({all_total}) should be >= 'has_host' ({has_host_total})"
                     );
 
                     splitter_totals_found = true;
@@ -401,7 +395,7 @@ async fn multi_output_transform_reports_per_output_sent_events() {
             }
             Ok(Some(Err(e))) => panic!("Stream error: {e}"),
             Ok(None) => panic!("Stream ended unexpectedly"),
-            Err(_) => continue, // timeout on this tick, keep looping
+            Err(_) => {} // timeout on this tick, keep looping
         }
     }
 
@@ -414,7 +408,7 @@ async fn multi_output_transform_reports_per_output_sent_events() {
 /// Regression test: `component_errors_total` emitted from a spawned task must carry
 /// the component's tracing span so that the metric is labelled with `component_id`.
 ///
-/// The gcp_pubsub source immediately tries to connect to a non-existent endpoint from
+/// The `gcp_pubsub` source immediately tries to connect to a non-existent endpoint from
 /// inside a `tokio::spawn`-ed per-stream task.  Before the `spawn_in_current_span` fix
 /// the task ran without the component span, so the counter had no `component_id` tag
 /// and never appeared in the API's `ErrorsTotal` stream.  With the fix the tag is
@@ -468,7 +462,7 @@ async fn gcp_pubsub_spawned_task_errors_carry_component_span() {
             }
             Ok(Some(Err(e))) => panic!("Stream error: {e}"),
             Ok(None) => panic!("Stream ended unexpectedly"),
-            Err(_) => continue, // poll timeout, keep looping
+            Err(_) => {} // poll timeout, keep looping
         }
     }
 

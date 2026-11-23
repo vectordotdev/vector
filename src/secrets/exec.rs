@@ -26,6 +26,7 @@ pub enum ExecVersion {
         /// The configuration to pass to the secrets executable. This is the `config` field in the
         /// backend request. Refer to the documentation of your `backend_type `to see which options
         /// are required to be set.
+        #[configurable(metadata(docs::required = true))]
         backend_config: Value,
     },
 }
@@ -128,7 +129,7 @@ impl SecretBackend for ExecBackend {
         )
         .await?;
         let mut secrets = HashMap::new();
-        for k in secret_keys.into_iter() {
+        for k in secret_keys {
             if let Some(secret) = output.get_mut(&k) {
                 if let Some(e) = &secret.error {
                     return Err(format!("secret for key '{k}' was not retrieved: {e}").into());
@@ -137,7 +138,7 @@ impl SecretBackend for ExecBackend {
                     if v.is_empty() {
                         return Err(format!("secret for key '{k}' was empty").into());
                     }
-                    secrets.insert(k.to_string(), v);
+                    secrets.insert(k, v);
                 } else {
                     return Err(format!("secret for key '{k}' was empty").into());
                 }
@@ -160,7 +161,7 @@ async fn query_backend(
 
     if cmd.len() > 1 {
         command.args(&cmd[1..]);
-    };
+    }
 
     command.kill_on_drop(true);
     command.stderr(std::process::Stdio::piped());
@@ -193,8 +194,8 @@ async fn query_backend(
             }
             Some(stderr) = stderr_stream.next() => {
                 match stderr {
-                    Ok(l) => warn!("An exec backend generated message on stderr: {}.", l),
-                    Err(e) => warn!("Error while reading from an exec backend stderr: {}.", e),
+                    Ok(l) => warn!("An exec backend generated message on stderr: {l}."),
+                    Err(e) => warn!("Error while reading from an exec backend stderr: {e}."),
                 }
             }
             stdout = stdout_stream.next() => {
@@ -204,7 +205,7 @@ async fn query_backend(
                     Some(Err(e)) => return Err(format!("Error while reading from an exec backend stdout: {e}.").into()),
                 }
             }
-            _ = &mut timeout => {
+            () = &mut timeout => {
                 drop(command);
                 return Err("Command timed-out".into());
             }

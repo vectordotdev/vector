@@ -1,7 +1,3 @@
-platforms:
-  - docker
-  - kubernetes
-
 sinks:
   - aws_sqs
   - aws_cloudwatch_logs
@@ -10,7 +6,6 @@ sinks:
   - aws_kinesis_streams
   - aws_s3
   - axiom
-  - azure_monitor_logs
   - clickhouse
   - databend
   - datadog_logs
@@ -42,7 +37,6 @@ sinks:
   - sematext_logs
   - sematext_metrics
   - socket
-  - splunk_hec
   - statsd
 
 sources:
@@ -50,7 +44,6 @@ sources:
   - aws_ecs_metrics
   - aws_kinesis_firehose
   - aws_s3
-  - datadog_logs
   - exec
   - file
   - heroku_logs

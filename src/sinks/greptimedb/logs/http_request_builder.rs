@@ -1,23 +1,27 @@
 use std::collections::HashMap;
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use http::{
     Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
-use hyper::Body;
 use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::Framer;
 
 use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{Auth, HttpClient, HttpError},
+    http::{Auth, HttpClient},
     sinks::{
         HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
 };
 
@@ -30,7 +34,7 @@ pub(super) struct PartitionKey {
     pub pipeline_version: Option<String>,
 }
 
-/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+/// `KeyPartitioner` that partitions events by (dbname, table, `pipeline_name`, `pipeline_version`) pair.
 pub(super) struct KeyPartitioner {
     dbname: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -39,7 +43,7 @@ pub(super) struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
-    pub const fn new(
+    pub(super) const fn new(
         db: ConfinedTemplate,
         table: ConfinedTemplate,
         pipeline_name: ConfinedTemplate,
@@ -57,7 +61,7 @@ impl KeyPartitioner {
         template
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -83,7 +87,7 @@ impl Partitioner for KeyPartitioner {
             Some(template) => match template.render_string(item) {
                 Ok(s) => Some(s),
                 Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: true,
@@ -91,7 +95,7 @@ impl Partitioner for KeyPartitioner {
                     return None;
                 }
                 Err(error) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("pipeline_version"),
                         drop_event: false,
@@ -113,7 +117,7 @@ impl Partitioner for KeyPartitioner {
 /// GreptimeDB logs HTTP request builder.
 #[derive(Debug, Clone)]
 pub(super) struct GreptimeDBLogsHttpRequestBuilder {
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) encoder: (Transformer, Encoder<Framer>),
     pub(super) compression: Compression,
@@ -122,13 +126,16 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
 }
 
 fn prepare_log_ingester_url(
-    endpoint: &str,
+    endpoint: &HttpEndpoint,
     db: &str,
     table: &str,
     metadata: &PartitionKey,
-    extra_params: &Option<HashMap<String, String>>,
+    extra_params: Option<&HashMap<String, String>>,
 ) -> String {
-    let path = format!("{endpoint}/v1/events/logs");
+    let path = endpoint
+        .append_path("/v1/events/logs")
+        .expect("static log ingester path should be a valid URL")
+        .to_string();
     let mut url = url::Url::parse(&path).unwrap();
     let mut url_builder = url.query_pairs_mut();
     url_builder
@@ -140,8 +147,8 @@ fn prepare_log_ingester_url(
         url_builder.append_pair("pipeline_version", pipeline_version);
     }
 
-    if let Some(extra_params) = extra_params.as_ref() {
-        for (key, value) in extra_params.iter() {
+    if let Some(extra_params) = extra_params {
+        for (key, value) in extra_params {
             url_builder.append_pair(key, value);
         }
     }
@@ -157,11 +164,11 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 
         // prepare url
         let url = prepare_log_ingester_url(
-            self.endpoint.as_str(),
+            &self.endpoint,
             &db,
             &table,
             metadata,
-            &self.extra_params,
+            self.extra_params.as_ref(),
         );
 
         // prepare body
@@ -172,7 +179,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .header(CONTENT_LENGTH, payload.len());
 
         if let Some(extra_headers) = self.extra_headers.as_ref() {
-            for (key, value) in extra_headers.iter() {
+            for (key, value) in extra_headers {
                 builder = builder.header(key, value);
             }
         }
@@ -181,14 +188,15 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             builder = builder.header(CONTENT_ENCODING, ce);
         }
 
-        if let Some(auth) = self.auth.clone() {
-            builder = auth.apply_builder(builder);
-        }
-
-        builder
+        let mut request = builder
             .body(payload)
             .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+            .map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
+        Ok(request)
     }
 }
 
@@ -242,11 +250,14 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
 
 pub(super) async fn http_healthcheck(
     client: HttpClient,
-    endpoint: String,
+    endpoint: HttpEndpoint,
     auth: Option<Auth>,
 ) -> crate::Result<()> {
-    let uri = format!("{endpoint}/health");
-    let mut request = Request::get(uri).body(Body::empty())?;
+    let uri = endpoint
+        .append_path("/health")
+        .expect("static health path should be a valid URL")
+        .to_string();
+    let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -256,27 +267,7 @@ pub(super) async fn http_healthcheck(
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
-}
-
-/// GreptimeDB HTTP retry logic.
-#[derive(Clone, Default)]
-pub(super) struct GreptimeDBHttpRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
-
-impl RetryLogic for GreptimeDBHttpRetryLogic {
-    type Error = HttpError;
-    type Request = HttpRequest<PartitionKey>;
-    type Response = HttpResponse;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_retriable()
-    }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        self.inner.should_retry_response(&response.http_response)
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
@@ -286,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_prepare_url() {
-        let endpoint = "http://localhost:8080";
+        let endpoint = HttpEndpoint::parse("http://localhost:8080").unwrap();
         let db = "test_db";
         let table = "test_table";
         let metadata = PartitionKey {
@@ -303,8 +294,13 @@ mod tests {
                 .collect(),
         );
 
-        let url = prepare_log_ingester_url(endpoint, db, table, &metadata, &extra_params);
+        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, extra_params.as_ref());
         let url = url::Url::parse(&url).unwrap();
+        assert_eq!(
+            url.path(),
+            "/v1/events/logs",
+            "log ingester path must not gain a double slash from the endpoint"
+        );
         let check = url.query_pairs().all(|(k, v)| match k.as_ref() {
             "db" => v == "test_db",
             "table" => v == "test_table",

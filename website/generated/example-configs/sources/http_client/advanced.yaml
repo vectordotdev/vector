@@ -22,4 +22,4 @@ sources:
         type: vrl
         value: now()
     scrape_interval_secs: 15
-    scrape_timeout_secs: 5
+    scrape_timeout_secs: 5.0

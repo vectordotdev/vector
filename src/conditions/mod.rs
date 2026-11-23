@@ -70,6 +70,8 @@ impl Condition {
     ///
     /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error
     /// case. As such, it should typically be avoided in hot paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
             Condition::IsLog => check_is_log_with_context(e),
@@ -118,6 +120,11 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
+    /// Builds the configured condition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -154,6 +161,12 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    /// Builds the condition described by this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Implementations return an error if the configuration cannot be turned into a usable
+    /// condition, such as a source that fails to compile or parse.
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -194,6 +207,16 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
+    /// Builds the condition, treating a plain string as a VRL boolean expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -211,6 +234,11 @@ impl AnyCondition {
         }
     }
 
+    /// Checks that the condition can be built, discarding the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
     pub fn validate(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -244,7 +272,7 @@ mod tests {
         assert_eq!(
             r#"String(".nork == false")"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 
     #[test]
@@ -259,6 +287,6 @@ mod tests {
         assert_eq!(
             r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 }

@@ -40,7 +40,6 @@ components: sources: syslog: {
 
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

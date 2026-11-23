@@ -45,7 +45,6 @@ components: sources: aws_sqs: components._aws & {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

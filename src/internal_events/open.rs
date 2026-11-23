@@ -8,7 +8,7 @@ use std::{
 
 use vector_lib::{
     NamedInternalEvent, gauge,
-    internal_event::{GaugeName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent, LossyF64},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -18,7 +18,7 @@ pub struct ConnectionOpen {
 
 impl InternalEvent for ConnectionOpen {
     fn emit(self) {
-        gauge!(GaugeName::OpenConnections).set(self.count as f64);
+        gauge!(GaugeName::OpenConnections).set(LossyF64(self.count));
     }
 }
 
@@ -29,7 +29,7 @@ pub struct EndpointsActive {
 
 impl InternalEvent for EndpointsActive {
     fn emit(self) {
-        gauge!(GaugeName::ActiveEndpoints).set(self.count as f64);
+        gauge!(GaugeName::ActiveEndpoints).set(LossyF64(self.count));
     }
 }
 
@@ -39,6 +39,7 @@ pub struct OpenGauge {
 }
 
 impl OpenGauge {
+    #[must_use]
     pub fn new() -> Self {
         OpenGauge {
             gauge: Arc::default(),
@@ -56,6 +57,7 @@ impl OpenGauge {
     }
 
     #[cfg(all(feature = "sources-utils-net-unix", unix))]
+    #[must_use]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }
@@ -81,6 +83,11 @@ impl<E: Fn(usize)> Drop for OpenToken<E> {
 /// If reporting gauges from multiple threads, they can end up in a wrong order
 /// resulting in having wrong value for a prolonged period of time.
 /// This function performs a synchronization procedure that corrects that.
+#[expect(
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    reason = "Gauge values are non-negative and stay far below `isize::MAX`"
+)]
 fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // The goal of this function is to properly sequence calls to `emitter` from
     // multiple threads. It is possible that `emitter` will be called multiple

@@ -2,16 +2,32 @@ version: 2
 updates:
   - package-ecosystem: "cargo"
     directory: "/"
+    cooldown:
+      default-days: 7
     schedule:
       interval: "monthly"
       time: "04:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain:deps"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      # These dependencies share archive validation APIs and must be updated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+
+      kube:
+        applies-to: version-updates
+        patterns:
+          - "kube"
+          - "k8s-openapi"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -62,17 +78,22 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      # These dependencies share metrics-util layer traits and must be updated
+      # together to avoid incompatible trait implementations across versions.
       metrics:
         patterns:
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
-        update-types:
-          - "patch"
-          - "minor"
       netlink:
         patterns:
           - "netlink-*"
+        update-types:
+          - "patch"
+          - "minor"
+      opendal:
+        patterns:
+          - "opendal*"
         update-types:
           - "patch"
           - "minor"
@@ -150,6 +171,12 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "bytecheck"
+          - "metrics"
+          - "metrics-tracing-context"
+          - "metrics-util"
+          - "rkyv"
         update-types:
           - "major"
       cargo-security:
@@ -166,7 +193,7 @@ updates:
       interval: "monthly"
       time: "04:00" # UTC
     labels:
-      - "domain: releasing"
+      - "domain:releasing"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
@@ -180,15 +207,14 @@ updates:
     schedule:
       interval: "monthly"
     labels:
-      - "domain: ci"
+      - "domain:ci"
       - "no-changelog"
     commit-message:
       prefix: "chore(ci)"
     groups:
-      artifact:
+      actions:
         patterns:
-          - "actions/download-artifact"
-          - "actions/upload-artifact"
+          - "*"
   - package-ecosystem: "npm"
     directory: "website/"
     schedule:
@@ -196,7 +222,7 @@ updates:
       time: "05:00" # UTC
     labels:
       - "dependencies"
-      - "javascript"
+      - "domain:website"
       - "no-changelog"
     commit-message:
       prefix: "chore(website deps)"
@@ -211,7 +237,7 @@ updates:
       interval: "monthly"
       time: "05:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain:deps"
       - "no-changelog"
     commit-message:
       prefix: "chore(deps)"

@@ -126,7 +126,7 @@ async fn buffer_drop_fan_out() {
 /// Connects 2 sources to a single sink, and asserts that the sum of the events produced
 /// by the sources is how many the single sink accepted.
 #[tokio::test]
-#[ignore]
+#[ignore = "Needs rework: unbounded sources do not measure buffer capacity reliably."]
 async fn multiple_inputs_backpressure() {
     test_util::trace_init();
 
@@ -142,7 +142,7 @@ async fn multiple_inputs_backpressure() {
     // before all of the interstitial buffers have been filled, etc.
     //
     // As-is, it seems like `expected_sourced_events` is much larger after a change to how we calculate available
-    // parallelism, which leads to this test failing to complete within the timeout, hence the `#[ignore]`.
+    // parallelism, which leads to this test failing to complete within the timeout, hence the `#[ignore = "Needs rework: unbounded sources do not measure buffer capacity reliably."]`.
     let mut config = Config::builder();
 
     let events_to_sink = 100;

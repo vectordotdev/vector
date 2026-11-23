@@ -57,7 +57,6 @@ components: sinks: websocket: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.websocket.configuration & {

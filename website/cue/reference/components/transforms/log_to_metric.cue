@@ -20,7 +20,6 @@ components: transforms: log_to_metric: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.log_to_metric.configuration & {

@@ -47,7 +47,6 @@ components: sources: statsd: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

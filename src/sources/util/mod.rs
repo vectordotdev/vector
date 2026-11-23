@@ -18,7 +18,7 @@ pub mod grpc;
 pub mod http;
 #[cfg(any(
     feature = "sources-http_client",
-    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus_scrape",
     feature = "sources-okta"
 ))]
 pub mod http_client;
@@ -66,8 +66,8 @@ pub use self::http::add_headers;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decompress_body;
@@ -82,7 +82,7 @@ pub use self::message_decoding::decode_message;
 ///
 /// Note: the behavior of StatsD if more than one colon is found (which would presumably
 /// be part of the tag value), is to remove any additional colons from the tag value.
-/// Thus Vector expects only one colon character to be present per chunk, so the find()
+/// Thus Vector expects only one colon character to be present per chunk, so the `find()`
 /// operation locating the first position is sufficient.
 #[cfg(any(feature = "sources-statsd", feature = "sources-datadog_agent"))]
 pub fn extract_tag_key_and_value<S: AsRef<str>>(

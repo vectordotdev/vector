@@ -1,4 +1,4 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use crate::{internal_events::TemplateRenderingError, template::UnconfinedTemplate};
 
@@ -16,6 +16,7 @@ pub struct ChroniclePartitioner {
 }
 
 impl ChroniclePartitioner {
+    #[must_use]
     pub const fn new(
         log_type: UnconfinedTemplate,
         fallback_log_type: Option<String>,
@@ -39,18 +40,19 @@ impl Partitioner for ChroniclePartitioner {
             .render_string(item)
             .or_else(|error| {
                 if let Some(fallback_log_type) = &self.fallback_log_type {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("log_type"),
                         drop_event: false,
                     });
                     Ok(fallback_log_type.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("log_type"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(())
                 }
             })
             .ok()?;
@@ -60,7 +62,7 @@ impl Partitioner for ChroniclePartitioner {
             .as_ref()
             .map(|namespace| {
                 namespace.render_string(item).map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("namespace"),
                         drop_event: true,

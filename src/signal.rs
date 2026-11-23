@@ -32,16 +32,14 @@ pub enum SignalTo {
 
 impl PartialEq for SignalTo {
     fn eq(&self, other: &Self) -> bool {
-        use SignalTo::*;
-
         match (self, other) {
-            (ReloadComponents(a), ReloadComponents(b)) => a == b,
+            (Self::ReloadComponents(a), Self::ReloadComponents(b)) => a == b,
+            (Self::Shutdown(a), Self::Shutdown(b)) => a == b,
             // TODO: This will require a lot of plumbing but ultimately we can derive equality for config builders.
-            (ReloadFromConfigBuilder(_), ReloadFromConfigBuilder(_)) => true,
-            (ReloadFromDisk, ReloadFromDisk) => true,
-            (ReloadEnrichmentTables, ReloadEnrichmentTables) => true,
-            (Shutdown(a), Shutdown(b)) => a == b,
-            (Quit, Quit) => true,
+            (Self::ReloadFromConfigBuilder(_), Self::ReloadFromConfigBuilder(_))
+            | (Self::ReloadFromDisk, Self::ReloadFromDisk)
+            | (Self::ReloadEnrichmentTables, Self::ReloadEnrichmentTables)
+            | (Self::Quit, Self::Quit) => true,
             _ => false,
         }
     }
@@ -61,6 +59,20 @@ pub enum ShutdownError {
     TransformAborted { key: ComponentKey, error: String },
     #[snafu(display(r#"The task for sink "{key}" died during execution: {error}"#))]
     SinkAborted { key: ComponentKey, error: String },
+}
+
+impl ShutdownError {
+    /// Low-cardinality label for this error, used as the `reason` tag of `stopped_total`.
+    #[must_use]
+    pub const fn reason(&self) -> &'static str {
+        match self {
+            Self::ApiFailed { .. } => "api_failed",
+            Self::ReloadFailedToRestore => "reload_failed_to_restore",
+            Self::SourceAborted { .. } => "source_aborted",
+            Self::TransformAborted { .. } => "transform_aborted",
+            Self::SinkAborted { .. } => "sink_aborted",
+        }
+    }
 }
 
 /// Convenience struct for app setup handling.
@@ -87,7 +99,7 @@ impl SignalPair {
     }
 }
 
-/// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
+/// `SignalHandler` is a general `ControlTo` message receiver and transmitter. It's used by
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
     tx: SignalTx,
@@ -97,6 +109,7 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
+    #[must_use]
     pub fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
@@ -108,11 +121,13 @@ impl SignalHandler {
     }
 
     /// Clones the transmitter.
+    #[must_use]
     pub fn clone_tx(&self) -> SignalTx {
         self.tx.clone()
     }
 
     /// Subscribe to the stream, and return a new receiver.
+    #[must_use]
     pub fn subscribe(&self) -> SignalRx {
         self.tx.subscribe()
     }

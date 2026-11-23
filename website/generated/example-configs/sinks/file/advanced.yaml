@@ -9,5 +9,5 @@ sinks:
     encoding:
       codec: json
     idle_timeout_secs: 30
-    path: /tmp/vector-%Y-%m-%d.log
+    path: /var/log/vector/vector-%Y-%m-%d.log
     timezone: local

@@ -32,7 +32,6 @@ pub struct MultilineConfig {
     /// Aggregation mode.
     ///
     /// This setting must be configured in conjunction with `condition_pattern`.
-    #[configurable(derived)]
     pub mode: line_agg::Mode,
 
     /// The maximum amount of time to wait for the next additional line, in milliseconds.
@@ -40,7 +39,7 @@ pub struct MultilineConfig {
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 1000))]
-    #[configurable(metadata(docs::examples = 600000))]
+    #[configurable(metadata(docs::examples = 600_000))]
     #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_ms: Duration,
 }

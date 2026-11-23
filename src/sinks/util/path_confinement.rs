@@ -82,13 +82,11 @@ pub enum ConfineError {
 /// This is pure: it never follows symlinks, never reads the FS, and never
 /// pops past a root or prefix component. The result has the same root /
 /// prefix as the input.
+#[must_use]
 pub fn normalize_lexically(p: &Path) -> PathBuf {
     let mut out: Vec<Component<'_>> = Vec::new();
     for component in p.components() {
         match component {
-            Component::Prefix(_) | Component::RootDir => {
-                out.push(component);
-            }
             Component::CurDir => {}
             Component::ParentDir => {
                 // Only pop if the last pushed component is a normal segment.
@@ -111,7 +109,7 @@ pub fn normalize_lexically(p: &Path) -> PathBuf {
                     }
                 }
             }
-            Component::Normal(_) => {
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
                 out.push(component);
             }
         }
@@ -176,6 +174,11 @@ impl PathConfinement {
     /// - `Err(_)` if no usable base can be derived and `explicit` is unset.
     ///
     /// Performs no filesystem I/O.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no safe absolute base can be derived, an explicit base
+    /// is relative, or a static path lies outside the explicit base.
     pub fn for_template(
         tpl: &UnconfinedTemplate,
         explicit: Option<&Path>,
@@ -190,32 +193,29 @@ impl PathConfinement {
             None => Vec::new(),
         };
 
-        let base_path = match explicit {
-            Some(p) => {
-                if !p.is_absolute() {
-                    return Err(BuildError::BaseNotAbsolute {
-                        path: p.to_path_buf(),
-                    });
-                }
-                normalize_lexically(p)
+        let base_path = if let Some(p) = explicit {
+            if !p.is_absolute() {
+                return Err(BuildError::BaseNotAbsolute {
+                    path: p.to_path_buf(),
+                });
             }
-            None => {
-                let raw = tpl.literal_prefix();
-                let dir_prefix = truncate_to_separator(raw);
-                if dir_prefix.is_empty() {
-                    return Err(BuildError::NoDerivableBase { fields });
-                }
-                let candidate = normalize_lexically(Path::new(dir_prefix));
-                if !candidate.is_absolute() {
-                    return Err(BuildError::NoDerivableBase { fields });
-                }
-                if is_filesystem_root(&candidate) {
-                    return Err(BuildError::DerivedBaseIsRoot {
-                        prefix: dir_prefix.to_owned(),
-                    });
-                }
-                candidate
+            normalize_lexically(p)
+        } else {
+            let raw = tpl.literal_prefix();
+            let dir_prefix = truncate_to_separator(raw);
+            if dir_prefix.is_empty() {
+                return Err(BuildError::NoDerivableBase { fields });
             }
+            let candidate = normalize_lexically(Path::new(dir_prefix));
+            if !candidate.is_absolute() {
+                return Err(BuildError::NoDerivableBase { fields });
+            }
+            if is_filesystem_root(&candidate) {
+                return Err(BuildError::DerivedBaseIsRoot {
+                    prefix: dir_prefix.to_owned(),
+                });
+            }
+            candidate
         };
 
         if explicit.is_some() && is_filesystem_root(&base_path) {
@@ -252,12 +252,18 @@ impl PathConfinement {
     }
 
     /// The lexical base directory used for containment checks.
+    #[must_use]
     pub fn base_dir(&self) -> &Path {
         &self.base_lexical
     }
 
     /// Apply lexical confinement to a rendered path. Pure — runs before
     /// any FS mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for NUL bytes, excessive length, forbidden Windows
+    /// components, or a path outside the base directory.
     pub fn confine(&self, rendered: &Path) -> Result<PathBuf, ConfineError> {
         let raw_bytes = path_bytes(rendered);
         if raw_bytes.contains(&0) {
@@ -316,8 +322,15 @@ impl PathConfinement {
     /// race between this call and the subsequent `open` to swap a directory
     /// for a symlink; closing that gap requires fd-based traversal
     /// (`openat`/`cap-std`), which is Phase 1b scope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if directory creation or canonicalization fails, or if
+    /// the canonical parent lies outside the canonical base directory.
     pub async fn verify_parent(&mut self, parent: &Path) -> Result<PathBuf, ConfineError> {
-        if self.base_canonical.is_none() {
+        let base_canonical = if let Some(ref canonical) = self.base_canonical {
+            canonical
+        } else {
             tokio_fs::create_dir_all(&self.base_lexical)
                 .await
                 .map_err(|source| ConfineError::BaseIo {
@@ -330,9 +343,8 @@ impl PathConfinement {
                     path: self.base_lexical.clone(),
                     source,
                 })?;
-            self.base_canonical = Some(canonical);
-        }
-        let base_canonical = self.base_canonical.as_ref().expect("just set");
+            self.base_canonical.insert(canonical)
+        };
 
         let parent_canonical =
             tokio_fs::canonicalize(parent)

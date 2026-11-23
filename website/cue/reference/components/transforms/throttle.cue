@@ -20,7 +20,6 @@ components: transforms: throttle: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.throttle.configuration & {

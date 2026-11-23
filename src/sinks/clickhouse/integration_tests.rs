@@ -1,18 +1,19 @@
 use std::{
     convert::Infallible,
-    net::SocketAddr,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
 };
 
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     future::{ok, ready},
     stream,
 };
 use http::StatusCode;
+use http_body_util::Full;
 use ordered_float::NotNan;
 use serde::Deserialize;
 use serde_json::Value;
@@ -23,7 +24,6 @@ use vector_lib::{
     lookup::PathPrefix,
 };
 use vrl::event_path;
-use warp::Filter;
 
 use crate::{
     codecs::{TimestampFormat, Transformer},
@@ -34,6 +34,7 @@ use crate::{
     },
     test_util::{
         components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
+        http::spawn_blackhole_http_server,
         random_table_name, trace_init,
     },
 };
@@ -299,29 +300,29 @@ async fn no_retry_on_incorrect_data() {
 }
 
 #[tokio::test]
-async fn no_retry_on_incorrect_data_warp() {
+async fn no_retry_on_incorrect_data_mock() {
     trace_init();
 
     let visited = Arc::new(AtomicBool::new(false));
-    let routes = warp::any().and_then(move || {
+    let host = spawn_blackhole_http_server(move |_| {
         assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
         visited.store(true, Ordering::SeqCst);
 
-        ok::<_, Infallible>(warp::reply::with_status(
-            "Code: 117",
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))
-    });
-    let server = warp::serve(routes).bind("0.0.0.0:8124".parse::<SocketAddr>().unwrap());
-    tokio::spawn(server);
-
-    let host = String::from("http://localhost:8124");
+        ok::<_, Infallible>(
+            http::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .body(Full::new(Bytes::from_static(b"Code: 117")))
+                .unwrap(),
+        )
+    })
+    .await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoint: host.try_into().unwrap(),
         table: random_table_name().try_into().unwrap(),
         batch,
         ..Default::default()
@@ -439,9 +440,11 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("create table failed: {}", response.text().await.unwrap())
-        }
+        assert!(
+            response.status().is_success(),
+            "create table failed: {}",
+            response.text().await.unwrap()
+        );
     }
 
     async fn create_table_with_sql(&self, sql: &str) {
@@ -453,9 +456,11 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("create table failed: {}", response.text().await.unwrap())
-        }
+        assert!(
+            response.status().is_success(),
+            "create table failed: {}",
+            response.text().await.unwrap()
+        );
     }
 
     async fn select_all(&self, table: &str) -> QueryResponse {
@@ -467,15 +472,13 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("select all failed: {}", response.text().await.unwrap())
-        } else {
-            let text = response.text().await.unwrap();
-            match serde_json::from_str(&text) {
-                Ok(value) => value,
-                Err(_) => panic!("json failed: {text:?}"),
-            }
-        }
+        assert!(
+            response.status().is_success(),
+            "select all failed: {}",
+            response.text().await.unwrap()
+        );
+        let text = response.text().await.unwrap();
+        serde_json::from_str(&text).unwrap_or_else(|error| panic!("json failed: {error}: {text:?}"))
     }
 }
 
@@ -511,7 +514,9 @@ async fn insert_events_arrow_format() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -533,9 +538,9 @@ async fn insert_events_arrow_format() {
 
     let mut events: Vec<Event> = Vec::new();
     for i in 0..5 {
-        let mut event = LogEvent::from(format!("log message {}", i));
-        event.insert(event_path!("host"), format!("host{}.example.com", i));
-        event.insert(event_path!("count"), i as i64);
+        let mut event = LogEvent::from(format!("log message {i}"));
+        event.insert(event_path!("host"), format!("host{i}.example.com"));
+        event.insert(event_path!("count"), i64::from(i));
         events.push(event.into());
     }
 
@@ -545,7 +550,7 @@ async fn insert_events_arrow_format() {
     assert_eq!(5, output.rows);
 
     // Verify fields exist and are correctly typed
-    for row in output.data.iter() {
+    for row in &output.data {
         assert!(row.get("host").and_then(|v| v.as_str()).is_some());
         assert!(row.get("message").and_then(|v| v.as_str()).is_some());
         assert!(
@@ -583,7 +588,9 @@ async fn insert_events_arrow_with_schema_fetching() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -598,15 +605,15 @@ async fn insert_events_arrow_with_schema_fetching() {
     // Create events with various types that should match the schema
     let mut events: Vec<Event> = Vec::new();
     for i in 0..3 {
-        let mut event = LogEvent::from(format!("Test message {}", i));
-        event.insert(event_path!("host"), format!("host{}.example.com", i));
-        event.insert(event_path!("id"), i as i64);
-        event.insert(event_path!("name"), format!("user_{}", i));
-        event.insert(event_path!("score"), 95.5 + i as f64);
+        let mut event = LogEvent::from(format!("Test message {i}"));
+        event.insert(event_path!("host"), format!("host{i}.example.com"));
+        event.insert(event_path!("id"), i64::from(i));
+        event.insert(event_path!("name"), format!("user_{i}"));
+        event.insert(event_path!("score"), 95.5 + f64::from(i));
         event.insert(event_path!("active"), i % 2 == 0);
         event.insert(
             event_path!("request_id"),
-            format!("550e8400-e29b-41d4-a716-44665544000{}", i),
+            format!("550e8400-e29b-41d4-a716-44665544000{i}"),
         );
         events.push(event.into());
     }
@@ -631,8 +638,8 @@ async fn insert_events_arrow_with_schema_fetching() {
                 .is_some()
         );
         assert!(row.get("name").and_then(|v| v.as_str()).is_some());
-        assert!(row.get("score").and_then(|v| v.as_f64()).is_some());
-        assert!(row.get("active").and_then(|v| v.as_bool()).is_some());
+        assert!(row.get("score").and_then(Value::as_f64).is_some());
+        assert!(row.get("active").and_then(Value::as_bool).is_some());
 
         // Check UUID field
         let request_id = row
@@ -641,11 +648,13 @@ async fn insert_events_arrow_with_schema_fetching() {
             .expect("request_id should be present");
         assert_eq!(
             request_id,
-            format!("550e8400-e29b-41d4-a716-44665544000{}", i)
+            format!("550e8400-e29b-41d4-a716-44665544000{i}")
         );
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::too_many_lines, reason = "Large complex-type fixture")]
 #[tokio::test]
 async fn test_complex_types() {
     trace_init();
@@ -703,7 +712,7 @@ async fn test_complex_types() {
 
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
-    let mut events: Vec<Event> = Vec::new();
+    let mut input: Vec<Event> = Vec::new();
 
     // Event 1: Comprehensive test with all complex types
     let mut event1 = LogEvent::from("Comprehensive complex types test");
@@ -922,7 +931,7 @@ async fn test_complex_types() {
         ]),
     );
 
-    events.push(event1.into());
+    input.push(event1.into());
 
     // Event 2: Empty and edge cases
     let mut event2 = LogEvent::from("Test empty collections");
@@ -1020,7 +1029,7 @@ async fn test_complex_types() {
         vector_lib::event::Value::Array(vec![]),
     );
 
-    events.push(event2.into());
+    input.push(event2.into());
 
     // Event 3: More varied data
     let mut event3 = LogEvent::from("Test varied data");
@@ -1187,9 +1196,9 @@ async fn test_complex_types() {
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(named_tuple3)]),
     );
 
-    events.push(event3.into());
+    input.push(event3.into());
 
-    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::iter(input), &SINK_TAGS).await;
 
     let output = client.select_all(&table).await;
     assert_eq!(3, output.rows);
@@ -1244,7 +1253,7 @@ async fn test_complex_types() {
     assert_eq!(2, nested3.len());
 }
 
-/// Tests that missing required fields emit EncoderNullConstraintError and reject the batch
+/// Tests that missing required fields emit `EncoderNullConstraintError` and reject the batch
 #[tokio::test]
 async fn test_missing_required_field_emits_null_constraint_error() {
     init_test();
@@ -1270,7 +1279,9 @@ async fn test_missing_required_field_emits_null_constraint_error() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -1306,8 +1317,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
         .filter(|m| {
             m.name() == "component_errors_total"
                 && m.tags()
-                    .map(|t| t.get("error_code") == Some("encoding_null_constraint"))
-                    .unwrap_or(false)
+                    .is_some_and(|t| t.get("error_code") == Some("encoding_null_constraint"))
         })
         .collect();
 

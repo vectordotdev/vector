@@ -5,6 +5,10 @@ use tokio::net::UdpSocket;
 
 use super::SocketListenAddr;
 
+///
+/// # Errors
+///
+/// Returns an error if the address cannot be bound or the inherited socket cannot be configured.
 /// Binds a UDP socket to the listen address.
 pub async fn try_bind_udp_socket(
     addr: SocketListenAddr,
@@ -13,7 +17,10 @@ pub async fn try_bind_udp_socket(
     match addr {
         SocketListenAddr::SocketAddr(addr) => UdpSocket::bind(&addr).await,
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_udp_socket(offset)? {
-            Some(socket) => UdpSocket::from_std(socket),
+            Some(socket) => {
+                socket.set_nonblocking(true)?;
+                UdpSocket::from_std(socket)
+            }
             None => Err(io::Error::new(
                 io::ErrorKind::AddrInUse,
                 "systemd fd already consumed",

@@ -24,7 +24,6 @@ components: transforms: route: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.route.configuration
