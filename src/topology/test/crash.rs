@@ -6,7 +6,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     config::AcknowledgementsConfig,
-    config::Config,
+    config::{BoxedSource, Config},
     signal::ShutdownError,
     sinks::socket::SocketSinkConfig,
     sources::socket::{SocketConfig, udp::UdpConfig},
@@ -274,6 +274,39 @@ async fn test_source_panic() {
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
+}
+
+/// The application shuts down without an error as soon as all sources finish, so a failed source
+/// must not count as finished before its error is sent.
+async fn assert_source_error_sent_before_sources_finish(source: impl Into<BoxedSource>) {
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+    timeout(Duration::from_secs(5), topology.sources_finished())
+        .await
+        .expect("sources did not finish");
+
+    assert!(matches!(
+        crash.try_recv(),
+        Ok(ShutdownError::SourceAborted { .. })
+    ));
+    topology.stop().await;
+}
+
+#[tokio::test]
+async fn test_source_error_sent_before_sources_finish() {
+    trace_init();
+    assert_source_error_sent_before_sources_finish(error_source()).await;
+}
+
+#[tokio::test]
+async fn test_source_panic_sent_before_sources_finish() {
+    trace_init();
+    std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
+    assert_source_error_sent_before_sources_finish(panic_source()).await;
+    _ = std::panic::take_hook();
 }
 
 /// Ensures that an unrelated sink completing immediately with an error does not prematurely terminate the topology.

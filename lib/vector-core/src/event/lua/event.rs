@@ -25,11 +25,7 @@ impl IntoLua for LuaEvent {
                 .into_lua(lua)?,
             )?,
             Event::Trace(_) => {
-                return Err(LuaError::ToLuaConversionError {
-                    from: String::from("Event"),
-                    to: "table",
-                    message: Some("Trace are not supported".to_string()),
-                });
+                return Err(LuaError::external("Trace events are not supported"));
             }
         }
         Ok(LuaValue::Table(table))

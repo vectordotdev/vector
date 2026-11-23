@@ -5,6 +5,7 @@ use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
+    x509::X509VerifyResult,
 };
 use snafu::{ResultExt, Snafu};
 use tokio::net::TcpStream;
@@ -12,12 +13,16 @@ use tokio_openssl::SslStream;
 
 use crate::tcp::{self, TcpKeepaliveConfig};
 
+mod client_cert_verifier;
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod reload;
 mod settings;
+#[cfg(test)]
+mod test_util;
 
+pub use client_cert_verifier::ClientCertVerifier;
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
 pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
@@ -27,13 +32,23 @@ pub use settings::{
     TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
 };
 
-/// Install Ring as the process-wide Rustls provider if none is already installed.
+/// Install the built-in process-wide Rustls provider if none is already installed.
+///
+/// The `tls-ring` feature selects Ring and takes precedence over `tls-aws-lc`. Without either
+/// feature, this does nothing and the caller must install a provider before constructing TLS
+/// clients.
 ///
 /// Call before constructing TLS clients when multiple providers are enabled.
 /// Repeated or concurrent calls preserve the first installed provider.
 pub fn install_default_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
-        _ = rustls::crypto::ring::default_provider().install_default();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-ring")] {
+                _ = rustls::crypto::ring::default_provider().install_default();
+            } else if #[cfg(feature = "tls-aws-lc")] {
+                _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            }
+        }
     }
 }
 
@@ -91,8 +106,27 @@ pub enum TlsError {
     },
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
+    #[snafu(display("A reloadable TLS acceptor requires TLS to be enabled"))]
+    ReloaderWithoutTls,
+    #[snafu(display(
+        "A client certificate verifier requires a CA file to validate client certificates"
+    ))]
+    ClientCertVerifierWithoutCa,
+    #[snafu(display(
+        "A client certificate verifier cannot be combined with system root certificates"
+    ))]
+    ClientCertVerifierWithSystemRoots,
     #[snafu(display("TLS handshake failed: {}", source))]
     Handshake { source: openssl::ssl::Error },
+    #[snafu(display(
+        "TLS handshake failed: peer certificate rejected: {}: {}",
+        reason,
+        source
+    ))]
+    PeerCertificateRejected {
+        source: openssl::ssl::Error,
+        reason: X509VerifyResult,
+    },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
@@ -111,6 +145,8 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting the TLS session id context: {}", source))]
+    SetSessionIdContext { source: ErrorStack },
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]
@@ -207,4 +243,87 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
             .context(SetSniSnafu)?;
     }
     Ok(configure)
+}
+
+#[cfg(test)]
+mod tests {
+    use rustls::crypto::CryptoProvider;
+
+    use super::install_default_crypto_provider;
+
+    /// Runs `test_name` in a child process and returns `true` in the parent.
+    ///
+    /// Rustls's process-wide provider cannot be reset between test cases.
+    fn run_in_subprocess(test_name: &str) -> bool {
+        if std::env::var("__VECTOR_CORE_CRYPTO_PROVIDER_TEST").is_ok() {
+            return false;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("__VECTOR_CORE_CRYPTO_PROVIDER_TEST", "1")
+            .args(["--exact", test_name, "--nocapture"])
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "subprocess test failed:\nstdout: {stdout}\nstderr: {}",
+            String::from_utf8_lossy(&output.stderr),
+        );
+        true
+    }
+
+    fn key_provider_name(provider: &CryptoProvider) -> String {
+        format!("{:?}", provider.key_provider)
+    }
+
+    #[test]
+    fn installs_built_in_crypto_provider() {
+        if run_in_subprocess("tls::tests::installs_built_in_crypto_provider") {
+            return;
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-ring")] {
+                let expected = Some(rustls::crypto::ring::default_provider());
+            } else if #[cfg(feature = "tls-aws-lc")] {
+                let expected = Some(rustls::crypto::aws_lc_rs::default_provider());
+            } else {
+                let expected: Option<CryptoProvider> = None;
+            }
+        }
+
+        assert!(CryptoProvider::get_default().is_none());
+        install_default_crypto_provider();
+        assert_eq!(
+            CryptoProvider::get_default().map(|provider| key_provider_name(provider)),
+            expected.as_ref().map(key_provider_name),
+        );
+    }
+
+    #[cfg(any(feature = "tls-ring", feature = "tls-aws-lc"))]
+    #[test]
+    fn preserves_installed_crypto_provider() {
+        if run_in_subprocess("tls::tests::preserves_installed_crypto_provider") {
+            return;
+        }
+
+        // Prefer a provider other than the one that would be installed.
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tls-aws-lc")] {
+                let mut provider = rustls::crypto::aws_lc_rs::default_provider();
+            } else {
+                let mut provider = rustls::crypto::ring::default_provider();
+            }
+        }
+        provider.cipher_suites.truncate(1);
+        provider.install_default().unwrap();
+        let original = std::sync::Arc::clone(CryptoProvider::get_default().unwrap());
+
+        install_default_crypto_provider();
+
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            CryptoProvider::get_default().unwrap(),
+        ));
+    }
 }

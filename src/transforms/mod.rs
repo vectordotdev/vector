@@ -1,6 +1,4 @@
 #![allow(missing_docs)]
-#[allow(unused_imports)]
-use std::collections::HashSet;
 
 pub mod dedupe;
 pub mod reduce;
@@ -49,7 +47,6 @@ mod test {
     use futures_util::SinkExt;
     use tokio::sync::mpsc;
     use tokio_util::sync::PollSender;
-    use vector_lib::transform::FunctionTransform;
 
     use crate::{
         config::{
@@ -59,27 +56,9 @@ mod test {
         event::Event,
         test_util::start_topology,
         topology::RunningTopology,
-        transforms::OutputBuffer,
     };
 
-    /// Transform a single `Event` through the `FunctionTransform`
-    ///
-    /// # Panics
-    ///
-    /// If `ft` attempts to emit more than one `Event` on transform this
-    /// function will panic.
-    // We allow dead_code here to avoid unused warnings when we compile our
-    // benchmarks as tests. It's a valid warning -- the benchmarks don't use
-    // this function -- but flagging this function off for bench flags will
-    // issue a unused warnings about the import above.
-    #[allow(dead_code)]
-    pub(super) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
-        let mut buf = OutputBuffer::with_capacity(1);
-        ft.transform(&mut buf, event);
-        assert!(buf.len() <= 1);
-        buf.into_events().next()
-    }
-
+    // The transform tests that use this helper are gated by Cargo features.
     #[allow(dead_code)]
     pub(super) async fn create_topology<T: TransformConfig + 'static>(
         events: impl Stream<Item = Event> + Send + 'static,

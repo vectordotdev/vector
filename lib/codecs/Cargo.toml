@@ -1,6 +1,6 @@
 [package]
 name = "codecs"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
@@ -31,6 +31,7 @@ derive_more.workspace = true
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
+http.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
@@ -86,7 +87,7 @@ arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 # Encode OTLP traces through the typed trace model (RFC 25329).
-typed-trace = ["opentelemetry-proto?/typed-trace"]
+typed-trace = ["vector-core/typed-trace", "opentelemetry-proto?/typed-trace"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []
 
