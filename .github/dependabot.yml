@@ -13,6 +13,10 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+    # goauth 0.17 switches token fetching to blocking I/O and changes proxy behavior.
+    # Keep upgrades manual until those compatibility concerns are addressed: #24761.
+    ignore:
+      - dependency-name: "goauth"
     groups:
       # These dependencies share archive validation APIs and must be updated
       # together, including consideration of disk buffer format compatibility.
