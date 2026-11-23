@@ -37,7 +37,7 @@ impl GenerateConfig for TraceToLogConfig {
 #[typetag::serde(name = "trace_to_log")]
 impl TransformConfig for TraceToLogConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(TraceToLog))
+        Ok(Transform::stateless(TraceToLog))
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -64,7 +64,7 @@ impl TransformConfig for TraceToLogConfig {
 pub struct TraceToLog;
 
 impl FunctionTransform for TraceToLog {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         if let Event::Trace(trace) = event {
             output.push(Event::Log(LogEvent::from(trace)));
         }

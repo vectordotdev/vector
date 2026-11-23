@@ -264,7 +264,7 @@ impl TransformConfig for SampleConfig {
             )
         };
 
-        Ok(Transform::function(sample))
+        Ok(Transform::stateful(sample))
     }
 
     fn input(&self) -> Input {
