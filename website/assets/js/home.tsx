@@ -1,7 +1,3 @@
-// Compatibility-related imports
-//import "core-js/stable";
-//import "regenerator-runtime/runtime";
-
 // Imports
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";

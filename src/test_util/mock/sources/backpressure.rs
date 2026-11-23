@@ -25,17 +25,21 @@ pub struct BackpressureSourceConfig {
 }
 
 impl GenerateConfig for BackpressureSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let config = Self {
             counter: Arc::new(AtomicUsize::new(0)),
         };
-        toml::Value::try_from(&config).unwrap()
+        serde_json::to_value(&config).unwrap()
     }
 }
 
 #[async_trait]
 #[typetag::serde(name = "test_backpressure")]
 impl SourceConfig for BackpressureSourceConfig {
+    #[expect(
+        clippy::for_unbounded_range,
+        reason = "The mock produces events until its task is cancelled"
+    )]
     async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
         let counter = Arc::clone(&self.counter);
         Ok(async move {

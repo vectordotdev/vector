@@ -10,8 +10,8 @@ message PushEventsRequest {
 message PushEventsResponse {}
 
 enum ServingStatus {
-    SERVING = 0;
-    NOT_SERVING = 1;
+  SERVING = 0;
+  NOT_SERVING = 1;
 }
 
 message HealthCheckRequest {}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::BuildHasher};
 
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
@@ -8,10 +8,10 @@ use vector_lib::{
 
 use crate::sources::http_server::HttpConfigParamKind;
 
-pub fn add_query_parameters(
+pub fn add_query_parameters<S: BuildHasher>(
     events: &mut [Event],
     query_parameters_config: &[HttpConfigParamKind],
-    query_parameters: &HashMap<String, String>,
+    query_parameters: &HashMap<String, String, S>,
     log_namespace: LogNamespace,
     source_name: &'static str,
 ) {
@@ -35,7 +35,7 @@ pub fn add_query_parameters(
                     }
                 }
             }
-            // Add all query_parameters that match against wildcard pattens specified
+            // Add all query_parameters that match against wildcard patterns specified
             // in the `query_parameters` config option to the event.
             HttpConfigParamKind::Glob(query_parameter_pattern) => {
                 for query_parameter_name in query_parameters.keys() {
@@ -58,7 +58,7 @@ pub fn add_query_parameters(
                     }
                 }
             }
-        };
+        }
     }
 }
 

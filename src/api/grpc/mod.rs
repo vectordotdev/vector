@@ -1,3 +1,3 @@
 mod service;
 
-pub use service::ObservabilityService;
+pub(super) use service::ObservabilityService;

@@ -7,8 +7,7 @@ components: sources: opentelemetry: {
 	title: "OpenTelemetry"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "aggregator"]
 		development:   "beta"
 		egress_method: "stream"
@@ -40,7 +39,6 @@ components: sources: opentelemetry: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -72,12 +70,11 @@ components: sources: opentelemetry: {
 
 	output: {
 		logs: event: {
-			description: "An individual log event from a batch of events received through an OTLP request. The following applies only when the `use_otlp_decoding` option is `false`."
+			description: "An individual log event from a batch of events received through an OTLP request. The following schema applies when logs use native conversion, which is the default. When `decoding.codec` is `otlp`, this schema applies only if `decoding.signal_types` excludes `logs`."
 			fields: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
 					required:    false
-					common:      true
 					type: object: {
 						examples: [
 							{
@@ -100,7 +97,6 @@ components: sources: opentelemetry: {
 				resources: {
 					description: "Set of attributes that describe the resource."
 					required:    false
-					common:      true
 					type: object: {
 						examples: [
 							{
@@ -117,7 +113,6 @@ components: sources: opentelemetry: {
 				"scope.name": {
 					description: "Instrumentation scope name (often logger name)."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["some.module.name"]
@@ -126,7 +121,6 @@ components: sources: opentelemetry: {
 				"scope.version": {
 					description: "Instrumentation scope version."
 					required:    false
-					common:      false
 					type: string: {
 						default: null
 						examples: ["1.2.3"]
@@ -135,7 +129,6 @@ components: sources: opentelemetry: {
 				"scope.attributes": {
 					description: "Set of attributes that belong to the instrumentation scope."
 					required:    false
-					common:      false
 					type: object: {
 						examples: [
 							{
@@ -149,7 +142,6 @@ components: sources: opentelemetry: {
 				"scope.dropped_attributes_count": {
 					description: "Number of attributes dropped from the instrumentation scope (if not zero)."
 					required:    false
-					common:      false
 					type: uint: {
 						unit: null
 					}
@@ -157,7 +149,6 @@ components: sources: opentelemetry: {
 				message: {
 					description: "Contains the body of the log record."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["20200415T072306-0700 INFO I like donuts"]
@@ -166,7 +157,6 @@ components: sources: opentelemetry: {
 				trace_id: {
 					description: "Request trace id as defined in W3C Trace Context. Can be set for logs that are part of request processing and have an assigned trace id."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["66346462623365646437363566363230"]
@@ -175,7 +165,6 @@ components: sources: opentelemetry: {
 				span_id: {
 					description: "Can be set for logs that are part of a particular processing span."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["43222c2d51a7abe3"]
@@ -188,7 +177,6 @@ components: sources: opentelemetry: {
 						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
 						"""
 					required: false
-					common:   true
 					type: uint: {
 						default: null
 						unit:    null
@@ -198,7 +186,6 @@ components: sources: opentelemetry: {
 				severity_text: {
 					description: "Severity text (also known as log level)."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["TRACE3", "INFO", "ERROR", "FATAL4"]
@@ -207,7 +194,6 @@ components: sources: opentelemetry: {
 				flags: {
 					description: "Trace flag as defined in W3C Trace Context specification."
 					required:    false
-					common:      true
 					type: uint: {
 						default: null
 						unit:    null
@@ -252,26 +238,45 @@ components: sources: opentelemetry: {
 		otlp_decoding: {
 			title: "OTLP Decoding Usage"
 			body: """
-				This section is a usage example for the `use_otlp_decoding` option.
-				This setup allows shipping OTLP formatted logs to an OTEL collector without the use of a `remap` transform.
-				The same can be done for metrics and traces.
+				Set `decoding.codec` to `otlp` to preserve the OTLP representation of incoming events.
+				Use `decoding.signal_types` to select which signals retain that representation; unlisted signals
+				are still accepted and converted to Vector's native format. Omitting `signal_types` preserves
+				OTLP for all signals, while an empty list uses native conversion for all signals. Omitting
+				`decoding` also uses native conversion for all signals.
 
-				However, OTLP formatted metrics cannot be converted to Vector's metrics format. As a workaround, the OTLP
-				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
-				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
+				The following example preserves OTLP logs and forwards them to an OpenTelemetry collector
+				without a `remap` transform. Metrics and traces continue to use native conversion.
 
-				The recommended `opentelemetry` sink configuration is the following:
 				```yaml
-					otel_sink:
-						inputs:
-							- otel.logs
-						type: opentelemetry
-						protocol:
-							type: http
-							uri: http://localhost:5318/v1/logs
-						encoding:
-							codec: otlp
+				sources:
+				  otel:
+				    type: opentelemetry
+				    grpc:
+				      address: 0.0.0.0:4317
+				    http:
+				      address: 0.0.0.0:4318
+				    decoding:
+				      codec: otlp
+				      signal_types: ["logs"]
+				sinks:
+				  otel_sink:
+				    inputs:
+				      - otel.logs
+				    type: opentelemetry
+				    protocol:
+				      type: http
+				      uri: http://localhost:5318/v1/logs
+				      encoding:
+				        codec: otlp
 				```
+
+				To preserve OTLP metrics or traces, include `metrics` or `traces` in `signal_types` and route
+				the corresponding source output to an OTLP sink. Metrics preserved as OTLP are emitted as
+				Vector log events, so native metric transforms such as `aggregate` cannot process them.
+				To use native metric transforms, exclude `metrics` from `signal_types`.
+
+				The legacy `use_otlp_decoding` option is deprecated. See the
+				[migration guide](/deprecations/#opentelemetry-use_otlp_decoding) for existing configurations.
 				"""
 		}
 		tls: {
@@ -305,6 +310,10 @@ components: sources: opentelemetry: {
 	}
 
 	telemetry: metrics: {
+		component_request_active:             components.sources.internal_metrics.output.metrics.component_request_active
+		component_request_concurrency_limit:  components.sources.internal_metrics.output.metrics.component_request_concurrency_limit
+		component_timed_out_requests_total:   components.sources.internal_metrics.output.metrics.component_timed_out_requests_total
+		component_load_shed_requests_total:   components.sources.internal_metrics.output.metrics.component_load_shed_requests_total
 		grpc_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.grpc_server_handler_duration_seconds
 		grpc_server_messages_received_total:  components.sources.internal_metrics.output.metrics.grpc_server_messages_received_total
 		grpc_server_messages_sent_total:      components.sources.internal_metrics.output.metrics.grpc_server_messages_sent_total

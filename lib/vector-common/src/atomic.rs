@@ -26,7 +26,7 @@ impl AtomicF64 {
     ) -> f64 {
         f64::from_bits(
             self.0
-                .fetch_update(set_order, fetch_order, |x| {
+                .try_update(set_order, fetch_order, |x| {
                     Some(f(f64::from_bits(x)).to_bits())
                 })
                 .expect("fetch_update always succeeds"),

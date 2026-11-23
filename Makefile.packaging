@@ -11,20 +11,26 @@
 # packaging and release targets here automatically.
 
 VDEV := cargo vdev
+PROFILE ?= release
 
 # Set version — only evaluated when this Makefile is loaded
 export VERSION ?= $(shell command -v cargo >/dev/null && $(VDEV) version || echo unknown)
+export VECTOR_VERSION := ${VERSION}
 
 # Delegate cross-compilation prerequisites to the main Makefile
-target/%/release/vector.tar.gz:
+target/%/vector.tar.gz:
 	unset TRIPLE && $(MAKE) $@
+
+# .SECONDEXPANSION allows prerequisites to reference $* (the pattern stem) and
+# $(PROFILE) (a variable) by escaping them as $$* and $$(PROFILE). Without it,
+# both would expand to empty at parse time before any target is matched.
+.SECONDEXPANSION:
 
 ##@ Packaging
 
 # archives
 target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
-target/artifacts/vector-${VERSION}-%.tar.gz: override PROFILE =release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: target/$$*/$$(PROFILE)/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \

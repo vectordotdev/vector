@@ -1,15 +1,59 @@
-{{ $params := site.Params.search }}
-{{ $apiKey := cond hugo.IsProduction $params.typesense_public_prod_apikey $params.typesense_public_dev_apikey }}
-{{ $apiKey = printf `"%s"` $apiKey }}
-{{ $index := printf `"%s"` $params.typesense_index }}
-{{ $host := cond hugo.IsProduction $params.typesense_prod_host $params.typesense_dev_host }}
-{{ $host = printf `"%s"` $host }}
 {{ $searchJs := "js/search.tsx" }}
 {{ $jsOpts := dict "sourceMap" "inline"
-  "defines" (dict "process.env.NODE_ENV" "\"development\""
-  "process.env.TYPESENSE_PUBLIC_API_KEY" $apiKey
-  "process.env.TYPESENSE_HOST" $host
-  "process.env.TYPESENSE_INDEX" $index) }}
+  "defines" (dict "process.env.NODE_ENV" "\"development\"") }}
 {{ $babelOpts := dict "noComments" true }}
 {{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
+
+{{ $exactSearchRecords := slice }}
+{{ range where (where site.RegularPages "Layout" "component") "Params.noindex" "ne" true }}
+  {{ $name := .File.BaseFileName }}
+  {{ $nameWords := replace $name "_" " " }}
+  {{ $kind := .Params.component_kind }}
+  {{ $kindPlural := printf "%ss" $kind }}
+  {{ $aliases := slice
+    $name
+    $nameWords
+    .Title
+    (printf "%s %s" $name $kind)
+    (printf "%s %s" $nameWords $kind)
+    (printf "%s %s" .Title $kind)
+    (printf "%s %s" $kind $name)
+    (printf "%s %s" $kind $nameWords)
+    (printf "%s %s" $kind .Title)
+    (printf "%s %s" .Title $kindPlural)
+    (printf "%s %s" $kindPlural .Title) }}
+  {{ $exactSearchRecords = $exactSearchRecords | append (dict
+    "aliases" $aliases
+    "category" ($kindPlural | title)
+    "content" (.Description | markdownify | plainify)
+    "title" (printf "%s %s" .Title $kind)
+    "url" .RelPermalink) }}
+{{ end }}
+
+{{ $functionsURL := "/docs/reference/vrl/functions/" | relURL }}
+{{ range site.Data.docs.remap.functions }}
+  {{ $exactSearchRecords = $exactSearchRecords | append (dict
+    "aliases" (slice .name)
+    "category" "VRL function"
+    "content" (.description | markdownify | plainify)
+    "title" .name
+    "url" (printf "%s#%s" $functionsURL .anchor)) }}
+{{ end }}
+
+{{ $exactSearchIndex := resources.FromString "search/exact-docs.json" ($exactSearchRecords | jsonify) | fingerprint "sha256" }}
 <script src="{{ $compiled.RelPermalink }}"></script>
+<script type="module">
+  window.loadExactSearch = async () => {
+    const response = await fetch("{{ $exactSearchIndex.RelPermalink }}");
+    if (!response.ok) {
+      throw new Error(`Unable to load exact documentation search index: ${response.status}`);
+    }
+    return response.json();
+  };
+
+  window.loadPagefind = async () => {
+    const pagefind = await import("/pagefind/pagefind.js");
+    await pagefind.init();
+    return pagefind;
+  };
+</script>

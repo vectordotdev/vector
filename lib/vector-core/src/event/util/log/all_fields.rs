@@ -1,10 +1,11 @@
-use std::{collections::btree_map, fmt::Write as _, iter, slice, sync::LazyLock};
+use std::{fmt::Write as _, iter, slice, sync::LazyLock};
 
 use regex::Regex;
 use serde::{Serialize, Serializer};
 use vrl::path::PathPrefix;
 
 use crate::event::{KeyString, ObjectMap, Value};
+use vrl::value::ObjectMapIter;
 
 static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
@@ -41,7 +42,7 @@ pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter<'_> {
 #[derive(Clone, Debug)]
 enum LeafIter<'a> {
     Root((&'a Value, bool)),
-    Map(btree_map::Iter<'a, KeyString, Value>),
+    Map(ObjectMapIter<'a>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
@@ -259,7 +260,11 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
         // Compare without the leading `"` char so that the order is the same as the collected fields.
-        expected.sort_by(|(a, _), (b, _)| a[1..].cmp(&b[1..]));
+        expected.sort_by(|(a, _), (b, _)| {
+            a.strip_prefix('"')
+                .unwrap_or(a)
+                .cmp(b.strip_prefix('"').unwrap_or(b))
+        });
 
         assert_eq!(collected, expected);
     }

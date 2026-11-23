@@ -121,8 +121,7 @@ pub struct S3Options {
     ///
     /// Directly comparable to the `Content-Type` HTTP header.
     ///
-    /// If not specified, the compression scheme used dictates this value.
-    /// When `compression` is set to `none`, the value `text/x-log` is used.
+    /// Defaults to `text/x-log`, or `application/vnd.apache.parquet` when Parquet batch encoding is enabled.
     #[configurable(metadata(docs::examples = "application/gzip"))]
     pub content_type: Option<String>,
 }
@@ -397,7 +396,7 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Healthcheck> {
+pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     let healthcheck = async move {
         let req = client
             .head_bucket()
@@ -422,9 +421,14 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         }
     };
 
-    Ok(healthcheck.boxed())
+    healthcheck.boxed()
 }
 
+/// Creates an S3 service.
+///
+/// # Errors
+///
+/// Returns an error if the S3 client cannot be created.
 pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,

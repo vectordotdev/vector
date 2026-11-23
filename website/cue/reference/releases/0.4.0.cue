@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.4.0": {
-	date:     "2019-09-24"
-	codename: "Hello World Again"
+releases: "0.4.0": {// Hello World Again
+	date: "2019-09-24"
 
 	whats_next: []
 
@@ -173,7 +172,7 @@ releases: "0.4.0": {
 		{sha: "bd22713c4b544b82b56b079bd2ef7411af951226", date: "2019-07-22 13:44:46 +0000", description: "fix broken build process", pr_number: null, scopes: ["operations"], type: "chore", breaking_change: false, author: "Ben Johnson", files_count: 1, insertions_count: 4, deletions_count: 4},
 		{sha: "01458f4e5764e6d06ca04b3a569eeb767ac58eee", date: "2019-07-22 20:21:26 +0000", description: "fix spelling in READMEs", pr_number: 671, scopes: [], type: "docs", breaking_change: false, author: "Brian Kabiro", files_count: 2, insertions_count: 2, deletions_count: 2},
 		{sha: "6c47a6716206d066191d4e67d810df0f7f761c96", date: "2019-07-22 13:13:53 +0000", description: "build x86_64-unknown-linux-musl with all features", pr_number: 669, scopes: ["operations"], type: "chore", breaking_change: false, author: "Binary Logic", files_count: 3, insertions_count: 54, deletions_count: 27},
-		{sha: "0a4ef9774092eef2d9d48ec7167b73d46caf464a", date: "2019-07-21 10:05:28 +0000", description: "update batch_timeuot unit to seconds across all docs", pr_number: null, scopes: [], type: "docs", breaking_change: false, author: "Ben Johnson", files_count: 9, insertions_count: 28, deletions_count: 24},
+		{sha: "0a4ef9774092eef2d9d48ec7167b73d46caf464a", date: "2019-07-21 10:05:28 +0000", description: "update batch_timeout unit to seconds across all docs", pr_number: null, scopes: [], type: "docs", breaking_change: false, author: "Ben Johnson", files_count: 9, insertions_count: 28, deletions_count: 24},
 		{sha: "a69668faab8c759e40377e696e5750f6bc58f244", date: "2019-07-21 09:16:01 +0000", description: "add support for armv7 releases, both gnueabihf and musleabihf", pr_number: 662, scopes: ["operations"], type: "chore", breaking_change: false, author: "Binary Logic", files_count: 6, insertions_count: 84, deletions_count: 4},
 		{sha: "d6f3a1a4c2f8da71b950725f7bb164f526c12386", date: "2019-07-19 11:10:53 +0000", description: "switch batch_timeout from bytes to seconds", pr_number: null, scopes: [], type: "docs", breaking_change: false, author: "Ben Johnson", files_count: 1, insertions_count: 1, deletions_count: 1},
 		{sha: "6812ca83f8de0a5c2bd6d131f3c7026b2a223d57", date: "2019-07-19 18:10:09 +0000", description: "Use correct units in example batch timeouts", pr_number: 664, scopes: [], type: "docs", breaking_change: false, author: "Alexander Rodin", files_count: 12, insertions_count: 12, deletions_count: 12},

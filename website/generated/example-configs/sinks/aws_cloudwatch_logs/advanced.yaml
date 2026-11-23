@@ -1,0 +1,15 @@
+sinks:
+  my_sink_id:
+    type: aws_cloudwatch_logs
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    create_missing_group: true
+    create_missing_stream: true
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.0:5000/path/to/service
+    group_name: group-name
+    region: us-east-1
+    stream_name: stream-{{ host }}

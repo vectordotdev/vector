@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use chrono::Utc;
 use serde_json::Value;
@@ -7,11 +7,12 @@ use vector_lib::{
     codecs::MetricTagValues,
     config::LogNamespace,
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{PathPrefix, event_path, owned_value_path, path},
 };
 use vrl::{
     path::OwnedValuePath,
-    value::{Kind, kind::Collection},
+    value::{Kind, ObjectMap, kind::Collection},
 };
 
 use crate::{
@@ -59,14 +60,14 @@ pub struct MetricToLogConfig {
     ///
     /// When set to `single`, only the last non-bare value of tags is displayed with the
     /// metric.  When set to `full`, all metric tags are exposed as separate assignments as
-    /// described by [the `native_json` codec][vector_native_json].
-    ///
-    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// arrays that retain every value, including bare values.
+    /// When set to `auto`, tag values are encoded using their underlying shape.
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 }
 
 impl MetricToLogConfig {
+    #[must_use]
     pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
         MetricToLog::new(
             self.host_tag.as_deref(),
@@ -78,8 +79,8 @@ impl MetricToLogConfig {
 }
 
 impl GenerateConfig for MetricToLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
             log_namespace: None,
@@ -122,6 +123,10 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
         .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
@@ -189,7 +194,10 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
                         ),
                     )
                     .with_known("count", Kind::integer())
-                    .with_known("sum", Kind::float()),
+                    // A histogram that reports no sum omits the field, so the schema must allow it
+                    // to be absent. The `aggregated_summary` equivalent below stays a plain float,
+                    // because a summary's sum is always reported.
+                    .with_known("sum", Kind::float().or_undefined()),
             )
             .or_undefined(),
             None,
@@ -262,6 +270,7 @@ pub struct MetricToLog {
 }
 
 impl MetricToLog {
+    #[must_use]
     pub fn new(
         host_tag: Option<&str>,
         timezone: TimeZone,
@@ -282,12 +291,13 @@ impl MetricToLog {
         }
     }
 
+    #[must_use]
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
         if self.tag_values == MetricTagValues::Single {
             metric.reduce_tags_to_single();
         }
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogSerializeError { error }))
+            .map_err(|error| emit(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -325,7 +335,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            vrl::value::Value::Object(BTreeMap::new()),
+                            vrl::value::Value::Object(ObjectMap::new()),
                         );
                     }
                     Some(log)
@@ -339,8 +349,8 @@ impl FunctionTransform for MetricToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
-            .map(|log| log.into());
-        output.extend(retval.into_iter())
+            .map(std::convert::Into::into);
+        output.extend(retval.into_iter());
     }
 }
 
@@ -349,7 +359,6 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
-    use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
@@ -372,7 +381,7 @@ mod tests {
     }
 
     async fn do_transform(metric: Metric) -> Option<LogEvent> {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = MetricToLogConfig {
                 host_tag: Some("host".into()),
                 timezone: None,
@@ -391,9 +400,9 @@ mod tests {
             assert_eq!(out.recv().await, None);
 
             result
-        })
+        }))
         .await
-        .map(|e| e.into_log())
+        .map(Event::into_log)
     }
 
     fn ts() -> DateTime<Utc> {
@@ -429,7 +438,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(counter).await.unwrap();
+        let log = Box::pin(do_transform(counter)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -460,7 +469,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(gauge).await.unwrap();
+        let log = Box::pin(do_transform(gauge)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -491,7 +500,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(set).await.unwrap();
+        let log = Box::pin(do_transform(set)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -524,7 +533,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(distro).await.unwrap();
+        let log = Box::pin(do_transform(distro)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -566,7 +575,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
-                sum: 50.0,
+                sum: Some(50.0),
             },
             event_metadata(),
         )
@@ -576,7 +585,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(histo).await.unwrap();
+        let log = Box::pin(do_transform(histo)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -632,7 +641,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(summary).await.unwrap();
+        let log = Box::pin(do_transform(summary)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -675,27 +684,27 @@ mod tests {
         #[test]
         fn transform_tag_single_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Single,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
+            );
             // The resulting tag must be either a single string value or not present.
             let value = values.into_single().map(|value| Value::Bytes(value.into()));
-            assert_eq!(tags.get(&*name), value.as_ref());
+            assert_eq!(tags.get(vrl::path!(&*name)), value.as_ref());
         }
 
         #[test]
         fn transform_tag_full_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Full,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
-            let tag = tags.get(&*name);
+            );
+            let tag = tags.get(vrl::path!(&*name));
             match values.len() {
                 // Empty tag set => missing tag
                 0 => assert_eq!(tag, None),
@@ -711,7 +720,7 @@ mod tests {
         tag.into_option().into()
     }
 
-    async fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
+    fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
         let counter = Metric::new(
             "counter",
             MetricKind::Absolute,

@@ -1,13 +1,26 @@
 #
 # VECTOR BUILDER
 #
-FROM docker.io/timberio/vector-dev:latest AS builder
+ARG RUST_VERSION=1
+FROM docker.io/rust:${RUST_VERSION}-slim-trixie AS builder
+
+# Copy the whole scripts/environment/ tree so prepare.sh can source its sibling
+# scripts on older checkouts in regression baseline builds.
+COPY scripts/environment/ /scripts/environment/
+
+RUN bash /scripts/environment/install-debian-build-deps.sh
+
 WORKDIR /vector
+COPY rust-toolchain.toml .
+
+RUN bash /scripts/environment/prepare.sh --modules=rustup
+RUN bash /scripts/environment/install-protoc.sh
+
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
-    cargo build --bin vector --release && \
+    /usr/bin/mold -run cargo build --bin vector --release && \
     cp target/release/vector .
 
 #

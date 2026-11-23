@@ -15,13 +15,17 @@ use nix::{
 };
 use serde_json::{Value, json};
 use similar_asserts::assert_eq;
+use tempfile::TempDir;
 use vector::test_util::{addr::next_addr, temp_file};
 
-use crate::{create_directory, create_file, overwrite_file};
+use crate::{create_directory, create_file, create_yaml_file, overwrite_file};
 
 const STARTUP_TIME: Duration = Duration::from_secs(2);
 const SHUTDOWN_TIME: Duration = Duration::from_secs(4);
 const RELOAD_TIME: Duration = Duration::from_secs(5);
+
+// Keep the directory alive until the subprocess has exited.
+type VectorCommand = (Command, TempDir);
 
 const STDIO_CONFIG: &str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
@@ -71,33 +75,38 @@ data_dir = "${{VECTOR_DATA_DIR}}"
     )
 }
 
-fn source_vector(source: &str) -> Command {
+fn source_vector(source: &str) -> VectorCommand {
     vector(source_config(source).as_str())
 }
 
-fn vector(config: &str) -> Command {
+fn vector(config: &str) -> VectorCommand {
     vector_with(create_file(config), next_addr().1, false)
 }
 
-fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Command {
+fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> VectorCommand {
+    let data_dir = create_directory();
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
         .arg(config_path)
         .arg(if quiet { "--quiet" } else { "-v" })
-        .env("VECTOR_DATA_DIR", create_directory())
+        .arg("--dangerously-allow-env-var-interpolation")
+        .env("VECTOR_DATA_DIR", data_dir.path())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
         .env("VECTOR_TEST_ADDRESS", address.to_string());
 
-    cmd
+    (cmd, data_dir)
 }
 
-fn test_timely_shutdown(cmd: Command) {
+fn test_timely_shutdown(cmd: VectorCommand) {
     test_timely_shutdown_with_sub(cmd, |_| ());
 }
 
 /// Returns stdout output
 #[allow(clippy::print_stdout)]
-fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
+fn test_timely_shutdown_with_sub(
+    (mut cmd, _data_dir): VectorCommand,
+    sub: impl FnOnce(&mut Child),
+) {
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -114,7 +123,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     sub(&mut vector);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Time shutdown.
     let now = Instant::now();
@@ -138,11 +147,13 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
 
 #[test]
 fn auto_shutdown() {
+    let data_dir = create_directory();
     let mut cmd = assert_cmd::Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(STDIO_CONFIG))
-        .env("VECTOR_DATA_DIR", create_directory());
+        .env("VECTOR_DATA_DIR", data_dir.path());
 
     // Once `stdin source` reads whole buffer it will automatically
     // shutdown which will also cause vector process to shutdown
@@ -154,9 +165,11 @@ fn auto_shutdown() {
 
 #[test]
 fn log_schema() {
+    let data_dir = create_directory();
     // Vector command
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(
             r#"
@@ -172,7 +185,7 @@ fn log_schema() {
             encoding.codec = "json"
     "#,
         ))
-        .env("VECTOR_DATA_DIR", create_directory());
+        .env("VECTOR_DATA_DIR", data_dir.path());
 
     // Run vector
     let mut vector = cmd
@@ -202,22 +215,23 @@ fn log_schema() {
 
 #[test]
 fn log_schema_multiple_config_files() {
+    let data_dir = create_directory();
     // Vector command
     let mut cmd = Command::cargo_bin("vector").unwrap();
 
     let config_dir = create_directory();
 
-    let sinks_config_dir = config_dir.join("sinks");
+    let sinks_config_dir = config_dir.path().join("sinks");
     create_dir(sinks_config_dir.clone()).unwrap();
 
-    let sources_config_dir = config_dir.join("sources");
+    let sources_config_dir = config_dir.path().join("sources");
     create_dir(sources_config_dir.clone()).unwrap();
 
     let input_dir = create_directory();
-    let input_file = input_dir.join("input_file");
+    let input_file = input_dir.path().join("input_file");
 
     overwrite_file(
-        config_dir.join("vector.toml"),
+        config_dir.path().join("vector.toml"),
         r#"
     data_dir = "${VECTOR_DATA_DIR}"
     log_schema.host_key = "test_host"
@@ -243,14 +257,15 @@ fn log_schema_multiple_config_files() {
 
     overwrite_file(
         input_file.clone(),
-        r#"42
-    "#,
+        r"42
+    ",
     );
 
     cmd.arg("--quiet")
-        .env("VECTOR_CONFIG_DIR", config_dir)
-        .env("VECTOR_DATA_DIR", create_directory())
-        .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
+        .arg("--dangerously-allow-env-var-interpolation")
+        .env("VECTOR_CONFIG_DIR", config_dir.path())
+        .env("VECTOR_DATA_DIR", data_dir.path())
+        .env("VECTOR_TEST_INPUT_FILE", input_file);
 
     // Run vector
     let vector = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
@@ -259,7 +274,7 @@ fn log_schema_multiple_config_files() {
     sleep(STARTUP_TIME);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Wait for shutdown
     let output = vector.wait_with_output().unwrap();
@@ -268,7 +283,14 @@ fn log_schema_multiple_config_files() {
     // Output
     let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
     assert_eq!(event["message"], json!("42"));
-    assert_eq!(event["test_host"], json!("runner"));
+    if std::env::var("CI").as_deref() == Ok("true") {
+        assert_eq!(event["test_host"], json!("runner"));
+    } else {
+        assert!(
+            event["test_host"].is_string(),
+            "expected test_host to be a string"
+        );
+    }
 }
 
 #[test]
@@ -278,7 +300,7 @@ fn configuration_path_recomputed() {
 
     // First configuration file
     overwrite_file(
-        dir.join("conf1.toml"),
+        dir.path().join("conf1.toml"),
         &source_config(
             r#"
         type = "demo_logs"
@@ -290,7 +312,7 @@ fn configuration_path_recomputed() {
 
     // Vector command
     let (_guard, address) = next_addr();
-    let mut cmd = vector_with(dir.join("*"), address, true);
+    let (mut cmd, _data_dir) = vector_with(dir.path().join("*"), address, true);
 
     // Run vector
     let mut vector = cmd
@@ -303,14 +325,14 @@ fn configuration_path_recomputed() {
     sleep(STARTUP_TIME);
 
     // Second configuration file
-    overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
+    overwrite_file(dir.path().join("conf2.toml"), STDIO_CONFIG);
     // Clean the first file so to have only the console source.
-    overwrite_file(dir.join("conf1.toml"), "");
+    overwrite_file(dir.path().join("conf1.toml"), "");
 
     // Signal reload
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGHUP).unwrap();
 
-    // Message to assert, sended to console source and picked up from
+    // Message to assert, sent to console source and picked up from
     // console sink, both added in the second configuration file.
     vector
         .stdin
@@ -331,7 +353,7 @@ fn configuration_path_recomputed() {
 #[test]
 fn remove_unix_socket_stream() {
     let dir = create_directory();
-    let mut path = dir.clone();
+    let mut path = dir.path().to_path_buf();
     path.push("tmp");
     path.set_extension("sock");
 
@@ -345,13 +367,13 @@ fn remove_unix_socket_stream() {
     )));
 
     // Assert that data folder is empty
-    assert!(read_dir(dir).unwrap().next().is_none());
+    assert!(read_dir(dir.path()).unwrap().next().is_none());
 }
 
 #[test]
 fn remove_unix_socket_datagram() {
     let dir = create_directory();
-    let mut path = dir.clone();
+    let mut path = dir.path().to_path_buf();
     path.push("tmp");
     path.set_extension("sock");
 
@@ -365,7 +387,7 @@ fn remove_unix_socket_datagram() {
     )));
 
     // Assert that data folder is empty
-    assert!(read_dir(dir).unwrap().next().is_none());
+    assert!(read_dir(dir.path()).unwrap().next().is_none());
 }
 
 #[test]
@@ -397,7 +419,7 @@ fn timely_shutdown_demo_logs() {
 fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "http"
+    type = "http_server"
     address = "${VECTOR_TEST_ADDRESS}"
     decoding.codec = "bytes""#,
     ));
@@ -563,6 +585,8 @@ fn timely_shutdown_internal_metrics() {
 fn timely_shutdown_lua_timer() {
     test_timely_shutdown(vector(
         r#"
+data_dir = "${VECTOR_DATA_DIR}"
+
 [sources.source]
    type = "stdin"
 
@@ -614,10 +638,10 @@ fn timely_reload_shutdown() {
     );
 
     let (_guard, address) = next_addr();
-    let mut cmd = vector_with(path.clone(), address, false);
+    let (mut cmd, data_dir) = vector_with(path.clone(), address, false);
     cmd.arg("-w");
 
-    test_timely_shutdown_with_sub(cmd, |vector| {
+    test_timely_shutdown_with_sub((cmd, data_dir), |vector| {
         overwrite_file(
             path,
             source_config(
@@ -643,30 +667,28 @@ fn timely_reload_shutdown() {
 
 #[tokio::test]
 async fn health_503_during_shutdown() {
-    use std::process::Command;
-
+    let data_dir = create_directory();
     let mut cmd = Command::cargo_bin("vector").unwrap();
-
-    cmd.arg("--quiet")
-        .arg("-c")
-        .arg(create_file(
-            r#"
-            [api]
-              enabled = true
-              address = "127.0.0.1:8686"
-
-            [sources.source]
-              type = "demo_logs"
-              format = "json"
-              interval = 0
-
-            [sinks.sink]
-              type = "blackhole"
-              inputs = ["source"]
-              rate = 1
-            "#,
-        ))
-        .env("VECTOR_DATA_DIR", create_directory());
+    let config = format!(
+        r"
+        data_dir: {data_dir}
+        api:
+          enabled: true
+          address: 127.0.0.1:8686
+        sources:
+          source:
+            type: demo_logs
+            format: json
+            interval: 0
+        sinks:
+          sink:
+            type: blackhole
+            inputs: [source]
+            rate: 1
+        ",
+        data_dir = serde_json::to_string(data_dir.path()).unwrap(),
+    );
+    cmd.arg("--quiet").arg("-c").arg(create_yaml_file(&config));
 
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
@@ -681,14 +703,15 @@ async fn health_503_during_shutdown() {
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Give vector time to begin shutting down.
     sleep(Duration::from_secs(1));
 
     let response = reqwest::get("http://127.0.0.1:8686/health").await.unwrap();
 
-    assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
 
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGKILL).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGKILL).unwrap();
+    vector.wait().unwrap();
 }

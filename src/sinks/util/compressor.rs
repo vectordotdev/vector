@@ -19,7 +19,7 @@ enum Writer {
 }
 
 impl Writer {
-    pub fn get_ref(&self) -> &BytesMut {
+    fn get_ref(&self) -> &BytesMut {
         match self {
             Writer::Plain(inner) => inner.get_ref(),
             Writer::Gzip(inner) => inner.get_ref().get_ref().get_ref(),
@@ -29,7 +29,7 @@ impl Writer {
         }
     }
 
-    pub fn into_inner(self) -> BytesMut {
+    fn into_inner(self) -> BytesMut {
         match self {
             Writer::Plain(writer) => writer,
             Writer::Gzip(writer) => writer
@@ -52,7 +52,7 @@ impl Writer {
         .into_inner()
     }
 
-    pub fn finish(self) -> io::Result<BytesMut> {
+    fn finish(self) -> io::Result<BytesMut> {
         let buf = match self {
             Writer::Plain(writer) => writer,
             Writer::Gzip(writer) => writer.into_inner()?.finish()?,
@@ -127,7 +127,8 @@ pub struct Compressor {
 }
 
 impl Compressor {
-    /// Gets a mutable reference to the underlying buffer.
+    /// Gets a reference to the underlying buffer.
+    #[must_use]
     pub fn get_ref(&self) -> &BytesMut {
         self.inner.get_ref()
     }
@@ -140,6 +141,7 @@ impl Compressor {
     ///
     /// Some callers can benefit from knowing whether or not compression is actually taking place,
     /// as different size limitations may come into play.
+    #[must_use]
     pub const fn is_compressed(&self) -> bool {
         self.compression.is_compressed()
     }
@@ -163,6 +165,7 @@ impl Compressor {
     /// footer/checksum data.
     ///
     /// Consider using `finish` if catching these scenarios is important.
+    #[must_use]
     pub fn into_inner(self) -> BytesMut {
         self.inner.into_inner()
     }

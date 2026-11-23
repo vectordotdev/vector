@@ -1,13 +1,16 @@
 [package]
 name = "vector-stream"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
 async-stream.workspace = true
-futures.workspace = true
+futures = { workspace = true, features = ["async-await"] }
 futures-util.workspace = true
 pin-project.workspace = true
 tokio = { workspace = true, features = ["full"] }

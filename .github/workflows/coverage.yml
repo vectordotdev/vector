@@ -1,39 +1,150 @@
-name: Code Coverage
+# Collect original reports from every producer, validate the full inventory,
+# then let Datadog aggregate them with unit/integration flags. E2E tests still
+# run, but their runner does not measure the separately launched Vector binary.
+name: Coverage
 
 on:
-  push:
-    branches:
-      - master
-  workflow_dispatch: # Allow manual trigger from GitHub UI
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to test (resolved once to an immutable commit)"
+        required: false
+        type: string
+      branch:
+        description: "Branch owning the tested commit"
+        required: false
+        type: string
+  schedule:
+    - cron: "0 2 * * 0" # 2 AM UTC every Sunday
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
   CI: true
-  CARGO_INCREMENTAL: "0" # Disable incremental compilation for coverage
 
 jobs:
-  coverage:
+  prepare:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/setup
         with:
           rust: true
-          libsasl2: true
-          protoc: true
-          cargo-llvm-cov: true
-          cargo-nextest: true
-          datadog-ci: true
-
-      - name: "Generate code coverage"
-        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
-
-      - name: "Upload coverage to Datadog"
+          mold: false
+          vdev: true
+      - name: Resolve tested commit and expected reports
+        id: commit
         env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          COVERAGE_RUN_ID: ${{ github.run_id }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/coverage-tools"
+          cp "$(command -v vdev)" "$RUNNER_TEMP/coverage-tools/vdev"
+          vdev build coverage plan \
+            --workflow ".github/workflows/integration.yml" \
+            --run-id "$COVERAGE_RUN_ID" \
+            --output "$RUNNER_TEMP/coverage-tools/plan.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools/
+          if-no-files-found: error
+          overwrite: true
+
+  tests:
+    needs: prepare
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ref: ${{ needs.prepare.outputs.commit }}
+      default: true
+      coverage: true
+      cli: true
+      vector-api: true
+
+  integration-tests:
+    needs: prepare
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/integration.yml
+    with:
+      run_all: true
+      coverage: true
+      ref: ${{ needs.prepare.outputs.commit }}
+    secrets: inherit
+
+  coverage-upload:
+    name: Validate and Publish Coverage
+    runs-on: ubuntu-24.04
+    needs: [prepare, tests, integration-tests]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      COVERAGE_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools
+      - name: Use workflow coverage tooling
+        run: |
+          chmod +x "$RUNNER_TEMP/coverage-tools/vdev"
+          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts
+          merge-multiple: false
+      - name: Validate complete collection
+        run: |
+          cp "$RUNNER_TEMP/coverage-tools/plan.json" coverage-plan.json
+          vdev build coverage publish \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --directory coverage-artifacts --summary coverage-summary.json \
+            --branch "$COVERAGE_BRANCH" --validate-only
+      - name: Archive original reports and validation summary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: archive-coverage-reports
+          path: |
+            coverage-artifacts/
+            coverage-summary.json
+            coverage-plan.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          datadog-ci: true
+      - uses: ./.github/actions/dd-token
+        with:
+          fail-on-error: true
+      - name: Publish original reports to Datadog
+        env:
           DD_SITE: datadoghq.com
           DD_ENV: ci
-        run: datadog-ci coverage upload lcov.info
+        run: |
+          : "${DD_API_KEY:?Datadog federation did not provide an API key}"
+          vdev build coverage publish \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --directory coverage-artifacts --summary coverage-summary.json \
+            --branch "$COVERAGE_BRANCH"

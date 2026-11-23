@@ -1,12 +1,15 @@
 [package]
 name = "prometheus-parser"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>", "Duy Do <juchiast@gmail.com>"]
 edition = "2024"
 publish = false
 license = "MPL-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints]
+workspace = true
 
 [dependencies]
 indexmap.workspace = true

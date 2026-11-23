@@ -1,12 +1,11 @@
-use metrics::counter;
 use tracing::error;
 use vector_lib::{
-    NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsEventLogParseError {
+pub(crate) struct WindowsEventLogParseError {
     pub error: String,
     pub channel: String,
     pub event_id: Option<u32>,
@@ -25,7 +24,7 @@ impl InternalEvent for WindowsEventLogParseError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "parse_failed",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -35,7 +34,7 @@ impl InternalEvent for WindowsEventLogParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsEventLogQueryError {
+pub(crate) struct WindowsEventLogQueryError {
     pub channel: String,
     pub query: Option<String>,
     pub error: String,
@@ -54,7 +53,7 @@ impl InternalEvent for WindowsEventLogQueryError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "query_failed",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -64,7 +63,7 @@ impl InternalEvent for WindowsEventLogQueryError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct WindowsEventLogBookmarkError {
+pub(crate) struct WindowsEventLogBookmarkError {
     pub channel: String,
     pub error: String,
 }
@@ -81,7 +80,7 @@ impl InternalEvent for WindowsEventLogBookmarkError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "bookmark_failed",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,

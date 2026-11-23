@@ -1,9 +1,14 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, sync::Arc};
 
-use governor::{
-    Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
-};
+use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore};
 use tokio;
+
+use super::transform::Throttle;
+use vector_lib::cpu_time::spawn_timed;
+
+/// A keyed rate limiter with a `DashMap` state store and no middleware.
+type KeyedRateLimiter<K, C> =
+    RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<<C as clock::Clock>::Instant>>;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.
@@ -12,7 +17,7 @@ where
     K: Hash + Eq + Clone,
     C: clock::Clock,
 {
-    pub rate_limiter: Arc<RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<C::Instant>>>,
+    pub rate_limiter: Arc<KeyedRateLimiter<K, C>>,
     flush_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -21,11 +26,16 @@ where
     K: Hash + Eq + Clone + Send + Sync + 'static,
     C: clock::Clock + Clone + Send + Sync + 'static,
 {
-    pub fn start(quota: Quota, clock: C, flush_keys_interval: Duration) -> Self {
-        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
+    pub fn start(throttle: &Throttle<C, C::Instant>) -> Self {
+        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(
+            throttle.quota,
+            throttle.clock.clone(),
+        ));
+
+        let flush_keys_interval = throttle.flush_keys_interval;
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        let flush_handle = tokio::spawn(async move {
+        let flush_handle = spawn_timed(async move {
             let mut interval = tokio::time::interval(flush_keys_interval);
             loop {
                 interval.tick().await;
