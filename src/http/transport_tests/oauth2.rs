@@ -453,7 +453,33 @@ async fn oauth2_token_request_times_out() {
 }
 
 #[tokio::test]
-async fn oauth2_unauthorized_response_discards_the_cached_token() {
+async fn oauth2_token_response_parse_error_hides_the_access_token() {
+    // The token server returns a body that Vector cannot parse. Vector must not copy that body
+    // into the error message, which Vector logs.
+    let token_server = super::spawn_server(no_tls(), |_request: Request<Incoming>| async move {
+        Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from_static(
+                br#"{"access_token":"live-secret","expires_in":{}}"#,
+            )))
+            .unwrap()
+    })
+    .await;
+    let origin = spawn_origin(no_tls()).await;
+    let config = oauth2_config(format!("{}/oauth/token", token_server.http_uri()), 60);
+    let client = client_with_oauth2(config, None);
+
+    let error = get(&client, &origin.http_uri())
+        .await
+        .expect_err("a malformed token response must fail the request");
+    assert!(
+        !error.to_string().contains("live-secret"),
+        "the access token must not enter the error message: {error}"
+    );
+}
+
+#[tokio::test]
+async fn oauth2_unauthorized_response_is_retriable_and_discards_the_cached_token() {
     let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(1));
     let token_server = spawn_token_server(no_tls(), move || {
         let number = fetched.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -483,7 +509,13 @@ async fn oauth2_unauthorized_response_discards_the_cached_token() {
     let client = client_with_oauth2(oauth2_config(token_server.token_endpoint(false), 60), None);
     let origin_uri = origin.http_uri();
 
-    get(&client, &origin_uri).await.unwrap();
+    let error = get(&client, &origin_uri)
+        .await
+        .expect_err("a rejected access token must fail retriably");
+    assert!(
+        error.is_retriable(),
+        "the sink must retry the request with a new access token"
+    );
     get(&client, &origin_uri).await.unwrap();
 
     assert_eq!(

@@ -142,19 +142,25 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
-                    // The authorization server may revoke the access token, or expire it before
-                    // the lifetime it announced. Vector then discards it, so the next request
-                    // fetches a new one.
-                    if response.status() == StatusCode::UNAUTHORIZED
-                        && let (Some(oauth2), Some(token)) = (&self.oauth2, &oauth2_token)
-                    {
-                        oauth2.invalidate(token);
-                    }
-
                     emit(GotHttpResponse {
                         response: &response,
                         roundtrip,
                     });
+
+                    // The resource server can reject an access token that the authorization
+                    // server already revoked, or that expired before the lifetime it announced.
+                    // Vector discards the cached token. A `401` response alone would be rejected
+                    // without a retry, so this reports a retriable error instead and the sink
+                    // retries the request with a new access token.
+                    if response.status() == StatusCode::UNAUTHORIZED
+                        && let (Some(oauth2), Some(token)) = (&self.oauth2, &oauth2_token)
+                    {
+                        oauth2.invalidate(token);
+                        return Err(HttpError::new(RejectedAccessToken {
+                            status: response.status(),
+                        }));
+                    }
+
                     Ok(response)
                 }
                 Err(error) => {
@@ -170,6 +176,28 @@ impl HttpClient {
         .await
     }
 }
+
+/// The resource server rejected the OAuth 2.0 access token.
+///
+/// [`HttpClient::send`] reports this as a retriable error, so the sink sends the request again
+/// with the access token that it fetches next.
+#[derive(Debug)]
+struct RejectedAccessToken {
+    status: StatusCode,
+}
+
+impl fmt::Display for RejectedAccessToken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "the resource server rejected the OAuth 2.0 access token with {}. Vector discarded the \
+             cached token and retries the request.",
+            self.status
+        )
+    }
+}
+
+impl std::error::Error for RejectedAccessToken {}
 
 fn default_user_agent() -> HeaderValue {
     HeaderValue::from_str(&format!(
