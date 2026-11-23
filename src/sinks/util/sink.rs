@@ -16,8 +16,8 @@
 //! and will provide full batching, and request dispatching based on
 //! the settings passed.
 //!
-//! For more advanced use cases like HTTP based sinks, one should use the
-//! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
+//! HTTP based sinks instead use a `StreamSink` that drives the native HTTP 1
+//! `http::HttpService`.
 //!
 //! # Driving to completion
 //!
@@ -39,6 +39,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll, ready},
 };
+use vector_lib::internal_event::{emit, register};
 
 use futures::{FutureExt, Sink, Stream, TryFutureExt, future::BoxFuture, stream::FuturesUnordered};
 use pin_project::pin_project;
@@ -48,6 +49,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
+use vector_lib::cpu_time::spawn_timed;
 use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
@@ -63,6 +65,13 @@ use super::{
 use crate::event::EventStatus;
 
 // === BatchSink ===
+
+/// The [`PartitionBatchSink`] used by [`BatchSink`], with a single unit partition.
+type UnpartitionedBatchSink<S, B> = PartitionBatchSink<
+    Map<S, PartitionInnerBuffer<<B as Batch>::Output, ()>, <B as Batch>::Output>,
+    PartitionBuffer<B, ()>,
+    (),
+>;
 
 /// A `Sink` interface that wraps a `Service` and a
 /// `Batch`.
@@ -88,11 +97,7 @@ where
     B: Batch,
 {
     #[pin]
-    inner: PartitionBatchSink<
-        Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
-        PartitionBuffer<B, ()>,
-        (),
-    >,
+    inner: UnpartitionedBatchSink<S, B>,
 }
 
 impl<S, B> BatchSink<S, B>
@@ -322,7 +327,7 @@ where
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();
-                    let future = crate::spawn_in_current_span(this.service.call(batch));
+                    let future = spawn_timed(this.service.call(batch));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
@@ -440,7 +445,7 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
-        let events_sent = register!(EventsSent::from(Output(None)));
+        let events_sent = register(EventsSent::from(Output(None)));
         self.service
             .call(items)
             .err_into()
@@ -456,7 +461,7 @@ where
                         // Emit the `Error` and `EventsDropped` internal events.
                         // This scenario occurs after retries have been attempted.
                         let error = result.err().unwrap_or_else(|| "Response failed.".into());
-                        emit!(CallError {
+                        emit(CallError {
                             error,
                             request_id,
                             count,

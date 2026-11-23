@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, configurable::configurable_component, lookup::OwnedValuePath,
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, internal_event::emit,
+    lookup::OwnedValuePath,
 };
 
 use crate::{
@@ -101,10 +102,10 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
             .handle_event(received_from, frame)
             .map(|event| {
                 if let Event::Log(ref log_event) = event {
-                    emit!(SocketEventsReceived {
+                    emit(SocketEventsReceived {
                         mode: SocketMode::Unix,
                         byte_size: log_event.estimated_json_encoded_size_of(),
-                        count: 1
+                        count: 1,
                     });
                 }
                 event

@@ -4,7 +4,10 @@ use tokio_stream::{wrappers::IntervalStream, StreamExt};
 use vector_common::shutdown::ShutdownSignal;
 use vrl::{
     diagnostic::Label,
-    prelude::{expression::Expr, *},
+    prelude::{
+        expression::Expr, fmt, Context, DiagnosticMessage, Expression, ExpressionError, Field,
+        KeyString, Kind, NotNan, Span, TypeState, Value,
+    },
     value,
 };
 
@@ -142,7 +145,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
             BTreeMap::from_iter(
                 value
                 .tags()
-                .map(|t| {
+                .map_or_else(Vec::new, |t| {
                     t.iter_sets()
                         .map(|(k, v)| {
                             (
@@ -157,8 +160,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
                             )
                         })
                     .collect::<Vec<_>>()
-                })
-                .unwrap_or_default(),
+                }),
             )
         },
         "type": { value.value().as_name() },
@@ -215,7 +217,7 @@ pub(crate) fn resolve_tags(
 mod tests {
     use vector_core::{
         compile_vrl,
-        event::{Event, LogEvent, MetricKind, MetricTagMode, MetricTags, VrlTarget},
+        event::{Event, LogEvent, MetricKind, MetricTagMode, MetricTags, ObjectMap, VrlTarget},
     };
     use vrl::{
         compiler::{
@@ -223,6 +225,7 @@ mod tests {
             CompilationResult, CompileConfig,
         },
         diagnostic::DiagnosticList,
+        prelude::TimeZone,
     };
 
     use super::*;
@@ -262,7 +265,7 @@ mod tests {
     }
 
     fn assert_metric_matches(
-        metric: &BTreeMap<KeyString, Value>,
+        metric: &ObjectMap,
         name: &str,
         value: f64,
         tags: Option<Vec<(&str, &str)>>,

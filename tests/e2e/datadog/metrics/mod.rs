@@ -1,8 +1,13 @@
+use std::time::Duration;
+
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
 use serde_json::Value;
-use tokio::io::{AsyncReadExt, BufReader};
+use tokio::{
+    io::{AsyncReadExt, BufReader},
+    time::{Instant, sleep},
+};
 use tracing::{debug, warn};
 use vector::test_util::{compression::is_zstd, trace_init};
 use vector_common::Result;
@@ -110,13 +115,12 @@ where
 async fn validate() {
     trace_init();
 
-    // Even with configuring docker service dependencies, we need a small buffer of time
-    // to ensure events flow through to fakeintake before asking for them
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    // Wait for workload data, not compilation time, to make both pipelines ready.
+    // Leave time to report failures before nextest's two-minute test timeout.
+    let deadline = Instant::now() + Duration::from_secs(90);
+    series::validate(deadline).await;
 
-    series::validate().await;
-
-    sketches::validate().await;
+    sketches::validate(deadline).await;
 }
 
 async fn compress_with_zstd(data: &[u8]) -> Vec<u8> {

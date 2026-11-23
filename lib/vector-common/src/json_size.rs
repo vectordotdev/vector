@@ -1,6 +1,7 @@
 use std::{
     fmt,
     iter::Sum,
+    num::NonZeroUsize,
     ops::{Add, AddAssign, Sub},
 };
 
@@ -85,21 +86,23 @@ impl JsonSize {
     }
 }
 
+/// Wraps `NonZeroUsize` so `Option<NonZeroJsonSize>` stays pointer-sized, which keeps
+/// `AtomicCell<Option<NonZeroJsonSize>>` lock-free.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::module_name_repetitions)]
-pub struct NonZeroJsonSize(JsonSize);
+pub struct NonZeroJsonSize(NonZeroUsize);
 
 impl NonZeroJsonSize {
     #[must_use]
     #[inline]
     pub fn new(size: JsonSize) -> Option<Self> {
-        (size.0 > 0).then_some(NonZeroJsonSize(size))
+        NonZeroUsize::new(size.0).map(Self)
     }
 }
 
 impl From<NonZeroJsonSize> for JsonSize {
     #[inline]
     fn from(value: NonZeroJsonSize) -> Self {
-        value.0
+        Self(value.0.get())
     }
 }

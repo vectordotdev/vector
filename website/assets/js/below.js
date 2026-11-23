@@ -3,10 +3,24 @@ import tocbot from "tocbot";
 // Table of contents for documentation pages
 const tableOfContents = () => {
   if (document.getElementById("toc")) {
+    const content = document.getElementById("page-content");
     tocbot.init({
       tocSelector: "#toc",
       contentSelector: "#page-content",
-      headingSelector: "h2,h3,h4,h5",
+      headingSelector: content?.dataset.tocHeadings || "h2,h3,h4,h5",
+      includeTitleTags: Boolean(content?.dataset.tocHeadings),
+      headingObjectCallback: (heading, element) => {
+        // Notice cards sit below their section; headings inside their bodies are excluded.
+        if (element.matches(".changelog-card")) {
+          return {
+            ...heading,
+            nodeName: "H3",
+            headingLevel: 3,
+            textContent: element.querySelector("[data-toc-title]").textContent.trim()
+          };
+        }
+        return heading;
+      },
       scrollSmoothDuration: 400,
       headingsOffset: 80,
       scrollSmoothOffset: -80,
@@ -15,16 +29,7 @@ const tableOfContents = () => {
   }
 };
 
-const showCodeFilename = () => {
-  var els = document.getElementsByClassName("highlight");
-  for (var i = 0; i < els.length; i++) {
-    if (els[i].title.length) {
-      var newNode = document.createElement("div");
-      newNode.innerHTML = `<span class="code-sample-filename">${els[i].title}</span>`;
-      els[i].parentNode.insertBefore(newNode, els[i]);
-    }
-  }
-};
+document.addEventListener("deprecations-sorted", tableOfContents);
 
 // Text of a code block, without line numbers. Returns null if the code can't be identified.
 const codeBlockText = (block) => {
@@ -48,12 +53,51 @@ const failedIcon = svgIcon(
   '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
 );
 
-// Copy buttons for code blocks in page content
-const addCopyButtons = () => {
-  if (!navigator.clipboard?.writeText) return;
+// Copy the full snippet even when its content is collapsed.
+const addCopyButton = (block, controls) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "code-copy-button";
+  button.setAttribute("aria-label", "Copy code to clipboard");
+  button.title = "Copy";
+  button.innerHTML = copyIcon;
 
-  // Raw HTML code blocks (e.g. in generated component descriptions) lack Hugo's .highlight wrapper
-  document.querySelectorAll("#page-content pre.chroma").forEach((pre) => {
+  const status = document.createElement("span");
+  status.className = "sr-only";
+  status.setAttribute("aria-live", "polite");
+
+  let resetTimer;
+  let copying = false;
+  button.addEventListener("click", async () => {
+    // Guard with a flag rather than `disabled`, which can drop keyboard focus
+    if (copying) return;
+    copying = true;
+    clearTimeout(resetTimer);
+    try {
+      await navigator.clipboard.writeText(codeBlockText(block));
+      button.innerHTML = copiedIcon;
+      button.title = status.textContent = "Copied!";
+    } catch {
+      button.innerHTML = failedIcon;
+      button.title = status.textContent = "Copy failed. Select the code to copy it manually.";
+    } finally {
+      copying = false;
+    }
+    resetTimer = setTimeout(() => {
+      button.innerHTML = copyIcon;
+      button.title = "Copy";
+      status.textContent = "";
+    }, 2000);
+  });
+
+  controls.append(button, status);
+};
+
+const collapsibleCodeLineCount = 20;
+
+const addCodeControls = () => {
+  // Plain-text and raw HTML code blocks lack Hugo's .highlight wrapper.
+  document.querySelectorAll("#page-content pre").forEach((pre) => {
     if (pre.closest(".highlight")) return;
     const wrapper = document.createElement("div");
     wrapper.className = "highlight";
@@ -61,46 +105,63 @@ const addCopyButtons = () => {
     wrapper.append(pre);
   });
 
-  document.querySelectorAll("#page-content .highlight").forEach((block) => {
-    if (codeBlockText(block) === null) return;
+  document.querySelectorAll("#page-content .highlight").forEach((block, index) => {
+    const text = codeBlockText(block);
+    if (text === null) return;
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "code-copy-button";
-    button.setAttribute("aria-label", "Copy code to clipboard");
-    button.title = "Copy";
-    button.innerHTML = copyIcon;
+    const lineCount = text.split("\n").length;
+    const collapsedByDefault = block.parentElement.dataset.codeCollapsed === "true";
+    const collapsible = collapsedByDefault || lineCount > collapsibleCodeLineCount;
+    const canCopy = Boolean(navigator.clipboard?.writeText);
+    const filename = block.title || block.parentElement.dataset.codeFilename;
+    const hasHeader = Boolean(filename) || collapsible;
+    if (!hasHeader && !canCopy) return;
 
-    const status = document.createElement("span");
-    status.className = "sr-only";
-    status.setAttribute("aria-live", "polite");
+    const content = block.firstElementChild;
+    content.classList.add("code-block-content");
+    block.classList.add("has-code-controls");
 
-    let resetTimer;
-    let copying = false;
-    button.addEventListener("click", async () => {
-      // Guard with a flag rather than `disabled`, which can drop keyboard focus
-      if (copying) return;
-      copying = true;
-      clearTimeout(resetTimer);
-      try {
-        await navigator.clipboard.writeText(codeBlockText(block));
-        button.innerHTML = copiedIcon;
-        button.title = status.textContent = "Copied!";
-      } catch {
-        button.innerHTML = failedIcon;
-        button.title = status.textContent = "Copy failed. Select the code to copy it manually.";
-      } finally {
-        copying = false;
+    const controls = document.createElement("div");
+    controls.className = "code-block-controls";
+
+    if (hasHeader) {
+      block.classList.add("has-code-header");
+      const label = document.createElement("span");
+      label.className = "code-line-count";
+      if (filename) {
+        const title = document.createElement("span");
+        title.className = "code-sample-filename";
+        title.textContent = filename;
+        label.append(title);
       }
-      resetTimer = setTimeout(() => {
-        button.innerHTML = copyIcon;
-        button.title = "Copy";
-        status.textContent = "";
-      }, 2000);
-    });
+      if (collapsible) label.append(`${filename ? " · " : ""}${lineCount} lines`);
+      controls.append(label);
+      block.prepend(controls);
+    } else {
+      block.append(controls);
+    }
 
-    block.classList.add("has-copy-button");
-    block.append(button, status);
+    if (collapsible) {
+      block.classList.add("is-collapsible");
+      content.id ||= `code-block-content-${index}`;
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "code-toggle-button";
+      content.hidden = collapsedByDefault;
+      toggle.textContent = content.hidden ? "Expand" : "Collapse";
+      toggle.setAttribute("aria-expanded", String(!content.hidden));
+      toggle.setAttribute("aria-controls", content.id);
+      toggle.addEventListener("click", () => {
+        content.hidden = !content.hidden;
+        toggle.setAttribute("aria-expanded", String(!content.hidden));
+        toggle.textContent = content.hidden ? "Expand" : "Collapse";
+      });
+
+      controls.append(toggle);
+    }
+
+    if (canCopy) addCopyButton(block, controls);
   });
 };
 
@@ -108,6 +169,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // search.start();
 
   tableOfContents();
-  showCodeFilename();
-  addCopyButtons();
+  addCodeControls();
+
+  // Code controls change the layout after Firefox may have followed the URL fragment.
+  document.querySelector(":target")?.scrollIntoView();
 });

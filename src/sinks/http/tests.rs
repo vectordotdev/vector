@@ -8,22 +8,26 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
-use hyper::{Body, Method, Response, StatusCode};
+use http::{Method, Response, StatusCode};
+use http_body_util::Full;
 use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::FramingConfig,
+        JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
     finalization::AddBatchNotifier,
+    metrics::Controller,
     serde::AsciiChar,
+    stream::batcher::limiter::ItemBatchSize as _,
 };
 
 use vrl::event_path;
 
 use super::{
+    batch::HttpBatchSizer,
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
 };
@@ -129,6 +133,74 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_native_json_batch_sizing_does_not_report_dropped_events() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    let config = indoc::indoc! {r#"
+        uri: "http://127.0.0.1:8080"
+        encoding:
+          codec: native_json
+          except_fields: [bad]
+        framing:
+          method: newline_delimited
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
+    let encoder = config.build_encoder().unwrap();
+    let sizer = HttpBatchSizer {
+        encoder: encoder.clone(),
+    };
+    let expected = Event::Log(LogEvent::from("keep this event"));
+    let mut event = expected.clone();
+    let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+    event.as_mut_log().insert(event_path!("bad"), too_deep);
+
+    assert_eq!(sizer.size(&event), event.size_of());
+
+    let filtered_encoder = HttpEncoder::new(
+        encoder.clone(),
+        config.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+    let mut output = Vec::new();
+    filtered_encoder
+        .encode_input(vec![event.clone()], &mut output)
+        .expect("excluding the deeply nested field should allow encoding");
+    let decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(output.into(), crate::config::LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.as_slice(), &[expected]);
+
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        assert!(
+            !metrics.iter().any(|metric| metric.name() == name),
+            "batch sizing must not report {name} for an event that encodes after filtering"
+        );
+    }
+
+    let unfiltered_encoder = HttpEncoder::new(
+        encoder,
+        Transformer::default(),
+        String::new(),
+        String::new(),
+    );
+    assert!(
+        unfiltered_encoder
+            .encode_input(vec![event], &mut Vec::new())
+            .is_err()
+    );
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
+    }
 }
 
 #[test]
@@ -462,10 +534,10 @@ async fn retries_on_temporary_error() {
                 // Send a temporary error for the first two responses
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::empty())
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::default())
             }
         });
 
@@ -518,10 +590,10 @@ async fn custom_retry_retries_only_configured_status_code() {
             if count < NUM_FAILURES {
                 Response::builder()
                     .status(StatusCode::SERVICE_UNAVAILABLE)
-                    .body(Body::empty())
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::default())
             }
         });
 
@@ -572,7 +644,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             in_counter.fetch_add(1, atomic::Ordering::Relaxed);
             Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Body::empty())
+                .body(Full::default())
                 .unwrap_or_else(|_| unreachable!())
         });
 
@@ -592,7 +664,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             unreachable!("There should be no successful requests")
         })
         .await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -619,7 +691,7 @@ async fn fails_on_permanent_error() {
 
         let output_lines =
             get_received_gzip(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -1128,7 +1200,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         observation
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
 
     // The proxy forwards the request to the origin without the proxy credentials,
@@ -1139,7 +1211,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         !parts
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
     let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(event["message"], "simple message");

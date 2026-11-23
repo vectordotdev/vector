@@ -63,12 +63,12 @@ fn ignore_prefixed_match(segment: &str, pattern: &str) -> bool {
 }
 
 /// Record an emitted internal event. This is somewhat dumb at this
-/// point, just recording the pure string value of the `emit!` call
-/// parameter. At some point, making all internal events implement
-/// `Debug` or `Serialize` might allow for more sophistication here, but
-/// this is good enough for these tests. This should only be used by the
-/// test `emit!` macro. The `check-events` script will test that emitted
-/// events contain the right fields, etc.
+/// point, just recording the event name. At some point, making all
+/// internal events implement `Debug` or `Serialize` might allow for more
+/// sophistication here, but this is good enough for these tests. This
+/// should only be used by the `emit` and `register` functions. The
+/// `check-events` script will test that emitted events contain the right
+/// fields, etc.
 pub fn record_internal_event(event: &str) {
     // Remove leading '&'
     let event = event.strip_prefix('&').unwrap_or(event);

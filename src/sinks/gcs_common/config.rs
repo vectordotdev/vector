@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::Body;
 use snafu::Snafu;
+use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -124,45 +124,29 @@ pub fn build_healthcheck(
     auth: GcpAuthenticator,
 ) -> Healthcheck {
     let healthcheck = async move {
-        let uri = base_url.into_uri();
-        let mut request = http::Request::head(uri).body(Body::empty())?;
+        let mut request = http::Request::head(base_url.into_uri()).body(empty_body())?;
 
         auth.apply(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(&response, not_found_error)
+        healthcheck_status(response.status(), not_found_error)
     };
 
     healthcheck.boxed()
 }
 
-/// Classifies a GCP healthcheck response.
+/// Classifies a GCP healthcheck response by status alone.
 ///
 /// # Errors
 /// Returns an error for forbidden, missing, or unexpected response statuses.
-pub fn healthcheck_response(
-    response: &http::Response<hyper::Body>,
-    not_found_error: crate::Error,
-) -> crate::Result<()> {
-    healthcheck_status(response.status(), not_found_error)
-}
-
-/// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
-/// HTTP clients.
-///
-/// # Errors
-/// Returns an error for forbidden, missing, or unexpected response statuses.
-pub fn healthcheck_status(
-    status: http::StatusCode,
-    not_found_error: crate::Error,
-) -> crate::Result<()> {
+pub fn healthcheck_status(status: StatusCode, not_found_error: crate::Error) -> crate::Result<()> {
     match status {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
@@ -186,7 +170,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
     }
 }
 
-// This is a clone of HttpRetryLogic for the Body type, should get merged
+// Mirrors `RetryStrategy::Default` for `GcsResponse`, but also retries 401 Unauthorized
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
     type Error = hyper::Error;
     type Request = Request;

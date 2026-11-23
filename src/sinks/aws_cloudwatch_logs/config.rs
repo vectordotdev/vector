@@ -33,7 +33,7 @@ use crate::{
     tls::TlsConfig,
 };
 
-pub struct CloudwatchLogsClientBuilder;
+pub(super) struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
     type Client = aws_sdk_cloudwatchlogs::client::Client;

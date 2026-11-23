@@ -5,8 +5,7 @@ sources:
     type: "datadog_agent"
     address: "0.0.0.0:8181"
     multiple_outputs: true
-    disable_metrics: true
-    disable_traces: true
+    enabled_data_types: ["logs"]
     store_api_key: false
 
 sinks:

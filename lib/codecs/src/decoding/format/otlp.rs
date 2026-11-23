@@ -126,12 +126,12 @@ impl Default for OtlpDeserializer {
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the embedded OTLP descriptor set cannot be decoded or does not contain the logs,
+    /// metrics, or traces export request message types.
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "The codec API panic documentation needs a separate audit."
-    )]
     pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
@@ -502,5 +502,50 @@ mod tests {
         // The trace should still have the OTLP trace data
         assert!(trace.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some());
         validate_trace_ids(trace.value());
+    }
+
+    #[test]
+    fn resource_spans_layout_converts_to_typed_kind_and_status() {
+        use opentelemetry_proto::{
+            proto::trace::v1::Status,
+            typed_trace::{HintedLegacy, hinted_legacy_to_typed},
+        };
+        use vector_core::event::typed_trace::{PanicOnIssue, SpanKind, SpanStatus};
+
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: TEST_TRACE_ID.to_vec(),
+                        span_id: TEST_SPAN_ID.to_vec(),
+                        name: "s".into(),
+                        kind: 2,
+                        status: Some(Status {
+                            message: "boom".into(),
+                            code: 2,
+                        }),
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let mut events = OtlpDeserializer::default()
+            .parse(Bytes::from(request.encode_to_vec()), LogNamespace::Vector)
+            .unwrap();
+        let Some(Event::Trace(trace)) = events.pop() else {
+            panic!("expected a trace event");
+        };
+
+        let HintedLegacy::Done(events) = hinted_legacy_to_typed(trace, &mut PanicOnIssue) else {
+            panic!("the source sets an OTLP layout hint");
+        };
+        let events = events.expect("OTLP layout conversion");
+        let span = &events[0].spans()[0];
+        assert_eq!(span.kind, SpanKind::Server);
+        assert_eq!(span.status, SpanStatus::Error("boom".into()));
     }
 }

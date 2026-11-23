@@ -11,6 +11,7 @@ use vector_lib::{
     codecs::{BytesDeserializerConfig, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
     schema::Definition,
@@ -33,6 +34,12 @@ use crate::{
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
+const HOST: &str = "host";
+const TAG: &str = "tag";
+const TIMESTAMP: &str = "timestamp";
+const RECORD: &str = "record";
+const TLS_CLIENT_METADATA: &str = "tls_client_metadata";
+
 /// Configuration for the `fluent` source.
 #[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
 #[derive(Clone, Debug)]
@@ -47,10 +54,9 @@ pub struct FluentConfig {
 }
 
 /// Listening mode for the `fluent` source.
-#[configurable_component(no_deser)]
+#[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[serde(untagged, from = "deser::FluentModeDe", into = "deser::FluentModeDe")]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum FluentMode {
     /// Listen on TCP port
@@ -66,45 +72,147 @@ pub enum FluentMode {
 ///
 /// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
-    use super::{Deserialize, FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
+    use serde::{Deserialize, Deserializer, de::Error as _};
+    use vector_config::configurable_component;
 
+    use super::{FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
+
+    /// Explicit listening mode for Fluent.
     #[allow(clippy::large_enum_variant)]
-    #[derive(Deserialize)]
+    #[configurable_component]
     #[serde(tag = "mode")]
-    enum FluentModeTagged {
+    #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+    pub(super) enum FluentModeTagged {
+        /// Listen on TCP port
         #[serde(rename = "tcp")]
         Tcp(FluentTcpConfig),
 
+        /// Listen on unix stream socket
         #[serde(rename = "unix")]
         Unix(UnixOnly<FluentUnixConfig>),
     }
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum FluentModeDe {
+    /// Fluent accepts an explicit mode or a TCP configuration without a mode tag.
+    #[configurable_component]
+    #[serde(untagged, deny_unknown_fields)]
+    pub(super) enum FluentModeDe {
+        /// Explicit TCP or Unix listening mode.
         Tagged(FluentModeTagged),
 
-        // Note: this must be last as serde attempts variants in order
-        Untagged(FluentTcpConfig),
+        // Note: this must be last as serde attempts variants in order.
+        /// TCP is the default when mode is omitted.
+        Untagged {
+            /// Prevent the TCP fallback from also matching an explicit Unix mode.
+            #[configurable(metadata(docs::hidden))]
+            #[serde(default)]
+            mode: DefaultTcpMode,
+            #[serde(flatten)]
+            config: FluentTcpConfig,
+        },
     }
 
-    impl<'de> Deserialize<'de> for FluentMode {
+    /// The default TCP mode, which excludes Unix mode from the fallback schema.
+    #[configurable_component(no_deser)]
+    #[derive(Default)]
+    #[serde(rename_all = "snake_case")]
+    pub(super) enum DefaultTcpMode {
+        /// Listen on TCP port.
+        #[default]
+        Tcp,
+    }
+
+    impl<'de> Deserialize<'de> for DefaultTcpMode {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: serde::Deserializer<'de>,
+            D: Deserializer<'de>,
         {
-            Ok(match FluentModeDe::deserialize(deserializer)? {
-                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
+            // Mode tags must be strings, not Serde's externally tagged object form.
+            match String::deserialize(deserializer)?.as_str() {
+                "tcp" => Ok(Self::Tcp),
+                value => Err(D::Error::unknown_variant(value, &["tcp"])),
+            }
+        }
+    }
+
+    impl From<FluentModeDe> for FluentMode {
+        fn from(input: FluentModeDe) -> Self {
+            match input {
+                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => Self::Unix(config),
                 FluentModeDe::Tagged(FluentModeTagged::Tcp(config))
-                | FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
+                | FluentModeDe::Untagged { config, .. } => Self::Tcp(config),
+            }
+        }
+    }
+
+    impl From<FluentMode> for FluentModeDe {
+        fn from(mode: FluentMode) -> Self {
+            Self::Tagged(match mode {
+                FluentMode::Tcp(config) => FluentModeTagged::Tcp(config),
+                FluentMode::Unix(config) => FluentModeTagged::Unix(config),
             })
         }
     }
 
     #[cfg(test)]
     mod tests {
+        use vector_config::schema::generate_root_schema;
+
         use super::*;
         use crate::sources::fluent::FluentConfig;
+
+        fn schema_validator() -> jsonschema::Validator {
+            // Generic Rust type names contain angle brackets. URI-escape those in
+            // reference fragments for the validator without changing their targets.
+            fn escape_references(value: &mut serde_json::Value) {
+                match value {
+                    serde_json::Value::Object(fields) => {
+                        if let Some(serde_json::Value::String(reference)) = fields.get_mut("$ref") {
+                            *reference = reference.replace('<', "%3C").replace('>', "%3E");
+                        }
+                        fields.values_mut().for_each(escape_references);
+                    }
+                    serde_json::Value::Array(values) => {
+                        values.iter_mut().for_each(escape_references);
+                    }
+                    _ => {}
+                }
+            }
+            let mut schema =
+                serde_json::to_value(generate_root_schema::<FluentConfig>().unwrap()).unwrap();
+            escape_references(&mut schema);
+            jsonschema::validator_for(&schema).unwrap()
+        }
+
+        fn parse_with_schema(input: serde_json::Value) -> FluentConfig {
+            let validator = schema_validator();
+            validator.validate(&input).unwrap();
+            let parsed: FluentConfig = serde_json::from_value(input).unwrap();
+            validator
+                .validate(&serde_json::to_value(&parsed).unwrap())
+                .unwrap();
+            parsed
+        }
+
+        #[test]
+        fn schema_and_deserializer_reject_invalid_modes() {
+            let validator = schema_validator();
+            for input in [
+                serde_json::json!({"mode": "udp", "address": "0.0.0.0:2020"}),
+                serde_json::json!({"mode": "tcp"}),
+                serde_json::json!({"mode": "unix"}),
+                serde_json::json!({"mode": "unix", "path": "/foo", "address": "0.0.0.0:24224"}),
+                serde_json::json!({"mode": "tcp", "address": "0.0.0.0:24224", "path": "/foo"}),
+                serde_json::json!({"mode": {"tcp": null}, "address": "0.0.0.0:24224"}),
+                serde_json::json!({"mode": null, "address": "0.0.0.0:24224"}),
+                serde_json::json!({"address": "0.0.0.0:2020", "connection_limit": "invalid"}),
+            ] {
+                assert!(!validator.is_valid(&input), "schema accepted {input}");
+                assert!(
+                    serde_json::from_value::<FluentConfig>(input.clone()).is_err(),
+                    "deserializer accepted {input}"
+                );
+            }
+        }
 
         #[test]
         fn test_tcp_default_mode() {
@@ -113,7 +221,7 @@ mod deser {
                 "connection_limit": 2
             });
 
-            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            let parsed = parse_with_schema(json_data);
             assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
         }
 
@@ -125,7 +233,7 @@ mod deser {
                 "connection_limit": 2
             });
 
-            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            let parsed = parse_with_schema(json_data);
             assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
         }
 
@@ -136,7 +244,7 @@ mod deser {
                 "path": "/foo"
             });
 
-            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            let parsed = parse_with_schema(json_data);
             assert!(
                 matches!(parsed.mode, FluentMode::Unix(c) if c.platform_independent().path.to_string_lossy() == "/foo")
             );
@@ -341,21 +449,21 @@ impl FluentConfig {
             .with_source_metadata(
                 FluentConfig::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 FluentConfig::NAME,
                 tag_key,
-                &owned_value_path!("tag"),
+                &owned_value_path!(TAG),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 FluentConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp(),
                 Some("timestamp"),
             )
@@ -363,14 +471,14 @@ impl FluentConfig {
             .with_source_metadata(
                 FluentConfig::NAME,
                 None,
-                &owned_value_path!("record"),
+                &owned_value_path!(RECORD),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 tls_client_metadata_path,
-                &owned_value_path!("tls_client_metadata"),
+                &owned_value_path!(TLS_CLIENT_METADATA),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
@@ -411,7 +519,7 @@ impl FluentSource {
                 FluentConfig::NAME,
                 log,
                 legacy_host_key,
-                path!("host"),
+                path!(HOST),
                 host.clone(),
             );
         }
@@ -693,9 +801,9 @@ impl Decoder for FluentDecoder {
 
             let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
                 let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
-                emit!(FluentMessageDecodeError {
+                emit(FluentMessageDecodeError {
                     error,
-                    base64_encoded_message
+                    base64_encoded_message,
                 });
             })?;
             if let Some(item) = maybe_item {
@@ -735,7 +843,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(FluentMessageReceived { byte_size });
+            emit(FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };
@@ -825,7 +933,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         match log_namespace {
             LogNamespace::Vector => {
-                log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
+                log.insert(metadata_path!(FluentConfig::NAME, TIMESTAMP), timestamp);
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
@@ -836,8 +944,8 @@ impl From<FluentEvent<'_>> for LogEvent {
         log_namespace.insert_source_metadata(
             FluentConfig::NAME,
             &mut log,
-            Some(LegacyKey::Overwrite(path!("tag"))),
-            path!("tag"),
+            Some(LegacyKey::Overwrite(path!(TAG))),
+            path!(TAG),
             tag,
         );
 
@@ -847,7 +955,7 @@ impl From<FluentEvent<'_>> for LogEvent {
                 FluentConfig::NAME,
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(key.as_str()))),
-                path!("record", key.as_str()),
+                path!(RECORD, key.as_str()),
                 value,
             );
         }

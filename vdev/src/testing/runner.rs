@@ -17,7 +17,7 @@ use crate::{
 };
 
 const MOUNT_PATH: &str = "/home/vector";
-const TARGET_PATH: &str = "/home/target";
+pub(super) const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
@@ -29,6 +29,16 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+const BUILD_TESTS_COMMAND: &[&str] = &[
+    "cargo",
+    "nextest",
+    "run",
+    "--no-run",
+    "--no-default-features",
+];
+/// Lock file in the shared target volume (`TARGET_PATH`), held by [`ContainerTestRunner::build_tests`]
+/// so concurrent runners can't relink shared artifacts before the follow-up step reads them.
+const BUILD_LOCK_PATH: &str = "/home/target/.vdev-build.lock";
 const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
 const COVERAGE_COMMAND: &[&str] = &[
     "cargo",
@@ -64,9 +74,7 @@ pub trait TestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()>;
@@ -120,12 +128,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn ensure_running(
-        &self,
-        features: Option<&[String]>,
-        config_environment_variables: &Environment,
-        build: bool,
-    ) -> Result<()> {
+    fn ensure_running(&self, config_environment_variables: &Environment) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -136,7 +139,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, build)?;
+                self.build(config_environment_variables)?;
                 self.create()?;
                 self.start()?;
             }
@@ -164,18 +167,29 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(())
     }
 
-    fn build(
-        &self,
-        features: Option<&[String]>,
-        config_env_vars: &Environment,
-        build: bool,
-    ) -> Result<()> {
+    fn build(&self, config_env_vars: &Environment) -> Result<()> {
         let image_name = self.image_name();
 
         let dockerfile = test_runner_dockerfile();
-        let mut command =
-            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        let mut command = prepare_build_command(&image_name, &dockerfile, config_env_vars);
         waiting!("Building image {}", image_name);
+        command.check_run()
+    }
+
+    /// Compile the tests selected by `args` in the running container without running them, then
+    /// run the shell command `then` while still holding the target-volume build lock.
+    fn build_tests(&self, args: &[String], then: &str) -> Result<()> {
+        let mut command = docker_command(["exec"]);
+        if *IS_A_TTY {
+            command.arg("--tty");
+        }
+        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        if let Ok(color) = std::env::var("CARGO_TERM_COLOR") {
+            command.args(["--env", &format!("CARGO_TERM_COLOR={color}")]);
+        }
+        command.arg(self.container_name());
+        command.args(locked_build_command(args, then));
+        waiting!("Compiling tests in {}", self.container_name());
         command.check_run()
     }
 
@@ -244,6 +258,18 @@ pub trait ContainerTestRunner: TestRunner {
     }
 }
 
+/// The command that compiles tests and then runs `then`, both under one `flock`.
+fn locked_build_command(args: &[String], then: &str) -> Vec<String> {
+    let mut command: Vec<String> = ["flock", BUILD_LOCK_PATH, "sh", "-c"]
+        .map(String::from)
+        .into();
+    command.push(format!(r#""$@" && {then}"#));
+    command.push("sh".to_string());
+    command.extend(BUILD_TESTS_COMMAND.iter().map(ToString::to_string));
+    command.extend(args.iter().cloned());
+    command
+}
+
 impl<T> TestRunner for T
 where
     T: ContainerTestRunner,
@@ -252,13 +278,11 @@ where
         &self,
         outer_env: &Environment,
         config_environment_variables: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()> {
-        self.ensure_running(features, config_environment_variables, build)?;
+        self.ensure_running(config_environment_variables)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -412,9 +436,7 @@ impl TestRunner for LocalTestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        _features: Option<&[String]>,
         args: &[String],
-        _build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()> {
@@ -446,5 +468,33 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locked_build_runs_build_and_follow_up_under_one_lock() {
+        let args = ["--features".to_string(), "a,b".to_string()];
+        assert_eq!(
+            locked_build_command(&args, "cp x y"),
+            [
+                "flock",
+                "/home/target/.vdev-build.lock",
+                "sh",
+                "-c",
+                r#""$@" && cp x y"#,
+                "sh",
+                "cargo",
+                "nextest",
+                "run",
+                "--no-run",
+                "--no-default-features",
+                "--features",
+                "a,b",
+            ]
+        );
     }
 }

@@ -1,8 +1,6 @@
-use std::{convert::Infallible, fmt, net::SocketAddr, time::Duration};
+use std::{fmt, net::SocketAddr, time::Duration};
 
 use futures::FutureExt;
-use hyper::{Server, service::make_service_fn};
-use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
@@ -11,7 +9,6 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::owned_value_path,
     sensitive_string::SensitiveString,
-    tls::MaybeTlsIncomingStream,
 };
 use vrl::value::{Kind, kind::Collection};
 
@@ -21,7 +18,7 @@ use crate::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer, serve},
     serde::{default_decoding, default_framing_message_based},
     sources::http_server::{build_param_matcher, remove_duplicates},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -201,25 +198,24 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            conn.peer_addr(),
-                        )
-                    }))
-                    .service(warp::service(svc.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
-
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(shutdown.map(|_| ()))
-                .await
-                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
+            serve(
+                listener.accept_stream(),
+                shutdown.map(|_| ()),
+                move |conn| {
+                    ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                conn.peer_addr(),
+                            )
+                        }))
+                        .service(warp::service(svc.clone()))
+                },
+            )
+            .await
+            .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))

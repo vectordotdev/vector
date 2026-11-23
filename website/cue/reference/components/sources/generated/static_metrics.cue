@@ -45,7 +45,8 @@ generated: components: sources: static_metrics: configuration: {
 							description: """
 																			A set of observations which are counted into buckets.
 
-																			It also contains the total count of all observations and their sum to allow calculating the mean.
+																			It also contains the total count of all observations, and their sum where the source reported
+																			one, to allow calculating the mean.
 																			"""
 							required: true
 							type: object: options: {
@@ -65,7 +66,14 @@ generated: components: sources: static_metrics: configuration: {
 										upper_limit: {
 											description: "The upper limit of values in the bucket."
 											required:    true
-											type: float: {}
+											type: {
+												float: {}
+												string: enum: {
+													"-inf": "Negative infinity."
+													NaN:    "Not a number."
+													inf:    "Positive infinity."
+												}
+											}
 										}
 									}
 								}
@@ -75,9 +83,16 @@ generated: components: sources: static_metrics: configuration: {
 									type: uint: {}
 								}
 								sum: {
-									description: "The sum of all observations contained within this histogram."
-									required:    false
-									type: float: default: 0.0
+									description: """
+																							The sum of all observations contained within this histogram.
+
+																							Optional, because not every source reports one: OTLP makes the histogram sum optional,
+																							and `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for
+																							histograms with negative bucket thresholds. A histogram without a sum is a legitimate
+																							input rather than an error, and consumers must not substitute zero for it.
+																							"""
+									required: false
+									type: float: {}
 								}
 							}
 						}

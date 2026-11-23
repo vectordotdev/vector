@@ -181,7 +181,7 @@ async fn assert_queue_contents(
     );
 }
 
-pub fn make_config() -> AmqpSinkConfig {
+pub(super) fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
         exchange: Template::try_from("it").unwrap(),
         ..Default::default()

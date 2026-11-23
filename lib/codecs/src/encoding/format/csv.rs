@@ -53,11 +53,10 @@ impl CsvSerializerConfig {
     }
 
     /// Build the `CsvSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no CSV fields are configured.
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
@@ -313,10 +312,48 @@ mod tests {
     use bytes::BytesMut;
     use chrono::DateTime;
     use ordered_float::NotNan;
-    use vector_common::btreemap;
     use vector_core::event::{LogEvent, ObjectMap, Value};
+    use vrl::objectmap;
 
     use super::*;
+
+    #[test]
+    fn ascii_field_schemas_match_their_serialized_values_and_defaults() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CsvSerializerOptions>().unwrap(),
+        )
+        .unwrap();
+        for (field, default) in [("delimiter", ","), ("escape", "\""), ("quote", "\"")] {
+            let property = &schema["properties"][field];
+            let resolved = property
+                .get("$ref")
+                .and_then(serde_json::Value::as_str)
+                .map_or(property, |reference| {
+                    schema
+                        .pointer(reference.strip_prefix('#').unwrap())
+                        .unwrap()
+                });
+            assert_eq!(resolved["type"], "string", "{field}: {schema}");
+            assert_eq!(property["default"], default, "{field}");
+        }
+
+        for field in ["delimiter", "escape", "quote"] {
+            let mut input = serde_json::json!({"fields": ["message"]});
+            input[field] = serde_json::json!("1");
+            let options: CsvSerializerOptions = serde_json::from_value(input.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_value(options).unwrap()[field],
+                "1",
+                "{field}"
+            );
+
+            input[field] = serde_json::json!(1);
+            assert!(
+                serde_json::from_value::<CsvSerializerOptions>(input).is_err(),
+                "{field}"
+            );
+        }
+    }
 
     fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();
@@ -344,7 +381,7 @@ mod tests {
 
     #[test]
     fn serialize_fields() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
@@ -385,7 +422,7 @@ mod tests {
 
     #[test]
     fn serialize_order() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "field1" => Value::from("value1"),
             "field2" => Value::from("value2"),
             "field3" => Value::from("value3"),
@@ -417,7 +454,7 @@ mod tests {
 
     #[test]
     fn correct_quoting() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "field1" => Value::from("hello world"),
             "field2" => Value::from(1),
             "field3" => Value::from("foo\"bar"),

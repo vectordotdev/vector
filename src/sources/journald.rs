@@ -7,6 +7,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -68,6 +69,9 @@ const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
 const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
+const METADATA: &str = "metadata";
+const TIMESTAMP: &str = "timestamp";
+const HOST: &str = "host";
 
 static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 
@@ -89,10 +93,14 @@ enum BuildError {
     ))]
     DuplicatedMatches { field: String, value: String },
     #[snafu(display(
-        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
-        systemd_version
+        "`current_boot_only: false` is not supported for systemd versions 250 through 257 (got {} from `{}`). Use journalctl from systemd 258 or later in Vector's runtime environment (inside the container for container deployments), or set `current_boot_only: true` to collect only the current boot.",
+        systemd_version,
+        journalctl_path.display()
     ))]
-    AllBootsNotSupported { systemd_version: u32 },
+    AllBootsNotSupported {
+        systemd_version: u32,
+        journalctl_path: PathBuf,
+    },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -111,6 +119,10 @@ pub struct JournaldConfig {
     pub since_now: bool,
 
     /// Only include entries that occurred after the current boot of the system.
+    ///
+    /// Setting this to `false` requires systemd 258 or later, or a version older than 250.
+    /// Versions 250 through 257 are not supported. For container deployments, this
+    /// requirement applies to the `journalctl` inside the container image.
     #[serde(default = "crate::serde::default_true")]
     pub current_boot_only: bool,
 
@@ -283,23 +295,23 @@ impl JournaldConfig {
             .with_source_metadata(
                 JournaldConfig::NAME,
                 None,
-                &owned_value_path!("metadata"),
+                &owned_value_path!(METADATA),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
                 log_schema().host_key().cloned().map(LegacyKey::Overwrite),
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             );
 
         // for metadata that is added to the events dynamically through the Record
@@ -381,7 +393,11 @@ impl SourceConfig for JournaldConfig {
 
         if !self.current_boot_only && (250..=257).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
-            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
+            return Err(BuildError::AllBootsNotSupported {
+                systemd_version,
+                journalctl_path,
+            }
+            .into());
         }
 
         let starter = StartJournalctl::new(
@@ -451,7 +467,7 @@ impl JournaldSource {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
-                emit!(JournaldCheckpointFileOpenError {
+                emit(JournaldCheckpointFileOpenError {
                     error: &error,
                     path: self
                         .checkpoint_path
@@ -499,7 +515,7 @@ impl JournaldSource {
                     drop(running);
                 }
                 Err(error) => {
-                    emit!(JournaldStartJournalctlError { error });
+                    emit(JournaldStartJournalctlError { error });
                 }
             }
 
@@ -521,8 +537,8 @@ impl JournaldSource {
         finalizer: &'a Finalizer,
         mut shutdown: ShutdownSignal,
     ) -> bool {
-        let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
-        let events_received = register!(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::from("journald")));
+        let events_received = register(EventsReceived);
 
         // Spawn stderr handler task
         let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
@@ -626,7 +642,7 @@ impl<'a> Batch<'a> {
                 false
             }
             Some(Err(error)) => {
-                emit!(JournaldReadError { error });
+                emit(JournaldReadError { error });
                 false
             }
             Some(Ok(bytes)) => {
@@ -659,9 +675,9 @@ impl<'a> Batch<'a> {
                         }
                     }
                     Err(error) => {
-                        emit!(JournaldInvalidRecordError {
+                        emit(JournaldInvalidRecordError {
                             error,
-                            text: String::from_utf8_lossy(&bytes).into_owned()
+                            text: String::from_utf8_lossy(&bytes).into_owned(),
                         });
                     }
                 }
@@ -692,7 +708,7 @@ impl<'a> Batch<'a> {
                     finalizer.finalize(cursor, self.receiver).await;
                 }
             } else {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 // `out` channel is closed, don't restart journalctl.
                 self.exiting = Some(false);
             }
@@ -852,10 +868,10 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(host) = log
-                .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+                .get(metadata_path!(JournaldConfig::NAME, METADATA))
                 .and_then(|meta| meta.get(path!(HOSTNAME)))
             {
-                log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
+                log.insert(metadata_path!(JournaldConfig::NAME, HOST), host.clone());
             }
         }
         LogNamespace::Legacy => {
@@ -864,7 +880,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
                     JournaldConfig::NAME,
                     log,
                     log_schema().host_key().map(LegacyKey::Overwrite),
-                    path!("host"),
+                    path!(HOST),
                     host,
                 );
             }
@@ -874,7 +890,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Create a Utc timestamp from an existing log field if present.
     let timestamp_value = match log_namespace {
         LogNamespace::Vector => log
-            .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+            .get(metadata_path!(JournaldConfig::NAME, METADATA))
             .and_then(|meta| {
                 meta.get(path!(SOURCE_TIMESTAMP))
                     .or_else(|| meta.get(path!(RECEIVED_TIMESTAMP)))
@@ -900,7 +916,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
 
             if let Some(ts) = timestamp {
-                log.insert(metadata_path!(JournaldConfig::NAME, "timestamp"), ts);
+                log.insert(metadata_path!(JournaldConfig::NAME, TIMESTAMP), ts);
             }
         }
         LogNamespace::Legacy => {
@@ -938,7 +954,7 @@ fn create_log_event_from_record(
             for (key, value) in &record {
                 log.metadata_mut()
                     .value_mut()
-                    .insert(path!(JournaldConfig::NAME, "metadata", key), value.as_str());
+                    .insert(path!(JournaldConfig::NAME, METADATA, key), value.as_str());
             }
 
             log
@@ -1135,7 +1151,7 @@ impl StatefulCheckpointer {
     async fn set(&mut self, token: impl Into<String>) {
         let token = token.into();
         if let Err(error) = self.checkpointer.set(&token).await {
-            emit!(JournaldCheckpointSetError {
+            emit(JournaldCheckpointSetError {
                 error,
                 filename: self
                     .checkpointer
@@ -1773,19 +1789,19 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "metadata"),
+                    &owned_value_path!(JournaldConfig::NAME, METADATA),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "timestamp"),
+                    &owned_value_path!(JournaldConfig::NAME, TIMESTAMP),
                     Kind::timestamp().or_undefined(),
-                    Some("timestamp"),
+                    Some(TIMESTAMP),
                 )
                 .with_metadata_field(
-                    &owned_value_path!(JournaldConfig::NAME, "host"),
+                    &owned_value_path!(JournaldConfig::NAME, HOST),
                     Kind::bytes().or_undefined(),
-                    Some("host"),
+                    Some(HOST),
                 );
 
         assert_eq!(definitions, Some(expected_definition));

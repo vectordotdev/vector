@@ -61,7 +61,7 @@ type Svc = Buffer<
 >;
 
 #[derive(Debug)]
-pub enum CloudwatchError {
+pub(super) enum CloudwatchError {
     Put(SdkError<PutLogEventsError, HttpResponse>),
     DescribeLogStreams(SdkError<DescribeLogStreamsError, HttpResponse>),
     CreateStream(SdkError<CreateLogStreamError, HttpResponse>),
@@ -106,7 +106,7 @@ impl From<SdkError<DescribeLogStreamsError, HttpResponse>> for CloudwatchError {
 }
 
 #[derive(Debug)]
-pub struct CloudwatchResponse {
+pub(super) struct CloudwatchResponse {
     events_byte_size: GroupedCountByteSize,
 }
 
@@ -131,7 +131,7 @@ impl DriverResponse for CloudwatchResponse {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(
+    pub(super) fn new(
         config: CloudwatchLogsSinkConfig,
         client: CloudwatchLogsClient,
         headers: BTreeMap<OrderedHeaderName, HeaderValue>,
@@ -210,7 +210,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(
+    pub(super) fn new(
         config: CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
         client: CloudwatchLogsClient,
@@ -242,7 +242,7 @@ impl CloudwatchLogsSvc {
         }
     }
 
-    pub fn process_events(mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
+    pub(super) fn process_events(mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
         // Sort by timestamp
         events.sort_by_key(|e| e.timestamp);
 
@@ -323,7 +323,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     }
 }
 
-pub struct CloudwatchLogsSvc {
+pub(super) struct CloudwatchLogsSvc {
     client: CloudwatchLogsClient,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     stream_name: String,
@@ -344,7 +344,7 @@ impl EncodedLength for InputLogEvent {
 }
 
 #[derive(Clone)]
-pub struct CloudwatchLogsPartitionSvc {
+pub(super) struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     clients: HashMap<CloudwatchKey, Svc>,

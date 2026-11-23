@@ -33,6 +33,10 @@ impl GenerateConfig for MmdbConfig {
 }
 
 impl EnrichmentTableConfig for MmdbConfig {
+    #[expect(
+        clippy::unused_async_trait_impl,
+        reason = "Preserve the async trait interface and when its body runs"
+    )]
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
@@ -52,11 +56,12 @@ pub struct Mmdb {
 
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database file cannot be opened or parsed, a test lookup against
+    /// the database fails or its result cannot be decoded, or the file's modification time
+    /// cannot be read.
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 

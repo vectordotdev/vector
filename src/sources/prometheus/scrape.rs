@@ -1,16 +1,28 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use http::{Uri, response::Parts};
+use http::{HeaderMap, HeaderValue, StatusCode, Uri, response::Parts, uri::Scheme};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, event::Event, internal_event::emit,
+    shutdown::ShutdownSignal,
+};
 
+#[cfg(feature = "kubernetes")]
+use futures::{Stream, StreamExt, stream};
+#[cfg(feature = "kubernetes")]
+use tokio_stream::wrappers::IntervalStream;
+
+#[cfg(feature = "kubernetes")]
+use super::kubernetes_service_discovery::{self, KubernetesScrapeConfig};
 use super::parser;
+#[cfg(feature = "kubernetes")]
+use crate::sources::util::http_client::{RequestOptions, run};
 use crate::{
     Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    http::{Auth, QueryParameters},
+    http::{Auth, HttpClient, QueryParameters},
     internal_events::PrometheusParseError,
     sources::{
         self,
@@ -33,6 +45,23 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
 
+/// A group of scrape targets.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of targets to discover."))]
+pub(crate) enum TargetConfig {
+    /// A static list of scrape URLs.
+    Static {
+        /// URLs to scrape.
+        #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
+        urls: Vec<String>,
+    },
+    /// Kubernetes Pod auto-discovery via `prometheus.io/*` annotations.
+    #[cfg(feature = "kubernetes")]
+    Kubernetes(KubernetesScrapeConfig),
+}
+
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
 #[configurable_component(source(
@@ -43,8 +72,18 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
     #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
-    #[serde(alias = "hosts")]
+    #[configurable(required_one_of = "targets")]
+    #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
+
+    /// Targets to scrape metrics from: fixed URLs, or Pods discovered automatically in Kubernetes.
+    ///
+    /// Each entry in the list configures a target group. Supported types are
+    /// `static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
+    #[configurable(metadata(docs::examples = "static_target_example()"))]
+    #[configurable(required_one_of = "targets")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    targets: Vec<TargetConfig>,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
     /// than the interval a new scrape will be started. This can take extra resources, set the timeout
@@ -77,14 +116,14 @@ pub struct PrometheusScrapeConfig {
     /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
     /// is renamed by prepending `exported_` to the original name.
     ///
-    /// This matches Prometheus’ `honor_labels` configuration.
+    /// This matches Prometheus' `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
-    /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+    /// appended to any parameters already in the scrape URLs. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "query_example()"))]
@@ -114,6 +153,12 @@ fn query_example() -> serde_json::Value {
     })
 }
 
+fn static_target_example() -> serde_json::Value {
+    serde_json::json!({
+        "static": { "urls": ["http://localhost:9090/metrics"] }
+    })
+}
+
 fn headers_example() -> serde_json::Value {
     serde_json::json!({
         "X-My-Header": ["value1", "value2"]
@@ -124,6 +169,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            targets: vec![],
             interval: default_interval(),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -138,39 +184,63 @@ impl GenerateConfig for PrometheusScrapeConfig {
     }
 }
 
+#[derive(Debug, snafu::Snafu)]
+enum ConfigError {
+    #[snafu(display("exactly one of `endpoints` or `targets` must be specified"))]
+    EndpointsAndTargetsConflict,
+    #[snafu(display("only one Kubernetes target group is currently supported"))]
+    MultipleKubernetesTargetGroups,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
-        let urls = self
-            .endpoints
+        warn_if_interval_too_low(self.timeout, self.interval);
+
+        // Collect static URLs
+        let mut static_urls: Vec<Uri> = Vec::new();
+        for s in &self.endpoints {
+            let uri = s.parse::<Uri>().context(sources::UriParseSnafu)?;
+            static_urls.push(uri);
+        }
+        for target in &self.targets {
+            match target {
+                TargetConfig::Static { urls } => {
+                    for s_url in urls {
+                        let uri = s_url.parse::<Uri>().context(sources::UriParseSnafu)?;
+                        static_urls.push(uri);
+                    }
+                }
+                #[cfg(feature = "kubernetes")]
+                TargetConfig::Kubernetes(_) => {}
+            }
+        }
+
+        let static_urls: Vec<Uri> = static_urls
             .iter()
-            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
-            .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
+            .map(|uri| build_url(uri, &self.query))
+            .collect();
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let headers = build_headers(&self.headers)?;
-
+        let client = HttpClient::new(tls.into(), &cx.proxy)?;
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
-        warn_if_interval_too_low(self.timeout, self.interval);
+        #[cfg(feature = "kubernetes")]
+        if let Some(k8s_cfg) = self.targets.iter().find_map(|target| match target {
+            TargetConfig::Kubernetes(k8s_cfg) => Some(k8s_cfg),
+            TargetConfig::Static { .. } => None,
+        }) {
+            return self
+                .build_kubernetes_source(k8s_cfg, static_urls, headers, client, builder, cx)
+                .await;
+        }
 
-        let inputs = GenericHttpClientInputs {
-            urls,
-            interval: self.interval,
-            timeout: self.timeout,
-            headers,
-            content_type: "text/plain".to_string(),
-            auth: self.auth.clone(),
-            tls,
-            proxy: cx.proxy.clone(),
-            shutdown: cx.shutdown,
-        };
-
+        let inputs = self.http_client_inputs(static_urls, headers, client, cx.shutdown);
         Ok(crate::sources::source_with_error(call(
             inputs,
             builder,
@@ -179,12 +249,139 @@ impl SourceConfig for PrometheusScrapeConfig {
         )))
     }
 
+    fn validate_structure(&self) -> std::result::Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        // Empty lists are fine: `endpoints: []` loaded before `targets` existed and scrapes
+        // nothing. The schema rejects a config that sets neither option.
+        if !self.endpoints.is_empty() && self.has_any_targets() {
+            errors.push(ConfigError::EndpointsAndTargetsConflict.to_string());
+        }
+
+        #[cfg(feature = "kubernetes")]
+        if self
+            .targets
+            .iter()
+            .filter(|target| matches!(target, TargetConfig::Kubernetes(_)))
+            .count()
+            > 1
+        {
+            errors.push(ConfigError::MultipleKubernetesTargetGroups.to_string());
+        }
+
+        #[cfg(feature = "kubernetes")]
+        for target in &self.targets {
+            if let TargetConfig::Kubernetes(k8s_cfg) = target {
+                errors.extend(
+                    k8s_cfg.validate(self.instance_tag.as_deref(), self.endpoint_tag.as_deref()),
+                );
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+impl PrometheusScrapeConfig {
+    fn has_any_targets(&self) -> bool {
+        self.targets.iter().any(|target| match target {
+            TargetConfig::Static { urls } => !urls.is_empty(),
+            #[cfg(feature = "kubernetes")]
+            TargetConfig::Kubernetes(_) => true,
+        })
+    }
+
+    fn http_client_inputs(
+        &self,
+        urls: Vec<Uri>,
+        headers: HeaderMap<HeaderValue>,
+        client: HttpClient,
+        shutdown: ShutdownSignal,
+    ) -> GenericHttpClientInputs {
+        GenericHttpClientInputs {
+            urls,
+            interval: self.interval,
+            timeout: self.timeout,
+            headers,
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
+            client,
+            shutdown,
+        }
+    }
+
+    /// Builds the source when `targets` contains a Kubernetes group.
+    ///
+    /// Static URLs and discovered Pods are scraped by two loops that share the source's output.
+    /// The source ends when both loops end or either one fails, which also stops the Pod watchers.
+    #[cfg(feature = "kubernetes")]
+    async fn build_kubernetes_source(
+        &self,
+        k8s_cfg: &KubernetesScrapeConfig,
+        static_urls: Vec<Uri>,
+        headers: HeaderMap<HeaderValue>,
+        client: HttpClient,
+        builder: PrometheusScrapeBuilder,
+        cx: SourceContext,
+    ) -> Result<sources::Source> {
+        let discovery = k8s_cfg.start_discovery().await?;
+
+        let static_scrape = (!static_urls.is_empty()).then(|| {
+            call(
+                self.http_client_inputs(
+                    static_urls,
+                    headers.clone(),
+                    client.clone(),
+                    cx.shutdown.clone(),
+                ),
+                builder.clone(),
+                cx.out.clone(),
+                HttpMethod::Get,
+            )
+        });
+
+        let options = RequestOptions {
+            client,
+            method: HttpMethod::Get,
+            timeout: self.timeout,
+            headers,
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
+        };
+        let interval = self.interval;
+        let query = self.query.clone();
+        let shutdown = cx.shutdown;
+        let out = cx.out;
+        let discovered_scrape = async move {
+            // Wait up to one scrape interval for the initial Pod list.
+            if !discovery.wait_until_ready(interval, shutdown.clone()).await {
+                return Ok(());
+            }
+            // `discovery` owns the watchers, so it lives as long as this loop.
+            let requests = discovered_requests(&discovery, &builder, &query, interval, shutdown);
+            run(requests, options, out).await
+        };
+
+        Ok(sources::source_with_error(async move {
+            match static_scrape {
+                Some(static_scrape) => futures::future::try_join(static_scrape, discovered_scrape)
+                    .await
+                    .map(|((), ())| ()),
+                None => discovered_scrape.await,
+            }
+        }))
     }
 }
 
@@ -216,26 +413,13 @@ struct PrometheusScrapeBuilder {
     endpoint_tag: Option<String>,
 }
 
-impl HttpClientBuilder for PrometheusScrapeBuilder {
-    type Context = PrometheusScrapeContext;
-
-    /// Expands the context with the instance info and endpoint info for the current request.
-    fn build(&self, url: &Uri) -> Self::Context {
-        let instance_info = self.instance_tag.as_ref().map(|tag| {
-            let instance = format!(
-                "{}:{}",
-                url.host().unwrap_or_default(),
-                url.port_u16().unwrap_or_else(|| match url.scheme() {
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-                    Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
-                    _ => 0,
-                })
-            );
-            InstanceInfo {
-                tag: tag.clone(),
-                instance,
-                honor_label: self.honor_labels,
-            }
+impl PrometheusScrapeBuilder {
+    /// Builds the context with the instance info and endpoint info for the current request.
+    fn context(&self, url: &Uri, instance: String) -> PrometheusScrapeContext {
+        let instance_info = self.instance_tag.as_ref().map(|tag| InstanceInfo {
+            tag: tag.clone(),
+            instance,
+            honor_label: self.honor_labels,
         });
         let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
             tag: tag.clone(),
@@ -245,7 +429,57 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
         PrometheusScrapeContext {
             instance_info,
             endpoint_info,
+            honor_labels: self.honor_labels,
+            discovery_tags: Vec::new(),
         }
+    }
+}
+
+impl HttpClientBuilder for PrometheusScrapeBuilder {
+    type Context = PrometheusScrapeContext;
+
+    fn build(&self, url: &Uri) -> Self::Context {
+        let instance = format!(
+            "{}:{}",
+            url.host().unwrap_or_default(),
+            url.port_u16().unwrap_or_else(|| match url.scheme() {
+                Some(scheme) if scheme == &Scheme::HTTP => 80,
+                Some(scheme) if scheme == &Scheme::HTTPS => 443,
+                _ => 0,
+            })
+        );
+        self.context(url, instance)
+    }
+}
+
+/// The requests for discovered Pods: on every tick, one request per current target.
+#[cfg(feature = "kubernetes")]
+fn discovered_requests<'a>(
+    discovery: &'a kubernetes_service_discovery::PodDiscovery,
+    builder: &'a PrometheusScrapeBuilder,
+    query: &'a QueryParameters,
+    interval: Duration,
+    shutdown: ShutdownSignal,
+) -> impl Stream<Item = (Uri, PrometheusScrapeContext)> + Send + 'a {
+    IntervalStream::new(tokio::time::interval(interval))
+        .take_until(shutdown)
+        .flat_map(move |_| stream::iter(discovery.targets(query)))
+        .map(move |target| {
+            let context = builder.context_for(&target);
+            (target.uri, context)
+        })
+}
+
+#[cfg(feature = "kubernetes")]
+impl PrometheusScrapeBuilder {
+    /// Builds the context for a discovered Pod target, which adds the Pod's tags.
+    fn context_for(
+        &self,
+        target: &kubernetes_service_discovery::Target,
+    ) -> PrometheusScrapeContext {
+        let mut context = self.context(&target.uri, target.instance.clone());
+        context.discovery_tags = target.discovery_tags();
+        context
     }
 }
 
@@ -253,6 +487,9 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
 struct PrometheusScrapeContext {
     instance_info: Option<InstanceInfo>,
     endpoint_info: Option<EndpointInfo>,
+    honor_labels: bool,
+    /// Tags from Kubernetes discovery, such as `namespace` and `pod`. Empty for static targets.
+    discovery_tags: Vec<(String, String)>,
 }
 
 impl HttpClientContext for PrometheusScrapeContext {
@@ -265,16 +502,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.instance_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_instance)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_instance);
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, instance, *honor_label);
             }
             if let Some(EndpointInfo {
                 tag,
@@ -282,16 +510,10 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.endpoint_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_endpoint)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_endpoint);
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, endpoint, *honor_label);
+            }
+            for (tag, value) in &self.discovery_tags {
+                super::merge_honor_label_tag(metric, tag, value, self.honor_labels);
             }
         }
     }
@@ -310,7 +532,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                         endpoint = %url,
                     );
                 }
-                emit!(PrometheusParseError {
+                emit(PrometheusParseError {
                     error,
                     url: url.clone(),
                     body,
@@ -321,7 +543,7 @@ impl HttpClientContext for PrometheusScrapeContext {
     }
 
     fn on_http_response_error(&self, url: &Uri, header: &Parts) {
-        if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+        if header.status == StatusCode::NOT_FOUND && url.path() == "/" {
             // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
             warn!(
                 message = NOT_FOUND_NO_PATH,
@@ -331,14 +553,181 @@ impl HttpClientContext for PrometheusScrapeContext {
     }
 }
 
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    use crate::config;
+
+    fn config_with(endpoints: Vec<String>, targets: Vec<TargetConfig>) -> PrometheusScrapeConfig {
+        PrometheusScrapeConfig {
+            endpoints,
+            targets,
+            interval: default_interval(),
+            timeout: default_timeout(),
+            instance_tag: None,
+            endpoint_tag: None,
+            honor_labels: false,
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            tls: None,
+            auth: None,
+        }
+    }
+
+    fn compilation_errors(config: PrometheusScrapeConfig) -> Vec<String> {
+        let mut builder = config::Config::builder();
+        builder.add_source("prometheus", config);
+        builder.build().expect_err("config should be rejected")
+    }
+
+    #[test]
+    fn rejects_endpoints_and_targets_together_during_config_compilation() {
+        let errors = compilation_errors(config_with(
+            vec!["http://localhost:9090/metrics".to_string()],
+            vec![TargetConfig::Static {
+                urls: vec!["http://localhost:9091/metrics".to_string()],
+            }],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus exactly one of `endpoints` or `targets` must be specified"
+        }));
+    }
+
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn rejects_multiple_kubernetes_groups_during_config_compilation() {
+        let errors = compilation_errors(config_with(
+            Vec::new(),
+            vec![
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+            ],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus only one Kubernetes target group is currently supported"
+        }));
+    }
+
+    /// Loads and compiles a source with the given target options through the normal config
+    /// loader, which also checks the config against the schema.
+    fn load(targets: &str) -> std::result::Result<config::Config, Vec<String>> {
+        let yaml = format!(
+            "sources:\n  prom:\n    type: prometheus_scrape\n{targets}\
+             sinks:\n  out:\n    type: prometheus_exporter\n    inputs: [prom]\n"
+        );
+        config::load_from_str(&yaml, config::Format::Yaml)
+    }
+
+    #[test]
+    fn hosts_endpoints_and_targets_all_load() {
+        for targets in [
+            "    hosts: [http://localhost:9090/metrics]\n",
+            "    endpoints: [http://localhost:9090/metrics]\n",
+            "    targets: [{static: {urls: [http://localhost:9090/metrics]}}]\n",
+            // Empty lists loaded before `targets` existed and still do.
+            "    hosts: []\n",
+            "    endpoints: []\n",
+        ] {
+            if let Err(errors) = load(targets) {
+                panic!("`{targets}` should load: {errors:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn loader_rejects_missing_or_combined_targets() {
+        // The schema requires one of the two options.
+        let errors = load("").expect_err("a source without endpoints or targets");
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("No matching oneOf variant")),
+            "{errors:?}"
+        );
+
+        let errors = load(
+            "    endpoints: [http://localhost:9090/metrics]\n    \
+             targets: [{static: {urls: [http://localhost:9091/metrics]}}]\n",
+        )
+        .expect_err("a source with both endpoints and targets");
+        assert!(
+            errors.iter().any(|error| error
+                == "Source prom exactly one of `endpoints` or `targets` must be specified"),
+            "{errors:?}"
+        );
+    }
+
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn rejects_conflicting_kubernetes_tags_during_config_compilation() {
+        let k8s_cfg: KubernetesScrapeConfig =
+            serde_json::from_value(serde_json::json!({ "pod_label_tags": ["namespace"] })).unwrap();
+        let errors = compilation_errors(config_with(
+            Vec::new(),
+            vec![TargetConfig::Kubernetes(k8s_cfg)],
+        ));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.starts_with("Source prometheus ")
+                    && error.contains("`pod_label_tags` entry `namespace`")),
+            "{errors:?}"
+        );
+    }
+
+    /// With `honor_labels` off, discovery tags handle conflicts like `instance_tag`: the scraped
+    /// `namespace` moves to `exported_namespace`, replacing the value already there.
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn discovery_tags_follow_honor_labels_like_static_tags() {
+        use vector_lib::event::{Metric, MetricKind, MetricValue};
+
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: false,
+            instance_tag: Some("instance".to_owned()),
+            endpoint_tag: None,
+        };
+        let target = kubernetes_service_discovery::Target {
+            uri: "http://10.0.0.1:9100/metrics".parse().unwrap(),
+            instance: "10.0.0.1:9100".to_owned(),
+            namespace: "monitoring".to_owned(),
+            pod_name: "exporter-0".to_owned(),
+            node_name: None,
+            container_name: None,
+            extra_tags: std::collections::BTreeMap::new(),
+        };
+        let mut metric = Metric::new(
+            "up",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        metric.replace_tag("namespace".to_owned(), "app".to_owned());
+        metric.replace_tag("exported_namespace".to_owned(), "old".to_owned());
+        let mut events = vec![Event::Metric(metric)];
+
+        builder.context_for(&target).enrich_events(&mut events);
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.tag_value("namespace").as_deref(), Some("monitoring"));
+        assert_eq!(
+            metric.tag_value("exported_namespace").as_deref(),
+            Some("app")
+        );
+        assert_eq!(metric.tag_value("pod").as_deref(), Some("exporter-0"));
+        assert_eq!(
+            metric.tag_value("instance").as_deref(),
+            Some("10.0.0.1:9100")
+        );
+    }
+}
+
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
-    use crate::config::AcknowledgementsConfig;
-    use http_body::Body as _;
-    use hyper::{
-        Body, Client, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use std::convert::Infallible;
+
+    use http::Response;
+    use http_body_util::{BodyExt as _, Empty, Full};
+    use hyper_util::{client::legacy::Client, rt::TokioExecutor};
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
     use vector_lib::event::Metric;
@@ -346,12 +735,16 @@ mod test {
 
     use super::*;
     use crate::{
-        Error, config,
+        config::{self, AcknowledgementsConfig},
         http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             addr::next_addr,
-            components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+            components::{
+                COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+                run_and_assert_source_error,
+            },
+            http::{SlowBody, spawn_blackhole_http_server, spawn_slow_body_http_server},
             start_topology, trace_init, wait_for_tcp,
         },
     };
@@ -379,6 +772,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -402,7 +796,40 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_stalled_body_times_out_without_blocking_other_endpoints() {
+        let stalled = spawn_slow_body_http_server(SlowBody::Stall).await;
+
+        let (_guard, in_addr) = next_addr();
+        let healthy_endpoint = warp::path!("metrics").map(|| {
+            r#"
+                promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
+                "#
+        });
+        tokio::spawn(warp::serve(healthy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![stalled.to_string(), format!("http://{in_addr}/metrics")],
+            targets: Vec::new(),
+            interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events =
+            run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS)
+                .await;
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -420,6 +847,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -437,7 +865,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -470,6 +898,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -487,7 +916,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -534,6 +963,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -551,7 +981,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<Metric> = events.into_iter().map(Event::into_metric).collect();
         let metric = &metrics[0];
@@ -587,6 +1017,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -618,7 +1049,7 @@ mod test {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -655,13 +1086,11 @@ mod test {
     #[tokio::test]
     async fn test_prometheus_routing() {
         trace_init();
-        let (_in_guard, in_addr) = next_addr();
         let (_out_guard, out_addr) = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(Response::new(Body::from(
-                    r#"
+        let in_uri = spawn_blackhole_http_server(|_| async {
+            Ok::<_, Infallible>(Response::new(Full::new(Bytes::from_static(
+                r#"
                     # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
                     # TYPE promhttp_metric_handler_requests_total counter
                     promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
@@ -688,23 +1117,19 @@ mod test {
                     rpc_duration_seconds{code="200",quantile="0.99"} 76656 1612411516789
                     rpc_duration_seconds_sum{code="200"} 1.7560473e+07 1612411516789
                     rpc_duration_seconds_count{code="200"} 2693 1612411516789
-                    "#,
-                )))
-            }))
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", %error);
-            }
-        });
-        wait_for_tcp(in_addr).await;
+                    "#
+                .as_bytes(),
+            ))))
+        })
+        .await;
+        let in_addr = in_uri.authority().unwrap();
 
         let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{in_addr}")],
+                targets: vec![],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
@@ -736,7 +1161,8 @@ mod test {
         let (topology, _) = start_topology(config.build().unwrap(), false).await;
         sleep(Duration::from_secs(1)).await;
 
-        let response = Client::new()
+        let response = Client::builder(TokioExecutor::new())
+            .build_http::<Empty<Bytes>>()
             .get(format!("http://{out_addr}/metrics").parse().unwrap())
             .await
             .unwrap();
@@ -798,6 +1224,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://prometheus:9090/metrics".into()],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
@@ -815,7 +1242,7 @@ mod integration_tests {
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
         let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
@@ -865,5 +1292,182 @@ mod integration_tests {
             go_info.tag_value("endpoint"),
             Some("http://prometheus:9090/metrics".to_string())
         );
+    }
+}
+
+#[cfg(all(test, feature = "kubernetes"))]
+mod kubernetes_tests {
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, Mutex},
+    };
+
+    use http::Response;
+    use http_body_util::Full;
+    use k8s_openapi::{
+        api::core::v1::{Pod, PodSpec, PodStatus},
+        apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    };
+    use kube::runtime::{reflector, watcher};
+    use tokio::time::sleep;
+
+    use super::*;
+    use crate::{
+        SourceSender,
+        config::ProxyConfig,
+        http::{ParameterValue, QueryParameterValue},
+        test_util::http::spawn_blackhole_http_server,
+        tls::MaybeTlsSettings,
+    };
+
+    const INTERVAL: Duration = Duration::from_millis(50);
+
+    fn pod(name: &str, path: &str, port: u16) -> Pod {
+        Pod {
+            metadata: ObjectMeta {
+                name: Some(name.to_owned()),
+                namespace: Some("ns".to_owned()),
+                annotations: Some(BTreeMap::from([
+                    ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+                    ("prometheus.io/port".to_owned(), port.to_string()),
+                    ("prometheus.io/path".to_owned(), path.to_owned()),
+                ])),
+                ..ObjectMeta::default()
+            },
+            spec: Some(PodSpec::default()),
+            status: Some(PodStatus {
+                pod_ip: Some("127.0.0.1".to_owned()),
+                ..PodStatus::default()
+            }),
+        }
+    }
+
+    /// Waits until the server has seen a request for every path in `expected`, then clears the
+    /// record and checks that the next few ticks only hit those paths.
+    async fn assert_scraped_paths(requests: &Mutex<Vec<String>>, expected: &[&str]) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let seen = requests.lock().unwrap().clone();
+                if expected
+                    .iter()
+                    .all(|path| seen.iter().any(|request| request.starts_with(path)))
+                {
+                    break;
+                }
+                sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("expected requests for {expected:?}"));
+
+        requests.lock().unwrap().clear();
+        sleep(INTERVAL * 4).await;
+        let seen = requests.lock().unwrap().clone();
+        assert!(
+            !seen.is_empty()
+                && seen
+                    .iter()
+                    .all(|request| expected.iter().any(|path| request.starts_with(path))),
+            "expected only {expected:?}, got {seen:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn discovered_pods_are_scraped_as_they_change() {
+        // The server records the path, query, `x-test` header, and `Authorization` header of every
+        // request.
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&requests);
+        let base = spawn_blackhole_http_server(move |request: http::Request<_>| {
+            let recorded = Arc::clone(&recorded);
+            async move {
+                let header = |name: &str| {
+                    request
+                        .headers()
+                        .get(name)
+                        .and_then(|value| value.to_str().ok())
+                        .unwrap_or_default()
+                        .to_owned()
+                };
+                let line = format!(
+                    "{} {} {}",
+                    request.uri(),
+                    header("x-test"),
+                    header("authorization")
+                );
+                recorded.lock().unwrap().push(line);
+                Ok(Response::new(Full::from("up 1\n")))
+            }
+        })
+        .await;
+        let port = base.port_u16().unwrap();
+
+        let mut writer = reflector::store::Writer::<Pod>::default();
+        let discovery = kubernetes_service_discovery::PodDiscovery::from_stores(
+            vec![writer.as_reader()],
+            &KubernetesScrapeConfig::default(),
+        );
+        writer.apply_watcher_event(&watcher::Event::Init);
+        writer.apply_watcher_event(&watcher::Event::InitApply(pod("a", "/a", port)));
+        writer.apply_watcher_event(&watcher::Event::InitDone);
+
+        let builder = PrometheusScrapeBuilder {
+            honor_labels: false,
+            instance_tag: None,
+            endpoint_tag: None,
+        };
+        let query = HashMap::from([(
+            "key".to_owned(),
+            QueryParameterValue::SingleParam(ParameterValue::String("value".to_owned())),
+        )]);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-test", HeaderValue::from_static("yes"));
+        let options = RequestOptions {
+            client: HttpClient::new(MaybeTlsSettings::Raw(()), &ProxyConfig::default()).unwrap(),
+            method: HttpMethod::Get,
+            timeout: Duration::from_secs(1),
+            headers,
+            content_type: "text/plain".to_owned(),
+            auth: Some(Auth::Bearer {
+                token: "secret".to_owned().into(),
+            }),
+        };
+        let (out, rx) = SourceSender::new_test();
+        let (trigger, shutdown, _done) = ShutdownSignal::new_wired();
+        let scrape = tokio::spawn(async move {
+            let requests = discovered_requests(&discovery, &builder, &query, INTERVAL, shutdown);
+            run(requests, options, out).await
+        });
+        // Keep reading events so the source never blocks on a full output.
+        let drain = tokio::spawn(rx.for_each(|_| async {}));
+
+        // The source query, headers, and auth apply to discovered targets too.
+        assert_scraped_paths(&requests, &["/a?key=value yes Bearer secret"]).await;
+
+        // An update changes the target.
+        writer.apply_watcher_event(&watcher::Event::Apply(pod("a", "/b", port)));
+        assert_scraped_paths(&requests, &["/b?"]).await;
+
+        // A new Pod is picked up on a later tick.
+        writer.apply_watcher_event(&watcher::Event::Apply(pod("c", "/c", port)));
+        assert_scraped_paths(&requests, &["/b?", "/c?"]).await;
+
+        // A deleted Pod gets no new requests.
+        writer.apply_watcher_event(&watcher::Event::Delete(pod("a", "/b", port)));
+        assert_scraped_paths(&requests, &["/c?"]).await;
+
+        // A re-list, as after a watcher reconnects, leaves no stale targets behind.
+        writer.apply_watcher_event(&watcher::Event::Init);
+        writer.apply_watcher_event(&watcher::Event::InitApply(pod("d", "/d", port)));
+        writer.apply_watcher_event(&watcher::Event::InitDone);
+        assert_scraped_paths(&requests, &["/d?"]).await;
+
+        drop(trigger);
+        tokio::time::timeout(Duration::from_secs(5), scrape)
+            .await
+            .expect("shutdown should stop the scrape loop")
+            .unwrap()
+            .unwrap();
+        drain.await.unwrap();
     }
 }

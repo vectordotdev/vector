@@ -14,7 +14,7 @@ use vector_lib::{
 use super::WebHdfsConfig;
 use crate::{
     config::{SinkConfig, SinkContext, ValidatedSink},
-    sinks::util::{BatchConfig, Compression, HttpEndpoint},
+    sinks::util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -120,6 +120,7 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
+        request: TowerRequestConfig::default(),
         acknowledgements: crate::config::AcknowledgementsConfig::default(),
         confinement: crate::template::ConfinementConfig::default(),
     }

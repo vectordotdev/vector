@@ -11,13 +11,16 @@ use crate::{event, metrics::AgentDDSketch};
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
+/// Protobuf descriptors for the native event wire model and its imports.
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/event_descriptor.bin"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
-use super::metadata::{Inner, default_schema_definition};
+use super::metadata::Inner;
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
@@ -173,24 +176,25 @@ impl TryFrom<MetricValue> for super::MetricValue {
                 statistic: dist.statistic().into(),
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
+            // Versions 1 and 2 have no way to encode an absent sum, so whatever they carry was
+            // reported by the source.
             MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
                 buckets: super::metric::zip_buckets(
                     hist.buckets,
                     hist.counts.iter().map(|h| u64::from(*h)),
                 ),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram2(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
-                // `f64` cannot express an unreported sum, so it reads as zero.
-                sum: if hist.sum_missing { 0.0 } else { hist.sum },
+                sum: (!hist.sum_missing).then_some(hist.sum),
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
                 quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
@@ -228,7 +232,9 @@ impl TryFrom<Metric> for super::Metric {
 
         let name = metric.name;
 
-        let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
+        let namespace = metric
+            .namespace_v2
+            .or_else(|| (!metric.namespace.is_empty()).then_some(metric.namespace));
 
         let timestamp = metric
             .timestamp
@@ -308,9 +314,9 @@ impl From<super::LogEvent> for WithMetadata<Log> {
         // in fields instead which is ignored during decoding. To reduce encoding bloat
         // from a dummy value, it is only used when the root value type is not an object.
         // Once this backwards compatibility is no longer required, "fields" can
-        // be entirely removed from the Log object
+        // be entirely removed from the Log object.
         let (fields, value) = if let VrlValue::Object(fields) = value {
-            // using only "fields" to prevent having to use the dummy value
+            // Use only "fields" to prevent having to use the dummy value.
             let fields = fields
                 .into_iter()
                 .map(|(k, v)| (k.into(), encode_value(v)))
@@ -389,8 +395,9 @@ impl From<super::MetricValue> for MetricValue {
             } => Self::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
-                sum,
-                sum_missing: false,
+                // Readers that predate `sum_missing` ignore it and see zero.
+                sum: sum.unwrap_or(0.0),
+                sum_missing: sum.is_none(),
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
@@ -479,6 +486,7 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let data = Metric {
             name,
             namespace,
+            namespace_v2: None,
             timestamp,
             tags_v1,
             tags_v2,
@@ -518,6 +526,40 @@ impl From<super::Event> for EventWrapper {
 impl From<super::Event> for WithMetadata<EventWrapper> {
     fn from(event: super::Event) -> Self {
         WithMetadata::<Event>::from(event).into()
+    }
+}
+
+impl EventWrapper {
+    /// Converts an event using only the current log value representation.
+    ///
+    /// Binary native encoding continues to use the standard `From` conversion so older
+    /// receivers and its wider object-root nesting boundary remain compatible. Native JSON uses
+    /// this conversion because deprecated fields are omitted from its published representation.
+    pub fn from_event_for_native_json(event: super::Event) -> Self {
+        let event = match event {
+            super::Event::Log(log) => {
+                let (value, metadata) = log.into_parts();
+                #[allow(deprecated)]
+                let log = Log {
+                    fields: BTreeMap::new(),
+                    value: Some(encode_value(value)),
+                    metadata: Some(encode_value(metadata.value().clone())),
+                    metadata_full: Some(metadata.into()),
+                };
+                Event::Log(log)
+            }
+            super::Event::Metric(metric) => {
+                let has_namespace = metric.namespace().is_some();
+                let mut metric: Metric = metric.into();
+                if has_namespace {
+                    metric.namespace_v2 = Some(std::mem::take(&mut metric.namespace));
+                }
+                Event::Metric(metric)
+            }
+            super::Event::Trace(trace) => Event::Trace(trace.into()),
+        };
+
+        Self { event: Some(event) }
     }
 }
 
@@ -597,6 +639,7 @@ impl From<Secrets> for super::metadata::Secrets {
 impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
+            metric_type: value.metric_type(),
             origin_product: value.product(),
             origin_category: value.category(),
             origin_service: value.service(),
@@ -611,6 +654,7 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
             value.origin_category,
             value.origin_service,
         )
+        .with_metric_type(value.metric_type)
     }
 }
 
@@ -638,6 +682,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
             ..
@@ -653,6 +698,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
             trace_layout: encode_trace_layout(trace_layout),
         }
     }
@@ -669,6 +715,7 @@ impl TryFrom<Metadata> for EventMetadata {
             upstream_id,
             secrets,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
         } = value;
@@ -706,9 +753,10 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: default_schema_definition(),
+                schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                datadog_metric_unit: datadog_metric_unit.map(Arc::from),
                 trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
@@ -744,8 +792,7 @@ fn decode_event_metadata(
         full.try_into()
     } else if let Some(value) = metadata {
         Ok(decode_value(value)?
-            .map(EventMetadata::default_with_value)
-            .unwrap_or_default())
+            .map_or_else(EventMetadata::default, EventMetadata::default_with_value))
     } else {
         Ok(EventMetadata::default())
     }
@@ -852,6 +899,12 @@ mod tests {
     // regenerate them from the current Rust types; each payload's exact contents are documented
     // below and mirrored by its test assertions.
 
+    // Pre-v23 Log with deprecated fields map entry message="hello" and no value field. This pins
+    // decoding for logs produced before object-root logs moved to the Value representation.
+    const PRE_V23_LOG_FIELDS: &[u8] = &[
+        10, 18, 10, 7, 109, 101, 115, 115, 97, 103, 101, 18, 7, 10, 5, 104, 101, 108, 108, 111,
+    ];
+
     // EventArray.metrics containing four pre-v24 metrics:
     // - AggregatedHistogram1 (field 9): bucket 1.5/count 2, total count 2, sum 3.0.
     // - AggregatedHistogram2 (field 13): bucket 1.5/count 2, total count 2, sum 3.0.
@@ -897,6 +950,31 @@ mod tests {
     // This pins the expected default when decoding payloads created before event IDs existed.
     const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
 
+    // Current EventWrapper.metric containing:
+    // - name field 1 set to "requests", kind field 4 set to Absolute, and Counter field 5 set to 1.0;
+    // - namespace field 11 set to "production", with namespace_v2 field 22 absent;
+    // - the empty legacy metadata field 19 and current metadata_full field 21.
+    // This pins binary native to the legacy namespace field while native JSON uses the
+    // presence-aware field.
+    const CURRENT_NATIVE_NAMESPACE: &[u8] = &[
+        18, 47, 10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 32, 1, 42, 9, 9, 0, 0, 0, 0, 0, 0,
+        240, 63, 90, 10, 112, 114, 111, 100, 117, 99, 116, 105, 111, 110, 154, 1, 2, 58, 0, 170, 1,
+        4, 10, 2, 58, 0,
+    ];
+
+    #[test]
+    fn decodes_pre_v23_log_fields() {
+        let decoded = crate::event::LogEvent::try_from(Log::decode(PRE_V23_LOG_FIELDS).unwrap())
+            .expect("legacy log fields should decode");
+
+        assert_eq!(
+            decoded.value(),
+            &VrlValue::Object(vrl::objectmap! {
+                "message" => VrlValue::from("hello")
+            })
+        );
+    }
+
     #[test]
     fn decodes_pre_v24_histogram_and_summary_variants() {
         let expected = [
@@ -906,7 +984,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedHistogram {
                 buckets: vec![metric::Bucket {
@@ -914,7 +992,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedSummary {
                 quantiles: vec![metric::Quantile {
@@ -950,10 +1028,9 @@ mod tests {
         assert_eq!(decoded, expected);
     }
 
-    /// Newer encoders set `sum_missing` on a histogram that reported no sum. `f64` cannot hold an
-    /// absent sum, so it must decode as zero whatever `sum` carries.
+    /// A histogram marked `sum_missing` reported no sum, whatever `sum` carries.
     #[test]
-    fn decodes_histogram_marked_sum_missing_as_zero() {
+    fn decodes_histogram_marked_sum_missing_as_absent() {
         let value = MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
             buckets: vec![HistogramBucket3 {
                 upper_limit: 1.5,
@@ -972,27 +1049,41 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 0.0,
+                sum: None,
             }
         );
     }
 
-    /// A reported sum of zero must not be mistaken for a missing one.
-    #[test]
-    fn encodes_reported_zero_sum_without_marker() {
+    fn encode_histogram(sum: Option<f64>) -> AggregatedHistogram3 {
         let value = MetricValue::from(EventMetricValue::AggregatedHistogram {
             buckets: vec![metric::Bucket {
                 upper_limit: 1.5,
                 count: 2,
             }],
             count: 2,
-            sum: 0.0,
+            sum,
         });
 
         let MetricValue::AggregatedHistogram3(hist) = value else {
             panic!("expected AggregatedHistogram3, got {value:?}");
         };
+        hist
+    }
+
+    /// A reported sum of zero must not be mistaken for a missing one.
+    #[test]
+    fn encodes_reported_zero_sum_without_marker() {
+        let hist = encode_histogram(Some(0.0));
         assert!(!hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
+    }
+
+    /// Readers that predate `sum_missing` skip it, so the zero in `sum` is what they see.
+    #[test]
+    fn encodes_unreported_sum_as_marked_zero() {
+        let hist = encode_histogram(None);
+        assert!(hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
     }
 
     #[test]
@@ -1032,6 +1123,96 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(values, [Some(String::new()), None]);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn native_json_log_encoding_does_not_change_native_protobuf_encoding() {
+        let event = crate::event::Event::Log(crate::event::LogEvent::from(vrl::objectmap! {
+            "message" => VrlValue::from("hello")
+        }));
+
+        let native = EventWrapper::from(event.clone()).event.unwrap();
+        let native_json = EventWrapper::from_event_for_native_json(event)
+            .event
+            .unwrap();
+        let (Event::Log(native), Event::Log(native_json)) = (native, native_json) else {
+            panic!("event wrappers did not contain logs");
+        };
+
+        assert!(!native.fields.is_empty());
+        assert!(native.value.is_none());
+        assert!(native_json.fields.is_empty());
+        assert!(native_json.value.is_some());
+    }
+
+    #[test]
+    fn native_json_metric_encoding_preserves_namespace_presence() {
+        for namespace in [None, Some(""), Some("production")] {
+            let event = crate::event::Event::Metric(
+                crate::event::Metric::new(
+                    "requests",
+                    crate::event::MetricKind::Absolute,
+                    EventMetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(namespace.map(str::to_owned)),
+            );
+
+            let native = EventWrapper::from(event.clone()).event.unwrap();
+            let native_json = EventWrapper::from_event_for_native_json(event)
+                .event
+                .unwrap();
+            let (Event::Metric(native), Event::Metric(native_json)) = (native, native_json) else {
+                panic!("event wrappers did not contain metrics");
+            };
+
+            assert_eq!(native.namespace, namespace.unwrap_or_default());
+            assert_eq!(native.namespace_v2, None);
+            assert_eq!(native_json.namespace, "");
+            assert_eq!(native_json.namespace_v2.as_deref(), namespace);
+            assert_eq!(
+                crate::event::Metric::try_from(native_json)
+                    .expect("native JSON metric should decode")
+                    .namespace(),
+                namespace
+            );
+        }
+    }
+
+    #[test]
+    fn namespace_v2_takes_precedence_over_legacy_namespace() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            namespace: "legacy".to_owned(),
+            namespace_v2: Some("current".to_owned()),
+            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            crate::event::Metric::try_from(metric)
+                .expect("metric with namespace_v2 should decode")
+                .namespace(),
+            Some("current")
+        );
+    }
+
+    #[test]
+    fn binary_native_keeps_namespace_on_field_11() {
+        let event = crate::event::Event::Metric(
+            crate::event::Metric::new_with_metadata(
+                "requests",
+                crate::event::MetricKind::Absolute,
+                EventMetricValue::Counter { value: 1.0 },
+                crate::event::EventMetadata::default().with_source_event_id(None),
+            )
+            .with_namespace(Some("production".to_owned())),
+        );
+
+        assert_eq!(
+            EventWrapper::from(event).encode_to_vec(),
+            CURRENT_NATIVE_NAMESPACE
+        );
     }
 
     #[test]

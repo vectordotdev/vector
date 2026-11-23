@@ -16,7 +16,7 @@ use crate::sinks::{
 /// that is used to send metrics to GreptimeDB.
 /// It also contains the finalizers and metadata that are used to
 #[derive(Clone)]
-pub struct GreptimeDBGrpcRequest {
+pub(super) struct GreptimeDBGrpcRequest {
     pub(super) items: RowInsertRequests,
     pub(super) finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
@@ -68,7 +68,7 @@ impl MetaDescriptive for GreptimeDBGrpcRequest {
 
 /// `GreptimeDBGrpcBatchOutput` is the output of the [`GreptimeDBGrpcService`]
 #[derive(Debug)]
-pub struct GreptimeDBGrpcBatchOutput {
+pub(super) struct GreptimeDBGrpcBatchOutput {
     pub _item_count: u32,
     pub metadata: RequestMetadata,
 }
@@ -89,7 +89,7 @@ impl DriverResponse for GreptimeDBGrpcBatchOutput {
 
 /// `GreptimeDBGrpcRetryLogic` is the retry logic for the [`GreptimeDBGrpcSink`]
 #[derive(Clone, Default)]
-pub struct GreptimeDBGrpcRetryLogic;
+pub(super) struct GreptimeDBGrpcRetryLogic;
 
 impl RetryLogic for GreptimeDBGrpcRetryLogic {
     type Error = GreptimeError;

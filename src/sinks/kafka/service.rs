@@ -18,13 +18,13 @@ use vector_lib::config;
 
 use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
-pub struct KafkaRequest {
+pub(crate) struct KafkaRequest {
     pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
     pub request_metadata: RequestMetadata,
 }
 
-pub struct KafkaRequestMetadata {
+pub(crate) struct KafkaRequestMetadata {
     pub finalizers: EventFinalizers,
     pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
@@ -32,7 +32,7 @@ pub struct KafkaRequestMetadata {
     pub topic: String,
 }
 
-pub struct KafkaResponse {
+pub(crate) struct KafkaResponse {
     event_byte_size: GroupedCountByteSize,
     raw_byte_size: usize,
     event_status: EventStatus,
@@ -87,7 +87,7 @@ impl Drop for BlockedRecordState {
 }
 
 #[derive(Clone)]
-pub struct KafkaService {
+pub(crate) struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
 
     /// The number of records blocked from being enqueued on the producer.

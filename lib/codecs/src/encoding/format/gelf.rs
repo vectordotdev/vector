@@ -127,11 +127,17 @@ impl GelfSerializer {
     }
 
     /// Encode event and represent it as JSON value.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event is not valid GELF and cannot be coerced into it: the `host`
+    /// field is missing, both `short_message` and the log schema message field are missing, a field
+    /// name contains characters other than word characters, `.`, `-`, or `@`, or a field value has
+    /// a type that GELF does not allow for that field.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the event is not a log event.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         // input_type() restricts the event type to LogEvents
         let log = to_gelf_event(event.into_log())?;
@@ -290,7 +296,7 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
             for field in missing_prefix {
                 log.rename_key(
                     event_path!(field.as_str()),
-                    event_path!(format!("_{}", &field).as_str()),
+                    event_path!(format!("_{field}").as_str()),
                 );
             }
             log
@@ -305,7 +311,7 @@ mod tests {
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
     use vrl::{
-        btreemap,
+        objectmap,
         value::{ObjectMap, Value},
     };
 
@@ -336,7 +342,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let event_fields = btreemap! {
+        let event_fields = objectmap! {
             VERSION => "1.1",
             HOST => "example.org",
             SHORT_MESSAGE => "Some message",
@@ -352,7 +358,7 @@ mod tests {
         let serializer = SerializerConfig::Gelf(GelfSerializerConfig::default())
             .build()
             .unwrap();
-        let event_fields = btreemap! {};
+        let event_fields = objectmap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         assert!(serializer.supports_json());
         assert!(serializer.to_json_value(log_event).is_err());
@@ -360,7 +366,7 @@ mod tests {
 
     #[test]
     fn gelf_serializing_valid() {
-        let event_fields = btreemap! {
+        let event_fields = objectmap! {
             VERSION => "1.1",
             HOST => "example.org",
             SHORT_MESSAGE => "Some message",
@@ -382,7 +388,7 @@ mod tests {
     fn gelf_serializing_coerced() {
         // no underscore
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 HOST => "example.org",
                 SHORT_MESSAGE => "Some message",
@@ -395,7 +401,7 @@ mod tests {
 
         // "message" => SHORT_MESSAGE
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 HOST => "example.org",
                 log_schema().message_key().unwrap().to_string() => "Some message",
@@ -419,7 +425,7 @@ mod tests {
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.1", "%Y-%m-%d %H:%M:%S%.f");
             let dt = naive_dt.unwrap().and_utc();
 
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
                 HOST => "example.org",
@@ -437,7 +443,7 @@ mod tests {
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.0", "%Y-%m-%d %H:%M:%S%.f");
             let dt = naive_dt.unwrap().and_utc();
 
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
                 HOST => "example.org",
@@ -454,7 +460,7 @@ mod tests {
     fn gelf_serializing_invalid_error() {
         // no host
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
             };
@@ -462,7 +468,7 @@ mod tests {
         }
         // no message
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
             };
@@ -470,7 +476,7 @@ mod tests {
         }
         // expected string
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => 0,
@@ -479,7 +485,7 @@ mod tests {
         }
         // expected integer
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -489,7 +495,7 @@ mod tests {
         }
         // expected float
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -499,7 +505,7 @@ mod tests {
         }
         // invalid field name
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -509,7 +515,7 @@ mod tests {
         }
         // invalid additional value type - bool
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -519,7 +525,7 @@ mod tests {
         }
         // invalid additional value type - null
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",

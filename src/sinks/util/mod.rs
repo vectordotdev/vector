@@ -9,14 +9,6 @@ pub mod compressor;
 pub mod datagram;
 pub mod encoding;
 pub mod http;
-#[cfg(any(
-    feature = "sinks-clickhouse",
-    feature = "sinks-gcp",
-    feature = "sinks-greptimedb_logs",
-    feature = "sinks-honeycomb",
-    feature = "sinks-keep",
-))]
-pub(crate) mod http_v1;
 pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
@@ -136,6 +128,19 @@ pub fn encode_namespace<'a>(
     }
 }
 
+#[cfg(any(feature = "sinks-datadog_metrics", feature = "sinks-statsd"))]
+pub(crate) fn encode_metric_tag(output: &mut String, name: &str, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            output.reserve(name.len() + value.len() + 1);
+            output.push_str(name);
+            output.push(':');
+            output.push_str(value);
+        }
+        None => output.push_str(name),
+    }
+}
+
 /// Marker trait for types that can hold a batch of events
 pub trait ElementCount {
     fn element_count(&self) -> usize;
@@ -152,5 +157,22 @@ pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
     match tz {
         TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
         TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
+    }
+}
+
+#[cfg(all(test, any(feature = "sinks-datadog_metrics", feature = "sinks-statsd")))]
+mod tests {
+    use super::encode_metric_tag;
+
+    #[test]
+    fn encode_metric_tag_formats_valued_and_bare_tags() {
+        let mut output = String::new();
+
+        encode_metric_tag(&mut output, "name", Some("value"));
+        assert_eq!(output, "name:value");
+
+        output.clear();
+        encode_metric_tag(&mut output, "bare", None);
+        assert_eq!(output, "bare");
     }
 }

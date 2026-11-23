@@ -1,16 +1,16 @@
-use std::{
-    fs::{OpenOptions, create_dir},
-    io::Write,
-    path::PathBuf,
-};
+use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
-use vector::test_util::{temp_dir, temp_file};
+use tempfile::TempDir;
+use vector::test_util::temp_file;
 
 #[cfg(feature = "cli-tests")]
 mod cli;
 
 #[cfg(feature = "shutdown-tests")]
 mod shutdown;
+
+#[cfg(windows)]
+mod windows;
 
 /// Creates a file with given content
 #[must_use]
@@ -52,8 +52,6 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
 ///
 /// Panics if the directory cannot be created.
 #[must_use]
-pub fn create_directory() -> PathBuf {
-    let path = temp_dir();
-    create_dir(path.clone()).unwrap();
-    path
+pub fn create_directory() -> TempDir {
+    tempfile::tempdir().expect("Failed to create temporary directory")
 }

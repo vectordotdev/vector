@@ -5,13 +5,16 @@ use std::{
 };
 
 use glob::Pattern;
-use http::Uri;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
+    proto::{
+        Component, ComponentType, InternalMetricKind, MetricName,
+        stream_component_metrics_response::Value,
+    },
 };
+use vector_common::internal_event::all_metrics;
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
 use vector_common::config::ComponentKey;
@@ -514,28 +517,25 @@ pub struct SubscribeHandles {
     pub poll_handle: JoinHandle<()>,
 }
 
-/// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
-/// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
-/// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
+/// Subscribe to each metrics stream, all sharing the connection of `client`.
+/// HTTP/2 multiplexes the concurrent streams — cloning a `Client` is cheap (clones share
+/// one connection pool) and avoids redundant TCP/HTTP2 handshakes.
 ///
-/// # Errors
-/// Returns an error if the API connection cannot be established.
+/// Pass the client that [`init_components`] used, so the streams reuse the connection that its
+/// RPCs opened. A stream that fails, for example because the API is unreachable, ends its task.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Keep the concrete set type used by the component polling task."
 )]
-pub async fn subscribe(
-    uri: Uri,
+pub fn subscribe(
+    client: Client,
     tx: state::EventTx,
     interval: i64,
     components_patterns: Vec<Pattern>,
     initial_components: HashSet<String>,
-) -> Result<SubscribeHandles, vector_api_client::Error> {
+) -> SubscribeHandles {
     let components_patterns = Arc::from(components_patterns);
-
-    let mut client = Client::new(uri);
-    client.connect().await?;
 
     let poll_handle = tokio::spawn(poll_components(
         client.clone(),
@@ -612,24 +612,24 @@ pub async fn subscribe(
         Arc::clone(&components_patterns),
     )));
 
-    Ok(SubscribeHandles {
+    SubscribeHandles {
         metric_handles,
         poll_handle,
-    })
+    }
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
 ///
+/// `client` must be connected. Its RPCs open the connection, so success means the API is
+/// reachable.
+///
 /// # Errors
 /// Returns an error if fetching the initial component list fails.
 pub async fn init_components(
-    uri: Uri,
+    client: &mut Client,
     components_patterns: &[Pattern],
 ) -> Result<state::State, vector_api_client::Error> {
-    let mut client = Client::new(uri);
-    client.connect().await?;
-
     // Get all components
     let response = client.get_components(0).await?;
 
@@ -645,21 +645,52 @@ pub async fn init_components(
         })
         .collect::<BTreeMap<_, _>>();
 
+    // GetCapabilities is a one-shot call made once per connection to learn allocation
+    // tracing status and the full set of registered metric names. Re-evaluated on every
+    // reconnect via the retry loop in `subscription()`.
+    // On older servers that don't implement GetCapabilities, fall back to the legacy
+    // GetAllocationTracingStatus RPC for the allocation tracing flag and use the
+    // compiled-in metric names as the available metrics list.
+    let (allocation_tracing_enabled, available_metrics) =
+        if let Ok(caps) = client.get_capabilities().await {
+            let metrics = caps
+                .available_metrics
+                .into_iter()
+                .filter_map(|m| {
+                    let kind = match InternalMetricKind::try_from(m.kind) {
+                        Ok(InternalMetricKind::Counter) => state::InternalMetricKind::Counter,
+                        Ok(InternalMetricKind::Gauge) => state::InternalMetricKind::Gauge,
+                        Ok(InternalMetricKind::Histogram) => state::InternalMetricKind::Histogram,
+                        _ => return None,
+                    };
+                    Some(state::MetricInfo { name: m.name, kind })
+                })
+                .collect();
+            (caps.allocation_tracing_enabled, metrics)
+        } else {
+            let enabled = client
+                .get_allocation_tracing_status()
+                .await
+                .is_ok_and(|r| r.enabled);
+            let metrics = all_metrics()
+                .map(|(name, kind)| state::MetricInfo {
+                    name: name.to_string(),
+                    kind,
+                })
+                .collect();
+            (enabled, metrics)
+        };
+
+    let mut state = state::State::new(rows);
+    state.available_metrics = available_metrics;
+
     #[cfg(unix)]
     {
-        // Allocation tracing is a compile-time + startup-time setting on the
-        // server, so querying once per connection is sufficient. On error
-        // (e.g. older server without this RPC) we default to false, matching
-        // pre-existing behavior. This is re-evaluated on every reconnect via
-        // the retry loop in `subscription()`.
-        let mut state = state::State::new(rows);
-        state.allocation_tracing_active = client
-            .get_allocation_tracing_status()
-            .await
-            .is_ok_and(|r| r.enabled);
-        Ok(state)
+        state.allocation_tracing_active = allocation_tracing_enabled;
     }
 
     #[cfg(not(unix))]
-    Ok(state::State::new(rows))
+    let _ = allocation_tracing_enabled;
+
+    Ok(state)
 }
