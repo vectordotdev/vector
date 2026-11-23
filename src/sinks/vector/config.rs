@@ -5,7 +5,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
@@ -848,22 +848,26 @@ const fn default_endpoint_health_config() -> HealthConfig {
     }
 }
 
+/// The longest idle connection timeout the sink accepts, about 136 years. Hyper's connection pool
+/// adds the timeout to the current time in its background task that evicts idle connections. That
+/// addition panics if the sum is out of range for the clock, and the pool then stops evicting in
+/// the background. This bound leaves ample headroom for the time that passes between building the
+/// client and the addition.
+const MAX_IDLE_CONNECTION_TIMEOUT_SECS: u64 = u32::MAX as u64;
+
 fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
     idle_connection_timeout_secs: NonZeroU64,
 ) -> crate::Result<Http2Client<TonicBody>> {
-    let idle_connection_timeout = Duration::from_secs(idle_connection_timeout_secs.get());
-    // Hyper's pool adds the timeout to the current time in its background task that evicts idle
-    // connections. That addition panics if the sum is out of range for the clock, and the pool
-    // then stops evicting in the background.
-    if Instant::now()
-        .checked_add(idle_connection_timeout)
-        .is_none()
-    {
-        return Err("`idle_connection_timeout_secs` is too large".into());
+    if idle_connection_timeout_secs.get() > MAX_IDLE_CONNECTION_TIMEOUT_SECS {
+        return Err(format!(
+            "`idle_connection_timeout_secs` must be at most {MAX_IDLE_CONNECTION_TIMEOUT_SECS} seconds"
+        )
+        .into());
     }
+    let idle_connection_timeout = Duration::from_secs(idle_connection_timeout_secs.get());
 
     let mut builder = Builder::new(CpuTimedExecutor);
     builder
@@ -1574,15 +1578,27 @@ mod tests {
     }
 
     #[test]
-    fn idle_connection_timeout_too_large_for_the_clock_is_rejected() {
+    fn idle_connection_timeout_above_the_maximum_is_rejected() {
         let result = new_client(
             &MaybeTlsSettings::Raw(()),
             &ProxyConfig::default(),
             None,
-            NonZeroU64::new(u64::MAX).unwrap(),
+            NonZeroU64::new(MAX_IDLE_CONNECTION_TIMEOUT_SECS + 1).unwrap(),
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn idle_connection_timeout_at_the_maximum_is_accepted() {
+        let result = new_client(
+            &MaybeTlsSettings::Raw(()),
+            &ProxyConfig::default(),
+            None,
+            NonZeroU64::new(MAX_IDLE_CONNECTION_TIMEOUT_SECS).unwrap(),
+        );
+
+        assert!(result.is_ok());
     }
 
     /// Sends two requests, with `gap` between them, to a server that counts the connections it
