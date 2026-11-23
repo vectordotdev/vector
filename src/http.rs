@@ -28,7 +28,7 @@ use vector_lib::{
     internal_event::emit,
     sensitive_string::SensitiveString,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsIncomingStream, TlsError},
+    tls::{MaybeTlsIncomingStream, TlsConfig, TlsError},
 };
 
 #[cfg(feature = "aws-core")]
@@ -143,6 +143,218 @@ impl Auth {
             #[cfg(feature = "aws-core")]
             _ => {}
         }
+    }
+}
+
+/// The authentication strategy of the `http` sink.
+///
+/// The `basic`, `bearer`, `custom` and `aws` strategies are the same as in [`Auth`]. The `oauth2`
+/// strategy fetches an access token asynchronously. [`Auth`] cannot do this because each other HTTP
+/// component applies [`Auth`] synchronously.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+#[cfg_attr(
+    not(feature = "aws-core"),
+    expect(
+        clippy::large_enum_variant,
+        reason = "Only the OAuth 2.0 variant is large. Boxing it would complicate the config schema."
+    )
+)]
+pub enum HttpSinkAuth {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        password: SensitiveString,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// The bearer token value (OAuth 2.0, JWT, etc.) is passed as-is.
+    Bearer {
+        /// The bearer authentication token.
+        token: SensitiveString,
+    },
+
+    #[cfg(feature = "aws-core")]
+    /// AWS authentication.
+    Aws {
+        /// The AWS authentication configuration.
+        auth: AwsAuthentication,
+
+        /// The AWS service name to use for signing.
+        service: String,
+    },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header.
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        value: String,
+    },
+
+    /// OAuth 2.0 client credentials.
+    ///
+    /// Vector requests an access token from `token_endpoint`. Vector caches the access token and
+    /// refreshes it before it expires. Vector sends the access token as a bearer token. Set
+    /// `client_secret` to use the standard grant. Set `tls` with a client certificate to use mutual
+    /// TLS ([RFC 8705][rfc8705]).
+    ///
+    /// [rfc8705]: https://datatracker.ietf.org/doc/html/rfc8705
+    // `rename_all` alone turns `OAuth2` into `o_auth2`.
+    #[serde(rename = "oauth2")]
+    OAuth2(OAuth2Config),
+}
+
+/// The settings of the OAuth 2.0 client credentials grant.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct OAuth2Config {
+    /// The client identifier from the authorization server.
+    #[configurable(metadata(docs::examples = "${CLIENT_ID}"))]
+    pub client_id: String,
+
+    /// The client secret.
+    ///
+    /// When this field is set, Vector authenticates to the token endpoint with HTTP Basic
+    /// authentication (RFC 6749, section 2.3.1). When this field is unset, Vector authenticates to
+    /// the token endpoint with a client certificate.
+    #[configurable(metadata(docs::examples = "${CLIENT_SECRET}"))]
+    pub client_secret: Option<SensitiveString>,
+
+    /// The token endpoint that issues the access token.
+    ///
+    /// Vector sends the client credential to this endpoint. Use a URI with the `https` scheme
+    /// unless the endpoint is on a trusted network.
+    #[configurable(metadata(docs::examples = "https://auth.example.com/oauth/token"))]
+    pub token_endpoint: String,
+
+    /// The scope to request from the authorization server.
+    ///
+    /// Some authorization servers require a scope. Vector sends this value as the `scope`
+    /// parameter of the token request.
+    #[configurable(metadata(docs::examples = "${SCOPE}"))]
+    pub scope: Option<String>,
+
+    /// The audience to request from the authorization server.
+    ///
+    /// Vector sends this value as the `audience` parameter of the token request. Some
+    /// authorization servers reject a token request without it.
+    #[configurable(metadata(docs::examples = "${AUDIENCE}"))]
+    pub audience: Option<String>,
+
+    /// The resource to request from the authorization server.
+    ///
+    /// Vector sends this value as the `resource` parameter of the token request
+    /// ([RFC 8707][rfc8707]).
+    ///
+    /// [rfc8707]: https://datatracker.ietf.org/doc/html/rfc8707
+    #[configurable(metadata(docs::examples = "${RESOURCE}"))]
+    pub resource: Option<String>,
+
+    /// The number of seconds to refresh the access token before it expires.
+    ///
+    /// When this value is equal to or larger than the access token lifetime, Vector requests a new
+    /// access token for each request.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_expiry_buffer_secs")]
+    pub expiry_buffer_secs: u32,
+
+    /// The time limit for a complete token request.
+    ///
+    /// A stalled authorization server cannot hold the refresh lock and block the requests of the
+    /// sink for longer than this value. A value of `0` is rejected.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_token_timeout_secs")]
+    pub timeout_secs: u64,
+
+    /// The TLS settings for the connection to the token endpoint.
+    ///
+    /// Set this field when the token endpoint needs different TLS settings than the sink `tls`
+    /// field. A client certificate is an example. When this field is unset, the sink `tls` field
+    /// applies.
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
+}
+
+const fn default_expiry_buffer_secs() -> u32 {
+    60
+}
+
+const fn default_token_timeout_secs() -> u64 {
+    10
+}
+
+impl HttpSinkAuth {
+    /// Returns the credentials that a request builder applies synchronously.
+    ///
+    /// Returns `None` for OAuth 2.0. [`HttpClient`] applies the OAuth 2.0 access token
+    /// asynchronously.
+    #[must_use]
+    pub fn to_auth(&self) -> Option<Auth> {
+        match self {
+            Self::Basic { user, password } => Some(Auth::Basic {
+                user: user.clone(),
+                password: password.clone(),
+            }),
+            Self::Bearer { token } => Some(Auth::Bearer {
+                token: token.clone(),
+            }),
+            #[cfg(feature = "aws-core")]
+            Self::Aws { auth, service } => Some(Auth::Aws {
+                auth: auth.clone(),
+                service: service.clone(),
+            }),
+            Self::Custom { value } => Some(Auth::Custom {
+                value: value.clone(),
+            }),
+            Self::OAuth2(_) => None,
+        }
+    }
+}
+
+impl OAuth2Config {
+    /// Checks these settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `token_endpoint` is not an absolute `http` or `https` URI, or when
+    /// `timeout_secs` is `0`.
+    pub fn validate(&self) -> crate::Result<()> {
+        let uri: http::Uri = self.token_endpoint.parse().map_err(|error| {
+            format!(
+                "`token_endpoint` is not a valid URI, got `{}`: {error}",
+                self.token_endpoint
+            )
+        })?;
+
+        match uri.scheme_str() {
+            Some("http" | "https") if uri.authority().is_some() => {}
+            _ => {
+                return Err(format!(
+                    "`token_endpoint` must be an absolute `http` or `https` URI, got `{}`",
+                    self.token_endpoint
+                )
+                .into());
+            }
+        }
+
+        if self.timeout_secs == 0 {
+            return Err("`timeout_secs` must be greater than `0`".into());
+        }
+
+        Ok(())
     }
 }
 
@@ -560,6 +772,9 @@ pub type QueryParameters = HashMap<String, QueryParameterValue>;
 mod client;
 pub use client::HttpClient;
 
+mod oauth2;
+pub use oauth2::{OAuth2Extension, TokenError};
+
 #[cfg(test)]
 mod transport_tests;
 
@@ -573,6 +788,115 @@ mod tests {
 
     use super::*;
     use crate::{config::ProxyConfig, test_util::addr::next_addr, tls::MaybeTlsSettings};
+
+    #[test]
+    fn auth2_deserializes_flat_oauth2() {
+        let auth: HttpSinkAuth = serde_yaml::from_str(indoc::indoc! {r"
+            strategy: oauth2
+            client_id: my-client
+            client_secret: my-secret
+            token_endpoint: https://auth.example.com/oauth/token
+        "})
+        .unwrap();
+
+        let HttpSinkAuth::OAuth2(config) = auth else {
+            panic!("expected the OAuth 2.0 variant");
+        };
+        assert_eq!(config.client_id, "my-client");
+        assert_eq!(config.expiry_buffer_secs, 60);
+        assert_eq!(config.timeout_secs, 10);
+        assert_eq!(
+            config.token_endpoint,
+            "https://auth.example.com/oauth/token"
+        );
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn auth2_rejects_the_snake_case_oauth2_tag() {
+        let error = serde_yaml::from_str::<HttpSinkAuth>(indoc::indoc! {r"
+            strategy: o_auth2
+            client_id: my-client
+            token_endpoint: https://auth.example.com/oauth/token
+        "})
+        .expect_err("`o_auth2` must not be accepted");
+        assert!(error.to_string().contains("oauth2"), "{error}");
+    }
+
+    #[test]
+    fn auth2_rejects_unknown_fields() {
+        assert!(
+            serde_yaml::from_str::<HttpSinkAuth>(indoc::indoc! {r"
+                strategy: oauth2
+                client_id: my-client
+                token_endpoint: https://auth.example.com/oauth/token
+                bogus: true
+            "})
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn auth2_maps_only_static_variants() {
+        assert_eq!(
+            HttpSinkAuth::Basic {
+                user: "user".to_owned(),
+                password: SensitiveString::from("pass".to_owned()),
+            }
+            .to_auth(),
+            Some(Auth::Basic {
+                user: "user".to_owned(),
+                password: SensitiveString::from("pass".to_owned()),
+            })
+        );
+        assert!(
+            HttpSinkAuth::OAuth2(crate::http::OAuth2Config {
+                client_id: "id".to_owned(),
+                client_secret: None,
+                token_endpoint: "https://auth.example.com/oauth/token".to_owned(),
+                scope: None,
+                audience: None,
+                resource: None,
+                expiry_buffer_secs: 60,
+                timeout_secs: 10,
+                tls: None,
+            })
+            .to_auth()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn oauth2_validate_rejects_relative_token_endpoint() {
+        let config = crate::http::OAuth2Config {
+            client_id: "id".to_owned(),
+            client_secret: None,
+            token_endpoint: "auth/token".to_owned(),
+            scope: None,
+            audience: None,
+            resource: None,
+            expiry_buffer_secs: 60,
+            timeout_secs: 10,
+            tls: None,
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn oauth2_validate_rejects_a_zero_timeout() {
+        let config = crate::http::OAuth2Config {
+            client_id: "id".to_owned(),
+            client_secret: None,
+            token_endpoint: "https://auth.example.com/oauth/token".to_owned(),
+            scope: None,
+            audience: None,
+            resource: None,
+            expiry_buffer_secs: 60,
+            timeout_secs: 0,
+            tls: None,
+        };
+        assert!(config.validate().is_err());
+    }
 
     #[test]
     fn test_auth_apply() {

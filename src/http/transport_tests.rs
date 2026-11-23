@@ -45,6 +45,7 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 
 mod http2;
+mod oauth2;
 mod streaming;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);

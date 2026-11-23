@@ -2,7 +2,7 @@ use std::{fmt, time::Duration};
 use vector_lib::internal_event::emit;
 
 use http::{
-    HeaderValue, Request, Response,
+    HeaderValue, Request, Response, StatusCode,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
 use hyper::body::Incoming;
@@ -11,7 +11,10 @@ use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
+    http::OAuth2Extension,
+    internal_events::http_client::{
+        AboutToSendHttpRequest, AuthExtensionError, GotHttpResponse, GotHttpWarning,
+    },
     tls::MaybeTlsSettings,
 };
 
@@ -36,6 +39,9 @@ pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(65);
 pub struct HttpClient {
     client: vector_http::HttpClient,
     user_agent: HeaderValue,
+    /// The OAuth 2.0 credentials that Vector applies to each request. `None` selects a plain
+    /// client.
+    oauth2: Option<OAuth2Extension>,
 }
 
 impl fmt::Debug for HttpClient {
@@ -75,7 +81,17 @@ impl HttpClient {
         Ok(Self {
             client: vector_http::HttpClient::new_with_options(tls, proxy, options)?,
             user_agent: default_user_agent(),
+            oauth2: None,
         })
+    }
+
+    /// Returns this client with `oauth2` applied to each request before it is sent.
+    ///
+    /// Clones share the token cache. Thus one access token serves all their requests.
+    #[must_use]
+    pub fn with_oauth2(mut self, oauth2: OAuth2Extension) -> Self {
+        self.oauth2 = Some(oauth2);
+        self
     }
 
     /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
@@ -101,6 +117,23 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
+            let oauth2_token = if let Some(oauth2) = &self.oauth2 {
+                match oauth2.apply(&mut request).await {
+                    Ok(token) => Some(token),
+                    Err(error) => {
+                        emit(AuthExtensionError { error: &error });
+                        return Err(if error.is_retriable() {
+                            HttpError::new(error)
+                        } else {
+                            let source: Box<dyn std::error::Error + Send + Sync> = Box::new(error);
+                            HttpError::from(source)
+                        });
+                    }
+                }
+            } else {
+                None
+            };
+
             emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
@@ -109,6 +142,15 @@ impl HttpClient {
 
             match response {
                 Ok(response) => {
+                    // The authorization server may revoke the access token, or expire it before
+                    // the lifetime it announced. Vector then discards it, so the next request
+                    // fetches a new one.
+                    if response.status() == StatusCode::UNAUTHORIZED
+                        && let (Some(oauth2), Some(token)) = (&self.oauth2, &oauth2_token)
+                    {
+                        oauth2.invalidate(token);
+                    }
+
                     emit(GotHttpResponse {
                         response: &response,
                         roundtrip,
