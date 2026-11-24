@@ -8,11 +8,6 @@ use tonic::{
 };
 use tonic_prost::ProstCodec;
 
-/// Preserve independent ownership of fields decoded from Vector RPCs.
-///
-/// Tonic 0.12's DecodeBuf shares its backing allocation when Prost decodes Bytes
-/// fields. A small surviving event can therefore retain an entire incoming batch,
-/// especially when a receiver partitions events into long-lived sink batches.
 #[derive(Debug, Default)]
 pub(super) struct CopyingProstCodec<T, U>(PhantomData<(T, U)>);
 
@@ -63,6 +58,4 @@ impl<B: Buf> Buf for CopyingBuf<B> {
         self.0.advance(count);
     }
 
-    // Deliberately inherit Buf's copying copy_to_bytes implementation, matching
-    // Tonic 0.11. Forwarding it to DecodeBuf would retain the incoming allocation.
 }
