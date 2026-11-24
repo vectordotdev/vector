@@ -10,7 +10,7 @@ use std::{
 };
 use tokio::{
     fs::File,
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
+    io::{AsyncBufRead, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader, ReadBuf},
     time::Instant,
 };
 use tracing::debug;
@@ -491,9 +491,17 @@ impl FileWatcher {
     }
 }
 
-async fn is_gzipped<R: AsyncRead + Unpin>(r: &mut BufReader<R>) -> io::Result<bool> {
-    let header_bytes = r.fill_buf().await?;
-    // WARN: The paired `BufReader::consume` is not called intentionally. If we
-    // do we'll chop a decent part of the potential gzip stream off.
-    Ok(header_bytes.starts_with(GZIP_MAGIC))
+async fn is_gzipped<R: AsyncRead + AsyncSeek + Unpin>(r: &mut BufReader<R>) -> io::Result<bool> {
+    let mut magic = [0u8; GZIP_MAGIC.len()];
+    let mut read = 0;
+    while read < magic.len() {
+        match r.read(&mut magic[read..]).await {
+            Ok(0) => break,
+            Ok(n) => read += n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+    r.seek(SeekFrom::Start(0)).await?;
+    Ok(read == magic.len() && magic == GZIP_MAGIC)
 }
