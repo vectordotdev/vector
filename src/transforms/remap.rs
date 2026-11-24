@@ -1404,6 +1404,42 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_metric_value_samples_write() {
+        // `assert_eq!` tells `2` apart from `2.0`, so it fails if the next read sees the assigned
+        // integer instead of the stored float. The statistic isn't the default, so the output also
+        // shows that it's kept.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    .distribution.samples = [{"value": 2, "rate": 1}, {"value": 4.5, "rate": 3}]
+                    assert_eq!(.distribution.samples, [{"value": 2.0, "rate": 1}, {"value": 4.5, "rate": 3}])
+                "#}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let distribution = Event::Metric(Metric::new(
+            "observations",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![1.0 => 1],
+                statistic: StatisticKind::Summary,
+            },
+        ));
+        let mut state = tform.new_state();
+        let result = transform_one(&tform, &mut state, distribution).unwrap();
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Distribution {
+                samples: vector_lib::samples![2.0 => 1, 4.5 => 3],
+                statistic: StatisticKind::Summary,
+            }
+        );
+    }
+
+    #[test]
     fn check_remap_metric_value_special_values() {
         // Reads of special values, and of the fields for other types.
         let tform = remap(RemapConfig {
