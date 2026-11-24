@@ -534,8 +534,9 @@ impl From<AgentDDSketch> for MetricValue {
     }
 }
 
-// Converts to the name of the metric's type, such as `aggregated histogram`, which VRL reads at
-// `.type`. VRL reads the value itself under the field for its type, such as `.aggregated_histogram`.
+// Converts to the name of the metric's type, such as `aggregated histogram`, the same name VRL
+// reads at `.type`. VRL reads the value itself under the field for its type, such as
+// `.aggregated_histogram`.
 impl From<MetricValue> for vrl::value::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()

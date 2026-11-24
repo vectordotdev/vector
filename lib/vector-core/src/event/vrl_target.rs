@@ -803,12 +803,12 @@ fn metric_value_to_vrl_value(value: &MetricValue) -> Value {
     metric_value_subfields_to_vrl_value(value, |_| true).into()
 }
 
-/// Converts the subfields of a metric's value that `wanted` accepts.
+/// Converts the subfields of a metric's value that `wanted` accepts, and leaves out the rest.
 ///
-/// This is the only place that lists the subfields VRL can read, so whole-object reads such as
-/// `get!(.aggregated_histogram, ["count"])` and path reads such as `.aggregated_histogram.count`
-/// always agree. A subfield is only converted if it's wanted, so reading `count` doesn't convert
-/// the buckets.
+/// Whole-value reads, such as `get!(.aggregated_histogram, ["count"])`, and subfield reads, such
+/// as `.aggregated_histogram.count`, both use this function, so they can't disagree on which
+/// subfields exist. Only wanted subfields are converted, so reading `count` doesn't convert the
+/// buckets. A missing subfield, like the sum of a histogram that doesn't have one, is left out.
 fn metric_value_subfields_to_vrl_value(
     value: &MetricValue,
     wanted: impl Fn(&str) -> bool,
@@ -2466,8 +2466,8 @@ mod test {
 
     /// One metric of each type, with the VRL field for its value and the expected object.
     ///
-    /// The expected objects are written by hand, so that tests catch a subfield missing from
-    /// `metric_value_subfields_to_vrl_value`.
+    /// The expected objects are written by hand rather than built by the conversion code, so tests
+    /// catch a subfield that is missing or converted incorrectly.
     fn metric_value_cases() -> Vec<(MetricValue, &'static str, Value)> {
         let mut sketch = AgentDDSketch::with_agent_defaults();
         sketch.insert_many(&[1.0, 3.0]);
@@ -3013,7 +3013,7 @@ mod test {
             Some(Value::from(5))
         );
 
-        // Reading an array as well converts the whole value.
+        // Reading the samples as well converts them next to the statistic.
         let target = metric_target_with_queries(
             big_distribution(),
             &[
