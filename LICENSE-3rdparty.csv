@@ -332,6 +332,10 @@ getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Pr
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
 gloo-timers,https://github.com/rustwasm/gloo/tree/master/crates/timers,MIT OR Apache-2.0,Rust and WebAssembly Working Group
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
+google-cloud-auth,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-gax,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-rpc,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-wkt,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
 governor,https://github.com/boinkor-net/governor,MIT,Andreas Fuchs <asf@boinkor.net>
 granit-parser,https://github.com/bourumir-wyngs/granit-parser,MIT OR Apache-2.0,"Ethiraric <ethiraric@gmail.com>, David Aguilar <davvid@gmail.com>, Yuheng Chen <yuhengchen@sensetime.com>, Bourumir Wyngs <bourumir-wyngs@gmail.com>"
 greptime-proto,https://github.com/GreptimeTeam/greptime-proto,Apache-2.0,The greptime-proto Authors
