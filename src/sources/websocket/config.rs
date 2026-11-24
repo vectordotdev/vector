@@ -85,6 +85,7 @@ impl PongValidation {
 /// It moves the burden of tracking latest received messages from this component to the server.
 /// This will only work if the server has it enabled. This will make the client respond to received
 /// messages with an ACK.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 pub struct ReplayAckConfig {
@@ -96,6 +97,16 @@ pub struct ReplayAckConfig {
     ///
     /// Use "." if message ID is the root of the message.
     pub message_id_path: ConfigValuePath,
+
+    /// Number of seconds before timing out while sending ACK.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_ack_timeout_secs")]
+    #[configurable(metadata(docs::examples = 10))]
+    pub timeout: Duration,
+}
+
+const fn default_ack_timeout_secs() -> Duration {
+    Duration::from_secs(10)
 }
 
 /// Configuration for message replay which allows replaying missed messages from servers that

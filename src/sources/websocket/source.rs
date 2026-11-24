@@ -10,7 +10,7 @@ use tokio::{sync::mpsc::Sender, time};
 use tokio_tungstenite::tungstenite::{
     Message, error::Error as TungsteniteError, protocol::CloseFrame,
 };
-use tokio_util::codec::Encoder;
+use tokio_util::{codec::Encoder, time::FutureExt};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, encoding::Serializer},
@@ -84,6 +84,9 @@ pub enum WebSocketSourceError {
 
     #[snafu(display("Connection timed out while waiting for a pong response"))]
     PongTimeout,
+
+    #[snafu(display("Server did not process the ACK message in time"))]
+    AckTimeout,
 
     #[snafu(display("A WebSocket error occurred: {}", source))]
     Tungstenite { source: TungsteniteError },
@@ -173,8 +176,7 @@ impl WebSocketSource {
                 },
 
                 Some(ack) = ack_rx.recv() => {
-                    self.handle_ack(&mut ws_sink, ack, stateful).await;
-                    Ok(())
+                    self.handle_ack(&mut ws_sink, ack, stateful).await
                 }
 
                 // Split "fairly" between pings and incoming messages
@@ -202,6 +204,10 @@ impl WebSocketSource {
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
                         warn!("Connection closed by server without a close frame.");
+                        emit(WebSocketConnectionShutdown);
+                    }
+                    WebSocketSourceError::AckTimeout => {
+                        warn!("Timeout while sending ACK message.");
                         emit(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
@@ -244,7 +250,8 @@ impl WebSocketSource {
 
         drop(ack_tx);
         while let Some(ack) = ack_rx.recv().await {
-            self.handle_ack(&mut ws_sink, ack, stateful).await;
+            // Ignore failures on shutdown, just try to send ACK if possible
+            _ = self.handle_ack(&mut ws_sink, ack, stateful).await;
         }
 
         Ok(())
@@ -440,7 +447,12 @@ impl WebSocketSource {
         message_ids
     }
 
-    async fn handle_ack(&mut self, ws_sink: &mut WebSocketSink, ack: String, stateful: bool) {
+    async fn handle_ack(
+        &mut self,
+        ws_sink: &mut WebSocketSink,
+        ack: String,
+        stateful: bool,
+    ) -> Result<(), WebSocketSourceError> {
         self.last_received_message_id = Some(ack.clone());
 
         if stateful {
@@ -448,7 +460,7 @@ impl WebSocketSource {
         }
 
         // Ignore failed acks
-        self.send_ack(ws_sink, ack).await;
+        self.send_ack(ws_sink, ack).await
     }
 
     fn add_metadata(&self, event: &mut LogEvent, now: DateTime<Utc>) {
@@ -608,7 +620,11 @@ impl WebSocketSource {
         Err(specific_error)
     }
 
-    async fn send_ack(&mut self, ws_sink: &mut WebSocketSink, message_id: impl Into<Value>) {
+    async fn send_ack(
+        &mut self,
+        ws_sink: &mut WebSocketSink,
+        message_id: impl Into<Value>,
+    ) -> Result<(), WebSocketSourceError> {
         if let Some(replay_config) = &self.config.replay
             && let Some(replay_ack_config) = &replay_config.ack
             && let Some(ack_serializer) = &mut self.ack_serializer
@@ -626,8 +642,9 @@ impl WebSocketSource {
                 },
                 &mut message_bytes,
             ) {
+                // Ignoring serialization errors
                 debug!(message = "Encoding ACK message failed.", %err);
-                return;
+                return Ok(());
             }
             let message = if ack_serializer.is_binary() {
                 Message::binary(message_bytes)
@@ -635,17 +652,22 @@ impl WebSocketSource {
                 Message::text(String::from_utf8_lossy(&message_bytes).as_ref())
             };
 
-            _ = ws_sink
+            ws_sink
                 .send(message)
+                .timeout(replay_ack_config.timeout)
                 .await
+                .map_err(|_| WebSocketSourceError::AckTimeout)
+                .inspect_err(|err| warn!(message = "Timeout occurred while sending ACK.", %err))?
                 .map_err(|error| {
                     emit(WebSocketSendError { error: &error });
                     WebSocketSourceError::Tungstenite { source: error }
                 })
                 .inspect_err(
                     |err| warn!(message = "WebSocket error occurred while sending ACK.", %err),
-                );
+                )?;
         }
+
+        Ok(())
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
@@ -1038,6 +1060,7 @@ mod tests {
             ack: Some(ReplayAckConfig {
                 encoding: SerializerConfig::Text(TextSerializerConfig::default()).into(),
                 message_id_path: ".".into(),
+                timeout: Duration::from_secs(30),
             }),
             data_dir: None,
             stateful: false,
