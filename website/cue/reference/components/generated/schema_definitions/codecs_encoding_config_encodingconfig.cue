@@ -88,7 +88,8 @@ _schemaDefinitions: "codecs::encoding::config::EncodingConfig": object: options:
 
 				Every event is encoded on its own, as a `# TYPE` line followed by one line per series.
 				The `http` sink instead encodes each request as one exposition, with a single `# TYPE`
-				line per metric family.
+				line per metric family and a single sample per series (from the last event of that
+				series), and frames that exposition as a whole.
 
 				Only absolute counters, gauges, sets, aggregated histograms and aggregated summaries can
 				be encoded; any other metric (such as an incremental metric, a distribution or a

@@ -56,7 +56,10 @@ pub struct PrometheusTextSerializer;
 
 impl PrometheusTextSerializer {
     /// Encodes the events as one exposition, in which every metric family has a single `# TYPE`
-    /// line followed by all of its series. Families are sorted by name.
+    /// line followed by all of its series. Families are sorted by name, and series by labels.
+    ///
+    /// A series (a metric name and labels) can only occur once in an exposition, so a series
+    /// that several events update is encoded once, from the last of them.
     ///
     /// # Errors
     ///
@@ -67,27 +70,35 @@ impl PrometheusTextSerializer {
         events: impl IntoIterator<Item = Event>,
         buffer: &mut BytesMut,
     ) -> Result<(), vector_common::Error> {
-        let mut families = BTreeMap::<String, (&str, String)>::new();
+        // The series of a family are keyed by their encoded labels.
+        let mut families = BTreeMap::<String, (&str, BTreeMap<String, String>)>::new();
         for event in events {
             let Event::Metric(metric) = event else {
                 return Err("the `prometheus_text` codec can only encode metrics".into());
             };
             let (name, kind, series) = encode_metric(&metric)?;
+            let mut labels = String::new();
+            encode_tags(&mut labels, metric.tags(), None);
             match families.get_mut(&name) {
                 Some((family_kind, _)) if *family_kind != kind => {
                     return Err(
                         format!("metric `{name}` is both a {family_kind} and a {kind}").into(),
                     );
                 }
-                Some((_, family_series)) => family_series.push_str(&series),
+                Some((_, family_series)) => {
+                    family_series.insert(labels, series);
+                }
                 None => {
-                    families.insert(name, (kind, series));
+                    families.insert(name, (kind, BTreeMap::from([(labels, series)])));
                 }
             }
         }
 
         for (name, (kind, series)) in families {
-            buffer.extend_from_slice(format!("# TYPE {name} {kind}\n{series}").as_bytes());
+            buffer.extend_from_slice(format!("# TYPE {name} {kind}\n").as_bytes());
+            for lines in series.into_values() {
+                buffer.extend_from_slice(lines.as_bytes());
+            }
         }
         Ok(())
     }
@@ -154,15 +165,16 @@ fn encode_metric(metric: &Metric) -> Result<(String, &'static str, String), vect
             sum,
         } => {
             // Prometheus buckets are cumulative, and the `+Inf` bucket is always the total count,
-            // so a bucket with an infinite upper limit is not encoded twice.
+            // so a bucket with an upper limit of `+Inf` is not encoded twice.
             let mut bucket_count = 0.0;
-            for bucket in buckets.iter().filter(|b| !b.upper_limit.is_infinite()) {
+            for bucket in buckets.iter().filter(|b| b.upper_limit != f64::INFINITY) {
                 bucket_count += bucket.count as f64;
-                emit(
-                    "_bucket",
-                    bucket_count,
-                    Some(("le", bucket.upper_limit.to_string())),
-                );
+                let le = if bucket.upper_limit == f64::NEG_INFINITY {
+                    "-Inf".to_string()
+                } else {
+                    bucket.upper_limit.to_string()
+                };
+                emit("_bucket", bucket_count, Some(("le", le)));
             }
             emit("_bucket", *count as f64, Some(("le", "+Inf".to_string())));
             // The sum is optional, and a made up zero would be wrong.
@@ -379,6 +391,35 @@ mod tests {
     }
 
     #[test]
+    fn keeps_negative_infinity_buckets() {
+        let metric = absolute(
+            "temperature",
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: f64::NEG_INFINITY,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 3,
+                    },
+                ],
+                count: 5,
+                sum: None,
+            },
+        );
+        assert_eq!(
+            encode(metric).unwrap(),
+            "# TYPE temperature histogram\n\
+             temperature_bucket{le=\"-Inf\"} 2\n\
+             temperature_bucket{le=\"1\"} 5\n\
+             temperature_bucket{le=\"+Inf\"} 5\n\
+             temperature_count 5\n"
+        );
+    }
+
+    #[test]
     fn sorts_the_bucket_label_among_the_tags() {
         let metric = absolute(
             "latency",
@@ -509,6 +550,46 @@ mod tests {
              # TYPE up gauge\n\
              up{host=\"a\"} 1\n\
              up{host=\"b\"} 1\n"
+        );
+    }
+
+    #[test]
+    fn encodes_each_series_of_a_batch_once_with_its_last_value() {
+        let gauge = |value| absolute("up", MetricValue::Gauge { value });
+        let histogram = |count| {
+            absolute(
+                "latency",
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![],
+                    count,
+                    sum: None,
+                },
+            )
+        };
+        let events = [
+            gauge(1.0),
+            gauge(5.0).with_tags(Some(metric_tags!("host" => "a"))),
+            histogram(1),
+            gauge(2.0),
+            histogram(2),
+            // A series with another timestamp is still the same series.
+            gauge(3.0).with_timestamp(Utc.timestamp_opt(1, 0).single()),
+        ]
+        .map(Event::Metric);
+
+        let mut buffer = BytesMut::new();
+        PrometheusTextSerializerConfig
+            .build()
+            .encode_batch(events, &mut buffer)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(buffer.to_vec()).unwrap(),
+            "# TYPE latency histogram\n\
+             latency_bucket{le=\"+Inf\"} 2\n\
+             latency_count 2\n\
+             # TYPE up gauge\n\
+             up 3 1000\n\
+             up{host=\"a\"} 5\n"
         );
     }
 

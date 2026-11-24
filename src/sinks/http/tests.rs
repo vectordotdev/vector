@@ -179,6 +179,53 @@ fn http_encode_prometheus_text_writes_each_family_once() {
 }
 
 #[test]
+fn http_encode_prometheus_text_frames_the_exposition() {
+    let encode = |max_frame_length: usize| {
+        let cfg: HttpSinkConfig = serde_yaml::from_str(&format!(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: prometheus_text
+            framing:
+              method: length_delimited
+              length_delimited:
+                max_frame_length: {max_frame_length}
+            "#
+        ))
+        .unwrap();
+        let encoder = HttpEncoder::new(
+            cfg.build_encoder().unwrap(),
+            cfg.encoding.transformer(),
+            String::new(),
+            String::new(),
+        );
+        let gauge = |host: &str| {
+            Event::Metric(
+                Metric::new(
+                    "up",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags!("host" => host))),
+            )
+        };
+        let mut output_buffer = vec![];
+        encoder
+            .encode_input(vec![gauge("a"), gauge("b")], &mut output_buffer)
+            .map(|_| output_buffer)
+    };
+
+    // The framing applies to the exposition as a whole, not to each event.
+    let exposition = "# TYPE up gauge\nup{host=\"a\"} 1\nup{host=\"b\"} 1\n";
+    let length = u32::try_from(exposition.len()).unwrap().to_be_bytes();
+    assert_eq!(
+        encode(1024).unwrap(),
+        [&length[..], exposition.as_bytes()].concat()
+    );
+    assert!(encode(exposition.len() - 1).is_err());
+}
+
+#[test]
 fn http_native_json_batch_sizing_does_not_report_dropped_events() {
     init_test();
     let controller = Controller::get().unwrap();

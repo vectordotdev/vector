@@ -12,7 +12,7 @@ use vector_lib::{
             Framer::{CharacterDelimited, NewlineDelimited},
             Serializer::{Json, PrometheusText},
         },
-        internal_events::EncoderSerializeError,
+        internal_events::{EncoderFramingError, EncoderSerializeError},
     },
     internal_event::emit,
 };
@@ -69,7 +69,8 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         }
 
         if let PrometheusText(serializer) = self.encoder.serializer() {
-            // The body is one exposition, so each metric family is written once, with all series.
+            // The body is one exposition, so each metric family is written once, with all series,
+            // and the framing applies to the exposition as a whole.
             let events = events.into_iter().map(|mut event| {
                 self.transformer.transform(&mut event);
                 byte_size.add_event(&event, event.estimated_json_encoded_size_of());
@@ -81,6 +82,11 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
                     emit(EncoderSerializeError { error: &error });
                     io::Error::other("unable to encode event")
                 })?;
+            let mut framer = self.encoder.framer().clone();
+            framer.encode((), &mut body).map_err(|error| {
+                emit(EncoderFramingError { error: &error });
+                io::Error::other("unable to frame exposition")
+            })?;
         } else {
             for mut event in events {
                 self.transformer.transform(&mut event);
