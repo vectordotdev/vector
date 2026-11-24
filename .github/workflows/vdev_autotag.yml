@@ -19,7 +19,6 @@ jobs:
         id: generate_token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          permission-contents: write
           client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
 
