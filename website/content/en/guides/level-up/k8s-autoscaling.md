@@ -178,7 +178,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 Expand the following code block to see the helm Vector configuration, which includes the actual
 Vector configuration within.
 
-{{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true collapsed=true >}}
 
 {{< collapsible title="Setup commands" open="false" >}}
 
