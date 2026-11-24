@@ -29,11 +29,6 @@ use crate::{
 const VALID_METRIC_PATHS_SET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
-/// The paths VRL can assign on a metric event. Deleting and mutable reads use
-/// `VALID_METRIC_PATHS_SET`, because the value can't be deleted.
-const VALID_METRIC_PATHS_INSERT: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
-    .counter.value, .gauge.value";
-
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
     .counter, .gauge, .set, .distribution, .aggregated_histogram, .aggregated_summary, .sketch";
 
@@ -385,7 +380,7 @@ fn set_metric_value(
     else {
         return Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
-            expected: VALID_METRIC_PATHS_INSERT,
+            expected: VALID_METRIC_PATHS_SET,
         }
         .to_string());
     };
@@ -471,16 +466,15 @@ impl Target for VrlTarget {
                                 set_metric_type(metric, &value)?;
                                 refresh_cached_metric_value(metric, metric_value, previous_field);
                             }
-                            // Only the value of the current type can be set, such as
-                            // `.gauge.value` on a gauge. This returns early so that the raw value
-                            // isn't cached below.
+                            // Only the value of the current type can be set. Returns early so that
+                            // the raw value isn't cached below.
                             [field, "value"] if *field == metric_value_field(metric.value()) => {
                                 return set_metric_value(metric, metric_value, path, &value);
                             }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &path.to_string(),
-                                    expected: VALID_METRIC_PATHS_INSERT,
+                                    expected: VALID_METRIC_PATHS_SET,
                                 }
                                 .to_string());
                             }
@@ -493,7 +487,7 @@ impl Target for VrlTarget {
 
                     Err(MetricPathError::InvalidPath {
                         path: &path.to_string(),
-                        expected: VALID_METRIC_PATHS_INSERT,
+                        expected: VALID_METRIC_PATHS_SET,
                     }
                     .to_string())
                 }
@@ -1787,19 +1781,6 @@ mod test {
             ".type",
         ];
 
-        // Assignments also accept the value of a counter or gauge, which can't be deleted.
-        let validpaths_insert = [
-            ".name",
-            ".namespace",
-            ".interval_ms",
-            ".timestamp",
-            ".kind",
-            ".tags",
-            ".type",
-            ".counter.value",
-            ".gauge.value",
-        ];
-
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
@@ -1819,7 +1800,7 @@ mod test {
         assert_eq!(
             Err(format!(
                 "invalid path zork: expected one of {}",
-                validpaths_insert.join(", ")
+                validpaths_set.join(", ")
             )),
             target.target_insert(
                 &OwnedTargetPath::event(owned_value_path!("zork")),
