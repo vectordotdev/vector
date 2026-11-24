@@ -169,7 +169,7 @@ fn route(c: &mut Criterion) {
                             .unwrap();
                     (route, param.input.clone(), param.output_buffer.clone())
                 },
-                |(mut route, input, mut output_buffer)| {
+                |(route, input, mut output_buffer)| {
                     route.transform(input, &mut output_buffer);
                     std::hint::black_box(());
                 },

@@ -5,6 +5,7 @@ use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
+    x509::X509VerifyResult,
 };
 use snafu::{ResultExt, Snafu};
 use tokio::net::TcpStream;
@@ -12,12 +13,16 @@ use tokio_openssl::SslStream;
 
 use crate::tcp::{self, TcpKeepaliveConfig};
 
+mod client_cert_verifier;
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod reload;
 mod settings;
+#[cfg(test)]
+mod test_util;
 
+pub use client_cert_verifier::ClientCertVerifier;
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
 pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
@@ -103,8 +108,25 @@ pub enum TlsError {
     MissingRequiredIdentity,
     #[snafu(display("A reloadable TLS acceptor requires TLS to be enabled"))]
     ReloaderWithoutTls,
+    #[snafu(display(
+        "A client certificate verifier requires a CA file to validate client certificates"
+    ))]
+    ClientCertVerifierWithoutCa,
+    #[snafu(display(
+        "A client certificate verifier cannot be combined with system root certificates"
+    ))]
+    ClientCertVerifierWithSystemRoots,
     #[snafu(display("TLS handshake failed: {}", source))]
     Handshake { source: openssl::ssl::Error },
+    #[snafu(display(
+        "TLS handshake failed: peer certificate rejected: {}: {}",
+        reason,
+        source
+    ))]
+    PeerCertificateRejected {
+        source: openssl::ssl::Error,
+        reason: X509VerifyResult,
+    },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]

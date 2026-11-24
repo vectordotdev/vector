@@ -722,6 +722,166 @@ fn scalar_array_elements_count_against_the_expansion_budget() {
     assert_eq!(attributes["k"].as_array().unwrap().len(), 1024);
 }
 
+/// JSON text of `count` copies of `token` joined by commas, with no spaces.
+fn json_array_text(token: &str, count: usize) -> String {
+    format!("[{}]", vec![token; count].join(","))
+}
+
+fn span_attribute(strings: &Strings, value: AnyValue) -> ddtrace_proto::idx::TraceChunk {
+    let mut span = base_span(strings);
+    span.attributes = strings.map(vec![("k", value)]);
+    chunk(0, 1, vec![span])
+}
+
+/// Rejects the attribute under a 4,096-byte budget and checks its JSON text under 256 KiB.
+fn assert_json_span_attribute_is_budgeted(value: impl Fn(&Strings) -> AnyValue, expected: &str) {
+    let strings = Strings::new();
+    let trace = span_attribute(&strings, value(&strings));
+    let error = convert_idx_tracer_payload(
+        strings.into_payload(vec![trace]),
+        &ExpansionBudget::new(4096),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        IdxConversionError::ExpansionLimitExceeded { limit: 4096 }
+    ));
+
+    let strings = Strings::new();
+    let trace = span_attribute(&strings, value(&strings));
+    let events = convert_idx_tracer_payload(
+        strings.into_payload(vec![trace]),
+        &ExpansionBudget::new(256 * 1024),
+    )
+    .unwrap();
+    let meta = object(span_at(&events[0], 0).get("meta").unwrap());
+    assert_eq!(meta.get("k").unwrap(), &Value::from(expected));
+}
+
+#[test]
+fn null_array_span_attributes_count_against_the_expansion_budget() {
+    // `[null,null,...]` for 1,024 nulls is 5,121 bytes. None of those elements is a
+    // string reference, so counting only the attribute key lets this pass a 4,096 budget.
+    assert_json_span_attribute_is_budgeted(
+        |_| Strings::array(vec![AnyValue { value: None }; 1024]),
+        &json_array_text("null", 1024),
+    );
+}
+
+#[test]
+fn bool_array_span_attributes_count_against_the_expansion_budget() {
+    // `[false,false,...]` for 1,024 bools is 6,145 bytes, and those tokens are not
+    // string references either.
+    assert_json_span_attribute_is_budgeted(
+        |_| Strings::array(vec![Strings::boolean(false); 1024]),
+        &json_array_text("false", 1024),
+    );
+}
+
+#[test]
+fn int_array_span_attributes_count_against_the_expansion_budget() {
+    // Each `i64::MIN` renders as 20 characters. 1,024 of them are 21,505 bytes of JSON.
+    assert_json_span_attribute_is_budgeted(
+        |_| Strings::array(vec![Strings::int(i64::MIN); 1024]),
+        &json_array_text("-9223372036854775808", 1024),
+    );
+}
+
+#[test]
+fn null_array_inside_an_object_counts_against_the_expansion_budget() {
+    // The object key is the only string reference. The nested null array is the same
+    // 5,121-byte JSON value as a bare array, wrapped as `{"k":...}`.
+    assert_json_span_attribute_is_budgeted(
+        |strings| {
+            strings.list(vec![(
+                "k",
+                Strings::array(vec![AnyValue { value: None }; 1024]),
+            )])
+        },
+        &format!("{{\"k\":{}}}", json_array_text("null", 1024)),
+    );
+}
+
+const JSON_TOKEN_ARRAY_LEN: usize = 1024;
+
+/// Budget used by a span whose attribute `k` is `value`. The limit is unbounded, so this
+/// measures the charge rather than rejecting it.
+fn budget_used_by_attribute(value: impl FnOnce(&Strings) -> AnyValue) -> usize {
+    let strings = Strings::new();
+    let trace = span_attribute(&strings, value(&strings));
+    let budget = ExpansionBudget::new(usize::MAX);
+    convert_idx_tracer_payload(strings.into_payload(vec![trace]), &budget).unwrap();
+    budget.used.get()
+}
+
+/// Budget used by a span whose attribute `k` is an array of [`JSON_TOKEN_ARRAY_LEN`] copies
+/// of `element`.
+fn budget_used_by_array_attribute(element: impl Fn(&Strings) -> AnyValue) -> usize {
+    budget_used_by_attribute(|strings| Strings::array(vec![element(strings); JSON_TOKEN_ARRAY_LEN]))
+}
+
+#[test]
+fn json_scalar_tokens_are_charged_by_their_rendered_length() {
+    // The arrays share every container charge, so the difference in budget used is the
+    // difference in JSON text length.
+    let zero = budget_used_by_array_attribute(|_| Strings::int(0));
+    // `-9223372036854775808` is 19 bytes longer than `0`.
+    assert_eq!(
+        budget_used_by_array_attribute(|_| Strings::int(i64::MIN)) - zero,
+        19 * JSON_TOKEN_ARRAY_LEN
+    );
+    // `1.5` is 2 bytes longer than `0`, and `false` is 4.
+    assert_eq!(
+        budget_used_by_array_attribute(|_| Strings::double(1.5)) - zero,
+        2 * JSON_TOKEN_ARRAY_LEN
+    );
+    assert_eq!(
+        budget_used_by_array_attribute(|_| Strings::boolean(false)) - zero,
+        4 * JSON_TOKEN_ARRAY_LEN
+    );
+    // `true`, `null`, and a non-finite double (rendered as `null`) are 3 bytes longer than `0`.
+    assert_eq!(
+        budget_used_by_array_attribute(|_| Strings::boolean(true)) - zero,
+        3 * JSON_TOKEN_ARRAY_LEN
+    );
+    assert_eq!(
+        budget_used_by_array_attribute(|_| AnyValue { value: None }) - zero,
+        3 * JSON_TOKEN_ARRAY_LEN
+    );
+    assert_eq!(
+        budget_used_by_array_attribute(|_| Strings::double(f64::NAN)) - zero,
+        3 * JSON_TOKEN_ARRAY_LEN
+    );
+    // `"a"` is a 1-byte copy plus the 3-byte JSON string, 3 bytes more than `0`.
+    assert_eq!(
+        budget_used_by_array_attribute(|strings| strings.string("a")) - zero,
+        3 * JSON_TOKEN_ARRAY_LEN
+    );
+}
+
+#[test]
+fn missing_object_values_are_charged_as_null() {
+    // A missing value renders as `null` (4 bytes). `0` renders as one byte. The keys match,
+    // so the budget difference is those 3 bytes per entry.
+    let used = |value: Option<AnyValue>| {
+        budget_used_by_attribute(move |strings| AnyValue {
+            value: Some(IdxValue::KeyValueList(KeyValueList {
+                key_values: vec![
+                    KeyValue {
+                        key: strings.intern("k"),
+                        value,
+                    };
+                    JSON_TOKEN_ARRAY_LEN
+                ],
+            })),
+        })
+    };
+    assert_eq!(
+        used(None) - used(Some(Strings::int(0))),
+        3 * JSON_TOKEN_ARRAY_LEN
+    );
+}
+
 #[test]
 fn link_ids_count_against_the_expansion_budget() {
     // An unset link encodes in two bytes but emits three 16-character hex ids, which

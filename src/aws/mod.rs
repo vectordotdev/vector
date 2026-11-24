@@ -264,6 +264,15 @@ where
         config_builder = config_builder.use_fips(use_fips);
     }
 
+    if let Some(response_checksum_validation) =
+        aws_config::default_provider::checksums::response_checksum_validation_provider(
+            &provider_config,
+        )
+        .await
+    {
+        config_builder = config_builder.response_checksum_validation(response_checksum_validation);
+    }
+
     if let Some(timeout) = timeout {
         let mut timeout_config_builder = TimeoutConfig::builder();
 

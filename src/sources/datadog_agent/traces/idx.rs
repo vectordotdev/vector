@@ -141,14 +141,13 @@ impl<'a> PayloadStrings<'a> {
     }
 
     /// Looks up a string that is copied into a JSON value and then into its escaped text.
+    ///
+    /// The container charges the slot that holds this string. This charges the owned copy
+    /// and the escaped text, which both exist while that JSON is rendered.
     fn get_for_json(&self, index: u32) -> Result<&'a str, IdxConversionError> {
         let value = self.table.get(index)?;
-        self.budget.charge(
-            value
-                .len()
-                .saturating_add(json_string_len(value))
-                .saturating_add(STRING_COPY_OVERHEAD_BYTES),
-        )?;
+        self.budget
+            .charge(value.len().saturating_add(json_string_len(value)))?;
         Ok(value)
     }
 }
@@ -163,6 +162,21 @@ fn json_string_len(value: &str) -> usize {
             _ => 1,
         })
         .fold(2, usize::saturating_add)
+}
+
+/// The length of `value` in the JSON spelling `serde_json` writes for an integer.
+const fn i64_json_len(value: i64) -> usize {
+    let mut magnitude = value.unsigned_abs();
+    let mut digits = 1usize;
+    while magnitude >= 10 {
+        magnitude /= 10;
+        digits = digits.saturating_add(1);
+    }
+    if value < 0 {
+        digits.saturating_add(1)
+    } else {
+        digits
+    }
 }
 
 /// The length of `String::from_utf8_lossy(bytes)`, which replaces each invalid sequence with the
@@ -572,6 +586,24 @@ fn any_value_as_string(
     Ok(text)
 }
 
+/// Charges the brackets, commas, and `entry_bytes` per entry of a JSON container before
+/// that container is allocated.
+///
+/// Scalar tokens are charged as each element is built. String copies and their escaped
+/// text are charged when the string is looked up.
+fn charge_json_container(
+    strings: &PayloadStrings<'_>,
+    count: usize,
+    entry_bytes: usize,
+) -> Result<(), IdxConversionError> {
+    strings.budget.charge(
+        count
+            .saturating_sub(1)
+            .saturating_add(2)
+            .saturating_add(count.saturating_mul(entry_bytes)),
+    )
+}
+
 fn any_value_json(
     strings: &PayloadStrings<'_>,
     value: &AnyValue,
@@ -580,42 +612,72 @@ fn any_value_json(
         Some(IdxValue::StringValueRef(index)) => {
             Ok(JsonValue::String(strings.get_for_json(*index)?.to_owned()))
         }
-        Some(IdxValue::BoolValue(bool_value)) => Ok(JsonValue::Bool(*bool_value)),
-        Some(IdxValue::IntValue(int_value)) => Ok(JsonValue::Number((*int_value).into())),
-        Some(IdxValue::DoubleValue(double_value)) => Ok(json_f64(*double_value)),
+        Some(IdxValue::BoolValue(bool_value)) => {
+            strings.budget.charge(if *bool_value {
+                "true".len()
+            } else {
+                "false".len()
+            })?;
+            Ok(JsonValue::Bool(*bool_value))
+        }
+        Some(IdxValue::IntValue(int_value)) => {
+            strings.budget.charge(i64_json_len(*int_value))?;
+            Ok(JsonValue::Number((*int_value).into()))
+        }
+        Some(IdxValue::DoubleValue(double_value)) => {
+            let json = json_f64(*double_value);
+            // `json_f64` returns a number, or null for a non-finite double.
+            let rendered = match &json {
+                JsonValue::Number(number) => number.to_string().len(),
+                _ => "null".len(),
+            };
+            strings.budget.charge(rendered)?;
+            Ok(json)
+        }
         Some(IdxValue::BytesValue(bytes)) => {
             strings
                 .budget
                 .charge(bytes.len().div_ceil(3).saturating_mul(4 * 2))?;
             Ok(JsonValue::String(BASE64_STANDARD.encode(bytes)))
         }
-        Some(IdxValue::ArrayValue(array)) => Ok(JsonValue::Array(
-            array
-                .values
-                .iter()
-                .map(|item| any_value_json(strings, item))
-                .collect::<Result<Vec<_>, _>>()?,
-        )),
+        Some(IdxValue::ArrayValue(array)) => {
+            charge_json_container(
+                strings,
+                array.values.len(),
+                std::mem::size_of::<JsonValue>(),
+            )?;
+            Ok(JsonValue::Array(
+                array
+                    .values
+                    .iter()
+                    .map(|item| any_value_json(strings, item))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ))
+        }
         Some(IdxValue::KeyValueList(list)) => {
+            // A value slot, the key's `String` header, and the colon.
+            let entry_bytes = std::mem::size_of::<JsonValue>()
+                .saturating_add(std::mem::size_of::<String>())
+                .saturating_add(1);
+            charge_json_container(strings, list.key_values.len(), entry_bytes)?;
             let mut entries = Vec::with_capacity(list.key_values.len());
+            let missing = AnyValue { value: None };
             for entry in &list.key_values {
                 let key = strings.get_for_json(entry.key)?.to_owned();
-                let json = entry
-                    .value
-                    .as_ref()
-                    .map(|value| any_value_json(strings, value))
-                    .transpose()?
-                    .unwrap_or(JsonValue::Null);
+                let json = any_value_json(strings, entry.value.as_ref().unwrap_or(&missing))?;
                 entries.push((key, json));
             }
             entries.sort_by(|left, right| left.0.cmp(&right.0));
-            let mut object = JsonMap::new();
+            let mut object = JsonMap::with_capacity(entries.len());
             for (key, json) in entries {
                 object.insert(key, json);
             }
             Ok(JsonValue::Object(object))
         }
-        None => Ok(JsonValue::Null),
+        None => {
+            strings.budget.charge("null".len())?;
+            Ok(JsonValue::Null)
+        }
     }
 }
 

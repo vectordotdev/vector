@@ -590,7 +590,7 @@ mod test {
         assert_eq!(expected.len(), output.len());
         for (source, received) in expected.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let metric = json.get("metric").unwrap();
+            let metric = json.pointer("/event/metric").unwrap();
             let metric_name = metric.get("name").unwrap().as_str().unwrap();
             assert_eq!(source.as_metric().name(), metric_name);
         }
