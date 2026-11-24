@@ -302,18 +302,24 @@ where
 
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
+                let mut discarded_any = false;
                 while let Ok(RawLineResult {
-                    raw_line: Some(line),
+                    raw_line,
                     discarded_for_size_and_truncated,
                 }) = watcher.read_line().await
                 {
                     for buf in &discarded_for_size_and_truncated {
+                        discarded_any = true;
                         self.emitter.emit_file_line_too_long(
                             &buf.clone(),
                             self.max_line_bytes,
                             buf.len(),
                         );
                     }
+
+                    let Some(line) = raw_line else {
+                        break;
+                    };
 
                     let sz = line.bytes.len();
                     trace!(
@@ -342,7 +348,7 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                } else {
+                } else if !discarded_any && !watcher.has_buffered_data() {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after
                         && watcher.last_read_success().elapsed() >= grace_period
@@ -629,4 +635,196 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io::Write as _,
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
+    use bytes::{Bytes, BytesMut};
+    use file_source_common::{
+        Checkpointer, FileSourceInternalEvents, FingerprintStrategy, Fingerprinter, ReadFrom,
+    };
+    use futures::StreamExt as _;
+    use tempfile::tempdir;
+
+    use super::{FileServer, Line};
+    use crate::paths_provider::{Glob, MatchOptions};
+
+    #[derive(Clone, Default)]
+    struct CountingEmitter {
+        line_too_long: Arc<AtomicUsize>,
+    }
+
+    impl FileSourceInternalEvents for CountingEmitter {
+        fn emit_file_added(&self, _path: &Path) {}
+        fn emit_file_resumed(&self, _path: &Path, _file_position: u64) {}
+        fn emit_file_watch_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_unwatched(
+            &self,
+            _path: &Path,
+            _reached_eof: bool,
+            _bytes_unread: Option<u64>,
+        ) {
+        }
+        fn emit_file_deleted(&self, _path: &Path) {}
+        fn emit_file_delete_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_fingerprint_read_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_checksum_failed(&self, _path: &Path) {}
+        fn emit_file_checkpointed(&self, _count: usize, _duration: Duration) {}
+        fn emit_file_checkpoint_write_error(&self, _error: std::io::Error) {}
+        fn emit_files_open(&self, _count: usize) {}
+        fn emit_path_globbing_failed(&self, _path: &Path, _error: &std::io::Error) {}
+        fn emit_file_line_too_long(&self, _truncated: &BytesMut, _limit: usize, _size: usize) {
+            self.line_too_long.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn make_server(
+        dir: &Path,
+        data_dir: &Path,
+        max_line_bytes: usize,
+        remove_after: Option<Duration>,
+        emitter: CountingEmitter,
+    ) -> FileServer<Glob<CountingEmitter>, CountingEmitter> {
+        let pattern = dir.join("*.log");
+        let paths_provider =
+            Glob::new(&[pattern], &[], MatchOptions::default(), emitter.clone()).unwrap();
+        FileServer {
+            paths_provider,
+            max_read_bytes: 2048,
+            ignore_checkpoints: false,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: data_dir.to_path_buf(),
+            glob_minimum_cooldown: Duration::from_millis(20),
+            fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, max_line_bytes, false),
+            oldest_first: false,
+            remove_after,
+            emitter,
+            rotate_wait: Duration::from_secs(60),
+        }
+    }
+
+    #[tokio::test]
+    async fn remove_after_zero_does_not_delete_file_with_buffered_partial_line() {
+        let dir = tempdir().unwrap();
+        let data_dir = tempdir().unwrap();
+        let path = dir.path().join("partial.log");
+
+        let mut writer = std::fs::File::create(&path).unwrap();
+        writer.write_all(b"line1\npartial_in_progress").unwrap();
+        writer.flush().unwrap();
+
+        let server = make_server(
+            dir.path(),
+            data_dir.path(),
+            1024,
+            Some(Duration::ZERO),
+            CountingEmitter::default(),
+        );
+        let (tx, mut rx) = futures::channel::mpsc::channel::<Vec<Line>>(16);
+        let collector = tokio::spawn(async move {
+            let mut collected = Vec::new();
+            while let Some(batch) = rx.next().await {
+                for line in batch {
+                    collected.push(String::from_utf8(line.text.to_vec()).unwrap());
+                }
+            }
+            collected
+        });
+        let (sd_tx, sd_rx) = tokio::sync::oneshot::channel::<()>();
+        let (cp_tx, cp_rx) = tokio::sync::oneshot::channel::<()>();
+        let handle = tokio::spawn(server.run(tx, sd_rx, cp_rx, Checkpointer::new(data_dir.path())));
+
+        // Let FileServer read `line1` and buffer `partial_in_progress` across multiple polls.
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        assert!(
+            path.exists(),
+            "file with buffered partial line must not be deleted by remove_after"
+        );
+
+        // Complete the partial line; it should be delivered, and THEN the file may be deleted.
+        writer.write_all(b"_done\n").unwrap();
+        writer.flush().unwrap();
+        tokio::time::sleep(Duration::from_millis(350)).await;
+
+        sd_tx.send(()).unwrap();
+        cp_tx.send(()).unwrap();
+        handle.await.unwrap().unwrap();
+        let lines = collector.await.unwrap();
+
+        assert_eq!(lines, vec!["line1", "partial_in_progress_done"]);
+        assert!(
+            !path.exists(),
+            "file should be deleted once all buffered data is drained and EOF is reached"
+        );
+    }
+
+    #[tokio::test]
+    async fn remove_after_does_not_delete_file_on_oversized_line_discard() {
+        let dir = tempdir().unwrap();
+        let data_dir = tempdir().unwrap();
+        let path = dir.path().join("oversized.log");
+
+        let mut writer = std::fs::File::create(&path).unwrap();
+        writer
+            .write_all(b"0123456789abcdefghijklmnopqrstuvwxyz\n")
+            .unwrap();
+        writer.flush().unwrap();
+
+        let emitter = CountingEmitter::default();
+        let server = make_server(
+            dir.path(),
+            data_dir.path(),
+            10,
+            Some(Duration::from_secs(1)),
+            emitter.clone(),
+        );
+        let (tx, mut rx) = futures::channel::mpsc::channel::<Vec<Line>>(16);
+        let collector = tokio::spawn(async move {
+            let mut collected = Vec::new();
+            while let Some(batch) = rx.next().await {
+                for line in batch {
+                    collected.push(String::from_utf8(line.text.to_vec()).unwrap());
+                }
+            }
+            collected
+        });
+        let (sd_tx, sd_rx) = tokio::sync::oneshot::channel::<()>();
+        let (cp_tx, cp_rx) = tokio::sync::oneshot::channel::<()>();
+        let handle = tokio::spawn(server.run(tx, sd_rx, cp_rx, Checkpointer::new(data_dir.path())));
+
+        // Let FileServer discard the oversized line.
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        assert!(
+            path.exists(),
+            "file must not be deleted immediately after discarding an oversized line"
+        );
+        assert!(
+            emitter.line_too_long.load(Ordering::Relaxed) >= 1,
+            "FileLineTooLong must be emitted even when no normal line follows"
+        );
+
+        writer.write_all(b"ok\n").unwrap();
+        writer.flush().unwrap();
+        tokio::time::sleep(Duration::from_millis(350)).await;
+
+        sd_tx.send(()).unwrap();
+        cp_tx.send(()).unwrap();
+        handle.await.unwrap().unwrap();
+        let lines = collector.await.unwrap();
+
+        assert_eq!(lines, vec!["ok"]);
+    }
 }

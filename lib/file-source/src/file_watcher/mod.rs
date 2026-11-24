@@ -340,6 +340,12 @@ impl FileWatcher {
         self.file_position
     }
 
+    /// Returns true if an incomplete line is currently buffered awaiting its delimiter.
+    #[inline]
+    pub fn has_buffered_data(&self) -> bool {
+        !self.buf.is_empty()
+    }
+
     /// Returns the number of bytes that were not read.
     /// Uses the current file size from the underlying File (works even after
     /// file deletion since the fd remains valid).
@@ -401,6 +407,9 @@ impl FileWatcher {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
             }) => {
+                if !discarded_for_size_and_truncated.is_empty() {
+                    self.track_read_success();
+                }
                 if self.file_findable() {
                     self.track_read_eof();
                     Ok(RawLineResult {
