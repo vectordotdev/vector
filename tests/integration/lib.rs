@@ -9,6 +9,9 @@ mod cli;
 #[cfg(feature = "shutdown-tests")]
 mod shutdown;
 
+#[cfg(windows)]
+mod windows;
+
 /// Creates a file with given content
 #[must_use]
 pub fn create_file(config: &str) -> PathBuf {
