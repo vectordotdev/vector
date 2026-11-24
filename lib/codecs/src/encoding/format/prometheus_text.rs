@@ -1,4 +1,4 @@
-use std::fmt::Write as _;
+use std::{collections::BTreeMap, fmt::Write as _};
 
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,8 @@ impl PrometheusTextSerializerConfig {
 /// format][format].
 ///
 /// Every event is encoded on its own: the output is a `# TYPE` line followed by one line per
-/// series, and every line ends with a line feed.
+/// series, and every line ends with a line feed. [`Self::encode_batch`] encodes several events as
+/// one exposition instead.
 ///
 /// Only absolute counters, gauges, sets, aggregated histograms and aggregated summaries can be
 /// encoded. Other metrics are rejected, because turning them into series needs state or
@@ -53,25 +54,59 @@ impl PrometheusTextSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct PrometheusTextSerializer;
 
-impl Encoder<Event> for PrometheusTextSerializer {
-    type Error = vector_common::Error;
+impl PrometheusTextSerializer {
+    /// Encodes the events as one exposition, in which every metric family has a single `# TYPE`
+    /// line followed by all of its series. Families are sorted by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error, and writes nothing, if an event cannot be encoded or if two metrics of
+    /// one family have different types.
+    pub fn encode_batch(
+        &self,
+        events: impl IntoIterator<Item = Event>,
+        buffer: &mut BytesMut,
+    ) -> Result<(), vector_common::Error> {
+        let mut families = BTreeMap::<String, (&str, String)>::new();
+        for event in events {
+            let Event::Metric(metric) = event else {
+                return Err("the `prometheus_text` codec can only encode metrics".into());
+            };
+            let (name, kind, series) = encode_metric(&metric)?;
+            match families.get_mut(&name) {
+                Some((family_kind, _)) if *family_kind != kind => {
+                    return Err(
+                        format!("metric `{name}` is both a {family_kind} and a {kind}").into(),
+                    );
+                }
+                Some((_, family_series)) => family_series.push_str(&series),
+                None => {
+                    families.insert(name, (kind, series));
+                }
+            }
+        }
 
-    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let Event::Metric(metric) = event else {
-            return Err("the `prometheus_text` codec can only encode metrics".into());
-        };
-
-        let text = encode_metric(&metric)?;
-        buffer.extend_from_slice(text.as_bytes());
+        for (name, (kind, series)) in families {
+            buffer.extend_from_slice(format!("# TYPE {name} {kind}\n{series}").as_bytes());
+        }
         Ok(())
     }
 }
 
+impl Encoder<Event> for PrometheusTextSerializer {
+    type Error = vector_common::Error;
+
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        self.encode_batch([event], buffer)
+    }
+}
+
+/// Returns the family name, the type and the series lines of the metric.
 #[allow(
     clippy::cast_precision_loss,
     reason = "Prometheus values are 64-bit floats."
 )]
-fn encode_metric(metric: &Metric) -> Result<String, vector_common::Error> {
+fn encode_metric(metric: &Metric) -> Result<(String, &'static str, String), vector_common::Error> {
     if metric.kind() != MetricKind::Absolute {
         return Err(format!(
             "the `prometheus_text` codec can only encode absolute metrics, but `{}` is \
@@ -85,13 +120,9 @@ fn encode_metric(metric: &Metric) -> Result<String, vector_common::Error> {
         Some(namespace) => format!("{namespace}_{}", metric.name()),
         None => metric.name().to_string(),
     };
-    let tags = metric.tags();
-    if contains_line_break(&name)
-        || tags.is_some_and(|tags| tags.iter_single().any(|(key, _)| contains_line_break(key)))
-    {
-        return Err(format!("metric `{name}` has a line break in its name or a tag name").into());
-    }
+    validate_names(&name, metric)?;
 
+    let tags = metric.tags();
     let timestamp = metric.timestamp().map(|t| t.timestamp_millis());
     let mut out = String::new();
     let mut emit = |suffix: &str, value: f64, extra: Option<(&str, String)>| {
@@ -168,11 +199,49 @@ fn encode_metric(metric: &Metric) -> Result<String, vector_common::Error> {
         }
     };
 
-    Ok(format!("# TYPE {name} {kind}\n{out}"))
+    Ok((name, kind, out))
 }
 
-fn contains_line_break(value: &str) -> bool {
-    value.contains(['\r', '\n'])
+/// Rejects a metric name or tag name that is not a valid Prometheus name, and a tag that would
+/// duplicate a label the codec adds.
+fn validate_names(name: &str, metric: &Metric) -> Result<(), vector_common::Error> {
+    if !is_valid_name(name, true) {
+        return Err(format!("`{name}` is not a valid Prometheus metric name").into());
+    }
+    let tags = metric.tags();
+    if let Some(key) = tags
+        .into_iter()
+        .flat_map(MetricTags::iter_single)
+        .map(|(key, _)| key)
+        .find(|key| !is_valid_name(key, false))
+    {
+        return Err(format!(
+            "metric `{name}` has the tag `{key}`, which is not a valid Prometheus label name"
+        )
+        .into());
+    }
+    let reserved = match metric.value() {
+        MetricValue::AggregatedHistogram { .. } => Some("le"),
+        MetricValue::AggregatedSummary { .. } => Some("quantile"),
+        _ => None,
+    };
+    if let Some(label) = reserved
+        && tags.is_some_and(|tags| tags.iter_single().any(|(key, _)| key == label))
+    {
+        return Err(format!("metric `{name}` has the reserved tag `{label}`").into());
+    }
+    Ok(())
+}
+
+/// Matches `[a-zA-Z_:][a-zA-Z0-9_:]*`, without the colons for a label name.
+fn is_valid_name(name: &str, allow_colon: bool) -> bool {
+    !name.is_empty()
+        && name.bytes().enumerate().all(|(index, byte)| {
+            byte.is_ascii_alphabetic()
+                || byte == b'_'
+                || (allow_colon && byte == b':')
+                || (index > 0 && byte.is_ascii_digit())
+        })
 }
 
 fn encode_tags(out: &mut String, tags: Option<&MetricTags>, extra: Option<(&str, String)>) {
@@ -404,6 +473,111 @@ mod tests {
     fn rejects_line_breaks_in_names() {
         let metric = absolute("a\nb", MetricValue::Gauge { value: 1.0 });
         assert!(encode(metric).is_err());
+    }
+
+    #[test]
+    fn encodes_a_batch_with_one_type_line_per_family() {
+        let gauge = |host: &str| {
+            absolute("up", MetricValue::Gauge { value: 1.0 })
+                .with_tags(Some(metric_tags!("host" => host)))
+        };
+        let histogram = |host: &str| {
+            absolute(
+                "latency",
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![],
+                    count: 1,
+                    sum: None,
+                },
+            )
+            .with_tags(Some(metric_tags!("host" => host)))
+        };
+        let events = [gauge("a"), histogram("a"), gauge("b"), histogram("b")].map(Event::Metric);
+
+        let mut buffer = BytesMut::new();
+        PrometheusTextSerializerConfig
+            .build()
+            .encode_batch(events, &mut buffer)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(buffer.to_vec()).unwrap(),
+            "# TYPE latency histogram\n\
+             latency_bucket{host=\"a\",le=\"+Inf\"} 1\n\
+             latency_count{host=\"a\"} 1\n\
+             latency_bucket{host=\"b\",le=\"+Inf\"} 1\n\
+             latency_count{host=\"b\"} 1\n\
+             # TYPE up gauge\n\
+             up{host=\"a\"} 1\n\
+             up{host=\"b\"} 1\n"
+        );
+    }
+
+    #[test]
+    fn rejects_a_batch_with_two_types_for_one_family() {
+        let events = [
+            absolute("up", MetricValue::Gauge { value: 1.0 }),
+            absolute("up", MetricValue::Counter { value: 1.0 }),
+        ]
+        .map(Event::Metric);
+
+        let mut buffer = BytesMut::new();
+        let error = PrometheusTextSerializerConfig
+            .build()
+            .encode_batch(events, &mut buffer)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("both a gauge and a counter"), "{error}");
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn rejects_names_that_are_not_prometheus_identifiers() {
+        let gauge = || absolute("up", MetricValue::Gauge { value: 1.0 });
+        for metric in [
+            absolute("foo.bar", MetricValue::Gauge { value: 1.0 }),
+            absolute("1up", MetricValue::Gauge { value: 1.0 }),
+            gauge().with_namespace(Some("my.app")),
+            gauge().with_tags(Some(metric_tags!("http.method" => "GET"))),
+            gauge().with_tags(Some(metric_tags!("0zone" => "a"))),
+            gauge().with_tags(Some(metric_tags!("a:b" => "c"))),
+        ] {
+            assert!(encode(metric.clone()).is_err(), "{metric:?}");
+        }
+    }
+
+    #[test]
+    fn accepts_colons_in_metric_names() {
+        let metric = absolute("job:requests:rate5m", MetricValue::Gauge { value: 1.0 });
+        assert_eq!(
+            encode(metric).unwrap(),
+            "# TYPE job:requests:rate5m gauge\njob:requests:rate5m 1\n"
+        );
+    }
+
+    #[test]
+    fn rejects_tags_named_like_generated_labels() {
+        let histogram = absolute(
+            "latency",
+            MetricValue::AggregatedHistogram {
+                buckets: vec![],
+                count: 0,
+                sum: None,
+            },
+        )
+        .with_tags(Some(metric_tags!("le" => "tenant")));
+        let summary = absolute(
+            "duration",
+            MetricValue::AggregatedSummary {
+                quantiles: vec![],
+                count: 0,
+                sum: 0.0,
+            },
+        )
+        .with_tags(Some(metric_tags!("quantile" => "x")));
+        for metric in [histogram, summary] {
+            let error = encode(metric).unwrap_err().to_string();
+            assert!(error.contains("reserved"), "{error}");
+        }
     }
 
     #[test]

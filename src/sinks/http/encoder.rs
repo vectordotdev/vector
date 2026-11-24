@@ -4,13 +4,17 @@ use std::io;
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::{
-    CharacterDelimitedEncoder,
-    encoding::{
-        Framer,
-        Framer::{CharacterDelimited, NewlineDelimited},
-        Serializer::Json,
+use vector_lib::{
+    codecs::{
+        CharacterDelimitedEncoder,
+        encoding::{
+            Framer,
+            Framer::{CharacterDelimited, NewlineDelimited},
+            Serializer::{Json, PrometheusText},
+        },
+        internal_events::EncoderSerializeError,
     },
+    internal_event::emit,
 };
 
 use crate::{
@@ -64,14 +68,29 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
             body.put_u8(b'[');
         }
 
-        for mut event in events {
-            self.transformer.transform(&mut event);
+        if let PrometheusText(serializer) = self.encoder.serializer() {
+            // The body is one exposition, so each metric family is written once, with all series.
+            let events = events.into_iter().map(|mut event| {
+                self.transformer.transform(&mut event);
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+                event
+            });
+            serializer
+                .encode_batch(events, &mut body)
+                .map_err(|error| {
+                    emit(EncoderSerializeError { error: &error });
+                    io::Error::other("unable to encode event")
+                })?;
+        } else {
+            for mut event in events {
+                self.transformer.transform(&mut event);
 
-            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
-            encoder
-                .encode(event, &mut body)
-                .map_err(|_| io::Error::other("unable to encode event"))?;
+                encoder
+                    .encode(event, &mut body)
+                    .map_err(|_| io::Error::other("unable to encode event"))?;
+            }
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {
