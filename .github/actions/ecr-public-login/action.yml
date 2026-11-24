@@ -1,17 +1,27 @@
 name: ECR Public Login
 description: "Log Docker in to the ECR Public gallery (public.ecr.aws) so image pulls use the AWS account quota instead of the anonymous per-IP data limit shared by GitHub-hosted runners."
 
+inputs:
+  role-to-assume:
+    required: true
+    description: "ARN of the IAM role allowed to authenticate to ECR Public. Pass `vars.ECR_PUBLIC_PULL_ROLE_ARN`; composite actions cannot read the `vars` context."
+
 runs:
   using: "composite"
   steps:
     # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
     # unset. Read it via shell (env context only covers YAML-declared vars) and
-    # skip the login when absent; pulls then stay anonymous.
-    - name: Check OIDC token availability
-      id: oidc
+    # skip the login when absent or when no role is configured; pulls then stay anonymous.
+    - name: Check login prerequisites
+      id: prereqs
       shell: bash
+      env:
+        ROLE_TO_ASSUME: ${{ inputs.role-to-assume }}
       run: |
-        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
+        if [ -z "${ROLE_TO_ASSUME}" ]; then
+          echo "::warning title=ECR Public role not configured::ECR_PUBLIC_PULL_ROLE_ARN is empty; continuing with anonymous public.ecr.aws pulls."
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        elif [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
           echo "available=true" >> "$GITHUB_OUTPUT"
         else
           echo "available=false" >> "$GITHUB_OUTPUT"
@@ -22,14 +32,13 @@ runs:
     # Best effort: a failure falls back to anonymous pulls instead of failing the job.
     - name: Get AWS credentials for ECR Public
       id: aws
-      if: ${{ steps.oidc.outputs.available == 'true' }}
+      if: ${{ steps.prereqs.outputs.available == 'true' }}
       continue-on-error: true
       uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
       with:
-        role-to-assume: arn:aws:iam::486234852809:role/vector-ecr-public-pull-github-actions
+        role-to-assume: ${{ inputs.role-to-assume }}
         aws-region: us-east-1 # ECR Public authentication is only available in us-east-1
         role-duration-seconds: 900
-        allowed-account-ids: "486234852809"
         output-env-credentials: false
         output-credentials: true
         # The default 12 attempts spend ~45s on a deterministic AccessDenied.
@@ -49,6 +58,6 @@ runs:
         fi
 
     - name: Warn about anonymous ECR Public pulls
-      if: ${{ steps.oidc.outputs.available == 'true' && steps.aws.outcome != 'success' }}
+      if: ${{ steps.prereqs.outputs.available == 'true' && steps.aws.outcome != 'success' }}
       shell: bash
-      run: echo "::warning title=ECR Public credentials unavailable::Could not assume vector-ecr-public-pull-github-actions; continuing with anonymous public.ecr.aws pulls."
+      run: echo "::warning title=ECR Public credentials unavailable::Could not assume the ECR Public role; continuing with anonymous public.ecr.aws pulls."
