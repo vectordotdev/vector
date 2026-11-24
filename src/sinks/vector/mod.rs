@@ -48,15 +48,6 @@ mod test {
     }
 
     #[test]
-    fn config_idle_connection_timeout_rejects_zero() {
-        let result = toml::from_str::<super::VectorConfig>(
-            "address = \"http://127.0.0.1:6000\"\nidle_connection_timeout_secs = 0",
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn config_rejects_boolean_compression() {
         for compression in [true, false] {
             let result: Result<super::VectorConfig, _> =

@@ -752,9 +752,7 @@ impl VectorConfig {
         }
     }
 
-    /// Checks the idle connection timeout against `MAX_IDLE_CONNECTION_TIMEOUT_SECS`. The check
-    /// does not depend on the environment, so it belongs here, where `vector validate
-    /// --no-environment` reaches it, and not only in `build`.
+    /// Checks the idle connection timeout against `MAX_IDLE_CONNECTION_TIMEOUT_SECS`.
     fn validate_idle_connection_timeout(&self) -> crate::Result<Duration> {
         let secs = self.idle_connection_timeout_secs.get();
         if secs > MAX_IDLE_CONNECTION_TIMEOUT_SECS {
@@ -1583,6 +1581,21 @@ mod tests {
         assert_eq!(config.idle_connection_timeout_secs.get(), 350);
     }
 
+    #[test]
+    fn idle_connection_timeout_rejects_zero() {
+        let result = toml::from_str::<VectorConfig>(
+            "address = \"http://127.0.0.1:6000\"\nidle_connection_timeout_secs = 0",
+        );
+
+        let err = result
+            .expect_err("idle_connection_timeout_secs = 0 should be rejected")
+            .to_string();
+        assert!(
+            err.contains("expected a nonzero"),
+            "unexpected error: {err}"
+        );
+    }
+
     /// Parses a `vector` sink config with the given idle connection timeout.
     fn config_with_idle_connection_timeout(secs: u64) -> VectorConfig {
         toml::from_str(&format!(
@@ -1670,8 +1683,6 @@ mod tests {
             .collect()
             .await
             .unwrap();
-        // Let the connection return to the pool before the clock is paused.
-        tokio::time::sleep(Duration::from_millis(50)).await;
         tokio::time::pause();
         tokio::time::advance(gap).await;
         tokio::time::resume();
@@ -1687,15 +1698,17 @@ mod tests {
     }
 
     #[rstest]
-    #[case::reused_within_the_timeout(300, 1)]
-    #[case::reopened_after_the_timeout(60, 2)]
+    #[case::reused_within_the_timeout(300, 100, 1)]
+    #[case::reopened_after_the_timeout(60, 75, 2)]
     #[tokio::test]
     async fn idle_connection_timeout_decides_whether_a_connection_is_reused(
         #[case] idle_timeout_secs: u64,
+        #[case] gap_secs: u64,
         #[case] expected_connections: usize,
     ) {
         let connections =
-            connections_for_requests_spaced_by(idle_timeout_secs, Duration::from_secs(100)).await;
+            connections_for_requests_spaced_by(idle_timeout_secs, Duration::from_secs(gap_secs))
+                .await;
 
         assert_eq!(connections, expected_connections);
     }
