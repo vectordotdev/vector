@@ -29,6 +29,11 @@ use crate::{
 const VALID_METRIC_PATHS_SET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
+/// The paths VRL can assign on a metric event. Deleting and mutable reads use
+/// `VALID_METRIC_PATHS_SET`, because the value can't be deleted.
+const VALID_METRIC_PATHS_INSERT: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
+    .counter.value, .gauge.value";
+
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
     .counter, .gauge, .set, .distribution, .aggregated_histogram, .aggregated_summary, .sketch";
 
@@ -365,6 +370,33 @@ fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Sets the value of a counter or gauge, such as `.gauge.value = 100`.
+///
+/// The value is converted before anything changes, so a rejected write leaves both the metric and
+/// the cached value as they were.
+fn set_metric_value(
+    metric: &mut Metric,
+    cached: &mut Value,
+    path: &OwnedValuePath,
+    value: &Value,
+) -> Result<(), String> {
+    let (MetricValue::Counter { value: current } | MetricValue::Gauge { value: current }) =
+        metric.value_mut()
+    else {
+        return Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_INSERT,
+        }
+        .to_string());
+    };
+    let new_value = value.try_into_f64().map_err(|e| e.to_string())?;
+    *current = new_value;
+    // Cache the converted float rather than `value`, so that `.gauge.value = 100` reads back as
+    // `100.0`, like the output.
+    cached.insert(path, metric_float_to_vrl_value(new_value));
+    Ok(())
+}
+
 impl Target for VrlTarget {
     fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         let path = &target_path.path;
@@ -439,10 +471,16 @@ impl Target for VrlTarget {
                                 set_metric_type(metric, &value)?;
                                 refresh_cached_metric_value(metric, metric_value, previous_field);
                             }
+                            // Only the value of the current type can be set, such as
+                            // `.gauge.value` on a gauge. This returns early so that the raw value
+                            // isn't cached below.
+                            [field, "value"] if *field == metric_value_field(metric.value()) => {
+                                return set_metric_value(metric, metric_value, path, &value);
+                            }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &path.to_string(),
-                                    expected: VALID_METRIC_PATHS_SET,
+                                    expected: VALID_METRIC_PATHS_INSERT,
                                 }
                                 .to_string());
                             }
@@ -455,7 +493,7 @@ impl Target for VrlTarget {
 
                     Err(MetricPathError::InvalidPath {
                         path: &path.to_string(),
-                        expected: VALID_METRIC_PATHS_SET,
+                        expected: VALID_METRIC_PATHS_INSERT,
                     }
                     .to_string())
                 }
@@ -905,9 +943,8 @@ fn insert_if_wanted(
     }
 }
 
-/// Updates the cached value after a metric's type changed from `previous_field`.
-///
-/// The value is only cached when the program reads it, so nothing is added otherwise.
+/// Moves the cached value to the field of the new type after a metric's type changed from
+/// `previous_field`. Nothing is added if the value wasn't cached.
 fn refresh_cached_metric_value(metric: &Metric, cached: &mut Value, previous_field: &str) {
     if let Value::Object(map) = cached
         && map.remove(previous_field).is_some()
@@ -1750,6 +1787,19 @@ mod test {
             ".type",
         ];
 
+        // Assignments also accept the value of a counter or gauge, which can't be deleted.
+        let validpaths_insert = [
+            ".name",
+            ".namespace",
+            ".interval_ms",
+            ".timestamp",
+            ".kind",
+            ".tags",
+            ".type",
+            ".counter.value",
+            ".gauge.value",
+        ];
+
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
@@ -1769,7 +1819,7 @@ mod test {
         assert_eq!(
             Err(format!(
                 "invalid path zork: expected one of {}",
-                validpaths_set.join(", ")
+                validpaths_insert.join(", ")
             )),
             target.target_insert(
                 &OwnedTargetPath::event(owned_value_path!("zork")),
@@ -1796,12 +1846,17 @@ mod test {
         );
     }
 
+    /// A program that sets `.type` and reads the value of either type afterwards.
     fn type_program_info() -> ProgramInfo {
         ProgramInfo {
             fallible: false,
             abortable: false,
-            target_queries: vec![OwnedTargetPath::event(owned_value_path!("type"))],
-            target_assignments: vec![],
+            target_queries: vec![
+                OwnedTargetPath::event(owned_value_path!("type")),
+                OwnedTargetPath::event(owned_value_path!("counter", "value")),
+                OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+            ],
+            target_assignments: vec![OwnedTargetPath::event(owned_value_path!("type"))],
         }
     }
 
@@ -1855,10 +1910,14 @@ mod test {
                 let (target, result) = set_type(metric, new_type.into());
                 assert_eq!(result, Ok(()));
 
-                // Later reads in the same program see the new type.
+                // Later reads in the same program see the new type, with the value under it.
                 assert_eq!(
                     target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
                     Ok(Some(&Value::from(new_type)))
+                );
+                assert_eq!(
+                    get(&target, owned_value_path!(new_type, "value")),
+                    Some(Value::from(4.5))
                 );
 
                 let metric = into_metric(target);
@@ -1890,6 +1949,11 @@ mod test {
                 target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
                 Ok(Some(&Value::from("gauge"))),
                 "{new_type:?} should leave `.type` reading the original type"
+            );
+            assert_eq!(
+                get(&target, owned_value_path!("gauge", "value")),
+                Some(Value::from(1.0)),
+                "{new_type:?} should leave the value readable under the original type"
             );
             assert_eq!(
                 into_metric(target).value(),
@@ -3042,29 +3106,143 @@ mod test {
     }
 
     #[test]
-    fn metric_value_write_still_rejected() {
-        let mut target = metric_target_with_queries(
-            MetricValue::Gauge { value: 1.0 },
-            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+    fn metric_value_write_sets_counter_value() {
+        // A negative value on an incremental counter: the metric changes, the next read sees the
+        // new float, and the kind is kept.
+        let metric = Metric::new(
+            "m",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
         );
 
         target
             .target_insert(
-                &OwnedTargetPath::event(owned_value_path!("gauge", "value")),
-                2.0.into(),
+                &OwnedTargetPath::event(owned_value_path!("counter", "value")),
+                Value::from(-2.5),
             )
-            .unwrap_err();
-        target
-            .target_remove(&OwnedTargetPath::event(owned_value_path!("gauge")), false)
-            .unwrap_err();
+            .unwrap();
 
         assert_eq!(
-            get(&target, owned_value_path!("gauge", "value")),
-            Some(Value::from(1.0))
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(-2.5))
         );
-        let VrlTarget::Metric { metric, .. } = &target else {
-            panic!("must be a metric");
+        let metric = into_metric(target);
+        assert_eq!(metric.value(), &MetricValue::Counter { value: -2.5 });
+        assert_eq!(metric.kind(), MetricKind::Incremental);
+    }
+
+    #[test]
+    fn metric_value_rejected_writes_keep_value() {
+        // Each write is checked before anything changes, so a rejected write leaves both the
+        // cached value and the metric as they were.
+        let mut target = metric_target_with_queries(
+            MetricValue::Gauge { value: 1.0 },
+            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+        );
+        for (path, value) in [
+            (owned_value_path!("gauge", "value"), Value::from("high")),
+            (
+                owned_value_path!("gauge"),
+                Value::from(objectmap! { "value" => 2.0 }),
+            ),
+            (owned_value_path!("gauge", "other"), Value::from(2.0)),
+            (owned_value_path!("counter", "value"), Value::from(2.0)),
+        ] {
+            target
+                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .expect_err(&path.to_string());
+        }
+        for path in [
+            owned_value_path!("gauge"),
+            owned_value_path!("gauge", "value"),
+        ] {
+            target
+                .target_remove(&OwnedTargetPath::event(path.clone()), false)
+                .expect_err(&path.to_string());
+        }
+
+        assert_eq!(
+            get(&target, owned_value_path!("gauge")),
+            Some(Value::from(objectmap! { "value" => 1.0 }))
+        );
+        // Writing another type's field doesn't add it to the cache either.
+        assert_eq!(get(&target, owned_value_path!("counter")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Gauge { value: 1.0 }
+        );
+
+        // Only counters and gauges have a writable value. Each input is valid for its path, so the
+        // write is rejected because of the path rather than the shape of the value.
+        let mut target = metric_target_with_queries(distribution_with_samples(), &[]);
+        for (path, value) in [
+            (owned_value_path!("distribution", "value"), Value::from(1.0)),
+            (
+                owned_value_path!("distribution", "samples"),
+                Value::from(vec![Value::from(
+                    objectmap! { "value" => 2.5, "rate" => 1 },
+                )]),
+            ),
+        ] {
+            target
+                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .expect_err(&path.to_string());
+        }
+        assert_eq!(into_metric(target).value(), &distribution_with_samples());
+    }
+
+    #[test]
+    fn metric_value_write_and_type_conversion() {
+        let new_target = || {
+            let metric = Metric::new("m", MetricKind::Absolute, MetricValue::Gauge { value: 1.0 });
+            VrlTarget::new(
+                Event::Metric(metric),
+                &type_program_info(),
+                MetricTagMode::Single,
+            )
         };
-        assert_eq!(metric.value(), &MetricValue::Gauge { value: 1.0 });
+        let insert = |target: &mut VrlTarget, path: OwnedValuePath, value: Value| {
+            target.target_insert(&OwnedTargetPath::event(path), value)
+        };
+
+        // Written before converting: the counter carries the new value.
+        let mut target = new_target();
+        insert(&mut target, owned_value_path!("gauge", "value"), 5.0.into()).unwrap();
+        insert(&mut target, owned_value_path!("type"), "counter".into()).unwrap();
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(5.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 5.0 }
+        );
+
+        // Converted before writing: the check uses the type at the time of the write, so
+        // `.counter.value` is writable and `.gauge.value` no longer is.
+        let mut target = new_target();
+        insert(&mut target, owned_value_path!("type"), "counter".into()).unwrap();
+        insert(
+            &mut target,
+            owned_value_path!("counter", "value"),
+            5.0.into(),
+        )
+        .unwrap();
+        insert(&mut target, owned_value_path!("gauge", "value"), 6.0.into()).unwrap_err();
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(5.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 5.0 }
+        );
     }
 }
