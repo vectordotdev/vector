@@ -65,9 +65,11 @@ use crate::{
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
-    shutdown::SourceShutdownCoordinator,
+    shutdown::{ShutdownSignal, SourceShutdownCoordinator},
     topology::task::TaskError,
-    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    transforms::{
+        ErasedSyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf,
+    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -132,6 +134,7 @@ struct Builder<'a> {
     config: &'a super::Config,
     diff: &'a ConfigDiff,
     shutdown_coordinator: SourceShutdownCoordinator,
+    source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     errors: Vec<String>,
     outputs: HashMap<OutputId, UnboundedSender<fanout::ControlMessage>>,
     tasks: HashMap<ComponentKey, Task>,
@@ -165,6 +168,7 @@ impl<'a> Builder<'a> {
             diff,
             buffers,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
+            source_shutdown_guards: HashMap::new(),
             errors: vec![],
             outputs: HashMap::new(),
             tasks: HashMap::new(),
@@ -200,6 +204,7 @@ impl<'a> Builder<'a> {
                 source_tasks,
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
+                source_shutdown_guards: self.source_shutdown_guards,
                 detach_triggers: self.detach_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
@@ -418,6 +423,8 @@ impl<'a> Builder<'a> {
         let (shutdown_signal, force_shutdown_tripwire) = self
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
+        self.source_shutdown_guards
+            .insert(key.clone(), shutdown_signal.clone());
 
         let context = SourceContext {
             key: key.clone(),
@@ -710,7 +717,10 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.build(cx).await {
+        // Registered inside the component span so that the counter picks up its tags.
+        let cpu_ns = sink.measure_cpu_usage.then(cpu_time::register_counter);
+
+        let (sink, healthcheck) = match cpu_scoped_if(sink.build(cx), cpu_ns.clone()).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;
@@ -762,7 +772,9 @@ impl<'a> Builder<'a> {
             .map_err(Into::into)
         };
 
-        let task = Task::new(key.clone(), typetag, sink);
+        // Connections opened by the healthcheck can be pooled and reused by the sink.
+        let healthcheck = cpu_scoped_if(healthcheck, cpu_ns.clone());
+        let task = Task::new(key.clone(), typetag, cpu_timed_if(sink, cpu_ns));
 
         let component_key = key.clone();
         let healthcheck_task = async move {
@@ -815,8 +827,6 @@ impl<'a> Builder<'a> {
         input_rx: BufferReceiver<EventArray>,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
         match transform {
-            // TODO: avoid the double boxing for function transforms here
-            Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
             Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
@@ -824,7 +834,7 @@ impl<'a> Builder<'a> {
 
     fn build_sync_transform(
         &self,
-        t: Box<dyn SyncTransform>,
+        t: Arc<dyn ErasedSyncTransform>,
         node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
@@ -1102,6 +1112,10 @@ pub struct TopologyPieces {
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    /// A copy of each source's shutdown signal, held by the topology until the source task's error
+    /// is reported. The source counts as finished only once every copy is dropped, so the error is
+    /// always observable by then.
+    pub(crate) source_shutdown_guards: HashMap<ComponentKey, ShutdownSignal>,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
@@ -1273,7 +1287,7 @@ impl TransformNode {
 }
 
 struct Runner {
-    transform: Box<dyn SyncTransform>,
+    transform: Arc<dyn ErasedSyncTransform>,
     input_rx: Option<BufferReceiver<EventArray>>,
     input_type: DataType,
     outputs: TransformOutputs,
@@ -1284,7 +1298,7 @@ struct Runner {
 
 impl Runner {
     fn new(
-        transform: Box<dyn SyncTransform>,
+        transform: Arc<dyn ErasedSyncTransform>,
         input_rx: BufferReceiver<EventArray>,
         timer_tx: UtilizationComponentSender,
         input_type: DataType,
@@ -1323,6 +1337,7 @@ impl Runner {
         const INLINE_BATCH_SIZE: usize = 128;
 
         let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
+        let mut executor = Arc::clone(&self.transform).create_executor();
 
         let mut input_rx = self
             .input_rx
@@ -1334,7 +1349,7 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
-            self.transform.transform_all(events, &mut outputs_buf);
+            executor.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf)
                 .await
                 .map_err(TaskError::wrapped)?;
@@ -1381,12 +1396,10 @@ impl Runner {
                             len += events.len();
                         }
 
-                        let mut t = self.transform.clone();
+                        let transform_template = Arc::clone(&self.transform);
                         let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                         let task = spawn_timed(async move {
-                            for events in input_arrays {
-                                t.transform_all(events, &mut outputs_buf);
-                            }
+                            transform_template.transform_batch(input_arrays, &mut outputs_buf);
                             outputs_buf
                         });
                         in_flight.push_back(task);

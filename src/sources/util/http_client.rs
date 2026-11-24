@@ -143,6 +143,12 @@ pub(crate) trait HttpClientContext {
 
 /// Builds a url for the HTTP requests.
 pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
+    try_build_url(uri, query).expect("Failed to build URI from parsed arguments")
+}
+
+/// Adds `query` to `uri`, failing if the result isn't a valid URI, for example because it is
+/// too long.
+pub(crate) fn try_build_url(uri: &Uri, query: &QueryParameters) -> Result<Uri, http::Error> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
@@ -170,9 +176,7 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
         query if !query.is_empty() => format!("{}?{query}", uri.path()),
         _ => uri.path().to_string(),
     });
-    builder
-        .build()
-        .expect("Failed to build URI from parsed arguments")
+    builder.build()
 }
 
 /// Warns if the scrape timeout is greater than the scrape interval.

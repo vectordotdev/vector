@@ -42,7 +42,7 @@ impl Route {
 }
 
 impl SyncTransform for Route {
-    fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
+    fn transform(&self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
@@ -129,7 +129,7 @@ impl GenerateConfig for RouteConfig {
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;
-        Ok(Transform::synchronous(route))
+        Ok(Transform::stateless(route))
     }
 
     fn input(&self) -> Input {
@@ -256,7 +256,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -302,7 +302,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -345,7 +345,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -389,7 +389,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
