@@ -160,6 +160,15 @@ generated: components: sources: websocket: configuration: {
 						required: true
 						type: string: {}
 					}
+					timeout: {
+						description: "Number of seconds before timing out while sending ACK."
+						required:    false
+						type: uint: {
+							default: 10
+							examples: [10]
+							unit: "seconds"
+						}
+					}
 				}
 			}
 			data_dir: {
