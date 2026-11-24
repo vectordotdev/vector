@@ -237,7 +237,6 @@ serde_json = { version = "1.0.150", default-features = false, features = ["prese
 serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
-simdutf8 = { version = "0.1.5", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
@@ -258,7 +257,6 @@ tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
-vector-buffers = { path = "lib/vector-buffers" }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
@@ -310,7 +308,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { workspace = true, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.4.1", default-features = false, optional = true }
+console-subscriber = { version = "0.5.0", default-features = false, optional = true }
 
 # Tracing
 tracing.workspace = true
@@ -397,6 +395,7 @@ databricks-zerobus-ingest-sdk = { version = "3.1.1", optional = true, features =
 # GCP
 goauth = { version = "0.16.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
+google-cloud-auth = { version = "1.19.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "4.3.0", default-features = false, features = ["tokio", "native-tls"], optional = true }
@@ -413,8 +412,8 @@ greptimedb-ingester = { version = "0.19.1", default-features = false, features =
 # External libs
 arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "60.1.0", default-features = false, features = ["ipc"], optional = true }
-parquet = { version = "60.1.0", default-features = false, features = [
+arrow = { version = "60.2.0", default-features = false, features = ["ipc"], optional = true }
+parquet = { version = "60.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -467,7 +466,7 @@ kube = { version = "4.2.0", default-features = false, features = ["client", "ope
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 libc.workspace = true
 lru = { version = "0.18.2", default-features = false }
-maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
+maxminddb = { version = "0.28.1", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
 async-nats = { version = "0.49.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
@@ -519,7 +518,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps
 
 # make sure to update the external docs when the Lua version changes
 mlua = { workspace = true, features = ["macros"], optional = true }
-sysinfo = "0.37.2"
+sysinfo = "0.38.4"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8.0"
@@ -710,7 +709,7 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-prost-build", "dep:prost-build"]
 
-gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
+gcp = ["dep:base64", "dep:goauth", "dep:google-cloud-auth", "dep:smpl_jwt"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]

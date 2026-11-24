@@ -300,8 +300,8 @@ fastrand,https://github.com/smol-rs/fastrand,Apache-2.0 OR MIT,Stjepan Glavina <
 ff,https://github.com/zkcrypto/ff,MIT OR Apache-2.0,"Sean Bowe <ewillbefull@gmail.com>, Jack Grigg <thestr4d@gmail.com>"
 fiat-crypto,https://github.com/mit-plv/fiat-crypto,MIT OR Apache-2.0 OR BSD-1-Clause,Fiat Crypto library authors <jgross@mit.edu>
 finl_unicode,https://github.com/dahosek/finl_unicode,MIT OR Apache-2.0,The finl_unicode Authors
-fixedbitset,https://github.com/petgraph/fixedbitset,MIT OR Apache-2.0,bluss
 fixed_decimal,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers
+fixedbitset,https://github.com/petgraph/fixedbitset,MIT OR Apache-2.0,bluss
 flatbuffers,https://github.com/google/flatbuffers,Apache-2.0,"Robert Winslow <hello@rwinslow.com>, FlatBuffers Maintainers"
 flate2,https://github.com/rust-lang/flate2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>"
 float_eq,https://github.com/jtempest/float_eq-rs,MIT OR Apache-2.0,jtempest
@@ -332,6 +332,10 @@ getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Pr
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
 gloo-timers,https://github.com/rustwasm/gloo/tree/master/crates/timers,MIT OR Apache-2.0,Rust and WebAssembly Working Group
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
+google-cloud-auth,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-gax,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-rpc,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
+google-cloud-wkt,https://github.com/googleapis/google-cloud-rust/tree/main,Apache-2.0,Google LLC
 governor,https://github.com/boinkor-net/governor,MIT,Andreas Fuchs <asf@boinkor.net>
 granit-parser,https://github.com/bourumir-wyngs/granit-parser,MIT OR Apache-2.0,"Ethiraric <ethiraric@gmail.com>, David Aguilar <davvid@gmail.com>, Yuheng Chen <yuhengchen@sensetime.com>, Bourumir Wyngs <bourumir-wyngs@gmail.com>"
 greptime-proto,https://github.com/GreptimeTeam/greptime-proto,Apache-2.0,The greptime-proto Authors
@@ -843,7 +847,6 @@ toml_edit,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_edit Author
 toml_parser,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_parser Authors
 toml_writer,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_writer Authors
 tonic,https://github.com/grpc/grpc-rust,MIT,gRPC authors
-tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
 tonic-health,https://github.com/grpc/grpc-rust,MIT,James Nugent <james@jen20.com>
 tonic-prost,https://github.com/grpc/grpc-rust,MIT,gRPC authors
 tonic-reflection,https://github.com/grpc/grpc-rust,MIT,"James Nugent <james@jen20.com>, Samani G. Gikandi <samani@gojulas.com>"
@@ -935,23 +938,26 @@ winapi-i686-pc-windows-gnu,https://github.com/retep998/winapi-rs,MIT OR Apache-2
 winapi-util,https://github.com/BurntSushi/winapi-util,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 winapi-x86_64-pc-windows-gnu,https://github.com/retep998/winapi-rs,MIT OR Apache-2.0,Peter Atashian <retep998@gmail.com>
 windows,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows Authors
 windows-collections,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-collections Authors
 windows-core,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-core,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-core Authors
 windows-future,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-future Authors
 windows-implement,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-implement,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-implement Authors
 windows-interface,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-interface,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-interface Authors
-windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-link Authors
 windows-numerics,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-numerics Authors
 windows-result,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-result,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-result Authors
 windows-service,https://github.com/mullvad/windows-service-rs,MIT OR Apache-2.0,Mullvad VPN
 windows-strings,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-strings,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-strings Authors
 windows-sys,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-sys,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-sys Authors
 windows-targets,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
-windows-threading,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
+windows-threading,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-threading Authors
 windows_aarch64_gnullvm,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows_aarch64_msvc,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows_i686_gnu,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
