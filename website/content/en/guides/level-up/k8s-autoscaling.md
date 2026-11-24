@@ -111,6 +111,18 @@ lines (`apache_common`) at 55 MiB/s over 100 persistent connections.
 Each Vector pod has 1 vCPU and 2 GiB of memory, with `requests == limits` for
 Guaranteed QoS.
 
+The test pipeline has three parts, described here in the order that events flow:
+
+1. Lading: the producer. Lading is used to send `apache_common` log lines at a target rate of
+   55 MiB/s over 100 persistent HTTP connections to the NGINX Ingress Controller, which
+   then routes requests to `Ready` Vector pods.
+2. Vector. We're using the `http_server` source to receive the log lines, a `remap` transform using
+   `parse_regex!` to process them and the `socket` sink to forward them to a drain.
+3. Consumer. A `socat` process effectively voids incoming data by forwarding the TCP stream to
+   `/dev/null`. We do that so there is little to no sink backpressure or latency on Vector's side,
+   allowing us to analyze only ingestion and processing; minimizing external factors.
+
+
 ### Load balancing with NGINX Ingress Controller
 
 To distribute traffic across available pods as replicas are created and
@@ -128,18 +140,15 @@ without traffic.
 For this reason, the experiments place the NGINX Ingress Controller in front
 of Vector instead of exposing Vector directly through a ClusterIP Service.
 
-## Setup & manual scaling
+## Setup
 
-TODO:
-1. Describe at the top; move files to the bottom.
-2. Organize like the Architecture section: producer -> vector -> consumer
-3. Make the code blocks hidden and at the end and all in one
-4. Subheadings to differentiate between setup and measurements
-4.1. Do the same in Automatic scaling with HPA
+In this section we will deploy all necessary components and a single Vector pod.
 
-Deploy the shared test components before starting the measurements. The
-consumer drains all data forwarded by Vector, and the NGINX Ingress Controller
-distributes requests across the Vector replicas:
+For the component setup we need to deploy them in the inverse order of that the events flow,
+meaning we'll start by the socket consumer, then deploy Vector and finally start the Lading
+producer and NGINX.
+
+### Consumer
 
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir=true collapsed=true >}}
 
@@ -161,13 +170,15 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 ```
 {{< /collapsible >}}
 
-The following Helm values configure Vector with an
-`http_server` source, the `parse_regex!` transform, and the `socket` sink that forwards data to
-the consumer:
+
+### Vector
+
+Expand the following code block to see the helm Vector configuration, which includes the actual
+Vector configuration within.
 
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true >}}
 
-
+{{< collapsible title="Setup commands" open="false" >}}
 ```bash
 helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
   -f values.yaml --set replicas=1 --set autoscaling.enabled=false --wait --timeout=3m
@@ -177,6 +188,9 @@ helm upgrade --install vector-ingress manifests/ingress-chart \
 helm upgrade --install producer manifests/producer-chart \
   -n vector-perf --wait --timeout=3m
 ```
+{{< /collapsible >}}
+
+### Producer and NGINX
 
 The following Ingress routes HTTP POST requests to the Vector Service at the request level (L7),
 so every pod receives a share of traffic as soon as it's Ready, independent of how or why the replica count changes:
@@ -191,7 +205,9 @@ that request's events rather than just delaying them.
 The producer is [lading](https://github.com/DataDog/lading), configured to
 generate `apache_common` log lines at 55 MiB/s across 100 parallel connections:
 
-{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir=true >}}
+{{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir=true collapsed=true >}}
+
+## Metric gathering and manual scaling
 
 After the environment is running, collect two samples of Vector's per-component
 counters 30 seconds apart. Calculate throughput from the change in
@@ -213,10 +229,13 @@ baseline for the three- and eight-pod measurements.
 After collecting the single-pod metrics, scale to three replicas, then eight.
 Collect metrics after each upgrade before continuing to the next replica count:
 
+
 ```bash
 # Three pods.
 helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
   -f values.yaml --set replicas=3 --set autoscaling.enabled=false --wait --timeout=3m
+
+# Collect metrics...
 
 # Eight pods.
 helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
@@ -261,8 +280,11 @@ when demand falls. This makes it a better fit for most deployments with varying
 traffic than a fixed, manually managed replica count.
 
 We can now configure the HPA to keep average CPU utilization around a 70%
-target, leaving headroom without keeping all eight pods running:
+target, leaving headroom without keeping all eight pods running.
 
+We'll do this by first scaling down back to one pod and then setting up HPA.
+
+{{< collapsible title="Scale down and HPA setup" open="false" >}}
 ```bash
 # Reset to 1 pod and keep autoscaling disabled until the scale-down completes.
 helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
@@ -278,6 +300,7 @@ helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0
   --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60 \
   --wait --timeout=3m
 ```
+{{< /collapsible >}}
 
 Based on the single-pod results, we can estimate how many pods we would need
 to spin up to stay under CPU saturation while keeping some headroom. The
@@ -417,30 +440,28 @@ leaving each pod with roughly 53% of unused CPU capacity.
 
 ## Handling sudden bursts
 
-TODO:
-1. Make 1st paragraph more clear, describe the problem and don't mention numbers.
-2. Move numbers to a later paragraph. Make data loss explanation better/more concise.
-
-The HPA is a reactive controller. It can adjust capacity for sustained changes,
-but it cannot make new pods Ready immediately when a burst begins. It only
-reconciles and issues a scaling decision every [15 seconds by
-default](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/),
-and each new pod still needs to start and pass its readiness probe. The
-binding deadline for an in-flight request is the [NGINX Ingress Controller's
+Consider a sudden burst that requires nine pods when only two are `Ready`. At the 70%
+target, the HPA formula therefore increases the recommendation through approximately
+2→3→5→8→9 instead of detecting the full nine-pod demand immediately. Since
+the HPA is a reactive controller, it can adjust capacity for sustained changes,
+but it cannot make new pods `Ready` immediately when a burst begins. Meaning that any data
+in between the time when the burst started and when pods are effectively available is
+susceptible to be lost if any timeout is hit, such as [NGINX Ingress Controller's
 proxy read and send
 timeouts](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/):
-**60 seconds by default**, and left unchanged in this guide.
+**60 seconds by default**.
 
-Consider a sudden burst that requires nine pods when only two are Ready. With
-the pods limited to 1 vCPU, observed CPU cannot exceed 100%. At the 70% target,
-the HPA formula therefore increases the recommendation through approximately
-2→3→5→8→9 instead of detecting the full nine-pod demand immediately, and each
-decision depends on another reconciliation cycle and fresh metrics. Even if
-`maxReplicas` is raised to nine, scaling takes about one minute or longer after
-pod startup and readiness are included. With this guide's `maxReplicas: 8`,
-the deployment can never reach nine pods.
 
-During that interval, Vector applies backpressure and HTTP requests stall. If
+HPA only reconciles and issues a scaling decision every [15 seconds by
+default](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/),
+and each new pod still needs to start and pass its readiness probe. Every scaling decision
+depends on another reconciliation cycle and fresh metrics, so using
+this guide's configuration data will inevitably be lost. Even in a scenario where 2→9 happens
+immediately (which would require manual intervention since the HPA won't do that on its own)
+data would **still** be lost due to NGINX's default configuration since each scaling takes
+about one minute or longer after pod startup and readiness are included.
+
+During that interval when Vector is overloaded, it'll apply backpressure and HTTP requests stall. If
 NGINX goes 60 seconds without progress while reading from or writing to the
 Vector upstream, it closes the connection. The events in that request are then
 lost. New replicas can accept later requests, but they cannot recover a request
