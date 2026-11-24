@@ -63,8 +63,9 @@ impl PrometheusTextSerializer {
     ///
     /// # Errors
     ///
-    /// Returns an error, and writes nothing, if an event cannot be encoded or if two metrics of
-    /// one family have different types.
+    /// Returns an error, and writes nothing, if an event cannot be encoded, if two metrics of
+    /// one family have different types, or if a metric is named like a series of a histogram or
+    /// summary (such as `latency_count` next to the histogram `latency`).
     pub fn encode_batch(
         &self,
         events: impl IntoIterator<Item = Event>,
@@ -91,6 +92,22 @@ impl PrometheusTextSerializer {
                 None => {
                     families.insert(name, (kind, BTreeMap::from([(labels, series)])));
                 }
+            }
+        }
+
+        // The `_bucket`, `_sum` and `_count` series of a histogram or summary belong to its family.
+        for (name, (kind, _)) in &families {
+            let suffixes: &[&str] = match *kind {
+                "histogram" => &["_bucket", "_sum", "_count"],
+                "summary" => &["_sum", "_count"],
+                _ => &[],
+            };
+            if let Some(other) = suffixes
+                .iter()
+                .map(|suffix| format!("{name}{suffix}"))
+                .find(|other| families.contains_key(other))
+            {
+                return Err(format!("metric `{other}` is a series of the {kind} `{name}`").into());
             }
         }
 
@@ -214,8 +231,8 @@ fn encode_metric(metric: &Metric) -> Result<(String, &'static str, String), vect
     Ok((name, kind, out))
 }
 
-/// Rejects a metric name or tag name that is not a valid Prometheus name, and a tag that would
-/// duplicate a label the codec adds.
+/// Rejects a metric name or tag name that is not a valid Prometheus name, and a tag that is
+/// reserved or would duplicate a label the codec adds.
 fn validate_names(name: &str, metric: &Metric) -> Result<(), vector_common::Error> {
     if !is_valid_name(name, true) {
         return Err(format!("`{name}` is not a valid Prometheus metric name").into());
@@ -232,13 +249,15 @@ fn validate_names(name: &str, metric: &Metric) -> Result<(), vector_common::Erro
         )
         .into());
     }
-    let reserved = match metric.value() {
-        MetricValue::AggregatedHistogram { .. } => Some("le"),
-        MetricValue::AggregatedSummary { .. } => Some("quantile"),
-        _ => None,
+    // `__name__` holds the metric name in Prometheus.
+    let reserved: &[&str] = match metric.value() {
+        MetricValue::AggregatedHistogram { .. } => &["__name__", "le"],
+        MetricValue::AggregatedSummary { .. } => &["__name__", "quantile"],
+        _ => &["__name__"],
     };
     if let Some(label) = reserved
-        && tags.is_some_and(|tags| tags.iter_single().any(|(key, _)| key == label))
+        .iter()
+        .find(|label| tags.is_some_and(|tags| tags.iter_single().any(|(key, _)| key == **label)))
     {
         return Err(format!("metric `{name}` has the reserved tag `{label}`").into());
     }
@@ -612,6 +631,63 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_batch_with_a_metric_named_like_a_series_of_another_family() {
+        let histogram = || {
+            absolute(
+                "latency",
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![],
+                    count: 1,
+                    sum: None,
+                },
+            )
+            .with_tags(Some(metric_tags!("host" => "a")))
+        };
+        let summary = absolute(
+            "duration",
+            MetricValue::AggregatedSummary {
+                quantiles: vec![],
+                count: 1,
+                sum: 1.0,
+            },
+        );
+        let gauge = |name: &str, host: &str| {
+            absolute(name, MetricValue::Gauge { value: 42.0 })
+                .with_tags(Some(metric_tags!("host" => host)))
+        };
+        for events in [
+            [histogram(), gauge("latency_count", "a")],
+            [gauge("latency_count", "a"), histogram()],
+            // A histogram without a sum still owns the `_sum` name, and labels do not matter.
+            [histogram(), gauge("latency_sum", "b")],
+            [histogram(), gauge("latency_bucket", "a")],
+            [summary.clone(), gauge("duration_count", "a")],
+        ] {
+            let mut buffer = BytesMut::new();
+            let error = PrometheusTextSerializerConfig
+                .build()
+                .encode_batch(events.map(Event::Metric), &mut buffer)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("is a series of the"), "{error}");
+            assert!(buffer.is_empty());
+        }
+
+        // Other suffixes, and a summary's `_bucket`, are separate families.
+        let events = [
+            histogram(),
+            gauge("latency_total", "a"),
+            summary,
+            gauge("duration_bucket", "a"),
+        ];
+        let mut buffer = BytesMut::new();
+        PrometheusTextSerializerConfig
+            .build()
+            .encode_batch(events.map(Event::Metric), &mut buffer)
+            .unwrap();
+    }
+
+    #[test]
     fn rejects_names_that_are_not_prometheus_identifiers() {
         let gauge = || absolute("up", MetricValue::Gauge { value: 1.0 });
         for metric in [
@@ -658,6 +734,31 @@ mod tests {
         for metric in [histogram, summary] {
             let error = encode(metric).unwrap_err().to_string();
             assert!(error.contains("reserved"), "{error}");
+        }
+    }
+
+    #[test]
+    fn rejects_the_reserved_name_tag_for_every_type() {
+        for value in [
+            MetricValue::Counter { value: 1.0 },
+            MetricValue::Gauge { value: 1.0 },
+            MetricValue::Set {
+                values: ["a".to_string()].into(),
+            },
+            MetricValue::AggregatedHistogram {
+                buckets: vec![],
+                count: 0,
+                sum: None,
+            },
+            MetricValue::AggregatedSummary {
+                quantiles: vec![],
+                count: 0,
+                sum: 0.0,
+            },
+        ] {
+            let metric = absolute("up", value).with_tags(Some(metric_tags!("__name__" => "other")));
+            let error = encode(metric).unwrap_err().to_string();
+            assert!(error.contains("reserved tag `__name__`"), "{error}");
         }
     }
 

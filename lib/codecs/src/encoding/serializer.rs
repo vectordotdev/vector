@@ -123,7 +123,8 @@ pub enum SerializerConfig {
     /// be encoded; any other metric (such as an incremental metric, a distribution or a
     /// sketch) is rejected. Use the `incremental_to_absolute` transform to turn incremental
     /// metrics into absolute ones. Metrics whose name or tag names are not valid Prometheus
-    /// names, histograms with an `le` tag and summaries with a `quantile` tag are rejected too.
+    /// names, metrics with a `__name__` tag, histograms with an `le` tag and summaries with a
+    /// `quantile` tag are rejected too.
     ///
     /// [prometheus_text]: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
     PrometheusText,
