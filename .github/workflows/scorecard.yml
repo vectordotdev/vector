@@ -15,7 +15,8 @@ on:
     branches: ["master"]
 
 # Declare default permissions as read only.
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:
@@ -23,12 +24,12 @@ jobs:
     if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
       # Needed to publish results and get a badge (see publish_results below).
       id-token: write
       # Uncomment the permissions below if installing in a private repository.
-      # contents: read
       # actions: read
 
     steps:
