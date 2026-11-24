@@ -249,7 +249,7 @@ pub struct HumioMetricsSink {
 #[async_trait]
 impl StreamSink<EventArray, SinkError> for HumioMetricsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), SinkError> {
-        let mut transform = self.transform;
+        let transform = self.transform;
         self.inner
             .run(input.map(move |events| {
                 let mut buf = OutputBuffer::with_capacity(events.len());

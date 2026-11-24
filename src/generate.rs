@@ -166,7 +166,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(source_type.clone()));
+                .insert("type".to_string(), Value::String(source_type));
 
             sources.insert(name, example);
         }
@@ -221,7 +221,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(transform_type.clone()));
+                .insert("type".to_string(), Value::String(transform_type));
 
             transforms.insert(
                 name,
@@ -267,7 +267,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(sink_type.clone()));
+                .insert("type".to_string(), Value::String(sink_type));
 
             sinks.insert(
                 name,

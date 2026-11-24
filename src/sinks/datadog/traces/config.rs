@@ -188,7 +188,7 @@ impl DatadogTracesConfig {
         // Send the APM stats payloads independently of the sink framework.
         // This is necessary to comply with what the APM stats backend of Datadog expects with
         // respect to receiving stats payloads.
-        crate::spawn_in_current_span(flush_apm_stats_thread(
+        vector_lib::cpu_time::spawn_timed(flush_apm_stats_thread(
             tripwire,
             client,
             compression,
