@@ -2623,7 +2623,7 @@ mod test {
         let whole = OwnedTargetPath::event(owned_value_path!("distribution"));
 
         // Only the indexed reads: only the samples are prepared.
-        let target = metric_target_with_queries(big_distribution(), &indexed);
+        let target = metric_target_with_queries(distribution_with_samples(), &indexed);
         let cached = cached_field(&target, "distribution").unwrap();
         assert_eq!(
             cached.get(&owned_value_path!("statistic")),
@@ -2639,12 +2639,12 @@ mod test {
         );
 
         // Mixed with a read of the whole value, in either order.
-        let full = metric_value_to_vrl_value(&big_distribution());
+        let full = metric_value_to_vrl_value(&distribution_with_samples());
         for queries in [
             vec![indexed[0].clone(), indexed[1].clone(), whole.clone()],
             vec![whole, indexed[0].clone(), indexed[1].clone()],
         ] {
-            let target = metric_target_with_queries(big_distribution(), &queries);
+            let target = metric_target_with_queries(distribution_with_samples(), &queries);
             assert_eq!(cached_field(&target, "distribution"), Some(full.clone()));
         }
     }
@@ -2730,35 +2730,6 @@ mod test {
     }
 
     #[test]
-    fn metric_value_read_root_includes_value() {
-        let target = metric_target_with_queries(
-            MetricValue::Counter { value: 1.0 },
-            &[OwnedTargetPath::event_root()],
-        );
-        let root = target
-            .target_get(&OwnedTargetPath::event_root())
-            .unwrap()
-            .cloned()
-            .unwrap();
-        assert_eq!(
-            root.get(&owned_value_path!("counter")).cloned(),
-            Some(Value::from(objectmap! { "value" => 1.0 }))
-        );
-    }
-
-    #[test]
-    fn metric_value_not_computed_unless_read() {
-        let target = metric_target_with_queries(
-            MetricValue::Counter { value: 1.0 },
-            &[OwnedTargetPath::event(owned_value_path!("name"))],
-        );
-        let VrlTarget::Metric { value, .. } = &target else {
-            panic!("must be a metric");
-        };
-        assert_eq!(value.get(&owned_value_path!("counter")), None);
-    }
-
-    #[test]
     fn metric_value_not_computed_for_other_types() {
         // `exists(.gauge)` on a large distribution shouldn't convert every sample.
         let target = metric_target_with_queries(
@@ -2811,7 +2782,7 @@ mod test {
             .cloned()
     }
 
-    fn big_distribution() -> MetricValue {
+    fn distribution_with_samples() -> MetricValue {
         MetricValue::Distribution {
             samples: crate::samples![1.0 => 1, 2.0 => 1, 3.0 => 1],
             statistic: StatisticKind::Histogram,
@@ -2858,19 +2829,10 @@ mod test {
             r#"get!(.tags, ["region"])"#,
             r#"tags = .tags; get!(tags, ["region"])"#,
         ] {
-            let (target, result) = run_metric_program(big_distribution(), source);
+            let (target, result) = run_metric_program(distribution_with_samples(), source);
             assert_eq!(result, Value::from("eu"), "{source}");
             assert_eq!(cached_field(&target, "distribution"), None, "{source}");
         }
-    }
-
-    #[test]
-    fn metric_value_runtime_missing_array_skips_value() {
-        // A distribution has no `buckets`, so nothing needs to be converted.
-        let (target, result) =
-            run_metric_program(big_distribution(), "exists(.distribution.buckets)");
-        assert_eq!(result, Value::from(false));
-        assert_eq!(cached_field(&target, "distribution"), None);
     }
 
     #[test]
@@ -2878,7 +2840,7 @@ mod test {
         // Unnesting a local copy of the tags reads only the tags, so the rows don't carry the
         // samples.
         let (target, result) = run_metric_program_with_tags(
-            big_distribution(),
+            distribution_with_samples(),
             metric_tags!("region" => "eu", "region" => "us"),
             MetricTagMode::Full,
             r#"tag_view = {"tags": .tags}; unnest!(tag_view.tags.region)"#,
@@ -2908,7 +2870,7 @@ mod test {
         );
 
         let (_, result) = run_metric_program(
-            big_distribution(),
+            distribution_with_samples(),
             "rows = unnest!(.distribution.samples); [rows[0].name, rows[0].type, rows[0].distribution.samples.value]",
         );
         assert_eq!(
@@ -2924,12 +2886,13 @@ mod test {
     #[test]
     fn metric_value_runtime_reads_only_what_the_program_reads() {
         // Only a metadata field: the samples aren't converted.
-        let (target, result) = run_metric_program(big_distribution(), r#".name == "m""#);
+        let (target, result) = run_metric_program(distribution_with_samples(), r#".name == "m""#);
         assert_eq!(result, Value::from(true));
         assert_eq!(cached_field(&target, "distribution"), None);
 
         // A metadata path with the same name as a value field.
-        let (target, result) = run_metric_program(big_distribution(), "exists(%distribution)");
+        let (target, result) =
+            run_metric_program(distribution_with_samples(), "exists(%distribution)");
         assert_eq!(result, Value::from(false));
         assert_eq!(cached_field(&target, "distribution"), None);
 
@@ -2950,7 +2913,7 @@ mod test {
 
         // A field that the type doesn't have: nothing is converted.
         let (target, result) =
-            run_metric_program(big_distribution(), "exists(.distribution.count)");
+            run_metric_program(distribution_with_samples(), "exists(.distribution.buckets)");
         assert_eq!(result, Value::from(false));
         assert_eq!(cached_field(&target, "distribution"), None);
 
@@ -2968,7 +2931,7 @@ mod test {
 
         // Reading `.` includes the value.
         let (_, result) = run_metric_program(
-            big_distribution(),
+            distribution_with_samples(),
             r#"contains(encode_json(.), "\"samples\"")"#,
         );
         assert_eq!(result, Value::from(true));
@@ -2982,7 +2945,7 @@ mod test {
     #[test]
     fn metric_value_scalar_reads_skip_arrays() {
         let target = metric_target_with_queries(
-            big_distribution(),
+            distribution_with_samples(),
             &[OwnedTargetPath::event(owned_value_path!(
                 "distribution",
                 "statistic"
@@ -3015,7 +2978,7 @@ mod test {
 
         // Reading the samples as well converts them next to the statistic.
         let target = metric_target_with_queries(
-            big_distribution(),
+            distribution_with_samples(),
             &[
                 OwnedTargetPath::event(owned_value_path!("distribution", "statistic")),
                 OwnedTargetPath::event(owned_value_path!("distribution", "samples")),
