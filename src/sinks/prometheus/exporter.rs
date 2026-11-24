@@ -333,6 +333,8 @@ impl Hash for MetricRef {
         self.value.hash(state);
         if let Some(bounds) = &self.bounds {
             for bound in bounds {
+                // `-0.0 == 0.0`, so both must hash alike.
+                let bound = if *bound == 0.0 { 0.0 } else { *bound };
                 bound.to_bits().hash(state);
             }
         }
@@ -676,7 +678,7 @@ mod tests {
     use super::*;
     use crate::{
         config::ProxyConfig,
-        event::metric::{Metric, MetricValue},
+        event::metric::{Bucket, Metric, MetricValue, Quantile},
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{
@@ -1645,6 +1647,49 @@ mod tests {
             .get(&MetricRef::from_metric(&expected_gauge))
             .expect("gauge metric should exist");
         assert_eq!(actual_gauge.0.value(), expected_gauge.value());
+    }
+
+    #[test]
+    fn metric_ref_hashes_negative_zero_bound_like_zero() {
+        use std::hash::{BuildHasher, RandomState};
+
+        let histogram = |upper_limit: f64| {
+            MetricRef::from_metric(&Metric::new(
+                "histogram",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![Bucket {
+                        upper_limit,
+                        count: 1,
+                    }],
+                    count: 1,
+                    sum: Some(1.0),
+                },
+            ))
+        };
+        let summary = |quantile: f64| {
+            MetricRef::from_metric(&Metric::new(
+                "summary",
+                MetricKind::Absolute,
+                MetricValue::AggregatedSummary {
+                    quantiles: vec![Quantile {
+                        quantile,
+                        value: 1.0,
+                    }],
+                    count: 1,
+                    sum: 1.0,
+                },
+            ))
+        };
+
+        let hasher = RandomState::new();
+        for (zero, negative_zero) in [
+            (histogram(0.0), histogram(-0.0)),
+            (summary(0.0), summary(-0.0)),
+        ] {
+            assert_eq!(zero, negative_zero);
+            assert_eq!(hasher.hash_one(&zero), hasher.hash_one(&negative_zero));
+        }
     }
 
     #[test]
