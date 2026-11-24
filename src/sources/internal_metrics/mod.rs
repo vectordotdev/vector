@@ -1,21 +1,21 @@
 use std::time::Duration;
 use vector_lib::internal_event::{emit, register};
 
-use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
-use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle, Protocol},
     lookup::lookup_v2::OptionalValuePath,
+    source_sender::SendResult,
 };
 
 use crate::{
     SourceSender,
     config::{SourceConfig, SourceContext, SourceOutput, log_schema},
+    event::Metric,
     internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -145,25 +145,33 @@ impl SourceConfig for InternalMetricsConfig {
         // Scrape now so that a source built after Vector has already been running does not report
         // the whole accumulated registry as one enormous first increment. Also covers reloads,
         // which rebuild sources.
-        let deltas = self.emit_incremental.then(|| {
+        let mut deltas = self.emit_incremental.then(|| {
             let mut deltas = DeltaState::default();
             deltas.seed(controller.capture_metrics());
             deltas
         });
 
-        Ok(crate::sources::source_with_error(
-            InternalMetrics {
-                namespace,
-                host_key,
-                pid_key,
-                controller,
-                deltas,
-                interval,
-                out: cx.out,
-                shutdown: cx.shutdown,
+        let capture = move |_| {
+            let mut metrics = controller.capture_metrics();
+            if let Some(deltas) = &mut deltas {
+                deltas.convert(&mut metrics);
             }
-            .run(),
-        ))
+            metrics
+        };
+        let options = MetricCaptureOptions {
+            interval,
+            // Captured metrics are already in the "vector" namespace.
+            namespace: (namespace != "vector").then_some(namespace),
+            host_key,
+            pid_key,
+            capture_on_shutdown: false,
+        };
+        Ok(crate::sources::source_with_error(run_metric_capture(
+            capture,
+            options,
+            cx.out,
+            cx.shutdown,
+        )))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -175,65 +183,112 @@ impl SourceConfig for InternalMetricsConfig {
     }
 }
 
-struct InternalMetrics<'a> {
-    namespace: String,
-    host_key: OptionalValuePath,
-    pid_key: Option<String>,
-    controller: &'a Controller,
-    deltas: Option<DeltaState>,
-    interval: time::Duration,
-    out: SourceSender,
-    shutdown: ShutdownSignal,
+/// Why [`run_metric_capture`] is capturing metrics.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CaptureTrigger {
+    /// The capture interval elapsed.
+    Interval,
+    /// The source is shutting down. Only with [`MetricCaptureOptions::capture_on_shutdown`].
+    Shutdown,
 }
 
-impl InternalMetrics<'_> {
-    async fn run(mut self) -> vector_lib::source_sender::SendResult {
-        let events_received = register(EventsReceived);
-        let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
-        let mut interval =
-            IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
-        while interval.next().await.is_some() {
-            let hostname = crate::get_hostname();
-            let pid = std::process::id().to_string();
+/// How [`run_metric_capture`] captures and tags metrics.
+#[derive(Clone, Debug)]
+pub struct MetricCaptureOptions {
+    /// The interval between captures. The first capture happens immediately.
+    pub interval: Duration,
+    /// Overrides the namespace of every captured metric, if set.
+    pub namespace: Option<String>,
+    /// The tag to add the host name under, if any.
+    pub host_key: OptionalValuePath,
+    /// The tag to add the process ID under, if any.
+    pub pid_key: Option<String>,
+    /// Captures once more when the source shuts down, and sends those metrics before the source
+    /// finishes.
+    pub capture_on_shutdown: bool,
+}
 
-            let mut metrics = self.controller.capture_metrics();
-            if let Some(deltas) = &mut self.deltas {
-                deltas.convert(&mut metrics);
-            }
-
-            let count = metrics.len();
-            let byte_size = metrics.size_of();
-            let json_size = metrics.estimated_json_encoded_size_of();
-
-            bytes_received.emit(ByteSize(byte_size));
-            events_received.emit(CountByteSize(count, json_size));
-
-            let batch = metrics.into_iter().map(|mut metric| {
-                // A metric starts out with a default "vector" namespace, but will be overridden
-                // if an explicit namespace is provided to this source.
-                if self.namespace != "vector" {
-                    metric = metric.with_namespace(Some(self.namespace.clone()));
-                }
-
-                if let Some(host_key) = &self.host_key.path
-                    && let Ok(hostname) = &hostname
-                {
-                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                }
-                if let Some(pid_key) = &self.pid_key {
-                    metric.replace_tag(pid_key.to_owned(), pid.clone());
-                }
-                metric
-            });
-
-            if let Err(error) = self.out.send_batch(batch).await {
-                emit(StreamClosedError { count });
-                return Err(error);
+/// Captures metrics with `capture` every [`MetricCaptureOptions::interval`] and sends them, tagged
+/// the way the `internal_metrics` source tags its metrics, until `shutdown`.
+///
+/// Sources that expose metrics from a store other than Vector's metrics registry can reuse this.
+///
+/// # Errors
+///
+/// Returns an error if the source's output is closed while sending captured metrics.
+pub async fn run_metric_capture(
+    mut capture: impl FnMut(CaptureTrigger) -> Vec<Metric>,
+    options: MetricCaptureOptions,
+    mut out: SourceSender,
+    mut shutdown: ShutdownSignal,
+) -> SendResult {
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::INTERNAL));
+    let mut interval = time::interval(options.interval);
+    // Holding the token keeps the topology from considering the source done before the final
+    // capture is sent.
+    let shutdown_token = loop {
+        tokio::select! {
+            biased;
+            token = &mut shutdown => break token,
+            _ = interval.tick() => {
+                let metrics = capture(CaptureTrigger::Interval);
+                send(metrics, &options, &mut out, &events_received, &bytes_received).await?;
             }
         }
-
-        Ok(())
+    };
+    if options.capture_on_shutdown {
+        let metrics = capture(CaptureTrigger::Shutdown);
+        send(
+            metrics,
+            &options,
+            &mut out,
+            &events_received,
+            &bytes_received,
+        )
+        .await?;
     }
+    drop(shutdown_token);
+    Ok(())
+}
+
+async fn send(
+    metrics: Vec<Metric>,
+    options: &MetricCaptureOptions,
+    out: &mut SourceSender,
+    events_received: &impl InternalEventHandle<Data = CountByteSize>,
+    bytes_received: &impl InternalEventHandle<Data = ByteSize>,
+) -> SendResult {
+    let hostname = crate::get_hostname();
+    let pid = std::process::id().to_string();
+
+    let count = metrics.len();
+    let byte_size = metrics.size_of();
+    let json_size = metrics.estimated_json_encoded_size_of();
+
+    bytes_received.emit(ByteSize(byte_size));
+    events_received.emit(CountByteSize(count, json_size));
+
+    let batch = metrics.into_iter().map(|mut metric| {
+        if let Some(namespace) = &options.namespace {
+            metric = metric.with_namespace(Some(namespace.clone()));
+        }
+        if let Some(host_key) = &options.host_key.path
+            && let Ok(hostname) = &hostname
+        {
+            metric.replace_tag(host_key.to_string(), hostname.to_owned());
+        }
+        if let Some(pid_key) = &options.pid_key {
+            metric.replace_tag(pid_key.to_owned(), pid.clone());
+        }
+        metric
+    });
+
+    if let Err(error) = out.send_batch(batch).await {
+        emit(StreamClosedError { count });
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -532,5 +587,36 @@ mod tests {
         let event = event_from_config(config).await;
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
+    }
+
+    #[tokio::test]
+    async fn capture_on_shutdown_sends_one_last_capture() {
+        let (tx, rx) = SourceSender::new_test();
+        let (trigger, shutdown, _shutdown_done) = ShutdownSignal::new_wired();
+        let capture = |trigger: CaptureTrigger| {
+            vec![Metric::new(
+                format!("{trigger:?}"),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )]
+        };
+        let options = MetricCaptureOptions {
+            interval: time::Duration::from_secs(3600),
+            namespace: None,
+            host_key: OptionalValuePath::none(),
+            pid_key: None,
+            capture_on_shutdown: true,
+        };
+        let source = tokio::spawn(run_metric_capture(capture, options, tx, shutdown));
+
+        time::sleep(time::Duration::from_millis(100)).await;
+        trigger.cancel();
+        source.await.unwrap().unwrap();
+
+        let names: Vec<_> = collect_ready(rx)
+            .into_iter()
+            .map(|event| event.into_metric().name().to_string())
+            .collect();
+        assert_eq!(names, ["Interval", "Shutdown"]);
     }
 }
