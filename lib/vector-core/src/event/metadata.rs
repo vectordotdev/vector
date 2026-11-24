@@ -153,6 +153,10 @@ pub struct DatadogMetricOriginMetadata {
 }
 
 impl DatadogMetricOriginMetadata {
+    /// The `OriginService` of metrics about Vector itself, such as those from the
+    /// `internal_metrics` source.
+    pub const SERVICE_INTERNAL_METRICS: u32 = 212;
+
     /// Creates a new `DatadogMetricOriginMetadata`.
     /// When Vector sends out metrics containing the Origin metadata, it should do so with
     /// all of the fields defined.
