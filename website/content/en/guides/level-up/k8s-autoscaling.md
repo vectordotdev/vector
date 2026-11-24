@@ -155,23 +155,14 @@ producer and NGINX.
 {{< collapsible title="Setup commands" open="false" >}}
 
 ```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add vectordotdev https://helm.vector.dev
 helm repo update
 
 helm upgrade --install consumer manifests/consumer-chart \
   -n vector-perf --create-namespace --wait --timeout=3m
-
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  -n ingress-nginx --create-namespace \
-  --version 4.15.1 \
-  --set controller.service.type=ClusterIP \
-  --set controller.replicaCount=1 \
-  --wait --timeout=3m
 ```
 
 {{< /collapsible >}}
-
 
 ### Vector
 
@@ -185,11 +176,6 @@ Vector configuration within.
 ```bash
 helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
   -f values.yaml --set replicas=1 --set autoscaling.enabled=false --wait --timeout=3m
-
-helm upgrade --install vector-ingress manifests/ingress-chart \
-  -n vector-perf --wait --timeout=3m
-helm upgrade --install producer manifests/producer-chart \
-  -n vector-perf --wait --timeout=3m
 ```
 
 {{< /collapsible >}}
@@ -210,6 +196,28 @@ The producer is [lading](https://github.com/DataDog/lading), configured to
 generate `apache_common` log lines at 55 MiB/s across 100 parallel connections:
 
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir=true collapsed=true >}}
+
+{{< collapsible title="Setup commands" open="false" >}}
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --version 4.15.1 \
+  --set controller.service.type=ClusterIP \
+  --set controller.replicaCount=1 \
+  --wait --timeout=3m
+
+helm upgrade --install vector-ingress manifests/ingress-chart \
+  -n vector-perf --wait --timeout=3m
+
+helm upgrade --install producer manifests/producer-chart \
+  -n vector-perf --wait --timeout=3m
+```
+
+{{< /collapsible >}}
 
 ## Metric gathering and manual scaling
 
