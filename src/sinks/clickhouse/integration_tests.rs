@@ -110,6 +110,7 @@ async fn insert_metrics() {
         endpoint: host.parse().unwrap(),
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
+        accept_metrics: true,
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,

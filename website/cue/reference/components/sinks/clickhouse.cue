@@ -168,6 +168,9 @@ components: sinks: clickhouse: {
 		metrics: {
 			title: "Metrics"
 			body:  """
+				The sink accepts metric events only when `accept_metrics` is `true`. Otherwise it accepts logs
+				only, and metrics from an input that produces both logs and metrics are not sent to ClickHouse.
+
 				With the JSON formats, metric events are encoded as one JSON object per row, using
 				Vector's native metric shape. For example, a counter is sent as:
 
@@ -175,11 +178,20 @@ components: sinks: clickhouse: {
 				{"name":"requests_total","namespace":"app","tags":{"host":"a"},"timestamp":"2025-01-01T00:00:00Z","kind":"incremental","counter":{"value":2.0}}
 				```
 
-				Vector does not enforce a table schema for metrics, so create a table whose columns match the
-				fields you want to keep, and enable `skip_unknown_fields` to drop the rest. Enable
-				`date_time_best_effort` to parse the RFC 3339 `timestamp` into a `DateTime64` column.
+				With `JSONEachRow`, create a table whose columns match the metric fields you want to keep.
+				Enable `skip_unknown_fields` to drop fields without matching columns and `date_time_best_effort`
+				to parse the RFC 3339 `timestamp` into a `DateTime64` column.
 
-				Metrics are not supported when `batch_encoding` is set (`arrow_stream` format).
+				With `JSONAsObject` or `JSONAsString`, use a table with a single `JSON` or `String` column,
+				respectively. ClickHouse stores the entire metric object in that column.
+
+				Logs and metrics that target the same table share insert batches, so a row that ClickHouse
+				rejects fails the whole batch. Send metrics to their own table with a separate `clickhouse` sink.
+
+				The `encoding.only_fields`, `encoding.except_fields`, and `encoding.timestamp_format`
+				settings apply only to logs. Metric fields and timestamps use the native JSON representation shown above.
+
+				Metrics are not supported with the `arrow_stream` format.
 				"""
 		}
 	}

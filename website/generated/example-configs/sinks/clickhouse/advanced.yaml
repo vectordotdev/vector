@@ -3,6 +3,7 @@ sinks:
     type: clickhouse
     inputs:
       - my-source-or-transform-id
+    accept_metrics: false
     compression: gzip
     dangerously_allow_unconfined_template_resolution: false
     database: mydatabase
