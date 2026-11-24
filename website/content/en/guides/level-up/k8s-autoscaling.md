@@ -153,6 +153,7 @@ producer and NGINX.
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir=true collapsed=true >}}
 
 {{< collapsible title="Setup commands" open="false" >}}
+
 ```bash
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add vectordotdev https://helm.vector.dev
@@ -168,6 +169,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.replicaCount=1 \
   --wait --timeout=3m
 ```
+
 {{< /collapsible >}}
 
 
@@ -179,6 +181,7 @@ Vector configuration within.
 {{< code-file file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir=true >}}
 
 {{< collapsible title="Setup commands" open="false" >}}
+
 ```bash
 helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
   -f values.yaml --set replicas=1 --set autoscaling.enabled=false --wait --timeout=3m
@@ -188,6 +191,7 @@ helm upgrade --install vector-ingress manifests/ingress-chart \
 helm upgrade --install producer manifests/producer-chart \
   -n vector-perf --wait --timeout=3m
 ```
+
 {{< /collapsible >}}
 
 ### Producer and NGINX
@@ -285,6 +289,7 @@ target, leaving headroom without keeping all eight pods running.
 We'll do this by first scaling down back to one pod and then setting up HPA.
 
 {{< collapsible title="Scale down and HPA setup" open="false" >}}
+
 ```bash
 # Reset to 1 pod and keep autoscaling disabled until the scale-down completes.
 helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
@@ -300,6 +305,7 @@ helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0
   --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60 \
   --wait --timeout=3m
 ```
+
 {{< /collapsible >}}
 
 Based on the single-pod results, we can estimate how many pods we would need
