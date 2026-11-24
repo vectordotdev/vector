@@ -534,7 +534,8 @@ impl From<AgentDDSketch> for MetricValue {
     }
 }
 
-// Currently, VRL can only read the type of the value and doesn't consider any actual metric values.
+// Converts to the name of the metric's type, such as `aggregated histogram`, which VRL reads at
+// `.type`. VRL reads the value itself under the field for its type, such as `.aggregated_histogram`.
 impl From<MetricValue> for vrl::value::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
@@ -595,7 +596,8 @@ impl ByteSizeOf for MetricSketch {
     }
 }
 
-// Currently, VRL can only read the type of the value and doesn't consider ny actual metric values.
+// Converts to the name of the sketch's type, such as `agent dd sketch`. VRL reads the statistics
+// of a sketch under `.sketch`.
 impl From<MetricSketch> for vrl::value::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
