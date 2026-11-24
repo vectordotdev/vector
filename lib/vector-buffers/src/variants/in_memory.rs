@@ -52,3 +52,52 @@ where
         Ok((tx.into(), rx.into()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use tracing::Span;
+
+    use super::*;
+    use crate::{
+        buffer_usage_data::{BufferUsage, BufferUsageSnapshot},
+        test::SizedRecord,
+    };
+
+    async fn reported_limits(buffer: MemoryBuffer) -> BufferUsageSnapshot {
+        let mut buffer_usage = BufferUsage::from_span(Span::none());
+        let usage_handle = buffer_usage.add_stage(0);
+
+        <MemoryBuffer as IntoBuffer<SizedRecord>>::into_buffer_parts(
+            Box::new(buffer),
+            usage_handle.clone(),
+        )
+        .await
+        .unwrap();
+
+        usage_handle.snapshot()
+    }
+
+    #[tokio::test]
+    async fn event_based_limit_is_reported_in_the_events_slot() {
+        let snapshot = reported_limits(MemoryBuffer::with_max_events(
+            NonZeroUsize::new(500).unwrap(),
+        ))
+        .await;
+
+        assert_eq!(snapshot.max_size_events, 500);
+        assert_eq!(snapshot.max_size_bytes, 0);
+    }
+
+    #[tokio::test]
+    async fn byte_based_limit_is_reported_in_the_bytes_slot() {
+        let snapshot = reported_limits(MemoryBuffer::new(MemoryBufferSize::MaxSize(
+            NonZeroUsize::new(268_435_488).unwrap(),
+        )))
+        .await;
+
+        assert_eq!(snapshot.max_size_bytes, 268_435_488);
+        assert_eq!(snapshot.max_size_events, 0);
+    }
+}

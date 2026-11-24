@@ -47,7 +47,7 @@ fn exclusive_routes() {
         "#})
     .unwrap();
 
-    let mut transform = ExclusiveRoute::new(&config, &TransformContext::default()).unwrap();
+    let transform = ExclusiveRoute::new(&config, &TransformContext::default()).unwrap();
 
     let (output_names, mut outputs) = get_outputs_buf();
     for service in ["a", "b", "c"] {
