@@ -184,8 +184,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
 
+      # Only the aws environment pulls from public.ecr.aws.
       - name: Login to ECR Public
-        if: steps.run_condition.outputs.should_run == 'true'
+        if: steps.run_condition.outputs.should_run == 'true' && matrix.service == 'aws'
         uses: ./.github/actions/ecr-public-login
 
       - name: Integration Tests - ${{ matrix.service }}
