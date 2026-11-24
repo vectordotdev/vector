@@ -216,6 +216,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ inputs.ref || github.sha }}
 
+      - name: Login to ECR Public
+        if: steps.check.outputs.should_run == 'true'
+        uses: ./.github/actions/ecr-public-login
+
       - name: Run Integration Tests for ${{ matrix.service }}
         if: steps.check.outputs.should_run == 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
