@@ -47,7 +47,7 @@ type WebSocketSink = Pin<Box<dyn Sink<Message, Error = TungsteniteError> + Send>
 type WebSocketStream = Pin<Box<dyn Stream<Item = Result<Message, TungsteniteError>> + Send>>;
 
 const LAST_RECEIVED_MESSAGE_ID_FILE_NAME: &str = "last_received_message_id";
-const LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME: &str = "last_received";
+pub(crate) const LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME: &str = "last_received";
 
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,

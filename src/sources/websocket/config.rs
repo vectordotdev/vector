@@ -19,7 +19,7 @@ use crate::{
     common::websocket::{ConnectSnafu, WebSocketCommonConfig, WebSocketConnector},
     config::{SourceConfig, SourceContext},
     serde::{default_decoding, default_framing_message_based},
-    sources::Source,
+    sources::{Source, websocket::source::LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME},
     tls::MaybeTlsSettings,
 };
 
@@ -232,7 +232,7 @@ impl SourceConfig for WebSocketConfig {
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         if self.replay.is_some()
             && let Some(query) = uri.path_and_query().and_then(|pq| pq.query())
-            && form_urlencoded::parse(query.as_bytes())
+            && url::form_urlencoded::parse(query.as_bytes())
                 .any(|(name, _)| name == LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME)
         {
             return Err(format!(
