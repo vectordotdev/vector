@@ -256,6 +256,7 @@ pub struct ValidatedVector {
     request_settings: TowerRequestSettings,
     batch_settings: BatcherSettings,
     endpoints: Vec<HttpEndpoint>,
+    idle_connection_timeout: Duration,
 }
 
 #[async_trait::async_trait]
@@ -271,11 +272,13 @@ impl ValidatedSink for VectorConfig {
         let endpoints = self.validate_endpoint_options()?;
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
+        let idle_connection_timeout = self.validate_idle_connection_timeout()?;
 
         Ok(ValidatedVector {
             request_settings,
             batch_settings,
             endpoints,
+            idle_connection_timeout,
         })
     }
 
@@ -289,6 +292,7 @@ impl ValidatedSink for VectorConfig {
             request_settings,
             batch_settings,
             endpoints,
+            idle_connection_timeout,
         } = validated.clone();
         let uris = endpoints
             .into_iter()
@@ -299,12 +303,7 @@ impl ValidatedSink for VectorConfig {
             .as_ref()
             .map_or_else(EndpointStrategy::default, |routing| routing.strategy);
 
-        let client = new_client(
-            &tls,
-            cx.proxy(),
-            self.keepalive,
-            self.idle_connection_timeout_secs,
-        )?;
+        let client = new_client(&tls, cx.proxy(), self.keepalive, idle_connection_timeout)?;
 
         let healthcheck = healthchecks(client.clone(), &uris, &cx.healthcheck, endpoint_strategy);
 
@@ -752,6 +751,21 @@ impl VectorConfig {
                 .collect(),
         }
     }
+
+    /// Checks the idle connection timeout against `MAX_IDLE_CONNECTION_TIMEOUT_SECS`. The check
+    /// does not depend on the environment, so it belongs here, where `vector validate
+    /// --no-environment` reaches it, and not only in `build`.
+    fn validate_idle_connection_timeout(&self) -> crate::Result<Duration> {
+        let secs = self.idle_connection_timeout_secs.get();
+        if secs > MAX_IDLE_CONNECTION_TIMEOUT_SECS {
+            return Err(format!(
+                "`idle_connection_timeout_secs` must be at most \
+                 {MAX_IDLE_CONNECTION_TIMEOUT_SECS} seconds, got {secs}"
+            )
+            .into());
+        }
+        Ok(Duration::from_secs(secs))
+    }
 }
 
 /// Check to see if the remote service accepts new events.
@@ -859,16 +873,8 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
-    idle_connection_timeout_secs: NonZeroU64,
+    idle_connection_timeout: Duration,
 ) -> crate::Result<Http2Client<TonicBody>> {
-    if idle_connection_timeout_secs.get() > MAX_IDLE_CONNECTION_TIMEOUT_SECS {
-        return Err(format!(
-            "`idle_connection_timeout_secs` must be at most {MAX_IDLE_CONNECTION_TIMEOUT_SECS} seconds"
-        )
-        .into());
-    }
-    let idle_connection_timeout = Duration::from_secs(idle_connection_timeout_secs.get());
-
     let mut builder = Builder::new(CpuTimedExecutor);
     builder
         .http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE)
@@ -1577,28 +1583,45 @@ mod tests {
         assert_eq!(config.idle_connection_timeout_secs.get(), 350);
     }
 
-    #[test]
-    fn idle_connection_timeout_above_the_maximum_is_rejected() {
-        let result = new_client(
-            &MaybeTlsSettings::Raw(()),
-            &ProxyConfig::default(),
-            None,
-            NonZeroU64::new(MAX_IDLE_CONNECTION_TIMEOUT_SECS + 1).unwrap(),
-        );
-
-        assert!(result.is_err());
+    /// Parses a `vector` sink config with the given idle connection timeout.
+    fn config_with_idle_connection_timeout(secs: u64) -> VectorConfig {
+        toml::from_str(&format!(
+            "address = \"http://127.0.0.1:6000\"\nidle_connection_timeout_secs = {secs}"
+        ))
+        .expect("config should parse")
     }
 
     #[test]
-    fn idle_connection_timeout_at_the_maximum_is_accepted() {
-        let result = new_client(
-            &MaybeTlsSettings::Raw(()),
-            &ProxyConfig::default(),
-            None,
-            NonZeroU64::new(MAX_IDLE_CONNECTION_TIMEOUT_SECS).unwrap(),
-        );
+    fn validate_rejects_an_idle_connection_timeout_above_the_maximum() {
+        let config = config_with_idle_connection_timeout(MAX_IDLE_CONNECTION_TIMEOUT_SECS + 1);
 
-        assert!(result.is_ok());
+        let err = config.validate().unwrap_err().to_string();
+
+        assert!(
+            err.contains("idle_connection_timeout_secs"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_an_idle_connection_timeout_at_the_maximum() {
+        let config = config_with_idle_connection_timeout(MAX_IDLE_CONNECTION_TIMEOUT_SECS);
+
+        let validated = config.validate().expect("validation should succeed");
+
+        assert_eq!(
+            validated.idle_connection_timeout,
+            Duration::from_secs(MAX_IDLE_CONNECTION_TIMEOUT_SECS)
+        );
+    }
+
+    #[test]
+    fn validate_retains_the_configured_idle_connection_timeout() {
+        let config = config_with_idle_connection_timeout(350);
+
+        let validated = config.validate().expect("validation should succeed");
+
+        assert_eq!(validated.idle_connection_timeout, Duration::from_secs(350));
     }
 
     /// Sends two requests, with `gap` between them, to a server that counts the connections it
@@ -1629,7 +1652,7 @@ mod tests {
             &MaybeTlsSettings::Raw(()),
             &ProxyConfig::default(),
             None,
-            NonZeroU64::new(idle_timeout_secs).unwrap(),
+            Duration::from_secs(idle_timeout_secs),
         )
         .unwrap();
         let request = || {
