@@ -411,8 +411,8 @@ greptimedb-ingester = { version = "0.19.1", default-features = false, features =
 # External libs
 arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "60.1.0", default-features = false, features = ["ipc"], optional = true }
-parquet = { version = "60.1.0", default-features = false, features = [
+arrow = { version = "60.2.0", default-features = false, features = ["ipc"], optional = true }
+parquet = { version = "60.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
