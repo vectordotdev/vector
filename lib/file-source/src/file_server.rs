@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+    FileFingerprint, FileSourceInternalEvents, FingerprintOutcome, Fingerprinter, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -198,51 +198,27 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths() {
-                    if let Some(file_id) = self
+                    match self
                         .fingerprinter
-                        .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                        .fingerprint_or_emit_outcome(&path, &mut known_small_files, &self.emitter)
                         .await
                     {
-                        if let Some(watcher) = fp_map.get_mut(&file_id) {
-                            // file fingerprint matches a watched file
-                            let was_found_this_cycle = watcher.file_findable();
-                            watcher.set_file_findable(true);
-                            if watcher.path == path {
-                                trace!(
-                                    message = "Continue watching file.",
-                                    path = ?path,
-                                );
-                            } else if !was_found_this_cycle {
-                                // matches a file with a different path
-                                info!(
-                                    message = "Watched file has been renamed.",
-                                    path = ?path,
-                                    old_path = ?watcher.path
-                                );
-                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
-                                    // Inode changed - emit metrics for the old file
-                                    self.emitter.emit_file_unwatched(
-                                        &unwatch_info.path,
-                                        unwatch_info.reached_eof,
-                                        unwatch_info.bytes_unread,
+                        FingerprintOutcome::Found(file_id) => {
+                            if let Some(watcher) = fp_map.get_mut(&file_id) {
+                                // file fingerprint matches a watched file
+                                let was_found_this_cycle = watcher.file_findable();
+                                watcher.set_file_findable(true);
+                                if watcher.path == path {
+                                    trace!(
+                                        message = "Continue watching file.",
+                                        path = ?path,
                                     );
-                                }
-                            } else {
-                                info!(
-                                    message = "More than one file has the same fingerprint.",
-                                    path = ?path,
-                                    old_path = ?watcher.path
-                                );
-                                let (old_path, new_path) = (&watcher.path, &path);
-                                if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(old_path).await.and_then(|m| m.modified()),
-                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
-                                ) && old_modified_time < new_modified_time
-                                {
+                                } else if !was_found_this_cycle {
+                                    // matches a file with a different path
                                     info!(
-                                        message = "Switching to watch most recently modified file.",
-                                        new_modified_time = ?new_modified_time,
-                                        old_modified_time = ?old_modified_time,
+                                        message = "Watched file has been renamed.",
+                                        path = ?path,
+                                        old_path = ?watcher.path
                                     );
                                     if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
                                     {
@@ -253,14 +229,59 @@ where
                                             unwatch_info.bytes_unread,
                                         );
                                     }
+                                } else {
+                                    info!(
+                                        message = "More than one file has the same fingerprint.",
+                                        path = ?path,
+                                        old_path = ?watcher.path
+                                    );
+                                    let (old_path, new_path) = (&watcher.path, &path);
+                                    if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                        fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                        fs::metadata(new_path).await.and_then(|m| m.modified()),
+                                    ) && old_modified_time < new_modified_time
+                                    {
+                                        info!(
+                                            message = "Switching to watch most recently modified file.",
+                                            new_modified_time = ?new_modified_time,
+                                            old_modified_time = ?old_modified_time,
+                                        );
+                                        if let Ok(Some(unwatch_info)) =
+                                            watcher.update_path(path).await
+                                        {
+                                            // Inode changed - emit metrics for the old file
+                                            self.emitter.emit_file_unwatched(
+                                                &unwatch_info.path,
+                                                unwatch_info.reached_eof,
+                                                unwatch_info.bytes_unread,
+                                            );
+                                        }
+                                    }
+                                }
+                            } else {
+                                // untracked file fingerprint
+                                self.watch_new_file(
+                                    path,
+                                    file_id,
+                                    &mut fp_map,
+                                    &checkpoints,
+                                    false,
+                                )
+                                .await;
+                                self.emitter.emit_files_open(fp_map.len());
+                            }
+                        }
+                        FingerprintOutcome::TransientError => {
+                            // Keep any existing watcher at this path marked findable so a
+                            // transient EACCES/EIO does not prematurely flush a partial line
+                            // or reap the watcher as if the file were deleted.
+                            for watcher in fp_map.values_mut() {
+                                if watcher.path == path {
+                                    watcher.set_file_findable(true);
                                 }
                             }
-                        } else {
-                            // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
-                                .await;
-                            self.emitter.emit_files_open(fp_map.len());
                         }
+                        FingerprintOutcome::Skipped => {}
                     }
                 }
                 stats.record("discovery", start.elapsed());
@@ -629,4 +650,112 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::{io::Write as _, os::unix::fs::PermissionsExt as _, path::Path, time::Duration};
+
+    use bytes::{Bytes, BytesMut};
+    use file_source_common::{
+        Checkpointer, FileSourceInternalEvents, FingerprintStrategy, Fingerprinter, ReadFrom,
+    };
+    use futures::StreamExt as _;
+    use tempfile::tempdir;
+
+    use super::{FileServer, Line};
+    use crate::paths_provider::{Glob, MatchOptions};
+
+    #[derive(Clone, Default)]
+    struct NoopEmitter;
+
+    impl FileSourceInternalEvents for NoopEmitter {
+        fn emit_file_added(&self, _path: &Path) {}
+        fn emit_file_resumed(&self, _path: &Path, _file_position: u64) {}
+        fn emit_file_watch_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_unwatched(
+            &self,
+            _path: &Path,
+            _reached_eof: bool,
+            _bytes_unread: Option<u64>,
+        ) {
+        }
+        fn emit_file_deleted(&self, _path: &Path) {}
+        fn emit_file_delete_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_fingerprint_read_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_checksum_failed(&self, _path: &Path) {}
+        fn emit_file_checkpointed(&self, _count: usize, _duration: Duration) {}
+        fn emit_file_checkpoint_write_error(&self, _error: std::io::Error) {}
+        fn emit_files_open(&self, _count: usize) {}
+        fn emit_path_globbing_failed(&self, _path: &Path, _error: &std::io::Error) {}
+        fn emit_file_line_too_long(&self, _truncated: &BytesMut, _limit: usize, _size: usize) {}
+    }
+
+    #[tokio::test]
+    async fn transient_eacces_does_not_tear_partial_line() {
+        let dir = tempdir().unwrap();
+        let data_dir = tempdir().unwrap();
+        let path = dir.path().join("app.log");
+
+        let mut writer = std::fs::File::create(&path).unwrap();
+        writer.write_all(b"partial_without_newline").unwrap();
+        writer.flush().unwrap();
+
+        let pattern = dir.path().join("*.log");
+        let paths_provider =
+            Glob::new(&[pattern], &[], MatchOptions::default(), NoopEmitter).unwrap();
+        let server = FileServer {
+            paths_provider,
+            max_read_bytes: 2048,
+            ignore_checkpoints: false,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: data_dir.path().to_path_buf(),
+            glob_minimum_cooldown: Duration::from_millis(20),
+            fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 1024, false),
+            oldest_first: false,
+            remove_after: None,
+            emitter: NoopEmitter,
+            rotate_wait: Duration::from_secs(60),
+        };
+
+        let (tx, mut rx) = futures::channel::mpsc::channel::<Vec<Line>>(16);
+        let collector = tokio::spawn(async move {
+            let mut collected = Vec::new();
+            while let Some(batch) = rx.next().await {
+                for line in batch {
+                    collected.push(String::from_utf8(line.text.to_vec()).unwrap());
+                }
+            }
+            collected
+        });
+        let (sd_tx, sd_rx) = tokio::sync::oneshot::channel::<()>();
+        let (cp_tx, cp_rx) = tokio::sync::oneshot::channel::<()>();
+        let checkpointer = Checkpointer::new(data_dir.path());
+
+        let handle = tokio::spawn(server.run(tx, sd_rx, cp_rx, checkpointer));
+
+        // Let FileServer open the file and buffer the partial line.
+        tokio::time::sleep(Duration::from_millis(60)).await;
+
+        // Inject transient EACCES across multiple glob cycles.
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Restore permissions and finish the line.
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        writer.write_all(b"_completed\n").unwrap();
+        writer.flush().unwrap();
+        tokio::time::sleep(Duration::from_millis(350)).await;
+
+        sd_tx.send(()).unwrap();
+        cp_tx.send(()).unwrap();
+        handle.await.unwrap().unwrap();
+        let lines = collector.await.unwrap();
+
+        // Before the fix, transient EACCES flushed "partial_without_newline" as a torn line.
+        assert_eq!(lines, vec!["partial_without_newline_completed"]);
+    }
 }
