@@ -1698,6 +1698,8 @@ mod tests {
         accepted.load(Ordering::SeqCst)
     }
 
+    // In each case, the gap lies on the other side of Hyper's default pool idle timeout (90 s)
+    // from the configured timeout, so each case fails if the configured timeout is ignored.
     #[rstest]
     #[case::reused_within_the_timeout(300, 100, 1)]
     #[case::reopened_after_the_timeout(60, 75, 2)]
