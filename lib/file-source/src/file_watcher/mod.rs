@@ -18,7 +18,7 @@ use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
-    buffer::{ReadResult, read_until_with_max_size},
+    buffer::{LineBufferState, ReadResult, read_until_with_max_size_stateful},
 };
 use vector_common::compression::gzip_multiple_decoder;
 
@@ -151,7 +151,7 @@ pub struct FileWatcher {
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
-    buf: BytesMut,
+    line_state: LineBufferState,
 }
 
 impl FileWatcher {
@@ -267,7 +267,7 @@ impl FileWatcher {
             last_seen: ts,
             max_line_bytes,
             line_delimiter,
-            buf: BytesMut::new(),
+            line_state: LineBufferState::new(),
         })
     }
 
@@ -374,12 +374,12 @@ impl FileWatcher {
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
-        let initial_position = *file_position;
-        match read_until_with_max_size(
+        let fallback_position = *file_position;
+        match read_until_with_max_size_stateful(
             reader,
             file_position,
             self.line_delimiter.as_ref(),
-            &mut self.buf,
+            &mut self.line_state,
             self.max_line_bytes,
         )
         .await
@@ -389,11 +389,9 @@ impl FileWatcher {
                 discarded_for_size_and_truncated,
             }) => {
                 self.track_read_success();
+                let (offset, bytes) = self.line_state.take_line(fallback_position);
                 Ok(RawLineResult {
-                    raw_line: Some(RawLine {
-                        offset: initial_position,
-                        bytes: self.buf.split().freeze(),
-                    }),
+                    raw_line: Some(RawLine { offset, bytes }),
                     discarded_for_size_and_truncated,
                 })
             }
@@ -412,7 +410,7 @@ impl FileWatcher {
                     // File has been deleted, so return what we have in the buffer, even though it
                     // didn't end with a newline. This is not a perfect signal for when we should
                     // give up waiting for a newline, but it's decent.
-                    let buf = self.buf.split().freeze();
+                    let (offset, buf) = self.line_state.take_remainder(fallback_position);
                     if buf.is_empty() {
                         // EOF
                         self.reached_eof = true;
@@ -422,10 +420,7 @@ impl FileWatcher {
                         })
                     } else {
                         Ok(RawLineResult {
-                            raw_line: Some(RawLine {
-                                offset: initial_position,
-                                bytes: buf,
-                            }),
+                            raw_line: Some(RawLine { offset, bytes: buf }),
                             discarded_for_size_and_truncated,
                         })
                     }

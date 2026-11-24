@@ -10,29 +10,253 @@ pub struct ReadResult {
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
+/// Persistent line-reading state across `read_until_with_max_size_stateful` calls,
+/// preserving partial multi-byte delimiters, oversized-line discard state, and the
+/// true starting byte offset of an in-progress line across EOF boundaries.
+#[derive(Debug, Default)]
+pub struct LineBufferState {
+    pub buf: BytesMut,
+    partial_delim: BytesMut,
+    discarding: bool,
+    line_start_offset: Option<FilePosition>,
+}
+
+impl LineBufferState {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns true if no buffered line bytes or partial delimiter bytes are held.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty() && self.partial_delim.is_empty()
+    }
+
+    /// Takes the completed line bytes and its starting byte offset, resetting per-line state.
+    pub fn take_line(&mut self, fallback_offset: FilePosition) -> (FilePosition, bytes::Bytes) {
+        let offset = self.line_start_offset.take().unwrap_or(fallback_offset);
+        (offset, self.buf.split().freeze())
+    }
+
+    /// Flushes any remaining partial line bytes (including an incomplete trailing
+    /// delimiter) when a file has been deleted/closed, resetting all line state.
+    pub fn take_remainder(
+        &mut self,
+        fallback_offset: FilePosition,
+    ) -> (FilePosition, bytes::Bytes) {
+        let offset = self.line_start_offset.take().unwrap_or(fallback_offset);
+        if self.discarding {
+            self.discarding = false;
+            self.buf.clear();
+            self.partial_delim.clear();
+            return (offset, bytes::Bytes::new());
+        }
+        if !self.partial_delim.is_empty() {
+            self.buf.extend_from_slice(&self.partial_delim);
+            self.partial_delim.clear();
+        }
+        (offset, self.buf.split().freeze())
+    }
+}
+
+fn longest_delim_prefix_suffix(slice: &[u8], delim: &[u8]) -> usize {
+    let max_prefix = delim.len().saturating_sub(1).min(slice.len());
+    for prefix_len in (1..=max_prefix).rev() {
+        if slice.ends_with(&delim[..prefix_len]) {
+            return prefix_len;
+        }
+    }
+    0
+}
+
+fn check_max_size(state: &mut LineBufferState, max_size: usize, discarded: &mut Vec<BytesMut>) {
+    if !state.discarding && state.buf.len() > max_size {
+        // keep only the first <1k bytes to make sure we can actually emit a usable error
+        let length_to_keep = min(1000, max_size);
+        let mut truncated: BytesMut = BytesMut::zeroed(length_to_keep);
+        truncated.copy_from_slice(&state.buf[0..length_to_keep]);
+        discarded.push(truncated);
+        state.discarding = true;
+    }
+}
+
+enum PartialDelimStep {
+    /// Completed a delimiter spanning the boundary, consuming `usize` bytes from `available`.
+    Matched(usize),
+    /// Consumed the entire `available` slice (`< delim.len() - 1`) without completing `delim`.
+    ConsumedAll(usize),
+    /// No delimiter started in `partial_delim`; `partial_delim` was flushed to `state.buf`
+    /// and caller should scan `available` normally.
+    Flushed,
+}
+
+fn resolve_partial_delim(
+    available: &[u8],
+    delim: &[u8],
+    delim_finder: &Finder<'_>,
+    state: &mut LineBufferState,
+    max_size: usize,
+    discarded: &mut Vec<BytesMut>,
+) -> PartialDelimStep {
+    let delim_len = delim.len();
+    let p_len = state.partial_delim.len();
+    let take = available.len().min(delim_len.saturating_sub(1));
+    let mut bridge = Vec::with_capacity(p_len + take);
+    bridge.extend_from_slice(&state.partial_delim);
+    bridge.extend_from_slice(&available[..take]);
+
+    if let Some(start) = delim_finder.find(&bridge) {
+        if !state.discarding && start > 0 {
+            state.buf.extend_from_slice(&state.partial_delim[..start]);
+            check_max_size(state, max_size, discarded);
+        }
+        let consume_from_avail = start + delim_len - p_len;
+        state.partial_delim.clear();
+        return PartialDelimStep::Matched(consume_from_avail);
+    }
+
+    if available.len() < delim_len.saturating_sub(1) {
+        let keep = longest_delim_prefix_suffix(&bridge, delim);
+        let flush_len = bridge.len() - keep;
+        if !state.discarding && flush_len > 0 {
+            state.buf.extend_from_slice(&bridge[..flush_len]);
+            check_max_size(state, max_size, discarded);
+        }
+        state.partial_delim.clear();
+        state.partial_delim.extend_from_slice(&bridge[flush_len..]);
+        return PartialDelimStep::ConsumedAll(available.len());
+    }
+
+    if !state.discarding {
+        state.buf.extend_from_slice(&state.partial_delim);
+        check_max_size(state, max_size, discarded);
+    }
+    state.partial_delim.clear();
+    PartialDelimStep::Flushed
+}
+
+/// Stateful version of [`read_until_with_max_size`] that preserves `partial_delim`,
+/// `discarding`, and `line_start_offset` across EOF boundaries.
+///
+/// # Errors
+/// Returns an error if reading from `reader` fails, except interrupted reads,
+/// which are retried.
+pub async fn read_until_with_max_size_stateful<'a, R: AsyncBufRead + ?Sized + Unpin>(
+    reader: &'a mut R,
+    position: &'a mut FilePosition,
+    delim: &'a [u8],
+    state: &'a mut LineBufferState,
+    max_size: usize,
+) -> io::Result<ReadResult> {
+    let mut total_read = 0;
+    let delim_finder = Finder::new(delim);
+    let delim_len = delim.len();
+    let mut discarded_for_size_and_truncated = Vec::new();
+
+    loop {
+        let available: &[u8] = match reader.fill_buf().await {
+            Ok(n) => n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+
+        if available.is_empty() {
+            return Ok(ReadResult {
+                successfully_read: None,
+                discarded_for_size_and_truncated,
+            });
+        }
+
+        if state.line_start_offset.is_none() {
+            state.line_start_offset = Some(*position);
+        }
+
+        if !state.partial_delim.is_empty() {
+            match resolve_partial_delim(
+                available,
+                delim,
+                &delim_finder,
+                state,
+                max_size,
+                &mut discarded_for_size_and_truncated,
+            ) {
+                PartialDelimStep::Matched(used) => {
+                    reader.consume(used);
+                    *position += used as u64;
+                    total_read += used;
+                    if state.discarding {
+                        state.discarding = false;
+                        state.buf.clear();
+                        state.line_start_offset = None;
+                        continue;
+                    }
+                    return Ok(ReadResult {
+                        successfully_read: Some(total_read),
+                        discarded_for_size_and_truncated,
+                    });
+                }
+                PartialDelimStep::ConsumedAll(used) => {
+                    reader.consume(used);
+                    *position += used as u64;
+                    total_read += used;
+                    continue;
+                }
+                PartialDelimStep::Flushed => {}
+            }
+        }
+
+        let (done, used) = if let Some(i) = delim_finder.find(available) {
+            if !state.discarding {
+                state.buf.extend_from_slice(&available[..i]);
+            }
+            (true, i + delim_len)
+        } else {
+            let partial_match_len = if delim_len > 1 {
+                longest_delim_prefix_suffix(available, delim)
+            } else {
+                0
+            };
+            let bytes_to_copy = available.len() - partial_match_len;
+            if !state.discarding && bytes_to_copy > 0 {
+                state.buf.extend_from_slice(&available[..bytes_to_copy]);
+            }
+            if partial_match_len > 0 {
+                state.partial_delim.clear();
+                state
+                    .partial_delim
+                    .extend_from_slice(&available[bytes_to_copy..]);
+            }
+            (false, available.len())
+        };
+
+        reader.consume(used);
+        *position += used as u64;
+        total_read += used;
+
+        check_max_size(state, max_size, &mut discarded_for_size_and_truncated);
+
+        if done {
+            if state.discarding {
+                state.discarding = false;
+                state.buf.clear();
+                state.line_start_offset = None;
+            } else {
+                return Ok(ReadResult {
+                    successfully_read: Some(total_read),
+                    discarded_for_size_and_truncated,
+                });
+            }
+        }
+    }
+}
+
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
 /// The function reads up to `max_size` bytes from `reader`, splitting the input
 /// by `delim`. If a `delim` is not found in `reader` before `max_size` bytes
 /// are read then the reader is polled until `delim` is found and the results
 /// are discarded. Else, the result is written into `buf`.
-///
-/// The return is unusual. In the Err case this function has not written into
-/// `buf` and the caller should not examine its contents. In the Ok case if the
-/// inner value is None the caller should retry the call as the buffering read
-/// hit the end of the buffer but did not find a `delim` yet, indicating that
-/// we've sheered a write or that there were no bytes available in the `reader`
-/// and the `reader` was very sure about it. If the inner value is Some the
-/// interior `usize` is the number of bytes written into `buf`.
-///
-/// Tweak of
-/// <https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471>.
-///
-/// # Performance
-///
-/// Benchmarks indicate that this function processes in the high single-digit
-/// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
-/// the overhead of setup dominates our benchmarks.
 ///
 /// # Errors
 ///
@@ -45,170 +269,19 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     buf: &'a mut BytesMut,
     max_size: usize,
 ) -> io::Result<ReadResult> {
-    let mut total_read = 0;
-    let mut discarding = false;
-    let delim_finder = Finder::new(delim);
-    let delim_len = delim.len();
-    let mut discarded_for_size_and_truncated = Vec::new();
-
-    // Used to track partial delimiter matches across buffer boundaries.
-    // Data is read in chunks from the reader (see `fill_buf` below).
-    // A multi-byte delimiter may be split across the "old" and "new" buffers.
-    // Any potential partial delimiter that was found in the "old" buffer is stored in this variable.
-    let mut partial_delim: BytesMut = BytesMut::with_capacity(delim_len);
-
-    loop {
-        // Read the next chunk of data
-        let available: &[u8] = match reader.fill_buf().await {
-            Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
-        };
-
-        // First, check if we have a partial delimiter from the previous iteration/buffer
-        if !partial_delim.is_empty() {
-            let expected_suffix = &delim[partial_delim.len()..];
-            let expected_suffix_len = expected_suffix.len();
-
-            // We already know that we have a partial delimiter match from the previous buffer.
-            // Here we check what part of the delimiter is missing and whether the new buffer
-            // contains the remaining part.
-            if available.len() >= expected_suffix_len
-                && &available[..expected_suffix_len] == expected_suffix
-            {
-                // Complete delimiter found! Consume the remainder of the delimiter so we can start
-                // processing data after the delimiter.
-                reader.consume(expected_suffix_len);
-                *position += expected_suffix_len as u64;
-                total_read += expected_suffix_len;
-                partial_delim.clear();
-
-                // Found a complete delimiter, return the current buffer so we can proceed with the
-                // next record after this delimiter in the next call.
-                return Ok(ReadResult {
-                    successfully_read: Some(total_read),
-                    discarded_for_size_and_truncated,
-                });
-            }
-            // Not a complete delimiter after all.
-            // Add partial_delim to output buffer as it is actual data.
-            if !discarding {
-                buf.extend_from_slice(&partial_delim);
-            }
-            partial_delim.clear();
-            // Continue processing current available buffer
-        }
-
-        let (done, used) = {
-            if let Some(i) = delim_finder.find(available) {
-                if !discarding {
-                    buf.extend_from_slice(&available[..i]);
-                }
-                (true, i + delim_len)
-            } else {
-                // No delimiter found in current buffer. But there could be a partial delimiter
-                // at the end of this buffer. For multi-byte delimiters like \r\n, we need
-                // to handle the case where the delimiter is split across buffer boundaries
-                // (e.g. \r in the "old" buffer, then we read new data and find \n in the new
-                // buffer).
-                let mut partial_match_len = 0;
-
-                // We only need to check if we're not already at the end of the buffer and if we
-                // have a delimiter that has more than one byte.
-                if !available.is_empty() && delim_len > 1 {
-                    // Check if the end of the current buffer matches a prefix of the delimiter
-                    // by testing from longest to shortest possible prefix.
-                    //
-                    // This loop runs at most (delim_len - 1) iterations:
-                    //   - 2-byte delimiter (\r\n): 1 iteration max
-                    //   - 5-byte delimiter: 4 iterations max
-                    //
-                    // This part of the code is only called if all of these are true:
-                    //
-                    // - We have a new buffer (e.g. every 8kB, i.e. only called once per buffer)
-                    // - We have a multi-byte delimiter
-                    // - This delimiter could not be found in the current buffer
-                    //
-                    // Even for longer delimiters the performance impact is negligible.
-                    //
-                    // Example 1:
-                    //   Delimiter: \r\n
-                    //   Iteration 1: It checks if the current buffer ends with "\r",
-                    //     if it does we have a potential partial delimiter.
-                    //   The next chunk will confirm whether this is truly part of a delimiter.
-
-                    // Example 2:
-                    //   Delimiter: ABCDE
-                    //   Iteration 1: It checks if the current buffer ends with "ABCD" (we don't
-                    //     need to check "ABCDE" because that would have been caught by
-                    //     `delim_finder.find` earlier)
-                    //   Iteration 2: It checks if the current buffer ends with "ABC"
-                    //   Iterations 3-4: Same for "AB" and "A"
-                    for prefix_len in (1..delim_len).rev() {
-                        if available.len() >= prefix_len
-                            && available.ends_with(&delim[..prefix_len])
-                        {
-                            partial_match_len = prefix_len;
-                            break;
-                        }
-                    }
-                }
-
-                let bytes_to_copy = available.len() - partial_match_len;
-
-                if !discarding && bytes_to_copy > 0 {
-                    buf.extend_from_slice(&available[..bytes_to_copy]);
-                }
-
-                // If we found a potential partial delimiter, save it for the next iteration
-                if partial_match_len > 0 {
-                    partial_delim.clear();
-                    partial_delim.extend_from_slice(&available[bytes_to_copy..]);
-                }
-
-                (false, available.len())
-            }
-        };
-
-        // Check if we're at EOF before we start processing
-        // (for borrow checker, has to come before `consume`)
-        let at_eof = available.is_empty();
-
-        reader.consume(used);
-        *position += used as u64; // do this at exactly same time
-        total_read += used;
-
-        if !discarding && buf.len() > max_size {
-            // keep only the first <1k bytes to make sure we can actually emit a usable error
-            let length_to_keep = min(1000, max_size);
-            let mut truncated: BytesMut = BytesMut::zeroed(length_to_keep);
-            truncated.copy_from_slice(&buf[0..length_to_keep]);
-            discarded_for_size_and_truncated.push(truncated);
-            discarding = true;
-        }
-
-        if done {
-            if discarding {
-                discarding = false;
-                buf.clear();
-            } else {
-                return Ok(ReadResult {
-                    successfully_read: Some(total_read),
-                    discarded_for_size_and_truncated,
-                });
-            }
-        } else if used == 0 && at_eof {
-            // We've hit EOF but haven't seen a delimiter. This can happen when:
-            // 1. The file ends without a trailing delimiter
-            // 2. We're observing an incomplete write
-            //
-            // Return None to signal the caller to retry later.
-            return Ok(ReadResult {
-                successfully_read: None,
-                discarded_for_size_and_truncated,
-            });
-        }
+    let mut state = LineBufferState {
+        buf: std::mem::take(buf),
+        partial_delim: BytesMut::new(),
+        discarding: false,
+        line_start_offset: None,
+    };
+    let result =
+        read_until_with_max_size_stateful(reader, position, delim, &mut state, max_size).await;
+    if !state.partial_delim.is_empty() && !state.discarding {
+        state.buf.extend_from_slice(&state.partial_delim);
     }
+    *buf = state.buf;
+    result
 }
 
 #[cfg(test)]

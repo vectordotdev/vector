@@ -5,7 +5,8 @@ mod experiment_no_truncations;
 use std::{fs, path::PathBuf, str, thread};
 
 use async_compression::tokio::bufread::GzipEncoder;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
+use file_source_common::buffer::LineBufferState;
 use quickcheck::{Arbitrary, Gen};
 use tokio::{io::AsyncReadExt as _, time::Instant};
 
@@ -236,8 +237,147 @@ fn watcher_for_timing() -> FileWatcher {
         last_seen: now,
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
-        buf: BytesMut::new(),
+        line_state: LineBufferState::new(),
     }
+}
+
+#[tokio::test]
+async fn partial_line_preserves_true_start_offset() {
+    use std::io::Write as _;
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("partial.log");
+    let mut f = fs::File::create(&path).unwrap();
+    f.write_all(b"hello ").unwrap();
+    f.flush().unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .unwrap();
+
+    // First poll buffers "hello " without newline.
+    assert!(fw.read_line().await.unwrap().raw_line.is_none());
+
+    // Complete line 1 and write line 2.
+    f.write_all(b"world\nsecond\n").unwrap();
+    f.flush().unwrap();
+
+    let l1 = fw.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(l1.bytes.as_ref(), b"hello world");
+    assert_eq!(l1.offset, 0);
+
+    let l2 = fw.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(l2.bytes.as_ref(), b"second");
+    assert_eq!(l2.offset, 12);
+}
+
+#[tokio::test]
+async fn multibyte_delimiter_split_across_eof_and_overlapping_prefix() {
+    use std::io::Write as _;
+
+    // Case 1: CRLF (`\r\n`) split across EOF between two polls.
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("crlf.log");
+    let mut f = fs::File::create(&path).unwrap();
+    f.write_all(b"hello\r").unwrap();
+    f.flush().unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\r\n"),
+    )
+    .await
+    .unwrap();
+
+    assert!(fw.read_line().await.unwrap().raw_line.is_none());
+
+    f.write_all(b"\nworld\r\n").unwrap();
+    f.flush().unwrap();
+
+    let l1 = fw.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(l1.bytes.as_ref(), b"hello");
+    assert_eq!(l1.offset, 0);
+
+    let l2 = fw.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(l2.bytes.as_ref(), b"world");
+    assert_eq!(l2.offset, 7);
+
+    // Case 2: Overlapping delimiter `AAB` where chunk 1 ends with `AA` and chunk 2 starts with `AB`
+    // (`firstAA` + `ABsecondAAB` = `firstA` + `AAB` + `second` + `AAB`).
+    let path2 = dir.path().join("overlap.log");
+    let mut f2 = fs::File::create(&path2).unwrap();
+    f2.write_all(b"firstAA").unwrap();
+    f2.flush().unwrap();
+
+    let mut fw2 = FileWatcher::new(
+        path2,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"AAB"),
+    )
+    .await
+    .unwrap();
+
+    assert!(fw2.read_line().await.unwrap().raw_line.is_none());
+
+    f2.write_all(b"ABsecondAAB").unwrap();
+    f2.flush().unwrap();
+
+    let o1 = fw2.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(o1.bytes.as_ref(), b"firstA");
+    let o2 = fw2.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(o2.bytes.as_ref(), b"second");
+}
+
+#[tokio::test]
+async fn oversized_line_split_across_eof_discards_once_and_preserves_next_offset() {
+    use std::io::Write as _;
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("big.log");
+    let mut f = fs::File::create(&path).unwrap();
+    f.write_all(b"0123456789abcdef").unwrap(); // 16 bytes > max_line_bytes=10
+    f.flush().unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        10,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .unwrap();
+
+    let r1 = fw.read_line().await.unwrap();
+    assert!(r1.raw_line.is_none());
+    assert_eq!(r1.discarded_for_size_and_truncated.len(), 1);
+
+    // Second chunk of the same oversized line must NOT emit a duplicate discard event.
+    f.write_all(b"ghijk").unwrap();
+    f.flush().unwrap();
+    let r2 = fw.read_line().await.unwrap();
+    assert!(r2.raw_line.is_none());
+    assert_eq!(r2.discarded_for_size_and_truncated.len(), 0);
+
+    // Finish the oversized line and append a valid line starting at offset 22.
+    f.write_all(b"\nok\n").unwrap();
+    f.flush().unwrap();
+    let r3 = fw.read_line().await.unwrap();
+    assert_eq!(r3.discarded_for_size_and_truncated.len(), 0);
+    let ok = r3.raw_line.unwrap();
+    assert_eq!(ok.bytes.as_ref(), b"ok");
+    assert_eq!(ok.offset, 22);
 }
 
 #[test]
