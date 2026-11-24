@@ -281,10 +281,12 @@ impl OAuth2Extension {
         }
 
         let token: TokenResponse = serde_json::from_slice(&body).map_err(|error| {
-            // A successful response holds the access token. Its body must not enter the error
-            // message, which is logged.
+            // A successful response holds the access token. The deserializer quotes values from
+            // the body in some messages, so report the position only.
             TokenError::transient(format!(
-                "the response from `{endpoint}` is not a token response: {error}"
+                "the response from `{endpoint}` is not a token response at line {} column {}",
+                error.line(),
+                error.column()
             ))
         })?;
 
