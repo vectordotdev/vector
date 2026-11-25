@@ -17,7 +17,7 @@ use crate::{
     event::Event,
     sinks::{
         prelude::*,
-        util::encoding::{Encoder as SinkEncoder, write_all},
+        util::encoding::{Encoder as SinkEncoder, emit_dropped, write_all},
     },
 };
 
@@ -69,9 +69,14 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
-            encoder
-                .encode(event, &mut body)
-                .map_err(|_| io::Error::other("unable to encode event"))?;
+            if encoder.encode(event, &mut body).is_err() {
+                // Returning the error discards the whole batch, so every event in it is
+                // lost, not just the one that failed. The codec reports that one; report
+                // the rest here, otherwise they are counted in neither
+                // `component_sent_events_total` nor `component_discarded_events_total`.
+                emit_dropped(n_events - 1);
+                return Err(io::Error::other("unable to encode event"));
+            }
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {
