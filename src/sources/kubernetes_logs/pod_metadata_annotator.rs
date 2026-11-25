@@ -24,7 +24,9 @@ use super::{
 };
 use crate::event::{Event, LogEvent};
 
-/// Configuration for how the events are enriched with Pod metadata.
+/// Field paths for Pod and container metadata in legacy logs.
+///
+/// With log namespacing enabled, Vector writes available metadata under `%kubernetes_logs`.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
@@ -109,52 +111,20 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = ""))]
     pub container_name: OptionalTargetPath,
 
-    /// Overrides the name of the log field used to add the container's CPU request
-    /// in millicores to each event.
-    ///
-    /// Off by default, the field is only added to the event if this is set.
-    #[configurable(metadata(docs::examples = ".k8s.container_cpu_request_millicores"))]
-    #[configurable(metadata(docs::examples = "k8s.container_cpu_request_millicores"))]
-    #[configurable(metadata(docs::examples = ""))]
+    /// Set this path to include the container's CPU request (millicores) in legacy logs.
+    #[configurable(metadata(docs::examples = "kubernetes.container_cpu_request_millicores"))]
     pub container_cpu_request_millicores: OptionalTargetPath,
 
-    /// Overrides the name of the log field used to add the container's memory request
-    /// in bytes to each event.
-    ///
-    /// Off by default, the field is only added to the event if this is set.
-    #[configurable(metadata(docs::examples = ".k8s.container_memory_request_bytes"))]
-    #[configurable(metadata(docs::examples = "k8s.container_memory_request_bytes"))]
-    #[configurable(metadata(docs::examples = ""))]
+    /// Set this path to include the container's memory request (bytes) in legacy logs.
+    #[configurable(metadata(docs::examples = "kubernetes.container_memory_request_bytes"))]
     pub container_memory_request_bytes: OptionalTargetPath,
 
-    /// Overrides the name of the log field used to add the Pod's effective CPU request
-    /// in millicores to each event.
-    ///
-    /// Includes application containers, restartable init containers, peak initialization
-    /// requests, and Pod overhead. An explicit Pod-level CPU request overrides the
-    /// container aggregate before overhead is added. Uses desired requests from the Pod spec.
-    /// Each quantity is rounded up to millicores before aggregation.
-    ///
-    /// Off by default in the legacy log namespace; always included in Vector metadata
-    /// when available. Omitted if no CPU request is specified or a contributing quantity
-    /// or total cannot be represented as a non-negative 64-bit integer.
-    #[configurable(metadata(docs::examples = "k8s.pod_cpu_request_millicores"))]
-    #[configurable(metadata(docs::examples = ""))]
+    /// Set this path to include the Pod's effective CPU request (millicores) in legacy logs.
+    #[configurable(metadata(docs::examples = "kubernetes.pod_cpu_request_millicores"))]
     pub pod_cpu_request_millicores: OptionalTargetPath,
 
-    /// Overrides the name of the log field used to add the Pod's effective memory request
-    /// in bytes to each event.
-    ///
-    /// Includes application containers, restartable init containers, peak initialization
-    /// requests, and Pod overhead. An explicit Pod-level memory request overrides the
-    /// container aggregate before overhead is added. Uses desired requests from the Pod spec.
-    /// Each quantity is rounded up to bytes before aggregation.
-    ///
-    /// Off by default in the legacy log namespace; always included in Vector metadata
-    /// when available. Omitted if no memory request is specified or a contributing quantity
-    /// or total cannot be represented as a non-negative 64-bit integer.
-    #[configurable(metadata(docs::examples = "k8s.pod_memory_request_bytes"))]
-    #[configurable(metadata(docs::examples = ""))]
+    /// Set this path to include the Pod's effective memory request (bytes) in legacy logs.
+    #[configurable(metadata(docs::examples = "kubernetes.pod_memory_request_bytes"))]
     pub pod_memory_request_bytes: OptionalTargetPath,
 
     /// Event field for the Container's ID.
@@ -603,9 +573,6 @@ fn annotate_from_container_status(
     );
 }
 
-// Mirror Kubernetes' spec-based PodRequests calculation, normalizing quantities to the
-// same integer units as the container fields. Missing requests contribute zero, but
-// leave the field absent if none are specified. Invalid quantities invalidate the total.
 fn pod_resource_request(pod_spec: &PodSpec, resource: &str, decimal_scale: i32) -> Option<i64> {
     let mut specified = false;
     let mut parse = |quantity: Option<&Quantity>| {
@@ -636,7 +603,7 @@ fn pod_resource_request(pod_spec: &PodSpec, resource: &str, decimal_scale: i32) 
                 sidecars = sidecars.checked_add(request)?;
                 sidecars
             } else {
-                // Only preceding restartable init containers run alongside this init.
+                // Earlier restartable init containers keep running during this stage.
                 sidecars.checked_add(request)?
             };
             initialization = initialization.max(stage);
@@ -886,7 +853,6 @@ mod tests {
             }
         }
 
-        // A relist replaces the cached spec just like an ordinary watch update.
         writer.apply_watcher_event(&watcher::Event::Init);
         pod.spec.as_mut().unwrap().containers.clear();
         writer.apply_watcher_event(&watcher::Event::InitApply(pod));

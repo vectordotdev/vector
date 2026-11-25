@@ -305,20 +305,19 @@ generated: components: sources: kubernetes_logs: configuration: {
 		type: bool: default: true
 	}
 	pod_annotation_fields: {
-		description: "Configuration for how the events are enriched with Pod metadata."
-		required:    false
+		description: """
+			Field paths for Pod and container metadata in legacy logs.
+
+			With log namespacing enabled, Vector writes available metadata under `%kubernetes_logs`.
+			"""
+		required: false
 		type: object: options: {
 			container_cpu_request_millicores: {
-				description: """
-					Overrides the name of the log field used to add the container's CPU request
-					in millicores to each event.
-
-					Off by default, the field is only added to the event if this is set.
-					"""
-				required: false
+				description: "Set this path to include the container's CPU request (millicores) in legacy logs."
+				required:    false
 				type: string: {
 					default: ""
-					examples: [".k8s.container_cpu_request_millicores", "k8s.container_cpu_request_millicores", ""]
+					examples: ["kubernetes.container_cpu_request_millicores"]
 				}
 			}
 			container_id: {
@@ -358,16 +357,11 @@ generated: components: sources: kubernetes_logs: configuration: {
 				}
 			}
 			container_memory_request_bytes: {
-				description: """
-					Overrides the name of the log field used to add the container's memory request
-					in bytes to each event.
-
-					Off by default, the field is only added to the event if this is set.
-					"""
-				required: false
+				description: "Set this path to include the container's memory request (bytes) in legacy logs."
+				required:    false
 				type: string: {
 					default: ""
-					examples: [".k8s.container_memory_request_bytes", "k8s.container_memory_request_bytes", ""]
+					examples: ["kubernetes.container_memory_request_bytes"]
 				}
 			}
 			container_name: {
@@ -395,23 +389,11 @@ generated: components: sources: kubernetes_logs: configuration: {
 				}
 			}
 			pod_cpu_request_millicores: {
-				description: """
-					Overrides the name of the log field used to add the Pod's effective CPU request
-					in millicores to each event.
-
-					Includes application containers, restartable init containers, peak initialization
-					requests, and Pod overhead. An explicit Pod-level CPU request overrides the
-					container aggregate before overhead is added. Uses desired requests from the Pod spec.
-					Each quantity is rounded up to millicores before aggregation.
-
-					Off by default in the legacy log namespace; always included in Vector metadata
-					when available. Omitted if no CPU request is specified or a contributing quantity
-					or total cannot be represented as a non-negative 64-bit integer.
-					"""
-				required: false
+				description: "Set this path to include the Pod's effective CPU request (millicores) in legacy logs."
+				required:    false
 				type: string: {
 					default: ""
-					examples: ["k8s.pod_cpu_request_millicores", ""]
+					examples: ["kubernetes.pod_cpu_request_millicores"]
 				}
 			}
 			pod_ip: {
@@ -451,23 +433,11 @@ generated: components: sources: kubernetes_logs: configuration: {
 				}
 			}
 			pod_memory_request_bytes: {
-				description: """
-					Overrides the name of the log field used to add the Pod's effective memory request
-					in bytes to each event.
-
-					Includes application containers, restartable init containers, peak initialization
-					requests, and Pod overhead. An explicit Pod-level memory request overrides the
-					container aggregate before overhead is added. Uses desired requests from the Pod spec.
-					Each quantity is rounded up to bytes before aggregation.
-
-					Off by default in the legacy log namespace; always included in Vector metadata
-					when available. Omitted if no memory request is specified or a contributing quantity
-					or total cannot be represented as a non-negative 64-bit integer.
-					"""
-				required: false
+				description: "Set this path to include the Pod's effective memory request (bytes) in legacy logs."
+				required:    false
 				type: string: {
 					default: ""
-					examples: ["k8s.pod_memory_request_bytes", ""]
+					examples: ["kubernetes.pod_memory_request_bytes"]
 				}
 			}
 			pod_name: {
