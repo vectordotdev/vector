@@ -605,6 +605,9 @@ pub fn build_runtime(
     let mut rt_builder = runtime::Builder::new_multi_thread();
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
+    // Experiment only: check whether the LIFO slot keeps pipeline stages on one worker.
+    #[cfg(tokio_unstable)]
+    rt_builder.disable_lifo_slot();
 
     let threads = threads.unwrap_or_else(vector_lib::num_threads);
     if threads == 0 {
