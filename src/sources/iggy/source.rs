@@ -1,16 +1,22 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
 use chrono::Utc;
-use futures::{StreamExt, future::join_all, stream::BoxStream};
+use futures::{StreamExt, stream::BoxStream};
 use iggy::prelude::{
-    Checkpoint, Client, IggyClient, IggyConsumer, IggyError, PollingKind, PollingStrategy,
+    Checkpoint, Client, IggyClient, IggyConsumerState, IggyError, PollingKind, PollingStrategy,
     ReadError, ReceivedMessage,
 };
-use tokio::time::{MissedTickBehavior, interval, sleep, sleep_until};
+use tokio::{
+    sync::mpsc,
+    time::{MissedTickBehavior, interval, sleep, sleep_until},
+};
 use tokio_stream::StreamMap;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -282,10 +288,38 @@ fn seek_started(seek: Option<PollingStrategy>, offset: u64) -> bool {
     })
 }
 
+/// Identity of one partition slot. A store or a commit result issued for a
+/// slot a reassignment or a lost history replaced must not be applied to the
+/// new slot, so a slot is retired before it is dropped and both the commit
+/// worker and the result handler compare identity, never just partition id.
+#[derive(Clone)]
+struct SlotId(Arc<AtomicBool>);
+
+impl SlotId {
+    fn new() -> Self {
+        Self(Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Mark the slot as replaced. A store queued for it is dropped instead of
+    /// reaching the broker under the history that took the partition over.
+    fn retire(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+
+    fn retired(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    fn same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// Everything the source keeps for one partition it owns. A reassignment or a
 /// lost history invalidates all of it together, so it lives in one place rather
 /// than one map per concern.
 struct PartitionSlot {
+    id: SlotId,
     state: PartitionState,
     finalizer: OrderedFinalizer<u64>,
     /// The last SDK generation seen for the partition. A generation change is a
@@ -305,6 +339,7 @@ impl PartitionSlot {
         let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
         (
             Self {
+                id: SlotId::new(),
                 state: PartitionState::default(),
                 finalizer,
                 generation: None,
@@ -342,14 +377,12 @@ fn reset_partition(
     slots: &mut HashMap<u32, PartitionSlot>,
     ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
 ) {
-    ack_streams.remove(&partition_id);
-    if let Some(slot) = slots.get_mut(&partition_id) {
-        slot.state = PartitionState::default();
-        slot.own_seek = None;
-        slot.last_settled_commit = None;
-        let (finalizer, _) = OrderedFinalizer::<u64>::new(None);
-        slot.finalizer = finalizer;
+    if let Some(slot) = slots.remove(&partition_id) {
+        // Retire before dropping so a store the worker still holds cannot land
+        // under the history that replaces this one.
+        slot.id.retire();
     }
+    ack_streams.remove(&partition_id);
 }
 
 /// The slot for `partition_id`, creating its acknowledgement stream on demand.
@@ -425,57 +458,131 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
     }
 }
 
-/// Store each partition's pending offset on the Iggy server. Stores run
-/// concurrently so a slow partition cannot stall the commit tick. A delivered
-/// message's checkpoint commits under the partition history that delivered it,
-/// so the SDK drops a store that a rebalance or a recreated partition made
-/// stale; a skipped offset has no checkpoint and is stored raw.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "One call keeps the commit and auth state together"
-)]
-async fn commit_offsets(
-    consumer: &IggyConsumer,
-    client: &IggyClient,
-    url: &str,
-    stream: &str,
-    topic: &str,
+/// One offset the poll loop wants stored. `checkpoint` is `None` for an offset
+/// that no message delivered, such as a record the broker could not decode.
+/// `slot` pins the request to the partition slot it was issued for.
+struct CommitRequest {
+    partition_id: u32,
+    slot: SlotId,
+    offset: u64,
+    checkpoint: Option<Checkpoint>,
+}
+
+struct CommitResult {
+    partition_id: u32,
+    slot: SlotId,
+    offset: u64,
+    result: Result<(), IggyError>,
+}
+
+/// Performs offset stores off the poll loop, on a clone of the consumer's
+/// state: the SDK documents that view as the way to commit while the consumer
+/// is borrowed for reading. One task keeps the requests in the order they were
+/// enqueued, which preserves per-partition order.
+async fn run_commit_worker(
+    state: IggyConsumerState,
+    client: Arc<IggyClient>,
+    url: String,
+    mut requests: mpsc::Receiver<CommitRequest>,
+    results: mpsc::Sender<CommitResult>,
+) {
+    while let Some(CommitRequest {
+        partition_id,
+        slot,
+        offset,
+        checkpoint,
+    }) = requests.recv().await
+    {
+        // A reassignment or a lost history may have replaced this slot while
+        // the request waited. The broker cannot tell a raw offset store issued
+        // for the old history from one for the new, so a retired slot must not
+        // reach it.
+        if slot.retired() {
+            continue;
+        }
+        let mut result = match checkpoint {
+            Some(checkpoint) => state.commit(checkpoint).await,
+            // Nothing was delivered at this offset: it is past a record the
+            // broker could not decode or a permanently rejected event, so only
+            // its offset is available to store.
+            None => state.store_offset(offset, Some(partition_id)).await,
+        };
+        // The SDK never refreshes an HTTP access token, so renew it from the
+        // connection string and retry the store once.
+        if matches!(&result, Err(error) if is_unauthenticated(error))
+            && logs_in_over_http(&url)
+            && login_if_http(&client, &url).await.is_ok()
+            && !slot.retired()
+        {
+            result = match checkpoint {
+                Some(checkpoint) => state.commit(checkpoint).await,
+                None => state.store_offset(offset, Some(partition_id)).await,
+            };
+        }
+        if results
+            .send(CommitResult {
+                partition_id,
+                slot,
+                offset,
+                result,
+            })
+            .await
+            .is_err()
+        {
+            break;
+        }
+    }
+}
+
+/// Hand each partition's pending offset to the commit worker. `pending` is
+/// taken here so a later tick cannot enqueue it twice; a full queue restores
+/// it, and a failed store re-derives it from the acknowledgements that arrived
+/// while the store was in flight.
+fn enqueue_commits(slots: &mut HashMap<u32, PartitionSlot>, commits: &mpsc::Sender<CommitRequest>) {
+    for (&partition_id, slot) in slots.iter_mut() {
+        let Some((offset, checkpoint)) = slot.state.take_pending() else {
+            continue;
+        };
+        if commits
+            .try_send(CommitRequest {
+                partition_id,
+                slot: slot.id.clone(),
+                offset,
+                checkpoint,
+            })
+            .is_err()
+        {
+            slot.state.pending = Some(offset);
+        }
+    }
+}
+
+/// Apply a store outcome. A result for a slot that a reassignment or a lost
+/// history replaced has no state left to apply: the slot it belongs to is gone.
+fn apply_commit_result(
+    done: CommitResult,
     slots: &mut HashMap<u32, PartitionSlot>,
     ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
+    stream: &str,
+    topic: &str,
 ) {
-    let pending: Vec<(u32, u64, Option<Checkpoint>)> = slots
-        .iter_mut()
-        .filter_map(|(&partition_id, slot)| {
-            slot.state
-                .take_pending()
-                .map(|(offset, checkpoint)| (partition_id, offset, checkpoint))
-        })
-        .collect();
-
-    if pending.is_empty() {
-        return;
-    }
-
-    let results = join_all(pending.into_iter().map(
-        |(partition_id, offset, checkpoint)| async move {
-            let result = match checkpoint {
-                Some(checkpoint) => consumer.commit(checkpoint).await,
-                // Nothing was delivered at this offset: it is past a record the
-                // broker could not decode or a permanently rejected event, so only
-                // its offset is available to store.
-                None => consumer.store_offset(offset, Some(partition_id)).await,
-            };
-            (partition_id, offset, result)
-        },
-    ))
-    .await;
-
-    for (partition_id, offset, result) in results {
-        match result {
-            Ok(()) => {
-                if let Some(slot) = slots.get_mut(&partition_id) {
-                    slot.state.committed_through(offset);
-                }
+    let CommitResult {
+        partition_id,
+        slot,
+        offset,
+        result,
+    } = done;
+    match result {
+        Ok(()) => {
+            // A store confirmed for a slot that a reassignment or a lost
+            // history replaced must not move the metric of the partition's
+            // current history: its offset belongs to a different one and can
+            // be lower.
+            if let Some(current) = slots
+                .get_mut(&partition_id)
+                .filter(|current| current.id.same(&slot))
+            {
+                current.state.committed_through(offset);
                 emit(IggyOffsetCommitted {
                     stream,
                     topic,
@@ -483,28 +590,33 @@ async fn commit_offsets(
                     offset,
                 });
             }
-            Err(
-                IggyError::NotResolvedConsumer(_) | IggyError::ConsumerGroupPartitionNotOwned(..),
-            ) => {
+        }
+        Err(IggyError::NotResolvedConsumer(_) | IggyError::ConsumerGroupPartitionNotOwned(..)) => {
+            // Only the slot the store was issued for is proven to be gone; a
+            // failure for an older slot must not drop its replacement's
+            // finalizers, which would let a later commit pass those messages.
+            if slots
+                .get(&partition_id)
+                .is_some_and(|current| current.id.same(&slot))
+            {
                 reset_partition(partition_id, slots, ack_streams);
                 debug!(
                     message = "Partition no longer assigned to this consumer; dropping per-partition acknowledgement state.",
                     stream, topic, partition_id,
                 );
             }
-            Err(error) => {
-                if let Some(slot) = slots.get_mut(&partition_id) {
-                    slot.state.pending = Some(offset);
-                }
-                let unauthenticated = is_unauthenticated(&error);
-                emit(IggyOffsetUpdateError { error });
-                if unauthenticated
-                    && logs_in_over_http(url)
-                    && let Err(error) = login_if_http(client, url).await
-                {
-                    emit(IggyOffsetUpdateError { error });
-                }
+        }
+        Err(error) => {
+            if let Some(current) = slots
+                .get_mut(&partition_id)
+                .filter(|current| current.id.same(&slot))
+            {
+                // Re-derive the safe offset instead of restoring the failed
+                // one: an acknowledgement may have raised it while the store
+                // was in flight, and rewinding would replay delivered records.
+                current.state.recompute_pending();
             }
+            emit(IggyOffsetUpdateError { error });
         }
     }
 }
@@ -771,6 +883,18 @@ pub(crate) async fn run_iggy_source(
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
+    // Offset stores run on their own task so a slow broker cannot stall reads;
+    // the loop keeps the bookkeeping and applies each result.
+    let (commit_tx, commit_rx) = mpsc::channel(64);
+    let (commit_result_tx, mut commit_results) = mpsc::channel(64);
+    let commit_worker = tokio::spawn(run_commit_worker(
+        consumer.state(),
+        Arc::clone(&keep_alive_client),
+        config.url.clone(),
+        commit_rx,
+        commit_result_tx,
+    ));
+
     // Set when the downstream sender closes so post-loop cleanup still runs.
     // Returning from the select arm would leave the TCP session open until
     // the broker times it out and delay rebalance.
@@ -926,30 +1050,16 @@ pub(crate) async fn run_iggy_source(
                     {
                         slot.last_settled_commit = Some(Instant::now());
                     }
-                    commit_offsets(
-                        &consumer,
-                        &keep_alive_client,
-                        &config.url,
-                        stream,
-                        topic,
-                        &mut slots,
-                        &mut ack_streams,
-                    )
-                    .await;
+                    enqueue_commits(&mut slots, &commit_tx);
                 }
             }
 
+            Some(done) = commit_results.recv() => {
+                apply_commit_result(done, &mut slots, &mut ack_streams, stream, topic);
+            }
+
             _ = commit_timer.tick() => {
-                commit_offsets(
-                    &consumer,
-                    &keep_alive_client,
-                    &config.url,
-                    stream,
-                    topic,
-                    &mut slots,
-                    &mut ack_streams,
-                )
-                .await;
+                enqueue_commits(&mut slots, &commit_tx);
             }
 
             // A stopped partition yields no read result, so the retry needs its
@@ -1170,16 +1280,51 @@ pub(crate) async fn run_iggy_source(
                 }
             }
         }
-        commit_offsets(
-            &consumer,
-            &keep_alive_client,
-            &config.url,
-            stream,
-            topic,
-            &mut slots,
-            &mut ack_streams,
-        )
-        .await;
+    }
+
+    // Flush what the drain settled and wait for the worker, so every store the
+    // loop enqueued lands while the consumer still owns its partitions. The
+    // queue is drained as capacity frees up: dropping a checkpoint because the
+    // bounded queue was full would replay records the drain acknowledged.
+    let mut queued: Vec<CommitRequest> = slots
+        .iter_mut()
+        .filter_map(|(&partition_id, slot)| {
+            let (offset, checkpoint) = slot.state.take_pending()?;
+            Some(CommitRequest {
+                partition_id,
+                slot: slot.id.clone(),
+                offset,
+                checkpoint,
+            })
+        })
+        .collect();
+    while !queued.is_empty() {
+        tokio::select! {
+            biased;
+
+            Some(done) = commit_results.recv() => {
+                apply_commit_result(done, &mut slots, &mut ack_streams, stream, topic);
+            }
+
+            permit = commit_tx.reserve() => match permit {
+                Ok(permit) => {
+                    if let Some(request) = queued.pop() {
+                        permit.send(request);
+                    }
+                }
+                Err(_) => break,
+            },
+        }
+    }
+    drop(commit_tx);
+    while let Some(done) = commit_results.recv().await {
+        apply_commit_result(done, &mut slots, &mut ack_streams, stream, topic);
+    }
+    if let Err(error) = commit_worker.await {
+        warn!(
+            message = "Iggy commit worker stopped unexpectedly; offsets stored by its last in-flight commit may be lost.",
+            %error,
+        );
     }
 
     if let Err(error) = consumer.shutdown().await {
@@ -1213,10 +1358,13 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
-        MAX_IN_FLIGHT, MAX_REDELIVERY_ATTEMPTS, PartitionState, RetryOutcome, at_capacity,
-        queue_seek, record_ack, seek_started, stopped_partition,
+        CommitResult, MAX_IN_FLIGHT, MAX_REDELIVERY_ATTEMPTS, PartitionSlot, PartitionState,
+        RetryOutcome, apply_commit_result, at_capacity, enqueue_commits, queue_seek, record_ack,
+        reset_partition, seek_started, slot_entry, stopped_partition,
     };
     use crate::event::BatchStatus;
+    use tokio::sync::mpsc;
+    use tokio_stream::StreamMap;
 
     fn checkpoint(offset: u64) -> Checkpoint {
         Checkpoint::new(0, offset, PartitionContext::default())
@@ -1382,6 +1530,70 @@ mod tests {
         s.committed_through(1);
         assert!(!s.checkpoints.contains_key(&1));
         assert!(s.checkpoints.contains_key(&2));
+    }
+
+    #[test]
+    fn enqueue_hands_each_pending_offset_to_the_worker_once() {
+        let mut slots = HashMap::new();
+        let mut slot = PartitionSlot::new().0;
+        slot.state.mark_in_flight(5, checkpoint(5));
+        record_ack(&mut slot.state, 0, BatchStatus::Delivered, 5);
+        slots.insert(0, slot);
+
+        let (tx, mut rx) = mpsc::channel(8);
+        enqueue_commits(&mut slots, &tx);
+        assert_eq!(slots[&0].state.pending, None);
+        let request = rx.try_recv().expect("request was enqueued");
+        assert_eq!((request.partition_id, request.offset), (0, 5));
+
+        enqueue_commits(&mut slots, &tx);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn a_retired_slot_is_not_its_replacement() {
+        let mut slots = HashMap::new();
+        let mut ack_streams = StreamMap::new();
+        let first = slot_entry(&mut slots, &mut ack_streams, 0).id.clone();
+        assert!(first.same(&slot_entry(&mut slots, &mut ack_streams, 0).id));
+
+        reset_partition(0, &mut slots, &mut ack_streams);
+        let replacement = slot_entry(&mut slots, &mut ack_streams, 0).id.clone();
+        assert!(first.retired());
+        assert!(!replacement.retired());
+        assert!(!first.same(&replacement));
+    }
+
+    #[test]
+    fn a_replaced_slots_store_failure_keeps_the_replacement_state() {
+        let mut slots = HashMap::new();
+        let mut ack_streams = StreamMap::new();
+        let replaced = slot_entry(&mut slots, &mut ack_streams, 0).id.clone();
+
+        // A reassignment drops the slot while its store is still in flight,
+        // and the next message registers against the replacement.
+        reset_partition(0, &mut slots, &mut ack_streams);
+        slot_entry(&mut slots, &mut ack_streams, 0)
+            .state
+            .mark_in_flight(2, checkpoint(2));
+
+        apply_commit_result(
+            CommitResult {
+                partition_id: 0,
+                slot: replaced,
+                offset: 2,
+                result: Err(IggyError::ConsumerGroupPartitionNotOwned(0, 0)),
+            },
+            &mut slots,
+            &mut ack_streams,
+            "stream",
+            "topic",
+        );
+
+        // The failure belongs to the old history; dropping the replacement's
+        // finalizer would let a later commit pass the unacknowledged offset 2.
+        assert_eq!(slots.len(), 1);
+        assert_eq!(ack_streams.len(), 1);
     }
 
     #[test]
