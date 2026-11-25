@@ -211,12 +211,14 @@ impl Checkpointer {
             let tmp_file_path = self.tmp_file_path.clone();
 
             // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
-            let current = tokio::task::spawn_blocking(move || -> Result<State, io::Error> {
-                let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
-                serde_json::to_writer(&mut f, &current)?;
-                f.into_inner()?.sync_all()?;
-                Ok(current)
-            })
+            let current = vector_common::cpu_time::spawn_blocking_timed(
+                move || -> Result<State, io::Error> {
+                    let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
+                    serde_json::to_writer(&mut f, &current)?;
+                    f.into_inner()?.sync_all()?;
+                    Ok(current)
+                },
+            )
             .await
             .map_err(io::Error::other)??;
 
