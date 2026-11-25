@@ -368,10 +368,10 @@ fn stopped_partition(error: &ReadError) -> Option<u32> {
         .then_some(partition_id)
 }
 
-/// Forget the acknowledgement state tied to a partition: a reassignment or a
-/// lost history invalidates all of it. The generation stays so the next message
-/// is not treated as another change, and the finalizer is replaced so late
-/// acknowledgements of the old history are dropped.
+/// Forget everything tied to a partition: a reassignment or a lost history
+/// invalidates all of it. Dropping the slot drops its finalizer, so
+/// acknowledgements that still arrive for the old history land on a closed
+/// stream, and the next message builds a fresh slot.
 fn reset_partition(
     partition_id: u32,
     slots: &mut HashMap<u32, PartitionSlot>,
@@ -1530,6 +1530,25 @@ mod tests {
         s.committed_through(1);
         assert!(!s.checkpoints.contains_key(&1));
         assert!(s.checkpoints.contains_key(&2));
+    }
+
+    #[test]
+    fn a_reset_partition_starts_from_a_fresh_slot() {
+        let mut slots = HashMap::new();
+        let mut ack_streams = StreamMap::new();
+        slot_entry(&mut slots, &mut ack_streams, 0)
+            .state
+            .mark_in_flight(1, checkpoint(1));
+
+        reset_partition(0, &mut slots, &mut ack_streams);
+        assert!(slots.is_empty());
+        assert!(ack_streams.is_empty());
+
+        // The next message of the new history builds its own slot and stream,
+        // so a late acknowledgement cannot land on a closed finalizer.
+        let slot = slot_entry(&mut slots, &mut ack_streams, 0);
+        assert!(slot.state.checkpoints.is_empty());
+        assert_eq!(ack_streams.len(), 1);
     }
 
     #[test]
