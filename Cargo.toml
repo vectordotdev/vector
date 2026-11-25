@@ -29,6 +29,18 @@ test = false
 bench = false
 required-features = ["secret-backend-example"]
 
+# Mock `exec` secrets backend used by the `secrets` integration test. It must be a binary target
+# so that the test can execute it as an external command.
+[[bin]]
+name = "mock-secrets-exec"
+path = "tests/behavior/secrets/mock_secrets_exec.rs"
+test = false
+bench = false
+
+[[test]]
+name = "secrets"
+path = "tests/secrets.rs"
+
 [[test]]
 name = "integration"
 path = "tests/integration/lib.rs"

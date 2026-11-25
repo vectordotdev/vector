@@ -12,7 +12,7 @@ use crate::{
 #[cfg(feature = "secrets-aws_secrets_manager")]
 mod aws_secrets_manager;
 mod directory;
-mod exec;
+pub mod exec;
 mod file;
 mod test;
 
