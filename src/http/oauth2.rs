@@ -327,6 +327,7 @@ impl OAuth2Extension {
         let mut request = Request::post(endpoint)
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .header(header::ACCEPT, "application/json")
+            .header(header::ACCEPT_ENCODING, "identity")
             .body(vector_http::full_body(Bytes::from(
                 self.token_request_body(),
             )))
@@ -563,6 +564,14 @@ mod tests {
             !request.headers().contains_key(header::AUTHORIZATION),
             "mutual TLS must not send basic credentials"
         );
+    }
+
+    #[test]
+    fn token_request_does_not_ask_for_a_compressed_response() {
+        let request = extension(0)
+            .token_request()
+            .expect("the token request must be valid");
+        assert_eq!(request.headers()[header::ACCEPT_ENCODING], "identity");
     }
 
     #[test]
