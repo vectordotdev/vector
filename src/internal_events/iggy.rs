@@ -100,6 +100,9 @@ impl InternalEvent for IggyOffsetPolled<'_> {
     }
 }
 
+/// Emitted when the broker confirms an offset store for the partition history
+/// still assigned to this consumer. Sets the committed-offset gauge and counts
+/// the store, so the commit rate is visible without differencing gauge values.
 #[derive(Debug, NamedInternalEvent)]
 pub(crate) struct IggyOffsetCommitted<'a> {
     pub stream: &'a str,
@@ -117,6 +120,36 @@ impl InternalEvent for IggyOffsetCommitted<'_> {
             "partition" => self.partition.to_string(),
         )
         .set(LossyF64(self.offset));
+        counter!(
+            CounterName::IggyConsumerOffsetsCommittedTotal,
+            "stream" => self.stream.to_string(),
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
+        )
+        .increment(1);
+    }
+}
+
+/// Emitted when replaying a permanently rejected message exhausted its budget
+/// and the offset is skipped with that message's events dropped. A counter
+/// rather than `ComponentEventsDropped`: one payload may decode to several
+/// events and the source no longer knows how many.
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct IggyMessageSkipped<'a> {
+    pub stream: &'a str,
+    pub topic: &'a str,
+    pub partition: u32,
+}
+
+impl InternalEvent for IggyMessageSkipped<'_> {
+    fn emit(self) {
+        counter!(
+            CounterName::IggyConsumerMessagesSkippedTotal,
+            "stream" => self.stream.to_string(),
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
+        )
+        .increment(1);
     }
 }
 

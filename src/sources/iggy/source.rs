@@ -37,8 +37,8 @@ use crate::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_events::{
         IggyBytesReceived, IggyConsumerInitError, IggyConsumerStreamEndedError, IggyEventsReceived,
-        IggyOffsetCommitted, IggyOffsetPolled, IggyOffsetUpdateError, IggyReadError,
-        StreamClosedError,
+        IggyMessageSkipped, IggyOffsetCommitted, IggyOffsetPolled, IggyOffsetUpdateError,
+        IggyReadError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources::iggy::config::IggySourceConfig,
@@ -1058,6 +1058,11 @@ pub(crate) async fn run_iggy_source(
                             offset = skipped,
                             attempts = MAX_REDELIVERY_ATTEMPTS,
                         );
+                        emit(IggyMessageSkipped {
+                            stream,
+                            topic,
+                            partition: partition_id,
+                        });
                         // A rejection above the skipped offset has no
                         // acknowledgement left to trigger its replay, so start
                         // it here or it would fence the partition forever.
