@@ -1380,6 +1380,30 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_metric_value_write() {
+        // An integer is stored as a float. `assert_eq!` tells `100` apart from `100.0`, unlike
+        // `==`, so it fails if the next read sees the assigned integer instead of the stored value.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    .gauge.value = 100
+                    assert_eq!(.gauge.value, 100.0)
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let result = transform_one(&tform, &mut state, gauge(0.5)).unwrap();
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Gauge { value: 100.0 }
+        );
+    }
+
+    #[test]
     fn check_remap_metric_value_special_values() {
         // Reads of special values, and of the fields for other types.
         let tform = remap(RemapConfig {
