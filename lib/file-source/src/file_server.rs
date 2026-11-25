@@ -198,79 +198,12 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths() {
-                    match self
+                    let file_id = match self
                         .fingerprinter
                         .fingerprint_or_emit_outcome(&path, &mut known_small_files, &self.emitter)
                         .await
                     {
-                        FingerprintOutcome::Found(file_id) => {
-                            if let Some(watcher) = fp_map.get_mut(&file_id) {
-                                // file fingerprint matches a watched file
-                                let was_found_this_cycle = watcher.file_findable();
-                                watcher.set_file_findable(true);
-                                if watcher.path == path {
-                                    trace!(
-                                        message = "Continue watching file.",
-                                        path = ?path,
-                                    );
-                                } else if !was_found_this_cycle {
-                                    // matches a file with a different path
-                                    info!(
-                                        message = "Watched file has been renamed.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
-                                    {
-                                        // Inode changed - emit metrics for the old file
-                                        self.emitter.emit_file_unwatched(
-                                            &unwatch_info.path,
-                                            unwatch_info.reached_eof,
-                                            unwatch_info.bytes_unread,
-                                        );
-                                    }
-                                } else {
-                                    info!(
-                                        message = "More than one file has the same fingerprint.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    let (old_path, new_path) = (&watcher.path, &path);
-                                    if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                        fs::metadata(old_path).await.and_then(|m| m.modified()),
-                                        fs::metadata(new_path).await.and_then(|m| m.modified()),
-                                    ) && old_modified_time < new_modified_time
-                                    {
-                                        info!(
-                                            message = "Switching to watch most recently modified file.",
-                                            new_modified_time = ?new_modified_time,
-                                            old_modified_time = ?old_modified_time,
-                                        );
-                                        if let Ok(Some(unwatch_info)) =
-                                            watcher.update_path(path).await
-                                        {
-                                            // Inode changed - emit metrics for the old file
-                                            self.emitter.emit_file_unwatched(
-                                                &unwatch_info.path,
-                                                unwatch_info.reached_eof,
-                                                unwatch_info.bytes_unread,
-                                            );
-                                        }
-                                    }
-                                }
-                            } else {
-                                // untracked file fingerprint
-                                self.watch_new_file(
-                                    path,
-                                    file_id,
-                                    &mut fp_map,
-                                    &checkpoints,
-                                    false,
-                                )
-                                .await;
-                                self.emitter.emit_files_open(fp_map.len());
-                            }
-                        }
+                        FingerprintOutcome::Found(file_id) => file_id,
                         FingerprintOutcome::TransientError => {
                             // Keep any existing watcher at this path marked findable so a
                             // transient EACCES/EIO does not prematurely flush a partial line
@@ -280,8 +213,67 @@ where
                                     watcher.set_file_findable(true);
                                 }
                             }
+                            continue;
                         }
-                        FingerprintOutcome::Skipped => {}
+                        FingerprintOutcome::Skipped => continue,
+                    };
+
+                    if let Some(watcher) = fp_map.get_mut(&file_id) {
+                        // file fingerprint matches a watched file
+                        let was_found_this_cycle = watcher.file_findable();
+                        watcher.set_file_findable(true);
+                        if watcher.path == path {
+                            trace!(
+                                message = "Continue watching file.",
+                                path = ?path,
+                            );
+                        } else if !was_found_this_cycle {
+                            // matches a file with a different path
+                            info!(
+                                message = "Watched file has been renamed.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                // Inode changed - emit metrics for the old file
+                                self.emitter.emit_file_unwatched(
+                                    &unwatch_info.path,
+                                    unwatch_info.reached_eof,
+                                    unwatch_info.bytes_unread,
+                                );
+                            }
+                        } else {
+                            info!(
+                                message = "More than one file has the same fingerprint.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            let (old_path, new_path) = (&watcher.path, &path);
+                            if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                fs::metadata(new_path).await.and_then(|m| m.modified()),
+                            ) && old_modified_time < new_modified_time
+                            {
+                                info!(
+                                    message = "Switching to watch most recently modified file.",
+                                    new_modified_time = ?new_modified_time,
+                                    old_modified_time = ?old_modified_time,
+                                );
+                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                    // Inode changed - emit metrics for the old file
+                                    self.emitter.emit_file_unwatched(
+                                        &unwatch_info.path,
+                                        unwatch_info.reached_eof,
+                                        unwatch_info.bytes_unread,
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        // untracked file fingerprint
+                        self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
+                            .await;
+                        self.emitter.emit_files_open(fp_map.len());
                     }
                 }
                 stats.record("discovery", start.elapsed());
