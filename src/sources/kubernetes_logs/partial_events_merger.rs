@@ -171,19 +171,11 @@ impl PartialEventMergeState {
     ) {
         let now = Instant::now();
 
-        // Collect the expired keys first: buckets cannot be removed while iterating, and
-        // the set of expired buckets is small.
-        let expired: Vec<Bytes> = self
+        for (_, bucket) in self
             .buckets
-            .iter()
-            .filter(|(_, bucket)| now >= bucket.expiration)
-            .map(|(file, _)| file.clone())
-            .collect();
-
-        for file in expired {
-            if let Some(bucket) = self.buckets.remove(&file)
-                && Self::should_emit(&bucket)
-            {
+            .extract_if(|_, bucket| now >= bucket.expiration)
+        {
+            if Self::should_emit(&bucket) {
                 emitter.emit(bucket.into_event(message_path));
             }
         }
