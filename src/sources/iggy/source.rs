@@ -349,6 +349,14 @@ impl PartitionSlot {
             stream,
         )
     }
+
+    /// Close the acknowledgement stream so the drain sees its already-queued
+    /// entries and then its end. Nothing is polled after the drain, so the
+    /// replacement finalizer's stream is discarded unregistered; a slot that
+    /// still serves messages must be reset through `PartitionSlots::reset`.
+    fn close_acks(&mut self) {
+        self.finalizer = OrderedFinalizer::<u64>::new(None).0;
+    }
 }
 
 /// Whether the acknowledgement backlog reached the cap that pauses polling.
@@ -1258,12 +1266,11 @@ pub(crate) async fn run_iggy_source(
     if acknowledgements {
         // Wait up to `drain_timeout_secs` for in-flight events to settle
         // before the final commit, so delivered messages are not replayed on
-        // restart. Clearing the finalizers closes each per-partition sender;
-        // their streams end once pending entries finalize. Clear rather than
-        // drop so the final commit still sees the partitions.
+        // restart. Closing the finalizers ends each per-partition stream once
+        // its pending entries finalize; the slots stay so the final commit
+        // still sees the partitions.
         for slot in partitions.slots.values_mut() {
-            let (finalizer, _) = OrderedFinalizer::<u64>::new(None);
-            slot.finalizer = finalizer;
+            slot.close_acks();
         }
         let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
         tokio::pin!(drain_deadline);
