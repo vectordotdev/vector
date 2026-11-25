@@ -3,7 +3,7 @@ use crate::sinks::{
         GreptimeDBLogsHttpRequestBuilder, KeyPartitioner, PartitionKey,
     },
     prelude::*,
-    util::http::HttpRequest,
+    util::{http::HttpRequest, partitioner::report_partition_error},
 };
 use vector_lib::internal_event::emit;
 
@@ -56,7 +56,7 @@ where
                 batcher_settings.timeout,
                 |_| batcher_settings.as_byte_size_config(),
             )
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

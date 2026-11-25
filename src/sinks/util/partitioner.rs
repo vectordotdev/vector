@@ -1,3 +1,6 @@
+use std::future;
+
+use snafu::{IntoError, Snafu};
 use vector_lib::{
     event::Event,
     internal_event::emit,
@@ -10,15 +13,54 @@ use crate::{
     template::{ConfinedTemplate, TemplateRenderingError as TplRenderError},
 };
 
+/// A required routing field failed to render, so the event cannot be partitioned.
+///
+/// Partition helpers return this without emitting anything. The caller that consumes the
+/// finalized partition result reports it exactly once, typically via
+/// [`report_partition_error`].
+#[derive(Debug, Snafu)]
+#[snafu(display("Failed to render `{field}` template: {source}"))]
+pub struct PartitionError {
+    field: &'static str,
+    source: TplRenderError,
+}
+
+impl PartitionError {
+    /// Wraps the render `error` of the routing template configured as `field`.
+    pub(crate) fn new(field: &'static str, error: TplRenderError) -> Self {
+        PartitionSnafu { field }.into_error(error)
+    }
+}
+
+/// Reports a partition failure and drops the event; passes successful values through.
+///
+/// Emits [`TemplateRenderingError`] with the failing field and `drop_event: true` for
+/// `Err`, yielding `None`. Returns a ready future so it can be passed directly to
+/// `StreamExt::filter_map`.
+pub fn report_partition_error<T>(result: Result<T, PartitionError>) -> future::Ready<Option<T>> {
+    future::ready(match result {
+        Ok(value) => Some(value),
+        Err(PartitionError { field, source }) => {
+            emit(TemplateRenderingError {
+                error: source,
+                field: Some(field),
+                drop_event: true,
+            });
+            None
+        }
+    })
+}
+
 /// Render `template` against `event` and apply standard key-prefix error handling.
 ///
 /// Routes to the rendered key or the configured fallback. Confinement violations are
-/// intentional discards. A render failure without a fallback is a permanent failure.
+/// intentional discards. A render failure without a fallback is a permanent failure that
+/// is returned unreported; see [`report_partition_error`].
 pub(crate) fn render_key_with_fallback(
     template: &ConfinedTemplate,
     event: &Event,
     dead_letter: Option<&str>,
-) -> Result<PartitionDecision<String>, PreparationError<TplRenderError>> {
+) -> Result<PartitionDecision<String>, PreparationError<PartitionError>> {
     match template.render_string(event) {
         Ok(key) => Ok(PartitionDecision::Route(key)),
         Err(TplRenderError::Confined {
@@ -48,30 +90,28 @@ pub(crate) fn render_key_with_fallback(
     }
 }
 
-/// Reports a required routing field's render error. Confinement failures discard the event.
+/// Converts a required routing field's render result into a partition decision.
+///
+/// Confinement failures are reported here and discard the event. Other render failures
+/// are returned as permanent [`PartitionError`]s without being reported; the caller
+/// reports them, typically via [`report_partition_error`].
 pub(crate) fn render_partition_value<T>(
     result: Result<T, TplRenderError>,
     field: &'static str,
-) -> Result<PartitionDecision<T>, PreparationError<TplRenderError>> {
+) -> Result<PartitionDecision<T>, PreparationError<PartitionError>> {
     match result {
         Ok(value) => Ok(PartitionDecision::Route(value)),
-        Err(error) => {
-            if matches!(error, TplRenderError::Confined { .. }) {
-                emit(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-                Ok(PartitionDecision::Discard)
-            } else {
-                emit(TemplateRenderingError {
-                    error: error.clone(),
-                    field: Some(field),
-                    drop_event: true,
-                });
-                Err(PreparationError::Permanent(error))
-            }
+        Err(error @ TplRenderError::Confined { .. }) => {
+            emit(TemplateRenderingError {
+                error,
+                field: Some(field),
+                drop_event: true,
+            });
+            Ok(PartitionDecision::Discard)
         }
+        Err(error) => Err(PreparationError::Permanent(PartitionError::new(
+            field, error,
+        ))),
     }
 }
 
@@ -101,7 +141,7 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = String;
-    type Error = TplRenderError;
+    type Error = PartitionError;
 
     fn partition(
         &self,

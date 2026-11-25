@@ -4,6 +4,7 @@ use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
 
 use super::partitioner::S3PartitionKey;
 use crate::sinks::prelude::*;
+use crate::sinks::util::partitioner::{PartitionError, report_partition_error};
 
 pub struct S3Sink<Svc, RB, P> {
     service: Svc,
@@ -37,7 +38,7 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = S3PartitionKey> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = S3PartitionKey, Error = PartitionError> + Unpin + Send,
     P::Key: Eq + Hash + Clone,
     P::Item: ByteSizeOf,
 {
@@ -50,7 +51,7 @@ where
             .batched_partitioned(partitioner, settings.timeout, |_| {
                 settings.as_byte_size_config()
             })
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -77,7 +78,7 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = S3PartitionKey> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = S3PartitionKey, Error = PartitionError> + Unpin + Send,
     P::Key: Eq + Hash + Clone,
     P::Item: ByteSizeOf,
 {

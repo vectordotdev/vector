@@ -3,7 +3,9 @@ use crate::sinks::{
 };
 use vector_lib::internal_event::emit;
 
-use crate::sinks::util::partitioner::render_partition_value;
+use crate::sinks::util::partitioner::{
+    PartitionError, render_partition_value, report_partition_error,
+};
 
 pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
@@ -43,7 +45,7 @@ where
             .batched_partitioned(key_partitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -101,7 +103,7 @@ impl DorisKeyPartitioner {
 impl Partitioner for DorisKeyPartitioner {
     type Item = Event;
     type Key = DorisPartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,

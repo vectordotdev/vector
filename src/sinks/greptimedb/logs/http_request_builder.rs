@@ -21,7 +21,7 @@ use crate::{
         util::{
             HttpEndpoint,
             http::{HttpRequest, HttpServiceRequestBuilder},
-            partitioner::render_partition_value,
+            partitioner::{PartitionError, render_partition_value},
         },
     },
 };
@@ -62,7 +62,7 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = PartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,

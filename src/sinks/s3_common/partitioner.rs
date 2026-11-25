@@ -5,7 +5,7 @@ use vector_lib::{
 };
 
 use crate::{
-    sinks::util::partitioner::{render_key_with_fallback, render_partition_value},
+    sinks::util::partitioner::{PartitionError, render_key_with_fallback, render_partition_value},
     template::ConfinedTemplate,
 };
 
@@ -44,7 +44,7 @@ impl S3KeyPartitioner {
 impl Partitioner for S3KeyPartitioner {
     type Item = Event;
     type Key = S3PartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,

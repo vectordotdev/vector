@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 use vector_lib::internal_event::emit;
 
-use crate::sinks::util::partitioner::render_partition_value;
+use crate::sinks::util::partitioner::{
+    PartitionError, render_partition_value, report_partition_error,
+};
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
@@ -52,7 +54,7 @@ where
                 self.batch_settings.timeout,
                 |_| self.batch_settings.as_item_size_config(batch_sizer.clone()),
             )
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             // Build requests with default concurrency limit.
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -112,7 +114,7 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = PartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,
