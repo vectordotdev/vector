@@ -858,14 +858,19 @@ pub(crate) async fn run_iggy_source(
         .factor(250)
         .max_delay(Duration::from_secs(30));
     let (keep_alive_client, mut consumer) = loop {
-        match config.connect_and_init(acknowledgements).await {
+        let initialized = tokio::select! {
+            _ = &mut shutdown => {
+                info!("Shutdown signal received while initializing the Iggy consumer.");
+                return Ok(());
+            }
+            result = config.connect_and_init(acknowledgements) => result,
+        };
+        match initialized {
             Ok(initialized) => break initialized,
             Err(error) => {
-                emit(IggyConsumerInitError);
-                warn!(
-                    message = "Failed to initialize the Iggy consumer; retrying.",
-                    %error,
-                );
+                emit(IggyConsumerInitError {
+                    error: error.to_string(),
+                });
                 let delay = init_backoff.next().unwrap_or(Duration::from_secs(30));
                 tokio::select! {
                     _ = &mut shutdown => {

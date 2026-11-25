@@ -252,10 +252,19 @@ impl InternalEvent for IggyOffsetUpdateError {
 /// Emitted when the consumer cannot be initialized. The source retries with
 /// backoff, so a persistent failure shows up here and nowhere else.
 #[derive(Debug, NamedInternalEvent)]
-pub(crate) struct IggyConsumerInitError;
+pub(crate) struct IggyConsumerInitError {
+    pub error: String,
+}
 
 impl InternalEvent for IggyConsumerInitError {
     fn emit(self) {
+        error!(
+            message = "Failed to initialize the Iggy consumer.",
+            error = %self.error,
+            error_code = "consumer_init_failed",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+        );
         counter!(
             CounterName::ComponentErrorsTotal,
             "error_code" => "consumer_init_failed",
