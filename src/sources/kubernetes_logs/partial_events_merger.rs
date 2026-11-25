@@ -208,13 +208,12 @@ impl Bucket {
         if let Some(message) = self.message.take() {
             return Some(message);
         }
-        let value = self.event.remove(message_path)?;
-        if let Some(bytes) = value.as_bytes() {
-            Some(BytesMut::from(bytes.as_ref()))
-        } else {
-            self.event.insert(message_path, value);
-            None
-        }
+        // Replace the field in place: removing it would shift the following elements when
+        // the message path indexes into an array. `into_event` overwrites the placeholder.
+        let value = self.event.get_mut(message_path)?;
+        let message = BytesMut::from(value.as_bytes()?.as_ref());
+        *value = Value::Null;
+        Some(message)
     }
 
     /// Materialize the accumulated message into the event.
@@ -325,6 +324,37 @@ mod test {
     use vrl::{event_path, metadata_path, value};
 
     use super::*;
+
+    fn bucket(event: LogEvent) -> Bucket {
+        Bucket {
+            event,
+            message: None,
+            expiration: Instant::now(),
+            exceeds_max_merged_line_limit: false,
+            truncated: false,
+        }
+    }
+
+    #[test]
+    fn merging_into_array_element_preserves_siblings() {
+        let path = OwnedTargetPath::event(owned_value_path!("payload", 0));
+
+        let mut merged = bucket(LogEvent::from(value!({"payload": ["hello ", "keep"]})));
+        let mut message = merged.take_message(&path).unwrap();
+        message.extend_from_slice(b"world");
+        merged.message = Some(message);
+        assert_eq!(
+            merged.into_event(&path).value(),
+            &value!({"payload": ["hello world", "keep"]})
+        );
+
+        let mut non_bytes = bucket(LogEvent::from(value!({"payload": [1, "keep"]})));
+        assert!(non_bytes.take_message(&path).is_none());
+        assert_eq!(
+            non_bytes.into_event(&path).value(),
+            &value!({"payload": [1, "keep"]})
+        );
+    }
 
     #[tokio::test]
     async fn merge_single_event_legacy() {
